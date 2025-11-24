@@ -599,6 +599,574 @@ export const creditUtilizationData = [
   }
 ];
 
+export const onboardedCorporates = [
+  {
+    id: 1,
+    company: "TechNova Pvt Ltd",
+    industry: "IT",
+    contact: "contact@technova.com",
+    status: "Active"
+  },
+  {
+    id: 2,
+    company: "Finexa Solutions",
+    industry: "Finance",
+    contact: "support@finexa.com",
+    status: "Active"
+  },
+  {
+    id: 3,
+    company: "HealthCare Prime",
+    industry: "Healthcare",
+    contact: "info@hcp.com",
+    status: "Inactive"
+  },
+  {
+    id: 4,
+    company: "EduGrowth India",
+    industry: "Education",
+    contact: "hello@edugrowth.in",
+    status: "Active"
+  }
+];
+
+export const bookingsSummary = [
+  {
+    id: 101,
+    employee: "Ravi Kumar",
+    department: "Sales",
+    type: "Flight",
+    date: "2024-01-12",
+    destination: "Mumbai",
+    status: "Completed",
+  },
+  {
+    id: 102,
+    employee: "Nina Patel",
+    department: "HR",
+    type: "Hotel",
+    date: "2024-02-15",
+    destination: "Bangalore",
+    status: "Pending",
+  },
+  {
+    id: 103,
+    employee: "Arjun Singh",
+    department: "Finance",
+    type: "Flight",
+    date: "2024-03-03",
+    destination: "Delhi",
+    status: "Completed",
+  },
+  {
+    id: 104,
+    employee: "Priya Sharma",
+    department: "Marketing",
+    type: "Hotel",
+    date: "2024-04-10",
+    destination: "Goa",
+    status: "Completed",
+  },
+  {
+    id: 105,
+    employee: "Rohit Gupta",
+    department: "Support",
+    type: "Flight",
+    date: "2024-05-22",
+    destination: "Pune",
+    status: "Pending",
+  }
+];
+
+export const corporateRevenueData = [
+  {
+    id: 1,
+    date: "2024-01-10",
+    company: "TechNova Pvt Ltd",
+    type: "Flight",
+    employee: "Ravi Kumar",
+    amount: 8500
+  },
+  {
+    id: 2,
+    date: "2024-01-12",
+    company: "Finexa Solutions",
+    type: "Hotel",
+    employee: "Nina Patel",
+    amount: 12000
+  },
+  {
+    id: 3,
+    date: "2024-01-20",
+    company: "HealthCare Prime",
+    type: "Flight",
+    employee: "Arjun Singh",
+    amount: 9200
+  },
+  {
+    id: 4,
+    date: "2024-02-04",
+    company: "TechNova Pvt Ltd",
+    type: "Hotel",
+    employee: "Priya Sharma",
+    amount: 7800
+  },
+  {
+    id: 5,
+    date: "2024-02-15",
+    company: "EduGrowth India",
+    type: "Flight",
+    employee: "Harsh Gupta",
+    amount: 11300
+  }
+];
+
+export const creditAlertsData = [
+  {
+    id: 1,
+    date: "2024-01-12",
+    company: "TechNova Pvt Ltd",
+    priority: "High",
+    message: "Credit limit exceeded. Immediate recharge required."
+  },
+  {
+    id: 2,
+    date: "2024-01-15",
+    company: "Finexa Solutions",
+    priority: "Medium",
+    message: "Credit usage at 80%. Monitor spending closely."
+  },
+  {
+    id: 3,
+    date: "2024-01-20",
+    company: "EduGrowth India",
+    priority: "Low",
+    message: "Upcoming invoice due in 10 days."
+  },
+  {
+    id: 4,
+    date: "2024-02-02",
+    company: "HealthCare Prime",
+    priority: "High",
+    message: "Postpaid dues pending beyond 15 days."
+  },
+  {
+    id: 5,
+    date: "2024-02-18",
+    company: "TechNova Pvt Ltd",
+    priority: "Medium",
+    message: "Wallet auto-recharge failed. Retry recommended."
+  }
+];
+
+export const walletRechargeLogs = [
+  {
+    id: 1,
+    date: "2024-01-12",
+    company: "TechNova Pvt Ltd",
+    amount: 50000,
+    method: "Bank Transfer",
+    status: "Success"
+  },
+  {
+    id: 2,
+    date: "2024-01-20",
+    company: "Finexa Solutions",
+    amount: 25000,
+    method: "UPI",
+    status: "Success"
+  },
+  {
+    id: 3,
+    date: "2024-01-22",
+    company: "EduGrowth India",
+    amount: 35000,
+    method: "Card",
+    status: "Failed"
+  },
+  {
+    id: 4,
+    date: "2024-02-05",
+    company: "HealthCare Prime",
+    amount: 15000,
+    method: "NEFT",
+    status: "Pending"
+  },
+  {
+    id: 5,
+    date: "2024-02-12",
+    company: "TechNova Pvt Ltd",
+    amount: 60000,
+    method: "Bank Transfer",
+    status: "Success"
+  }
+];
+
+export const corporateAccessControlData = [
+  {
+    id: 1,
+    company: "TechNova Pvt Ltd",
+    user: "Ravi Kumar",
+    role: "Manager",
+    status: "Active"
+  },
+  {
+    id: 2,
+    company: "Finexa Solutions",
+    user: "Nina Patel",
+    role: "Admin",
+    status: "Inactive"
+  },
+  {
+    id: 3,
+    company: "EduGrowth India",
+    user: "Priya Sharma",
+    role: "Employee",
+    status: "Active"
+  },
+  {
+    id: 4,
+    company: "HealthCare Prime",
+    user: "Arjun Singh",
+    role: "Manager",
+    status: "Inactive"
+  },
+  {
+    id: 5,
+    company: "TechNova Pvt Ltd",
+    user: "Harsh Gupta",
+    role: "Employee",
+    status: "Active"
+  }
+];
+
+export const pendingAmendmentsData = [
+  {
+    id: 101,
+    company: "TechNova Pvt Ltd",
+    employee: "Ravi Kumar",
+    type: "Flight",
+    details: "Change in travel date (Feb 15 → Feb 18)",
+    status: "Pending"
+  },
+  {
+    id: 102,
+    company: "Finexa Solutions",
+    employee: "Nina Patel",
+    type: "Hotel",
+    details: "Room upgrade requested (Standard → Deluxe)",
+    status: "Pending"
+  },
+  {
+    id: 103,
+    company: "EduGrowth India",
+    employee: "Priya Sharma",
+    type: "Flight",
+    details: "Change destination (Mumbai → Pune)",
+    status: "Approved"
+  },
+  {
+    id: 104,
+    company: "HealthCare Prime",
+    employee: "Arjun Singh",
+    type: "Hotel",
+    details: "Extend stay by 2 nights",
+    status: "Rejected"
+  }
+];
+
+export const commissionSettingsData = [
+  {
+    id: 1,
+    company: "TechNova Pvt Ltd",
+    type: "Flight",
+    commission: 5,
+    status: "Active",
+  },
+  {
+    id: 2,
+    company: "Finexa Solutions",
+    type: "Hotel",
+    commission: 8,
+    status: "Active",
+  },
+  {
+    id: 3,
+    company: "EduGrowth India",
+    type: "Flight",
+    commission: 4,
+    status: "Inactive",
+  },
+  {
+    id: 4,
+    company: "HealthCare Prime",
+    type: "Hotel",
+    commission: 10,
+    status: "Active",
+  }
+];
+
+export const apiConfigurationsData = [
+  {
+    id: 1,
+    name: "Airswift Flight API",
+    type: "Flight",
+    apiKey: "FLIGHT123456TOKEN",
+    status: "Active"
+  },
+  {
+    id: 2,
+    name: "HotelEase API",
+    type: "Hotel",
+    apiKey: "HOTEL987654API",
+    status: "Inactive"
+  },
+  {
+    id: 3,
+    name: "Finance Credit API",
+    type: "Finance",
+    apiKey: "FINPAY445566KEY",
+    status: "Active"
+  }
+];
+
+export const systemLogsData = [
+  {
+    id: 1,
+    date: "2024-02-10",
+    user: "Admin",
+    type: "Info",
+    message: "User logged in",
+    isToday: true,
+  },
+  {
+    id: 2,
+    date: "2024-02-10",
+    user: "Ravi Kumar",
+    type: "Warning",
+    message: "API rate limit approaching",
+    isToday: true,
+  },
+  {
+    id: 3,
+    date: "2024-02-09",
+    user: "System",
+    type: "Error",
+    message: "Payment gateway timeout",
+    isToday: false,
+  },
+  {
+    id: 4,
+    date: "2024-02-08",
+    user: "Nina Patel",
+    type: "Success",
+    message: "Wallet recharge successful",
+    isToday: false,
+  },
+  {
+    id: 5,
+    date: "2024-02-05",
+    user: "System",
+    type: "Info",
+    message: "Daily summary generated",
+    isToday: false,
+  },
+];
+
+export const employeeBookings = [
+  {
+    id: 1,
+    type: "Flight",
+    destination: "Delhi",
+    startDate: "2024-02-12",
+    endDate: "2024-02-15",
+    cost: 8500,
+    status: "Confirmed",
+  },
+  {
+    id: 2,
+    type: "Hotel",
+    destination: "Mumbai",
+    startDate: "2024-03-05",
+    endDate: "2024-03-07",
+    cost: 5600,
+    status: "Pending",
+  },
+  {
+    id: 3,
+    type: "Flight",
+    destination: "Bangalore",
+    startDate: "2024-01-20",
+    endDate: "2024-01-22",
+    cost: 9200,
+    status: "Cancelled",
+  },
+];
+
+export const myUpcomingTrips = [
+  {
+    id: 1,
+    type: "Flight",
+    destination: "Goa",
+    startDate: "2024-03-10",
+    endDate: "2024-03-15",
+    status: "Confirmed",
+  },
+  {
+    id: 2,
+    type: "Hotel",
+    destination: "Hyderabad",
+    startDate: "2024-04-05",
+    endDate: "2024-04-08",
+    status: "Pending",
+  },
+  {
+    id: 3,
+    type: "Flight",
+    destination: "Chennai",
+    startDate: "2024-05-12",
+    endDate: "2024-05-14",
+    status: "Confirmed",
+  },
+];
+
+export const myPastTrips = [
+  {
+    id: 1,
+    type: "Flight",
+    destination: "Kolkata",
+    startDate: "2023-12-10",
+    endDate: "2023-12-12",
+    cost: 9800,
+    rating: 4,
+    notes: "Smooth journey. Flights on time.",
+  },
+  {
+    id: 2,
+    type: "Hotel",
+    destination: "Pune",
+    startDate: "2023-11-02",
+    endDate: "2023-11-05",
+    cost: 7600,
+    rating: 5,
+    notes: "Comfortable stay. Excellent hotel service.",
+  },
+  {
+    id: 3,
+    type: "Flight",
+    destination: "Jaipur",
+    startDate: "2023-09-14",
+    endDate: "2023-09-16",
+    cost: 8800,
+    rating: 3,
+    notes: "Return flight was delayed.",
+  },
+];
+
+export const myPendingApprovals = [
+  {
+    id: 1,
+    type: "Flight",
+    destination: "Delhi",
+    startDate: "2024-03-18",
+    endDate: "2024-03-20",
+    reason: "Business client meeting",
+  },
+  {
+    id: 2,
+    type: "Hotel",
+    destination: "Chandigarh",
+    startDate: "2024-04-05",
+    endDate: "2024-04-08",
+    reason: "Project training session",
+  },
+  {
+    id: 3,
+    type: "Flight",
+    destination: "Ahmedabad",
+    startDate: "2024-05-10",
+    endDate: "2024-05-12",
+    reason: "Conference event",
+  },
+];
+
+export const myRejectedRequests = [
+  {
+    id: 1,
+    type: "Flight",
+    destination: "Delhi",
+    startDate: "2024-01-15",
+    endDate: "2024-01-16",
+    reason: "Attending marketing workshop",
+    rejectedBy: "Manager - A. Sharma",
+    remarks: "Budget exceeded for this quarter",
+  },
+  {
+    id: 2,
+    type: "Hotel",
+    destination: "Kolkata",
+    startDate: "2024-02-10",
+    endDate: "2024-02-12",
+    reason: "Client onboarding meeting",
+    rejectedBy: "Admin - R. Verma",
+    remarks: "Hotel not approved for corporate travel",
+  },
+  {
+    id: 3,
+    type: "Flight",
+    destination: "Bangalore",
+    startDate: "2024-03-05",
+    endDate: "2024-03-07",
+    reason: "Tech summit visit",
+    rejectedBy: "Manager - S. Patel",
+    remarks: "Travel request submitted too late",
+  },
+];
+
+export const employeeProfile = {
+  name: "Ayush Kumar",
+  email: "ayush.kumar@company.com",
+  phone: "+91 9876543210",
+  designation: "Software Engineer",
+  employeeId: "EMP-1024",
+  department: "Technology",
+  location: "Bangalore, India",
+  image:
+    "https://i.pravatar.cc/300?img=12",
+};
+
+export const travelDocuments = [
+  {
+    id: 1,
+    name: "Passport",
+    number: "M4589123",
+    expiry: "2025-11-18",
+    fileName: "passport_ayush.pdf",
+  },
+  {
+    id: 2,
+    name: "Visa",
+    number: "VISA90214IN",
+    expiry: "2024-03-10",
+    fileName: "usa_visa.pdf",
+  },
+  {
+    id: 3,
+    name: "PAN Card",
+    number: "ABCDE1234F",
+    expiry: "N/A",
+    fileName: "pan_card.jpg",
+  },
+  {
+    id: 4,
+    name: "Company ID Card",
+    number: "ID-990122",
+    expiry: "2026-01-10",
+    fileName: "id_card.png",
+  },
+];
+
+
 export const wallet = { prepaid: 155000, currency: 'INR' };
 
 export const credit = { limit: 500000, used: 126000 };
