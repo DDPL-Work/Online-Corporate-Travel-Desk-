@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { FaUserCircle, FaBars, FaChevronDown, FaBell } from "react-icons/fa";
 
-export default function Header({ toggleSidebar, sidebarOpen }) {
+export default function Header({ toggleSidebar, sidebarOpen, activeUserType }) {
   const [open, setOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const dropdownRef = useRef();
@@ -21,6 +21,32 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
     return () => document.removeEventListener("click", closeDropdowns);
   }, []);
 
+  const getDashboardTitle = () => {
+    switch (activeUserType) {
+      case "travelAdmin":
+        return "Travel Admin Dashboard";
+      case "travelCompany":
+        return "Travel Company Dashboard";
+      case "employee":
+        return "Employee Dashboard";
+      default:
+        return "Travel Admin Dashboard";
+    }
+  };
+
+  const getUserRole = () => {
+    switch (activeUserType) {
+      case "travelAdmin":
+        return "Admin";
+      case "travelCompany":
+        return "Company Manager";
+      case "employee":
+        return "Employee";
+      default:
+        return "Admin";
+    }
+  };
+
   return (
     <header className="h-16 bg-white shadow flex items-center justify-between px-4 md:px-6 sticky top-0 z-40">
       {/* Left Section - Menu Toggle & Title */}
@@ -36,7 +62,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
 
         {/* Desktop Title */}
         <h1 className="text-lg font-semibold text-[#0A4D68] hidden sm:block">
-          Travel Admin Dashboard
+          {getDashboardTitle()}
         </h1>
         
         {/* Mobile Title - Shows when sidebar is closed */}
@@ -94,7 +120,9 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
             aria-label="User menu"
           >
             <FaUserCircle className="text-2xl sm:text-3xl text-[#0A4D68]" />
-            <span className="hidden sm:block font-medium text-sm md:text-base">Admin</span>
+            <span className="hidden sm:block font-medium text-sm md:text-base">
+              {getUserRole()}
+            </span>
             <FaChevronDown
               className={`hidden sm:block transition-transform ${
                 open ? "rotate-180" : "rotate-0"
@@ -105,8 +133,12 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
           {open && (
             <div className="absolute right-0 w-48 bg-white shadow-lg border rounded mt-2 z-50 py-1">
               <div className="px-4 py-2 border-b">
-                <p className="font-medium text-sm">Admin User</p>
-                <p className="text-xs text-gray-500">admin@example.com</p>
+                <p className="font-medium text-sm">{getUserRole()} User</p>
+                <p className="text-xs text-gray-500">
+                  {activeUserType === "travelAdmin" && "admin@example.com"}
+                  {activeUserType === "travelCompany" && "manager@company.com"}
+                  {activeUserType === "employee" && "employee@company.com"}
+                </p>
               </div>
               <button className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100">
                 Profile Settings
