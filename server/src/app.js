@@ -1,166 +1,263 @@
-require('dotenv').config();
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
-const compression = require('compression');
-const morgan = require('morgan');
-const cookieParser = require('cookie-parser');
-const session = require('express-session');
-const passport = require('passport');
+/************************************
+ * LOAD ENV EARLY
+ ************************************/
+require("dotenv").config();
 
-const config = require('./config');
-const routes = require('./routes');
-const errorMiddleware = require('./middlewares/error.middleware');
-const rateLimitMiddleware = require('./middlewares/rateLimit.middleware');
-const logger = require('./utils/logger');
-const cronJobs = require('./jobs');
+/************************************
+ * IMPORTS
+ ************************************/
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const helmet = require("helmet");
+const compression = require("compression");
+const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
+const session = require("express-session");
+const passport = require("passport");
+
+const config = require("./config");
+const routes = require("./routes/index.js");
+const { errorMiddleware } = require("./middleware/error.middleware.js");
+const rateLimitMiddleware = require("./middleware/rateLimit.middleware.js");
+const logger = require("./utils/logger.js");
+const cronJobs = require("./jobs");
+const { connectDB } = require("./config/database.js");
+const seedSuperAdmin = require("./config/seedSuperAdmin.js");
 
 const app = express();
 
-// Database Connection
-mongoose.connect(config.database.uri, config.database.options)
-  .then(() => {
-    logger.info('✓ MongoDB Connected Successfully');
+/************************************
+ *  CONNECT TO DATABASE
+ ************************************/
+if (!config.database.uri) {
+  logger.error("❌ MongoDB URI missing from config");
+  process.exit(1);
+}
+
+connectDB(config.database.uri, config.database.options)
+  .then(async () => {
+    logger.info("✅ MongoDB Ready");
+    await seedSuperAdmin();
   })
-  .catch(err => {
-    logger.error('✗ MongoDB Connection Error:', err);
+  .catch((err) => {
+    logger.error("❌ Fatal MongoDB Error:", err);
     process.exit(1);
   });
 
-// Trust proxy for rate limiting behind reverse proxy
-app.set('trust proxy', 1);
+/************************************
+ * TRUST PROXY
+ ************************************/
+app.set("trust proxy", 1);
 
-// Security Middlewares
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", 'data:', 'https:']
-    }
-  },
-  hsts: {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true
-  }
-}));
+/************************************
+ * SECURITY: HELMET
+ ************************************/
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
+    },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+  })
+);
 
-app.use(cors({
-  origin: [config.frontend.url, config.frontend.adminUrl],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+/************************************
+ * SECURITY: CORS
+ ************************************/
+app.use(
+  cors({
+    origin: [config.frontend.url, config.frontend.adminUrl],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-app.use(mongoSanitize());
-app.use(compression());
-
-// Body Parsers
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+/************************************
+ * BODY PARSERS (Must be BEFORE sanitizer)
+ ************************************/
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
-// Session Configuration
-app.use(session({
-  secret: config.session.secret,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: config.env === 'production',
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+/************************************
+ * CUSTOM SAFE SANITIZER
+ * (Does NOT reassign req.query, so NO ERRORS)
+ ************************************/
+function safeSanitize(req, res, next) {
+  const sanitize = (obj) => {
+    if (!obj || typeof obj !== "object") return;
+
+    for (const key in obj) {
+      // Remove dangerous keys
+      if (key.startsWith("$")) delete obj[key];
+
+      // Replace key dots (Mongo path injection)
+      if (key.includes(".")) {
+        const newKey = key.replace(/\./g, "_");
+        obj[newKey] = obj[key];
+        delete obj[key];
+      }
+
+      if (typeof obj[key] === "object") sanitize(obj[key]);
+    }
+  };
+
+  try {
+    sanitize(req.body);
+    sanitize(req.params);
+    sanitize(req.query); // SAFE - only mutates
+  } catch (err) {
+    console.warn("Sanitize error:", err.message);
   }
-}));
 
-// Passport Initialization
-app.use(passport.initialize());
-app.use(passport.session());
-require('./config/sso.config');
-
-// Logging
-if (config.env === 'development') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined', {
-    stream: { write: message => logger.info(message.trim()) }
-  }));
+  next();
 }
 
-// Rate Limiting
-app.use('/api', rateLimitMiddleware);
+app.use(safeSanitize);
 
-// Static Files
-app.use('/uploads', express.static('uploads'));
+/************************************
+ * COMPRESSION
+ ************************************/
+app.use(compression());
 
-// API Routes
+/************************************
+ * SESSION
+ ************************************/
+app.use(
+  session({
+    secret: config.session.secret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: config.env === "production",
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+);
+
+/************************************
+ * PASSPORT
+ ************************************/
+app.use(passport.initialize());
+app.use(passport.session());
+
+/************************************
+ * LOGGING
+ ************************************/
+if (config.env === "development") {
+  app.use(morgan("dev"));
+} else {
+  app.use(
+    morgan("combined", {
+      stream: { write: (message) => logger.info(message.trim()) },
+    })
+  );
+}
+
+/************************************
+ * RATE LIMITING
+ ************************************/
+app.use("/api", rateLimitMiddleware.apiLimiter);
+
+/************************************
+ * STATIC FILES
+ ************************************/
+app.use("/uploads", express.static("uploads"));
+
+/************************************
+ * API ROUTES
+ ************************************/
 app.use(`/api/${config.api.version}`, routes);
 
-// Health Check
-app.get('/health', (req, res) => {
+/************************************
+ * HEALTH CHECK
+ ************************************/
+app.get("/health", (req, res) => {
   res.status(200).json({
-    status: 'OK',
+    status: "OK",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: config.env,
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    mongodb:
+      mongoose.connection.readyState === 1 ? "connected" : "disconnected",
   });
 });
 
-// Root Route
-app.get('/', (req, res) => {
+/************************************
+ * ROOT ROUTE
+ ************************************/
+app.get("/", (req, res) => {
   res.json({
-    message: 'Corporate Travel Desk API',
+    message: "Corporate Travel Desk API",
     version: config.api.version,
-    documentation: '/api-docs'
+    documentation: "/api-docs",
   });
 });
 
-// 404 Handler
+/************************************
+ * 404 HANDLER
+ ************************************/
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Route not found',
-    path: req.originalUrl
+    message: "Route not found",
+    path: req.originalUrl,
   });
 });
 
-// Error Handling Middleware (must be last)
+/************************************
+ * ERROR HANDLER (LAST)
+ ************************************/
 app.use(errorMiddleware);
 
-// Start Cron Jobs
+/************************************
+ * START CRON JOBS
+ ************************************/
 if (config.cronJobs.enabled) {
   cronJobs.start();
-  logger.info('✓ Cron Jobs Started');
+  logger.info("✓ Cron Jobs Started");
 }
 
-// Graceful Shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM signal received: closing HTTP server');
+/************************************
+ * GRACEFUL SHUTDOWN
+ ************************************/
+process.on("SIGTERM", () => {
+  logger.info("SIGTERM signal received: closing server");
   mongoose.connection.close(false, () => {
-    logger.info('MongoDB connection closed');
+    logger.info("MongoDB connection closed");
     process.exit(0);
   });
 });
 
-process.on('unhandledRejection', (err) => {
-  logger.error('Unhandled Rejection:', err);
+process.on("unhandledRejection", (err) => {
+  logger.error("Unhandled Rejection:", err);
   process.exit(1);
 });
 
+/************************************
+ * START SERVER
+ ************************************/
 const PORT = config.server.port;
 
-const server = app.listen(PORT, () => {
+app.listen(PORT, () => {
   logger.info(`
-    ╔══════════════════════════════════════════════╗
-    ║  🚀 Server running successfully              ║
-    ║  📍 Mode: ${config.env.padEnd(32)} ║
-    ║  🌐 Port: ${PORT.toString().padEnd(32)} ║
-    ║  📅 Started: ${new Date().toLocaleString().padEnd(26)} ║
-    ╚══════════════════════════════════════════════╝
+    🚀 Server running successfully
+    📍 Mode: ${config.env}
+    🔎 Version: ${config.api.version}
+    🌐 Port: ${PORT}
+    📅 Started: ${new Date().toLocaleString()}
   `);
 });
 
