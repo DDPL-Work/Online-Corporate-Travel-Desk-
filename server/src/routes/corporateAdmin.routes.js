@@ -2,16 +2,8 @@ const router = require("express").Router();
 const corpAdminCtrl = require("../controllers/corporateAdmin.controller");
 const auth = require("../middleware/auth.middleware");
 
-// -------------------------
-// PUBLIC ROUTES
-// -------------------------
-router.post("/register", corpAdminCtrl.register);
-router.post("/login", corpAdminCtrl.login);
 
-// -------------------------
-// PROTECTED ROUTES
-// CorporateAdmin Only
-// -------------------------
+
 router.post(
   "/employee/create",
   auth.verifyToken,

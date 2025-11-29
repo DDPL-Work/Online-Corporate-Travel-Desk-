@@ -2,11 +2,7 @@ const router = require("express").Router();
 const superAdminCtrl = require("../controllers/superAdmin.controller.js");
 const auth = require("../middleware/auth.middleware.js");
 
-// -------- PUBLIC --------
-// Login Super Admin
-router.post("/login", superAdminCtrl.loginSuperAdmin);
 
-// -------- PROTECTED --------
 router.get(
   "/profile",
   auth.verifyToken,

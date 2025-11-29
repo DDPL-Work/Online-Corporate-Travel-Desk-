@@ -1,30 +1,45 @@
 const jwt = require("jsonwebtoken");
 
-
-
 // ===========================
 // TOKEN VERIFICATION MIDDLEWARE
 // ===========================
 exports.verifyToken = async (req, res, next) => {
   try {
-    let token = req.headers.authorization;
+    let authHeader = req.headers.authorization;
 
-    if (!token || !token.startsWith("Bearer ")) {
+    // No Authorization header
+    if (!authHeader) {
       return res
         .status(401)
-        .json({ success: false, message: "Unauthorized user" });
+        .json({ success: false, message: "Authorization header missing" });
     }
 
-    token = token.split(" ")[1];
+    // Must begin with "Bearer "
+    if (!authHeader.startsWith("Bearer ")) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid token format" });
+    }
 
+    const token = authHeader.split(" ")[1];
+
+    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.user = decoded; // attach user id + role
+    // Extra validation (Recommended)
+    if (!decoded.id || !decoded.role) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token payload",
+      });
+    }
+
+    req.user = decoded; // { id, role, name, email }
     next();
   } catch (err) {
     return res.status(401).json({
       success: false,
-      message: "Unauthorized user",
+      message: "Unauthorized or expired token",
       error: err.message,
     });
   }

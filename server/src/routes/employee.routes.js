@@ -2,10 +2,6 @@ const router = require("express").Router();
 const employeeCtrl = require("../controllers/employee.controller");
 const auth = require("../middleware/auth.middleware");
 
-// -------------------------
-// PUBLIC ROUTES
-// -------------------------
-router.post("/login", employeeCtrl.loginEmployee);
 
 // -------------------------
 // PROTECTED EMPLOYEE ROUTES
