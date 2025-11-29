@@ -37,8 +37,8 @@ module.exports = {
   },
 
   frontend: {
-    url: process.env.FRONTEND_URL || 'http://localhost:3000',
-    adminUrl: process.env.ADMIN_DASHBOARD_URL || 'http://localhost:3001'
+    url: process.env.FRONTEND_URL || 'http://localhost:5173',
+    adminUrl: process.env.ADMIN_DASHBOARD_URL || 'http://localhost:5173'
   },
 
   upload: {
