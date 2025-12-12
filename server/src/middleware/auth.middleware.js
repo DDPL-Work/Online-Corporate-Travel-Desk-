@@ -1,70 +1,106 @@
-const jwt = require("jsonwebtoken");
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const SuperAdmin = require('../models/SuperAdmin.model'); // ✅ REQUIRED
+const ApiError = require('../utils/ApiError');
 
-// ===========================
-// TOKEN VERIFICATION MIDDLEWARE
-// ===========================
+const SECRET = process.env.JWT_SECRET;
+
 exports.verifyToken = async (req, res, next) => {
   try {
-    let authHeader = req.headers.authorization;
-
-    // No Authorization header
-    if (!authHeader) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Authorization header missing" });
-    }
-
-    // Must begin with "Bearer "
-    if (!authHeader.startsWith("Bearer ")) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid token format" });
-    }
-
-    const token = authHeader.split(" ")[1];
-
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Extra validation (Recommended)
-    if (!decoded.id || !decoded.role) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
-        message: "Invalid token payload",
+        message: 'Unauthorized or missing token'
       });
     }
 
-    req.user = decoded; // { id, role, name, email }
-    next();
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, SECRET);
+
+    if (!decoded?.id || !decoded?.role) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token payload'
+      });
+    }
+
+    let account = null;
+
+    // ✅ ✅ HANDLE SUPER ADMIN SEPARATELY
+    if (decoded.role === 'super-admin') {
+      account = await SuperAdmin.findById(decoded.id);
+
+      if (!account) {
+        return res.status(401).json({
+          success: false,
+          message: 'Super Admin not found'
+        });
+      }
+
+      req.user = {
+        id: account._id.toString(),
+        role: 'super-admin',
+        roles: ['super-admin'],
+        email: account.email,
+        name: account.name
+      };
+
+      return next(); // ✅ IMPORTANT: STOP HERE
+    }
+
+    // ✅ ✅ NORMAL USER FLOW (Travel Admin / Employee)
+    const user = await User.findById(decoded.id);
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found or inactive'
+      });
+    }
+
+    req.user = {
+      id: user._id.toString(),
+      role: user.role,
+      roles: [user.role],
+      corporateId: user.corporateId ? user.corporateId.toString() : null,
+      email: user.email,
+      name: user.name
+    };
+
+    return next();
   } catch (err) {
     return res.status(401).json({
       success: false,
-      message: "Unauthorized or expired token",
-      error: err.message,
+      message: 'Unauthorized or expired token',
+      error: err.message
     });
   }
 };
 
-// ===========================
-// ROLE-BASED ACCESS CONTROL
-// ===========================
-module.exports.authorizeRoles = (...allowedRoles) => {
+// ✅ ROLE AUTHORIZATION (UNCHANGED – VALID)
+exports.authorizeRoles = (...allowedRoles) => {
+  const normalize = r => r?.toString().replace(/[-_ ]/g, '').toLowerCase();
+  const wanted = allowedRoles.map(normalize);
+
   return (req, res, next) => {
-    if (!allowedRoles.includes(req.user.role)) {
+    const role = normalize(req.user?.role);
+    if (!role || !wanted.includes(role)) {
       return res.status(403).json({
         success: false,
-        message: "You are not authorized to perform this action",
+        message: 'You are not authorized to perform this action'
       });
     }
     next();
   };
 };
 
+// ✅ SUPER ADMIN GUARD (UNCHANGED – VALID)
 exports.verifySuperAdmin = (req, res, next) => {
-  if (!req.user || req.user.role !== "super-admin") {
+  if (!req.user || req.user.role !== 'super-admin') {
     return res.status(403).json({
       success: false,
-      message: "Super Admin access only",
+      message: 'Super Admin access only'
     });
   }
   next();

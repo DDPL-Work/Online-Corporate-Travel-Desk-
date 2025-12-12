@@ -1,119 +1,56 @@
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const CorporateAdmin = require("../models/CorporateAdmin");
 const Employee = require("../models/Employee");
-const { ApiError } = require("../middleware/error.middleware");
-
+const User = require("../models/User"); // TravelAdmin
+const { ApiError } = require("../utils/ApiError");
+const mongoose = require("mongoose"); // <- add this
 
 
 
 // =============================
-// CREATE EMPLOYEE (CORPORATE ADMIN ONLY)
+// TOGGLE EMPLOYEE STATUS (Activate/Deactivate)
 // =============================
-exports.createEmployee = async (req, res, next) => {
+exports.toggleEmployeeStatus = async (req, res, next) => {
   try {
-    const { name, email, mobile, department, designation, password } = req.body;
+    let emp = null;
+    const id = req.params.id;
 
-    // Required fields validation
-    if (!name || !email || !mobile || !department || !designation || !password) {
-      return next(new ApiError(400, "All fields are required"));
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      emp = await Employee.findById(id);
     }
+    if (!emp) {
+      emp = await Employee.findOne({ userId: id });
+    }
+    if (!emp) return next(new ApiError(404, 'Employee not found'));
 
-    // Check duplicate employee email
-    const exists = await Employee.findOne({ email });
-    if (exists) return next(new ApiError(409, "Employee already exists"));
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create employee under the logged-in Corporate Admin
-    const employee = await Employee.create({
-      corporateAdminId: req.user.id,   // comes from JWT middleware
-      name,
-      email,
-      mobile,
-      department,
-      designation,
-      password: hashedPassword,
-      role: "employee"
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Employee created successfully",
-      employee,
-      createdBy: {
-        corporateAdminId: req.user.id,
-        corporateAdminRole: req.user.role
-      }
-    });
-
-  } catch (err) {
-    next(err);
-  }
-};
-
-
-// =============================
-// DEACTIVATE EMPLOYEE
-// =============================
-exports.deactivateEmployee = async (req, res, next) => {
-  try {
-    const emp = await Employee.findById(req.params.id);
-
-    if (!emp) return next(new ApiError(404, "Employee not found"));
-
-    emp.status = "inactive";
+    emp.status = emp.status === 'active' ? 'inactive' : 'active';
     await emp.save();
 
-    res.json({
-      success: true,
-      message: "Employee deactivated successfully",
-    });
-
+    res.json({ success: true, message: `Employee ${emp.status} successfully`, status: emp.status });
   } catch (err) {
     next(err);
   }
 };
-// =============================
-// ACTIVATE EMPLOYEE
-// =============================
-exports.activateEmployee = async (req, res, next) => {
-  try {
-    const emp = await Employee.findById(req.params.id);
-
-    if (!emp) return next(new ApiError(404, "Employee not found"));
-
-    emp.status = "active";
-    await emp.save();
-
-    res.json({
-      success: true,
-      message: "Employee activated successfully",
-    });
-
-  } catch (err) {
-    next(err);
-  }
-};
-
 // =============================
 // REMOVE EMPLOYEE
 // =============================
 exports.removeEmployee = async (req, res, next) => {
   try {
-    const emp = await Employee.findById(req.params.id);
+    let emp = null;
+    const id = req.params.id;
 
-    if (!emp) return next(new ApiError(404, "Employee not found"));
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      emp = await Employee.findById(id);
+    }
+    if (!emp) {
+      emp = await Employee.findOne({ userId: id });
+    }
+    if (!emp) return next(new ApiError(404, 'Employee not found'));
 
-    await Employee.findByIdAndDelete(req.params.id);
+    await Employee.findByIdAndDelete(emp._id);
 
-    res.json({
-      success: true,
-      message: "Employee deleted successfully",
-    });
-
+    res.json({ success: true, message: 'Employee removed successfully' });
   } catch (err) {
     next(err);
   }
 };
+

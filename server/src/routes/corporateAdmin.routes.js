@@ -1,15 +1,12 @@
+
+// corporateAdmin.routes.js
 const router = require("express").Router();
 const corpAdminCtrl = require("../controllers/corporateAdmin.controller");
 const auth = require("../middleware/auth.middleware");
 
 
 
-router.post(
-  "/employee/create",
-  auth.verifyToken,
-  auth.authorizeRoles("CorporateAdmin"),
-  corpAdminCtrl.createEmployee
-);
+
 
 router.patch(
   "/employee/:id/deactivate",

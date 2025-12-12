@@ -1,63 +1,25 @@
+// server/src/routes/bookings.routes.js
+
 const router = require("express").Router();
-const auth = require("../middleware/auth.middleware");
-const bookingCtrl = require("../controllers/booking.controller");
-const { validate } = require("../middleware/validate.middleware");
-const bookingValidator = require("../validations/booking.validation");
+const { verifyToken } = require("../middleware/auth.middleware");
+const bookingsController = require("../controllers/booking.controller");
+
+// All booking routes are private
+router.use(verifyToken);
 
 // Create booking
-router.post(
-  "/create",
-  auth.verifyToken,
-  validate(bookingValidator.createBooking),
-  bookingCtrl.createBooking
-);
+router.post("/", bookingsController.createBooking);
 
-// User bookings
-router.get("/my", auth.verifyToken, bookingCtrl.getMyBookings);
+// Confirm booking after approval
+router.post("/:id/confirm", bookingsController.confirmBooking);
 
-// Corporate admin bookings
-router.get(
-  "/corporate",
-  auth.verifyToken,
-  auth.authorizeRoles("corporate-admin", "travel-admin"),
-  bookingCtrl.getCorporateBookings
-);
+// Get all bookings
+router.get("/", bookingsController.getAllBookings);
 
-// Approve booking
-router.post(
-  "/approve/:bookingId",
-  auth.verifyToken,
-  auth.authorizeRoles("corporate-admin", "approver", "travel-admin"),
-  validate(bookingValidator.approveReject),
-  bookingCtrl.approveBooking
-);
-
-// Reject booking
-router.post(
-  "/reject/:bookingId",
-  auth.verifyToken,
-  auth.authorizeRoles("corporate-admin", "approver", "travel-admin"),
-  validate(bookingValidator.approveReject),
-  bookingCtrl.rejectBooking
-);
-
-// Confirm booking
-router.post(
-  "/confirm/:bookingId",
-  auth.verifyToken,
-  validate(bookingValidator.confirmBooking),
-  bookingCtrl.confirmBooking
-);
+// Get single booking
+router.get("/:id", bookingsController.getBooking);
 
 // Cancel booking
-router.post(
-  "/cancel/:bookingId",
-  auth.verifyToken,
-  validate(bookingValidator.approveReject),
-  bookingCtrl.cancelBooking
-);
-
-// Get booking by id
-router.get("/:bookingId", auth.verifyToken, bookingCtrl.getBookingById);
+router.post("/:id/cancel", bookingsController.cancelBooking);
 
 module.exports = router;

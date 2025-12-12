@@ -1,8 +1,18 @@
+// server/src/routes/superAdmin.routes.js
+
 const router = require("express").Router();
 const superAdminCtrl = require("../controllers/superAdmin.controller.js");
 const auth = require("../middleware/auth.middleware.js");
 
+// ---------------------
+// PUBLIC ROUTES
+// ---------------------
+router.post("/register", superAdminCtrl.registerSuperAdmin);
+router.post("/login", superAdminCtrl.loginSuperAdmin);
 
+// ---------------------
+// PROTECTED ROUTES
+// ---------------------
 router.get(
   "/profile",
   auth.verifyToken,
@@ -18,14 +28,14 @@ router.patch(
 );
 
 router.patch(
-  "/:id/deactivated",
+  "/:id/deactivate",
   auth.verifyToken,
   auth.verifySuperAdmin,
   superAdminCtrl.deactivateCorporateAdmin
 );
 
 router.patch(
-  "/:id/activated",
+  "/:id/activate",
   auth.verifyToken,
   auth.verifySuperAdmin,
   superAdminCtrl.activateCorporateAdmin

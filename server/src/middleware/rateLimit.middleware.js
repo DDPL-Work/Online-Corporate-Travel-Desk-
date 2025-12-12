@@ -1,56 +1,57 @@
-const rateLimit = require("express-rate-limit");
+// server/src/middleware/rateLimit.middleware.js
 
-// ===========================
-// GLOBAL RATE LIMITER
-// ===========================
-const apiLimiter = rateLimit({
+const rateLimit = require('express-rate-limit');
+const config = require('../config');
+
+const limiter = rateLimit({
+  windowMs: config.rateLimit.windowMs,
+  max: config.rateLimit.max,
+  message: {
+    success: false,
+    error: 'Too many requests from this IP, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      error: 'Too many requests from this IP, please try again after 15 minutes.'
+    });
+  }
+});
+
+// Specific limiters for different endpoints
+const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 200,               // max 200 requests per window
+  max: 5,
+  skipSuccessfulRequests: true,
   message: {
     success: false,
-    message: "Too many requests from this IP, please try again later."
-  },
-  standardHeaders: true,    // return rate limit info in headers
-  legacyHeaders: false      // disable old headers
+    error: 'Too many login attempts, please try again after 15 minutes.'
+  }
 });
 
-
-// ===========================
-// STRICT LOGIN LIMITER
-// Helps prevent brute force
-// ===========================
-const loginLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,  // 10 minutes
-  limit: 10,                 // 10 login attempts allowed
+const searchLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30,
   message: {
     success: false,
-    message: "Too many login attempts. Try again after 10 minutes."
-  },
-  skipSuccessfulRequests: true, // successful login resets counter
-  standardHeaders: true,
-  legacyHeaders: false
+    error: 'Too many search requests, please slow down.'
+  }
 });
 
-
-// ===========================
-// STRICT OTP / SSO LIMITER
-// Helpful for OTP or SSO calls
-// ===========================
-const otpLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  limit: 5,                // 5 OTP/SSO hits allowed
+const bookingLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 50,
   message: {
     success: false,
-    message: "Too many OTP/SSO requests. Try again after 5 minutes."
-  },
-  standardHeaders: true,
-  legacyHeaders: false
+    error: 'Too many booking requests, please try again later.'
+  }
 });
 
-
-// EXPORT
 module.exports = {
-  apiLimiter,
-  loginLimiter,
-  otpLimiter
+  limiter,
+  authLimiter,
+  searchLimiter,
+  bookingLimiter
 };
