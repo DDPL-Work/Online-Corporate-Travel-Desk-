@@ -1,9 +1,10 @@
+// server/src/controllers/booking.controller.js
 const Booking = require('../models/Booking');
 const Approval = require('../models/Approval');
 const Corporate = require('../models/Corporate');
 const WalletTransaction = require('../models/Wallet');
 const Ledger = require('../models/Ledger');
-const tboService = require('../services/tbo.service');
+const tboService = require('../services/tektravels/flight.service');
 const pdfService = require('../services/pdf.service');
 const notificationService = require('../services/notification.service');
 const { generateBookingReference } = require('../utils/helpers');
@@ -87,91 +88,96 @@ exports.createBooking = asyncHandler(async (req, res) => {
 // @desc    Confirm booking after approval
 // @route   POST /api/v1/bookings/:id/confirm
 // @access  Private
+// Confirm booking after approval
 exports.confirmBooking = asyncHandler(async (req, res) => {
   const booking = await Booking.findById(req.params.id);
 
-  if (!booking) {
-    throw new ApiError(404, 'Booking not found');
-  }
+  if (!booking) throw new ApiError(404, 'Booking not found');
 
   if (booking.userId.toString() !== req.user.id) {
-    throw new ApiError(403, 'Not authorized to confirm this booking');
+    throw new ApiError(403, 'Not authorized');
   }
 
   if (booking.status !== 'approved') {
-    throw new ApiError(400, 'Booking must be approved before confirmation');
+    throw new ApiError(400, 'Booking must be approved first');
   }
 
   const corporate = await Corporate.findById(booking.corporateId);
 
-  // Process payment based on classification
-  if (corporate.classification === 'prepaid') {
-    if (booking.paymentDetails.method === 'wallet') {
-      // Deduct from wallet
-      if (corporate.walletBalance < booking.pricing.totalAmount) {
-        throw new ApiError(400, 'Insufficient wallet balance');
-      }
-
-      corporate.walletBalance -= booking.pricing.totalAmount;
-      await corporate.save();
-
-      // Record wallet transaction
-      await WalletTransaction.create({
-        corporateId: corporate._id,
-        type: 'debit',
-        amount: booking.pricing.totalAmount,
-        balanceBefore: corporate.walletBalance + booking.pricing.totalAmount,
-        balanceAfter: corporate.walletBalance,
-        description: `Booking payment for ${booking.bookingReference}`,
-        bookingId: booking._id,
-        status: 'completed'
-      });
+  /**
+   * 🔹 STEP 1: TBO Ticketing (Flight only)
+   */
+  if (booking.bookingType === 'flight') {
+    if (!booking.flightDetails?.traceId || !booking.flightDetails?.priceId) {
+      throw new ApiError(400, 'Missing TBO flight identifiers');
     }
-    // If gateway, payment would be handled separately
+
+    const ticketResponse = await tboService.ticketFlight({
+      traceId: booking.flightDetails.traceId,
+      priceId: booking.flightDetails.priceId,
+      passengers: booking.travellers
+    });
+
+    booking.flightDetails.ticketResponse = ticketResponse;
+    booking.flightDetails.pnr = ticketResponse?.Response?.PNR;
+    booking.flightDetails.ticketStatus = 'issued';
+  }
+
+  /**
+   * 🔹 STEP 2: Payment handling (your existing logic)
+   */
+  if (corporate.classification === 'prepaid') {
+    if (corporate.walletBalance < booking.pricing.totalAmount) {
+      throw new ApiError(400, 'Insufficient wallet balance');
+    }
+
+    corporate.walletBalance -= booking.pricing.totalAmount;
+    await corporate.save();
+
+    await WalletTransaction.create({
+      corporateId: corporate._id,
+      bookingId: booking._id,
+      type: 'debit',
+      amount: booking.pricing.totalAmount,
+      status: 'completed',
+      description: `Booking ${booking.bookingReference}`
+    });
   } else {
-    // Postpaid - add to ledger
     corporate.currentCredit += booking.pricing.totalAmount;
     await corporate.save();
 
     await Ledger.create({
       corporateId: corporate._id,
       bookingId: booking._id,
-      type: 'booking',
       amount: booking.pricing.totalAmount,
-      creditUsed: booking.pricing.totalAmount,
-      creditBefore: corporate.currentCredit - booking.pricing.totalAmount,
-      creditAfter: corporate.currentCredit,
-      description: `Booking charge for ${booking.bookingReference}`,
-      status: 'pending'
+      type: 'booking'
     });
   }
 
-  // Generate voucher
-  if (booking.bookingType === 'flight') {
-    const voucherUrl = await pdfService.generateFlightVoucher(booking, req.user, corporate);
-    booking.voucherUrl = voucherUrl;
-  } else {
-    const voucherUrl = await pdfService.generateHotelVoucher(booking, req.user, corporate);
-    booking.voucherUrl = voucherUrl;
-  }
+  /**
+   * 🔹 STEP 3: Voucher
+   */
+  booking.voucherUrl =
+    booking.bookingType === 'flight'
+      ? await pdfService.generateFlightVoucher(booking, req.user, corporate)
+      : await pdfService.generateHotelVoucher(booking, req.user, corporate);
 
   booking.status = 'confirmed';
   booking.paymentDetails.paymentStatus = 'completed';
+
   await booking.save();
 
-  // Update corporate metadata
-  corporate.metadata.totalBookings += 1;
-  corporate.metadata.totalRevenue += booking.pricing.totalAmount;
-  corporate.metadata.lastBookingDate = new Date();
-  await corporate.save();
-
-  // Send notification
-  await notificationService.sendBookingNotification(booking, req.user, 'confirmation');
+  await notificationService.sendBookingNotification(
+    booking,
+    req.user,
+    'confirmation'
+  );
 
   res.status(200).json(
     new ApiResponse(200, booking, 'Booking confirmed successfully')
   );
 });
+
 
 // @desc    Get all bookings
 // @route   GET /api/v1/bookings

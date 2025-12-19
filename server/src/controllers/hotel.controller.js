@@ -1,4 +1,4 @@
-const tboService = require('../services/tbo.service');
+const tboService = require('../services/tektravels/hotel.service');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const asyncHandler = require('../utils/asyncHandler');

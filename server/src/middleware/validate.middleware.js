@@ -2,32 +2,28 @@
 const { validationResult } = require("express-validator");
 
 // validate() must RETURN a middleware function
-exports.validate = (validations = []) => {
-  return async (req, res, next) => {
-    try {
-      // Run each validation
-      for (let validation of validations) {
-        await validation.run(req);
-      }
+// middleware/validate.middleware.js
 
-      const errors = validationResult(req);
+exports.validate = (schema) => {
+  return (req, res, next) => {
+    const options = {
+      abortEarly: false,   // return all errors
+      allowUnknown: true,  // ignore unknown fields
+      stripUnknown: true,  // remove unknown fields
+    };
 
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: "Validation failed",
-          errors: errors.array(),
-        });
-      }
+    const { error, value } = schema.validate(req.body, options);
 
-      next();
-    } catch (err) {
-      console.error("Validation middleware error:", err);
-      return res.status(500).json({
+    if (error) {
+      return res.status(400).json({
         success: false,
-        message: "Internal validation error",
+        message: 'Validation failed',
+        errors: error.details.map((detail) => detail.message),
       });
     }
+
+    req.body = value; // cleaned data
+    next();
   };
 };
 
