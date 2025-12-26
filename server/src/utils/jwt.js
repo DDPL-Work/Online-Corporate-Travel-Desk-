@@ -1,11 +1,11 @@
 // server/src/utils/jwt.js
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
-const ACCESS_EXP = process.env.JWT_EXP || '1d';
+const ACCESS_EXP = process.env.JWT_EXP || "1d";
 const SECRET = process.env.JWT_SECRET;
 
 if (!SECRET) {
-  console.warn('⚠️ JWT_SECRET not set! Tokens will not be secure.');
+  console.warn("⚠️ JWT_SECRET not set! Tokens will not be secure.");
 }
 
 /**
@@ -19,7 +19,7 @@ exports.signAccessToken = (user) => {
     corporateId: user.corporateId ? user.corporateId.toString() : null,
     role: user.role,
     email: user.email,
-    name: user.name || {}
+    name: user.name || {},
   };
   return jwt.sign(payload, SECRET, { expiresIn: ACCESS_EXP });
 };
@@ -37,7 +37,7 @@ exports.generateSSOToken = (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "SSO failed: No user returned"
+        message: "SSO failed: No user returned",
       });
     }
 
@@ -46,28 +46,26 @@ exports.generateSSOToken = (req, res) => {
       corporateId: user.corporateId ? user.corporateId.toString() : null,
       role: user.role,
       email: user.email,
-      name: user.name || {}
+      name: user.name || {},
     };
 
-    const token = jwt.sign(payload, SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
+    const token = jwt.sign(payload, SECRET, {
+      expiresIn: process.env.JWT_EXPIRE || "7d",
+    });
 
     // ✅ Option 1: JSON response (API)
-    return res.status(200).json({
-      success: true,
-      message: "SSO Login Successful",
-      token,
-      user
-    });
+    return res.redirect(
+      `${process.env.FRONTEND_URL}/sso/callback?token=${token}`
+    );
 
     // 🔹 Option 2: Frontend redirect (uncomment if needed)
     // res.redirect(`${process.env.FRONTEND_URL}/sso-success?token=${token}`);
-
   } catch (err) {
-    console.error('SSO Token generation error:', err);
+    console.error("SSO Token generation error:", err);
     return res.status(500).json({
       success: false,
       message: "SSO Token Generation Failed",
-      error: err.message
+      error: err.message,
     });
   }
 };
@@ -81,6 +79,6 @@ exports.verifyToken = (token) => {
   try {
     return jwt.verify(token, SECRET);
   } catch (err) {
-    throw new Error('Invalid or expired token');
+    throw new Error("Invalid or expired token");
   }
 };

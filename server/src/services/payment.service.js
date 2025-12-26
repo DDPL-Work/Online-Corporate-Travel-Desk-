@@ -7,7 +7,7 @@ class PaymentService {
   async createOrder(amount, bookingReference, corporateId) {
     try {
       const options = {
-        amount: Math.round(amount * 100), // Convert to paise
+        amount: Math.round(amount * 100),
         currency: config.currency,
         receipt: `${config.receiptPrefix}${bookingReference}`,
         notes: {
@@ -16,8 +16,7 @@ class PaymentService {
         }
       };
 
-      const order = await razorpay.orders.create(options);
-      return order;
+      return await razorpay.orders.create(options);
     } catch (error) {
       logger.error('Razorpay Create Order Error:', error);
       throw new ApiError(500, 'Failed to create payment order');
@@ -25,9 +24,14 @@ class PaymentService {
   }
 
   verifyPaymentSignature(orderId, paymentId, signature) {
-    const body = orderId + '|' + paymentId;
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+      throw new ApiError(500, "Razorpay key secret not configured");
+    }
+
+    const body = `${orderId}|${paymentId}`;
+
     const expectedSignature = crypto
-      .createHmac('sha256', config.config.keySecret)
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
       .update(body)
       .digest('hex');
 
@@ -36,8 +40,10 @@ class PaymentService {
 
   async capturePayment(paymentId, amount) {
     try {
-      const capture = await razorpay.payments.capture(paymentId, Math.round(amount * 100));
-      return capture;
+      return await razorpay.payments.capture(
+        paymentId,
+        Math.round(amount * 100)
+      );
     } catch (error) {
       logger.error('Razorpay Capture Payment Error:', error);
       throw new ApiError(500, 'Failed to capture payment');
@@ -46,10 +52,9 @@ class PaymentService {
 
   async refundPayment(paymentId, amount) {
     try {
-      const refund = await razorpay.payments.refund(paymentId, {
+      return await razorpay.payments.refund(paymentId, {
         amount: Math.round(amount * 100)
       });
-      return refund;
     } catch (error) {
       logger.error('Razorpay Refund Error:', error);
       throw new ApiError(500, 'Failed to process refund');

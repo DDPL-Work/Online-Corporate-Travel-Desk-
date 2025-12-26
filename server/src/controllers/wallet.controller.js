@@ -85,48 +85,100 @@ exports.initiateRecharge = asyncHandler(async (req, res) => {
 // @desc    Verify payment and credit wallet
 // @route   POST /api/v1/wallet/verify-payment
 // @access  Private (Travel Admin)
-exports.verifyPayment = asyncHandler(async (req, res) => {
-  const { orderId, paymentId, signature } = req.body;
+// exports.verifyPayment = asyncHandler(async (req, res) => {
+//   const { orderId, paymentId, signature } = req.body;
 
-  const isValid = paymentService.verifyPaymentSignature(orderId, paymentId, signature);
+//   const isValid = paymentService.verifyPaymentSignature(orderId, paymentId, signature);
+
+//   if (!isValid) {
+//     throw new ApiError(400, 'Invalid payment signature');
+//   }
+
+//   const corporate = await Corporate.findById(req.user.corporateId);
+
+//   // Capture payment
+//   const capture = await paymentService.capturePayment(paymentId, req.body.amount / 100);
+
+//   // Update wallet
+//   const balanceBefore = corporate.walletBalance;
+//   corporate.walletBalance += (req.body.amount / 100);
+//   await corporate.save();
+
+//   // Record transaction
+//   await WalletTransaction.create({
+//     corporateId: corporate._id,
+//     type: 'credit',
+//     amount: req.body.amount / 100,
+//     balanceBefore,
+//     balanceAfter: corporate.walletBalance,
+//     description: 'Wallet recharge',
+//     transactionId: paymentId,
+//     paymentGateway: {
+//       name: 'razorpay',
+//       orderId,
+//       paymentId,
+//       signature
+//     },
+//     processedBy: req.user.id,
+//     status: 'completed'
+//   });
+
+//   res.status(200).json(
+//     new ApiResponse(200, {
+//       balance: corporate.walletBalance,
+//       transaction: paymentId
+//     }, 'Wallet recharged successfully')
+//   );
+// });
+
+exports.verifyPayment = asyncHandler(async (req, res) => {
+  const { orderId, paymentId, signature, amount } = req.body;
+
+  const isValid = paymentService.verifyPaymentSignature(
+    orderId,
+    paymentId,
+    signature
+  );
 
   if (!isValid) {
-    throw new ApiError(400, 'Invalid payment signature');
+    throw new ApiError(400, "Invalid payment signature");
   }
 
   const corporate = await Corporate.findById(req.user.corporateId);
 
-  // Capture payment
-  const capture = await paymentService.capturePayment(paymentId, req.body.amount / 100);
+  // ✅ PAYMENT IS ALREADY CAPTURED BY RAZORPAY
+  const creditAmount = amount / 100;
 
-  // Update wallet
   const balanceBefore = corporate.walletBalance;
-  corporate.walletBalance += (req.body.amount / 100);
+  corporate.walletBalance += creditAmount;
   await corporate.save();
 
-  // Record transaction
   await WalletTransaction.create({
     corporateId: corporate._id,
-    type: 'credit',
-    amount: req.body.amount / 100,
+    type: "credit",
+    amount: creditAmount,
     balanceBefore,
     balanceAfter: corporate.walletBalance,
-    description: 'Wallet recharge',
+    description: "Wallet recharge",
     transactionId: paymentId,
     paymentGateway: {
-      name: 'razorpay',
+      name: "razorpay",
       orderId,
       paymentId,
-      signature
+      signature,
     },
     processedBy: req.user.id,
-    status: 'completed'
+    status: "completed",
   });
 
   res.status(200).json(
-    new ApiResponse(200, {
-      balance: corporate.walletBalance,
-      transaction: paymentId
-    }, 'Wallet recharged successfully')
+    new ApiResponse(
+      200,
+      {
+        balance: corporate.walletBalance,
+        transaction: paymentId,
+      },
+      "Wallet recharged successfully"
+    )
   );
 });

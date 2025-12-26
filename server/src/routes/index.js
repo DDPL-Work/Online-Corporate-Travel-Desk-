@@ -1,3 +1,5 @@
+//index.js
+
 const express = require('express');
 const router = express.Router();
 
@@ -14,6 +16,7 @@ const voucherRoutes = require('./voucher.routes');
 const superAdminRoutes = require('./superAdmin.routes');
 const authSSORoutes = require('./auth.sso.routes');
 const employeeRoutes = require('./employee.routes');
+const corporateAdmin = require('./corporateAdmin.routes');
 
 // ------------------ ✅ IMPORTANT FIX ------------------
 // ✅ SSO MUST BE MOUNTED BEFORE /auth (to avoid JWT blocking)
@@ -31,6 +34,7 @@ router.use('/wallet', walletRoutes);
 router.use('/vouchers', voucherRoutes);
 router.use('/super-admin', superAdminRoutes);
 router.use('/employees', employeeRoutes);
+router.use('/corporate-admin', corporateAdmin);
 
 // ------------------ API Info ------------------
 router.get('/', (req, res) => {
@@ -49,7 +53,8 @@ router.get('/', (req, res) => {
       vouchers: '/api/v1/vouchers',
       superAdmin: '/api/v1/super-admin',
       sso: '/api/v1/auth/sso',
-      employees: '/api/v1/employees'
+      employees: '/api/v1/employees',
+      corporateAdmin: '/api/v1/corporate-admin'      
     }
   });
 });

@@ -12,25 +12,23 @@ const { uploadMultiple } = require('../middleware/upload.middleware');
 // Validations (express-validator)
 const corporateValidation = require('../validations/corporate.validation');
 
-// ------------------------------------
+// --------------------------------------------------
 // PUBLIC : ONBOARD CORPORATE
+// --------------------------------------------------
 router.post(
   "/onboard",
   uploadMultiple,
+  sanitizeBody(["corporateName", "primaryContact.email", "ssoConfig.domain"]),
   validate(corporateValidation.corporateOnboarding),
-  sanitizeBody([
-    "corporateName",
-    "primaryContact.email",
-    "ssoConfig.domain"
-  ]),
   corporateController.onboardCorporate
 );
 
-// ------------------------------------
+// --------------------------------------------------
 // PROTECTED ROUTES
+// --------------------------------------------------
 router.use(verifyToken);
 
-// Get All Corporates
+// Get All Corporates (Super Admin)
 router.get(
   "/",
   authorizeRoles("super-admin"),
@@ -38,17 +36,15 @@ router.get(
 );
 
 // Get Single Corporate
-router.get(
-  "/:id",
-  corporateController.getCorporate
-);
+router.get("/:id", corporateController.getCorporate);
 
 // Update Corporate
 router.put(
   "/:id",
-  authorizeRoles("super-admin", "travel-admin"),
-  validate(corporateValidation.updateCorporate),
+  authorizeRoles("super-admin", "travel-admin", "travel-admin"),
+  corporateValidation.updateCorporate,
   sanitizeBody(["corporateName", "primaryContact.email"]),
+  validate,
   corporateController.updateCorporate
 );
 
