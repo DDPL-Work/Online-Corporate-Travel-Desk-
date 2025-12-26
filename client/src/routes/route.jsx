@@ -4,7 +4,8 @@ import Layout from "../layout/Layout";
 import ProtectedRoute from "./ProtectedRoute";
 
 // Auth Pages
-import Login from "../pages/Auth/Login";
+import Login from "../Pages/Auth/Login";
+import SSOLogin from "../Pages/Auth/SSOLogin";
 import Unauthorized from "../Pages/Auth/Unauthorized";
 
 // SuperAdmin Pages
@@ -27,21 +28,21 @@ import RejectedTravelRequests from "../components/TravelAdminTabs/RejectedTravel
 import UpcomingTrips from "../components/TravelAdminTabs/UpcomingTrips";
 import PastTrips from "../components/TravelAdminTabs/PastTrips";
 import UserManagement from "../components/TravelAdminTabs/UserManagement";
-// import ProfileSettings from "../components/TravelAdminTabs/ProfileSettings";
+import TravelAdminProfile from "../components/TravelAdminTabs/TravelAdminProfile";
 import CreditUtilizationPostpaid from "../components/TravelAdminTabs/CreditUtilizationPostpaid";
 import CorporateWallet from "../components/TravelAdminTabs/CorporateWalletStatusPrepaid";
 
 // Travel Company
-import OnboardedCorporates from "../components/TravelCompanyTabs/OnboardedCorporates";
-import BookingsSummary from "../components/TravelCompanyTabs/BookingsSummary";
-import CorporateRevenue from "../components/TravelCompanyTabs/CorporateRevenue";
-import CreditStatusAlerts from "../components/TravelCompanyTabs/CreditStatusAlerts";
-import WalletRechargeLogs from "../components/TravelCompanyTabs/WalletRechargeLogs";
-import CorporateAccessControl from "../components/TravelCompanyTabs/CorporateAccessControl";
-import PendingAmendments from "../components/TravelCompanyTabs/PendingAmendments";
-import CommissionSettings from "../components/TravelCompanyTabs/CommissionSettings";
-import ApiConfigurations from "../components/TravelCompanyTabs/ApiConfigurations";
-import SystemLogs from "../components/TravelCompanyTabs/SystemLogs";
+import OnboardedCorporates from "../components/SuperAdminTabs/OnboardedCorporates";
+import BookingsSummary from "../components/SuperAdminTabs/BookingsSummary";
+import CorporateRevenue from "../components/SuperAdminTabs/CorporateRevenue";
+import CreditStatusAlerts from "../components/SuperAdminTabs/CreditStatusAlerts";
+import WalletRechargeLogs from "../components/SuperAdminTabs/WalletRechargeLogs";
+import CorporateAccessControl from "../components/SuperAdminTabs/CorporateAccessControl";
+import PendingAmendments from "../components/SuperAdminTabs/PendingAmendments";
+import CommissionSettings from "../components/SuperAdminTabs/CommissionSettings";
+import ApiConfigurations from "../components/SuperAdminTabs/ApiConfigurations";
+import SystemLogs from "../components/SuperAdminTabs/SystemLogs";
 
 // Employee
 import MyBookings from "../components/EmployeeDashboard/MyBookings";
@@ -52,10 +53,13 @@ import MyRejectedRequests from "../components/EmployeeDashboard/MyRejectedReques
 import MyProfile from "../components/EmployeeDashboard/MyProfile";
 import TravelDocuments from "../components/EmployeeDashboard/TravelDocuments";
 import ProfileSettings from "../Pages/Auth/ProfileSettings";
-
+import SSOCallback from "../Pages/Auth/SSOCallback";
+import FlightSearch from "../Pages/EmployeeDashboard/FlightSearch";
+import HotelSearchPage from "../Pages/EmployeeDashboard/HotelSearch";
+import FlightSearchResults from "../Pages/search-results/Flight-results/FlightSearchResults";
+import OneFlightBooking from "../Pages/Booking-Flow/Flight-Booking/OneFlightBooking";
 
 export const appRouter = createBrowserRouter([
-
   // -------------------------------
   // PUBLIC ROUTES
   // -------------------------------
@@ -64,15 +68,23 @@ export const appRouter = createBrowserRouter([
     element: <Login />,
   },
   {
+    path: "/sso-login",
+    element: <SSOLogin />,
+  },
+  {
+    path: "/sso/callback",
+    element: <SSOCallback />, // ✅ REQUIRED
+  },
+  {
     path: "/unauthorized",
     element: <Unauthorized />,
   },
 
   // -------------------------------
-  // SUPER-ADMIN PROTECTED ROUTES
+  // TRAVEL-ADMIN PROTECTED ROUTES
   // -------------------------------
   {
-    element: <ProtectedRoute allowedRoles={["super-admin"]} />,
+    element: <ProtectedRoute allowedRoles={["travel-admin"]} />,
     children: [
       {
         path: "/",
@@ -92,26 +104,29 @@ export const appRouter = createBrowserRouter([
           // { path: "/update-pricing-config", element: <UpdatePricingConfig /> },
 
           // Travel Admin Dashboard
-          { path: "/total-bookings", element: <BookingsDashboard /> },
+          { path: "total-bookings", element: <BookingsDashboard /> },
           { path: "/pending-requests", element: <PendingTravelRequests /> },
           { path: "/approved-requests", element: <ApprovedTravelRequests /> },
           { path: "/rejected-requests", element: <RejectedTravelRequests /> },
           { path: "/upcoming-trips", element: <UpcomingTrips /> },
           { path: "/past-trips", element: <PastTrips /> },
           { path: "/user-management", element: <UserManagement /> },
-          { path: "/profile-settings", element: <ProfileSettings /> },
+          { path: "/travel-profile-settings", element: <TravelAdminProfile /> },
           { path: "/corporate-wallet", element: <CorporateWallet /> },
-          { path: "/credit-utilization", element: <CreditUtilizationPostpaid /> },
+          {
+            path: "/credit-utilization",
+            element: <CreditUtilizationPostpaid />,
+          },
         ],
       },
     ],
   },
 
   // -------------------------------
-  // TRAVEL COMPANY PROTECTED ROUTES
+  // SUPER ADMIN PROTECTED ROUTES
   // -------------------------------
   {
-    element: <ProtectedRoute allowedRoles={["travel-company"]} />,
+    element: <ProtectedRoute allowedRoles={["super-admin"]} />,
     children: [
       {
         path: "/",
@@ -151,6 +166,10 @@ export const appRouter = createBrowserRouter([
           { path: "/travel-documents", element: <TravelDocuments /> },
         ],
       },
+      { path: "/search-flight", element: <FlightSearch /> },
+      { path: "/search-hotel", element: <HotelSearchPage /> },
+      { path: "/search-flight-results", element: <FlightSearchResults /> },
+      { path: "/one-way-flight/booking", element: <OneFlightBooking /> },
     ],
   },
 

@@ -1,236 +1,167 @@
-import React, { useState } from "react";
-import { FiFilter, FiPlusCircle, FiDownload } from "react-icons/fi";
-import { corporateWalletData } from "../../data/dummyData";
+import React, { useEffect, useState } from "react";
+import { FiFilter, FiDownload, FiPlusCircle } from "react-icons/fi";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  fetchWalletBalance,
+  fetchWalletTransactions,
+} from "../../Redux/Slice/walletSlice";
 
 const colors = {
   primary: "#0A4D68",
-  secondary: "#088395",
-  accent: "#05BFDB",
   light: "#F8FAFC",
   dark: "#1E293B",
 };
 
 export default function CorporateWallet() {
-  const [openModal, setOpenModal] = useState(false);
-  const [transactions, setTransactions] = useState(corporateWalletData);
+  const dispatch = useDispatch();
 
-  const [filterType, setFilterType] = useState("All");
-  const [startDate, setStartDate] = useState("2024-01-01");
-  const [endDate, setEndDate] = useState("2024-12-31");
-
-  const balance = transactions.reduce(
-    (sum, t) => (t.type === "Credit" ? sum + t.amount : sum - t.amount),
-    0
+  const { balance, currency, transactions, loading } = useSelector(
+    (state) => state.wallet
   );
 
-  // FILTERS
-  const filtered = transactions.filter((t) => {
-    const d = new Date(t.date);
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+  const [filterType, setFilterType] = useState("All");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-    const dateMatch = d >= start && d <= end;
-    const typeMatch = filterType === "All" || t.type === filterType;
+  // INITIAL LOAD
+  useEffect(() => {
+    dispatch(fetchWalletBalance());
+    dispatch(fetchWalletTransactions());
+  }, [dispatch]);
 
-    return dateMatch && typeMatch;
-  });
-
-  function addFunds(amount) {
-    const newTx = {
-      id: Date.now(),
-      date: new Date().toISOString().split("T")[0],
-      description: "Wallet Top-Up",
-      amount: parseInt(amount),
-      type: "Credit",
-    };
-
-    setTransactions((prev) => [newTx, ...prev]);
-    setOpenModal(false);
-  }
+  // APPLY FILTERS
+  const applyFilters = () => {
+    dispatch(
+      fetchWalletTransactions({
+        type: filterType !== "All" ? filterType.toLowerCase() : undefined,
+        dateFrom: startDate || undefined,
+        dateTo: endDate || undefined,
+      })
+    );
+  };
 
   return (
     <div className="p-6" style={{ backgroundColor: colors.light }}>
       <div className="max-w-5xl mx-auto">
-
         {/* HEADER */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold" style={{ color: colors.dark }}>
-            Corporate Wallet
-          </h1>
+        <h1 className="text-3xl font-bold mb-6" style={{ color: colors.dark }}>
+          Corporate Wallet
+        </h1>
 
+        {/* BALANCE */}
+        <div className="bg-white shadow rounded-lg p-6 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          {/* Balance Info */}
+          <div>
+            <p className="text-gray-500 text-sm">Available Balance</p>
+            <h2
+              className="text-4xl font-bold mt-1"
+              style={{ color: colors.primary }}
+            >
+              {currency} {balance.toLocaleString()}
+            </h2>
+          </div>
+
+          {/* Recharge Button */}
           <button
-            onClick={() => setOpenModal(true)}
-            className="flex items-center gap-2 px-5 py-2 rounded text-white font-medium shadow"
+            // onClick={() => setOpenModal(true)}
+            className="flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-white font-semibold shadow transition hover:opacity-90"
             style={{ backgroundColor: colors.primary }}
           >
-            <FiPlusCircle /> Add Funds
+            <FiPlusCircle size={18} />
+            Recharge Wallet
           </button>
-        </div>
-
-        {/* WALLET SUMMARY */}
-        <div
-          className="bg-white shadow rounded-lg p-6 mb-6"
-          style={{ borderLeft: `6px solid ${colors.primary}` }}
-        >
-          <p className="text-gray-600 text-sm">Available Balance</p>
-          <h2 className="text-4xl font-bold mt-1" style={{ color: colors.primary }}>
-            ₹{balance.toLocaleString()}
-          </h2>
         </div>
 
         {/* FILTERS */}
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <FiFilter className="text-[22px] text-[#0A4D68]" />
+            <FiFilter className="text-xl text-[#0A4D68]" />
             <h2 className="text-lg font-semibold">Filters</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-sm font-medium">Start Date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full border p-2 rounded mt-1"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">End Date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full border p-2 rounded mt-1"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Transaction Type</label>
-              <select
-                className="w-full p-2 border rounded mt-1"
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-              >
-                <option>All</option>
-                <option>Credit</option>
-                <option>Debit</option>
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <button
-                className="flex items-center gap-2 px-4 py-2 rounded text-white w-full"
-                style={{ backgroundColor: colors.primary }}
-              >
-                <FiDownload /> Export
-              </button>
-            </div>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="border p-2 rounded"
+            />
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="border p-2 rounded"
+            />
+            <select
+              className="border p-2 rounded"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+            >
+              <option>All</option>
+              <option>Credit</option>
+              <option>Debit</option>
+            </select>
+            <button
+              onClick={applyFilters}
+              className="text-white rounded px-4 py-2"
+              style={{ backgroundColor: colors.primary }}
+            >
+              Apply
+            </button>
           </div>
         </div>
 
-        {/* TRANSACTION TABLE */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        {/* TRANSACTIONS */}
+        <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="p-6 border-b">
             <h2 className="text-xl font-semibold">Transaction History</h2>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead style={{ backgroundColor: colors.primary }}>
-                <tr>
-                  {["Date", "Description", "Type", "Amount"].map((h) => (
-                    <th key={h} className="px-6 py-3 text-sm font-semibold text-white">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+          <table className="w-full">
+            <thead style={{ backgroundColor: colors.primary }}>
+              <tr>
+                {["Date", "Description", "Type", "Amount"].map((h) => (
+                  <th key={h} className="px-6 py-3 text-white text-sm">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
 
-              <tbody className="divide-y divide-gray-200">
-                {filtered.length === 0 ? (
-                  <tr>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="4" className="text-center py-6">
+                    Loading...
+                  </td>
+                </tr>
+              ) : transactions.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="text-center py-6 text-gray-500">
+                    No transactions found
+                  </td>
+                </tr>
+              ) : (
+                transactions.map((t) => (
+                  <tr key={t._id} className="border-t hover:bg-gray-50">
+                    <td className="px-6 py-3 text-sm">
+                      {new Date(t.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-3 text-sm">{t.description}</td>
+                    <td className="px-6 py-3 text-sm capitalize">{t.type}</td>
                     <td
-                      colSpan="4"
-                      className="text-center py-8 text-gray-600"
+                      className={`px-6 py-3 text-sm font-semibold ${
+                        t.type === "credit" ? "text-green-600" : "text-red-600"
+                      }`}
                     >
-                      No transactions found
+                      {t.type === "credit" ? "+" : "-"} ₹
+                      {t.amount.toLocaleString()}
                     </td>
                   </tr>
-                ) : (
-                  filtered.map((t) => (
-                    <tr key={t.id} className="hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 text-sm">{t.date}</td>
-                      <td className="px-6 py-4 text-sm">{t.description}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`px-3 py-1 text-xs rounded-full ${
-                            t.type === "Credit"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-600"
-                          }`}
-                        >
-                          {t.type}
-                        </span>
-                      </td>
-
-                      <td
-                        className={`px-6 py-4 text-sm font-semibold ${
-                          t.type === "Credit"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {t.type === "Credit" ? "+" : "-"} ₹
-                        {t.amount.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* MODAL */}
-        {openModal && <AddFundsModal onClose={() => setOpenModal(false)} onSave={addFunds} />}
-      </div>
-    </div>
-  );
-}
-
-// ----------------------
-// ADD FUNDS MODAL
-// ----------------------
-function AddFundsModal({ onClose, onSave }) {
-  const [amount, setAmount] = useState("");
-
-  return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow w-96 animate-fadeIn">
-        <h2 className="text-xl font-semibold mb-4">Add Funds</h2>
-
-        <input
-          type="number"
-          placeholder="Enter Amount"
-          className="w-full border p-2 rounded mb-4"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-        />
-
-        <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 border rounded">
-            Cancel
-          </button>
-
-          <button
-            onClick={() => onSave(amount)}
-            className="px-4 py-2 text-white rounded"
-            style={{ backgroundColor: "#0A4D68" }}
-          >
-            Add
-          </button>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

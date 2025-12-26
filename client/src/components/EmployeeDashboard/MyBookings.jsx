@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { FiSearch, FiEye } from "react-icons/fi";
 import { employeeBookings } from "../../data/dummyData";
+import { useNavigate } from "react-router-dom";
 
 const colors = {
   primary: "#0A4D68",
@@ -12,6 +13,7 @@ const colors = {
 
 export default function MyBookings() {
   const [search, setSearch] = useState("");
+  const navigate = useNavigate();
 
   const filtered = employeeBookings.filter((b) =>
     b.destination.toLowerCase().includes(search.toLowerCase())
@@ -19,9 +21,15 @@ export default function MyBookings() {
 
   return (
     <div className="p-6" style={{ backgroundColor: colors.light }}>
+      <div className="flex items-center justify-between">
       <h1 className="text-2xl font-bold mb-6" style={{ color: colors.dark }}>
         My Bookings
       </h1>
+
+      <div onClick={()=>navigate("/search-flight")} className="bg-[#035966] text-white text-center py-1.5 px-3 rounded-xl cursor-pointer">
+        Make Booking
+      </div>
+      </div>
 
       {/* Search */}
       <div className="bg-white p-4 rounded shadow flex items-center gap-3 mb-6">
