@@ -3,6 +3,7 @@ import { MdEmail, MdLock } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { loginUser } from "../../Redux/Slice/authSlice";
 import { useNavigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 
 const travelStack =
   "https://plus.unsplash.com/premium_photo-1661962174396-e6d539b5c0d8?fm=jpg&q=60&w=2400";
@@ -27,18 +28,47 @@ const Login = () => {
       })
     )
       .unwrap()
-      .then(() => {
-        navigate("/total-bookings");
-      })
-      .catch((err) => {
-        console.log("Login error:", err);
+      .then((data) => {
+        // token already saved by authSlice
+        const token = sessionStorage.getItem("token");
+
+        if (!token) {
+          console.error("Token missing after login");
+          return;
+        }
+
+        try {
+          const decoded = jwtDecode(token);
+          const role = decoded.role || decoded.userRole;
+
+          switch (role) {
+            case "travel-company":
+              navigate("/total-bookings");
+              break;
+
+            case "super-admin":
+              navigate("/onboarded-corporates");
+              break;
+
+            case "employee":
+              navigate("/my-bookings");
+              break;
+
+            default:
+              console.warn("Unknown role:", role);
+              navigate("/login");
+          }
+        } catch (err) {
+          console.error("Invalid token:", err);
+          navigate("/login");
+        }
       });
   };
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-300 relative overflow-hidden p-4">
+    <div className="min-h-screen w-full flex items-center justify-center bg-linear-to-br from-gray-100 to-gray-300 relative overflow-hidden p-4">
       {/* Decorative Background Blurs */}
       {/* <div className="absolute top-10 -left-16 w-72 h-72 bg-blue-600 rounded-full blur-[120px] opacity-30"></div> */}
       <div className="absolute bottom-10 -right-16 w-72 h-72 bg-purple-600 rounded-full blur-[120px] opacity-30"></div>
@@ -75,7 +105,7 @@ const Login = () => {
             <p className="text-gray-200 mb-6 text-lg">
               Your corporate travel journey starts here
             </p>
-            <button className="bg-white text-blue-700 font-semibold py-2 px-8 rounded-2xl shadow-lg hover:bg-gray-200 transition">
+            <button onClick={()=> navigate('/sso-login')} className="bg-white text-blue-700 font-semibold py-2 px-8 rounded-2xl shadow-lg hover:bg-gray-200 transition">
               SIGN UP
             </button>
           </div>

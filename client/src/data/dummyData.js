@@ -1170,3 +1170,161 @@ export const travelDocuments = [
 export const wallet = { prepaid: 155000, currency: 'INR' };
 
 export const credit = { limit: 500000, used: 126000 };
+
+
+/* =====================================================
+   DUMMY DATA — FLIGHTS
+   Used for UI development & testing (NO API / REDUX)
+===================================================== */
+
+export const dummySearchParams = {
+  tripType: "Multi-city",
+  from: { city: "Delhi", code: "DEL" },
+  to: { city: "Mumbai", code: "BOM" },
+  departureDate: "2025-10-10",
+  returnDate: "2025-10-15",
+  passengers: {
+    adults: 1,
+  },
+  searchQuery: {
+    paxInfo: { ADULT: 1 },
+    routeInfos: [
+      {
+        fromCityOrAirport: { city: "Delhi", code: "DEL" },
+        toCityOrAirport: { city: "Goa", code: "GOI" },
+        travelDate: "2025-10-10",
+      },
+      {
+        fromCityOrAirport: { city: "Goa", code: "GOI" },
+        toCityOrAirport: { city: "Mumbai", code: "BOM" },
+        travelDate: "2025-10-12",
+      },
+    ],
+  },
+};
+
+export const dummyFlights = [
+  {
+    type: "S1",
+    sI: [
+      {
+        dt: "2025-10-10T06:30",
+        at: "2025-10-10T09:00",
+        duration: 150,
+        da: { city: "Delhi", code: "DEL" },
+        aa: { city: "Goa", code: "GOI" },
+        fD: {
+          fN: "6E-221",
+          ac: "A320",
+          aI: { name: "IndiGo", code: "6E" },
+        },
+      },
+    ],
+    totalPriceList: [
+      {
+        fareIdentifier: "ECONOMY",
+        fd: {
+          ADULT: {
+            fC: { TF: 5400 },
+            bI: { iB: "15kg" },
+            rT: 0,
+          },
+        },
+      },
+    ],
+  },
+  {
+    type: "S2",
+    sI: [
+      {
+        dt: "2025-10-12T14:00",
+        at: "2025-10-12T16:00",
+        duration: 120,
+        da: { city: "Goa", code: "GOI" },
+        aa: { city: "Mumbai", code: "BOM" },
+        fD: {
+          fN: "AI-665",
+          ac: "A321",
+          aI: { name: "Air India", code: "AI" },
+        },
+      },
+    ],
+    totalPriceList: [
+      {
+        fareIdentifier: "REFUNDABLE",
+        fd: {
+          ADULT: {
+            fC: { TF: 4600 },
+            bI: { iB: "20kg" },
+            rT: 1,
+          },
+        },
+      },
+    ],
+  },
+  {
+    type: "S3",
+    sI: [
+      {
+        dt: "2025-10-10T06:30",
+        at: "2025-10-10T09:00",
+        duration: 150,
+        da: { city: "Delhi", code: "DEL" },
+        aa: { city: "Goa", code: "GOI" },
+        fD: {
+          fN: "6E-221",
+          ac: "A320",
+          aI: { name: "IndiGo", code: "6E" },
+        },
+      },
+    ],
+    totalPriceList: [
+      {
+        fareIdentifier: "ECONOMY",
+        fd: {
+          ADULT: {
+            fC: { TF: 5400 },
+            bI: { iB: "15kg" },
+            rT: 0,
+          },
+        },
+      },
+    ],
+  },
+  {
+    type: "S4",
+    sI: [
+      {
+        dt: "2025-10-12T14:00",
+        at: "2025-10-12T16:00",
+        duration: 120,
+        da: { city: "Goa", code: "GOI" },
+        aa: { city: "Mumbai", code: "BOM" },
+        fD: {
+          fN: "AI-665",
+          ac: "A321",
+          aI: { name: "Air India", code: "AI" },
+        },
+      },
+    ],
+    totalPriceList: [
+      {
+        fareIdentifier: "REFUNDABLE",
+        fd: {
+          ADULT: {
+            fC: { TF: 4600 },
+            bI: { iB: "20kg" },
+            rT: 1,
+          },
+        },
+      },
+    ],
+  },
+];
+
+export const ONE_WAY_OVERRIDE = {
+  from: { city: "Delhi", code: "DEL" },
+  to: { city: "Mumbai", code: "BOM" },
+  tripType: "one-way",
+};
+

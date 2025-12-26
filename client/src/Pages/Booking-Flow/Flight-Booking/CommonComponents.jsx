@@ -1,0 +1,1123 @@
+// Common Components
+import React, { useMemo, useState } from "react";
+import {
+  MdAccessTime,
+  MdOutlineShield,
+  MdOutlineFlight,
+  MdEventSeat,
+  MdAirplanemodeActive,
+  MdCancel,
+  MdAutorenew,
+  MdWork,
+  MdInfo,
+} from "react-icons/md";
+import {
+  FaSuitcase,
+  FaWifi,
+  FaUtensils,
+  FaAngleDown,
+  FaAngleUp,
+  FaArrowRight,
+  FaUser,
+  FaPlane,
+  FaPlaneArrival,
+} from "react-icons/fa";
+import {
+  BsLuggage,
+  BsTag,
+  BsCashStack,
+  BsCalendar4,
+  BsInfoCircleFill,
+} from "react-icons/bs";
+import { AiOutlineCheck, AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
+import { FaArrowTrendDown, FaPlaneDeparture } from "react-icons/fa6";
+import {
+  IoAirplaneOutline,
+  IoPersonAdd,
+  IoPersonRemove,
+} from "react-icons/io5";
+import { BiTime, BiPurchaseTag } from "react-icons/bi";
+import { PiNoteDuotone, PiAirplaneTilt, PiForkKnifeBold } from "react-icons/pi";
+import { RiHotelLine } from "react-icons/ri";
+import { HiOutlineLocationMarker } from "react-icons/hi";
+import { GoPeople } from "react-icons/go";
+import PhoneInput from "react-phone-input-2";
+import "react-phone-input-2/lib/style.css";
+import { useNavigate } from "react-router-dom";
+
+// Updated color scheme - clean and minimal
+export const orangeText = "text-blue-600";
+export const orangeBg = "bg-blue-600";
+export const blueBg = "bg-gray-800";
+export const blueText = "text-gray-800";
+export const grayText = "text-gray-500";
+export const greenText = "text-green-600";
+export const lightGreenBg = "bg-green-50";
+
+const normalizeTripInfos = (tripInfos) => {
+  if (!tripInfos) return [];
+  if (Array.isArray(tripInfos)) return tripInfos;
+  if (typeof tripInfos === "object") {
+    return Object.values(tripInfos).filter(Array.isArray);
+  }
+  return [];
+};
+
+// Helper functions
+export const formatTime = (dateTimeString) => {
+  if (!dateTimeString) return "N/A";
+  try {
+    const d = new Date(dateTimeString);
+    if (isNaN(d.getTime())) return "N/A";
+    return d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return "N/A";
+  }
+};
+
+export const formatDate = (dateTimeString) => {
+  if (!dateTimeString) return "N/A";
+  try {
+    const date = new Date(dateTimeString);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch (e) {
+    return "N/A";
+  }
+};
+
+export const formatDurationCompact = (totalMinutes) => {
+  if (typeof totalMinutes !== "number" || Number.isNaN(totalMinutes))
+    return "0h:00m";
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h:${minutes.toString().padStart(2, "0")}m`;
+};
+
+export const getAirlineLogo = (code) => {
+  if (!code) return "https://via.placeholder.com/64";
+  return `https://images.kiwi.com/airlines/64x64/${code}.png`;
+};
+
+export const formatDuration = (totalMinutes) => {
+  if (!totalMinutes) return "0h 00m";
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
+};
+
+// Flight Data Parsing Functions
+export const parseFlightData = (rawFlightData) => {
+  if (!rawFlightData?.Segments?.length) return null;
+  return parseOneWayData(rawFlightData);
+};
+
+const _norm = (v = "") => (v || "").toString().trim().toUpperCase();
+
+const formatPassengers = (passengers = {}) => {
+  const adults = passengers.adults || 1;
+  const children = passengers.children || 0;
+  const infants = passengers.infants || 0;
+  let result = `${adults} Adult${adults > 1 ? "s" : ""}`;
+  if (children > 0) result += `, ${children} Child${children > 1 ? "ren" : ""}`;
+  if (infants > 0) result += `, ${infants} Infant${infants > 1 ? "s" : ""}`;
+  return result;
+};
+
+export const parseOneWayData = (result) => {
+  const segmentGroup = result.Segments?.[0] || [];
+  if (!segmentGroup.length) return null;
+
+  const segments = segmentGroup.map((seg, idx) => {
+    const next = segmentGroup[idx + 1];
+
+    return {
+      dt: seg.Origin.DepTime,
+      at: seg.Destination.ArrTime,
+
+      da: {
+        city: seg.Origin.Airport.CityName,
+        code: seg.Origin.Airport.AirportCode,
+        name: seg.Origin.Airport.AirportName,
+        terminal: seg.Origin.Airport.Terminal,
+      },
+
+      aa: {
+        city: seg.Destination.Airport.CityName,
+        code: seg.Destination.Airport.AirportCode,
+        name: seg.Destination.Airport.AirportName,
+        terminal: seg.Destination.Airport.Terminal,
+      },
+
+      fD: {
+        aI: {
+          code: seg.Airline.AirlineCode,
+          name: seg.Airline.AirlineName,
+        },
+        fN: seg.Airline.FlightNumber,
+        eT: seg.Craft,
+      },
+
+      duration: seg.Duration,
+
+      layoverTime: next
+        ? Math.max(
+            0,
+            (new Date(next.Origin.DepTime) -
+              new Date(seg.Destination.ArrTime)) /
+              60000
+          )
+        : 0,
+    };
+  });
+
+  const first = segmentGroup[0];
+  const last = segmentGroup[segmentGroup.length - 1];
+
+  return {
+    type: "one-way",
+    segments,
+    basePrice: Math.round(result.Fare?.PublishedFare || 0),
+
+    flightData: {
+      from: first.Origin.Airport.CityName,
+      to: last.Destination.Airport.CityName,
+      date: first.Origin.DepTime,
+      airline: first.Airline.AirlineName,
+      airlineCode: first.Airline.AirlineCode,
+      flightNumber: first.Airline.FlightNumber,
+      duration: segments.reduce((s, x) => s + x.duration, 0),
+      stops: segments.length - 1,
+    },
+
+    baggageInfo: result.Fare?.Baggage || {},
+    fareClass: result.Fare?.FareClassification?.Type || "ECONOMY",
+    isRefundable: result.IsRefundable,
+  };
+};
+
+export const FlightTimeline = ({
+  segments = [],
+  selectedSeats = {},
+  openSeatModal,
+  journeyType = "onward",
+}) => {
+  const formatDateTime = (value) => {
+    const d = new Date(value);
+    return {
+      time: d.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      }),
+      date: d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+    };
+  };
+
+  if (!segments.length) {
+    return <p className="text-gray-500">No flight segments available.</p>;
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-12">
+      {segments.map((segment, idx) => {
+        const dep = formatDateTime(segment.dt);
+        const arr = formatDateTime(segment.at);
+
+        return (
+          <div key={idx} className="relative">
+            {/* HORIZONTAL FLIGHT ROW */}
+            <div className="flex items-center justify-between relative">
+              {/* Departure */}
+              <div className="flex flex-col items-center text-center w-1/4">
+                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center mb-2 shadow-md">
+                  <FaPlaneDeparture className="text-white text-sm" />
+                </div>
+                <p className="text-lg font-bold text-gray-900">{dep.time}</p>
+                <p className="text-xs text-gray-500">{dep.date}</p>
+                <p className="text-xs text-gray-500">{segment.da?.name}</p>
+                <p className="mt-1 font-semibold text-gray-900">
+                  {segment.da?.city}
+                  {/* ({segment.da?.code}) */}
+                </p>
+                <p className="text-xs text-blue-600 font-medium">
+                  Terminal {segment.da?.terminal || "N/A"}
+                </p>
+              </div>
+
+              {/* Dotted Line */}
+              <div className="flex-1 relative mx-2">
+                <div className="animated-dotted-line"></div>
+                <div className="absolute inset-x-0 top-0 -translate-y-12">
+                  <div className="flex justify-center">
+                    <div className="bg-white px-6">
+                      {/* Flight card in the center */}
+                      <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow duration-300 min-w-[220px]">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <img
+                              src={getAirlineLogo(segment.fD?.aI?.code)}
+                              alt="airline"
+                              className="w-8 h-8 rounded"
+                              onError={(e) =>
+                                (e.target.src =
+                                  "https://via.placeholder.com/40")
+                              }
+                            />
+                            <div>
+                              <p className="font-semibold text-gray-900 text-sm">
+                                {segment.fD?.aI?.name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {segment.fD?.aI?.code}-{segment.fD?.fN}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Duration: {formatDurationCompact(segment.duration)} •{" "}
+                          {segment.fD?.eT || "Aircraft"}
+                        </p>
+                        
+                        {/* Selected seats */}
+                        {(() => {
+                          const seatKey = `${journeyType}|${idx}`;
+                          const seats = selectedSeats?.[seatKey]?.list || [];
+                          if (!seats.length) return null;
+                          return (
+                            <div className="mt-2 bg-green-50 border border-green-200 rounded-lg p-1.5">
+                              <p className="text-xs font-semibold text-green-800">
+                                Seats: {seats.join(", ")}
+                              </p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Arrival */}
+              <div className="flex flex-col items-center text-center w-1/4">
+                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center mb-2 shadow-md">
+                  <FaPlaneArrival className="text-white text-sm" />
+                </div>
+                <p className="text-lg font-bold text-gray-900">{arr.time}</p>
+                <p className="text-xs text-gray-500">{arr.date}</p>
+                <p className="text-xs text-gray-500">{segment.aa?.name}</p>
+                <p className="mt-1 font-semibold text-gray-900">
+                  {segment.aa?.city}
+                  {/* ({segment.aa?.code}) */}
+                </p>
+                <p className="text-xs text-blue-600 font-medium">
+                  Terminal {segment.aa?.terminal || "N/A"}
+                </p>
+              </div>
+            </div>
+
+            {/* Layover */}
+            {idx < segments.length - 1 && (
+              <div className="flex justify-center mx-auto mt-14">
+                <div className="flex items-center gap-2 px-6 h-10 rounded-lg bg-blue-50 border border-blue-200 text-sm font-medium text-blue-700 shadow-sm">
+                  <HiOutlineLocationMarker className="text-blue-600" />
+                  <span>
+                    Layover at{" "}
+                    <span className="font-semibold text-gray-900">
+                      {segment.aa?.city}
+                    </span>
+                    {" • "}
+                    {formatDurationCompact(segment.layoverTime || 60)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// Fare Options Component
+export const FareOptions = ({
+  fareOptions = [],
+  selectedFare,
+  onFareSelect,
+  expandedFare,
+  onExpandFare,
+}) => {
+  if (!fareOptions || fareOptions.length === 0) {
+    return <p className="text-gray-500">No fare options available.</p>;
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {fareOptions.map((fare) => (
+        <div
+          key={fare.type}
+          onClick={() => onFareSelect(fare.type)}
+          className={`border-2 rounded-xl p-5 cursor-pointer transition-all ${
+            selectedFare === fare.type
+              ? "border-blue-500 bg-blue-50 shadow-md"
+              : "border-gray-200 hover:border-blue-300 hover:shadow-sm"
+          } ${fare.popular ? "ring-2 ring-blue-200" : ""}`}
+        >
+          {fare.popular && (
+            <span className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-medium">
+              Most Popular
+            </span>
+          )}
+          <h4 className="font-bold text-lg mt-3 text-gray-900">{fare.type}</h4>
+          <p className="text-2xl font-bold text-blue-600 mt-2">
+            ₹{(fare.price || 0).toLocaleString()}
+          </p>
+          <button
+            className={`w-full mt-4 py-2.5 rounded-lg font-semibold transition ${
+              selectedFare === fare.type
+                ? "bg-blue-600 text-white shadow-sm"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            {selectedFare === fare.type ? "Selected" : "Select"}
+          </button>
+
+          <div className="mt-4 space-y-2">
+            {(fare.features || []).slice(0, 3).map((feature, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-sm">
+                {feature.included ? (
+                  <AiOutlineCheck className="text-green-600 flex-shrink-0" />
+                ) : (
+                  <span className="text-red-500 flex-shrink-0">✕</span>
+                )}
+                <span
+                  className={
+                    feature.included
+                      ? "text-gray-700"
+                      : "text-gray-400 line-through"
+                  }
+                >
+                  {feature.text}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onExpandFare(expandedFare === fare.type ? null : fare.type);
+            }}
+            className="text-sm text-blue-600 hover:text-blue-700 mt-3 font-medium"
+          >
+            {expandedFare === fare.type ? "Show less" : "Show more"}
+          </button>
+
+          {expandedFare === fare.type && (
+            <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
+              {(fare.features || []).slice(3).map((feature, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-sm">
+                  {feature.included ? (
+                    <AiOutlineCheck className="text-green-600 flex-shrink-0" />
+                  ) : (
+                    <span className="text-red-500 flex-shrink-0">✕</span>
+                  )}
+                  <span
+                    className={
+                      feature.included
+                        ? "text-gray-700"
+                        : "text-gray-400 line-through"
+                    }
+                  >
+                    {feature.text}
+                  </span>
+                </div>
+              ))}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-xs font-semibold text-gray-700 mb-2">
+                  Conditions:
+                </p>
+                {(fare.conditions || []).map((condition, idx) => (
+                  <p key={idx} className="text-xs text-gray-600 mb-1">
+                    • {condition}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Price Summary Component
+export const PriceSummary = ({
+  parsedFlightData,
+  couponCode = "",
+  onCouponChange,
+  onApplyCoupon,
+  discountAmount = 0,
+  selectedSeats = {},
+  travelers = [],
+}) => {
+  if (!parsedFlightData) return null;
+
+  const travelerCount = travelers.length || 1;
+  const totalBaseFare = parsedFlightData.basePrice || 0;
+  const perPassengerBaseFare = Math.round(totalBaseFare / travelerCount);
+
+  const totalSeatPrice = useMemo(() => {
+    let sum = 0;
+    Object.values(selectedSeats || {}).forEach((v) => {
+      if (!v?.priceMap || !v?.list) return;
+      v.list.forEach((seat) => {
+        sum += v.priceMap[seat] || 0;
+      });
+    });
+    return sum;
+  }, [selectedSeats]);
+
+  const taxRate = 0.08;
+  const taxAmount = Math.round(totalBaseFare * taxRate);
+  const convenienceFee = 99;
+
+  const subtotal = totalBaseFare + taxAmount + convenienceFee + totalSeatPrice;
+  const totalAmount = Math.max(0, subtotal - (discountAmount || 0));
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden ">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-gray-700 to-gray-800 text-white p-5">
+        <h3 className="text-xl font-bold">Fare Summary</h3>
+        <p className="text-xs text-gray-300 mt-1">Complete price breakdown</p>
+      </div>
+
+      <div className="p-5 space-y-3">
+        {/* Base Fare */}
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">
+            Base Fare ({travelerCount} Adult)
+          </span>
+          <span className="font-semibold text-gray-900">
+            ₹{totalBaseFare.toLocaleString()}
+          </span>
+        </div>
+
+        {/* Taxes */}
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Taxes & Fees</span>
+          <span className="font-semibold text-gray-900">
+            ₹{taxAmount.toLocaleString()}
+          </span>
+        </div>
+
+        {/* Seat Charges */}
+        {totalSeatPrice > 0 && (
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Seat Charges</span>
+            <span className="font-semibold text-gray-900">
+              ₹{totalSeatPrice.toLocaleString()}
+            </span>
+          </div>
+        )}
+
+        {/* Convenience Fee */}
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Convenience Fee</span>
+          <span className="font-semibold text-gray-900">₹{convenienceFee}</span>
+        </div>
+
+        {/* Discount */}
+        {discountAmount > 0 && (
+          <div className="flex justify-between items-center text-green-600">
+            <span className="text-sm font-semibold">Discount</span>
+            <span className="font-semibold">
+              -₹{discountAmount.toLocaleString()}
+            </span>
+          </div>
+        )}
+
+        <div className="border-t border-gray-200 pt-3 mt-3 flex justify-between items-center">
+          <span className="text-lg font-bold text-gray-900">Total Payable</span>
+          <span className="text-xl font-bold text-blue-600">
+            ₹{totalAmount.toLocaleString()}
+          </span>
+        </div>
+
+        {/* Coupon */}
+        {/* <div className="pt-3 border-t border-gray-200">
+          <input
+            type="text"
+            value={couponCode}
+            onChange={onCouponChange}
+            placeholder="Enter coupon code"
+            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <button
+            onClick={onApplyCoupon}
+            className="mt-2 w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition"
+          >
+            Apply Coupon
+          </button>
+        </div> */}
+      </div>
+    </div>
+  );
+};
+
+// Important Information Component
+export const ImportantInformation = ({
+  expandedSections = {},
+  onToggleSection,
+  fareRules = null,
+  fareRulesStatus = "idle",
+}) => {
+  const sections = [
+    {
+      key: "fareRules",
+      title: "Fare Rules",
+      content: fareRules
+        ? [
+            "Cancellation Policy:",
+            ...fareRules.cancellation.map((x) => "• " + x),
+            "",
+            "Date Change Policy:",
+            ...fareRules.dateChange.map((x) => "• " + x),
+            "",
+            "Baggage Rules:",
+            ...fareRules.baggage.map((x) => "• " + x),
+            "",
+            "Important Information:",
+            ...fareRules.important.map((x) => "• " + x),
+          ]
+        : [
+            fareRulesStatus === "loading"
+              ? "Fetching fare rules..."
+              : "No fare rules available for this fare.",
+          ],
+    },
+    {
+      key: "checkIn",
+      title: "Check-in Policy",
+      content: [
+        "• Web check-in opens 48 hours before departure",
+        "• Airport check-in: 2 hours before domestic, 3 hours before international",
+        "• Boarding gate closes 25 minutes before departure",
+      ],
+    },
+    {
+      key: "travelDocs",
+      title: "Travel Documents",
+      content: [
+        "• Valid government-issued photo ID required",
+        "• Passport mandatory for international flights",
+        "• Visa requirements vary by destination",
+      ],
+    },
+  ];
+
+  return (
+    <div className="space-y-3">
+      {sections.map((section) => (
+        <div
+          key={section.key}
+          className="border border-gray-200 rounded-lg overflow-hidden"
+        >
+          <button
+            onClick={() => onToggleSection(section.key)}
+            className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition"
+          >
+            <span className="font-semibold text-gray-900">{section.title}</span>
+            {expandedSections[section.key] ? (
+              <AiOutlineMinus className="text-gray-600" />
+            ) : (
+              <AiOutlinePlus className="text-gray-600" />
+            )}
+          </button>
+          {expandedSections[section.key] && (
+            <div className="p-4 space-y-2 text-sm text-gray-600 bg-white">
+              {section.content.map((line, idx) => (
+                <p key={idx}>{line}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export const FareRulesAccordion = ({
+  fareRules = null,
+  fareRulesStatus = "idle",
+}) => {
+  const [open, setOpen] = useState({
+    cancellation: false,
+    dateChange: false,
+    baggage: false,
+    important: false,
+  });
+
+  const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  if (fareRulesStatus === "loading") {
+    return (
+      <div className="text-center py-4 text-gray-600 font-medium">
+        Fetching fare rules...
+      </div>
+    );
+  }
+
+  if (!fareRules) {
+    return (
+      <div className="text-center py-4 text-gray-600 font-medium">
+        Fare rules not available for this fare.
+      </div>
+    );
+  }
+
+  const sections = [
+    {
+      key: "cancellation",
+      title: "Cancellation Rules",
+      icon: <MdCancel className="text-red-500 text-xl" />,
+      data: fareRules.cancellation,
+      bg: "from-red-50 to-red-100 border-red-400",
+    },
+    {
+      key: "dateChange",
+      title: "Date Change / Reschedule",
+      icon: <MdAutorenew className="text-blue-500 text-xl" />,
+      data: fareRules.dateChange,
+      bg: "from-blue-50 to-blue-100 border-blue-400",
+    },
+    {
+      key: "baggage",
+      title: "Baggage Rules",
+      icon: <MdWork className="text-yellow-600 text-xl" />,
+      data: fareRules.baggage,
+      bg: "from-yellow-50 to-yellow-100 border-yellow-400",
+    },
+    {
+      key: "important",
+      title: "Important Notes",
+      icon: <MdInfo className="text-purple-600 text-xl" />,
+      data: fareRules.important,
+      bg: "from-purple-50 to-purple-100 border-purple-400",
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {sections.map((sec) => (
+        <div
+          key={sec.key}
+          className={`rounded-xl overflow-hidden border shadow-sm bg-linear-to-r ${sec.bg}`}
+        >
+          {/* Header */}
+          <button
+            onClick={() => toggle(sec.key)}
+            className="w-full flex items-center justify-between p-4"
+          >
+            <div className="flex items-center gap-3">
+              {sec.icon}
+              <span className="font-semibold text-gray-900">{sec.title}</span>
+            </div>
+
+            <span className="text-gray-700 text-lg">
+              {open[sec.key] ? "−" : "+"}
+            </span>
+          </button>
+
+          {/* Content */}
+          {open[sec.key] && (
+            <div className="bg-white p-4 border-t border-gray-200 space-y-2 animate-fadeIn">
+              {sec.data.length > 0 ? (
+                sec.data.map((line, i) => (
+                  <p key={i} className="text-sm text-gray-700 flex gap-2">
+                    <span className="text-orange-500 mt-1">•</span>
+                    {line}
+                  </p>
+                ))
+              ) : (
+                <p className="text-sm text-gray-600">
+                  No information available.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Baggage Table Component
+export const BaggageTable = ({ baggageInfo = {}, fareClass = "" }) => {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="border border-gray-300 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <BsLuggage className="text-orange-600" />
+          <h4 className="font-bold">Cabin Baggage</h4>
+        </div>
+        <p className="text-sm text-gray-600">
+          {baggageInfo?.cB || "7 Kg per passenger"}
+        </p>
+      </div>
+
+      <div className="border border-gray-300 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <BsLuggage className="text-orange-600 text-xl" />
+          <h4 className="font-bold">Check-In Baggage</h4>
+        </div>
+        <p className="text-sm text-gray-600">
+          {baggageInfo?.iB || "15 Kg per passenger"}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export const TravelerForm = ({
+  travelers = [],
+  addTraveler,
+  removeTraveler,
+  updateTraveler,
+}) => {
+  if (!Array.isArray(travelers)) travelers = [];
+
+  return (
+    <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+      {/* ================= HEADER ================= */}
+      <div className="bg-linear-to-r from-[#1a2957] to-[#24a7c] text-white p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center shadow-lg">
+              <FaUser className="text-white text-xl" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold">Traveler Details</h2>
+              <p className="text-sm text-blue-100 font-medium">
+                Enter passenger information
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={addTraveler}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-semibold transition shadow-md"
+          >
+            <IoPersonAdd size={20} />
+            <span>Add Adult</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ================= BODY ================= */}
+      <div className="p-6 space-y-6 bg-linear-to-b from-gray-50 to-white">
+        {travelers.map((traveler, index) => (
+          <div
+            key={traveler.id ?? index}
+            className="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition"
+          >
+            {/* ===== Traveler Header ===== */}
+            <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center">
+                  <FaUser className="text-white" />
+                </div>
+                <h3 className="font-bold text-blue-900 text-lg">
+                  {`${index + 1} Adult (12yrs+) `}
+                </h3>
+              </div>
+
+              {travelers.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeTraveler(traveler.id)}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-semibold transition border border-red-200"
+                >
+                  <IoPersonRemove size={18} />
+                  Remove
+                </button>
+              )}
+            </div>
+
+            {/* ===== Name Section ===== */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Title <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={traveler.title || "Mr."}
+                  onChange={(e) =>
+                    updateTraveler(traveler.id, "title", e.target.value)
+                  }
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  required
+                >
+                  <option>Mr.</option>
+                  <option>Ms.</option>
+                  <option>Mrs.</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  First Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={traveler.firstName || ""}
+                  onChange={(e) =>
+                    updateTraveler(traveler.id, "firstName", e.target.value)
+                  }
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Middle Name
+                </label>
+                <input
+                  type="text"
+                  value={traveler.middleName || ""}
+                  onChange={(e) =>
+                    updateTraveler(traveler.id, "middleName", e.target.value)
+                  }
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Last Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={traveler.lastName || ""}
+                  onChange={(e) =>
+                    updateTraveler(traveler.id, "lastName", e.target.value)
+                  }
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* ===== Primary Adult Extra Fields ===== */}
+            {/* {index === 0 && ( */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={traveler.email || ""}
+                  onChange={(e) =>
+                    updateTraveler(traveler.id, "email", e.target.value)
+                  }
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Mobile Number <span className="text-red-500">*</span>
+                </label>
+                <PhoneInput
+                  country={"in"}
+                  value={traveler.phoneWithCode || ""}
+                  onChange={(phone) =>
+                    updateTraveler(traveler.id, "phoneWithCode", phone)
+                  }
+                  enableSearch
+                  containerStyle={{ width: "100%" }}
+                  inputStyle={{
+                    width: "100%",
+                    height: "48px",
+                    border: "2px solid #d1d5db",
+                    borderRadius: "0.5rem",
+                    paddingLeft: "48px",
+                  }}
+                  required
+                />
+              </div>
+            </div>
+            {/*)} */}
+
+            {/* ===== Gender + Age ===== */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Gender <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={traveler.gender || ""}
+                  onChange={(e) =>
+                    updateTraveler(traveler.id, "gender", e.target.value)
+                  }
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  required
+                >
+                  <option value="">Select Gender</option>
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Age <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={12}
+                  value={traveler.age ?? ""}
+                  onChange={(e) =>
+                    updateTraveler(
+                      traveler.id,
+                      "age",
+                      parseInt(e.target.value || "0")
+                    )
+                  }
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* ===== Note ===== */}
+            <div className="mt-6 bg-blue-50 border-l-4 border-blue-900 p-4 rounded-lg">
+              <p className="text-sm text-gray-700">
+                <span className="font-bold text-blue-900">Note:</span> Ensure
+                all details match your government ID.
+              </p>
+            </div>
+          </div>
+        ))}
+
+        {/* ===== ADD NEW ADULT ===== */}
+        <div className="flex justify-center pt-4">
+          <button
+            type="button"
+            onClick={addTraveler}
+            className="flex items-center gap-2 px-6 py-3 border-2 border-dashed border-orange-500 text-orange-600 hover:bg-orange-50 rounded-xl font-bold transition"
+          >
+            <IoPersonAdd size={20} />+ ADD NEW ADULT
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const CTABox = () => {
+  return (
+    <div className="bg-linear-to-r from-blue-50 to-blue-100 border-l-4 border-blue-900 rounded-lg p-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center shrink-0">
+          <BsInfoCircleFill className="text-white text-lg" />
+        </div>
+        <div>
+          <p className="text-sm font-bold text-blue-900">Need Help?</p>
+          <p className="text-xs text-gray-700">
+            Call us at{" "}
+            <span className="font-bold text-blue-900">1800-123-4567</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const HotelHomeButton = () => {
+  const navigate = useNavigate();
+  return (
+    <div className="bg-white rounded-lg border border-gray-300 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <RiHotelLine className="text-orange-600 text-xl font-bold" />
+        <span className="text-base font-semibold text-gray-900">
+          Need a Hotel?
+        </span>
+      </div>
+      <p className="text-xs text-gray-600">
+        Save up to 20% when booking hotel with your flight
+      </p>
+      <button
+        onClick={() => navigate("/search-hotel")}
+        className="w-full py-3 border border-gray-300 text-gray-900 rounded-lg text-sm font-semibold hover:bg-blue-600 hover:text-white transition duration-500 cursor-pointer"
+      >
+        Browse Hotels
+      </button>
+    </div>
+  );
+};
+
+export const Amenities = () => {
+  return (
+    <div className="bg-white rounded-lg p-4 border border-gray-200">
+      <h4 className="text-sm font-semibold text-gray-900 mb-3">Amenities</h4>
+      <div className="flex flex-wrap gap-2">
+        <span className="px-3 py-1.5 border border-gray-300 text-gray-900 rounded-full text-xs font-medium flex items-center gap-1.5">
+          <FaWifi />
+          Wi-Fi
+        </span>
+        <span className="px-3 py-1.5 border border-gray-300 text-gray-900 rounded-full text-xs font-medium flex items-center gap-1.5">
+          <PiForkKnifeBold />
+          Meal
+        </span>
+        <span className="px-3 py-1.5 border border-gray-300 text-gray-900 rounded-full text-xs font-medium flex items-center gap-1.5">
+          <BsTag />
+          Power
+        </span>
+      </div>
+    </div>
+  );
+};
+
+export default {
+  orangeText,
+  orangeBg,
+  blueBg,
+  blueText,
+  grayText,
+  greenText,
+  lightGreenBg,
+  formatTime,
+  formatDate,
+  getAirlineLogo,
+  formatDuration,
+  formatDurationCompact,
+  parseFlightData,
+  FlightTimeline,
+  FareOptions,
+  PriceSummary,
+  ImportantInformation,
+  BaggageTable,
+  TravelerForm,
+  FareRulesAccordion,
+  CTABox,
+  HotelHomeButton,
+  Amenities,
+};
