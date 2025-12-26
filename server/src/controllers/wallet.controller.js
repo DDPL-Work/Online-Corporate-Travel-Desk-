@@ -1,3 +1,6 @@
+
+/// controllers/wallet.controller.js
+
 const Corporate = require('../models/Corporate');
 const WalletTransaction = require('../models/Wallet');
 const paymentService = require('../services/payment.service');

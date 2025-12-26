@@ -97,6 +97,44 @@ class FlightService {
     }
   }
 
+/* ---------------- FARE RULE ---------------- */
+async getFareRule(traceId, resultIndex) {
+  if (!traceId || !resultIndex) {
+    throw new ApiError(400, 'traceId and resultIndex are required');
+  }
+
+  // Dummy support
+  if (process.env.NODE_ENV !== 'production') {
+    return {
+      FareRules: [
+        {
+          Airline: "AI",
+          Origin: "DEL",
+          Destination: "BOM",
+          FareBasisCode: "Y",
+          FareRestriction: "Non Refundable",
+          FareRuleDetail: [
+            "Cancellation fee applies",
+            "Reissue charges applicable"
+          ]
+        }
+      ]
+    };
+  }
+
+  // LIVE
+  return this.postLive(
+    '/BookingEngineService_Air/AirService.svc/rest/FareRule',
+    {
+      TraceId: traceId,
+      ResultIndex: resultIndex
+    },
+    'live'
+  );
+}
+
+
+
 
 /* ---------------- FARE QUOTE ---------------- */
 async getFareQuote(traceId, resultIndex) {
@@ -131,45 +169,70 @@ async getFareQuote(traceId, resultIndex) {
     'live'
   );
 }
-/* ---------------- SSR ---------------- */
+
+/* ---------------- REAL SSR ---------------- */
 async getSSR(traceId, resultIndex) {
-  // 🔹 Dummy response
+  // Dummy for non-production
   if (process.env.NODE_ENV !== 'production') {
     return {
       Status: 1,
       TraceId: traceId,
       Results: {
-        Baggage: [
+        Baggage: [],
+        Meal: [],
+        Seat: []
+      }
+    };
+  }
+
+  // LIVE SSR
+  return this.postLive(
+    config.live.endpoints.flightSSR,
+    {
+      TraceId: traceId,
+      ResultIndex: resultIndex
+    },
+    'live'
+  );
+}
+
+/* ---------------- FARE UPSELL ---------------- */
+async getFareUpsell(traceId, resultIndex) {
+  if (!traceId || !resultIndex) {
+    throw new ApiError(400, 'traceId and resultIndex are required');
+  }
+
+  // Dummy support
+  if (process.env.NODE_ENV !== 'production') {
+    return {
+      TraceId: traceId,
+      ResponseStatus: 1,
+      IsPriceChanged: false,
+      UpsellOptionsList: {
+        UpsellList: [
           {
-            AirlineCode: "AI",
-            Weight: "15KG",
-            Price: 1200,
-            Currency: "INR"
-          }
-        ],
-        Meal: [
-          {
-            Code: "VGML",
-            Description: "Vegetarian Meal",
-            Price: 450,
-            Currency: "INR"
-          }
-        ],
-        Seat: [
-          {
-            RowNo: "12",
-            SeatNo: "A",
-            Price: 350,
-            Currency: "INR"
+            FareFamilyCode: "ECONOMY_PLUS",
+            FareFamilyName: "Economy Plus",
+            PassengerType: 1,
+            ServicesList: [
+              {
+                Code: "SEAT",
+                IsChargeable: false,
+                IsIncluded: true,
+                ServiceType: "Seat",
+                SSRCode: "SEAT",
+                UpsellDescription: "Free Seat Selection"
+              }
+            ]
           }
         ]
       }
     };
   }
 
-  // 🔹 Live
+  // LIVE FARE UPSELL
   return this.postLive(
-    config.live.endpoints.flightSSR,
+    '/BookingEngineService_Air/AirService.svc/rest/FareUpsell',
     {
       TraceId: traceId,
       ResultIndex: resultIndex
@@ -185,16 +248,19 @@ async getSSR(traceId, resultIndex) {
 /* ---------------- BOOK (NON-LCC HOLDservice) ---------------- */
 async bookFlight({ traceId, resultIndex, fareQuote, passengers }) {
 
+  // 🔹 Extract main fare object
+  const fare = fareQuote?.Results?.[0]?.Fare;
+  if (!fare) throw new ApiError(400, "Fare is missing from fareQuote");
+
   const payload = {
     TraceId: traceId,
     ResultIndex: resultIndex,
-
-    IsLCC: fareQuote.IsLCC,
-
-    Fare: fareQuote.Fare,   // 🔥 FULL Fare object
-
-    Passengers: passengers.map(p => this.mapPassenger(p)),
-
+    IsLCC: false,
+    Fare: fare, // ✅ main fare
+    Passengers: passengers.map((p, idx) => ({
+      ...this.mapPassenger(p),
+      Fare: fareQuote.FareBreakdown?.[idx] || fare  // ✅ per passenger fare
+    })),
     GSTDetails: {
       GSTCompanyAddress: "",
       GSTCompanyContactNumber: "",
@@ -204,19 +270,18 @@ async bookFlight({ traceId, resultIndex, fareQuote, passengers }) {
     }
   };
 
- const response = await this.postLive(
-  config.live.endpoints.flightBook,
-  payload,
-  'live'
-);
-
-if (response?.Response?.ResponseStatus !== 1) {
-  throw new ApiError(
-    400,
-    response?.Response?.Error?.ErrorMessage || 'Booking failed'
+  const response = await this.postLive(
+    config.live.endpoints.flightBook,
+    payload,
+    'live'
   );
-}
 
+  if (response?.Response?.ResponseStatus !== 1) {
+    throw new ApiError(
+      400,
+      response?.Response?.Error?.ErrorMessage || 'Booking failed'
+    );
+  }
 
   return {
     bookingId: response.FlightItinerary.BookingId,
@@ -225,13 +290,44 @@ if (response?.Response?.ResponseStatus !== 1) {
 }
 
 
+
+
   /* ---------------- TICKET ---------------- */
-  async ticketFlight(bookingId, pnr) {
-    return this.postLive(config.live.endpoints.flightTicket, {
-      BookingId: bookingId,
-      PNR: pnr
-    });
+
+async ticketFlight(payload) {
+
+  // 🔹 LCC → DIRECT TICKET
+  if (payload.IsLCC === true) {
+    return this.postLive(
+      config.live.endpoints.flightTicket,
+      {
+        TraceId: payload.traceId,
+        ResultIndex: payload.resultIndex,
+        Fare: payload.fareQuote.Fare,
+        Passengers: payload.passengers.map(p => this.mapPassenger(p))
+      },
+      'live'
+    );
   }
+
+  // 🔹 NON-LCC → BOOKING BASED TICKET
+  if (!payload.bookingId || !payload.pnr) {
+    throw new ApiError(
+      400,
+      'bookingId and pnr are required for Non-LCC ticketing'
+    );
+  }
+
+  return this.postLive(
+    config.live.endpoints.flightTicket,
+    {
+      BookingId: payload.bookingId,
+      PNR: payload.pnr
+    },
+    'live'
+  );
+}
+
 
   /* ---------------- PASSENGER MAPPER ---------------- */
 mapPassenger(pax) {

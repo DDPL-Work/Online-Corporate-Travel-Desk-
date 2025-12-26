@@ -23,7 +23,7 @@ const limiter = rateLimit({
 // Specific limiters for different endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,
+  max: 150,
   skipSuccessfulRequests: true,
   message: {
     success: false,
@@ -33,7 +33,7 @@ const authLimiter = rateLimit({
 
 const searchLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 30,
+  max: 130,
   message: {
     success: false,
     error: 'Too many search requests, please slow down.'
@@ -42,7 +42,7 @@ const searchLimiter = rateLimit({
 
 const bookingLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 50,
+  max: 150,
   message: {
     success: false,
     error: 'Too many booking requests, please try again later.'

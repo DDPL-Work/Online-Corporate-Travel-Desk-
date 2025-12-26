@@ -1,3 +1,5 @@
+// config/payment.config.js
+
 const Razorpay = require('razorpay');
 
 const razorpayInstance = new Razorpay({

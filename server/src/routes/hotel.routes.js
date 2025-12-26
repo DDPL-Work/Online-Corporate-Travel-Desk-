@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
+
 const hotelController = require('../controllers/hotel.controller');
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
-const { validate } = require('../middleware/validate.middleware');
+const validate = require('../middleware/validate.middleware'); // ✅ FIX
 const { bookingValidation } = require('../validations');
 const { searchLimiter } = require('../middleware/rateLimit.middleware');
 
@@ -19,6 +20,10 @@ router.post(
 );
 
 // Hotel details (GET)
-router.get('/:hotelCode', hotelController.getHotelDetails);
+router.get(
+  '/:hotelCode',
+  authorizeRoles('manager', 'travel-admin', 'corporateAdmin'),
+  hotelController.getHotelDetails
+);
 
 module.exports = router;

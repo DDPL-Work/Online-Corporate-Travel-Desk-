@@ -1,3 +1,5 @@
+// models/OfflineVoucher.js
+
 const mongoose = require('mongoose');
 
 const offlineVoucherSchema = new mongoose.Schema({

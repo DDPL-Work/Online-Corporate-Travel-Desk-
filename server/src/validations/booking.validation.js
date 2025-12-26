@@ -1,5 +1,4 @@
 // booking.validation.js
-
 const Joi = require("joi");
 
 /* ---------------- SSR ---------------- */
@@ -7,7 +6,6 @@ const ssr = Joi.object({
   traceId: Joi.string().required(),
   resultIndex: Joi.string().required(),
 });
-
 
 // Create booking
 const createBooking = Joi.object({
@@ -22,52 +20,56 @@ const createBooking = Joi.object({
   requestData: Joi.any(),
 });
 
+// ✅ Updated Flight Booking Validation
 const bookFlight = Joi.object({
   traceId: Joi.string().required(),
   resultIndex: Joi.string().required(),
 
-  fareQuote: Joi.object({
-    IsLCC: Joi.boolean().required(),
-
+  // Top-level Fare
+  Fare: Joi.object({
     Currency: Joi.string().required(),
     BaseFare: Joi.number().required(),
     Tax: Joi.number().required(),
-    PublishedFare: Joi.number().required(),
-    OfferedFare: Joi.number().optional(),
-
     YQTax: Joi.number().optional(),
-    OtherCharges: Joi.number().optional(),
-    Discount: Joi.number().optional(),
-
-    CommissionEarned: Joi.number().optional(),
-    PLBEarned: Joi.number().optional(),
-    IncentiveEarned: Joi.number().optional(),
-
-    ServiceFee: Joi.number().optional(),
-    TotalBaggageCharges: Joi.number().optional(),
-    TotalMealCharges: Joi.number().optional(),
-    TotalSeatCharges: Joi.number().optional(),
-    TotalSpecialServiceCharges: Joi.number().optional()
+    TransactionFee: Joi.number().optional(),
+    AdditionalTxnFeeOfrd: Joi.number().optional(),
+    AdditionalTxnFeePub: Joi.number().optional(),
+    AirTransFee: Joi.number().optional(),
+    PublishedFare: Joi.number().required(),
+    OfferedFare: Joi.number().optional()
   }).required(),
 
-  passengers: Joi.array().items(
-    Joi.object({
-      title: Joi.string().required(),
-      firstName: Joi.string().required(),
-      lastName: Joi.string().required(),
-      paxType: Joi.string().valid("ADULT", "CHILD", "INFANT").required(),
-
-      gender: Joi.string().valid("Male", "Female").required(),
-      contactNo: Joi.string().required(),
-      email: Joi.string().email().required(),
-
-      dateOfBirth: Joi.date().optional(),
-
-      passportNo: Joi.string().optional(),
-      passportExpiry: Joi.date().optional(),
-      passportIssueDate: Joi.date().optional()
-    })
-  ).min(1).required(),
+  // Passengers
+  passengers: Joi.array()
+    .items(
+      Joi.object({
+        title: Joi.string().required(),
+        firstName: Joi.string().required(),
+        lastName: Joi.string().required(),
+        paxType: Joi.string().valid("ADULT", "CHILD", "INFANT").required(),
+        gender: Joi.string().valid("Male", "Female").required(),
+        contactNo: Joi.string().required(),
+        email: Joi.string().email().required(),
+        dateOfBirth: Joi.date().optional(),
+        passportNo: Joi.string().optional(),
+        passportExpiry: Joi.date().optional(),
+        passportIssueDate: Joi.date().optional(),
+        Fare: Joi.object({  // Optional now
+          Currency: Joi.string().required(),
+          BaseFare: Joi.number().required(),
+          Tax: Joi.number().required(),
+          YQTax: Joi.number().optional(),
+          TransactionFee: Joi.number().optional(),
+          AdditionalTxnFeeOfrd: Joi.number().optional(),
+          AdditionalTxnFeePub: Joi.number().optional(),
+          AirTransFee: Joi.number().optional(),
+          PublishedFare: Joi.number().required(),
+          OfferedFare: Joi.number().optional()
+        }).optional()
+      })
+    )
+    .min(1)
+    .required(),
 
   ssr: Joi.object({
     baggage: Joi.array().optional(),
@@ -77,8 +79,6 @@ const bookFlight = Joi.object({
 
   isHold: Joi.boolean().default(false)
 });
-
-
 
 // Approve / Reject
 const approverAction = Joi.object({
@@ -103,15 +103,12 @@ const searchFlights = Joi.object({
   cabinClass: Joi.string().valid("economy", "business", "first").default("economy"),
 });
 
-
-
+// Other validations
 const fareQuote = Joi.object({
   traceId: Joi.string().required(),
-  resultIndex: Joi.string().required(), // ✔ change from number to string
+  resultIndex: Joi.string().required(),
 });
 
-
-// Hotel search
 const searchHotel = Joi.object({
   cityCode: Joi.string().required(),
   checkIn: Joi.date().required(),
@@ -120,13 +117,31 @@ const searchHotel = Joi.object({
   guests: Joi.number().min(1).required(),
 });
 
+const ticketFlight = Joi.object({
+  bookingId: Joi.string().required(),
+  pnr: Joi.string().required(),
+});
+
+const fareUpsell = Joi.object({
+  traceId: Joi.string().required(),
+  resultIndex: Joi.string().required(),
+});
+
+const fareRule = Joi.object({
+  traceId: Joi.string().required(),
+  resultIndex: Joi.string().required()
+});
+
 module.exports = {
   createBooking,
   approverAction,
   confirmBooking,
   searchFlights,
-  fareQuote,     
+  fareQuote,
   searchHotel,
   ssr,
   bookFlight,
+  ticketFlight,
+  fareUpsell,
+  fareRule
 };
