@@ -289,7 +289,14 @@ export const FlightTimeline = ({
                           Duration: {formatDurationCompact(segment.duration)} •{" "}
                           {segment.fD?.eT || "Aircraft"}
                         </p>
-                        
+                        <button
+                          onClick={() => openSeatModal(idx)}
+                          className="mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 border border-blue-600 rounded-lg py-2 hover:bg-blue-600 hover:text-white transition"
+                        >
+                          <MdEventSeat />
+                          Select Seats
+                        </button>
+
                         {/* Selected seats */}
                         {(() => {
                           const seatKey = `${journeyType}|${idx}`;

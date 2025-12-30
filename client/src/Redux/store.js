@@ -8,7 +8,9 @@ import corporateListReducer from "./Slice/corporateListSlice.js";
 import employeeActionReducer from "./Slice/employeeActionSlice.js";
 import corporateAdminReducer from "./Slice/corporateAdminSlice.js";
 import walletReducer from "./Slice/walletSlice.js";
-import flightReducer from './Slice/flightSearchSlice.js'
+import flightReducer from "./Slice/flightSearchSlice.js";
+import walletRechargeLogsReducer from "./Slice/walletRechargeLogsSlice";
+import tboBalanceReducer from "./Slice/tboBalanceSlice";
 
 export const store = configureStore({
   reducer: {
@@ -22,5 +24,7 @@ export const store = configureStore({
     corporateAdmin: corporateAdminReducer,
     wallet: walletReducer,
     flights: flightReducer,
+    walletRechargeLogs: walletRechargeLogsReducer,
+    tboBalance: tboBalanceReducer,
   },
 });

@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FiFilter, FiDownload, FiCheckCircle, FiXCircle } from "react-icons/fi";
 import { FaRupeeSign, FaCreditCard, FaBuilding } from "react-icons/fa";
-import { walletRechargeLogs } from "../../data/dummyData";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchWalletRechargeLogs } from "../../Redux/Slice/walletRechargeLogsSlice";
 
 const colors = {
   primary: "#0A4D68",
@@ -17,35 +18,64 @@ export default function WalletRechargeLogs() {
   const [corporate, setCorporate] = useState("All");
   const [method, setMethod] = useState("All");
   const [status, setStatus] = useState("All");
+  const dispatch = useDispatch();
 
-  const corporates = ["All", ...new Set(walletRechargeLogs.map((r) => r.company))];
+  const { logs, loading } = useSelector((state) => state.walletRechargeLogs);
+
+  useEffect(() => {
+    dispatch(
+      fetchWalletRechargeLogs({
+        status: status !== "All" ? status.toUpperCase() : undefined,
+        corporateId: corporate !== "All" ? corporate : undefined,
+        from: startDate || undefined,
+        to: endDate || undefined,
+        page: 1,
+        limit: 100,
+      })
+    );
+  }, [dispatch, status, corporate, startDate, endDate]);
+
+  const normalizedLogs = useMemo(() => {
+    return logs.map((log) => ({
+      id: log._id,
+      date: new Date(log.createdAt).toLocaleDateString(),
+      company: log.corporateId?.corporateName || "—",
+      amount: log.amount,
+      method: "Razorpay", // backend truth
+      status:
+        log.status === "SUCCESS"
+          ? "Success"
+          : log.status === "FAILED"
+          ? "Failed"
+          : "Pending",
+    }));
+  }, [logs]);
+
+  const corporates = useMemo(() => {
+    return [
+      "All",
+      ...new Set(normalizedLogs.map((l) => l.company).filter(Boolean)),
+    ];
+  }, [normalizedLogs]);
+
+  // const corporates = [
+  //   "All",
+  //   ...new Set(walletRechargeLogs.map((r) => r.company)),
+  // ];
   const methods = ["All", "Bank Transfer", "UPI", "Card", "NEFT"];
   const statuses = ["All", "Success", "Failed", "Pending"];
 
-  // FILTERED DATA
-  const filtered = walletRechargeLogs.filter((log) => {
-    const logDate = new Date(log.date);
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+  const totalRecharge = normalizedLogs.reduce((sum, l) => sum + l.amount, 0);
 
-    const dateMatch = logDate >= start && logDate <= end;
-    const corpMatch = corporate === "All" || log.company === corporate;
-    const methodMatch = method === "All" || log.method === method;
-    const statusMatch = status === "All" || log.status === status;
+  const success = normalizedLogs.filter((l) => l.status === "Success").length;
 
-    return dateMatch && corpMatch && methodMatch && statusMatch;
-  });
+  const failed = normalizedLogs.filter((l) => l.status === "Failed").length;
 
-  // SUMMARY VALUES
-  const totalRecharge = filtered.reduce((sum, l) => sum + l.amount, 0);
-  const success = filtered.filter((l) => l.status === "Success").length;
-  const failed = filtered.filter((l) => l.status === "Failed").length;
-  const pending = filtered.filter((l) => l.status === "Pending").length;
+  const pending = normalizedLogs.filter((l) => l.status === "Pending").length;
 
   return (
     <div className="p-6" style={{ backgroundColor: colors.light }}>
       <div className="max-w-6xl mx-auto">
-
         {/* HEADER */}
         <h1 className="text-3xl font-bold mb-6" style={{ color: colors.dark }}>
           Wallet Recharge Logs
@@ -53,7 +83,6 @@ export default function WalletRechargeLogs() {
 
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-
           <SummaryCard
             title="Total Recharge Amount"
             value={`₹${totalRecharge.toLocaleString()}`}
@@ -81,7 +110,6 @@ export default function WalletRechargeLogs() {
             color="#F59E0B"
             icon={<FiXCircle size={26} />}
           />
-
         </div>
 
         {/* FILTERS */}
@@ -92,7 +120,6 @@ export default function WalletRechargeLogs() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-
             {/* Start Date */}
             <div>
               <label className="text-sm font-medium">Start Date</label>
@@ -156,7 +183,6 @@ export default function WalletRechargeLogs() {
                 ))}
               </select>
             </div>
-
           </div>
         </div>
 
@@ -177,29 +203,35 @@ export default function WalletRechargeLogs() {
             <table className="w-full text-left">
               <thead style={{ backgroundColor: colors.primary }}>
                 <tr>
-                  {["Date", "Company", "Amount", "Method", "Status"].map((h) => (
-                    <th
-                      key={h}
-                      className="px-6 py-3 text-sm text-white font-medium"
-                    >
-                      {h}
-                    </th>
-                  ))}
+                  {["Date", "Company", "Amount", "Method", "Status"].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        className="px-6 py-3 text-sm text-white font-medium"
+                      >
+                        {h}
+                      </th>
+                    )
+                  )}
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-gray-200">
-
-                {filtered.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan="5" className="text-center py-8 text-gray-500">
+                      Loading recharge logs...
+                    </td>
+                  </tr>
+                ) : normalizedLogs.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="text-center py-8 text-gray-500">
                       No recharge logs found
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((log) => (
+                  normalizedLogs.map((log) => (
                     <tr key={log.id} className="hover:bg-gray-50 transition">
-
                       <td className="px-6 py-4 text-sm">{log.date}</td>
 
                       <td className="px-6 py-4 text-sm flex items-center gap-2">
@@ -213,39 +245,35 @@ export default function WalletRechargeLogs() {
 
                       <td className="px-6 py-4 text-sm flex items-center gap-2">
                         <FaCreditCard className="text-[#05BFDB]" />
-                        {log.method}
+                        Razorpay
                       </td>
 
                       <td className="px-6 py-4 text-sm">
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-medium
-                            ${
-                              log.status === "Success"
-                                ? "bg-green-100 text-green-700"
-                                : log.status === "Failed"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-yellow-100 text-yellow-700"
-                            }
-                          `}
+            ${
+              log.status === "Success"
+                ? "bg-green-100 text-green-700"
+                : log.status === "Failed"
+                ? "bg-red-100 text-red-700"
+                : "bg-yellow-100 text-yellow-700"
+            }
+          `}
                         >
                           {log.status}
                         </span>
                       </td>
-
                     </tr>
                   ))
                 )}
-
               </tbody>
             </table>
           </div>
         </div>
-
       </div>
     </div>
   );
 }
-
 
 // Summary Card Component
 function SummaryCard({ title, value, color, icon }) {
