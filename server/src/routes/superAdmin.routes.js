@@ -11,6 +11,16 @@ router.post("/register", superAdminCtrl.registerSuperAdmin);
 router.post("/login", superAdminCtrl.loginSuperAdmin);
 
 // ---------------------
+// TBO (SUPER ADMIN ONLY)
+// ---------------------
+router.post(
+  "/tbo/agency-balance",
+  auth.verifyToken,
+  auth.verifySuperAdmin,
+  superAdminCtrl.getTboAgencyBalance
+);
+
+// ---------------------
 // PROTECTED ROUTES
 // ---------------------
 router.get(

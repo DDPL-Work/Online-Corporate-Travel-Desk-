@@ -27,6 +27,7 @@ import {
   getFareRule,
   getSSR,
 } from "../../../Redux/Actions/flight.thunks";
+import SeatSelectionModal from "./SeatSelectionModal";
 
 const normalizeFareOptions = ({ fareQuote, fareRule }) => {
   if (!fareQuote?.Results?.length) return [];
@@ -100,6 +101,8 @@ export default function OneFlightBooking() {
 
   const [parsedFlightData, setParsedFlightData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [seatModalOpen, setSeatModalOpen] = useState(false);
+  const [activeSegmentIndex, setActiveSegmentIndex] = useState(null);
 
   const [expandedSections, setExpandedSections] = useState({
     flightDetails: true,
@@ -262,6 +265,11 @@ export default function OneFlightBooking() {
     );
   }, [fareQuote, dispatch, searchParams, selectedFlight]);
 
+  const openSeatModal = (segmentIndex) => {
+    setActiveSegmentIndex(segmentIndex);
+    setSeatModalOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -404,8 +412,9 @@ export default function OneFlightBooking() {
                   <div className="bg-white rounded-xl p-5">
                     <FlightTimeline
                       segments={parsedFlightData.segments || []}
-                      isMultiWay={false}
-                      allSegmentsData={[]}
+                      selectedSeats={{}} // or your real state
+                      openSeatModal={openSeatModal}
+                      journeyType="onward"
                     />
                   </div>
                 </div>
@@ -486,6 +495,20 @@ export default function OneFlightBooking() {
           </div>
         </div>
       </div>
+      {seatModalOpen && (
+        <SeatSelectionModal
+          isOpen={seatModalOpen}
+          onClose={() => setSeatModalOpen(false)}
+          flightIndex={activeSegmentIndex}
+          journeyType="onward"
+          travelers={[]} // pass travelers array
+          selectedSeats={{}} // pass selectedSeats state
+          onSeatSelect={() => {}}
+          segment={parsedFlightData.segments[activeSegmentIndex]}
+          traceId={searchParams.traceId} // ✅ REQUIRED
+          resultIndex={selectedFlight.ResultIndex} // ✅ REQUIRED
+        />
+      )}
     </div>
   );
 }

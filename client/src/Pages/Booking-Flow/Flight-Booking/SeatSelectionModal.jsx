@@ -3,15 +3,13 @@ import { AiOutlineClose } from "react-icons/ai";
 import { FaArrowRight } from "react-icons/fa";
 import { MdEventSeat, MdFlightLand, MdFlightTakeoff } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
+import { getSeatMap } from "../../../Redux/Actions/flight.thunks";
 
-import {
-  fetchSeatMap,
-  selectSeatMap,
-  selectSeatMapStatus,
-} from "../../../Redux/Slice/flightSearchSlice";
-
-const ORANGE = "bg-[#F97415]";
-const BLUE = "bg-[#1a2957]";
+const PRIMARY_BG = "bg-blue-600";
+const PRIMARY_DARK = "bg-blue-900";
+const PRIMARY_TEXT = "text-blue-600";
+const PRIMARY_BORDER = "border-blue-600";
+const SUCCESS_BG = "bg-green-500";
 
 export const buildSeatMapPayload = ({
   bookingId,
@@ -70,12 +68,14 @@ export default function SeatSelectionModal({
   reviewResponse,
   segment,
   segmentIndex,
+  traceId,
+  resultIndex,
 }) {
   const dispatch = useDispatch();
-  const seatMap = useSelector(selectSeatMap);
-  const seatMapStatus = useSelector(selectSeatMapStatus);
+  const { seatMap, loading } = useSelector((state) => state.flights);
 
   const [seatsFlat, setSeatsFlat] = useState([]);
+  const fareQuote = useSelector((state) => state.flights.fareQuote);
 
   /* ---------- fetch seatmap when opened ---------- */
   useEffect(() => {
@@ -86,83 +86,112 @@ export default function SeatSelectionModal({
       reviewResponse,
     });
 
-    if (isOpen && bookingId && reviewResponse && segment) {
-      dispatch(
-        fetchSeatMap({
-          bookingId,
-          reviewResponse,
-          segment,
-          segmentIndex,
-          journeyType,
-          date,
-        })
-      );
-    }
-  }, [isOpen, bookingId, reviewResponse, segment]);
+    if (!isOpen || !traceId || !resultIndex || !fareQuote) return;
+
+    const isLCC = fareQuote?.Results?.[0]?.IsLCC;
+
+    dispatch(
+      getSeatMap({
+        traceId,
+        resultIndex,
+        isLCC,
+      })
+    );
+  }, [isOpen, traceId, resultIndex, fareQuote, dispatch]);
 
   /* ---------- parse different TripJack formats ---------- */
+  // useEffect(() => {
+  //   if (!seatMap) return;
+
+  //   // helper to normalize seat entries -> items with row,column,seatNo,price,flags
+  //   const normalizeFromSInfo = (sinfo) =>
+  //     sinfo.map((s) => ({
+  //       seatNo: s.seatNo,
+  //       row: Number(s.seatPosition?.row) || null,
+  //       col: Number(s.seatPosition?.column) || null,
+  //       price: Number(s.amount || s.price || 0) || 0,
+  //       occupied: !!s.isBooked,
+  //       premium: !!s.isLegroom,
+  //       exitRow: !!s.isExitRow,
+  //       isAisle: !!s.isAisle,
+  //       raw: s,
+  //     }));
+
+  //   // 1) dynamic-key format: tripSeatMap.tripSeat.{<dynamicKey>}.sInfo
+  //   const tripSeatRoot = seatMap?.tripSeatMap?.tripSeat;
+  //   if (tripSeatRoot && typeof tripSeatRoot === "object") {
+  //     const keys = Object.keys(tripSeatRoot).filter((k) => k !== "__proto__");
+  //     if (keys.length) {
+  //       // prefer block that has sInfo
+  //       const blockKey =
+  //         keys.find((k) => Array.isArray(tripSeatRoot[k]?.sInfo)) || keys[0];
+  //       const block = tripSeatRoot[blockKey];
+  //       if (block?.sInfo && Array.isArray(block.sInfo)) {
+  //         setSeatsFlat(normalizeFromSInfo(block.sInfo));
+  //         return;
+  //       }
+  //     }
+  //   }
+
+  //   // 2) older: seatMap -> array of rows each with seats array
+  //   if (Array.isArray(seatMap?.seatMap)) {
+  //     const arr = [];
+  //     seatMap.seatMap.forEach((r) => {
+  //       (r.seats || []).forEach((s) => {
+  //         arr.push({
+  //           seatNo: `${r.row}${s.column}`,
+  //           row: Number(r.row) || null,
+  //           col: Number(s.column) || null,
+  //           price: Number(s.amount || 0) || 0,
+  //           occupied: ["O", "BOOKED"].includes(s.status) || !!s.isBooked,
+  //           premium: s.type === "P" || !!s.isLegroom,
+  //           exitRow: s.type === "E",
+  //           isAisle: !!s.isAisle,
+  //           raw: s,
+  //         });
+  //       });
+  //     });
+  //     setSeatsFlat(arr);
+  //     return;
+  //   }
+
+  //   // 3) fallback: maybe tripSeatMap.tripSeat directly is array
+  //   if (Array.isArray(seatMap?.tripSeatMap?.tripSeat)) {
+  //     setSeatsFlat(normalizeFromSInfo(seatMap.tripSeatMap.tripSeat));
+  //     return;
+  //   }
+
+  //   console.warn("SeatSelectionModal: unknown seat map shape", seatMap);
+  // }, [seatMap]);
+
   useEffect(() => {
-    if (!seatMap) return;
-
-    // helper to normalize seat entries -> items with row,column,seatNo,price,flags
-    const normalizeFromSInfo = (sinfo) =>
-      sinfo.map((s) => ({
-        seatNo: s.seatNo,
-        row: Number(s.seatPosition?.row) || null,
-        col: Number(s.seatPosition?.column) || null,
-        price: Number(s.amount || s.price || 0) || 0,
-        occupied: !!s.isBooked,
-        premium: !!s.isLegroom,
-        exitRow: !!s.isExitRow,
-        isAisle: !!s.isAisle,
-        raw: s,
-      }));
-
-    // 1) dynamic-key format: tripSeatMap.tripSeat.{<dynamicKey>}.sInfo
-    const tripSeatRoot = seatMap?.tripSeatMap?.tripSeat;
-    if (tripSeatRoot && typeof tripSeatRoot === "object") {
-      const keys = Object.keys(tripSeatRoot).filter((k) => k !== "__proto__");
-      if (keys.length) {
-        // prefer block that has sInfo
-        const blockKey =
-          keys.find((k) => Array.isArray(tripSeatRoot[k]?.sInfo)) || keys[0];
-        const block = tripSeatRoot[blockKey];
-        if (block?.sInfo && Array.isArray(block.sInfo)) {
-          setSeatsFlat(normalizeFromSInfo(block.sInfo));
-          return;
-        }
-      }
+    if (!seatMap?.rows?.length) {
+      setSeatsFlat([]);
+      return;
     }
 
-    // 2) older: seatMap -> array of rows each with seats array
-    if (Array.isArray(seatMap?.seatMap)) {
-      const arr = [];
-      seatMap.seatMap.forEach((r) => {
-        (r.seats || []).forEach((s) => {
-          arr.push({
-            seatNo: `${r.row}${s.column}`,
-            row: Number(r.row) || null,
-            col: Number(s.column) || null,
-            price: Number(s.amount || 0) || 0,
-            occupied: ["O", "BOOKED"].includes(s.status) || !!s.isBooked,
-            premium: s.type === "P" || !!s.isLegroom,
-            exitRow: s.type === "E",
-            isAisle: !!s.isAisle,
-            raw: s,
-          });
+    const flat = [];
+
+    seatMap.rows.forEach((row) => {
+      const rowNo = Number(row.RowNo);
+
+      row.Seats.forEach((seat, colIndex) => {
+        if (seat.Code === "NoSeat") return;
+
+        flat.push({
+          seatNo: seat.Code,
+          row: rowNo,
+          col: colIndex + 1,
+          price: seat.Price || 0,
+          occupied: seat.AvailablityType === 3,
+          premium: seat.SeatType === 4,
+          exitRow: seat.SeatType === 5,
+          isAisle: false, // aisle inferred by NoSeat gaps
         });
       });
-      setSeatsFlat(arr);
-      return;
-    }
+    });
 
-    // 3) fallback: maybe tripSeatMap.tripSeat directly is array
-    if (Array.isArray(seatMap?.tripSeatMap?.tripSeat)) {
-      setSeatsFlat(normalizeFromSInfo(seatMap.tripSeatMap.tripSeat));
-      return;
-    }
-
-    console.warn("SeatSelectionModal: unknown seat map shape", seatMap);
+    setSeatsFlat(flat);
   }, [seatMap]);
 
   /* ---------- derive grid dimensions and matrix ---------- */
@@ -233,7 +262,7 @@ export default function SeatSelectionModal({
         <div className="text-xs text-gray-600">Booked / Occupied</div>
       </div>
       <div className="flex items-center gap-2">
-        <div className="w-5 h-5 bg-yellow-100 border rounded-sm" />
+        <div className="w-5 h-5 bg-blue-50 border border-blue-300 rounded-sm" />
         <div className="text-xs text-gray-600">Premium / Extra legroom</div>
       </div>
       <div className="flex items-center gap-2">
@@ -247,7 +276,7 @@ export default function SeatSelectionModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
@@ -255,13 +284,9 @@ export default function SeatSelectionModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* header */}
-        <div
-          className={`${BLUE} p-5 flex items-start justify-between gap-4 shrink-0`}
-        >
+        <div className="bg-linear-to-r from-blue-900 to-blue-700 p-5 flex items-start justify-between gap-4 shrink-0">
           <div className="flex items-start gap-4">
-            <div
-              className={`w-12 h-12 ${ORANGE} rounded-full flex items-center justify-center`}
-            >
+            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-md">
               <MdEventSeat className="text-white text-2xl" />
             </div>
             <div>
@@ -291,25 +316,25 @@ export default function SeatSelectionModal({
         <div className="flex-1 lg:flex overflow-hidden">
           {/* left: seat grid */}
           <div className="flex-1 p-6 overflow-auto">
-            {seatMapStatus === "loading" && (
+            {loading && (
               <div className="text-center py-12 text-gray-600">
                 Loading seat map…
               </div>
             )}
 
-            {seatMapStatus === "failed" && (
+            {/* {seatMapStatus === "failed" && (
               <div className="text-center py-12 text-red-600 font-semibold">
                 Failed to load seat map
               </div>
-            )}
+            )} */}
 
-            {seatMapStatus === "succeeded" && rows === 0 && (
+            {!loading && rows === 0 && (
               <div className="text-center py-12 text-gray-600">
                 No seat data available for this itinerary.
               </div>
             )}
 
-            {seatMapStatus === "succeeded" && rows > 0 && (
+            {!loading && rows > 0 && (
               <div className="mx-auto max-w-[900px]">
                 {/* top column numbers */}
                 <div className="flex items-center justify-center gap-2 mb-3">
@@ -373,10 +398,10 @@ export default function SeatSelectionModal({
                             const classes = seat.occupied
                               ? `${base} bg-gray-300 border-gray-400 text-gray-700 cursor-not-allowed`
                               : selected
-                              ? `${base} bg-green-500 border-green-700 text-white scale-105`
+                              ? `${base} ${SUCCESS_BG} border-green-700 text-white scale-105`
                               : seat.premium
-                              ? `${base} bg-yellow-50 border-yellow-300 text-gray-800`
-                              : `${base} bg-white border-gray-200 text-gray-800 hover:scale-105 cursor-pointer`;
+                              ? `${base} bg-blue-50 border-blue-300 text-blue-900`
+                              : `${base} bg-white border-gray-300 text-gray-800 hover:border-blue-600 hover:text-blue-700 hover:scale-105 cursor-pointer`;
 
                             return (
                               <button
@@ -388,7 +413,7 @@ export default function SeatSelectionModal({
                                 }`}
                               >
                                 <div className="text-sm">{seat.seatNo}</div>
-                                <div className="absolute top-0 right-0 text-[10px] px-1 py-0.5 rounded-bl-md bg-orange-500 text-white">
+                                <div className="absolute top-0 right-0 text-[10px] px-1 py-0.5 rounded-bl-md bg-blue-600 text-white">
                                   {seat.price > 0 ? `₹${seat.price}` : ""}
                                 </div>
                               </button>
@@ -427,12 +452,8 @@ export default function SeatSelectionModal({
                   : segment?.fD?.date || segment?.date || "—"}
               </div> */}
               <div className="mt-2 text-xs text-gray-500">
-  Date:{" "}
-  {segment?.dt
-    ? new Date(segment.dt).toDateString()
-    : "—"}
-</div>
-
+                Date: {segment?.dt ? new Date(segment.dt).toDateString() : "—"}
+              </div>
             </div>
 
             <div className="mb-4">
@@ -441,7 +462,7 @@ export default function SeatSelectionModal({
                 {(() => {
                   const seatObj = selectedSeats[
                     // `${journeyType}-flight-${flightIndex}`
-                      `${journeyType}|${flightIndex}`
+                    `${journeyType}|${flightIndex}`
                   ] || { list: [] };
 
                   return (
@@ -478,7 +499,7 @@ export default function SeatSelectionModal({
             <div className="mt-auto">
               <button
                 onClick={onClose}
-                className={`w-full py-3 ${ORANGE} text-white rounded-lg font-semibold`}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition"
               >
                 Confirm & Close
               </button>

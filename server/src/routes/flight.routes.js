@@ -1,16 +1,19 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
 // Controllers
-const flightController = require('../controllers/flight.controller');
+const flightController = require("../controllers/flight.controller");
 
 // Middleware
-const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
-const validate = require('../middleware/validate.middleware');
-const { searchLimiter } = require('../middleware/rateLimit.middleware');
+const {
+  verifyToken,
+  authorizeRoles,
+} = require("../middleware/auth.middleware");
+const validate = require("../middleware/validate.middleware");
+const { searchLimiter } = require("../middleware/rateLimit.middleware");
 
 // Validations (Joi)
-const bookingValidation = require('../validations/booking.validation');
+const bookingValidation = require("../validations/booking.validation");
 
 // ------------------------------------
 // All flight routes require auth
@@ -19,8 +22,8 @@ router.use(verifyToken);
 // ------------------------------------
 // 1️⃣ Flight Search
 router.post(
-  '/search',
-  authorizeRoles('manager', 'travel-admin', 'corporate-admin', "employee"),
+  "/search",
+  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
   searchLimiter,
   validate(bookingValidation.searchFlights),
   flightController.searchFlights
@@ -29,8 +32,8 @@ router.post(
 // ------------------------------------
 // 2️⃣ Fare Quote
 router.post(
-  '/fare-quote',
-  authorizeRoles('manager', 'travel-admin', 'corporate-admin', "employee"),
+  "/fare-quote",
+  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
   validate(bookingValidation.fareQuote),
   flightController.getFareQuote
 );
@@ -38,8 +41,8 @@ router.post(
 // ------------------------------------
 // 3️⃣ Fare Rule
 router.post(
-  '/fare-rule',
-  authorizeRoles('manager', 'travel-admin', 'corporate-admin', "employee"),
+  "/fare-rule",
+  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
   validate(bookingValidation.fareRule),
   flightController.getFareRule
 );
@@ -47,34 +50,42 @@ router.post(
 // ------------------------------------
 // 4 SSR
 router.post(
-  '/ssr',
-  authorizeRoles('manager', 'travel-admin', 'corporate-admin', "employee"),
+  "/ssr",
+  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
   validate(bookingValidation.ssr),
   flightController.getSSR
 );
 
 // ------------------------------------
+// 4️⃣.2 Seat Map
+router.post(
+  "/seat-map",
+  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
+  flightController.getSeatMap
+);
+
+// ------------------------------------
 // 5️ Book Flight
 router.post(
-  '/book',
-  authorizeRoles('manager', 'travel-admin', 'corporate-admin', "employee"),
- 
+  "/book",
+  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
+
   flightController.bookFlight
 );
 
 // ------------------------------------
 //  Ticket Flight
 router.post(
-  '/ticket',
-  authorizeRoles('manager', 'travel-admin', 'corporate-admin', "employee"),
+  "/ticket",
+  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
   validate(bookingValidation.ticketFlight),
   flightController.ticketFlight
 );
 
 // ------------------------------------
 router.post(
-  '/fare-upsell',
-  authorizeRoles('manager', 'travel-admin', 'corporate-admin', "employee"),
+  "/fare-upsell",
+  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
   validate(bookingValidation.fareUpsell),
   flightController.getFareUpsell
 );
@@ -82,10 +93,9 @@ router.post(
 // ------------------------------------
 //  Retrieve Booking
 router.get(
-  '/booking/:pnr',
-  authorizeRoles('manager', 'travel-admin', 'corporate-admin', "employee"),
+  "/booking/:pnr",
+  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
   flightController.getBookingDetails
 );
-
 
 module.exports = router;

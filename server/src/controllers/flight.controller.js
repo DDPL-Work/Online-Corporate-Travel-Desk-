@@ -4,6 +4,7 @@ const tboService = require("../services/tektravels/flight.service");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
+const { buildSeatMap } = require("../services/seatmap.service");
 /* --------------------------------------------------
  * 1️⃣ Flight Search
  * -------------------------------------------------- */
@@ -37,13 +38,12 @@ exports.getFareRule = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data
+      data,
     });
   } catch (err) {
     next(err);
   }
 };
-
 
 /* --------------------------------------------------
  * 4️⃣ SSR (Seat / Meal / Baggage)
@@ -57,9 +57,22 @@ exports.getSSR = asyncHandler(async (req, res) => {
 
   const data = await tboService.getSSR(traceId, resultIndex);
 
-  res.status(200).json(
-    new ApiResponse(200, data, 'SSR fetched successfully')
-  );
+  res.status(200).json(new ApiResponse(200, data, "SSR fetched successfully"));
+});
+
+/* --------------------------------------------------
+ * 4️⃣.2 Seat Map (REAL)
+ * -------------------------------------------------- */
+exports.getSeatMap = asyncHandler(async (req, res) => {
+  const { traceId, resultIndex, isLCC } = req.body;
+
+  const rawSeatMap = await tboService.getSeatMap(traceId, resultIndex, isLCC);
+
+  const seatMap = buildSeatMap(rawSeatMap);
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, seatMap, "Seat map fetched successfully"));
 });
 
 /* --------------------------------------------------
@@ -70,9 +83,9 @@ exports.getFareUpsell = asyncHandler(async (req, res) => {
 
   const data = await tboService.getFareUpsell(traceId, resultIndex);
 
-  res.status(200).json(
-    new ApiResponse(200, data, 'Fare upsell fetched successfully')
-  );
+  res
+    .status(200)
+    .json(new ApiResponse(200, data, "Fare upsell fetched successfully"));
 });
 
 /* --------------------------------------------------
@@ -84,7 +97,7 @@ exports.bookFlight = asyncHandler(async (req, res) => {
   if (!traceId || !resultIndex || !Fare || !passengers?.length) {
     throw new ApiError(
       400,
-      'traceId, resultIndex, Fare and passengers are required'
+      "traceId, resultIndex, Fare and passengers are required"
     );
   }
 
@@ -93,27 +106,23 @@ exports.bookFlight = asyncHandler(async (req, res) => {
   const formattedPassengers = passengers.map((p, index) => ({
     ...p,
     paxType: paxTypeMap[p.paxType],
-    isLeadPax: index === 0
+    isLeadPax: index === 0,
   }));
 
   // Wrap the Fare object in the required fareQuote structure
   const fareQuote = {
-    Fare: Fare
+    Fare: Fare,
   };
 
   const data = await tboService.bookFlight({
     traceId,
     resultIndex,
     fareQuote,
-    passengers: formattedPassengers
+    passengers: formattedPassengers,
   });
 
-  res.status(200).json(
-    new ApiResponse(200, data, 'Flight booking successful')
-  );
+  res.status(200).json(new ApiResponse(200, data, "Flight booking successful"));
 });
-
-
 
 /* --------------------------------------------------
  * 6️⃣ Ticket Flight
@@ -121,9 +130,9 @@ exports.bookFlight = asyncHandler(async (req, res) => {
 exports.ticketFlight = asyncHandler(async (req, res) => {
   const data = await tboService.ticketFlight(req.body);
 
-  res.status(200).json(
-    new ApiResponse(200, data, 'Ticket issued successfully')
-  );
+  res
+    .status(200)
+    .json(new ApiResponse(200, data, "Ticket issued successfully"));
 });
 
 /* --------------------------------------------------

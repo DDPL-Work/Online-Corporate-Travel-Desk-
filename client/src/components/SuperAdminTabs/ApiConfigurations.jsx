@@ -11,6 +11,8 @@ import {
 import { apiConfigurationsData } from "../../data/dummyData";
 import AddApiConfigModal from "../../Modal/AddApiConfigModal";
 import EditApiConfigModal from "../../Modal/EditApiConfigModal";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchTboBalance } from "../../Redux/Slice/tboBalanceSlice";
 
 const colors = {
   primary: "#0A4D68",
@@ -31,6 +33,17 @@ export default function ApiConfigurations() {
 
   const [type, setType] = useState("All");
   const [status, setStatus] = useState("All");
+
+  const dispatch = useDispatch();
+
+  const {
+    balance,
+    creditLimit,
+    currency,
+    loading: balanceLoading,
+    error: balanceError,
+    lastUpdated,
+  } = useSelector((state) => state.tboBalance);
 
   const types = ["All", "Flight", "Hotel", "Finance"];
   const statuses = ["All", "Active", "Inactive"];
@@ -69,9 +82,72 @@ export default function ApiConfigurations() {
     );
   }
 
+  React.useEffect(() => {
+    dispatch(fetchTboBalance());
+  }, [dispatch]);
+
   return (
     <div className="p-6" style={{ backgroundColor: colors.light }}>
       <div className="max-w-6xl mx-auto">
+        {/* ================= TBO API BALANCE ================= */}
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div
+            className="bg-white shadow rounded-lg p-6 border-l-4"
+            style={{ borderColor: colors.accent }}
+          >
+            <p className="text-sm text-gray-600">TBO API Balance</p>
+
+            <h2
+              className="text-3xl font-bold mt-2"
+              style={{ color: colors.primary }}
+            >
+              {balanceLoading
+                ? "Loading..."
+                : `${currency} ${(Number(balance) || 0).toLocaleString()}`}
+            </h2>
+
+            <p className="text-xs text-gray-500 mt-1">Available balance</p>
+          </div>
+
+          <div
+            className="bg-white shadow rounded-lg p-6 border-l-4"
+            style={{ borderColor: colors.secondary }}
+          >
+            <p className="text-sm text-gray-600">Credit Limit</p>
+
+            <h2
+              className="text-3xl font-bold mt-2"
+              style={{ color: colors.secondary }}
+            >
+              {currency} {(Number(creditLimit) || 0).toLocaleString()}
+            </h2>
+
+            <p className="text-xs text-gray-500 mt-1">Maximum allowed credit</p>
+          </div>
+
+          <div
+            className="bg-white shadow rounded-lg p-6 border-l-4"
+            style={{ borderColor: colors.primary }}
+          >
+            <p className="text-sm text-gray-600">Balance Status</p>
+
+            {Number(balance) < Number(creditLimit) * 0.2 ? (
+              <p className="mt-3 text-sm font-semibold text-red-600">
+                Low balance – top-up required
+              </p>
+            ) : (
+              <p className="mt-3 text-sm font-semibold text-green-600">
+                Sufficient balance
+              </p>
+            )}
+
+            {lastUpdated && (
+              <p className="text-xs text-gray-400 mt-2">
+                Last updated: {new Date(lastUpdated).toLocaleTimeString()}
+              </p>
+            )}
+          </div>
+        </div>
 
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
@@ -90,11 +166,21 @@ export default function ApiConfigurations() {
 
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-
-          <SummaryCard title="Total APIs" value={total} color={colors.primary} />
-          <SummaryCard title="Active APIs" value={active} color={colors.success} />
-          <SummaryCard title="Inactive APIs" value={inactive} color={colors.danger} />
-
+          <SummaryCard
+            title="Total APIs"
+            value={total}
+            color={colors.primary}
+          />
+          <SummaryCard
+            title="Active APIs"
+            value={active}
+            color={colors.success}
+          />
+          <SummaryCard
+            title="Inactive APIs"
+            value={inactive}
+            color={colors.danger}
+          />
         </div>
 
         {/* FILTERS */}
@@ -105,7 +191,6 @@ export default function ApiConfigurations() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
             {/* Type */}
             <div>
               <label className="text-sm font-medium">API Type</label>
@@ -133,7 +218,6 @@ export default function ApiConfigurations() {
                 ))}
               </select>
             </div>
-
           </div>
         </div>
 
@@ -148,7 +232,10 @@ export default function ApiConfigurations() {
               <thead style={{ backgroundColor: colors.primary }}>
                 <tr>
                   {["API Name", "Type", "Key", "Status", "Actions"].map((h) => (
-                    <th key={h} className="px-6 py-3 text-sm text-white font-medium">
+                    <th
+                      key={h}
+                      className="px-6 py-3 text-sm text-white font-medium"
+                    >
                       {h}
                     </th>
                   ))}
@@ -156,7 +243,6 @@ export default function ApiConfigurations() {
               </thead>
 
               <tbody className="divide-y divide-gray-200">
-
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="py-8 text-center text-gray-500">
@@ -166,8 +252,9 @@ export default function ApiConfigurations() {
                 ) : (
                   filtered.map((row) => (
                     <tr key={row.id} className="hover:bg-gray-50 transition">
-
-                      <td className="px-6 py-4 text-sm font-medium">{row.name}</td>
+                      <td className="px-6 py-4 text-sm font-medium">
+                        {row.name}
+                      </td>
                       <td className="px-6 py-4 text-sm">{row.type}</td>
 
                       <td className="px-6 py-4 text-sm">
@@ -191,7 +278,6 @@ export default function ApiConfigurations() {
                       </td>
 
                       <td className="px-6 py-4 flex items-center gap-4">
-
                         <button
                           className="text-blue-600 hover:text-blue-800"
                           onClick={() => {
@@ -204,27 +290,29 @@ export default function ApiConfigurations() {
 
                         <button onClick={() => toggleStatus(row.id)}>
                           {row.status === "Active" ? (
-                            <FiToggleRight size={26} className="text-green-600" />
+                            <FiToggleRight
+                              size={26}
+                              className="text-green-600"
+                            />
                           ) : (
                             <FiToggleLeft size={26} className="text-red-600" />
                           )}
                         </button>
-
                       </td>
-
                     </tr>
                   ))
                 )}
-
               </tbody>
-
             </table>
           </div>
         </div>
 
         {/* MODALS */}
         {openAdd && (
-          <AddApiConfigModal onClose={() => setOpenAdd(false)} onSave={addConfig} />
+          <AddApiConfigModal
+            onClose={() => setOpenAdd(false)}
+            onSave={addConfig}
+          />
         )}
 
         {openEdit && selected && (
@@ -234,12 +322,10 @@ export default function ApiConfigurations() {
             onSave={updateConfig}
           />
         )}
-
       </div>
     </div>
   );
 }
-
 
 // SUMMARY CARD COMPONENT
 function SummaryCard({ title, value, color }) {
