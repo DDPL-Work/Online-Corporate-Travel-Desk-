@@ -1,11 +1,51 @@
 // booking.validation.js
 const Joi = require("joi");
 
+
+
+/* ---------------- COMMON SSR SCHEMAS ---------------- */
+
+const seatSSR = Joi.object({
+  segmentIndex: Joi.number().min(0).required(),
+  paxIndex: Joi.number().min(0).required(), // passenger index
+  seatCode: Joi.string().required(),        // e.g. 12A
+  seatType: Joi.string().optional(),        // WINDOW / AISLE / MIDDLE
+  row: Joi.number().optional(),
+  column: Joi.string().optional(),
+  price: Joi.number().min(0).default(0),
+  currency: Joi.string().default("INR"),
+  isChargeable: Joi.boolean().default(false)
+});
+
+const mealSSR = Joi.object({
+  segmentIndex: Joi.number().min(0).required(),
+  paxIndex: Joi.number().min(0).required(),
+  code: Joi.string().required(),
+  description: Joi.string().optional(),
+  price: Joi.number().min(0).default(0),
+  currency: Joi.string().default("INR")
+});
+
+const baggageSSR = Joi.object({
+  segmentIndex: Joi.number().min(0).required(),
+  paxIndex: Joi.number().min(0).required(),
+  code: Joi.string().required(),
+  weight: Joi.string().optional(), // e.g. 15KG
+  price: Joi.number().min(0).default(0),
+  currency: Joi.string().default("INR")
+});
+
+
 /* ---------------- SSR ---------------- */
 const ssr = Joi.object({
   traceId: Joi.string().required(),
   resultIndex: Joi.string().required(),
+
+  seat: Joi.array().items(seatSSR).optional(),
+  meal: Joi.array().items(mealSSR).optional(),
+  baggage: Joi.array().items(baggageSSR).optional()
 });
+
 
 // Create booking
 const createBooking = Joi.object({
@@ -92,16 +132,79 @@ const confirmBooking = Joi.object({
 });
 
 // Flight search
+// Flight search
 const searchFlights = Joi.object({
-  origin: Joi.string().required(),
-  destination: Joi.string().required(),
-  departureDate: Joi.date().required(),
-  returnDate: Joi.date().optional(),
+  journeyType: Joi.number().valid(1, 2, 3).required(),
+
+  // ONE-WAY / ROUND-TRIP
+  origin: Joi.when("journeyType", {
+    is: Joi.valid(1, 2),
+    then: Joi.string().length(3).required(),
+    otherwise: Joi.forbidden()
+  }),
+
+  destination: Joi.when("journeyType", {
+    is: Joi.valid(1, 2),
+    then: Joi.string().length(3).required(),
+    otherwise: Joi.forbidden()
+  }),
+
+  departureDate: Joi.when("journeyType", {
+    is: Joi.valid(1, 2),
+    then: Joi.string()
+      .pattern(/^\d{4}-\d{2}-\d{2}$/)
+      .required()
+      .messages({
+        "string.pattern.base": "departureDate must be YYYY-MM-DD"
+      }),
+    otherwise: Joi.forbidden()
+  }),
+
+  returnDate: Joi.when("journeyType", {
+    is: 2,
+    then: Joi.string()
+      .pattern(/^\d{4}-\d{2}-\d{2}$/)
+      .required()
+      .messages({
+        "string.pattern.base": "returnDate must be YYYY-MM-DD"
+      }),
+    otherwise: Joi.forbidden()
+  }),
+
+  // MULTI-CITY
+  segments: Joi.when("journeyType", {
+    is: 3,
+    then: Joi.array()
+      .items(
+        Joi.object({
+          origin: Joi.string().length(3).required(),
+          destination: Joi.string().length(3).required(),
+          departureDate: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .required()
+            .messages({
+              "string.pattern.base": "segment departureDate must be YYYY-MM-DD"
+            })
+        })
+      )
+      .min(2)
+      .required(),
+    otherwise: Joi.forbidden()
+  }),
+
   adults: Joi.number().min(1).required(),
-  children: Joi.number().min(0).optional(),
-  infants: Joi.number().min(0).optional(),
-  cabinClass: Joi.string().valid("economy", "business", "first").default("economy"),
+  children: Joi.number().min(0).default(0),
+  infants: Joi.number().min(0).default(0),
+
+  cabinClass: Joi.string()
+    .valid("economy", "business", "first")
+    .default("economy"),
+
+  directFlight: Joi.boolean().default(false),
+  oneStop: Joi.boolean().default(false)
 });
+
+
 
 // Other validations
 const fareQuote = Joi.object({
@@ -140,8 +243,12 @@ module.exports = {
   fareQuote,
   searchHotel,
   ssr,
+  seatSSR,
+  mealSSR,
+  baggageSSR,
   bookFlight,
   ticketFlight,
   fareUpsell,
-  fareRule
+  fareRule,
+
 };

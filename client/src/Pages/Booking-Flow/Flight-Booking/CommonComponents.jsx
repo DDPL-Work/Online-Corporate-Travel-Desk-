@@ -208,6 +208,7 @@ export const FlightTimeline = ({
   selectedSeats = {},
   openSeatModal,
   journeyType = "onward",
+  isSeatReady = false,
 }) => {
   const formatDateTime = (value) => {
     const d = new Date(value);
@@ -229,6 +230,7 @@ export const FlightTimeline = ({
     return <p className="text-gray-500">No flight segments available.</p>;
   }
 
+  const seatDisabled = !isSeatReady;
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-12">
       {segments.map((segment, idx) => {
@@ -275,13 +277,32 @@ export const FlightTimeline = ({
                                   "https://via.placeholder.com/40")
                               }
                             />
-                            <div>
-                              <p className="font-semibold text-gray-900 text-sm">
-                                {segment.fD?.aI?.name}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {segment.fD?.aI?.code}-{segment.fD?.fN}
-                              </p>
+                            <div className="flex items-center gap-4">
+                              <div>
+                                <p className="font-semibold text-gray-900 text-sm">
+                                  {segment.fD?.aI?.name}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {segment.fD?.aI?.code}-{segment.fD?.fN}
+                                </p>
+                              </div>
+
+                              <div>
+                                {/* Selected seats */}
+                                {(() => {
+                                  const seatKey = `${journeyType}|${idx}`;
+                                  const seats =
+                                    selectedSeats?.[seatKey]?.list || [];
+                                  if (!seats.length) return null;
+                                  return (
+                                    <div className=" bg-green-50 border border-green-200 rounded-lg p-1.5">
+                                      <p className="text-xs font-semibold text-green-600">
+                                        Seats: {seats.join(", ")}
+                                      </p>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -290,26 +311,19 @@ export const FlightTimeline = ({
                           {segment.fD?.eT || "Aircraft"}
                         </p>
                         <button
-                          onClick={() => openSeatModal(idx)}
-                          className="mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 border border-blue-600 rounded-lg py-2 hover:bg-blue-600 hover:text-white transition"
+                          onClick={() => !seatDisabled && openSeatModal(idx)}
+                          disabled={seatDisabled}
+                          className={`mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-lg py-2 transition
+    ${
+      seatDisabled
+        ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
+        : "text-blue-600 border border-blue-600 hover:bg-blue-600 hover:text-white"
+    }
+  `}
                         >
                           <MdEventSeat />
-                          Select Seats
+                          {seatDisabled ? "Seats loading…" : "Select Seats"}
                         </button>
-
-                        {/* Selected seats */}
-                        {(() => {
-                          const seatKey = `${journeyType}|${idx}`;
-                          const seats = selectedSeats?.[seatKey]?.list || [];
-                          if (!seats.length) return null;
-                          return (
-                            <div className="mt-2 bg-green-50 border border-green-200 rounded-lg p-1.5">
-                              <p className="text-xs font-semibold text-green-800">
-                                Seats: {seats.join(", ")}
-                              </p>
-                            </div>
-                          );
-                        })()}
                       </div>
                     </div>
                   </div>
@@ -358,109 +372,95 @@ export const FlightTimeline = ({
 };
 
 // Fare Options Component
-export const FareOptions = ({
-  fareOptions = [],
-  selectedFare,
-  onFareSelect,
-  expandedFare,
-  onExpandFare,
-}) => {
-  if (!fareOptions || fareOptions.length === 0) {
-    return <p className="text-gray-500">No fare options available.</p>;
+export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
+  const [open, setOpen] = useState({
+    cancellation: false,
+    dateChange: false,
+    baggage: false,
+    important: false,
+  });
+
+  const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  if (fareRulesStatus === "loading") {
+    return (
+      <div className="text-center py-4 text-gray-600 font-medium">
+        Fetching fare rules...
+      </div>
+    );
   }
 
+  if (!fareRules) {
+    return (
+      <div className="text-center py-4 text-gray-600 font-medium">
+        Fare rules not available for this fare.
+      </div>
+    );
+  }
+
+  const sections = [
+    {
+      key: "important",
+      title: "Important Notes",
+      icon: <MdInfo className="text-teal-600 text-xl" />,
+      data: fareRules.important,
+      bg: "from-teal-50 to-purple-100 border-gray-300",
+    },
+  ];
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {fareOptions.map((fare) => (
+    <div className="space-y-4">
+      {sections.map((sec) => (
         <div
-          key={fare.type}
-          onClick={() => onFareSelect(fare.type)}
-          className={`border-2 rounded-xl p-5 cursor-pointer transition-all ${
-            selectedFare === fare.type
-              ? "border-blue-500 bg-blue-50 shadow-md"
-              : "border-gray-200 hover:border-blue-300 hover:shadow-sm"
-          } ${fare.popular ? "ring-2 ring-blue-200" : ""}`}
+          key={sec.key}
+          className={`rounded-xl overflow-hidden border shadow-sm bg-linear-to-r ${sec.bg}`}
         >
-          {fare.popular && (
-            <span className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-medium">
-              Most Popular
+          {/* Header */}
+          <button
+            onClick={() => toggle(sec.key)}
+            className="w-full flex items-center justify-between p-4"
+          >
+            <div className="flex items-center gap-3">
+              {sec.icon}
+              <span className="font-semibold text-gray-900">{sec.title}</span>
+            </div>
+
+            <span className="text-gray-700 text-lg">
+              {open[sec.key] ? "−" : "+"}
             </span>
-          )}
-          <h4 className="font-bold text-lg mt-3 text-gray-900">{fare.type}</h4>
-          <p className="text-2xl font-bold text-blue-600 mt-2">
-            ₹{(fare.price || 0).toLocaleString()}
-          </p>
-          <button
-            className={`w-full mt-4 py-2.5 rounded-lg font-semibold transition ${
-              selectedFare === fare.type
-                ? "bg-blue-600 text-white shadow-sm"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            {selectedFare === fare.type ? "Selected" : "Select"}
           </button>
 
-          <div className="mt-4 space-y-2">
-            {(fare.features || []).slice(0, 3).map((feature, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-sm">
-                {feature.included ? (
-                  <AiOutlineCheck className="text-green-600 flex-shrink-0" />
-                ) : (
-                  <span className="text-red-500 flex-shrink-0">✕</span>
-                )}
-                <span
-                  className={
-                    feature.included
-                      ? "text-gray-700"
-                      : "text-gray-400 line-through"
-                  }
-                >
-                  {feature.text}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onExpandFare(expandedFare === fare.type ? null : fare.type);
-            }}
-            className="text-sm text-blue-600 hover:text-blue-700 mt-3 font-medium"
-          >
-            {expandedFare === fare.type ? "Show less" : "Show more"}
-          </button>
-
-          {expandedFare === fare.type && (
-            <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
-              {(fare.features || []).slice(3).map((feature, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm">
-                  {feature.included ? (
-                    <AiOutlineCheck className="text-green-600 flex-shrink-0" />
-                  ) : (
-                    <span className="text-red-500 flex-shrink-0">✕</span>
-                  )}
-                  <span
-                    className={
-                      feature.included
-                        ? "text-gray-700"
-                        : "text-gray-400 line-through"
-                    }
-                  >
-                    {feature.text}
-                  </span>
-                </div>
-              ))}
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-xs font-semibold text-gray-700 mb-2">
-                  Conditions:
+          {/* Content */}
+          {open[sec.key] && (
+            <div className="bg-white p-5 border-t border-gray-200 animate-fadeIn">
+              {sec.data.length > 0 ? (
+                sec.data.map((html, i) => (
+                  <div
+                    key={i}
+                    className="
+            prose prose-sm max-w-none
+            prose-ul:pl-5
+            prose-li:marker:text-purple-500
+            prose-strong:text-gray-900
+            prose-p:my-2
+            text-gray-700
+          "
+                    dangerouslySetInnerHTML={{
+                      __html: html
+                        // optional cleanup for better spacing
+                        .replace(/<br\s*\/?>/gi, "<br/>")
+                        .replace(
+                          /FareBasisCode is:\s*(\w+)/i,
+                          '<div class="mb-3 inline-flex items-center gap-2 bg-purple-50 border border-purple-200 text-purple-800 px-3 py-1 rounded-lg text-xs font-semibold">Fare Basis Code: $1</div>'
+                        ),
+                    }}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-gray-600">
+                  No information available.
                 </p>
-                {(fare.conditions || []).map((condition, idx) => (
-                  <p key={idx} className="text-xs text-gray-600 mb-1">
-                    • {condition}
-                  </p>
-                ))}
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -472,16 +472,13 @@ export const FareOptions = ({
 // Price Summary Component
 export const PriceSummary = ({
   parsedFlightData,
-  couponCode = "",
-  onCouponChange,
-  onApplyCoupon,
   discountAmount = 0,
   selectedSeats = {},
   travelers = [],
 }) => {
   if (!parsedFlightData) return null;
 
-  const travelerCount = travelers.length || 1;
+  const travelerCount = Math.max(travelers.length || 1);
   const totalBaseFare = parsedFlightData.basePrice || 0;
   const perPassengerBaseFare = Math.round(totalBaseFare / travelerCount);
 
@@ -502,6 +499,25 @@ export const PriceSummary = ({
 
   const subtotal = totalBaseFare + taxAmount + convenienceFee + totalSeatPrice;
   const totalAmount = Math.max(0, subtotal - (discountAmount || 0));
+
+  const seatBreakdown = useMemo(() => {
+    const rows = [];
+
+    Object.entries(selectedSeats || {}).forEach(([key, value]) => {
+      if (!value?.list?.length) return;
+
+      value.list.forEach((seat, index) => {
+        rows.push({
+          seat,
+          price: value.priceMap?.[seat] || 0,
+          passenger: `Passenger ${index + 1}`,
+          segment: key,
+        });
+      });
+    });
+
+    return rows;
+  }, [selectedSeats]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden ">
@@ -531,13 +547,37 @@ export const PriceSummary = ({
         </div>
 
         {/* Seat Charges */}
+        {/* Seat Charges */}
         {totalSeatPrice > 0 && (
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Seat Charges</span>
-            <span className="font-semibold text-gray-900">
-              ₹{totalSeatPrice.toLocaleString()}
-            </span>
-          </div>
+          <>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Seat Charges</span>
+              <span className="font-semibold text-gray-900">
+                ₹{totalSeatPrice.toLocaleString()}
+              </span>
+            </div>
+
+            {/* Seat breakdown */}
+            <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
+              {seatBreakdown.map((s, i) => (
+                <div
+                  key={`${s.seat}-${i}`}
+                  className="flex justify-between items-center text-sm"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-medium text-gray-800">
+                      Seat {s.seat}
+                    </span>
+                    <span className="text-xs text-gray-500">{s.passenger}</span>
+                  </div>
+
+                  <span className="font-semibold text-gray-900">
+                    ₹{s.price.toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
         {/* Convenience Fee */}
@@ -670,103 +710,86 @@ export const FareRulesAccordion = ({
   fareRules = null,
   fareRulesStatus = "idle",
 }) => {
-  const [open, setOpen] = useState({
-    cancellation: false,
-    dateChange: false,
-    baggage: false,
-    important: false,
-  });
-
-  const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  const [open, setOpen] = useState(true);
 
   if (fareRulesStatus === "loading") {
     return (
-      <div className="text-center py-4 text-gray-600 font-medium">
-        Fetching fare rules...
+      <div className="py-6 text-center text-gray-500 text-sm">
+        Fetching fare rules…
       </div>
     );
   }
 
-  if (!fareRules) {
+  if (!fareRules || !fareRules.important?.length) {
     return (
-      <div className="text-center py-4 text-gray-600 font-medium">
+      <div className="py-6 text-center text-gray-500 text-sm">
         Fare rules not available for this fare.
       </div>
     );
   }
 
-  const sections = [
-    {
-      key: "cancellation",
-      title: "Cancellation Rules",
-      icon: <MdCancel className="text-red-500 text-xl" />,
-      data: fareRules.cancellation,
-      bg: "from-red-50 to-red-100 border-red-400",
-    },
-    {
-      key: "dateChange",
-      title: "Date Change / Reschedule",
-      icon: <MdAutorenew className="text-blue-500 text-xl" />,
-      data: fareRules.dateChange,
-      bg: "from-blue-50 to-blue-100 border-blue-400",
-    },
-    {
-      key: "baggage",
-      title: "Baggage Rules",
-      icon: <MdWork className="text-yellow-600 text-xl" />,
-      data: fareRules.baggage,
-      bg: "from-yellow-50 to-yellow-100 border-yellow-400",
-    },
-    {
-      key: "important",
-      title: "Important Notes",
-      icon: <MdInfo className="text-purple-600 text-xl" />,
-      data: fareRules.important,
-      bg: "from-purple-50 to-purple-100 border-purple-400",
-    },
-  ];
-
   return (
-    <div className="space-y-4">
-      {sections.map((sec) => (
-        <div
-          key={sec.key}
-          className={`rounded-xl overflow-hidden border shadow-sm bg-linear-to-r ${sec.bg}`}
-        >
-          {/* Header */}
-          <button
-            onClick={() => toggle(sec.key)}
-            className="w-full flex items-center justify-between p-4"
-          >
-            <div className="flex items-center gap-3">
-              {sec.icon}
-              <span className="font-semibold text-gray-900">{sec.title}</span>
-            </div>
-
-            <span className="text-gray-700 text-lg">
-              {open[sec.key] ? "−" : "+"}
-            </span>
-          </button>
-
-          {/* Content */}
-          {open[sec.key] && (
-            <div className="bg-white p-4 border-t border-gray-200 space-y-2 animate-fadeIn">
-              {sec.data.length > 0 ? (
-                sec.data.map((line, i) => (
-                  <p key={i} className="text-sm text-gray-700 flex gap-2">
-                    <span className="text-orange-500 mt-1">•</span>
-                    {line}
-                  </p>
-                ))
-              ) : (
-                <p className="text-sm text-gray-600">
-                  No information available.
-                </p>
-              )}
-            </div>
-          )}
+    <div className="rounded-2xl border border-purple-200 bg-purple-50/40 shadow-sm overflow-hidden">
+      {/* Header */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-5 py-4 bg-purple-50 hover:bg-purple-100 transition"
+      >
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 flex items-center justify-center rounded-full bg-purple-600 text-white">
+            <MdInfo size={18} />
+          </div>
+          <div className="text-left">
+            <p className="font-semibold text-gray-900">Fare Rules</p>
+            <p className="text-xs text-gray-500">
+              Cancellation, reissue & airline conditions
+            </p>
+          </div>
         </div>
-      ))}
+
+        <span className="text-xl font-medium text-gray-600">
+          {open ? "−" : "+"}
+        </span>
+      </button>
+
+      {/* Content */}
+      {open && (
+        <div className="bg-white px-6 py-5 border-t border-purple-200 space-y-4 animate-fadeIn">
+          {fareRules.important.map((html, i) => (
+            <div
+              key={i}
+              className="prose prose-sm max-w-none text-gray-700
+                prose-p:leading-relaxed
+                prose-ul:pl-5
+                prose-li:my-1
+                prose-li:marker:text-purple-500"
+              dangerouslySetInnerHTML={{
+                __html: html
+                  // normalize breaks
+                  .replace(/<br\s*\/?>/gi, "<br/>")
+
+                  // Fare basis pill
+                  .replace(
+                    /FareBasisCode is:\s*(\w+)/i,
+                    `
+                    <div class="mb-4">
+                      <span class="inline-flex items-center gap-2 bg-purple-100 text-purple-800 border border-purple-200 px-3 py-1 rounded-full text-xs font-semibold">
+                        Fare Basis Code: $1
+                      </span>
+                    </div>
+                    `
+                  )
+
+                  // Emphasize important notices
+                  .replace(
+                    /(GST,.*?EXTRA\.)/gi,
+                    `<div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm font-medium">$1</div>`
+                  ),
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

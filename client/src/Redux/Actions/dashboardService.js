@@ -8,15 +8,15 @@ export const fetchDashboardDataAPI = async (role) => {
 
   switch (role) {
     case "employee":
-      endpoint = "/api/v1/dashboard/employee";
+      endpoint = "/dashboard/employee";
       break;
 
     case "travel-admin":
-      endpoint = "/api/v1/dashboard/travel-admin";
+      endpoint = "/dashboard/travel-admin";
       break;
 
     case "super-admin":
-      endpoint = "/api/v1/dashboard/super-admin";
+      endpoint = "/dashboard/super-admin";
       break;
 
     default:

@@ -57,14 +57,6 @@ router.post(
 );
 
 // ------------------------------------
-// 4️⃣.2 Seat Map
-router.post(
-  "/seat-map",
-  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
-  flightController.getSeatMap
-);
-
-// ------------------------------------
 // 5️ Book Flight
 router.post(
   "/book",

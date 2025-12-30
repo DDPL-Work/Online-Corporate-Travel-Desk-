@@ -19,6 +19,7 @@ import {
   Amenities,
   HotelHomeButton,
   CTABox,
+  FareRulesAccordion,
 } from "./CommonComponents";
 import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
 import { useDispatch, useSelector } from "react-redux";
@@ -30,18 +31,20 @@ import {
 import SeatSelectionModal from "./SeatSelectionModal";
 
 const normalizeFareOptions = ({ fareQuote, fareRule }) => {
-  if (!fareQuote?.Results?.length) return [];
+  const results = fareQuote?.Response?.Results;
+  if (!results || !results.length) return [];
 
-  const fare = fareQuote.Results[0].Fare;
+  const fare = results[0].Fare;
 
-  const rules = fareRule?.FareRules || [];
+  const rules = fareRule?.Response?.FareRules || [];
 
-  const hasCancellation = rules.some(
-    (r) =>
-      r.Type === "Cancellation" && !/non[- ]?refundable/i.test(r.Description)
+  const hasCancellation = rules.some((r) =>
+    /cancel/i.test(r.FareRuleDetail || "")
   );
 
-  const hasDateChange = rules.some((r) => r.Type === "DateChange");
+  const hasDateChange = rules.some((r) =>
+    /reissue|date change/i.test(r.FareRuleDetail || "")
+  );
 
   return [
     {
@@ -51,35 +54,73 @@ const normalizeFareOptions = ({ fareQuote, fareRule }) => {
 
       features: [
         { text: "Cabin baggage included", included: true },
-        { text: "Check-in baggage included", included: true },
-        { text: "Date change allowed", included: hasDateChange },
-        { text: "Cancellation allowed", included: hasCancellation },
+        {
+          text: "Check-in baggage included",
+          included: !!fare.Baggage,
+        },
+        {
+          text: "Cancellation allowed",
+          included: fare.IsRefundable || hasCancellation,
+        },
+        {
+          text: "Date change allowed",
+          included: hasDateChange,
+        },
       ],
 
-      conditions: rules.map((r) => r.Description),
+      conditions: rules.map((r) => r.FareRuleDetail).filter(Boolean),
     },
   ];
 };
 
 const normalizeFareRules = (fareRule) => {
-  if (!fareRule?.FareRules) return null;
+  const rules = fareRule?.Response?.FareRules;
+  if (!rules || !rules.length) return null;
 
   return {
-    cancellation: fareRule.FareRules.filter(
-      (r) => r.Type === "Cancellation"
-    ).map((r) => r.Description),
+    cancellation: [],
+    dateChange: [],
+    baggage: [],
+    important: rules.map((r) => r.FareRuleDetail).filter(Boolean),
+  };
+};
 
-    dateChange: fareRule.FareRules.filter((r) => r.Type === "DateChange").map(
-      (r) => r.Description
-    ),
+const normalizeFareRulesFromQuote = (fareQuote) => {
+  const mini = fareQuote?.Response?.Results?.MiniFareRules?.[0];
+  if (!mini || !mini.length) return null;
 
-    baggage: fareRule.FareRules.filter((r) => r.Type === "Baggage").map(
-      (r) => r.Description
-    ),
+  return {
+    cancellation: mini
+      .filter((r) => r.Type === "Cancellation")
+      .map((r) => {
+        const range = r.To
+          ? `${r.From}-${r.To} ${r.Unit.toLowerCase()}`
+          : `After ${r.From} ${r.Unit.toLowerCase()}`;
 
-    important: fareRule.FareRules.filter((r) => r.Type === "General").map(
-      (r) => r.Description
-    ),
+        return `${range}: ${r.Details}`;
+      }),
+
+    dateChange: mini
+      .filter((r) => r.Type === "Reissue")
+      .map((r) => {
+        const range = r.To
+          ? `${r.From}-${r.To} ${r.Unit.toLowerCase()}`
+          : `After ${r.From} ${r.Unit.toLowerCase()}`;
+
+        return `${range}: ${r.Details}`;
+      }),
+
+    baggage: [
+      `Cabin baggage: ${fareQuote.Response.Results.Segments[0][0].CabinBaggage}`,
+      `Check-in baggage: ${fareQuote.Response.Results.Segments[0][0].Baggage}`,
+    ],
+
+    important: [
+      fareQuote.Response.Results.AirlineRemark,
+      fareQuote.Response.Results.IsRefundable
+        ? "Ticket is refundable"
+        : "Ticket is non-refundable",
+    ].filter(Boolean),
   };
 };
 
@@ -103,6 +144,7 @@ export default function OneFlightBooking() {
   const [loading, setLoading] = useState(true);
   const [seatModalOpen, setSeatModalOpen] = useState(false);
   const [activeSegmentIndex, setActiveSegmentIndex] = useState(null);
+  const [selectedSeats, setSelectedSeats] = useState({});
 
   const [expandedSections, setExpandedSections] = useState({
     flightDetails: true,
@@ -144,30 +186,6 @@ export default function OneFlightBooking() {
     }));
   };
 
-  const buildFareOptions = (fareQuote) => {
-    if (!fareQuote?.Results?.length) return [];
-
-    const fare = fareQuote.Results[0].Fare;
-
-    return [
-      {
-        type: "Standard",
-        price: fare.PublishedFare,
-        popular: true,
-        features: [
-          { text: "Cabin baggage included", included: true },
-          { text: "Check-in baggage included", included: true },
-          { text: "Date change allowed", included: true },
-          { text: "Cancellation allowed", included: false },
-        ],
-        conditions: [
-          "Cancellation charges apply as per fare rules",
-          "Date change charges apply",
-        ],
-      },
-    ];
-  };
-
   const baggageInfo = React.useMemo(() => {
     if (!ssr?.Results?.Baggage?.length) return {};
 
@@ -179,6 +197,39 @@ export default function OneFlightBooking() {
     };
   }, [ssr]);
 
+  // OneFlightBooking.jsx
+  const buildSeatSSR = () => {
+    const seatSSR = [];
+
+    Object.entries(selectedSeats).forEach(([key, value]) => {
+      const [, segmentIndex] = key.split("|");
+
+      value.list.forEach((seatCode, paxIndex) => {
+        seatSSR.push({
+          segmentIndex: Number(segmentIndex),
+          paxIndex: paxIndex, // 🔑 better than hard-coded 0
+          seatCode,
+          price: value.priceMap[seatCode] || 0,
+          currency: "INR",
+          isChargeable: (value.priceMap[seatCode] || 0) > 0,
+        });
+      });
+    });
+
+    return seatSSR;
+  };
+
+  // useEffect(() => {
+  //   if (!searchParams?.traceId || !selectedFlight?.ResultIndex) return;
+
+  //   dispatch(
+  //     getFareRule({
+  //       traceId: searchParams.traceId,
+  //       resultIndex: selectedFlight.ResultIndex,
+  //     })
+  //   );
+  // }, [dispatch, searchParams, selectedFlight]);
+
   useEffect(() => {
     if (!searchParams?.traceId || !selectedFlight?.ResultIndex) return;
 
@@ -188,25 +239,49 @@ export default function OneFlightBooking() {
         resultIndex: selectedFlight.ResultIndex,
       })
     );
-  }, [dispatch, searchParams, selectedFlight]);
+  }, [dispatch, searchParams?.traceId, selectedFlight?.ResultIndex]);
+
+  // useEffect(() => {
+  //   if (!fareQuote?.Results?.length) return;
+
+  //   dispatch(
+  //     getFareQuote({
+  //       traceId: searchParams.traceId,
+  //       resultIndex: selectedFlight.ResultIndex,
+  //     })
+  //   );
+
+  //   dispatch(
+  //     getSSR({
+  //       traceId: searchParams.traceId,
+  //       resultIndex: selectedFlight.ResultIndex,
+  //     })
+  //   );
+  // }, [fareQuote, dispatch, searchParams, selectedFlight]);
 
   useEffect(() => {
-    if (!fareQuote?.Results?.length) return;
+    const quoteResult = fareQuote?.Response?.Results;
+
+    if (!quoteResult?.ResultIndex) return;
 
     dispatch(
       getFareRule({
         traceId: searchParams.traceId,
-        resultIndex: selectedFlight.ResultIndex,
+        resultIndex: quoteResult.ResultIndex, // 🔑 USE THIS
       })
     );
 
     dispatch(
       getSSR({
         traceId: searchParams.traceId,
-        resultIndex: selectedFlight.ResultIndex,
+        resultIndex: quoteResult.ResultIndex,
       })
     );
-  }, [fareQuote, dispatch, searchParams, selectedFlight]);
+  }, [
+    fareQuote?.Response?.Results?.ResultIndex,
+    dispatch,
+    searchParams?.traceId,
+  ]);
 
   useEffect(() => {
     console.log("SSR DATA:", ssr);
@@ -235,39 +310,56 @@ export default function OneFlightBooking() {
     }
   }, [loading, selectedFlight, rawFlightData, navigate]);
 
-  useEffect(() => {
-    if (!searchParams?.traceId || !selectedFlight?.ResultIndex) return;
-
-    dispatch(
-      getFareQuote({
-        traceId: searchParams.traceId,
-        resultIndex: selectedFlight.ResultIndex,
-      })
-    );
-  }, [dispatch, searchParams, selectedFlight]);
-
-  useEffect(() => {
-    if (!fareQuote || !searchParams?.traceId || !selectedFlight?.ResultIndex)
-      return;
-
-    dispatch(
-      getFareRule({
-        traceId: searchParams.traceId,
-        resultIndex: selectedFlight.ResultIndex,
-      })
-    );
-
-    dispatch(
-      getSSR({
-        traceId: searchParams.traceId,
-        resultIndex: selectedFlight.ResultIndex,
-      })
-    );
-  }, [fareQuote, dispatch, searchParams, selectedFlight]);
+  const isSeatReady = Boolean(
+    ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[0]?.RowSeats?.length
+  );
 
   const openSeatModal = (segmentIndex) => {
+    if (!isSeatReady) return;
+    const seatRows =
+      ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[0]?.RowSeats;
+
+    if (!Array.isArray(seatRows) || seatRows.length === 0) {
+      alert("Seat data is still loading. Please wait...");
+      return;
+    }
+
     setActiveSegmentIndex(segmentIndex);
     setSeatModalOpen(true);
+  };
+
+  const handleSeatSelect = (journeyType, segmentIndex, seatNo, price = 0) => {
+    const key = `${journeyType}|${segmentIndex}`;
+
+    setSelectedSeats((prev) => {
+      const current = prev[key] || { list: [], priceMap: {} };
+
+      // toggle logic
+      if (current.list.includes(seatNo)) {
+        const newList = current.list.filter((s) => s !== seatNo);
+        const newPriceMap = { ...current.priceMap };
+        delete newPriceMap[seatNo];
+
+        return {
+          ...prev,
+          [key]: {
+            list: newList,
+            priceMap: newPriceMap,
+          },
+        };
+      }
+
+      return {
+        ...prev,
+        [key]: {
+          list: [...current.list, seatNo],
+          priceMap: {
+            ...current.priceMap,
+            [seatNo]: price,
+          },
+        },
+      };
+    });
   };
 
   if (loading) {
@@ -305,6 +397,13 @@ export default function OneFlightBooking() {
 
   const departureDateTime = segments[0]?.dt;
   const arrivalDateTime = segments[segments.length - 1]?.at;
+
+  const travelerCount =
+    searchParams?.passengers?.adults || searchParams?.adults || 1;
+
+  const travelersForSeat = Array.from({ length: travelerCount }, (_, i) => ({
+    id: i + 1,
+  }));
 
   return (
     <div className="min-h-screen bg-slate-50 font-[DM Sans]">
@@ -412,9 +511,10 @@ export default function OneFlightBooking() {
                   <div className="bg-white rounded-xl p-5">
                     <FlightTimeline
                       segments={parsedFlightData.segments || []}
-                      selectedSeats={{}} // or your real state
+                      selectedSeats={selectedSeats}
                       openSeatModal={openSeatModal}
                       journeyType="onward"
+                      isSeatReady={isSeatReady}
                     />
                   </div>
                 </div>
@@ -427,11 +527,10 @@ export default function OneFlightBooking() {
                 Fare Options
               </h3>
               <FareOptions
-                fareOptions={normalizeFareOptions({ fareQuote, fareRule })}
-                selectedFare={selectedFare}
-                onFareSelect={setSelectedFare}
-                expandedFare={expandedFare}
-                onExpandFare={setExpandedFare}
+                fareRules={normalizeFareRulesFromQuote(fareQuote)}
+                fareRulesStatus={
+                  fareQuote?.Response?.Results ? "succeeded" : "loading"
+                }
               />
               {ssr?.Results?.Meal?.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm p-6">
@@ -461,9 +560,15 @@ export default function OneFlightBooking() {
                 <h3 className="text-lg font-bold mb-4">
                   Important Information
                 </h3>
-                <ImportantInformation
+                {/* <ImportantInformation
                   expandedSections={expandedSections}
                   onToggleSection={toggleSection}
+                  fareRules={normalizeFareRules(fareRule)}
+                  fareRulesStatus={!fareRule ? "loading" : "succeeded"}
+                />
+                 */}
+
+                <FareRulesAccordion
                   fareRules={normalizeFareRules(fareRule)}
                   fareRulesStatus={!fareRule ? "loading" : "succeeded"}
                 />
@@ -483,9 +588,11 @@ export default function OneFlightBooking() {
                 parsedFlightData={{
                   ...parsedFlightData,
                   basePrice:
-                    fareQuote?.Results?.[0]?.Fare?.PublishedFare ||
+                    fareQuote?.Response?.Results?.Fare?.PublishedFare ||
                     parsedFlightData.basePrice,
                 }}
+                selectedSeats={selectedSeats} // ✅ PASS THIS
+                travelers={parsedFlightData?.travelers || []} // ✅ PASS THIS
               />
 
               <Amenities />
@@ -501,12 +608,12 @@ export default function OneFlightBooking() {
           onClose={() => setSeatModalOpen(false)}
           flightIndex={activeSegmentIndex}
           journeyType="onward"
-          travelers={[]} // pass travelers array
-          selectedSeats={{}} // pass selectedSeats state
-          onSeatSelect={() => {}}
+          travelers={travelersForSeat}
+          selectedSeats={selectedSeats}
+          onSeatSelect={handleSeatSelect}
           segment={parsedFlightData.segments[activeSegmentIndex]}
-          traceId={searchParams.traceId} // ✅ REQUIRED
-          resultIndex={selectedFlight.ResultIndex} // ✅ REQUIRED
+          traceId={searchParams.traceId}
+          resultIndex={selectedFlight.ResultIndex}
         />
       )}
     </div>

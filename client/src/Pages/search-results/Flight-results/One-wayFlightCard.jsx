@@ -28,7 +28,7 @@ const formatTime12Hr = (dateTime) => {
   });
 };
 
-export default function OneWayFlightCard({ flight, traceId }) {
+export default function OneWayFlightCard({ flight, traceId, travelClass }) {
   const navigate = useNavigate();
 
   if (!flight || !flight.Segments?.length || !flight.Segments[0]?.length) {
@@ -119,7 +119,7 @@ export default function OneWayFlightCard({ flight, traceId }) {
       {/* TAGS */}
       <div className="flex flex-wrap gap-2 mt-4 text-sm">
         <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full">
-          Economy
+          {travelClass}
         </span>
 
         <span className="flex items-center gap-1 text-slate-600">
