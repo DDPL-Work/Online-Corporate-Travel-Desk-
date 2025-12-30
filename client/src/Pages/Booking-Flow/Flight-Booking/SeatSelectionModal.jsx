@@ -3,7 +3,7 @@ import { AiOutlineClose } from "react-icons/ai";
 import { FaArrowRight } from "react-icons/fa";
 import { MdEventSeat, MdFlightLand, MdFlightTakeoff } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
-import { getSeatMap } from "../../../Redux/Actions/flight.thunks";
+import { ToastConfirm } from "../../../utils/ToastConfirm";
 
 const PRIMARY_BG = "bg-blue-600";
 const PRIMARY_DARK = "bg-blue-900";
@@ -12,7 +12,6 @@ const PRIMARY_BORDER = "border-blue-600";
 const SUCCESS_BG = "bg-green-500";
 
 export const buildSeatMapPayload = ({
-  bookingId,
   reviewResponse,
   segment,
   segmentIndex,
@@ -26,7 +25,6 @@ export const buildSeatMapPayload = ({
   if (!sI) return null;
 
   return {
-    bookingId,
 
     priceIds:
       reviewResponse.priceIds || reviewResponse?.searchQuery?.priceIds || [],
@@ -63,7 +61,6 @@ export default function SeatSelectionModal({
   travelers = [],
   selectedSeats = {},
   onSeatSelect,
-  bookingId,
   date,
   reviewResponse,
   segment,
@@ -76,28 +73,7 @@ export default function SeatSelectionModal({
 
   const [seatsFlat, setSeatsFlat] = useState([]);
   const fareQuote = useSelector((state) => state.flights.fareQuote);
-
-  /* ---------- fetch seatmap when opened ---------- */
-  useEffect(() => {
-    console.log("SEAT MODAL TRIGGER:", {
-      isOpen,
-      bookingId,
-      segment,
-      reviewResponse,
-    });
-
-    if (!isOpen || !traceId || !resultIndex || !fareQuote) return;
-
-    const isLCC = fareQuote?.Results?.[0]?.IsLCC;
-
-    dispatch(
-      getSeatMap({
-        traceId,
-        resultIndex,
-        isLCC,
-      })
-    );
-  }, [isOpen, traceId, resultIndex, fareQuote, dispatch]);
+  const ssr = useSelector((state) => state.flights.ssr);
 
   /* ---------- parse different TripJack formats ---------- */
   // useEffect(() => {
@@ -164,35 +140,39 @@ export default function SeatSelectionModal({
   //   console.warn("SeatSelectionModal: unknown seat map shape", seatMap);
   // }, [seatMap]);
 
+useEffect(() => {
+  const rowSeats =
+    ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[0]?.RowSeats;
+
+  if (!Array.isArray(rowSeats) || rowSeats.length === 0) {
+    setSeatsFlat([]);
+    return;
+  }
+
+  const flat = rowSeats.flatMap((row) =>
+    (row.Seats || []).map((s) => ({
+      seatNo: s.Code,                     // e.g. "12A"
+      row: Number(s.RowNo),               // 12
+      col: s.SeatNo ? s.SeatNo.charCodeAt(0) - 64 : null, // A=1
+      price: Number(s.Price || 0),
+      occupied: s.AvailablityType !== 1 && s.Code !== "NoSeat",
+      premium: s.SeatType === 2 || s.SeatType === 3,
+      raw: s,
+    }))
+  );
+
+  setSeatsFlat(flat);
+}, [ssr]);
+
+
   useEffect(() => {
-    if (!seatMap?.rows?.length) {
-      setSeatsFlat([]);
-      return;
-    }
+    console.log("SSR RAW SEAT:", ssr?.Results?.Seat);
+    console.log("SEATS FLAT:", seatsFlat);
+  }, [ssr, seatsFlat]);
 
-    const flat = [];
-
-    seatMap.rows.forEach((row) => {
-      const rowNo = Number(row.RowNo);
-
-      row.Seats.forEach((seat, colIndex) => {
-        if (seat.Code === "NoSeat") return;
-
-        flat.push({
-          seatNo: seat.Code,
-          row: rowNo,
-          col: colIndex + 1,
-          price: seat.Price || 0,
-          occupied: seat.AvailablityType === 3,
-          premium: seat.SeatType === 4,
-          exitRow: seat.SeatType === 5,
-          isAisle: false, // aisle inferred by NoSeat gaps
-        });
-      });
-    });
-
-    setSeatsFlat(flat);
-  }, [seatMap]);
+  useEffect(() => {
+    console.log("SSR FULL OBJECT:", ssr);
+  }, [ssr]);
 
   /* ---------- derive grid dimensions and matrix ---------- */
   const { rows, cols, matrix } = useMemo(() => {
@@ -243,7 +223,9 @@ export default function SeatSelectionModal({
       onSeatSelect(journeyType, flightIndex, seat.seatNo, seat.price);
     } else {
       if (list.length >= travelers.length) {
-        alert(`You can select max ${travelers.length} seats`);
+        ToastConfirm({
+          message:`You can select max ${travelers.length} seats`,
+        });
         return;
       }
       onSeatSelect(journeyType, flightIndex, seat.seatNo, seat.price);
@@ -295,10 +277,6 @@ export default function SeatSelectionModal({
                 {segment?.fD?.aI?.name || "Airline"} •
                 {segment?.fD?.aI?.code || ""}-{segment?.fD?.fN || ""}
               </p>
-
-              <div className="mt-2 text-xs text-blue-100">
-                Booking: <span className="font-medium">{bookingId || "—"}</span>
-              </div>
             </div>
           </div>
 

@@ -75,16 +75,21 @@ export const FlightSearchProvider = ({ children: childComponents }) => {
     setIsModalOpen(!isModalOpen);
   };
 
-  const handleApply = () => {
-    setIsModalOpen(false);
+  const handleApply = ({
+    adults,
+    children,
+    childAges,
+    travelClass,
+    directOnly,
+  }) => {
+    setAdults(adults);
+    setChildren(children);
+    setChildAges(childAges);
+    setTravelClass(travelClass); // ✅ THIS WAS MISSING
+    setDirectOnly(directOnly);
     setTravelers(adults + children);
-    console.log({
-      adults,
-      children,
-      childAges,
-      travelClass,
-      directOnly,
-    });
+
+    setIsModalOpen(false);
   };
 
   // Child management functions

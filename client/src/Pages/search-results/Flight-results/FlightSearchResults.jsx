@@ -56,6 +56,7 @@ export default function FlightSearchResults() {
     searchResults: flights,
     traceId,
     journeyType,
+    cabinClass,
     loading,
     error,
   } = useSelector((state) => state.flights);
@@ -98,19 +99,19 @@ export default function FlightSearchResults() {
     return () => unlockScroll();
   }, []);
 
-  useEffect(() => {
-    dispatch(
-      searchFlights({
-        origin: ONE_WAY_OVERRIDE.from.code,
-        destination: ONE_WAY_OVERRIDE.to.code,
-        adults: 1,
-        children: 0,
-        journeyType: 2,
-        cabinClass: "Economy",
-        directFlight: false,
-      })
-    );
-  }, [dispatch]);
+  // useEffect(() => {
+  //   dispatch(
+  //     searchFlights({
+  //       origin: ONE_WAY_OVERRIDE.from.code,
+  //       destination: ONE_WAY_OVERRIDE.to.code,
+  //       adults: 1,
+  //       children: 0,
+  //       journeyType: 2,
+  //       cabinClass: "Economy",
+  //       directFlight: false,
+  //     })
+  //   );
+  // }, [dispatch]);
 
   const getSegments = (flight) => {
     if (!flight?.Segments) return [];
@@ -361,19 +362,41 @@ export default function FlightSearchResults() {
 
   const renderFlightCard = (flight, idx) => {
     if (journeyType === 2 && flight?.Segments?.length < 2) {
-      return <OneWayFlightCard key={idx} flight={flight} traceId={traceId} />;
+      return (
+        <OneWayFlightCard
+          key={idx}
+          flight={flight}
+          traceId={traceId}
+          travelClass={cabinClass}
+        />
+      );
     }
 
     if (journeyType === 1) {
-      return <OneWayFlightCard key={idx} flight={flight} traceId={traceId} />;
+      return (
+        <OneWayFlightCard
+          key={idx}
+          flight={flight}
+          traceId={traceId}
+          travelClass={cabinClass}
+        />
+      );
     }
 
     if (journeyType === 2) {
-      return <ReturnFlightCard key={idx} flight={flight} />;
+      return (
+        <ReturnFlightCard key={idx} flight={flight} travelClass={cabinClass} />
+      );
     }
 
     if (journeyType === 3) {
-      return <MultiCityFlightCard key={idx} segments={flight.Segments} />;
+      return (
+        <MultiCityFlightCard
+          key={idx}
+          segments={flight.Segments}
+          travelClass={cabinClass}
+        />
+      );
     }
 
     return null;
@@ -578,7 +601,7 @@ export default function FlightSearchResults() {
 
           {filteredFlights
             .slice(0, visibleCount)
-            .map((flight, idx) => renderFlightCard(flight, idx))}
+            .map((flight, idx) => renderFlightCard(flight, idx, cabinClass))}
           {visibleCount < filteredFlights.length && !loading && (
             <div className="flex justify-center py-6">
               <button

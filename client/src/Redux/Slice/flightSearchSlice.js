@@ -7,7 +7,6 @@ import {
   bookFlight,
   ticketFlight,
   getBookingDetails,
-  getSeatMap,
 } from "../Actions/flight.thunks";
 
 const initialState = {
@@ -19,8 +18,6 @@ const initialState = {
   fareQuote: null,
   fareRule: null,
   ssr: null,
-
-  seatMap: null,
 
   booking: null,
   ticket: null,
@@ -50,6 +47,8 @@ const flightSlice = createSlice({
         state.loading = false;
         state.traceId = action.payload.TraceId;
         state.journeyType = action.payload.journeyType;
+        state.cabinClass = action.meta.arg.cabinClass;
+
 
         // 🔥 IMPORTANT: Flatten Results
         state.searchResults = action.payload.Results;
@@ -73,19 +72,6 @@ const flightSlice = createSlice({
       /* SSR */
       .addCase(getSSR.fulfilled, (state, action) => {
         state.ssr = action.payload;
-      })
-
-      /* SEAT MAP */
-      .addCase(getSeatMap.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(getSeatMap.fulfilled, (state, action) => {
-        state.loading = false;
-        state.seatMap = action.payload;
-      })
-      .addCase(getSeatMap.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
       })
 
       /* BOOK */

@@ -133,6 +133,16 @@ const AirportSearchInput = ({ value, onChange, placeholder, id }) => {
   );
 };
 
+
+const CABIN_CLASS_MAP = {
+  Economy: "economy",
+  Business: "business",
+  First: "first",
+  "Premium Economy": "economy",
+};
+
+
+
 export default function FlightSearchPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -149,13 +159,13 @@ export default function FlightSearchPage() {
   const [multiCityFlights, setMultiCityFlights] = useState([
     { from: "", to: "", date: "" },
   ]);
-  const [travelerData, setTravelerData] = useState({
-    adults: 1,
-    children: 0,
-    childAges: [],
-    travelClass: "Economy",
-    directOnly: false,
-  });
+  // const [travelerData, setTravelerData] = useState({
+  //   adults: 1,
+  //   children: 0,
+  //   childAges: [],
+  //   travelClass: "Economy",
+  //   directOnly: false,
+  // });
   const [fromAirport, setFromAirport] = useState({
     code: "DEL",
     city: "New Delhi",
@@ -231,7 +241,9 @@ export default function FlightSearchPage() {
       children,
       infants: 0,
 
-      cabinClass: travelClass.toLowerCase(),
+      // cabinClass: travelClass.toLowerCase(),
+      cabinClass: CABIN_CLASS_MAP[travelClass] || 1,
+
       directFlight: directOnly,
 
       origin: fromAirport.code,

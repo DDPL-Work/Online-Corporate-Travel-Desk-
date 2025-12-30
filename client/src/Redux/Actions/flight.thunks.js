@@ -78,26 +78,6 @@ export const getSSR = createAsyncThunk(
   }
 );
 
-/* ---------------- SEAT MAP ---------------- */
-export const getSeatMap = createAsyncThunk(
-  "flights/seatMap",
-  async ({ traceId, resultIndex, isLCC }, { rejectWithValue }) => {
-    try {
-      const { data } = await flightApi.post("/seat-map", {
-        traceId,
-        resultIndex,
-        isLCC,
-      });
-
-      return data.data;
-    } catch (err) {
-      return rejectWithValue(
-        err.response?.data?.message || "Seat map fetch failed"
-      );
-    }
-  }
-);
-
 /* ---------------- BOOK ---------------- */
 export const bookFlight = createAsyncThunk(
   "flights/book",
