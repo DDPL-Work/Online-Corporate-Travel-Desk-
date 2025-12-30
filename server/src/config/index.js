@@ -28,9 +28,9 @@ module.exports = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRE || "30d",
   },
 
-  frontend: {
-    url: process.env.FRONTEND_URL || "http://localhost:5173",
-    adminUrl: process.env.ADMIN_FRONTEND_URL || "http://localhost:5173",
+   frontend: {
+    url: process.env.FRONTEND_URL || "https://cotd-lyart-kappa.vercel.app",
+    adminUrl: process.env.ADMIN_FRONTEND_URL || "https://cotd-lyart-kappa.vercel.app",
   },
 
   upload: {
