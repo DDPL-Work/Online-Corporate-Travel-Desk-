@@ -29,8 +29,8 @@ module.exports = {
   },
 
   frontend: {
-    url: process.env.FRONTEND_URL || "http://localhost:5173",
-    adminUrl: process.env.ADMIN_FRONTEND_URL || "http://localhost:5173",
+    url: process.env.FRONTEND_URL,
+    adminUrl: process.env.ADMIN_FRONTEND_URL,
   },
 
   upload: {
