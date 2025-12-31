@@ -1,46 +1,15 @@
 // Common Components
 import React, { useMemo, useState } from "react";
-import {
-  MdAccessTime,
-  MdOutlineShield,
-  MdOutlineFlight,
-  MdEventSeat,
-  MdAirplanemodeActive,
-  MdCancel,
-  MdAutorenew,
-  MdWork,
-  MdInfo,
-} from "react-icons/md";
-import {
-  FaSuitcase,
-  FaWifi,
-  FaUtensils,
-  FaAngleDown,
-  FaAngleUp,
-  FaArrowRight,
-  FaUser,
-  FaPlane,
-  FaPlaneArrival,
-} from "react-icons/fa";
-import {
-  BsLuggage,
-  BsTag,
-  BsCashStack,
-  BsCalendar4,
-  BsInfoCircleFill,
-} from "react-icons/bs";
-import { AiOutlineCheck, AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
-import { FaArrowTrendDown, FaPlaneDeparture } from "react-icons/fa6";
-import {
-  IoAirplaneOutline,
-  IoPersonAdd,
-  IoPersonRemove,
-} from "react-icons/io5";
-import { BiTime, BiPurchaseTag } from "react-icons/bi";
-import { PiNoteDuotone, PiAirplaneTilt, PiForkKnifeBold } from "react-icons/pi";
+import { MdEventSeat, MdInfo } from "react-icons/md";
+import { FaWifi, FaUser, FaPlaneArrival } from "react-icons/fa";
+import { BsLuggage, BsTag, BsInfoCircleFill } from "react-icons/bs";
+import { AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
+import { FaPlaneDeparture } from "react-icons/fa6";
+import { IoPersonAdd, IoPersonRemove } from "react-icons/io5";
+import { PiForkKnifeBold } from "react-icons/pi";
 import { RiHotelLine } from "react-icons/ri";
 import { HiOutlineLocationMarker } from "react-icons/hi";
-import { GoPeople } from "react-icons/go";
+import { LuInfo } from "react-icons/lu";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { useNavigate } from "react-router-dom";
@@ -522,7 +491,7 @@ export const PriceSummary = ({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden ">
       {/* Header */}
-      <div className="bg-gradient-to-r from-gray-700 to-gray-800 text-white p-5">
+      <div className="bg-linear-to-r from-gray-700 to-gray-800 text-white p-5">
         <h3 className="text-xl font-bold">Fare Summary</h3>
         <p className="text-xs text-gray-300 mt-1">Complete price breakdown</p>
       </div>
@@ -706,6 +675,21 @@ export const ImportantInformation = ({
   );
 };
 
+// Normalize the API response to extract fare rules
+const normalizeFareRules = (fareRule) => {
+  if (!fareRule?.Response?.FareRules?.length) {
+    return null;
+  }
+
+  const rules = fareRule.Response.FareRules.map(
+    (rule) => rule.FareRuleDetail
+  ).filter(Boolean);
+
+  return {
+    important: rules,
+  };
+};
+
 export const FareRulesAccordion = ({
   fareRules = null,
   fareRulesStatus = "idle",
@@ -714,82 +698,162 @@ export const FareRulesAccordion = ({
 
   if (fareRulesStatus === "loading") {
     return (
-      <div className="py-6 text-center text-gray-500 text-sm">
-        Fetching fare rules…
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div className="px-6 py-8 text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mb-3"></div>
+          <p className="text-gray-500 text-sm">Fetching fare rules…</p>
+        </div>
       </div>
     );
   }
 
   if (!fareRules || !fareRules.important?.length) {
     return (
-      <div className="py-6 text-center text-gray-500 text-sm">
-        Fare rules not available for this fare.
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div className="px-6 py-8 text-center text-gray-500 text-sm">
+          Fare rules not available for this fare.
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-purple-200 bg-purple-50/40 shadow-sm overflow-hidden">
+    <div className="rounded-xl border border-purple-100 bg-linear-to-br from-purple-50/50 to-white shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
       {/* Header */}
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-4 bg-purple-50 hover:bg-purple-100 transition"
+        className="w-full flex items-center justify-between px-6 py-4 bg-linear-to-r from-purple-50 to-purple-50/30 hover:from-purple-100 hover:to-purple-50 transition-all duration-200 group"
       >
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 flex items-center justify-center rounded-full bg-purple-600 text-white">
-            <MdInfo size={18} />
+          <div className="h-10 w-10 flex items-center justify-center rounded-full bg-purple-600 text-white shadow-md group-hover:scale-110 transition-transform duration-200">
+            <LuInfo size={20} strokeWidth={2.5} />
           </div>
           <div className="text-left">
-            <p className="font-semibold text-gray-900">Fare Rules</p>
-            <p className="text-xs text-gray-500">
+            <p className="font-bold text-gray-900 text-base">Fare Rules</p>
+            <p className="text-xs text-gray-600 mt-0.5">
               Cancellation, reissue & airline conditions
             </p>
           </div>
         </div>
 
-        <span className="text-xl font-medium text-gray-600">
-          {open ? "−" : "+"}
-        </span>
+        <div
+          className="text-purple-600 transition-transform duration-200"
+          style={{ transform: open ? "rotate(0deg)" : "rotate(0deg)" }}
+        >
+          {open ? <AiOutlineMinus  /> : <AiOutlinePlus />}
+        </div>
       </button>
 
       {/* Content */}
       {open && (
-        <div className="bg-white px-6 py-5 border-t border-purple-200 space-y-4 animate-fadeIn">
+        <div className="bg-white px-6 py-6 border-t border-purple-100 animate-fadeIn">
           {fareRules.important.map((html, i) => (
             <div
               key={i}
-              className="prose prose-sm max-w-none text-gray-700
-                prose-p:leading-relaxed
-                prose-ul:pl-5
-                prose-li:my-1
-                prose-li:marker:text-purple-500"
+              className="fare-rules-content text-gray-700 text-sm leading-relaxed"
               dangerouslySetInnerHTML={{
                 __html: html
-                  // normalize breaks
-                  .replace(/<br\s*\/?>/gi, "<br/>")
-
-                  // Fare basis pill
+                  // Extract and style Fare Basis Code
                   .replace(
-                    /FareBasisCode is:\s*(\w+)/i,
-                    `
-                    <div class="mb-4">
-                      <span class="inline-flex items-center gap-2 bg-purple-100 text-purple-800 border border-purple-200 px-3 py-1 rounded-full text-xs font-semibold">
-                        Fare Basis Code: $1
+                    /The FareBasisCode is:\s*(\w+)/i,
+                    `<div style="margin-bottom: 1.5rem;">
+                      <span style="display: inline-flex; align-items: center; gap: 0.5rem; background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); color: #7c3aed; border: 1px solid #e9d5ff; padding: 0.5rem 1rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(124, 58, 237, 0.1);">
+                        <span style="font-size: 0.7rem; opacity: 0.8;">Fare Basis Code:</span> $1
                       </span>
-                    </div>
-                    `
+                    </div>`
                   )
 
-                  // Emphasize important notices
+                  // Style GST/RAF notice with improved design
                   .replace(
                     /(GST,.*?EXTRA\.)/gi,
-                    `<div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm font-medium">$1</div>`
+                    `<div style="margin-top: 1.5rem; padding: 1rem 1.25rem; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-left: 4px solid #f59e0b; border-radius: 0.5rem; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);">
+                      <p style="margin: 0; color: #92400e; font-weight: 600; font-size: 0.875rem;">$1</p>
+                    </div>`
                   ),
               }}
             />
           ))}
         </div>
       )}
+
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+        
+        .fare-rules-content ul {
+          list-style: none;
+          padding-left: 0;
+          margin: 1rem 0;
+        }
+        
+        .fare-rules-content li {
+          padding: 0.5rem 0;
+          padding-left: 1.5rem;
+          position: relative;
+          line-height: 1.6;
+        }
+        
+        .fare-rules-content li:before {
+          content: "•";
+          position: absolute;
+          left: 0.5rem;
+          color: #7c3aed;
+          font-weight: bold;
+          font-size: 1.2rem;
+        }
+        
+        .fare-rules-content table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 1.5rem 0;
+          border-radius: 0.5rem;
+          overflow: hidden;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .fare-rules-content table td {
+          padding: 0.875rem 1rem;
+          border: 1px solid #e5e7eb;
+          background: white;
+        }
+        
+        .fare-rules-content table tr:first-child td {
+          background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+          font-weight: 600;
+          color: #374151;
+        }
+        
+        .fare-rules-content table tr:hover td {
+          background: #faf5ff;
+        }
+        
+        .fare-rules-content b {
+          color: #1f2937;
+          font-weight: 700;
+        }
+        
+        .fare-rules-content p {
+          margin: 0.75rem 0;
+          line-height: 1.7;
+        }
+        
+        .fare-rules-content strong {
+          color: #1f2937;
+          font-weight: 600;
+        }
+      `}</style>
     </div>
   );
 };
