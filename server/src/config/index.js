@@ -31,6 +31,7 @@ module.exports = {
   frontend: {
     url: process.env.FRONTEND_URL,
     adminUrl: process.env.ADMIN_FRONTEND_URL,
+    prodUrl: process.env.PRODUCTION_FRONTEND_URL
   },
 
   upload: {
