@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const flightApi = axios.create({
-  baseURL: import.meta.env.VITE_API_URL + "/flights",
+  baseURL: import.meta.env.VITE_API_BASE_URL + "/flights",
   withCredentials: true
 });
 

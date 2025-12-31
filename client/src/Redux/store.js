@@ -1,6 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "./Slice/authSlice.js";
-import ssoAuthReducer from "./Slice/ssoAuthSlice.js";
+// import ssoAuthReducer from "./Slice/ssoAuthSlice.js";
 import dashboardReducer from "./Slice/dashboardSlice.js";
 import profileReducer from "./Slice/profileSlice";
 import corporateOnboardingReducer from "./Slice/corporateOnboardingSlice.js";
@@ -15,7 +15,7 @@ import tboBalanceReducer from "./Slice/tboBalanceSlice";
 export const store = configureStore({
   reducer: {
     auth: authReducer,
-    ssoAuth: ssoAuthReducer,
+    // ssoAuth: ssoAuthReducer,
     dashboard: dashboardReducer,
     profile: profileReducer,
     corporateList: corporateListReducer,

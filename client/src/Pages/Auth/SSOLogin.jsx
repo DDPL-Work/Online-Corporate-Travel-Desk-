@@ -10,15 +10,15 @@ const SSOLogin = () => {
   const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
   const loginWithGoogle = () => {
-    window.location.href = `${API_BASE}/api/v1/auth/sso/google`;
+    window.location.href = `${API_BASE}/auth/sso/google`;
   };
 
   const loginWithMicrosoft = () => {
-    window.location.href = `${API_BASE}/api/v1/auth/sso/microsoft`;
+    window.location.href = `${API_BASE}/auth/sso/microsoft`;
   };
 
   const loginWithZoho = () => {
-    window.location.href = `${API_BASE}/api/v1/auth/sso/zoho`;
+    window.location.href = `${API_BASE}/auth/sso/zoho`;
   };
 
   return (
