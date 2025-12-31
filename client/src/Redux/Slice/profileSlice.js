@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import api from "../../config/axiosConfig";
+import api from "../../API/axios";
 
 // ==============================
 // FETCH USER PROFILE

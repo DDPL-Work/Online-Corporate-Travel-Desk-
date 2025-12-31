@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
-import { ssoLoginSuccess } from "../../Redux/Slice/ssoAuthSlice";
+import { ssoLoginSuccess } from "../../Redux/Slice/authSlice";
 import { fetchDashboardData } from "../../Redux/Slice/dashboardSlice";
 
 const SSOCallback = () => {
