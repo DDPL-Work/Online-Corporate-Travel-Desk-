@@ -5,53 +5,6 @@ import { MdEventSeat, MdFlightLand, MdFlightTakeoff } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { ToastConfirm } from "../../../utils/ToastConfirm";
 
-const PRIMARY_BG = "bg-blue-600";
-const PRIMARY_DARK = "bg-blue-900";
-const PRIMARY_TEXT = "text-blue-600";
-const PRIMARY_BORDER = "border-blue-600";
-const SUCCESS_BG = "bg-green-500";
-
-export const buildSeatMapPayload = ({
-  reviewResponse,
-  segment,
-  segmentIndex,
-  journeyType,
-  date,
-}) => {
-  if (!reviewResponse || !segment) return null;
-
-  const sI = reviewResponse?.tripInfos?.[0]?.sI?.[segmentIndex];
-
-  if (!sI) return null;
-
-  return {
-
-    priceIds:
-      reviewResponse.priceIds || reviewResponse?.searchQuery?.priceIds || [],
-
-    tripType: reviewResponse?.searchQuery?.tripType || "OW",
-
-    segmentKey: sI.sK,
-
-    airlineCode: segment?.fD?.aI?.code,
-    flightNumber: segment?.fD?.fN,
-
-    from: segment?.da?.code,
-    to: segment?.aa?.code,
-
-    dt: date || segment?.dt,
-    at: segment?.at,
-
-    cabinClass: segment?.cT || "ECONOMY",
-
-    paxInfo: reviewResponse?.searchQuery?.paxInfo || {
-      adt: 1,
-      chd: 0,
-      inf: 0,
-    },
-  };
-};
-
 export default function SeatSelectionModal({
   isOpen,
   onClose,
@@ -70,152 +23,89 @@ export default function SeatSelectionModal({
 }) {
   const dispatch = useDispatch();
   const { seatMap, loading } = useSelector((state) => state.flights);
-
   const [seatsFlat, setSeatsFlat] = useState([]);
   const fareQuote = useSelector((state) => state.flights.fareQuote);
   const ssr = useSelector((state) => state.flights.ssr);
 
-  /* ---------- parse different TripJack formats ---------- */
-  // useEffect(() => {
-  //   if (!seatMap) return;
-
-  //   // helper to normalize seat entries -> items with row,column,seatNo,price,flags
-  //   const normalizeFromSInfo = (sinfo) =>
-  //     sinfo.map((s) => ({
-  //       seatNo: s.seatNo,
-  //       row: Number(s.seatPosition?.row) || null,
-  //       col: Number(s.seatPosition?.column) || null,
-  //       price: Number(s.amount || s.price || 0) || 0,
-  //       occupied: !!s.isBooked,
-  //       premium: !!s.isLegroom,
-  //       exitRow: !!s.isExitRow,
-  //       isAisle: !!s.isAisle,
-  //       raw: s,
-  //     }));
-
-  //   // 1) dynamic-key format: tripSeatMap.tripSeat.{<dynamicKey>}.sInfo
-  //   const tripSeatRoot = seatMap?.tripSeatMap?.tripSeat;
-  //   if (tripSeatRoot && typeof tripSeatRoot === "object") {
-  //     const keys = Object.keys(tripSeatRoot).filter((k) => k !== "__proto__");
-  //     if (keys.length) {
-  //       // prefer block that has sInfo
-  //       const blockKey =
-  //         keys.find((k) => Array.isArray(tripSeatRoot[k]?.sInfo)) || keys[0];
-  //       const block = tripSeatRoot[blockKey];
-  //       if (block?.sInfo && Array.isArray(block.sInfo)) {
-  //         setSeatsFlat(normalizeFromSInfo(block.sInfo));
-  //         return;
-  //       }
-  //     }
-  //   }
-
-  //   // 2) older: seatMap -> array of rows each with seats array
-  //   if (Array.isArray(seatMap?.seatMap)) {
-  //     const arr = [];
-  //     seatMap.seatMap.forEach((r) => {
-  //       (r.seats || []).forEach((s) => {
-  //         arr.push({
-  //           seatNo: `${r.row}${s.column}`,
-  //           row: Number(r.row) || null,
-  //           col: Number(s.column) || null,
-  //           price: Number(s.amount || 0) || 0,
-  //           occupied: ["O", "BOOKED"].includes(s.status) || !!s.isBooked,
-  //           premium: s.type === "P" || !!s.isLegroom,
-  //           exitRow: s.type === "E",
-  //           isAisle: !!s.isAisle,
-  //           raw: s,
-  //         });
-  //       });
-  //     });
-  //     setSeatsFlat(arr);
-  //     return;
-  //   }
-
-  //   // 3) fallback: maybe tripSeatMap.tripSeat directly is array
-  //   if (Array.isArray(seatMap?.tripSeatMap?.tripSeat)) {
-  //     setSeatsFlat(normalizeFromSInfo(seatMap.tripSeatMap.tripSeat));
-  //     return;
-  //   }
-
-  //   console.warn("SeatSelectionModal: unknown seat map shape", seatMap);
-  // }, [seatMap]);
-
-useEffect(() => {
-  const rowSeats =
-    ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[0]?.RowSeats;
-
-  if (!Array.isArray(rowSeats) || rowSeats.length === 0) {
-    setSeatsFlat([]);
-    return;
-  }
-
-  const flat = rowSeats.flatMap((row) =>
-    (row.Seats || []).map((s) => ({
-      seatNo: s.Code,                     // e.g. "12A"
-      row: Number(s.RowNo),               // 12
-      col: s.SeatNo ? s.SeatNo.charCodeAt(0) - 64 : null, // A=1
-      price: Number(s.Price || 0),
-      occupied: s.AvailablityType !== 1 && s.Code !== "NoSeat",
-      premium: s.SeatType === 2 || s.SeatType === 3,
-      raw: s,
-    }))
-  );
-
-  setSeatsFlat(flat);
-}, [ssr]);
-
-
   useEffect(() => {
-    console.log("SSR RAW SEAT:", ssr?.Results?.Seat);
-    console.log("SEATS FLAT:", seatsFlat);
-  }, [ssr, seatsFlat]);
+    const rowSeats =
+      ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[0]?.RowSeats;
 
-  useEffect(() => {
-    console.log("SSR FULL OBJECT:", ssr);
+    if (!Array.isArray(rowSeats) || rowSeats.length === 0) {
+      setSeatsFlat([]);
+      return;
+    }
+
+    const flat = rowSeats.flatMap((row) =>
+      (row.Seats || []).map((s) => ({
+        seatNo: s.Code,
+        row: Number(s.RowNo),
+        col: s.SeatNo ? s.SeatNo.charCodeAt(0) - 64 : null,
+        price: Number(s.Price || 0),
+        occupied: s.AvailablityType !== 1 && s.Code !== "NoSeat",
+        premium: s.SeatType === 2 || s.SeatType === 3,
+        isEmergencyExit: s.SeatType === 3,
+        raw: s,
+      }))
+    );
+
+    setSeatsFlat(flat);
   }, [ssr]);
 
-  /* ---------- derive grid dimensions and matrix ---------- */
-  const { rows, cols, matrix } = useMemo(() => {
-    let maxR = 0,
-      maxC = 0;
-    seatsFlat.forEach((s) => {
-      if (s.row && s.col) {
-        maxR = Math.max(maxR, s.row);
-        maxC = Math.max(maxC, s.col);
-      }
+  const seatRows = useMemo(() => {
+    const rows = {};
+    seatsFlat.forEach((seat) => {
+      if (!seat.row) return;
+      if (!rows[seat.row]) rows[seat.row] = [];
+      rows[seat.row].push(seat);
     });
 
-    // build matrix: rows indexed 1..maxR, cols 1..maxC
-    const mat = {};
-    for (let r = 1; r <= maxR; r++) mat[r] = {};
-
-    seatsFlat.forEach((s) => {
-      if (!s.row || !s.col) return;
-      mat[s.row][s.col] = s;
+    Object.keys(rows).forEach((row) => {
+      rows[row].sort((a, b) => (a.col || 0) - (b.col || 0));
     });
 
-    return { rows: maxR, cols: maxC, matrix: mat };
+    return rows;
   }, [seatsFlat]);
 
-  /* ---------- helpers ---------- */
-  const keyFor = (r, c) => `${journeyType}|${flightIndex}-${r}-${c}`;
+  const seatConfiguration = useMemo(() => {
+    if (Object.keys(seatRows).length === 0) return [];
+    
+    const firstRow = seatRows[Object.keys(seatRows)[0]];
+    const seatsPerSide = [];
+    let currentGroup = [];
+    let lastCol = 0;
+    
+    firstRow.forEach((seat, index) => {
+      if (index === 0) {
+        currentGroup.push(seat);
+        lastCol = seat.col;
+      } else if (seat.col === lastCol + 1) {
+        currentGroup.push(seat);
+        lastCol = seat.col;
+      } else {
+        seatsPerSide.push(currentGroup.length);
+        currentGroup = [seat];
+        lastCol = seat.col;
+      }
+    });
+    
+    if (currentGroup.length > 0) {
+      seatsPerSide.push(currentGroup.length);
+    }
+    
+    return seatsPerSide;
+  }, [seatRows]);
 
   const isSelected = (seat) => {
-    // const key = `${journeyType}-flight-${flightIndex}`;
     const key = `${journeyType}|${flightIndex}`;
     const seatObj = selectedSeats[key];
-
-    // always look inside seatObj.list
     const list = Array.isArray(seatObj?.list) ? seatObj.list : [];
-
     return list.includes(seat.seatNo);
   };
 
   const tryToggle = (seat) => {
     if (!seat || seat.occupied) return;
-    // const key = `${journeyType}-flight-${flightIndex}`;
     const key = `${journeyType}|${flightIndex}`;
-
     const seatObj = selectedSeats[key] || { list: [], priceMap: {} };
     const list = Array.isArray(seatObj.list) ? seatObj.list : [];
 
@@ -224,7 +114,7 @@ useEffect(() => {
     } else {
       if (list.length >= travelers.length) {
         ToastConfirm({
-          message:`You can select max ${travelers.length} seats`,
+          message: `You can select max ${travelers.length} seats`,
         });
         return;
       }
@@ -232,254 +122,333 @@ useEffect(() => {
     }
   };
 
-  /* ---------- UI pieces ---------- */
-  const Legend = () => (
-    <div className="flex flex-wrap gap-3 items-center text-sm">
-      <div className="flex items-center gap-2">
-        <div className="w-5 h-5 bg-white border rounded-sm" />
-        <div className="text-xs text-gray-600">Available</div>
+  const getSelectedSeatsCount = () => {
+    const key = `${journeyType}|${flightIndex}`;
+    const seatObj = selectedSeats[key] || { list: [] };
+    return seatObj.list.length;
+  };
+
+  const getTotalPrice = () => {
+    const key = `${journeyType}|${flightIndex}`;
+    const seatObj = selectedSeats[key] || { list: [], priceMap: {} };
+    return seatObj.list.reduce((total, seatNo) => {
+      return total + (seatObj.priceMap[seatNo] || 0);
+    }, 0);
+  };
+
+  const renderSeat = (seat) => {
+    if (!seat) return null;
+
+    const selected = isSelected(seat);
+    const isPremium = seat.premium;
+    const isEmergencyExit = seat.isEmergencyExit;
+
+    let seatClasses = "w-9 h-9 sm:w-10 sm:h-10 rounded flex flex-col items-center justify-center text-[9px] sm:text-[10px] font-semibold transition-all duration-200 border-2 ";
+    
+    if (seat.occupied) {
+      seatClasses += "bg-gray-300 border-gray-400 text-gray-500 cursor-not-allowed ";
+    } else if (selected) {
+      seatClasses += "bg-green-500 border-green-600 text-white shadow-md scale-105 ";
+    } else if (isEmergencyExit) {
+      seatClasses += "bg-orange-100 border-orange-400 text-orange-700 hover:border-orange-600 cursor-pointer hover:scale-105 ";
+    } else if (isPremium) {
+      seatClasses += "bg-blue-100 border-blue-400 text-blue-700 hover:border-blue-500 cursor-pointer hover:scale-105 ";
+    } else {
+      seatClasses += "bg-white border-gray-300 text-gray-700 hover:border-blue-400 cursor-pointer hover:scale-105 ";
+    }
+
+    return (
+      <button
+        key={`${seat.row}-${seat.col}`}
+        onClick={() => tryToggle(seat)}
+        disabled={seat.occupied}
+        className={seatClasses}
+        title={`${seat.seatNo}${seat.price ? ` • ₹${seat.price}` : ''}${isEmergencyExit ? ' • Emergency Exit' : ''}`}
+      >
+        <span className="font-bold text-[10px] sm:text-xs">{seat.seatNo}</span>
+        {seat.price > 0 && !seat.occupied && (
+          <span className="text-[7px] sm:text-[8px]">₹{seat.price}</span>
+        )}
+      </button>
+    );
+  };
+
+  const renderSeatRow = (rowNumber) => {
+    const seats = seatRows[rowNumber] || [];
+    
+    return (
+      <div key={rowNumber} className="flex items-center justify-center gap-2 sm:gap-3">
+        <div className="w-5 sm:w-6 text-center text-[10px] sm:text-xs font-bold text-gray-600">
+          {rowNumber}
+        </div>
+        
+        <div className="flex items-center gap-3 sm:gap-4">
+          {seatConfiguration.map((groupSize, groupIndex) => {
+            const groupSeats = seats.slice(
+              seatConfiguration.slice(0, groupIndex).reduce((a, b) => a + b, 0),
+              seatConfiguration.slice(0, groupIndex + 1).reduce((a, b) => a + b, 0)
+            );
+            
+            return (
+              <div key={groupIndex} className="flex items-center gap-1 sm:gap-1.5">
+                {groupSeats.map((seat) => renderSeat(seat))}
+                {groupIndex < seatConfiguration.length - 1 && (
+                  <div className="w-6 sm:w-8 h-9 sm:h-10 flex items-center justify-center">
+                    <div className="w-0.5 h-7 sm:h-8 bg-gray-300"></div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        
+        <div className="w-5 sm:w-6 text-center text-[10px] sm:text-xs font-bold text-gray-600">
+          {rowNumber}
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="w-5 h-5 bg-gray-300 rounded-sm" />
-        <div className="text-xs text-gray-600">Booked / Occupied</div>
-      </div>
-      <div className="flex items-center gap-2">
-        <div className="w-5 h-5 bg-blue-50 border border-blue-300 rounded-sm" />
-        <div className="text-xs text-gray-600">Premium / Extra legroom</div>
-      </div>
-      <div className="flex items-center gap-2">
-        <div className="w-5 h-5 bg-green-500 rounded-sm" />
-        <div className="text-xs text-gray-600">Selected</div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[92vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-lg sm:rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* header */}
-        <div className="bg-linear-to-r from-blue-900 to-blue-700 p-5 flex items-start justify-between gap-4 shrink-0">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-md">
-              <MdEventSeat className="text-white text-2xl" />
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-800 to-blue-600 px-3 sm:px-5 py-3 sm:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+              <MdEventSeat className="text-white text-base sm:text-lg" />
             </div>
-            <div>
-              <h3 className="text-white text-xl font-semibold">Select Seats</h3>
-              <p className="text-sm text-blue-100 mt-1">
-                {segment?.fD?.aI?.name || "Airline"} •
-                {segment?.fD?.aI?.code || ""}-{segment?.fD?.fN || ""}
+            <div className="min-w-0 flex-1">
+              <h2 className="text-white text-sm sm:text-lg font-bold truncate">Select Your Seats</h2>
+              <p className="text-blue-100 text-[10px] sm:text-xs mt-0.5 flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <span className="flex items-center gap-1">
+                  <MdFlightTakeoff className="text-xs sm:text-sm" />
+                  <span className="truncate">{segment?.da?.city} ({segment?.da?.code})</span>
+                </span>
+                <FaArrowRight className="text-[8px] sm:text-[10px]" />
+                <span className="flex items-center gap-1">
+                  <MdFlightLand className="text-xs sm:text-sm" />
+                  <span className="truncate">{segment?.aa?.city} ({segment?.aa?.code})</span>
+                </span>
               </p>
             </div>
           </div>
-
-          <div className="flex items-center gap-4">
+          
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <div className="hidden sm:block text-white text-xs bg-white/20 px-3 py-1 rounded-full font-medium">
+              {segment?.fD?.aI?.code} {segment?.fD?.fN}
+            </div>
             <button
               onClick={onClose}
-              className="p-2 bg-white/20 rounded-full hover:bg-white/30"
+              className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
             >
-              <AiOutlineClose className="text-white text-lg" />
+              <AiOutlineClose className="text-white text-base sm:text-lg" />
             </button>
           </div>
         </div>
 
-        {/* body */}
-        <div className="flex-1 lg:flex overflow-hidden">
-          {/* left: seat grid */}
-          <div className="flex-1 p-6 overflow-auto">
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+          {/* Left Panel - Seat Map */}
+          <div className="flex-1 p-3 sm:p-5 overflow-auto">
             {loading && (
-              <div className="text-center py-12 text-gray-600">
-                Loading seat map…
+              <div className="flex items-center justify-center h-full min-h-[300px]">
+                <div className="text-center">
+                  <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                  <p className="mt-3 text-gray-600 text-sm">Loading seat map...</p>
+                </div>
               </div>
             )}
 
-            {/* {seatMapStatus === "failed" && (
-              <div className="text-center py-12 text-red-600 font-semibold">
-                Failed to load seat map
-              </div>
-            )} */}
-
-            {!loading && rows === 0 && (
-              <div className="text-center py-12 text-gray-600">
-                No seat data available for this itinerary.
+            {!loading && Object.keys(seatRows).length === 0 && (
+              <div className="flex items-center justify-center h-full min-h-[300px]">
+                <div className="text-center text-gray-500">
+                  <MdEventSeat className="text-4xl mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm sm:text-base">No seat map available</p>
+                </div>
               </div>
             )}
 
-            {!loading && rows > 0 && (
-              <div className="mx-auto max-w-[900px]">
-                {/* top column numbers */}
-                <div className="flex items-center justify-center gap-2 mb-3">
-                  <div className="w-8" />
-                  <div
-                    className="grid"
-                    style={{ gridTemplateColumns: `repeat(${cols}, 48px)` }}
-                  >
-                    {Array.from({ length: cols }).map((_, ci) => (
-                      <div
-                        key={ci}
-                        className="text-center text-xs text-gray-500"
-                      >
-                        {ci + 1}
+            {!loading && Object.keys(seatRows).length > 0 && (
+              <div className="w-full max-w-4xl mx-auto">
+                {/* Flight Info */}
+                <div className="mb-4 sm:mb-5 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div>
+                      <h3 className="font-bold text-gray-800 text-xs sm:text-sm">
+                        {segment?.fD?.aI?.name} • {segment?.cT || "ECONOMY"}
+                      </h3>
+                      <p className="text-[10px] sm:text-xs text-gray-600 mt-0.5">
+                        {new Date(segment?.dt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <div className="text-[10px] sm:text-xs text-gray-600">Selected</div>
+                      <div className="text-lg sm:text-xl font-bold text-blue-700">
+                        {getSelectedSeatsCount()}/{travelers.length}
                       </div>
-                    ))}
+                    </div>
                   </div>
-                  <div className="w-8" />
                 </div>
 
-                {/* grid rows */}
-                <div className="space-y-2">
-                  {Array.from({ length: rows }).map((_, ri) => {
-                    const rowIndex = ri + 1;
-                    return (
-                      <div
-                        key={rowIndex}
-                        className="flex items-center justify-center gap-2"
-                      >
-                        <div className="w-8 text-center text-sm font-semibold text-gray-600">
-                          {rowIndex}
-                        </div>
+                {/* Cabin Layout */}
+                <div className="relative">
+                  {/* Cockpit */}
+                  <div className="flex justify-center mb-4 sm:mb-5">
+                    <div className="w-28 sm:w-32 h-7 sm:h-8 bg-gradient-to-b from-gray-700 to-gray-800 rounded-t-xl flex items-center justify-center">
+                      <div className="text-white text-[9px] sm:text-[10px] font-bold">COCKPIT</div>
+                    </div>
+                  </div>
 
-                        <div
-                          className="grid"
-                          style={{
-                            gridTemplateColumns: `repeat(${cols}, 48px)`,
-                            gap: "8px",
-                          }}
-                        >
-                          {Array.from({ length: cols }).map((_, ci) => {
-                            const colIndex = ci + 1;
-                            const seat = matrix[rowIndex]
-                              ? matrix[rowIndex][colIndex]
-                              : undefined;
+                  {/* Cabin */}
+                  <div className="bg-gradient-to-b from-gray-100 to-gray-200 rounded-lg sm:rounded-xl p-3 sm:p-5 border border-gray-300">
+                    {/* Overhead Bins */}
+                    <div className="flex justify-center mb-3 sm:mb-4">
+                      <div className="w-full h-3 sm:h-4 bg-gradient-to-r from-gray-300 via-gray-200 to-gray-300 rounded"></div>
+                    </div>
 
-                            if (!seat) {
-                              // Render gap (aisle / empty)
-                              return (
-                                <div
-                                  key={`${rowIndex}-${colIndex}`}
-                                  className="w-12 h-12"
-                                />
-                              );
-                            }
-
-                            const selected = isSelected(seat);
-
-                            const base =
-                              "w-12 h-12 rounded-md border-2 flex items-center justify-center font-semibold relative text-xs";
-                            const classes = seat.occupied
-                              ? `${base} bg-gray-300 border-gray-400 text-gray-700 cursor-not-allowed`
-                              : selected
-                              ? `${base} ${SUCCESS_BG} border-green-700 text-white scale-105`
-                              : seat.premium
-                              ? `${base} bg-blue-50 border-blue-300 text-blue-900`
-                              : `${base} bg-white border-gray-300 text-gray-800 hover:border-blue-600 hover:text-blue-700 hover:scale-105 cursor-pointer`;
-
-                            return (
-                              <button
-                                key={`${rowIndex}-${colIndex}`}
-                                onClick={() => tryToggle(seat)}
-                                className={classes}
-                                title={`${seat.seatNo} ${
-                                  seat.price ? "• ₹" + seat.price : ""
-                                }`}
-                              >
-                                <div className="text-sm">{seat.seatNo}</div>
-                                <div className="absolute top-0 right-0 text-[10px] px-1 py-0.5 rounded-bl-md bg-blue-600 text-white">
-                                  {seat.price > 0 ? `₹${seat.price}` : ""}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        <div className="w-8 text-center text-sm font-semibold text-gray-600">
-                          {rowIndex}
-                        </div>
+                    {/* Seats - Centered */}
+                    <div className="flex justify-center">
+                      <div className="space-y-2.5 sm:space-y-3">
+                        {Object.keys(seatRows)
+                          .sort((a, b) => a - b)
+                          .map((rowNumber) => renderSeatRow(rowNumber))}
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
 
-                {/* small key / notes */}
-                <div className="mt-6 text-xs text-gray-600">
-                  Tip: Click a seat to select. Premium seats may have additional
-                  charge.
+                    
+                  </div>
+
+                  {/* Rear */}
+                  <div className="flex justify-center mt-4 sm:mt-5">
+                    <div className="w-32 sm:w-40 h-5 sm:h-6 bg-gradient-to-t from-gray-600 to-gray-700 rounded-b-lg"></div>
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* right: details + legend + selected */}
-          <div className="w-full lg:w-[360px] border-l px-6 py-6 bg-gray-50 overflow-auto">
-            <div className="mb-4">
-              <h4 className="font-semibold text-gray-700">Flight</h4>
-              <div className="text-sm text-gray-600">
-                {segment?.da?.city} → {segment?.aa?.city}
-              </div>
-              {/* <div className="mt-2 text-xs text-gray-500">
-                Date:{" "}
-                {date
-                  ? date.split("T")[0]
-                  : segment?.fD?.date || segment?.date || "—"}
-              </div> */}
-              <div className="mt-2 text-xs text-gray-500">
-                Date: {segment?.dt ? new Date(segment.dt).toDateString() : "—"}
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <h4 className="font-semibold text-gray-700">Selected seats</h4>
-              <div className="mt-2 text-sm text-gray-700">
-                {(() => {
-                  const seatObj = selectedSeats[
-                    // `${journeyType}-flight-${flightIndex}`
-                    `${journeyType}|${flightIndex}`
-                  ] || { list: [] };
-
-                  return (
-                    <>
-                      {seatObj.list.length === 0 && (
-                        <div className="text-xs text-gray-500">
-                          No seats selected
+          {/* Right Panel - Summary */}
+          <div className="w-full lg:w-64 border-t lg:border-t-0 lg:border-l border-gray-200 bg-gray-50 flex flex-col max-h-[40vh] lg:max-h-none">
+            <div className="p-3 sm:p-4 flex-1 overflow-auto">
+              <h3 className="font-bold text-gray-800 text-sm sm:text-base mb-3 sm:mb-4">Your Selection</h3>
+              
+              {/* Selected Seats */}
+              <div className="mb-3 sm:mb-4">
+                <h4 className="font-semibold text-gray-700 text-xs sm:text-sm mb-2">Seats</h4>
+                <div className="space-y-2">
+                  {(() => {
+                    const key = `${journeyType}|${flightIndex}`;
+                    const seatObj = selectedSeats[key] || { list: [], priceMap: {} };
+                    
+                    if (seatObj.list.length === 0) {
+                      return (
+                        <div className="text-center py-3 sm:py-4 text-gray-400">
+                          <MdEventSeat className="text-xl sm:text-2xl mx-auto mb-1" />
+                          <p className="text-[10px] sm:text-xs">No seats selected</p>
                         </div>
-                      )}
-
-                      <ul className="space-y-1">
-                        {seatObj.list.map((s) => (
-                          <li
-                            key={s}
-                            className="flex items-center justify-between text-sm"
-                          >
-                            <span>{s}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  );
-                })()}
+                      );
+                    }
+                    
+                    return seatObj.list.map((seatNo) => (
+                      <div
+                        key={seatNo}
+                        className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 sm:w-7 sm:h-7 bg-green-500 rounded flex items-center justify-center">
+                            <span className="text-white text-[10px] sm:text-xs font-bold">{seatNo}</span>
+                          </div>
+                          <div className="text-[10px] sm:text-xs">
+                            <div className="font-medium text-gray-800">Seat {seatNo}</div>
+                            <div className="text-[9px] sm:text-[10px] text-gray-500">
+                              {seatObj.priceMap[seatNo] ? `₹${seatObj.priceMap[seatNo]}` : 'Free'}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => onSeatSelect(journeyType, flightIndex, seatNo, seatObj.priceMap[seatNo])}
+                          className="text-gray-400 hover:text-red-500 text-xs"
+                        >
+                          <AiOutlineClose />
+                        </button>
+                      </div>
+                    ));
+                  })()}
+                </div>
               </div>
+
+              {/* Total */}
+              <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-white rounded-lg border border-gray-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs sm:text-sm text-gray-600">Total</span>
+                  <span className="font-bold text-base sm:text-lg text-blue-700">
+                    ₹{getTotalPrice()}
+                  </span>
+                </div>
+                <div className="text-[9px] sm:text-[10px] text-gray-500 mt-1">
+                  {travelers.length} seat(s) available
+                </div>
+              </div>
+
+              {/* Legend */}
+                    <div className="mt-4 sm:mt-5 pt-3 sm:pt-4 border-t border-gray-300 flex flex-wrap gap-2 sm:gap-3 justify-center text-[9px] sm:text-[10px]">
+                      <div className="flex items-center gap-1 sm:gap-1.5">
+                        <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 bg-white border-2 border-gray-300 rounded"></div>
+                        <span className="text-gray-600">Available</span>
+                      </div>
+                      <div className="flex items-center gap-1 sm:gap-1.5">
+                        <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 bg-gray-300 border-2 border-gray-400 rounded"></div>
+                        <span className="text-gray-600">Occupied</span>
+                      </div>
+                      <div className="flex items-center gap-1 sm:gap-1.5">
+                        <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 bg-green-500 border-2 border-green-600 rounded"></div>
+                        <span className="text-gray-600">Selected</span>
+                      </div>
+                      <div className="flex items-center gap-1 sm:gap-1.5">
+                        <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 bg-blue-100 border-2 border-blue-400 rounded"></div>
+                        <span className="text-gray-600">Premium</span>
+                      </div>
+                      <div className="flex items-center gap-1 sm:gap-1.5">
+                        <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 bg-orange-100 border-2 border-orange-400 rounded"></div>
+                        <span className="text-gray-600">Exit Row</span>
+                      </div>
+                    </div>
             </div>
 
-            <div className="mb-4">
-              <h4 className="font-semibold text-gray-700">Legend</h4>
-              <div className="mt-2">
-                <Legend />
-              </div>
-            </div>
-
-            <div className="mt-auto">
+            {/* Actions */}
+            <div className="p-3 sm:p-4 border-t border-gray-200 space-y-2">
               <button
                 onClick={onClose}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition"
+                className="w-full py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs sm:text-sm transition-colors"
               >
-                Confirm & Close
+                Confirm {getSelectedSeatsCount() > 0 ? `(${getSelectedSeatsCount()})` : ''}
+              </button>
+              <button
+                onClick={() => {
+                  const key = `${journeyType}|${flightIndex}`;
+                  const seatObj = selectedSeats[key];
+                  if (seatObj?.list) {
+                    seatObj.list.forEach(seatNo => {
+                      onSeatSelect(journeyType, flightIndex, seatNo, seatObj.priceMap[seatNo]);
+                    });
+                  }
+                }}
+                className="w-full py-1.5 sm:py-2 text-gray-600 hover:text-gray-800 text-[10px] sm:text-xs font-medium"
+              >
+                Clear All
               </button>
             </div>
           </div>

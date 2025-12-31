@@ -560,14 +560,6 @@ export default function OneFlightBooking() {
                 <h3 className="text-lg font-bold mb-4">
                   Important Information
                 </h3>
-                {/* <ImportantInformation
-                  expandedSections={expandedSections}
-                  onToggleSection={toggleSection}
-                  fareRules={normalizeFareRules(fareRule)}
-                  fareRulesStatus={!fareRule ? "loading" : "succeeded"}
-                />
-                 */}
-
                 <FareRulesAccordion
                   fareRules={normalizeFareRules(fareRule)}
                   fareRulesStatus={!fareRule ? "loading" : "succeeded"}

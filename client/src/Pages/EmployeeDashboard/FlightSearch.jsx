@@ -249,21 +249,24 @@ export default function FlightSearchPage() {
       origin: fromAirport.code,
       destination: toAirport.code,
 
-      departureDate: formatDate(departureDate),
+      // departureDate: formatDate(departureDate),
+      departureDate,
       nearbyAirportsFrom,
       nearbyAirportsTo,
       flexibleDates,
     };
 
     if (tripType === "round-trip") {
-      payload.returnDate = formatDate(returnDate);
+      // payload.returnDate = formatDate(returnDate);
+      payload.returnDate = returnDate;
     }
 
     if (tripType === "multi-city") {
       payload.segments = multiCityFlights.map((f) => ({
         origin: f.from.code,
         destination: f.to.code,
-        departureDate: formatDate(f.date),
+        // departureDate: formatDate(f.date),
+        departureDate: f.date,
         nearbyFrom: !!f.nearbyFrom,
         nearbyTo: !!f.nearbyTo,
       }));
