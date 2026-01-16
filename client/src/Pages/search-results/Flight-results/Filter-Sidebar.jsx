@@ -117,8 +117,6 @@ const RangeSlider = ({ min, max, values, onChange, formatValue }) => {
 // Enhanced Flight Filters Component
 const FlightFilterSidebar = ({
   flights = [],
-  selectedMaxPrice,
-  setSelectedMaxPrice,
   selectedStops,
   setSelectedStops,
   selectedTime,
@@ -170,54 +168,84 @@ const FlightFilterSidebar = ({
   });
 
   // Calculate price range from flights
+  // useEffect(() => {
+  //   if (!flights.length) return;
+
+  //   const prices = flights
+  //     .map((f) => f?.Fare?.PublishedFare || 0)
+  //     .filter((p) => p > 0);
+
+  //   if (!prices.length) return;
+
+  //   const min = Math.floor(Math.min(...prices) / 100) * 100;
+  //   const max = Math.ceil(Math.max(...prices) / 100) * 100;
+
+  //   setPriceRange({ min, max });
+
+  //   if (!priceValues || priceValues[1] === 70000) {
+  //     setPriceValues([min, max]);
+  //   }
+  // }, [flights]);
+
+  // // Calculate duration range
+  // useEffect(() => {
+  //   if (flights.length > 0) {
+  //     const durations = flights
+  //       .map((f) => getSegments(f)[0]?.Duration || 0)
+  //       .filter(Boolean);
+
+  //     if (durations.length > 0) {
+  //       const minDur = Math.min(...durations);
+  //       const maxDur = Math.max(...durations);
+  //       setDurationRange({ min: minDur, max: maxDur });
+
+  //       // Only set initial values if they haven't been set yet
+  //       if (
+  //         !durationValues ||
+  //         (durationValues[0] === 0 && durationValues[1] === 1440)
+  //       ) {
+  //         setDurationValues([minDur, maxDur]);
+  //         setSelectedMaxDuration(maxDur);
+  //       }
+  //     }
+  //   }
+  // }, [flights]);
+
   useEffect(() => {
-    if (!flights.length) return;
+  if (!flights.length) return;
 
-    const prices = flights
-      .map((f) => f?.Fare?.PublishedFare || 0)
-      .filter((p) => p > 0);
+  const prices = flights
+    .map((f) => f?.Fare?.PublishedFare || 0)
+    .filter(Boolean);
 
-    if (!prices.length) return;
+  if (!prices.length) return;
 
-    const min = Math.floor(Math.min(...prices) / 100) * 100;
-    const max = Math.ceil(Math.max(...prices) / 100) * 100;
+  const min = Math.floor(Math.min(...prices) / 100) * 100;
+  const max = Math.ceil(Math.max(...prices) / 100) * 100;
 
-    setPriceRange({ min, max });
+  setPriceRange({ min, max });
+}, [flights]);
 
-    if (!priceValues || priceValues[1] === 70000) {
-      setPriceValues([min, max]);
-      setSelectedMaxPrice(max);
-    }
-  }, [flights]);
+useEffect(() => {
+  if (!flights.length) return;
 
-  // Calculate duration range
-  useEffect(() => {
-    if (flights.length > 0) {
-      const durations = flights
-        .map((f) => getSegments(f)[0]?.Duration || 0)
-        .filter(Boolean);
+  const durations = flights
+    .map((f) => getSegments(f)[0]?.Duration || 0)
+    .filter(Boolean);
 
-      if (durations.length > 0) {
-        const minDur = Math.min(...durations);
-        const maxDur = Math.max(...durations);
-        setDurationRange({ min: minDur, max: maxDur });
+  if (!durations.length) return;
 
-        // Only set initial values if they haven't been set yet
-        if (
-          !durationValues ||
-          (durationValues[0] === 0 && durationValues[1] === 1440)
-        ) {
-          setDurationValues([minDur, maxDur]);
-          setSelectedMaxDuration(maxDur);
-        }
-      }
-    }
-  }, [flights]);
+  const minDur = Math.min(...durations);
+  const maxDur = Math.max(...durations);
+
+  setDurationRange({ min: minDur, max: maxDur });
+}, [flights]);
+
 
   // Handle price range change
   const handlePriceChange = (newValues) => {
     setPriceValues(newValues);
-    setSelectedMaxPrice(newValues[1]); // Use the upper bound for filtering
+    // setSelectedMaxPrice(newValues[1]); // Use the upper bound for filtering
   };
 
   // Handle duration range change
@@ -421,7 +449,6 @@ const FlightFilterSidebar = ({
 
   const resetAllFilters = () => {
     setPriceValues([priceRange.min, priceRange.max]);
-    setSelectedMaxPrice(priceRange.max);
     setDurationValues([durationRange.min, durationRange.max]);
     setSelectedMaxDuration(durationRange.max);
     setSelectedStops([]);
@@ -530,7 +557,7 @@ const FlightFilterSidebar = ({
         clearText="RESET"
         onClear={() => {
           setPriceValues([priceRange.min, priceRange.max]);
-          setSelectedMaxPrice(priceRange.max);
+          // setSelectedMaxPrice(priceRange.max);
         }}
       >
         {priceRange.min === priceRange.max ? (

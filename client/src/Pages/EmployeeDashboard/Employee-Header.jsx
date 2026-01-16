@@ -53,7 +53,7 @@ export default function EmployeeHeader() {
 
   return (
     <header className="w-full sticky top-0 z-50 bg-white">
-      <div className="max-w-7xl mx-auto px-4 py-1  flex items-center justify-between">
+      <div className="max-w-full mx-10  py-1  flex items-center justify-between">
         {/* LEFT: LOGO */}
         <div
           onClick={() => navigate("/my-bookings")}

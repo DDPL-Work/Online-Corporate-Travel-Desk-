@@ -1,11 +1,26 @@
 // Common Components
 import React, { useMemo, useState } from "react";
-import { MdEventSeat, MdInfo } from "react-icons/md";
+import {
+  MdCancel,
+  MdDateRange,
+  MdEventSeat,
+  MdInfo,
+  MdLuggage,
+} from "react-icons/md";
 import { FaWifi, FaUser, FaPlaneArrival } from "react-icons/fa";
 import { BsLuggage, BsTag, BsInfoCircleFill } from "react-icons/bs";
-import { AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
+import {
+  AiOutlineInfoCircle,
+  AiOutlineMinus,
+  AiOutlinePlus,
+} from "react-icons/ai";
 import { FaPlaneDeparture } from "react-icons/fa6";
-import { IoPersonAdd, IoPersonRemove } from "react-icons/io5";
+import {
+  IoChevronDown,
+  IoChevronUp,
+  IoPersonAdd,
+  IoPersonRemove,
+} from "react-icons/io5";
 import { PiForkKnifeBold } from "react-icons/pi";
 import { RiHotelLine } from "react-icons/ri";
 import { HiOutlineLocationMarker } from "react-icons/hi";
@@ -13,6 +28,8 @@ import { LuInfo } from "react-icons/lu";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { selectRTSeatReady } from "../../../utils/selectRTSeatReady";
 
 // Updated color scheme - clean and minimal
 export const orangeText = "text-blue-600";
@@ -172,9 +189,48 @@ export const parseOneWayData = (result) => {
   };
 };
 
+const calculateDurationInMinutes = (segments = []) => {
+  if (!segments.length) return 0;
+
+  const start = new Date(segments[0].dt);
+  const end = new Date(segments[segments.length - 1].at);
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+
+  return Math.round((end - start) / 60000);
+};
+
+export const parseRoundTripBooking = ({ onward, return: ret }) => {
+  if (!onward || !ret) return null;
+
+  const onwardParsed = parseOneWayData(onward);
+  const returnParsed = parseOneWayData(ret);
+
+  return {
+    type: "round-trip",
+
+    onwardSegments: onwardParsed.segments,
+    returnSegments: returnParsed.segments,
+
+    onwardData: onwardParsed.flightData,
+    returnData: returnParsed.flightData,
+
+    basePrice:
+      (onward.Fare?.PublishedFare || 0) + (ret.Fare?.PublishedFare || 0),
+
+    baggageInfo: onwardParsed.baggageInfo,
+    isRefundable: onwardParsed.isRefundable && returnParsed.isRefundable,
+
+    // ✅ SEPARATE DURATIONS (THIS FIXES THE UI)
+    totalDuration: calculateDurationInMinutes(onwardParsed.segments),
+    returnTotalDuration: calculateDurationInMinutes(returnParsed.segments),
+  };
+};
+
 export const FlightTimeline = ({
   segments = [],
   selectedSeats = {},
+  segmentIndex,
   openSeatModal,
   journeyType = "onward",
   isSeatReady = false,
@@ -199,7 +255,9 @@ export const FlightTimeline = ({
     return <p className="text-gray-500">No flight segments available.</p>;
   }
 
-  const seatDisabled = !isSeatReady;
+  // const seatDisabled = !isSeatReady;
+  const seatDisabled = isSeatReady !== true;
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-12">
       {segments.map((segment, idx) => {
@@ -259,7 +317,7 @@ export const FlightTimeline = ({
                               <div>
                                 {/* Selected seats */}
                                 {(() => {
-                                  const seatKey = `${journeyType}|${idx}`;
+                                  const seatKey = `${journeyType}|${segmentIndex}`;
                                   const seats =
                                     selectedSeats?.[seatKey]?.list || [];
                                   if (!seats.length) return null;
@@ -286,7 +344,7 @@ export const FlightTimeline = ({
     ${
       seatDisabled
         ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
-        : "text-blue-600 border border-blue-600 hover:bg-blue-600 hover:text-white"
+        : "text-blue-600 border border-blue-600 hover:border-[#0A4D68] hover:bg-[#0A4D68] hover:text-white"
     }
   `}
                         >
@@ -340,12 +398,187 @@ export const FlightTimeline = ({
   );
 };
 
-// Fare Options Component
+/* ======================================================
+   ROUND TRIP FLIGHT TIMELINE
+   (Wrapper over FlightTimeline)
+   ====================================================== */
+
+export const RoundTripFlightTimeline = ({
+  segments = [],
+  isReturnJourney = false,
+  selectedSeats = {},
+  openSeatModal,
+  isSeatReady,
+}) => {
+  const journeyType = isReturnJourney ? "return" : "onward";
+  const seatReady = Boolean(isSeatReady);
+
+  return (
+    <div className="space-y-6">
+      {segments.map((segment, segmentIndex) => (
+        <FlightTimeline
+          key={segmentIndex}
+          segmentIndex={segmentIndex}
+          segments={[segment]}
+          journeyType={journeyType}
+          selectedSeats={selectedSeats}
+          openSeatModal={() =>
+            openSeatModal(segment, segmentIndex, journeyType)
+          }
+          isSeatReady={seatReady}
+        />
+      ))}
+    </div>
+  );
+};
+
+export const normalizeSSRList = (list = []) => {
+  if (!Array.isArray(list)) return [];
+
+  // Flatten one level if needed
+  const flat = Array.isArray(list[0]) ? list.flat() : list;
+
+  const map = new Map();
+
+  flat.forEach((meal) => {
+    if (!meal || meal.Code === "NoMeal") return;
+
+    // Deduplicate by Meal Code (correct key)
+    if (!map.has(meal.Code)) {
+      map.set(meal.Code, meal);
+    }
+  });
+
+  return Array.from(map.values());
+};
+
+export const MealSelectionCards = ({
+  meals = [],
+  selectedMeals = {},
+  onToggleMeal,
+  journeyType,
+  flightIndex,
+  travelersCount = 1,
+  onClearMeals,
+  onConfirm,
+}) => {
+  const normalizedMeals = normalizeSSRList(meals).filter(
+    (m) => m.Code !== "NoMeal"
+  );
+
+  if (!normalizedMeals.length) {
+    return (
+      <p className="text-sm text-gray-500 text-center py-6">
+        No meals available for this flight
+      </p>
+    );
+  }
+
+  const key = `${journeyType}|${flightIndex}`;
+  const selected = selectedMeals[key] || [];
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
+          🍱 Choose Your Meal
+        </h2>
+        <button
+          onClick={() => onClearMeals?.(journeyType, flightIndex)}
+          className="text-sm font-semibold text-gray-500 hover:text-red-600"
+        >
+          Clear All
+        </button>
+      </div>
+
+      {/* Meal Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {normalizedMeals.map((meal, idx) => {
+          const isSelected = selected.some((m) => m.Code === meal.Code);
+
+          return (
+            <div
+              key={idx}
+              className={`group relative border rounded-2xl p-4 flex flex-col justify-between shadow-sm transition-all duration-200 hover:shadow-lg ${
+                isSelected
+                  ? "border-green-500 bg-green-50"
+                  : "border-gray-200 bg-white hover:border-orange-400"
+              }`}
+            >
+              {/* Top Section */}
+              <div className="flex gap-4 items-center">
+                {/* Icon */}
+                <div
+                  className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 transition ${
+                    isSelected ? "bg-green-100" : "bg-orange-50"
+                  }`}
+                >
+                  <PiForkKnifeBold
+                    className={`text-2xl transition ${
+                      isSelected ? "text-green-600" : "text-orange-600"
+                    }`}
+                  />
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-gray-800 text-sm sm:text-base truncate">
+                    {meal.AirlineDescription || "Meal Option"}
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5 truncate">
+                    {meal.Description || "Delicious in-flight meal"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Price + Button */}
+              <div className="mt-4 flex justify-between items-center">
+                <div className="text-lg font-bold text-orange-600">
+                  ₹{meal.Price}
+                </div>
+                <button
+                  onClick={() =>
+                    onToggleMeal(journeyType, flightIndex, meal, travelersCount)
+                  }
+                  className={`px-4 py-1.5 text-sm font-semibold rounded-full shadow-sm transition-all duration-200 ${
+                    isSelected
+                      ? "bg-red-500 text-white hover:bg-red-600"
+                      : "bg-orange-600 text-white hover:bg-orange-700"
+                  }`}
+                >
+                  {isSelected ? "Remove" : "Add Meal"}
+                </button>
+              </div>
+
+              {/* Selection Ribbon (MMT style) */}
+              {isSelected && (
+                <div className="absolute top-0 right-0 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">
+                  Selected
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer Actions */}
+      <div className="flex justify-end items-center gap-3 pt-3 border-t border-gray-200">
+        <button
+          onClick={onConfirm}
+          className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
+        >
+          Confirm Selection
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
   const [open, setOpen] = useState({
-    cancellation: false,
-    dateChange: false,
-    baggage: false,
+    cancellation: true,
+    dateChange: true,
     important: false,
   });
 
@@ -353,87 +586,735 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
 
   if (fareRulesStatus === "loading") {
     return (
-      <div className="text-center py-4 text-gray-600 font-medium">
-        Fetching fare rules...
+      <div className="border border-gray-200 bg-white rounded-xl shadow-sm p-6 text-center">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
+        <p className="text-gray-600 text-sm">Loading fare rules...</p>
       </div>
     );
   }
 
   if (!fareRules) {
     return (
-      <div className="text-center py-4 text-gray-600 font-medium">
+      <div className="border border-gray-200 bg-white rounded-xl shadow-sm p-6 text-center text-gray-500 text-sm">
         Fare rules not available for this fare.
       </div>
     );
   }
 
+  const results = fareRules?.Response?.Results || fareRules;
+  const miniFareRules = Array.isArray(results?.MiniFareRules)
+    ? results.MiniFareRules.flat()
+    : [];
+
+  const cancellationRules = miniFareRules.filter(
+    (rule) => rule.Type === "Cancellation"
+  );
+  const reissueRules = miniFareRules.filter((rule) => rule.Type === "Reissue");
+
+  const fareBasisCode = results?.FareRules?.[0]?.FareBasisCode || "";
+  const airlineRemark = results?.AirlineRemark || "";
+  const isRefundable = results?.IsRefundable;
+
+  const formatTimeRange = (from, to, unit) => {
+    if (!from && !to) return "Anytime";
+    if (from && !to)
+      return `More than ${from} ${unit.toLowerCase()} before departure`;
+    if (!from && to) return `Within ${to} ${unit.toLowerCase()} of departure`;
+    return `${from}-${to} ${unit.toLowerCase()} before departure`;
+  };
+
   const sections = [
     {
+      key: "cancellation",
+      title: "Cancellation Charges",
+      icon: <MdCancel size={20} />,
+      color: "text-red-600",
+      data: cancellationRules,
+      hasData: cancellationRules.length > 0,
+    },
+    {
+      key: "dateChange",
+      title: "Date Change Charges",
+      icon: <MdDateRange size={20} />,
+      color: "text-orange-600",
+      data: reissueRules,
+      hasData: reissueRules.length > 0,
+    },
+    {
       key: "important",
-      title: "Important Notes",
-      icon: <MdInfo className="text-teal-600 text-xl" />,
-      data: fareRules.important,
-      bg: "from-teal-50 to-purple-100 border-gray-300",
+      title: "Important Information",
+      icon: <AiOutlineInfoCircle size={20} />,
+      color: "text-blue-600",
+      data: { fareBasisCode, airlineRemark, isRefundable },
+      hasData: !!(fareBasisCode || airlineRemark || isRefundable !== undefined),
     },
   ];
 
   return (
     <div className="space-y-4">
-      {sections.map((sec) => (
-        <div
-          key={sec.key}
-          className={`rounded-xl overflow-hidden border shadow-sm bg-linear-to-r ${sec.bg}`}
-        >
-          {/* Header */}
-          <button
-            onClick={() => toggle(sec.key)}
-            className="w-full flex items-center justify-between p-4"
+      {sections.map((sec) =>
+        sec.hasData ? (
+          <div
+            key={sec.key}
+            className="border border-gray-200 bg-white rounded-xl shadow-sm overflow-hidden"
           >
-            <div className="flex items-center gap-3">
-              {sec.icon}
-              <span className="font-semibold text-gray-900">{sec.title}</span>
-            </div>
-
-            <span className="text-gray-700 text-lg">
-              {open[sec.key] ? "−" : "+"}
-            </span>
-          </button>
-
-          {/* Content */}
-          {open[sec.key] && (
-            <div className="bg-white p-5 border-t border-gray-200 animate-fadeIn">
-              {sec.data.length > 0 ? (
-                sec.data.map((html, i) => (
-                  <div
-                    key={i}
-                    className="
-            prose prose-sm max-w-none
-            prose-ul:pl-5
-            prose-li:marker:text-purple-500
-            prose-strong:text-gray-900
-            prose-p:my-2
-            text-gray-700
-          "
-                    dangerouslySetInnerHTML={{
-                      __html: html
-                        // optional cleanup for better spacing
-                        .replace(/<br\s*\/?>/gi, "<br/>")
-                        .replace(
-                          /FareBasisCode is:\s*(\w+)/i,
-                          '<div class="mb-3 inline-flex items-center gap-2 bg-purple-50 border border-purple-200 text-purple-800 px-3 py-1 rounded-lg text-xs font-semibold">Fare Basis Code: $1</div>'
-                        ),
-                    }}
-                  />
-                ))
+            {/* Header */}
+            <button
+              onClick={() => toggle(sec.key)}
+              className="w-full flex items-center justify-between px-5 py-4 bg-gray-50 hover:bg-gray-100 transition"
+            >
+              <div className="flex items-center gap-3">
+                <span className={`${sec.color}`}>{sec.icon}</span>
+                <span className="font-semibold text-gray-800 text-sm">
+                  {sec.title}
+                </span>
+              </div>
+              {open[sec.key] ? (
+                <IoChevronUp className="text-gray-500" size={18} />
               ) : (
-                <p className="text-sm text-gray-600">
-                  No information available.
-                </p>
+                <IoChevronDown className="text-gray-500" size={18} />
               )}
+            </button>
+
+            {/* Content */}
+            {open[sec.key] && (
+              <div className="bg-white divide-y divide-gray-100">
+                <div className="px-5 py-4 text-sm text-gray-700 space-y-3">
+                  {sec.key === "cancellation" &&
+                    sec.data.map((rule, i) => (
+                      <div
+                        key={i}
+                        className="flex justify-between items-start border-b border-gray-100 last:border-0 pb-2"
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-800">
+                            {formatTimeRange(rule.From, rule.To, rule.Unit)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {rule.JourneyPoints}
+                          </p>
+                        </div>
+                        <p className="text-right text-sm font-semibold text-gray-900">
+                          {rule.Details}
+                        </p>
+                      </div>
+                    ))}
+
+                  {sec.key === "dateChange" &&
+                    sec.data.map((rule, i) => (
+                      <div
+                        key={i}
+                        className="flex justify-between items-start border-b border-gray-100 last:border-0 pb-2"
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-800">
+                            {formatTimeRange(rule.From, rule.To, rule.Unit)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {rule.JourneyPoints}
+                          </p>
+                        </div>
+                        <p className="text-right text-sm font-semibold text-gray-900">
+                          {rule.Details}
+                        </p>
+                      </div>
+                    ))}
+
+                  {sec.key === "important" && (
+                    <div className="space-y-3">
+                      {sec.data.fareBasisCode && (
+                        <div className="p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
+                          <p className="text-xs text-gray-600 font-medium">
+                            Fare Basis Code
+                          </p>
+                          <p className="font-semibold text-blue-900 text-sm">
+                            {sec.data.fareBasisCode}
+                          </p>
+                        </div>
+                      )}
+
+                      {sec.data.isRefundable !== undefined && (
+                        <div
+                          className={`p-3 border-l-4 rounded ${
+                            sec.data.isRefundable
+                              ? "bg-green-50 border-green-500"
+                              : "bg-red-50 border-red-500"
+                          }`}
+                        >
+                          <p className="text-xs text-gray-600 font-medium">
+                            Refund Policy
+                          </p>
+                          <p
+                            className={`font-semibold text-sm ${
+                              sec.data.isRefundable
+                                ? "text-green-800"
+                                : "text-red-800"
+                            }`}
+                          >
+                            {sec.data.isRefundable
+                              ? "Refundable"
+                              : "Non-Refundable"}
+                          </p>
+                        </div>
+                      )}
+
+                      {sec.data.airlineRemark && (
+                        <div className="p-3 bg-gray-50 border-l-4 border-gray-400 rounded">
+                          <p className="text-xs text-gray-600 font-medium">
+                            Airline Remark
+                          </p>
+                          <p className="text-xs text-gray-700 mt-1">
+                            {sec.data.airlineRemark.split(".")[0]}.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : null
+      )}
+    </div>
+  );
+};
+
+export const FareRulesAccordion = ({
+  fareRules = null,
+  fareRulesStatus = "idle",
+}) => {
+  const [open, setOpen] = useState(true);
+
+  const rules =
+    fareRules?.FareRules ||
+    fareRules?.Response?.FareRules ||
+    fareRules?.data?.Response?.FareRules ||
+    [];
+
+  // Helper function to parse the fare rule detail text
+  const parseFareRuleDetail = (detail) => {
+    if (!detail) return null;
+
+    // Extract fare basis code
+    const fareBasisMatch = detail.match(/The FareBasisCode is:\s*(\w+)/i);
+    const fareBasisCode = fareBasisMatch ? fareBasisMatch[1] : null;
+
+    // Split content into domestic and international sections
+    // const domesticMatch = detail.match(
+    //   /Domestic:([\s\S]*?)(?=International:|$)/i
+    // );
+    // const internationalMatch = detail.match(
+    //   /International:([\s\S]*?)(?=\*|$)/i
+    // );
+
+    const domesticMatch = detail.match(
+      /Domestic([\s\S]*?)(?=International|$)/i
+    );
+    const internationalMatch = detail.match(/International([\s\S]*?)(?=\*|$)/i);
+
+    // Extract important notes (lines starting with *)
+    const importantNotes = detail.match(/\*[^\r\n]+/g) || [];
+
+    return {
+      fareBasisCode,
+      domestic: domesticMatch ? domesticMatch[1].trim() : null,
+      international: internationalMatch ? internationalMatch[1].trim() : null,
+      importantNotes: importantNotes.map((note) =>
+        note.replace(/^\*\s*/, "").trim()
+      ),
+    };
+  };
+
+  // Parse baggage allowance table
+  const parseBaggageTable = (text) => {
+    if (!text) return [];
+
+    const lines = text.split(/\r\n/).filter((l) => l.trim());
+    const baggageLines = lines.filter(
+      (l) => l.includes("Ex ") && l.includes("Kgs")
+    );
+
+    return baggageLines
+      .map((line) => {
+        const parts = line.split(/\s+(\d+\s*Kgs?)/i);
+        if (parts.length >= 2) {
+          return {
+            sector: parts[0].trim(),
+            allowance: parts[1].trim(),
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  };
+
+  // Format fare rule content with proper styling
+  const formatFareRuleContent = (detail) => {
+    const parsed = parseFareRuleDetail(detail);
+    if (!parsed) return null;
+
+    const domesticBaggage = parsed.domestic
+      ? parseBaggageTable(parsed.domestic)
+      : [];
+    const internationalBaggage = parsed.international
+      ? parseBaggageTable(parsed.international)
+      : [];
+
+    return (
+      <div className="space-y-6">
+        {/* Fare Basis Code */}
+        {parsed.fareBasisCode && (
+          <div className="fare-basis-pill">
+            <span>Fare Basis Code</span>
+            <strong>{parsed.fareBasisCode}</strong>
+          </div>
+        )}
+
+        {/* Domestic Section */}
+        {parsed.domestic && (
+          <div className="rule-card">
+            <div className="rule-header">
+              <span className="rule-icon">✈️</span>
+              <h3>Domestic Fare Rules</h3>
+            </div>
+            <div className="rule-content">
+              <p>{parsed.domestic.split(/(?=Free baggage)/i)[0].trim()}</p>
+
+              {domesticBaggage.length > 0 && (
+                <div className="baggage-info">
+                  <div className="baggage-highlight">
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                      />
+                    </svg>
+                    <span>
+                      Free Baggage:{" "}
+                      <strong>{domesticBaggage[0]?.allowance}</strong>
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* International Section */}
+        {parsed.international && (
+          <div className="rule-card">
+            <div className="rule-header">
+              <span className="rule-icon">🌍</span>
+              <h3>International Fare Rules</h3>
+            </div>
+            <div className="rule-content">
+              <p>{parsed.international.split(/(?=Free baggage)/i)[0].trim()}</p>
+
+              {internationalBaggage.length > 0 && (
+                <div className="baggage-table-wrapper">
+                  <div className="baggage-table-header">
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                      />
+                    </svg>
+                    <span>Free Baggage Allowance by Sector</span>
+                  </div>
+                  <div className="baggage-grid">
+                    {internationalBaggage.map((item, idx) => (
+                      <div key={idx} className="baggage-item">
+                        <span className="sector-name">{item.sector}</span>
+                        <span className="allowance-badge">
+                          {item.allowance}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Important Notes */}
+        {parsed.importantNotes.length > 0 && (
+          <div className="important-notes">
+            {parsed.importantNotes.map((note, idx) => {
+              const isGstNote =
+                note.toUpperCase().includes("GST") ||
+                note.toUpperCase().includes("EXTRA");
+              const isTimeNote = note.toUpperCase().includes("HOURS BEFORE");
+
+              return (
+                <div
+                  key={idx}
+                  className={`note-item ${
+                    isGstNote ? "note-warning" : "note-info"
+                  }`}
+                >
+                  <div className="note-icon">
+                    {isGstNote ? "⚠️" : isTimeNote ? "🕐" : "ℹ️"}
+                  </div>
+                  <div className="note-content">
+                    {note.includes(":") ? (
+                      <>
+                        <strong>{note.split(":")[0]}:</strong>
+                        {note.split(":").slice(1).join(":")}
+                      </>
+                    ) : (
+                      note
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (fareRulesStatus === "loading") {
+    return (
+      <div className="border border-gray-200 bg-white">
+        <div className="px-6 py-8 text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
+          <p className="text-gray-600 text-sm">Loading fare rules...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle both old format (important array) and new API format
+  let fareRuleDetails = null;
+
+  // Debug: Log the entire fareRules object to console
+  console.log("Fare Rules Data:", fareRules);
+  console.log("Fare Rules Status:", fareRulesStatus);
+
+  if (fareRules?.important?.length) {
+    // Old format - array of HTML strings
+    fareRuleDetails = fareRules.important;
+    console.log("Using important array format");
+  } else if (fareRules?.data?.Response?.FareRules?.length) {
+    // New API format - nested data.Response
+    fareRuleDetails = fareRules.data.Response.FareRules.map(
+      (rule) => rule.FareRuleDetail
+    ).filter((detail) => detail && detail.trim());
+    console.log("Using data.Response.FareRules format");
+  } else if (fareRules?.Response?.FareRules?.length) {
+    // API format - direct Response
+    fareRuleDetails = fareRules.Response.FareRules.map(
+      (rule) => rule.FareRuleDetail
+    ).filter((detail) => detail && detail.trim());
+    console.log("Using Response.FareRules format");
+  } else if (fareRules?.FareRules?.length) {
+    // Direct FareRules array
+    fareRuleDetails = fareRules.FareRules.map(
+      (rule) => rule.FareRuleDetail
+    ).filter((detail) => detail && detail.trim());
+    console.log("Using direct FareRules format");
+  } else if (Array.isArray(fareRules) && fareRules.length > 0) {
+    // If fareRules itself is an array
+    fareRuleDetails = fareRules
+      .map((rule) =>
+        typeof rule === "string"
+          ? rule
+          : rule.FareRuleDetail || rule.important?.[0]
+      )
+      .filter((detail) => detail && detail.trim());
+    console.log("Using direct array format");
+  } else if (fareRules && typeof fareRules === "object") {
+    // Last resort: check if fareRules has FareRuleDetail directly
+    if (fareRules.FareRuleDetail) {
+      fareRuleDetails = [fareRules.FareRuleDetail];
+      console.log("Using direct FareRuleDetail");
+    }
+  }
+
+  console.log("Processed Fare Rule Details:", fareRuleDetails);
+  console.log("Number of rules found:", fareRuleDetails?.length || 0);
+
+  if (!fareRuleDetails || fareRuleDetails.length === 0) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="px-6 py-8 text-center text-gray-500 text-sm">
+          Fare rules not available for this fare.
+          {fareRules && (
+            <div className="mt-2 text-xs text-gray-400">
+              Data structure: {JSON.stringify(Object.keys(fareRules))}
             </div>
           )}
         </div>
-      ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      {/* Header */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-6 py-4 bg-linear-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-200 border-b border-gray-200"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center shadow-sm">
+            <AiOutlineInfoCircle className="text-white" size={20} />
+          </div>
+          <span className="font-semibold text-gray-800 text-base">
+            Fare Rules & Policies
+          </span>
+        </div>
+
+        {open ? (
+          <IoChevronUp
+            className="text-gray-600 transition-transform"
+            size={20}
+          />
+        ) : (
+          <IoChevronDown
+            className="text-gray-600 transition-transform"
+            size={20}
+          />
+        )}
+      </button>
+
+      {/* Content */}
+      {open && (
+        <div className="bg-linear-to-br from-gray-50 to-white">
+          <div className="px-6 py-6">
+            {fareRuleDetails.map((detail, i) => (
+              <div key={i}>{formatFareRuleContent(detail)}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        /* Fare Basis Pill */
+        .fare-basis-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem 1.25rem;
+          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+          border-radius: 12px;
+          box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+          margin-bottom: 1.5rem;
+        }
+        
+        .fare-basis-pill span {
+          color: #bfdbfe;
+          font-size: 0.75rem;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        
+        .fare-basis-pill strong {
+          color: white;
+          font-size: 1rem;
+          font-weight: 700;
+          letter-spacing: 1px;
+        }
+
+        /* Rule Cards */
+        .rule-card {
+          background: white;
+          border-radius: 16px;
+          border: 1px solid #e5e7eb;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+          margin-bottom: 1.25rem;
+        }
+        
+        .rule-header {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 1rem 1.25rem;
+          background: linear-gradient(to right, #f8fafc, #f1f5f9);
+          border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .rule-icon {
+          font-size: 1.5rem;
+        }
+        
+        .rule-header h3 {
+          margin: 0;
+          font-size: 0.95rem;
+          font-weight: 600;
+          color: #1e293b;
+        }
+        
+        .rule-content {
+          padding: 1.25rem;
+        }
+        
+        .rule-content p {
+          color: #475569;
+          line-height: 1.7;
+          font-size: 0.875rem;
+          margin: 0 0 1rem 0;
+        }
+
+        /* Baggage Info */
+        .baggage-info {
+          margin-top: 1rem;
+        }
+        
+        .baggage-highlight {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.625rem 1rem;
+          background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+          border: 1px solid #86efac;
+          border-radius: 10px;
+          color: #065f46;
+          font-size: 0.875rem;
+        }
+        
+        .baggage-highlight svg {
+          width: 1.25rem;
+          height: 1.25rem;
+          color: #059669;
+        }
+        
+        .baggage-highlight strong {
+          color: #047857;
+          font-weight: 700;
+        }
+
+        /* Baggage Table */
+        .baggage-table-wrapper {
+          margin-top: 1.25rem;
+          background: #f8fafc;
+          border-radius: 12px;
+          padding: 1rem;
+          border: 1px solid #e2e8f0;
+        }
+        
+        .baggage-table-header {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-bottom: 1rem;
+          color: #475569;
+          font-weight: 600;
+          font-size: 0.875rem;
+        }
+        
+        .baggage-table-header svg {
+          width: 1.25rem;
+          height: 1.25rem;
+          color: #3b82f6;
+        }
+        
+        .baggage-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 0.75rem;
+        }
+        
+        .baggage-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.75rem 1rem;
+          background: white;
+          border-radius: 8px;
+          border: 1px solid #e2e8f0;
+          transition: all 0.2s;
+        }
+        
+        .baggage-item:hover {
+          border-color: #3b82f6;
+          box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+        }
+        
+        .sector-name {
+          color: #475569;
+          font-size: 0.8125rem;
+          font-weight: 500;
+        }
+        
+        .allowance-badge {
+          padding: 0.25rem 0.625rem;
+          background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+          color: #1e40af;
+          font-size: 0.75rem;
+          font-weight: 700;
+          border-radius: 6px;
+        }
+
+        /* Important Notes */
+        .important-notes {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+          margin-top: 1.5rem;
+        }
+        
+        .note-item {
+          display: flex;
+          gap: 0.875rem;
+          padding: 1rem;
+          border-radius: 12px;
+          font-size: 0.875rem;
+          line-height: 1.6;
+          border: 1px solid;
+        }
+        
+        .note-warning {
+          background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+          border-color: #fbbf24;
+          color: #92400e;
+        }
+        
+        .note-info {
+          background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+          border-color: #93c5fd;
+          color: #1e40af;
+        }
+        
+        .note-icon {
+          font-size: 1.25rem;
+          line-height: 1;
+          flex-shrink: 0;
+        }
+        
+        .note-content {
+          flex: 1;
+        }
+        
+        .note-content strong {
+          font-weight: 600;
+          display: inline-block;
+          margin-right: 0.25rem;
+        }
+
+        /* Utilities */
+        .w-5 { width: 1.25rem; }
+        .h-5 { height: 1.25rem; }
+      `}</style>
     </div>
   );
 };
@@ -443,53 +1324,61 @@ export const PriceSummary = ({
   parsedFlightData,
   discountAmount = 0,
   selectedSeats = {},
+  selectedMeals = {},
+  selectedBaggage = {},
   travelers = [],
+  onSendForApproval,
+  loading = false,
 }) => {
   if (!parsedFlightData) return null;
 
   const travelerCount = Math.max(travelers.length || 1);
-  const totalBaseFare = parsedFlightData.basePrice || 0;
-  const perPassengerBaseFare = Math.round(totalBaseFare / travelerCount);
+
+  const baseFare = parsedFlightData.baseFare || 0;
+  const taxFare = parsedFlightData.taxFare || 0;
 
   const totalSeatPrice = useMemo(() => {
     let sum = 0;
     Object.values(selectedSeats || {}).forEach((v) => {
       if (!v?.priceMap || !v?.list) return;
       v.list.forEach((seat) => {
-        sum += v.priceMap[seat] || 0;
+        sum += Number(v.priceMap[seat] || 0);
       });
     });
     return sum;
   }, [selectedSeats]);
 
-  const taxRate = 0.08;
-  const taxAmount = Math.round(totalBaseFare * taxRate);
-  const convenienceFee = 99;
+  const totalMealPrice = useMemo(() => {
+    let sum = 0;
 
-  const subtotal = totalBaseFare + taxAmount + convenienceFee + totalSeatPrice;
-  const totalAmount = Math.max(0, subtotal - (discountAmount || 0));
-
-  const seatBreakdown = useMemo(() => {
-    const rows = [];
-
-    Object.entries(selectedSeats || {}).forEach(([key, value]) => {
-      if (!value?.list?.length) return;
-
-      value.list.forEach((seat, index) => {
-        rows.push({
-          seat,
-          price: value.priceMap?.[seat] || 0,
-          passenger: `Passenger ${index + 1}`,
-          segment: key,
-        });
+    Object.values(selectedMeals || {}).forEach((meals) => {
+      if (!Array.isArray(meals)) return;
+      meals.forEach((meal) => {
+        sum += Number(meal.Price || 0);
       });
     });
 
-    return rows;
-  }, [selectedSeats]);
+    return sum;
+  }, [selectedMeals]);
+
+  const totalBaggagePrice = useMemo(() => {
+    let sum = 0;
+
+    Object.values(selectedBaggage || {}).forEach((bag) => {
+      if (!bag) return;
+      sum += Number(bag.Price || 0) * travelers.length;
+    });
+
+    return sum;
+  }, [selectedBaggage, travelers.length]);
+
+  const subtotal =
+    baseFare + taxFare + totalSeatPrice + totalMealPrice + totalBaggagePrice;
+
+  const totalAmount = Math.max(0, subtotal - discountAmount);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden ">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       {/* Header */}
       <div className="bg-linear-to-r from-gray-700 to-gray-800 text-white p-5">
         <h3 className="text-xl font-bold">Fare Summary</h3>
@@ -498,66 +1387,54 @@ export const PriceSummary = ({
 
       <div className="p-5 space-y-3">
         {/* Base Fare */}
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between">
           <span className="text-sm text-gray-600">
             Base Fare ({travelerCount} Adult)
           </span>
-          <span className="font-semibold text-gray-900">
-            ₹{totalBaseFare.toLocaleString()}
-          </span>
+          <span className="font-semibold">₹{baseFare.toLocaleString()}</span>
         </div>
 
         {/* Taxes */}
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">Taxes & Fees</span>
-          <span className="font-semibold text-gray-900">
-            ₹{taxAmount.toLocaleString()}
-          </span>
-        </div>
-
-        {/* Seat Charges */}
-        {/* Seat Charges */}
-        {totalSeatPrice > 0 && (
-          <>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Seat Charges</span>
-              <span className="font-semibold text-gray-900">
-                ₹{totalSeatPrice.toLocaleString()}
-              </span>
-            </div>
-
-            {/* Seat breakdown */}
-            <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
-              {seatBreakdown.map((s, i) => (
-                <div
-                  key={`${s.seat}-${i}`}
-                  className="flex justify-between items-center text-sm"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium text-gray-800">
-                      Seat {s.seat}
-                    </span>
-                    <span className="text-xs text-gray-500">{s.passenger}</span>
-                  </div>
-
-                  <span className="font-semibold text-gray-900">
-                    ₹{s.price.toLocaleString()}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
+        {taxFare > 0 && (
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Taxes & Fees</span>
+            <span className="font-semibold">₹{taxFare.toLocaleString()}</span>
+          </div>
         )}
 
-        {/* Convenience Fee */}
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">Convenience Fee</span>
-          <span className="font-semibold text-gray-900">₹{convenienceFee}</span>
-        </div>
+        {/* Seat Charges */}
+        {totalSeatPrice > 0 && (
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Seat Charges</span>
+            <span className="font-semibold">
+              ₹{totalSeatPrice.toLocaleString()}
+            </span>
+          </div>
+        )}
+
+        {/* Baggage Charges */}
+        {totalBaggagePrice > 0 && (
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Extra Baggage</span>
+            <span className="font-semibold">
+              ₹{totalBaggagePrice.toLocaleString()}
+            </span>
+          </div>
+        )}
+
+        {/* Meal Charges */}
+        {totalMealPrice > 0 && (
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Meals</span>
+            <span className="font-semibold">
+              ₹{totalMealPrice.toLocaleString()}
+            </span>
+          </div>
+        )}
 
         {/* Discount */}
         {discountAmount > 0 && (
-          <div className="flex justify-between items-center text-green-600">
+          <div className="flex justify-between text-green-600">
             <span className="text-sm font-semibold">Discount</span>
             <span className="font-semibold">
               -₹{discountAmount.toLocaleString()}
@@ -565,29 +1442,25 @@ export const PriceSummary = ({
           </div>
         )}
 
-        <div className="border-t border-gray-200 pt-3 mt-3 flex justify-between items-center">
-          <span className="text-lg font-bold text-gray-900">Total Payable</span>
+        <div className="border-t border-gray-200 pt-3 mt-3 flex justify-between">
+          <span className="text-lg font-bold">Total Payable</span>
           <span className="text-xl font-bold text-blue-600">
             ₹{totalAmount.toLocaleString()}
           </span>
         </div>
 
-        {/* Coupon */}
-        {/* <div className="pt-3 border-t border-gray-200">
-          <input
-            type="text"
-            value={couponCode}
-            onChange={onCouponChange}
-            placeholder="Enter coupon code"
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          <button
-            onClick={onApplyCoupon}
-            className="mt-2 w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition"
-          >
-            Apply Coupon
-          </button>
-        </div> */}
+        <div
+          onClick={!loading ? onSendForApproval : undefined}
+          className={`text-white font-bold px-3 py-1.5 flex items-center justify-center rounded-xl
+    ${
+      loading
+        ? "bg-gray-400 cursor-not-allowed"
+        : "bg-blue-600 hover:bg-[#0A4D68] cursor-pointer"
+    }
+  `}
+        >
+          {loading ? "Submitting..." : "Send For Approval"}
+        </div>
       </div>
     </div>
   );
@@ -675,214 +1548,174 @@ export const ImportantInformation = ({
   );
 };
 
-// Normalize the API response to extract fare rules
-const normalizeFareRules = (fareRule) => {
-  if (!fareRule?.Response?.FareRules?.length) {
-    return null;
-  }
-
-  const rules = fareRule.Response.FareRules.map(
-    (rule) => rule.FareRuleDetail
-  ).filter(Boolean);
-
-  return {
-    important: rules,
-  };
-};
-
-export const FareRulesAccordion = ({
-  fareRules = null,
-  fareRulesStatus = "idle",
+// Baggage Table Component
+export const BaggageTable = ({
+  baggage = [],
+  selectable = false,
+  selectedBaggage = null,
+  onAddBaggage,
+  onClearBaggage,
+  onConfirm,
 }) => {
-  const [open, setOpen] = useState(true);
-
-  if (fareRulesStatus === "loading") {
+  if (!Array.isArray(baggage) || baggage.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-6 py-8 text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mb-3"></div>
-          <p className="text-gray-500 text-sm">Fetching fare rules…</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!fareRules || !fareRules.important?.length) {
-    return (
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-6 py-8 text-center text-gray-500 text-sm">
-          Fare rules not available for this fare.
-        </div>
-      </div>
+      <p className="text-sm text-gray-500 text-center py-6">
+        No baggage information available
+      </p>
     );
   }
 
   return (
-    <div className="rounded-xl border border-purple-100 bg-linear-to-br from-purple-50/50 to-white shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
+    <div className="flex flex-col gap-6">
       {/* Header */}
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-6 py-4 bg-linear-to-r from-purple-50 to-purple-50/30 hover:from-purple-100 hover:to-purple-50 transition-all duration-200 group"
-      >
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 flex items-center justify-center rounded-full bg-purple-600 text-white shadow-md group-hover:scale-110 transition-transform duration-200">
-            <LuInfo size={20} strokeWidth={2.5} />
-          </div>
-          <div className="text-left">
-            <p className="font-bold text-gray-900 text-base">Fare Rules</p>
-            <p className="text-xs text-gray-600 mt-0.5">
-              Cancellation, reissue & airline conditions
-            </p>
-          </div>
-        </div>
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center gap-2">
+          🧳 Choose Your Baggage
+        </h2>
+        {selectable && (
+          <button
+            onClick={onClearBaggage}
+            className="text-sm font-semibold text-gray-500 hover:text-red-600 transition"
+          >
+            Clear All
+          </button>
+        )}
+      </div>
 
-        <div
-          className="text-purple-600 transition-transform duration-200"
-          style={{ transform: open ? "rotate(0deg)" : "rotate(0deg)" }}
-        >
-          {open ? <AiOutlineMinus  /> : <AiOutlinePlus />}
-        </div>
-      </button>
+      {/* Baggage Options Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {baggage.map((bag, idx) => {
+          const isAdded =
+            selectedBaggage?.Code === bag.Code &&
+            selectedBaggage?.Weight === bag.Weight;
 
-      {/* Content */}
-      {open && (
-        <div className="bg-white px-6 py-6 border-t border-purple-100 animate-fadeIn">
-          {fareRules.important.map((html, i) => (
+          return (
             <div
-              key={i}
-              className="fare-rules-content text-gray-700 text-sm leading-relaxed"
-              dangerouslySetInnerHTML={{
-                __html: html
-                  // Extract and style Fare Basis Code
-                  .replace(
-                    /The FareBasisCode is:\s*(\w+)/i,
-                    `<div style="margin-bottom: 1.5rem;">
-                      <span style="display: inline-flex; align-items: center; gap: 0.5rem; background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); color: #7c3aed; border: 1px solid #e9d5ff; padding: 0.5rem 1rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(124, 58, 237, 0.1);">
-                        <span style="font-size: 0.7rem; opacity: 0.8;">Fare Basis Code:</span> $1
-                      </span>
-                    </div>`
-                  )
+              key={idx}
+              className={`relative border rounded-2xl p-5 shadow-sm transition-all duration-200 hover:shadow-md flex flex-col justify-between ${
+                isAdded
+                  ? "border-blue-600 bg-blue-50"
+                  : "border-gray-200 bg-white hover:border-blue-300"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                {/* Left: Baggage Info */}
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                      isAdded ? "bg-blue-100" : "bg-sky-50"
+                    }`}
+                  >
+                    <BsLuggage
+                      className={`text-xl ${
+                        isAdded ? "text-blue-700" : "text-blue-500"
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-800 text-sm sm:text-base">
+                      {bag.Weight === 0
+                        ? "No Extra Baggage"
+                        : `${bag.Weight} Kg Extra`}
+                    </h4>
+                    <p className="text-xs text-gray-500">
+                      {bag.Description || "Add more luggage allowance"}
+                    </p>
+                  </div>
+                </div>
 
-                  // Style GST/RAF notice with improved design
-                  .replace(
-                    /(GST,.*?EXTRA\.)/gi,
-                    `<div style="margin-top: 1.5rem; padding: 1rem 1.25rem; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-left: 4px solid #f59e0b; border-radius: 0.5rem; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);">
-                      <p style="margin: 0; color: #92400e; font-weight: 600; font-size: 0.875rem;">$1</p>
-                    </div>`
-                  ),
-              }}
-            />
-          ))}
+                {/* Right: Action Button */}
+                {selectable && (
+                  <button
+                    onClick={() => onAddBaggage?.(bag)}
+                    disabled={isAdded}
+                    className={`px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-all duration-200 shadow-sm ${
+                      isAdded
+                        ? "bg-gray-300 text-gray-700 cursor-default"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}
+                  >
+                    {isAdded ? "Added" : "Add"}
+                  </button>
+                )}
+              </div>
+
+              {/* Price */}
+              <div className="flex justify-between items-center">
+                <p className="text-lg sm:text-xl font-bold text-blue-700">
+                  ₹{bag.Price}
+                </p>
+                {isAdded && (
+                  <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                    Selected
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer Actions */}
+      {selectable && (
+        <div className="flex justify-end items-center gap-3 pt-4 border-t border-gray-200">
+          <button
+            onClick={onConfirm}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition"
+          >
+            Confirm Selection
+          </button>
         </div>
       )}
-
-      <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-        
-        .fare-rules-content ul {
-          list-style: none;
-          padding-left: 0;
-          margin: 1rem 0;
-        }
-        
-        .fare-rules-content li {
-          padding: 0.5rem 0;
-          padding-left: 1.5rem;
-          position: relative;
-          line-height: 1.6;
-        }
-        
-        .fare-rules-content li:before {
-          content: "•";
-          position: absolute;
-          left: 0.5rem;
-          color: #7c3aed;
-          font-weight: bold;
-          font-size: 1.2rem;
-        }
-        
-        .fare-rules-content table {
-          width: 100%;
-          border-collapse: collapse;
-          margin: 1.5rem 0;
-          border-radius: 0.5rem;
-          overflow: hidden;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        }
-        
-        .fare-rules-content table td {
-          padding: 0.875rem 1rem;
-          border: 1px solid #e5e7eb;
-          background: white;
-        }
-        
-        .fare-rules-content table tr:first-child td {
-          background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
-          font-weight: 600;
-          color: #374151;
-        }
-        
-        .fare-rules-content table tr:hover td {
-          background: #faf5ff;
-        }
-        
-        .fare-rules-content b {
-          color: #1f2937;
-          font-weight: 700;
-        }
-        
-        .fare-rules-content p {
-          margin: 0.75rem 0;
-          line-height: 1.7;
-        }
-        
-        .fare-rules-content strong {
-          color: #1f2937;
-          font-weight: 600;
-        }
-      `}</style>
     </div>
   );
 };
 
-// Baggage Table Component
-export const BaggageTable = ({ baggageInfo = {}, fareClass = "" }) => {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div className="border border-gray-300 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <BsLuggage className="text-orange-600" />
-          <h4 className="font-bold">Cabin Baggage</h4>
-        </div>
-        <p className="text-sm text-gray-600">
-          {baggageInfo?.cB || "7 Kg per passenger"}
-        </p>
-      </div>
+const isInternationalTrip = (parsedFlightData) => {
+  if (!parsedFlightData) return false;
 
-      <div className="border border-gray-300 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <BsLuggage className="text-orange-600 text-xl" />
-          <h4 className="font-bold">Check-In Baggage</h4>
-        </div>
-        <p className="text-sm text-gray-600">
-          {baggageInfo?.iB || "15 Kg per passenger"}
-        </p>
-      </div>
-    </div>
-  );
+  const checkSegments = (segments = []) =>
+    segments.some(
+      (s) =>
+        s?.da?.countryCode &&
+        s?.aa?.countryCode &&
+        s.da.countryCode !== s.aa.countryCode
+    );
+
+  if (parsedFlightData.type === "one-way") {
+    return checkSegments(parsedFlightData.segments);
+  }
+
+  if (parsedFlightData.type === "round-trip") {
+    return (
+      checkSegments(parsedFlightData.onwardSegments) ||
+      checkSegments(parsedFlightData.returnSegments)
+    );
+  }
+
+  if (parsedFlightData.type === "multi-city") {
+    return (parsedFlightData.allSegmentsData || []).some((seg) =>
+      checkSegments(seg.segments)
+    );
+  }
+
+  return false;
+};
+
+const calculateAgeFromDOB = (dob) => {
+  if (!dob) return "";
+
+  const birthDate = new Date(dob);
+  const today = new Date();
+
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+
+  return age;
 };
 
 export const TravelerForm = ({
@@ -890,8 +1723,15 @@ export const TravelerForm = ({
   addTraveler,
   removeTraveler,
   updateTraveler,
+  errors = {},
+  parsedFlightData,
+  maxTravelers,
+  purposeOfTravel,
+  setPurposeOfTravel,
 }) => {
   if (!Array.isArray(travelers)) travelers = [];
+
+  const isInternational = isInternationalTrip(parsedFlightData);
 
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
@@ -899,7 +1739,7 @@ export const TravelerForm = ({
       <div className="bg-linear-to-r from-[#1a2957] to-[#24a7c] text-white p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 bg-blue-900 rounded-full flex items-center justify-center shadow-lg">
               <FaUser className="text-white text-xl" />
             </div>
             <div>
@@ -913,7 +1753,12 @@ export const TravelerForm = ({
           <button
             type="button"
             onClick={addTraveler}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-semibold transition shadow-md"
+            disabled={travelers.length >= maxTravelers}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition shadow-md  ${
+              travelers.length >= maxTravelers
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-[#0A4D68]/60 hover:bg-[#0A4D68] text-white"
+            }`}
           >
             <IoPersonAdd size={20} />
             <span>Add Adult</span>
@@ -923,6 +1768,35 @@ export const TravelerForm = ({
 
       {/* ================= BODY ================= */}
       <div className="p-6 space-y-6 bg-linear-to-b from-gray-50 to-white">
+        {/* ================= PURPOSE OF TRAVEL ================= */}
+        <div className="bg-white border-2 border-blue-200 rounded-xl p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-blue-900 mb-2">
+            Purpose of Travel <span className="text-red-500">*</span>
+          </h3>
+
+          <textarea
+            rows={3}
+            value={purposeOfTravel || ""}
+            onChange={(e) => setPurposeOfTravel(e.target.value)}
+            placeholder="E.g. Client meeting, Project deployment, Training, Conference"
+            className={`w-full px-4 py-3 border-2 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              errors.purposeOfTravel ? "border-red-400" : "border-gray-300"
+            }`}
+            required
+          />
+
+          {errors.purposeOfTravel && (
+            <p className="text-sm text-red-600 mt-1 font-medium">
+              {errors.purposeOfTravel}
+            </p>
+          )}
+
+          <p className="text-xs text-gray-500 mt-2">
+            This information is mandatory for approval by the travel
+            administrator.
+          </p>
+        </div>
+
         {travelers.map((traveler, index) => (
           <div
             key={traveler.id ?? index}
@@ -958,16 +1832,17 @@ export const TravelerForm = ({
                   Title <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={traveler.title || "Mr."}
+                  value={traveler.title || "MR"}
                   onChange={(e) =>
                     updateTraveler(traveler.id, "title", e.target.value)
                   }
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
                   required
                 >
-                  <option>Mr.</option>
-                  <option>Ms.</option>
-                  <option>Mrs.</option>
+                  <option value="MR">Mr</option>
+                  <option value="MRS">Mrs</option>
+                  <option value="MS">Ms</option>
+                  <option value="MISS">Miss</option>
                 </select>
               </div>
 
@@ -979,7 +1854,11 @@ export const TravelerForm = ({
                   type="text"
                   value={traveler.firstName || ""}
                   onChange={(e) =>
-                    updateTraveler(traveler.id, "firstName", e.target.value)
+                    updateTraveler(
+                      traveler.id,
+                      "firstName",
+                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, "")
+                    )
                   }
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
                   required
@@ -994,7 +1873,11 @@ export const TravelerForm = ({
                   type="text"
                   value={traveler.middleName || ""}
                   onChange={(e) =>
-                    updateTraveler(traveler.id, "middleName", e.target.value)
+                    updateTraveler(
+                      traveler.id,
+                      "middleName",
+                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, "")
+                    )
                   }
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
                 />
@@ -1008,7 +1891,11 @@ export const TravelerForm = ({
                   type="text"
                   value={traveler.lastName || ""}
                   onChange={(e) =>
-                    updateTraveler(traveler.id, "lastName", e.target.value)
+                    updateTraveler(
+                      traveler.id,
+                      "lastName",
+                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, "")
+                    )
                   }
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
                   required
@@ -1017,50 +1904,82 @@ export const TravelerForm = ({
             </div>
 
             {/* ===== Primary Adult Extra Fields ===== */}
-            {/* {index === 0 && ( */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={traveler.email || ""}
-                  onChange={(e) =>
-                    updateTraveler(traveler.id, "email", e.target.value)
-                  }
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
-                  required
-                />
-              </div>
+            {index === 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={traveler.email || ""}
+                    onChange={(e) =>
+                      updateTraveler(traveler.id, "email", e.target.value)
+                    }
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Mobile Number <span className="text-red-500">*</span>
-                </label>
-                <PhoneInput
-                  country={"in"}
-                  value={traveler.phoneWithCode || ""}
-                  onChange={(phone) =>
-                    updateTraveler(traveler.id, "phoneWithCode", phone)
-                  }
-                  enableSearch
-                  containerStyle={{ width: "100%" }}
-                  inputStyle={{
-                    width: "100%",
-                    height: "48px",
-                    border: "2px solid #d1d5db",
-                    borderRadius: "0.5rem",
-                    paddingLeft: "48px",
-                  }}
-                  required
-                />
-              </div>
-            </div>
-            {/*)} */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Mobile Number <span className="text-red-500">*</span>
+                  </label>
+                  <PhoneInput
+                    country={"in"}
+                    value={traveler.phoneWithCode || ""}
+                    onChange={(phone, countryData) => {
+                      updateTraveler(traveler.id, "phoneWithCode", phone);
 
-            {/* ===== Gender + Age ===== */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                      // ✅ Get ISO country code (e.g. "in", "us", "gb")
+                      const isoCode = countryData?.countryCode?.toUpperCase();
+                      if (isoCode) {
+                        try {
+                          const regionNames = new Intl.DisplayNames(["en"], {
+                            type: "region",
+                          });
+                          const nationality = regionNames.of(isoCode); // e.g. "India", "United States"
+                          updateTraveler(
+                            traveler.id,
+                            "nationality",
+                            nationality
+                          );
+                        } catch (err) {
+                          console.warn("Failed to resolve country name:", err);
+                        }
+                      }
+                    }}
+                    enableSearch
+                    containerStyle={{ width: "100%" }}
+                    inputStyle={{
+                      width: "100%",
+                      height: "48px",
+                      border: errors?.[index]?.phoneWithCode
+                        ? "2px solid #ef4444"
+                        : "2px solid #d1d5db",
+                      borderRadius: "0.5rem",
+                      paddingLeft: "48px",
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Nationality<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={traveler.nationality || "India"}
+                    readOnly
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ===== Gender + DOB + Calculated Age ===== */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+              {/* Gender */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
                   Gender <span className="text-red-500">*</span>
@@ -1080,26 +1999,81 @@ export const TravelerForm = ({
                 </select>
               </div>
 
+              {/* DOB */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Age <span className="text-red-500">*</span>
+                  Date of Birth <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="number"
-                  min={12}
-                  value={traveler.age ?? ""}
-                  onChange={(e) =>
-                    updateTraveler(
-                      traveler.id,
-                      "age",
-                      parseInt(e.target.value || "0")
-                    )
-                  }
+                  type="date"
+                  value={traveler.dob || ""}
+                  onChange={(e) => {
+                    const dob = e.target.value;
+                    const age = calculateAgeFromDOB(dob);
+
+                    updateTraveler(traveler.id, "dob", dob);
+                    updateTraveler(traveler.id, "age", age); // derived
+                  }}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
                   required
                 />
               </div>
+
+              {/* Calculated Age (Read-only) */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Age (Auto-calculated)
+                </label>
+                <input
+                  type="text"
+                  value={traveler.age || ""}
+                  readOnly
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                />
+              </div>
             </div>
+
+            {isInternational && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Passport Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={traveler.passportNumber || ""}
+                    onChange={(e) =>
+                      updateTraveler(
+                        traveler.id,
+                        "passportNumber",
+                        e.target.value
+                      )
+                    }
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Passport Expiry <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={traveler.passportExpiry || ""}
+                    onChange={(e) =>
+                      updateTraveler(
+                        traveler.id,
+                        "passportExpiry",
+                        e.target.value
+                      )
+                    }
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    required
+                  />
+                </div>
+              </div>
+            )}
 
             {/* ===== Note ===== */}
             <div className="mt-6 bg-blue-50 border-l-4 border-blue-900 p-4 rounded-lg">
@@ -1116,7 +2090,11 @@ export const TravelerForm = ({
           <button
             type="button"
             onClick={addTraveler}
-            className="flex items-center gap-2 px-6 py-3 border-2 border-dashed border-orange-500 text-orange-600 hover:bg-orange-50 rounded-xl font-bold transition"
+            className={`flex items-center gap-2 px-6 py-3 border-2  border-dashed rounded-xl font-bold transition ${
+              travelers.length >= maxTravelers
+                ? " text-gray-500 cursor-not-allowed"
+                : "text-[#0A4D68] cursor-pointer"
+            }`}
           >
             <IoPersonAdd size={20} />+ ADD NEW ADULT
           </button>
@@ -1205,6 +2183,7 @@ export default {
   formatDurationCompact,
   parseFlightData,
   FlightTimeline,
+  RoundTripFlightTimeline,
   FareOptions,
   PriceSummary,
   ImportantInformation,
@@ -1214,4 +2193,5 @@ export default {
   CTABox,
   HotelHomeButton,
   Amenities,
+  MealSelectionCards,
 };

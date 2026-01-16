@@ -1,30 +1,10 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import PhoneInput from "react-phone-input-2";
-import "react-phone-input-2/lib/style.css";
-import {
-  MdArrowBack,
-  MdFlightTakeoff,
-  MdFlightLand,
-  MdEventSeat,
-} from "react-icons/md";
-import { FaPlane, FaUser, FaWifi } from "react-icons/fa";
-import {
-  BsTag,
-  BsInfoCircleFill,
-  BsCashStack,
-  BsCalendar4,
-} from "react-icons/bs";
-import { AiOutlineCheck, AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
-import { BiTime } from "react-icons/bi";
-import {
-  IoPersonAdd,
-  IoPersonRemove,
-  IoAirplaneOutline,
-} from "react-icons/io5";
-import { GoPeople } from "react-icons/go";
-import { PiForkKnifeBold } from "react-icons/pi";
-import { RiHotelLine } from "react-icons/ri";
+import { MdArrowBack, MdFlightTakeoff, MdFlightLand } from "react-icons/md";
+import { BsCalendar4 } from "react-icons/bs";
+import { AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
+import { useDispatch, useSelector } from "react-redux";
+import {  ToastWithTimer } from "../../../utils/ToastConfirm";
 import SeatSelectionModal from "./SeatSelectionModal";
 
 import {
@@ -47,28 +27,65 @@ import {
   Amenities,
   HotelHomeButton,
   CTABox,
+  parseRoundTripBooking,
 } from "./CommonComponents";
-import { useDispatch, useSelector } from "react-redux";
+import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
 import {
-  reviewPrices,
-  selectBookingId,
-  fetchFareRules,
-  selectFareRules,
-  selectFareRulesStatus,
-} from "../../features/slices/flightSearchSlice";
-import { ToastWithTimer } from "../../utils/ToastWithTimer";
+  getRTFareQuote,
+  getRTFareRule,
+  getRTSSR,
+} from "../../../Redux/Actions/flight.thunks.RT";
+import { IoChevronDown, IoChevronUp } from "react-icons/io5";
+import RTSeatSelectionModal from "./RTSeatSelectionModal";
+
+// ✅ NORMALIZE FULL FARE RULE API RESPONSE (FareRule API)
+const normalizeFareRules = (fareRule) => {
+  const list = fareRule?.Response?.FareRules;
+  if (!Array.isArray(list)) return null;
+
+  return {
+    cancellation: [],
+    dateChange: [],
+    baggage: [],
+    important: list.map((r) => r.FareRuleDetail).filter(Boolean),
+  };
+};
+
+const ExpandableSection = ({ title, defaultOpen = false, children }) => {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-200">
+      {/* Header */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 hover:bg-gray-100 transition"
+      >
+        <h3 className="text-lg font-bold text-gray-800">{title}</h3>
+        {open ? (
+          <IoChevronUp size={20} className="text-gray-600" />
+        ) : (
+          <IoChevronDown size={20} className="text-gray-600" />
+        )}
+      </button>
+
+      {/* Content */}
+      {open && (
+        <div className="p-6 border-t border-gray-200 bg-white">{children}</div>
+      )}
+    </div>
+  );
+};
 
 export default function RoundTripFlightBooking() {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  console.log("🟦 NAVIGATION STATE:", location.state);
-  console.log(
-    "🟦 SELECTED priceIds:",
-    location.state?.selectedFlight?.priceIds
-  );
-  console.log("🟦 RAW priceIds:", location.state?.rawFlightData?.priceIds);
+  if (!location.state) {
+    navigate("/search-flight", { replace: true });
+    return null;
+  }
 
   const {
     selectedFlight,
@@ -86,7 +103,6 @@ export default function RoundTripFlightBooking() {
     travelDocs: false,
     terms: false,
   });
-  const [couponCode, setCouponCode] = useState("");
   const [travelers, setTravelers] = useState([
     {
       id: 1,
@@ -103,7 +119,6 @@ export default function RoundTripFlightBooking() {
     },
   ]);
   const [selectedSeats, setSelectedSeats] = useState({});
-  const [expandedFare, setExpandedFare] = useState(null);
   const [showSeatModal, setShowSeatModal] = useState({
     flight: null,
     flightIndex: null,
@@ -112,113 +127,144 @@ export default function RoundTripFlightBooking() {
     show: false,
   });
 
-  const [selectedFare, setSelectedFare] = useState("Standard");
   const [parsedFlightData, setParsedFlightData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [expandFare, setExpandFare] = useState({
+    onward: true,
+    return: true,
+  });
+  const [selectedMeals, setSelectedMeals] = useState({});
+  const [selectedBaggage, setSelectedBaggage] = useState({});
 
-  const reduxBookingId = useSelector(selectBookingId);
-  const fareRules = useSelector(selectFareRules);
-  const fareRulesStatus = useSelector(selectFareRulesStatus);
-  const [seatReviewData, setSeatReviewData] = useState(null);
-  const [reviewLoading, setReviewLoading] = useState(false);
+  const fareQuote = useSelector((state) => state.flightsRT.fareQuoteRT);
+  const fareRule = useSelector((state) => state.flightsRT.fareRuleRT);
+  const ssr = useSelector((state) => state.flightsRT.ssrRT);
+  // const traceId = useSelector((state) => state.flightsRT.traceId);
+  const reduxTraceId = useSelector((state) => state.flightsRT.traceId);
 
-  useEffect(() => {
-    if (rawFlightData) {
-      try {
-        console.log("=== RoundTripFlightBooking - Parsing Data ===");
-        console.log("Raw Flight Data:", rawFlightData);
-        console.log("Search Params:", searchParams);
-        console.log("Trip Type:", tripType);
+  const traceId = location.state?.traceId || reduxTraceId || null;
 
-        const parsedData = parseFlightData(
-          rawFlightData,
-          tripType,
-          searchParams
-        );
+  const extractFareParts = (quote) => {
+    const fare = quote?.Response?.Results?.Fare;
+    if (!fare) return { base: 0, tax: 0 };
 
-        console.log("=== Parsed Result ===");
-        console.log("Parsed Data:", parsedData);
-
-        setParsedFlightData(parsedData);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error parsing flight data:", error);
-        setLoading(false);
-      }
-    } else {
-      console.warn("No rawFlightData provided");
-      setLoading(false);
+    // Case 1: API gives full breakup
+    if (fare.BaseFare != null || fare.Tax != null) {
+      return {
+        base: Number(fare.BaseFare || 0),
+        tax: Number(fare.Tax || 0),
+      };
     }
-  }, [rawFlightData, tripType, searchParams]);
 
-  useEffect(() => {
-    if (!loading && (!selectedFlight || !rawFlightData)) {
-      navigate("/");
+    // Case 2: API gives only PublishedFare
+    if (fare.PublishedFare != null) {
+      return {
+        base: Number(fare.PublishedFare),
+        tax: 0,
+      };
     }
-  }, [selectedFlight, rawFlightData, navigate, loading]);
 
-  // Helper functions to get city data from segments
-  const getCityFromSegment = (segments, isDeparture = true) => {
-    if (!segments || segments.length === 0) return "N/A";
-    const segment = segments[0];
-    return isDeparture ? segment?.da?.city : segment?.aa?.city;
+    // Fallback
+    return { base: 0, tax: 0 };
   };
 
-  const getCityCodeFromSegment = (segments, isDeparture = true) => {
-    if (!segments || segments.length === 0) return "N/A";
-    const segment = segments[0];
-    return isDeparture ? segment?.da?.code : segment?.aa?.code;
+  const isRTSeatReady = useMemo(() => {
+    const onwardResultIndex = rawFlightData?.onward?.ResultIndex;
+    const returnResultIndex = rawFlightData?.return?.ResultIndex;
+
+    const onwardSSR = ssr?.onward?.[onwardResultIndex];
+    const returnSSR = ssr?.return?.[returnResultIndex];
+
+    const hasSeats = (journeySSR) =>
+      journeySSR?.Response?.SeatDynamic?.some((sd) =>
+        sd?.SegmentSeat?.some(
+          (seg) => Array.isArray(seg?.RowSeats) && seg.RowSeats.length > 0
+        )
+      );
+
+    return {
+      onward: hasSeats(onwardSSR),
+      return: hasSeats(returnSSR),
+    };
+  }, [ssr, rawFlightData]);
+
+  useEffect(() => {
+    console.log("🟢 Seat Ready Check", {
+      onward: isRTSeatReady.onward,
+      return: isRTSeatReady.return,
+      onwardSSR: ssr?.onward?.[rawFlightData?.onward?.ResultIndex],
+      returnSSR: ssr?.return?.[rawFlightData?.return?.ResultIndex],
+    });
+  }, [isRTSeatReady, ssr, rawFlightData]);
+
+  console.log("SSR ONWARD SeatDynamic:", ssr?.onward?.Results?.SeatDynamic);
+
+  const logRT = (label, data) => {
+    console.group(`🟦 [RT DEBUG] ${label}`);
+    console.log(data);
+    console.groupEnd();
   };
 
-  // Use segment data directly for reliable city names
-  //   const onwardFrom = getCityFromSegment(parsedFlightData?.onwardSegments, true);
-  //   const onwardTo = getCityFromSegment(parsedFlightData?.onwardSegments, false);
-  const onwardFromCode = getCityCodeFromSegment(
-    parsedFlightData?.onwardSegments,
-    true
-  );
-  const onwardToCode = getCityCodeFromSegment(
-    parsedFlightData?.onwardSegments,
-    false
-  );
+  useEffect(() => {
+    logRT("INITIAL INPUTS", {
+      traceId,
+      rawFlightData,
+      onwardResultIndex: rawFlightData?.onward?.ResultIndex,
+      returnResultIndex: rawFlightData?.return?.ResultIndex,
+    });
+  }, [traceId, rawFlightData]);
 
-  //   const returnFrom = getCityFromSegment(parsedFlightData?.returnSegments, true);
-  //   const returnTo = getCityFromSegment(parsedFlightData?.returnSegments, false);
-  const returnFromCode = getCityCodeFromSegment(
-    parsedFlightData?.returnSegments,
-    true
-  );
-  const returnToCode = getCityCodeFromSegment(
-    parsedFlightData?.returnSegments,
-    false
-  );
+  useEffect(() => {
+    if (!rawFlightData?.onward || !rawFlightData?.return) {
+      navigate("/search-flight", { replace: true });
+      return;
+    }
 
-  //   // For dates, use the segment departure times
-  //   const onwardDate = parsedFlightData?.onwardSegments?.[0]?.dt ?
-  //                     formatDate(parsedFlightData.onwardSegments[0].dt) : "N/A";
-  //   const returnDate = parsedFlightData?.returnSegments?.[0]?.dt ?
-  //                     formatDate(parsedFlightData.returnSegments[0].dt) : "N/A";
+    const parsed = parseRoundTripBooking(rawFlightData);
+    setParsedFlightData(parsed);
+    setLoading(false);
+  }, [rawFlightData, navigate]);
 
-  // In RoundTripFlightBooking.jsx, replace the city and date assignment with:
-
-  // CORRECTED: Use searchParams for the intended journey direction
   const onwardFrom = searchParams?.from?.city || searchParams?.from || "Delhi";
   const onwardTo = searchParams?.to?.city || searchParams?.to || "Mumbai";
-  const onwardDate = searchParams?.departureDate
-    ? formatDate(searchParams.departureDate)
-    : "Nov 24, 2025";
+  const onwardDate = formatDate(parsedFlightData?.onwardSegments?.[0]?.dt);
 
   const returnFrom = searchParams?.to?.city || searchParams?.to || "Mumbai";
   const returnTo = searchParams?.from?.city || searchParams?.from || "Delhi";
-  const returnDate = searchParams?.returnDate
-    ? formatDate(searchParams.returnDate)
-    : "Nov 28, 2025";
+  const returnDate = formatDate(parsedFlightData?.returnSegments?.[0]?.dt);
+
+  const onwardFare = extractFareParts(fareQuote?.onward);
+  const returnFare = extractFareParts(fareQuote?.return);
+
+  const totalBaseFare = onwardFare.base + returnFare.base;
+  const totalTaxFare = onwardFare.tax + returnFare.tax;
+
+  useEffect(() => {
+    console.log(
+      "ONWARD FareQuote Fare:",
+      fareQuote?.onward?.Response?.Results?.Fare
+    );
+    console.log(
+      "RETURN FareQuote Fare:",
+      fareQuote?.return?.Response?.Results?.Fare
+    );
+  }, [fareQuote]);
+
+  const baggageInfo = useMemo(() => {
+    if (!ssr?.onward?.Results?.Baggage?.length) return {};
+
+    const bag = ssr.onward.Results.Baggage[0];
+
+    return {
+      cB: "7 Kg",
+      iB: bag.Weight,
+    };
+  }, [ssr]);
 
   console.log("=== CORRECTED JOURNEY ASSIGNMENT ===");
   console.log("Onward:", onwardFrom, "→", onwardTo, "on", onwardDate);
   console.log("Return:", returnFrom, "→", returnTo, "on", returnDate);
 
-  // Debug logging
   useEffect(() => {
     if (parsedFlightData) {
       console.log("=== UI DATA DEBUG ===");
@@ -237,150 +283,91 @@ export default function RoundTripFlightBooking() {
     returnDate,
   ]);
 
-  const normalizeTripType = (type) => {
-    if (!type) return "OW";
+  useEffect(() => {
+    if (!traceId || !rawFlightData?.onward || !rawFlightData?.return) {
+      logRT("FARE QUOTE SKIPPED", {
+        traceId,
+        onward: rawFlightData?.onward,
+        return: rawFlightData?.return,
+      });
+      return;
+    }
 
-    const t = type.toLowerCase();
+    logRT("DISPATCHING RT FARE QUOTE", {
+      traceId,
+      onwardResultIndex: rawFlightData.onward.ResultIndex,
+      returnResultIndex: rawFlightData.return.ResultIndex,
+    });
 
-    if (t.includes("round")) return "round-trip";
-    if (t.includes("multi")) return "Multi-city";
-    return "one-way";
-  };
-
-  // === AUTO FETCH BOOKING ID WHEN PARSED DATA IS READY ===
-  // useEffect(() => {
-  //   if (!parsedFlightData) return;
-
-  //   const priceIds = extractPriceIds(
-  //     parsedFlightData,
-  //     rawFlightData?.tripInfos
-  //   );
-  //   if (priceIds.length === 0) return;
-
-  //   // 1️⃣ Review API → bookingId
-  //   dispatch(
-  //     reviewPrices({
-  //       priceIds,
-  //       searchParams,
-  //       tripType: normalizeTripType(tripType),
-  //     })
-  //   )
-  //     .unwrap()
-  //     .then((res) => {
-  //       sessionStorage.setItem("bookingId", res.bookingId);
-
-  //       // 2️⃣ Fetch Fare Rules immediately after review succeeds
-  //       dispatch(
-  //         fetchFareRules({
-  //           priceIds,
-  //           tripType: normalizeTripType(tripType),
-  //         })
-  //       );
-  //     })
-  //     .catch((err) => console.error("Review Error:", err));
-  // }, [parsedFlightData]);
-
-  console.log("Booking Id:", reduxBookingId);
-
-  const fareOptions = useMemo(() => {
-    if (!parsedFlightData) return [];
-    const totalBasePrice =
-      (parsedFlightData.basePrice || 0) +
-      (parsedFlightData.returnBasePrice || 0);
-
-    return [
-      {
-        type: "Saver",
-        price: Math.round(totalBasePrice * 0.85),
-        popular: false,
-        features: [
-          {
-            text: parsedFlightData.baggageInfo?.cB || "7kg hand baggage",
-            included: true,
-          },
-          { text: "No check-in baggage", included: false },
-          { text: "No meal included", included: false },
-          { text: "Standard seat", included: true },
-          { text: "Free web check-in", included: true },
-          { text: "Boarding pass access", included: true },
-        ],
-        conditions: [
-          "No refund on cancellation",
-          "₹3,000 fee for date changes",
-          "Name change not allowed",
-        ],
-      },
-      {
-        type: "Standard",
-        price: totalBasePrice,
-        popular: true,
-        features: [
-          {
-            text: parsedFlightData.baggageInfo?.cB || "7kg hand baggage",
-            included: true,
-          },
-          {
-            text: parsedFlightData.baggageInfo?.iB || "15kg check-in baggage",
-            included: true,
-          },
-          { text: "Complimentary meal", included: true },
-          { text: "Standard seat selection", included: true },
-          { text: "Free web check-in", included: true },
-          { text: "Priority boarding", included: true },
-        ],
-        conditions: [
-          parsedFlightData.isRefundable
-            ? "50% refund if cancelled 24hrs+ before departure"
-            : "No refund on cancellation",
-          "₹2,000 fee for date changes",
-          "Name change allowed with fee",
-        ],
-      },
-      {
-        type: "Flexi",
-        price: Math.round(totalBasePrice * 1.15),
-        popular: false,
-        features: [
-          { text: "10kg hand baggage", included: true },
-          { text: "25kg check-in baggage", included: true },
-          { text: "Premium meal & beverage", included: true },
-          { text: "Priority seat selection", included: true },
-          { text: "Free date changes unlimited", included: true },
-          { text: "Fast track security", included: true },
-        ],
-        conditions: [
-          "90% refund if cancelled anytime",
-          "Free date changes unlimited",
-          "Name change allowed once free",
-        ],
-      },
-    ];
-  }, [parsedFlightData]);
-
-  const selectedFareData = useMemo(() => {
-    return (
-      fareOptions.find((f) => f.type === selectedFare) ||
-      fareOptions[1] || { price: 0 }
+    dispatch(
+      getRTFareQuote({
+        traceId,
+        resultIndex: rawFlightData.onward.ResultIndex,
+        journeyType: "onward",
+      })
     );
-  }, [fareOptions, selectedFare]);
 
-  const structuredFareRules = useMemo(() => {
-    if (!fareRules || !fareRules.FR) return null;
+    dispatch(
+      getRTFareQuote({
+        traceId,
+        resultIndex: rawFlightData.return.ResultIndex,
+        journeyType: "return",
+      })
+    );
+  }, [traceId, rawFlightData, dispatch]);
 
-    const fr = fareRules.FR.ADULT || {};
+  useEffect(() => {
+    if (!traceId || !rawFlightData?.onward || !rawFlightData?.return) return;
 
-    const extract = (arr) =>
-      Array.isArray(arr)
-        ? arr.map((s) => (typeof s === "string" ? s : s.rule || ""))
-        : [];
+    const onwardIdx = rawFlightData.onward.ResultIndex;
+    const returnIdx = rawFlightData.return.ResultIndex;
 
-    return {
-      cancellation: extract(fr.CANCELLATION),
-      dateChange: extract(fr.DATECHANGE),
-      baggage: extract(fr.BAGGAGE),
-      important: extract(fr.IMPORTANTINFO),
-    };
-  }, [fareRules]);
+    dispatch(
+      getRTFareRule({
+        traceId,
+        resultIndex: onwardIdx,
+        journeyType: "onward",
+      })
+    );
+
+    dispatch(
+      getRTSSR({
+        traceId,
+        resultIndex: onwardIdx,
+        journeyType: "onward",
+      })
+    );
+
+    dispatch(
+      getRTFareRule({
+        traceId,
+        resultIndex: returnIdx,
+        journeyType: "return",
+      })
+    );
+
+    dispatch(
+      getRTSSR({
+        traceId,
+        resultIndex: returnIdx,
+        journeyType: "return",
+      })
+    );
+  }, [traceId, rawFlightData, dispatch]);
+
+  useEffect(() => {
+    logRT("FARE QUOTE REDUX STATE", {
+      onward: fareQuote?.onward,
+      return: fareQuote?.return,
+    });
+  }, [fareQuote]);
+
+  useEffect(() => {
+    console.log("FARE RULE ONWARD:", fareRule?.onward);
+    console.log("FARE RULE RETURN:", fareRule?.return);
+    console.log("SSR ONWARD:", ssr?.onward);
+    console.log("SSR RETURN:", ssr?.return);
+  }, [fareRule, ssr]);
 
   const addTraveler = () => {
     const newTraveler = {
@@ -411,20 +398,22 @@ export default function RoundTripFlightBooking() {
     );
   };
 
-  const toggleSeatSelection = (journeyType, flightIdx, seatNum, price = 0) => {
+  const toggleSeatSelection = (
+    journeyType,
+    segmentIndex,
+    seatNum,
+    price = 0
+  ) => {
     setSelectedSeats((prev) => {
-      // const key = `${journeyType}-flight-${flightIdx}`;
-      const key = `${journeyType}|${flightIdx}`;
+      const key = `${journeyType}|${segmentIndex}`;
       const current = prev[key] || { list: [], priceMap: {} };
 
       const isSelected = current.list.includes(seatNum);
 
-      // ❌ Prevent selecting more seats than travelers
       if (!isSelected && current.list.length >= travelers.length) {
         ToastWithTimer({
-          message: `You can only select ${travelers.length} seat(s) for ${travelers.length} traveler(s)`,
+          message: `You can only select ${travelers.length} seat(s)`,
           type: "info",
-          duration: 3000,
         });
         return prev;
       }
@@ -434,11 +423,8 @@ export default function RoundTripFlightBooking() {
         : [...current.list, seatNum];
 
       const updatedPriceMap = { ...current.priceMap };
-      if (isSelected) {
-        delete updatedPriceMap[seatNum];
-      } else {
-        updatedPriceMap[seatNum] = price;
-      }
+      if (isSelected) delete updatedPriceMap[seatNum];
+      else updatedPriceMap[seatNum] = price;
 
       return {
         ...prev,
@@ -450,89 +436,27 @@ export default function RoundTripFlightBooking() {
     });
   };
 
-  // const openSeatModal = (flight, flightIndex, journeyType, date) => {
-  //   const bookingId =
-  //     reduxBookingId || sessionStorage.getItem("bookingId") || null;
+  const openSeatModal = (segment, segmentIndex, journeyType, resultIndex) => {
+    const journeySSR = ssr?.[journeyType]?.[resultIndex];
 
-  //   if (!bookingId) {
-  //     alert("Booking ID not ready yet. Please wait 1–2 seconds.");
-  //     return;
-  //   }
+    const seatData = journeySSR?.Response?.SeatDynamic;
 
-  //   setShowSeatModal({
-  //     flight,
-  //     flightIndex,
-  //     journeyType,
-  //     bookingId,
-  //     date,
-  //     show: true,
-  //   });
-  // };
-
-  const openSeatModal = async (segment, segmentIndex, journeyType, date) => {
-    try {
-      if (seatReviewData?.bookingId) {
-        setShowSeatModal({
-          show: true,
-          segment,
-          segmentIndex,
-          journeyType,
-          bookingId: seatReviewData.bookingId,
-          date,
-        });
-        return;
-      }
-
-      const priceIds = extractPriceIds(parsedFlightData);
-
-      console.log("REVIEW priceIds:", priceIds);
-
-      if (priceIds.length !== 2) {
-        ToastWithTimer({
-          type: "error",
-          message: "Price expired. Please re-search.",
-        });
-        return;
-      }
-
-      setReviewLoading(true);
-
-      const res = await dispatch(
-        reviewPrices({
-          priceIds,
-          searchParams,
-          tripType: "round-trip", // ✅ FIXED
-        })
-      ).unwrap();
-
-      if (res.conditions?.isa !== true) {
-        ToastWithTimer({
-          type: "info",
-          message: "Seat selection not available for this flight.",
-        });
-        return;
-      }
-
-      setSeatReviewData(res);
-
-      setShowSeatModal({
-        show: true,
-        segment,
-        segmentIndex,
-        journeyType,
-        bookingId: res.bookingId,
-        date,
-      });
-    } catch (err) {
-      console.error("REVIEW ERROR:", err);
+    if (!Array.isArray(seatData) || seatData.length === 0) {
       ToastWithTimer({
-        type: "error",
-        message: "Price expired. Please re-search.",
+        type: "info",
+        message: "Seat selection not available for this flight.",
       });
-      navigate(-1);
-    } finally {
-      setReviewLoading(false);
+      return;
     }
+
+    setShowSeatModal({
+      show: true,
+      segment,
+      segmentIndex,
+      journeyType,
+      resultIndex,
+      date: segment?.dt,
+    });
   };
 
   const closeSeatModal = () => {
@@ -541,6 +465,42 @@ export default function RoundTripFlightBooking() {
 
   const toggleSection = (section) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const toggleMealSelection = (
+    journeyType,
+    segmentIndex,
+    meal,
+    travelersCount
+  ) => {
+    const key = `${journeyType}|${segmentIndex}`;
+
+    setSelectedMeals((prev) => {
+      const list = prev[key] || [];
+      const exists = list.find((m) => m.Code === meal.Code);
+
+      if (exists) {
+        return { ...prev, [key]: list.filter((m) => m.Code !== meal.Code) };
+      }
+
+      if (list.length >= travelersCount) {
+        ToastWithTimer({
+          type: "info",
+          message: `You can add meals for only ${travelersCount} traveler(s)`,
+        });
+        return prev;
+      }
+
+      return { ...prev, [key]: [...list, meal] };
+    });
+  };
+
+  const handleSelectBaggage = (journeyType, segmentIndex, bag) => {
+    const key = `${journeyType}|${segmentIndex}`;
+    setSelectedBaggage((prev) => ({
+      ...prev,
+      [key]: bag,
+    }));
   };
 
   const totalSeatPrice = useMemo(() => {
@@ -557,36 +517,17 @@ export default function RoundTripFlightBooking() {
     return total;
   }, [selectedSeats]);
 
+  const toggleFareSection = (key) => {
+    setExpandFare((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
   useEffect(() => {
     console.log("SELECTED SEATS:", selectedSeats);
     console.log("TOTAL SEAT PRICE:", totalSeatPrice);
   }, [selectedSeats, totalSeatPrice]);
-
-  const extractPriceIds = (parsed) => {
-    if (!parsed) return [];
-
-    const pickFareId = (list) =>
-      Array.isArray(list) && list.length ? list[0].id : null;
-
-    if (parsed.type === "round-trip") {
-      return [
-        pickFareId(parsed.onwardData?.totalPriceList),
-        pickFareId(parsed.returnData?.totalPriceList),
-      ].filter(Boolean);
-    }
-
-    if (parsed.type === "one-way") {
-      return [pickFareId(parsed.totalPriceList)].filter(Boolean);
-    }
-
-    if (parsed.type === "Multi-city") {
-      return (parsed.allSegmentsData || [])
-        .map((seg) => pickFareId(seg.totalPriceList))
-        .filter(Boolean);
-    }
-
-    return [];
-  };
 
   const getTotalDurationDisplay = () => {
     if (!parsedFlightData) return "0h:00m";
@@ -595,6 +536,27 @@ export default function RoundTripFlightBooking() {
     return `${formatDurationCompact(onwardDuration)} + ${formatDurationCompact(
       returnDuration
     )}`;
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "N/A";
+
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return "N/A";
+
+    const date = d.toLocaleDateString("en-US", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+
+    const time = d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    return `${date}, ${time}`;
   };
 
   console.log(
@@ -609,12 +571,10 @@ export default function RoundTripFlightBooking() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 font-semibold">
-            Loading flight details...
-          </p>
+          <div className="h-14 w-14 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Loading flight details…</p>
         </div>
       </div>
     );
@@ -622,14 +582,14 @@ export default function RoundTripFlightBooking() {
 
   if (!parsedFlightData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 font-semibold">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-xl shadow-md text-center max-w-md w-full">
+          <p className="text-gray-700 font-semibold mb-4">
             No flight data available. Please search again.
           </p>
           <button
             onClick={() => navigate("/")}
-            className="mt-4 px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+            className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             Back to Search
           </button>
@@ -640,162 +600,147 @@ export default function RoundTripFlightBooking() {
 
   const totalDurationDisplay = getTotalDurationDisplay();
 
+  const onwardSegments = parsedFlightData.onwardSegments || [];
+  const returnSegments = parsedFlightData.returnSegments || [];
+
+  const onwardDepartureDateTime = onwardSegments[0]?.dt;
+  const onwardArrivalDateTime = onwardSegments[onwardSegments.length - 1]?.at;
+  const returnDepartureDateTime = returnSegments[0]?.dt;
+  const returnArrivalDateTime = returnSegments[returnSegments.length - 1]?.at;
+
   return (
-    <div
-      className="min-h-screen bg-gray-50"
-      style={{ fontFamily: "DM Sans, sans-serif" }}
-    >
-      <SeatSelectionModal
+    <div className="min-h-screen bg-slate-50 font-[DM Sans]">
+      <EmployeeHeader />
+      <RTSeatSelectionModal
         isOpen={showSeatModal.show}
         onClose={closeSeatModal}
         segment={showSeatModal.segment}
         segmentIndex={showSeatModal.segmentIndex}
         journeyType={showSeatModal.journeyType}
-        bookingId={showSeatModal.bookingId}
-        reviewResponse={seatReviewData} // ✅ REQUIRED
         travelers={travelers}
+        resultIndex={showSeatModal.resultIndex}
         selectedSeats={selectedSeats}
+        selectedMeals={selectedMeals} 
+        selectedBaggage={selectedBaggage} 
         onSeatSelect={toggleSeatSelection}
+        onToggleMeal={toggleMealSelection}
+        onSelectBaggage={handleSelectBaggage} 
         date={showSeatModal.date}
         flightIndex={showSeatModal.segmentIndex}
       />
 
-      {/* Header */}
-      <div className={`${blueBg} text-white shadow-sm`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <button
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-2 hover:text-orange-400 transition"
-            >
-              <MdArrowBack size={20} />
-              <span className="text-sm font-medium">
-                Back to Search Results
-              </span>
-            </button>
-            <div className="flex items-center gap-4">
-              <span className="text-sm">
-                Booking ID:{seatReviewData?.bookingId || "—"}
-              </span>
-              <span className="text-sm bg-orange-500 px-2 py-1 rounded">
-                ROUND-TRIP
-              </span>
-            </div>
+      {/* Top Bar */}
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-full mx-10 px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-sm text-slate-600 hover:text-blue-700 transition"
+          >
+            <MdArrowBack size={18} />
+            Back to results
+          </button>
+          <div className="flex items-center gap-4">
+            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-600 text-white">
+              ROUND-TRIP
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="w-full mx-auto">
-        <div className="max-w-6/7 mx-auto py-6 lg:py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-4">
-              {/* Overview Card */}
-              <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-                <div
-                  className={`${blueBg} bg-linear-to-r from-[#1a2957] to-[#2d4a7c] text-white p-6`}
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div
-                      className={`w-12 h-12 ${orangeBg} rounded-full flex items-center justify-center shadow-lg`}
-                    >
-                      <FaPlane className="text-white text-xl" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold">
-                        Round Trip Flight Details
-                      </h2>
-                      <p className="text-sm text-blue-100 font-medium">
-                        Complete journey information
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-white text-gray-950 bg-opacity-15 backdrop-blur-sm rounded-lg p-4 border border-white border-opacity-20">
-                      <div className="flex items-center gap-2 mb-2">
-                        <MdFlightTakeoff className="text-orange-400 text-xl" />
-                        <span className="text-sm  font-semibold">
-                          Onward Journey
-                        </span>
-                      </div>
-                      <p className="font-bold text-lg">
-                        {onwardFrom} → {onwardTo}
-                      </p>
-                      <p className="text-sm font-medium text-blue-900">
-                        {onwardDate}
-                      </p>
-                    </div>
-
-                    <div className="bg-white text-gray-950 bg-opacity-15 backdrop-blur-sm rounded-lg p-4 border border-white border-opacity-20">
-                      <div className="flex items-center gap-2 mb-2">
-                        <MdFlightLand className="text-purple-400 text-xl" />
-                        <span className="text-sm font-semibold">
-                          Return Journey
-                        </span>
-                      </div>
-                      <p className="font-bold text-lg">
-                        {returnFrom} → {returnTo}
-                      </p>
-                      <p className="text-sm text-blue-900">{returnDate}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 mt-4">
-                    <div className="bg-white text-gray-950 bg-opacity-15 backdrop-blur-sm rounded-lg p-3 text-center border border-white border-opacity-20">
-                      <BiTime className="text-orange-400 text-xl mx-auto mb-1.5" />
-                      <p className="text-xs font-bold uppercase tracking-wide mb-1">
-                        Duration
-                      </p>
-                      <p className="font-bold text-sm">
-                        {totalDurationDisplay}
-                      </p>
-                    </div>
-
-                    <div className="bg-white text-gray-950 bg-opacity-15 backdrop-blur-sm rounded-lg p-3 text-center border border-white border-opacity-20">
-                      <GoPeople className="text-orange-400 text-xl mx-auto mb-1.5" />
-                      <p className="text-xs font-bold uppercase tracking-wide mb-1">
-                        Travelers
-                      </p>
-                      <p className="font-bold text-sm">
-                        {travelers.length} Adult
-                        {travelers.length > 1 ? "s" : ""}
-                      </p>
-                    </div>
-
-                    <div className="bg-white text-gray-950 bg-opacity-15 backdrop-blur-sm rounded-lg p-3 text-center border border-white border-opacity-20">
-                      <BsCashStack className="text-orange-400 text-xl mx-auto mb-1.5" />
-                      <p className="text-xs font-bold uppercase tracking-wide mb-1">
-                        Total
-                      </p>
-                      <p className="font-bold text-sm">
-                        ₹{parsedFlightData.totalPrice?.toLocaleString()}
-                      </p>
-                    </div>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* LEFT COLUMN */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Flight Summary Card */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-6 bg-linear-to-br from-blue-50 to-blue-100">
+                <div className="flex justify-between items-start mb-5">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">
+                      Round Trip Flight Details
+                    </h2>
+                    <p className="text-sm text-slate-600">
+                      Complete journey information
+                    </p>
                   </div>
                 </div>
-              </div>
 
-              {/* Onward Flight Details */}
-              <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+                <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                  <InfoBox
+                    icon={<MdFlightTakeoff />}
+                    label="Onward Journey"
+                    value={
+                      <>
+                        <div className="font-semibold">
+                          {onwardFrom} → {onwardTo}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {formatDateTime(onwardDepartureDateTime)}
+                        </div>
+                      </>
+                    }
+                  />
+
+                  <InfoBox
+                    icon={<MdFlightLand />}
+                    label="Return Journey"
+                    value={
+                      <>
+                        <div className="font-semibold">
+                          {returnFrom} → {returnTo}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {formatDateTime(returnDepartureDateTime)}
+                        </div>
+                      </>
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <InfoBox
+                    icon={<BsCalendar4 />}
+                    label="Duration"
+                    value={
+                      <div className="font-semibold text-sm">
+                        {totalDurationDisplay}
+                      </div>
+                    }
+                  />
+
+                  <InfoBox
+                    icon={<span className="text-lg">👤</span>}
+                    label="Travelers"
+                    value={
+                      <div className="font-semibold text-sm">
+                        {travelers.length} Adult
+                        {travelers.length > 1 ? "s" : ""}
+                      </div>
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+            {/* Onward Flight Details */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-5 bg-linear-to-r from-green-50 to-emerald-50 border-l-4 border-green-500">
                 <button
                   onClick={() => toggleSection("onwardFlightDetails")}
-                  className="w-full bg-linear-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 p-5 flex items-center justify-between hover:from-green-100 hover:to-emerald-100 transition"
+                  className="w-full flex items-center justify-between"
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-                      <AiOutlineCheck className="text-white text-2xl" />
+                      <MdFlightTakeoff className="text-white text-2xl" />
                     </div>
                     <div className="text-left">
                       <p className="font-bold text-lg text-green-800">
-                        Onward Journey:{" "}
-                        <span className="text-gray-900">{onwardFrom}</span>
-                        <span className="text-orange-600 mx-2 font-extrabold">
-                          →
-                        </span>
-                        <span className="text-gray-900">{onwardTo}</span>
+                        Onward Journey
                       </p>
                       <p className="text-sm text-gray-700 font-medium">
-                        {onwardDate} •{" "}
+                        {onwardFrom} → {onwardTo} • {onwardDate}
+                      </p>
+                      <p className="text-xs text-gray-600">
                         {parsedFlightData.onwardSegments?.length || 0} Flight
                         {(parsedFlightData.onwardSegments?.length || 0) > 1
                           ? "s"
@@ -811,49 +756,48 @@ export default function RoundTripFlightBooking() {
                     )}
                   </div>
                 </button>
+              </div>
 
-                {expandedSections.onwardFlightDetails && (
-                  <div className="p-6 bg-linear-to-b from-gray-50 to-white">
-                    <h3 className="text-lg font-bold mb-4">
-                      Onward Flight Timeline
-                    </h3>
+              {expandedSections.onwardFlightDetails && (
+                <div className="p-6 bg-slate-50">
+                  <div className="bg-white rounded-xl p-5">
                     <RoundTripFlightTimeline
-                      segments={parsedFlightData.onwardSegments || []}
+                      segments={parsedFlightData.onwardSegments}
                       isReturnJourney={false}
                       selectedSeats={selectedSeats}
                       openSeatModal={(flight, flightIdx) =>
-                        openSeatModal(flight, flightIdx, "onward")
+                        openSeatModal(
+                          flight,
+                          flightIdx,
+                          "onward",
+                          rawFlightData.onward.ResultIndex
+                        )
                       }
-                      flightData={parsedFlightData.onwardData?.flightData}
-                      onSeatSelect={(flightIdx, seat) =>
-                        toggleSeatSelection("onward", flightIdx, seat)
-                      }
+                      isSeatReady={isRTSeatReady.onward}
                     />
                   </div>
-                )}
-              </div>
-
-              {/* Return Flight Details */}
-              <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+                </div>
+              )}
+            </div>
+            {/* Return Flight Details */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-5 bg-linear-to-r from-purple-50 to-indigo-50 border-l-4 border-purple-500">
                 <button
                   onClick={() => toggleSection("returnFlightDetails")}
-                  className="w-full bg-linear-to-r from-purple-50 to-indigo-50 border-l-4 border-purple-500 p-5 flex items-center justify-between hover:from-purple-100 hover:to-indigo-100 transition"
+                  className="w-full flex items-center justify-between"
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
-                      <AiOutlineCheck className="text-white text-2xl" />
+                      <MdFlightLand className="text-white text-2xl" />
                     </div>
                     <div className="text-left">
                       <p className="font-bold text-lg text-purple-800">
-                        Return Journey:{" "}
-                        <span className="text-gray-900">{returnFrom}</span>
-                        <span className="text-orange-600 mx-2 font-extrabold">
-                          →
-                        </span>
-                        <span className="text-gray-900">{returnTo}</span>
+                        Return Journey
                       </p>
                       <p className="text-sm text-gray-700 font-medium">
-                        {returnDate} •{" "}
+                        {returnFrom} → {returnTo} • {returnDate}
+                      </p>
+                      <p className="text-xs text-gray-600">
                         {parsedFlightData.returnSegments?.length || 0} Flight
                         {(parsedFlightData.returnSegments?.length || 0) > 1
                           ? "s"
@@ -869,107 +813,219 @@ export default function RoundTripFlightBooking() {
                     )}
                   </div>
                 </button>
+              </div>
 
-                {expandedSections.returnFlightDetails && (
-                  <div className="p-6 bg-linear-to-b from-gray-50 to-white">
-                    <h3 className="text-lg font-bold mb-4">
-                      Return Flight Timeline
-                    </h3>
+              {expandedSections.returnFlightDetails && (
+                <div className="p-6 bg-slate-50">
+                  <div className="bg-white rounded-xl p-5">
                     <RoundTripFlightTimeline
                       segments={parsedFlightData.returnSegments}
                       isReturnJourney={true}
                       selectedSeats={selectedSeats}
                       openSeatModal={(flight, flightIdx) =>
-                        openSeatModal(flight, flightIdx, "return")
+                        openSeatModal(
+                          flight,
+                          flightIdx,
+                          "return",
+                          rawFlightData.return.ResultIndex
+                        )
                       }
-                      flightData={parsedFlightData.returnData?.flightData}
-                      onSeatSelect={(flightIdx, seat) =>
-                        toggleSeatSelection("return", flightIdx, seat)
-                      }
+                      isSeatReady={isRTSeatReady.return}
                     />
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Fare Quote */}
+            <div className="space-y-5">
+              {/* Fare  - Onward */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                {/* Header */}
+                <button
+                  onClick={() => toggleFareSection("onward")}
+                  className="w-full bg-linear-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center shadow-md">
+                      <MdFlightTakeoff className="text-white text-xl" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-lg font-bold text-gray-900">
+                        Onward Journey
+                      </h3>
+                      <p className="text-xs text-gray-600">
+                        Fare details & add-ons
+                      </p>
+                    </div>
+                  </div>
+
+                  {expandFare.onward ? (
+                    <AiOutlineMinus className="text-green-700 text-lg" />
+                  ) : (
+                    <AiOutlinePlus className="text-green-700 text-lg" />
+                  )}
+                </button>
+
+                {/* Content */}
+                {expandFare.onward && (
+                  <div className="p-6 space-y-6">
+                    {/* Fare Options */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-5 bg-green-600 rounded-full"></div>
+                        <h4 className="text-base font-semibold text-gray-900">
+                          Fare Rules & Charges
+                        </h4>
+                      </div>
+                      <FareOptions
+                        fareRules={fareQuote?.onward}
+                        fareRulesStatus={
+                          fareQuote?.onward?.Response?.Results?.MiniFareRules
+                            ? "succeeded"
+                            : "loading"
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Fare  - Return */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                {/* Header */}
+                <button
+                  onClick={() => toggleFareSection("return")}
+                  className="w-full bg-linear-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center shadow-md">
+                      <MdFlightTakeoff className="text-white text-xl" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-lg font-bold text-gray-900">
+                        Return Journey
+                      </h3>
+                      <p className="text-xs text-gray-600">
+                        Fare details & add-ons
+                      </p>
+                    </div>
+                  </div>
+
+                  {expandFare.return ? (
+                    <AiOutlineMinus className="text-green-700 text-lg" />
+                  ) : (
+                    <AiOutlinePlus className="text-green-700 text-lg" />
+                  )}
+                </button>
+
+                {/* Content */}
+                {expandFare.return && (
+                  <div className="p-6 space-y-6">
+                    {/* Fare Options */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-5 bg-purple-600 rounded-full"></div>
+                        <h4 className="text-base font-semibold text-gray-900">
+                          Fare Rules & Charges
+                        </h4>
+                      </div>
+                      <FareOptions
+                        fareRules={fareQuote?.return}
+                        fareRulesStatus={
+                          fareQuote?.return?.Response?.Results?.MiniFareRules
+                            ? "succeeded"
+                            : "loading"
+                        }
+                      />
+                    </div>
+
+                    {/* Meals Section */}
+                    {ssr?.return?.Results?.Meal?.length > 0 && (
+                      <div className="border-t border-gray-200 pt-6">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-1 h-5 bg-orange-500 rounded-full"></div>
+                          <h4 className="text-base font-semibold text-gray-900">
+                            In-Flight Meals
+                          </h4>
+                          <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-semibold rounded-full">
+                            {ssr.return.Results.Meal.length} Available
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {ssr.return.Results.Meal.map((meal, idx) => (
+                            <div
+                              key={idx}
+                              className="border border-gray-200 rounded-lg p-4 hover:border-orange-300 hover:shadow-md transition-all duration-200 group"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="w-12 h-12 bg-orange-50 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-orange-100 transition-colors">
+                                  <PiForkKnifeBold className="text-orange-600 text-xl" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-semibold text-gray-900 text-sm mb-1">
+                                    {meal.Description}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mb-2">
+                                    {meal.Code}
+                                  </p>
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-lg font-bold text-orange-600">
+                                      ₹{meal.Price}
+                                    </p>
+                                    <button className="px-3 py-1.5 bg-orange-600 text-white text-xs font-semibold rounded-md hover:bg-orange-700 transition-colors">
+                                      Add
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Fare Options */}
-              <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                <h3 className="text-xl font-bold mb-4">Select Your Fare</h3>
-                <FareOptions
-                  fareOptions={fareOptions}
-                  selectedFare={selectedFare}
-                  onFareSelect={setSelectedFare}
-                  expandedFare={expandedFare}
-                  onExpandFare={setExpandedFare}
-                />
-              </div>
-
-              {/* Traveler Details */}
-              <TravelerForm
-                travelers={travelers}
-                addTraveler={addTraveler}
-                removeTraveler={removeTraveler}
-                updateTraveler={updateTraveler}
-              />
-
-              {/* Important Information */}
-              <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                <h3 className="text-xl font-bold mb-4">
-                  Important Information
-                </h3>
-                <ImportantInformation
-                  expandedSections={expandedSections}
-                  onToggleSection={toggleSection}
-                  fareRules={structuredFareRules}
-                  fareRulesStatus={fareRulesStatus}
-                />
-              </div>
-
-              <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                <h3 className="text-xl font-bold mb-4">Fare Rules</h3>
+              <ExpandableSection
+                title="Important Information — Onward"
+                defaultOpen={false}
+              >
                 <FareRulesAccordion
-                  fareRules={structuredFareRules}
-                  fareRulesStatus={fareRulesStatus}
+                  fareRules={normalizeFareRules(fareRule?.onward)}
+                  fareRulesStatus={fareRule?.onward ? "succeeded" : "loading"}
                 />
-              </div>
+              </ExpandableSection>
 
-              {/* Baggage & Inclusions */}
-              <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                <h3 className="text-xl font-bold mb-4">Baggage & Inclusions</h3>
-                <BaggageTable
-                  baggageInfo={parsedFlightData.baggageInfo || {}}
-                  fareClass={parsedFlightData.fareClass || ""}
+              <ExpandableSection
+                title="Important Information — Return"
+                defaultOpen={false}
+              >
+                <FareRulesAccordion
+                  fareRules={normalizeFareRules(fareRule?.return)}
+                  fareRulesStatus={fareRule?.return ? "succeeded" : "loading"}
                 />
-              </div>
+              </ExpandableSection>
             </div>
+          </div>
 
-            {/* Right Sidebar */}
-            <div className="lg:col-span-1">
+          {/* RIGHT SIDEBAR */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-6 space-y-6">
               <PriceSummary
-                selectedFareData={selectedFareData}
-                travelers={travelers}
-                totalSeatPrice={totalSeatPrice}
-                couponCode={couponCode}
-                onCouponChange={(e) =>
-                  setCouponCode(e.target.value.toUpperCase())
-                }
-                onApplyCoupon={() =>
-                  console.log("Applying coupon:", couponCode)
-                }
-                parsedFlightData={parsedFlightData}
-                discountAmount={0}
+                parsedFlightData={{
+                  baseFare: totalBaseFare,
+                  taxFare: totalTaxFare,
+                }}
                 selectedSeats={selectedSeats}
+                selectedMeals={selectedMeals}
+                selectedBaggage={selectedBaggage}
+                travelers={travelers}
               />
 
-              <div className="mt-6 space-y-4">
-                {/* Amenities section  */}
-                <Amenities />
-
-                {/* Need Hotel Button  */}
-                <HotelHomeButton />
-
-                {/* CTA Section */}
-                <CTABox />
-              </div>
+              <Amenities />
+              <HotelHomeButton />
+              <CTABox />
             </div>
           </div>
         </div>
@@ -977,3 +1033,14 @@ export default function RoundTripFlightBooking() {
     </div>
   );
 }
+
+/* Helper Component */
+const InfoBox = ({ icon, label, value }) => (
+  <div className="bg-white rounded-xl border border-gray-300 p-4 shadow-sm">
+    <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
+      {icon}
+      {label}
+    </div>
+    <div className="text-slate-900">{value}</div>
+  </div>
+);

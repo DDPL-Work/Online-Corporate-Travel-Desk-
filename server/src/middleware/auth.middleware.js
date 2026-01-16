@@ -1,49 +1,50 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const SuperAdmin = require('../models/SuperAdmin.model'); // ✅ REQUIRED
-const ApiError = require('../utils/ApiError');
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const SuperAdmin = require("../models/SuperAdmin.model"); // ✅ REQUIRED
+const ApiError = require("../utils/ApiError");
 
 const SECRET = process.env.JWT_SECRET;
 
 exports.verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
-        message: 'Unauthorized or missing token'
+        message: "Unauthorized or missing token",
       });
     }
 
-    const token = authHeader.split(' ')[1];
+    const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, SECRET);
 
     if (!decoded?.id || !decoded?.role) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid token payload'
+        message: "Invalid token payload",
       });
     }
 
     let account = null;
 
     // ✅ ✅ HANDLE SUPER ADMIN SEPARATELY
-    if (decoded.role === 'super-admin') {
+    if (decoded.role === "super-admin") {
       account = await SuperAdmin.findById(decoded.id);
 
       if (!account) {
         return res.status(401).json({
           success: false,
-          message: 'Super Admin not found'
+          message: "Super Admin not found",
         });
       }
 
       req.user = {
+        _id: account._id,
         id: account._id.toString(),
-        role: 'super-admin',
-        roles: ['super-admin'],
+        role: "super-admin",
+        roles: ["super-admin"],
         email: account.email,
-        name: account.name
+        name: account.name,
       };
 
       return next(); // ✅ IMPORTANT: STOP HERE
@@ -55,32 +56,33 @@ exports.verifyToken = async (req, res, next) => {
     if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
-        message: 'User not found or inactive'
+        message: "User not found or inactive",
       });
     }
 
     req.user = {
+      _id: user._id,
       id: user._id.toString(),
       role: user.role,
       roles: [user.role],
       corporateId: user.corporateId ? user.corporateId.toString() : null,
       email: user.email,
-      name: user.name
+      name: user.name,
     };
 
     return next();
   } catch (err) {
     return res.status(401).json({
       success: false,
-      message: 'Unauthorized or expired token',
-      error: err.message
+      message: "Unauthorized or expired token",
+      error: err.message,
     });
   }
 };
 
 // ✅ ROLE AUTHORIZATION (UNCHANGED – VALID)
 exports.authorizeRoles = (...allowedRoles) => {
-  const normalize = r => r?.toString().replace(/[-_ ]/g, '').toLowerCase();
+  const normalize = (r) => r?.toString().replace(/[-_ ]/g, "").toLowerCase();
   const wanted = allowedRoles.map(normalize);
 
   return (req, res, next) => {
@@ -88,7 +90,7 @@ exports.authorizeRoles = (...allowedRoles) => {
     if (!role || !wanted.includes(role)) {
       return res.status(403).json({
         success: false,
-        message: 'You are not authorized to perform this action'
+        message: "You are not authorized to perform this action",
       });
     }
     next();
@@ -97,10 +99,10 @@ exports.authorizeRoles = (...allowedRoles) => {
 
 // ✅ SUPER ADMIN GUARD (UNCHANGED – VALID)
 exports.verifySuperAdmin = (req, res, next) => {
-  if (!req.user || req.user.role !== 'super-admin') {
+  if (!req.user || req.user.role !== "super-admin") {
     return res.status(403).json({
       success: false,
-      message: 'Super Admin access only'
+      message: "Super Admin access only",
     });
   }
   next();

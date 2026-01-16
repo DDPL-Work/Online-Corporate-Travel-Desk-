@@ -58,6 +58,8 @@ import FlightSearch from "../Pages/EmployeeDashboard/FlightSearch";
 import HotelSearchPage from "../Pages/EmployeeDashboard/HotelSearch";
 import FlightSearchResults from "../Pages/search-results/Flight-results/FlightSearchResults";
 import OneFlightBooking from "../Pages/Booking-Flow/Flight-Booking/OneFlightBooking";
+import RoundTripFlightBooking from "../Pages/Booking-Flow/Flight-Booking/RoundTripFlightBooking";
+import BookApprovedFlight from "../Pages/Booking-Flow/Flight-Booking/BookApprovedFlight";
 
 export const appRouter = createBrowserRouter([
   // -------------------------------
@@ -170,6 +172,11 @@ export const appRouter = createBrowserRouter([
       { path: "/search-hotel", element: <HotelSearchPage /> },
       { path: "/search-flight-results", element: <FlightSearchResults /> },
       { path: "/one-way-flight/booking", element: <OneFlightBooking /> },
+      {
+        path: "/round-trip-flight/booking",
+        element: <RoundTripFlightBooking />,
+      },
+      { path: "/bookings/:id/book", element: <BookApprovedFlight /> },
     ],
   },
 

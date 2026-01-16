@@ -1,4 +1,17 @@
-import { toast } from "react-toastify";
+import { toast } from "sonner";
+
+export const ToastWithTimer = ({ message, type, duration = 4000 }) => {
+  toast(message, {
+    duration,
+    className: `sonner-toast ${type}`,
+    description: (
+      <div
+        className="sonner-progress"
+        style={{ animationDuration: `${duration}ms` }}
+      />
+    ),
+  });
+};
 
 export const ToastConfirm = ({
   message,
@@ -8,35 +21,29 @@ export const ToastConfirm = ({
   type = "warning",
 }) => {
   const id = toast(
-    ({ closeToast }) => (
-      <div className="space-y-3">
+    <div className={`sonner-toast ${type}`}>
+      <div className="sonner-content space-y-3">
         <p className="font-medium">{message}</p>
         <div className="flex gap-3 justify-end">
           <button
             className="px-3 py-1 border rounded"
-            onClick={closeToast}
+            onClick={() => toast.dismiss(id)}
           >
             {cancelText}
           </button>
           <button
             className="px-3 py-1 bg-red-600 text-white rounded"
             onClick={() => {
-              closeToast();
-              onConfirm();
+              toast.dismiss(id);
+              onConfirm?.();
             }}
           >
             {confirmText}
           </button>
         </div>
       </div>
-    ),
-    {
-      type,
-      autoClose: false,
-      closeOnClick: false,
-      closeButton: false,
-    }
+    </div>,
+    { duration: Infinity }
   );
-
   return id;
 };

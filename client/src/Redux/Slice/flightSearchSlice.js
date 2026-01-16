@@ -1,3 +1,5 @@
+//flightSearchSlice.js
+
 import { createSlice } from "@reduxjs/toolkit";
 import {
   searchFlights,

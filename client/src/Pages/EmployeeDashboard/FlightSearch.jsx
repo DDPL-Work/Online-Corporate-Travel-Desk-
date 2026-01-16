@@ -133,15 +133,12 @@ const AirportSearchInput = ({ value, onChange, placeholder, id }) => {
   );
 };
 
-
 const CABIN_CLASS_MAP = {
   Economy: "economy",
   Business: "business",
   First: "first",
   "Premium Economy": "economy",
 };
-
-
 
 export default function FlightSearchPage() {
   const navigate = useNavigate();
@@ -221,7 +218,9 @@ export default function FlightSearchPage() {
     if (tripType === "multi-city") {
       multiCityFlights.forEach((f, idx) => {
         if (!f.from?.code || !f.to?.code || !f.date) {
-          newErrors[`multi-${idx}`] = `Flight ${idx + 1}: all fields required`;
+          newErrors[`multi-${idx}`] = `Flight ${
+            idx + 1
+          }: all fields are required`;
         }
       });
     }
@@ -256,7 +255,7 @@ export default function FlightSearchPage() {
       flexibleDates,
     };
 
-    if (tripType === "round-trip") {
+    if (tripType === "round-trip" && returnDate) {
       // payload.returnDate = formatDate(returnDate);
       payload.returnDate = returnDate;
     }
@@ -265,29 +264,26 @@ export default function FlightSearchPage() {
       payload.segments = multiCityFlights.map((f) => ({
         origin: f.from.code,
         destination: f.to.code,
-        // departureDate: formatDate(f.date),
         departureDate: f.date,
-        nearbyFrom: !!f.nearbyFrom,
-        nearbyTo: !!f.nearbyTo,
+        nearbyFrom: Boolean(f.nearbyFrom),
+        nearbyTo: Boolean(f.nearbyTo),
       }));
     }
 
     try {
       setLoading(true);
       await dispatch(searchFlights(payload)).unwrap();
-      navigate("/search-flight-results");
+      navigate("/search-flight-results", {
+        state: {
+          searchPayload: payload,
+        },
+      });
     } catch (err) {
       console.error("Flight search failed:", err);
       alert("Flight search failed. Please try again.");
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return null;
-    // HTML date input gives YYYY-MM-DD → convert to YYYY/MM/DD
-    return dateStr.replace(/-/g, "/");
   };
 
   const swapLocations = () => {

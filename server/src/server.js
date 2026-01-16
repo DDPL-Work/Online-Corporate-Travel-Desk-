@@ -19,10 +19,10 @@ console.log("GOOGLE_CALLBACK_URL:", process.env.GOOGLE_CALLBACK_URL);
     server.listen(PORT, () => {
       logger.info(`
 ===========================================
-Corporate Travel Desk – Server Running
-Environment: ${config.env}
-Port: ${PORT}
-API Version: ${config.api.version}
+Corporate Travel Desk – Server Running ⛷️
+Environment: ${config.env} 🛡️
+Port: ${PORT} 🔌
+API Version: ${config.api.version} 1️⃣
 ===========================================
 `);
     });
