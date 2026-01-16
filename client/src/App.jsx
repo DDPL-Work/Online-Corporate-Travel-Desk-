@@ -1,24 +1,22 @@
 import "./App.css";
 import AppRoutes from "./routes";
-
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { Toaster } from "sonner";
 
 function App() {
   return (
     <>
       <AppRoutes />
 
-      {/* Global Toast Container */}
-      <ToastContainer
+      {/* ✅ Sonner Toaster with custom CSS */}
+      <Toaster
         position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        pauseOnHover
-        draggable
-        theme="light"
+        expand
+        toastOptions={{
+          unstyled: true, // 🚀 this disables Sonner’s default styles completely
+          classNames: {
+            toast: "sonner-toast",
+          },
+        }}
       />
     </>
   );

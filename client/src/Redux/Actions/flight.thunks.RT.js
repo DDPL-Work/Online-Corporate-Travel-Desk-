@@ -1,11 +1,11 @@
-//flight.thunks.js
+//flight.thunks.RT.js
 
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import flightApi from "../../API/flightAPI";
 
 /* ---------------- SEARCH ---------------- */
-export const searchFlights = createAsyncThunk(
-  "flights/search",
+export const searchFlightsRT = createAsyncThunk(
+  "flightsRT/search",
   async (payload, { rejectWithValue }) => {
     try {
       const { data } = await flightApi.post("/search", payload);
@@ -32,51 +32,61 @@ export const searchFlights = createAsyncThunk(
   }
 );
 
-/* ---------------- FARE QUOTE ---------------- */
-export const getFareQuote = createAsyncThunk(
-  "flights/fareQuote",
-  async ({ traceId, resultIndex }, { rejectWithValue }) => {
+/* ---------------- FARE QUOTE (ROUND-TRIP) ---------------- */
+export const getRTFareQuote = createAsyncThunk(
+  "flightsRT/fareQuoteRT",
+  async ({ traceId, resultIndex, journeyType }, { rejectWithValue }) => {
     try {
       const { data } = await flightApi.post("/fare-quote", {
         traceId,
         resultIndex,
       });
-      return data.data;
+
+      return {
+        journeyType,
+        data: data.data,
+      };
     } catch (err) {
       return rejectWithValue(err.response?.data?.message);
     }
   }
 );
 
-/* ---------------- FARE RULE ---------------- */
-export const getFareRule = createAsyncThunk(
-  "flights/fareRule",
-  async ({ traceId, resultIndex }, { rejectWithValue }) => {
-    try {
-      const { data } = await flightApi.post("/fare-rule", {
-        traceId,
-        resultIndex,
-      });
-      return data.data;
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message);
-    }
+/* ---------------- FARE RULE (ROUND-TRIP) ---------------- */
+export const getRTFareRule = createAsyncThunk(
+  "flightsRT/getRTFareRule",
+  async ({ traceId, resultIndex, journeyType }) => {
+    const { data } = await flightApi.post("/fare-rule", {
+      traceId,
+      resultIndex,
+    });
+
+    return {
+      journeyType,
+      resultIndex,
+      data: data.data,
+    };
   }
 );
 
-/* ---------------- SSR ---------------- */
-export const getSSR = createAsyncThunk(
-  "flights/ssr",
-  async ({ traceId, resultIndex }, { rejectWithValue }) => {
-    try {
-      const { data } = await flightApi.post("/ssr", {
-        traceId,
-        resultIndex,
-      });
-      return data.data;
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message);
-    }
+/* ---------------- SSR (ROUND-TRIP) ---------------- */
+export const getRTSSR = createAsyncThunk(
+  "flightsRT/getRTSSR",
+  async ({ traceId, resultIndex, journeyType }) => {
+    console.log("🚀 SSR THUNK HIT", { traceId, resultIndex, journeyType });
+
+    const { data } = await flightApi.post("/ssr", {
+      traceId,
+      resultIndex,
+    });
+
+    console.log("✅ SSR API RESPONSE", data);
+
+    return {
+      journeyType,
+      resultIndex,
+      data: data.data,
+    };
   }
 );
 

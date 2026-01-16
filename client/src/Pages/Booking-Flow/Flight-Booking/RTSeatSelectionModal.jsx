@@ -8,17 +8,18 @@ import {
   MdRestaurant,
 } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
-import { ToastWithTimer } from "../../../utils/ToastConfirm";
-import { normalizeSSRBySegmentOW } from "../../../utils/parseReturnFlight";
 import {
   BaggageTable,
   MealSelectionCards,
   normalizeSSRList,
 } from "./CommonComponents";
+import { FaSuitcase } from "react-icons/fa6";
 import { airlineLogo } from "../../../utils/formatter";
 import { BsLuggage } from "react-icons/bs";
+import { normalizeSSRBySegment } from "../../../utils/parseReturnFlight";
+import { ToastWithTimer } from "../../../utils/ToastConfirm";
 
-export default function SeatSelectionModal({
+export default function RTSeatSelectionModal({
   isOpen,
   onClose,
   flight,
@@ -33,45 +34,51 @@ export default function SeatSelectionModal({
   segmentIndex,
   traceId,
   resultIndex,
+  type,
   selectedMeals,
   onToggleMeal,
   selectedBaggage,
   onSelectBaggage,
+  routes,
+  segments,
 }) {
   const dispatch = useDispatch();
-  const { seatMap, loading } = useSelector((state) => state.flights);
-  const [seatsFlat, setSeatsFlat] = useState([]);
-  const fareQuote = useSelector((state) => state.flights.fareQuote);
-  const ssr = useSelector((state) => state.flights.ssr);
+  const { seatMap, loading } = useSelector((state) => state.flightsRT);
+  const fareQuote = useSelector((state) => state.flightsRT.fareQuoteRT);
+  const ssr = useSelector(
+    (state) => state.flightsRT.ssrRT?.[journeyType]?.[resultIndex]
+  );
 
+  const [seatsFlat, setSeatsFlat] = useState([]);
   const [seatModalOpen, setSeatModalOpen] = useState(true);
   const [mealModalOpen, setMealModalOpen] = useState(false);
   const [baggageModalOpen, setBaggageModalOpen] = useState(false);
 
+  // SSR Normalization
   const segmentSSR = useMemo(() => {
-    const segmentSeat =
-      ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[segmentIndex];
-
-    return {
-      seats: segmentSeat?.RowSeats || [],
-      meals: ssr?.Response?.MealDynamic || [],
-      baggage: ssr?.Response?.Baggage || [],
-    };
+    const normalized = normalizeSSRBySegment(ssr);
+    return (
+      normalized?.[segmentIndex] || {
+        seats: [],
+        meals: [],
+        baggage: [],
+      }
+    );
   }, [ssr, segmentIndex]);
 
+  // Flatten seat map
   useEffect(() => {
     const rowSeats = segmentSSR.seats;
-
-    if (!Array.isArray(rowSeats) || rowSeats.length === 0) {
+    if (!Array.isArray(rowSeats)) {
       setSeatsFlat([]);
       return;
     }
 
     const flat = [];
     rowSeats.forEach((row, rowIndex) => {
-      (row.Seats || []).forEach((s) => {
+      if (!Array.isArray(row.Seats)) return;
+      row.Seats.forEach((s) => {
         if (!s?.Code || s.Code === "NoSeat") return;
-
         flat.push({
           seatNo: s.Code,
           row: Number(s.RowNo || rowIndex + 1),
@@ -84,10 +91,10 @@ export default function SeatSelectionModal({
         });
       });
     });
-
     setSeatsFlat(flat);
   }, [segmentSSR]);
 
+  // Group by row
   const seatRows = useMemo(() => {
     const rows = {};
     seatsFlat.forEach((seat) => {
@@ -95,22 +102,19 @@ export default function SeatSelectionModal({
       if (!rows[seat.row]) rows[seat.row] = [];
       rows[seat.row].push(seat);
     });
-
-    Object.keys(rows).forEach((row) => {
-      rows[row].sort((a, b) => (a.col || 0) - (b.col || 0));
-    });
-
+    Object.keys(rows).forEach((row) =>
+      rows[row].sort((a, b) => (a.col || 0) - (b.col || 0))
+    );
     return rows;
   }, [seatsFlat]);
 
+  // Seat configuration (Aisle pattern)
   const seatConfiguration = useMemo(() => {
     if (Object.keys(seatRows).length === 0) return [];
-
     const firstRow = seatRows[Object.keys(seatRows)[0]];
     const seatsPerSide = [];
     let currentGroup = [];
     let lastCol = 0;
-
     firstRow.forEach((seat, index) => {
       if (index === 0) {
         currentGroup.push(seat);
@@ -124,43 +128,21 @@ export default function SeatSelectionModal({
         lastCol = seat.col;
       }
     });
-
-    if (currentGroup.length > 0) {
-      seatsPerSide.push(currentGroup.length);
-    }
-
+    if (currentGroup.length > 0) seatsPerSide.push(currentGroup.length);
     return seatsPerSide;
   }, [seatRows]);
 
+  // Tab Switcher
   const handleSSR = (type) => {
     setSeatModalOpen(false);
     setMealModalOpen(false);
     setBaggageModalOpen(false);
-
-    switch (type) {
-      case "seat":
-        setSeatModalOpen(true);
-        break;
-      case "meal":
-        setMealModalOpen(true);
-        break;
-      case "baggage":
-        setBaggageModalOpen(true);
-        break;
-      default:
-        setSeatModalOpen(true);
-    }
+    if (type === "seat") setSeatModalOpen(true);
+    if (type === "meal") setMealModalOpen(true);
+    if (type === "baggage") setBaggageModalOpen(true);
   };
 
-  const handleClearMeals = (journeyType, segmentIndex) => {
-    const key = `${journeyType}|${segmentIndex}`;
-    onToggleMeal((prev) => {
-      const copy = { ...prev };
-      delete copy[key];
-      return copy;
-    });
-  };
-
+  // Meal/Baggage normalization
   const normalizedMeals = useMemo(
     () => normalizeSSRList(segmentSSR.meals),
     [segmentSSR.meals]
@@ -177,6 +159,7 @@ export default function SeatSelectionModal({
     [segmentSSR.baggage]
   );
 
+  // Helpers
   const isSelected = (seat) => {
     const key = `${journeyType}|${segmentIndex}`;
     const seatObj = selectedSeats[key];
@@ -189,13 +172,12 @@ export default function SeatSelectionModal({
     const key = `${journeyType}|${segmentIndex}`;
     const seatObj = selectedSeats[key] || { list: [], priceMap: {} };
     const list = Array.isArray(seatObj.list) ? seatObj.list : [];
-
     if (list.includes(seat.seatNo)) {
       onSeatSelect(journeyType, segmentIndex, seat.seatNo, seat.price);
     } else {
       if (list.length >= travelers.length) {
         ToastWithTimer({
-          type: "info",
+          type:"info",
           message: `You can select max ${travelers.length} seats`,
         });
         return;
@@ -213,26 +195,23 @@ export default function SeatSelectionModal({
   const getTotalPrice = () => {
     const key = `${journeyType}|${segmentIndex}`;
     const seatObj = selectedSeats[key] || { list: [], priceMap: {} };
-    return seatObj.list.reduce((total, seatNo) => {
-      return total + (seatObj.priceMap[seatNo] || 0);
-    }, 0);
+    return seatObj.list.reduce(
+      (total, seatNo) => total + (seatObj.priceMap[seatNo] || 0),
+      0
+    );
   };
 
+  // Tooltip + Seat Render
   const renderSeat = (seat) => {
     if (!seat) return null;
-
     const selected = isSelected(seat);
     const isPremium = seat.premium;
     const isEmergencyExit = seat.isEmergencyExit;
 
     let seatClasses =
       "relative w-10 h-10 sm:w-11 sm:h-11 transition-all duration-200 group";
-
-    // Base seat style
     const seatStyle =
       "absolute inset-0 rounded-t-lg flex items-center justify-center";
-
-    // Color variants
     let colorClass = "";
     let borderClass = "";
     let hoverEffect = "";
@@ -258,7 +237,6 @@ export default function SeatSelectionModal({
       seatClasses += " cursor-pointer";
     }
 
-    // Tooltip text
     const tooltipText = seat.occupied
       ? "This seat is already selected"
       : `Seat: ${seat.seatNo}\nType: ${
@@ -277,31 +255,21 @@ export default function SeatSelectionModal({
           disabled={seat.occupied}
           className={seatClasses}
         >
-          {/* Seat visual */}
           <div
             className={`${seatStyle} ${colorClass} ${borderClass} ${hoverEffect}`}
           >
-            {/* Exit row marker */}
             {isEmergencyExit && !seat.occupied && (
               <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-red-500 rounded-full"></div>
             )}
-
-            {/* Non-reclining marker */}
             {seat.raw?.SeatType === 4 && !seat.occupied && (
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-800 rounded-b"></div>
             )}
-
-            {/* ❌ Cross for occupied */}
             {seat.occupied && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-gray-400 text-sm sm:text-base font-bold select-none">
-                  ✕
-                </span>
+                <span className="text-gray-400 text-sm font-bold">✕</span>
               </div>
             )}
           </div>
-
-          {/* Seat number & price */}
           {!seat.occupied && (
             <div className="relative z-10 flex flex-col items-center justify-center h-full text-[9px] sm:text-[10px] font-semibold text-gray-700">
               <span>{seat.seatNo}</span>
@@ -312,8 +280,6 @@ export default function SeatSelectionModal({
               )}
             </div>
           )}
-
-          {/* Custom Tooltip */}
           <div className="absolute -top-14 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col bg-gray-800 text-white text-[10px] sm:text-xs font-medium rounded-md px-2 py-1.5 whitespace-pre z-20 shadow-lg">
             {tooltipText}
             <div className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
@@ -326,40 +292,54 @@ export default function SeatSelectionModal({
   const renderSeatRow = (rowNumber) => {
     const seats = seatRows[rowNumber] || [];
 
+    // Sort seats by column
+    const sorted = [...seats].sort((a, b) => (a.col ?? 0) - (b.col ?? 0));
+
+    // Detect aisle gaps (when column jumps)
+    const groups = [];
+    let current = [];
+
+    sorted.forEach((seat, idx) => {
+      if (idx === 0) {
+        current.push(seat);
+        return;
+      }
+
+      const prev = sorted[idx - 1];
+      if (seat.col !== prev.col + 1) {
+        groups.push(current);
+        current = [];
+      }
+      current.push(seat);
+    });
+
+    if (current.length) groups.push(current);
+
     return (
       <div
         key={rowNumber}
         className="flex items-center justify-center gap-2 sm:gap-3"
       >
+        {/* Row number left */}
         <div className="w-5 sm:w-6 text-center text-[10px] sm:text-xs font-semibold text-gray-600">
           {rowNumber}
         </div>
 
+        {/* Seats */}
         <div className="flex items-center gap-3 sm:gap-4">
-          {seatConfiguration.map((groupSize, groupIndex) => {
-            const groupSeats = seats.slice(
-              seatConfiguration.slice(0, groupIndex).reduce((a, b) => a + b, 0),
-              seatConfiguration
-                .slice(0, groupIndex + 1)
-                .reduce((a, b) => a + b, 0)
-            );
-
-            return (
-              <div
-                key={groupIndex}
-                className="flex items-center gap-1 sm:gap-1.5"
-              >
-                {groupSeats.map((seat) => renderSeat(seat))}
-                {groupIndex < seatConfiguration.length - 1 && (
-                  <div className="w-6 sm:w-8 h-10 sm:h-11 flex items-center justify-center">
-                    <div className="text-gray-300 text-xs font-bold">|</div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {groups.map((group, gIdx) => (
+            <div key={gIdx} className="flex items-center gap-1 sm:gap-1.5">
+              {group.map((seat) => renderSeat(seat))}
+              {gIdx < groups.length - 1 && (
+                <div className="w-6 sm:w-8 h-10 sm:h-11 flex items-center justify-center">
+                  <div className="text-gray-300 text-xs font-bold">|</div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
 
+        {/* Row number right */}
         <div className="w-5 sm:w-6 text-center text-[10px] sm:text-xs font-semibold text-gray-600">
           {rowNumber}
         </div>
@@ -369,14 +349,11 @@ export default function SeatSelectionModal({
 
   const legendItems = useMemo(() => {
     if (!seatsFlat.length) return [];
-
     const prices = seatsFlat
       .filter((s) => !s.occupied && s.price > 0)
       .map((s) => s.price);
-
     const minPrice = prices.length ? Math.min(...prices) : null;
     const maxPrice = prices.length ? Math.max(...prices) : null;
-
     const hasFree = seatsFlat.some((s) => !s.occupied && s.price === 0);
     const hasPaid = prices.length > 0;
     const hasPremium = seatsFlat.some((s) => s.premium && !s.occupied);
@@ -385,18 +362,14 @@ export default function SeatSelectionModal({
       (s) => s.raw?.SeatType === 4 && !s.occupied
     );
     const hasOccupied = seatsFlat.some((s) => s.occupied);
-
     const items = [];
-
-    if (hasFree) {
+    if (hasFree)
       items.push({
         key: "free",
         label: "Free (Standard)",
         seatClass: "bg-sky-100 border-sky-300",
       });
-    }
-
-    if (hasPaid) {
+    if (hasPaid)
       items.push({
         key: "paid",
         label:
@@ -405,42 +378,32 @@ export default function SeatSelectionModal({
             : `₹${minPrice} – ₹${maxPrice}`,
         seatClass: "bg-blue-500 border-blue-600",
       });
-    }
-
-    if (hasPremium) {
+    if (hasPremium)
       items.push({
         key: "premium",
         label: "Premium",
         seatClass: "bg-yellow-100 border-yellow-400",
       });
-    }
-
-    if (hasExit) {
+    if (hasExit)
       items.push({
         key: "exit",
         label: "Emergency Exit",
         seatClass: "bg-yellow-100 border-yellow-400",
         exit: true,
       });
-    }
-
-    if (hasNonRecline) {
+    if (hasNonRecline)
       items.push({
         key: "nonrecline",
         label: "Non-Reclining",
         seatClass: "bg-sky-100 border-sky-300",
         nonRecline: true,
       });
-    }
-
-    if (hasOccupied) {
+    if (hasOccupied)
       items.push({
         key: "occupied",
         label: "Occupied",
         seatClass: "bg-gray-200 border-gray-300",
       });
-    }
-
     return items;
   }, [seatsFlat]);
 
@@ -462,13 +425,13 @@ export default function SeatSelectionModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/20 transition-colors"
+            className="p-2 rounded-full hover:bg-white/20"
           >
             <AiOutlineClose className="text-white text-lg" />
           </button>
         </div>
 
-        {/* Tabs (Seats, Meals, Baggage) */}
+        {/* TABS */}
         <div className="flex items-center justify-center gap-3 bg-blue-50 py-2 border-b border-blue-100">
           {[
             { key: "seat", label: "Seats", icon: MdEventSeat },
@@ -491,28 +454,12 @@ export default function SeatSelectionModal({
           ))}
         </div>
 
-        {/* MAIN BODY */}
+        {/* BODY */}
         {seatModalOpen && (
           <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-            {/* LEFT SIDE — Seat Map */}
+            {/* LEFT — Map */}
             <div className="flex-1 bg-sky-50 p-4 sm:p-6 overflow-auto">
-              {/* Cabin Info */}
-              <div className="flex justify-between items-center mb-4 bg-white rounded-xl shadow-sm p-3 border border-gray-100">
-                <div>
-                  <h3 className="font-bold text-gray-800 text-sm sm:text-base">
-                    {segment?.da?.city} → {segment?.aa?.city}
-                  </h3>
-                  <p className="text-xs text-gray-500">
-                    {getSelectedSeatsCount()} of {travelers.length} Seat(s)
-                    selected
-                  </p>
-                </div>
-                <div className="text-blue-600 font-semibold text-sm sm:text-base">
-                  ₹{getTotalPrice()}
-                </div>
-              </div>
-
-              {/* Seat Map Container */}
+              {/* Cabin */}
               <div className="relative bg-gradient-to-b from-sky-100 to-white rounded-2xl shadow-inner p-5">
                 {/* Cockpit */}
                 <div className="flex justify-center mb-4">
@@ -540,15 +487,12 @@ export default function SeatSelectionModal({
                           <stop offset="100%" stopColor="#0f172a" />
                         </linearGradient>
                       </defs>
-
-                      {/* Cockpit shape */}
                       <path
                         d="M 20 85 Q 20 20, 100 5 Q 180 20, 180 85 Z"
                         fill="url(#cockpitGradient)"
                         stroke="#64748b"
                         strokeWidth="1.2"
                       />
-                      {/* Windows */}
                       <path
                         d="M 55 40 Q 100 15, 145 40 Q 100 25, 55 40 Z"
                         fill="url(#windowGradient)"
@@ -560,34 +504,8 @@ export default function SeatSelectionModal({
                   </div>
                 </div>
 
-                {/* Cabin Body */}
+                {/* Seats */}
                 <div className="bg-white rounded-xl shadow-inner border border-gray-100 p-4">
-                  {/* Column Labels */}
-                  <div className="flex justify-center gap-4 mb-3 text-xs font-semibold text-gray-600">
-                    {seatConfiguration.map((groupSize, groupIndex) => {
-                      const startCol = seatConfiguration
-                        .slice(0, groupIndex)
-                        .reduce((a, b) => a + b, 0);
-                      const groupCols = Array.from(
-                        { length: groupSize },
-                        (_, i) => String.fromCharCode(65 + startCol + i)
-                      );
-                      return (
-                        <div key={groupIndex} className="flex gap-2">
-                          {groupCols.map((col) => (
-                            <div key={col} className="w-8 text-center">
-                              {col}
-                            </div>
-                          ))}
-                          {groupIndex < seatConfiguration.length - 1 && (
-                            <div className="w-6"></div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Seat Rows */}
                   <div className="flex flex-col items-center gap-2">
                     {Object.keys(seatRows)
                       .sort((a, b) => a - b)
@@ -595,7 +513,7 @@ export default function SeatSelectionModal({
                   </div>
                 </div>
 
-                {/* Tail Section */}
+                {/* Tail */}
                 <div className="flex justify-center mt-6 sm:mt-8">
                   <div className="w-56 sm:w-64">
                     <svg viewBox="0 0 200 80" className="w-full">
@@ -629,14 +547,14 @@ export default function SeatSelectionModal({
               </div>
             </div>
 
-            {/* RIGHT SIDE — Summary */}
+            {/* RIGHT — Summary */}
             <div className="w-full lg:w-72 border-t lg:border-t-0 lg:border-l border-gray-200 bg-white flex flex-col">
               <div className="flex-1 p-4 overflow-auto">
                 <h3 className="font-semibold text-gray-800 mb-3">
                   Your Selection
                 </h3>
 
-                {/* Selected Seats */}
+                {/* Selected seats */}
                 <div className="space-y-2 mb-4">
                   {(() => {
                     const key = `${journeyType}|${segmentIndex}`;
@@ -644,16 +562,13 @@ export default function SeatSelectionModal({
                       list: [],
                       priceMap: {},
                     };
-
-                    if (seatObj.list.length === 0) {
+                    if (seatObj.list.length === 0)
                       return (
                         <div className="text-center text-gray-400 py-4">
                           <MdEventSeat className="text-3xl mx-auto mb-2" />
                           <p>No seats selected</p>
                         </div>
                       );
-                    }
-
                     return seatObj.list.map((seatNo) => (
                       <div
                         key={seatNo}
@@ -687,7 +602,7 @@ export default function SeatSelectionModal({
                   })()}
                 </div>
 
-                {/* LEGEND SECTION */}
+                {/* Legend */}
                 <div className="mt-3 pt-3 border-t border-gray-200">
                   <h4 className="font-semibold text-gray-800 text-sm mb-3">
                     Seat Legend
@@ -699,11 +614,9 @@ export default function SeatSelectionModal({
                           <div
                             className={`absolute inset-0 rounded-t-md border-2 ${item.seatClass}`}
                           >
-                            {/* Exit Row Indicator */}
                             {item.exit && (
                               <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-1 bg-red-500 rounded-full"></div>
                             )}
-                            {/* Non Reclining Indicator */}
                             {item.nonRecline && (
                               <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-800 rounded-b"></div>
                             )}
@@ -716,7 +629,7 @@ export default function SeatSelectionModal({
                 </div>
               </div>
 
-              {/* TOTAL + BUTTONS */}
+              {/* Total + Buttons */}
               <div className="p-4 border-t bg-white">
                 <div className="flex justify-between text-sm font-semibold text-gray-700 mb-2">
                   <span>Total</span>
@@ -754,7 +667,7 @@ export default function SeatSelectionModal({
           </div>
         )}
 
-        {/* Meals / Baggage Sections remain unchanged */}
+        {/* Meals / Baggage */}
         {mealModalOpen && (
           <div className="p-4 overflow-auto bg-sky-50">
             <MealSelectionCards
@@ -764,7 +677,6 @@ export default function SeatSelectionModal({
               journeyType={journeyType}
               flightIndex={segmentIndex}
               travelersCount={travelers.length}
-              onClearMeals={handleClearMeals}
               onConfirm={() => {
                 setMealModalOpen(false);
                 setSeatModalOpen(true);

@@ -1,7 +1,8 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+// const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const logger = require('../utils/logger');
 
 class PDFService {
@@ -19,7 +20,7 @@ class PDFService {
   async generateFlightVoucher(booking, user, corporate) {
     return new Promise((resolve, reject) => {
       try {
-        const filename = `flight-${booking.bookingReference}-${uuidv4()}.pdf`;
+        const filename = `flight-${booking.bookingReference}-${randomUUID()}.pdf`;
         const filepath = path.join(this.voucherDir, filename);
         
         const doc = new PDFDocument({ margin: 50 });
@@ -86,7 +87,7 @@ class PDFService {
   async generateHotelVoucher(booking, user, corporate) {
     return new Promise((resolve, reject) => {
       try {
-        const filename = `hotel-${booking.bookingReference}-${uuidv4()}.pdf`;
+        const filename = `hotel-${booking.bookingReference}-${randomUUID()}.pdf`;
         const filepath = path.join(this.voucherDir, filename);
         
         const doc = new PDFDocument({ margin: 50 });
