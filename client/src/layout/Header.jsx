@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import { FaUserCircle, FaBars, FaChevronDown, FaBell } from "react-icons/fa";
+import { FaUserCircle, FaBars, FaChevronDown, FaBell, FaSignOutAlt } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { logoutUser } from "../Redux/Slice/authSlice";
 import { useNavigate } from "react-router-dom";
+import { FiSettings } from "react-icons/fi";
 
 export default function Header({ toggleSidebar, sidebarOpen }) {
   const dispatch = useDispatch();
@@ -84,7 +85,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
   };
 
   return (
-    <header className="h-16 bg-white shadow flex items-center justify-between px-4 sticky top-0 z-40">
+    <header className="h-14 bg-[#0A4D68] border-b border-[#0A4D68] flex items-center justify-between px-4 sticky top-0 z-40">
       {/* LEFT */}
       <div className="flex items-center gap-4">
         <button
@@ -94,9 +95,9 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
           <FaBars size={20} />
         </button>
 
-        <h1 className="text-lg font-semibold text-[#0A4D68] hidden sm:block">
+        {/* <h1 className="text-lg font-semibold text-[#0A4D68] hidden sm:block">
           {getDashboardTitle()}
-        </h1>
+        </h1> */}
       </div>
 
       {/* RIGHT */}
@@ -104,10 +105,10 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
         {/* Notifications */}
         <div ref={notificationsRef} className="relative">
           <button
-            className="p-2 text-[#0A4D68] hover:bg-gray-100 rounded"
+            className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded"
             onClick={() => setNotificationsOpen(!notificationsOpen)}
           >
-            <FaBell size={18} />
+            <FaBell size={20} />
           </button>
         </div>
 
@@ -115,9 +116,9 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
         <div ref={dropdownRef} className="relative">
           <button
             onClick={() => setOpen(!open)}
-            className="flex items-center gap-2 hover:bg-gray-100 px-3 py-2 rounded"
+            className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded"
           >
-            <FaUserCircle className="text-3xl text-[#0A4D68]" />
+            <FaUserCircle className="text-xl text-[#0A4D68]" />
             <span className="hidden sm:block font-medium">{fullName}</span>
             <FaChevronDown
               className={`hidden sm:block transition ${
@@ -127,25 +128,27 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
           </button>
 
           {open && (
-            <div className="absolute right-0 w-56 bg-white shadow-lg border rounded mt-2 z-50">
-              <div className="px-4 py-3 border-b">
+            <div className="absolute right-0 w-56 bg-white shadow-lg border border-gray-300 rounded mt-2 z-50">
+              {/* <div className="px-4 py-3 border-b border-gray-300">
                 <p className="font-semibold">{fullName}</p>
                 <p className="text-xs text-gray-500">{email}</p>
                 <p className="text-xs text-gray-400 capitalize">{userRole}</p>
-              </div>
+              </div> */}
 
               <button
                 onClick={handleProfileNavigation}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-              >
+                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+              > 
+              <FiSettings />
                 Profile Settings
               </button>
 
-              <div className="border-t">
+              <div className="border-t border-gray-300">
                 <button
                   onClick={handleLogout}
-                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
-                >
+                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100 flex items-center gap-2"
+                > 
+                <FaSignOutAlt />
                   Logout
                 </button>
               </div>

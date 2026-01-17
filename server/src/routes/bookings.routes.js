@@ -24,6 +24,7 @@ router.post(
 // Confirm booking after approval
 router.post("/:id/confirm", bookingsController.confirmBooking);
 
+router.get("/my/rejected", bookingsController.getMyRejectedRequests);
 router.get("/my", bookingsController.getMyRequests);
 
 router.get("/my/:id", bookingsController.getMyRequestById);

@@ -8,6 +8,7 @@ const approvalSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "BookingRequest",
       index: true,
+      required: true,
     },
 
     approvalReference: {
@@ -34,6 +35,7 @@ const approvalSchema = new mongoose.Schema(
     approverId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      required: true,
       index: true,
     },
 
@@ -53,116 +55,11 @@ const approvalSchema = new mongoose.Schema(
     rejectedAt: Date,
     expiredAt: Date,
 
-    /* ================= FULL BOOKING REQUEST SNAPSHOT ================= */
+    /* ================= FULL SNAPSHOT ================= */
 
-    bookingReference: String,
-
-    bookingType: {
-      type: String,
-      enum: ["flight", "hotel"],
+    bookingRequestSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
       required: true,
-    },
-
-    purposeOfTravel: String,
-
-    travellers: [
-      {
-        title: String,
-        firstName: String,
-        lastName: String,
-        email: String,
-        dateOfBirth: Date,
-        gender: String,
-        passportNumber: String,
-        passportExpiry: Date,
-        nationality: String,
-        isLeadPassenger: Boolean,
-      },
-    ],
-
-    /* ================= FLIGHT SNAPSHOT ================= */
-
-    flightRequest: {
-      traceId: String,
-      resultIndex: String,
-
-      segments: [
-        {
-          segmentIndex: Number,
-          airlineCode: String,
-          airlineName: String,
-          flightNumber: String,
-          fareClass: String,
-          cabinClass: Number,
-          aircraft: String,
-
-          origin: {
-            airportCode: String,
-            airportName: String,
-            terminal: String,
-            city: String,
-            country: String,
-          },
-
-          destination: {
-            airportCode: String,
-            airportName: String,
-            terminal: String,
-            city: String,
-            country: String,
-          },
-
-          departureDateTime: Date,
-          arrivalDateTime: Date,
-          durationMinutes: Number,
-          stopOver: Boolean,
-
-          baggage: {
-            checkIn: String,
-            cabin: String,
-          },
-        },
-      ],
-
-      fareSnapshot: {
-        baseFare: Number,
-        tax: Number,
-        publishedFare: Number,
-        offeredFare: Number,
-        currency: String,
-        refundable: Boolean,
-        fareType: String,
-        miniFareRules: mongoose.Schema.Types.Mixed,
-        lastTicketDate: Date,
-      },
-
-      ssrSnapshot: {
-        seats: mongoose.Schema.Types.Mixed,
-        meals: mongoose.Schema.Types.Mixed,
-        baggage: mongoose.Schema.Types.Mixed,
-      },
-
-      fareExpiry: Date,
-    },
-
-    /* ================= PRICING SNAPSHOT ================= */
-
-    pricingSnapshot: {
-      totalAmount: Number,
-      currency: String,
-      capturedAt: Date,
-    },
-
-    /* ================= LIGHTWEIGHT ADMIN SNAPSHOT ================= */
-
-    bookingSnapshot: {
-      sectors: [String],
-      airline: String,
-      travelDate: Date,
-      returnDate: Date,
-      amount: Number,
-      city: String,
-      purposeOfTravel: String,
     },
 
     /* ================= POLICY SNAPSHOT ================= */
@@ -199,5 +96,12 @@ approvalSchema.methods.reject = function (comments = "") {
   this.rejectedAt = new Date();
   return this.save();
 };
+
+approvalSchema.pre("save", function () {
+  if (!this.isNew && this.isModified("bookingRequestSnapshot")) {
+    throw new Error("Approval snapshot is immutable");
+  }
+});
+
 
 module.exports = mongoose.model("Approval", approvalSchema);

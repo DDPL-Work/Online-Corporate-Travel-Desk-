@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 
 const bookingRequestSchema = new mongoose.Schema(
   {
+    /* ================= CORE ================= */
+
     bookingReference: {
       type: String,
       unique: true,
@@ -29,7 +31,7 @@ const bookingRequestSchema = new mongoose.Schema(
       index: true,
     },
 
-    /* ================= REQUEST PHASE ================= */
+    /* ================= REQUEST STATUS ================= */
 
     requestStatus: {
       type: String,
@@ -38,10 +40,23 @@ const bookingRequestSchema = new mongoose.Schema(
       index: true,
     },
 
-    approvalId: {
+    /* ================= APPROVER DETAILS ================= */
+
+    approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Approval",
+      ref: "User",
     },
+    approvedAt: Date,
+
+    rejectedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    rejectedAt: Date,
+
+    approverComments: String,
+
+    /* ================= REQUEST INFO ================= */
 
     purposeOfTravel: {
       type: String,
@@ -64,97 +79,13 @@ const bookingRequestSchema = new mongoose.Schema(
       },
     ],
 
-    /* ================= FLIGHT REQUEST SNAPSHOT ================= */
+    /* ================= FLIGHT REQUEST (FULL DATA) ================= */
 
     flightRequest: {
-      traceId: String,
-      resultIndex: String,
-
-      segments: [
-        {
-          segmentIndex: Number,
-
-          airlineCode: String,
-          airlineName: String,
-          flightNumber: String,
-          fareClass: String,
-          cabinClass: Number,
-          aircraft: String,
-
-          origin: {
-            airportCode: String,
-            airportName: String,
-            terminal: String,
-            city: String,
-            country: String,
-          },
-
-          destination: {
-            airportCode: String,
-            airportName: String,
-            terminal: String,
-            city: String,
-            country: String,
-          },
-
-          departureDateTime: Date,
-          arrivalDateTime: Date,
-
-          durationMinutes: Number,
-          stopOver: Boolean,
-
-          baggage: {
-            checkIn: String,
-            cabin: String,
-          },
-        },
-      ],
-
-      fareSnapshot: {
-        baseFare: Number,
-        tax: Number,
-        publishedFare: Number,
-        offeredFare: Number,
-        currency: String,
-
-        refundable: Boolean,
-        fareType: String,
-
-        miniFareRules: mongoose.Schema.Types.Mixed,
-        lastTicketDate: Date,
-      },
-
-      ssrSnapshot: {
-        seats: [
-          {
-            segmentIndex: Number,
-            travelerIndex: Number,
-            seatNo: String,
-            price: Number,
-          },
-        ],
-        meals: [
-          {
-            segmentIndex: Number,
-            travelerIndex: Number,
-            code: String,
-            description: String,
-            price: Number,
-          },
-        ],
-        baggage: [
-          {
-            segmentIndex: Number,
-            travelerIndex: Number,
-            code: String,
-            weight: String,
-            price: Number,
-          },
-        ],
-      },
-
-      fareExpiry: Date,
+      type: mongoose.Schema.Types.Mixed, // 🔥 FULL PROVIDER PAYLOAD
     },
+
+    /* ================= PRICING ================= */
 
     pricingSnapshot: {
       totalAmount: Number,
@@ -162,7 +93,7 @@ const bookingRequestSchema = new mongoose.Schema(
       capturedAt: Date,
     },
 
-    /* ================= EXECUTION PHASE ================= */
+    /* ================= EXECUTION ================= */
 
     executionStatus: {
       type: String,
@@ -180,9 +111,11 @@ const bookingRequestSchema = new mongoose.Schema(
     bookingResult: {
       pnr: String,
       ticketNumbers: [String],
-      tboBookingId: String,
-      tboResponse: mongoose.Schema.Types.Mixed,
+      providerBookingId: String,
+      providerResponse: mongoose.Schema.Types.Mixed,
     },
+
+    /* ================= PAYMENT ================= */
 
     payment: {
       method: {
@@ -197,23 +130,32 @@ const bookingRequestSchema = new mongoose.Schema(
       },
     },
 
+    /* ================= BOOKING SUMMARY ================= */
+
     bookingSnapshot: {
       sectors: [String],
       airline: String,
       travelDate: String,
       returnDate: String,
+      cabinClass: {
+        type: String,
+        enum: ["Economy", "Premium Economy", "Business", "First"],
+        index: true,
+      },
       amount: Number,
       purposeOfTravel: String,
       city: String,
     },
 
-    /* ================= POST BOOKING ================= */
+    /* ================= DOCUMENTS ================= */
 
     documents: {
       ticketUrl: String,
       invoiceUrl: String,
       voucherUrl: String,
     },
+
+    /* ================= CANCELLATION ================= */
 
     cancellation: {
       cancelledAt: Date,
@@ -226,7 +168,11 @@ const bookingRequestSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-/* Guards */
+/* ======================================================
+   🔒 GUARDS & BUSINESS RULES
+====================================================== */
+
+/* 1️⃣ Prevent payment before approval */
 bookingRequestSchema.pre("save", function () {
   if (
     this.requestStatus === "pending_approval" &&
@@ -236,5 +182,66 @@ bookingRequestSchema.pre("save", function () {
     throw new Error("Payment not allowed before approval");
   }
 });
+
+/* 2️⃣ Enforce status transitions */
+const ALLOWED_STATUS_TRANSITIONS = {
+  draft: ["pending_approval"],
+  pending_approval: ["approved", "rejected"],
+  approved: [],
+  rejected: [],
+  expired: [],
+};
+
+bookingRequestSchema.pre("save", function () {
+  if (!this.isModified("requestStatus")) return;
+
+  const previousStatus = this.$locals.previousStatus || "draft";
+  const nextStatus = this.requestStatus;
+
+  if (!ALLOWED_STATUS_TRANSITIONS[previousStatus]?.includes(nextStatus)) {
+    throw new Error(
+      `Invalid request status transition: ${previousStatus} → ${nextStatus}`
+    );
+  }
+});
+
+/* 3️⃣ Freeze data after approval */
+bookingRequestSchema.pre("save", function () {
+  if (this.requestStatus !== "approved") return;
+
+  const immutableFields = [
+    "flightRequest",
+    "pricingSnapshot",
+    "travellers",
+    "priority",
+  ];
+
+  for (const field of immutableFields) {
+    if (this.isModified(field)) {
+      throw new Error(`${field} cannot be modified after approval`);
+    }
+  }
+});
+
+/* 4️⃣ Prevent execution before approval */
+bookingRequestSchema.pre("save", function () {
+  if (
+    this.isModified("executionStatus") &&
+    this.executionStatus !== "not_started" &&
+    this.requestStatus !== "approved"
+  ) {
+    throw new Error("Execution cannot start before approval");
+  }
+});
+
+/* ======================================================
+   ⚡ INDEXES
+====================================================== */
+
+bookingRequestSchema.index({ corporateId: 1, requestStatus: 1 });
+bookingRequestSchema.index({ corporateId: 1, createdAt: -1 });
+bookingRequestSchema.index({ approvedBy: 1 });
+bookingRequestSchema.index({ rejectedBy: 1 });
+bookingRequestSchema.index({ executionStatus: 1 });
 
 module.exports = mongoose.model("BookingRequest", bookingRequestSchema);

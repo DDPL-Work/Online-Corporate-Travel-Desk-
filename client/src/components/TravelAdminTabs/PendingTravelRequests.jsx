@@ -22,6 +22,8 @@ import {
   rejectApproval,
 } from "../../Redux/Actions/approval.thunks";
 import Swal from "sweetalert2";
+import HeaderWithStats from "./Shared/HeaderWithStats";
+import { getDateInIST } from "../../utils/formatter";
 
 const colors = {
   primary: "#0A4D68",
@@ -54,7 +56,7 @@ export default function PendingTravelRequests() {
         id: b._id,
         bookingRef: b.bookingReference,
         type: b.bookingType,
-        status: b.requestStatus,
+        status: b.requestStatus || "pending_approval",
         employee: b.userId?.name?.firstName || b.userId?.email || "Employee",
         travellers: (b.travellers || []).map((t) => ({
           name:
@@ -91,6 +93,20 @@ export default function PendingTravelRequests() {
           const toCode = s?.destination?.airportCode || "---";
           return `${fromCity} (${fromCode}) → ${toCity} (${toCode})`;
         }),
+        segmentRows: segments.map((s) => ({
+          route: `${s.origin?.city} (${s.origin?.airportCode}) → ${s.destination?.city} (${s.destination?.airportCode})`,
+          airline: s.airlineName || "N/A",
+          airlineCode: s.airlineCode || "N/A",
+          airlineDisplay: `${s.airlineName || "N/A"} (${s.airlineCode || ""}-${
+            s.flightNumber || ""
+          })`,
+          flightNumber: s.flightNumber || "N/A",
+          aircraft: s.aircraft || "N/A",
+          departure: s.departureDateTime,
+          arrival: s.arrivalDateTime,
+          baggage: s.baggage || {},
+          cabin: s.cabinClass,
+        })),
         country:
           (firstSegment?.origin?.country || "N/A") !==
           (lastSegment?.destination?.country || "N/A")
@@ -119,6 +135,7 @@ export default function PendingTravelRequests() {
         meals: ssr.meals || [],
         extraBaggage: ssr.baggage || [],
         pricing: b.pricingSnapshot || {},
+        fareExpiry: b.flightRequest?.fareExpiry || null,
         fare: b.flightRequest?.fareSnapshot || null,
       };
     });
@@ -193,6 +210,33 @@ export default function PendingTravelRequests() {
     }
   };
 
+  const totalPending = filteredRequests.length;
+
+  const totalPendingFlights = filteredRequests.filter(
+    (r) =>
+      r.status === "pending_approval" &&
+      (r.bookingType === "flight" || r.type === "flight")
+  ).length;
+
+  const totalPendingHotels = filteredRequests.filter(
+    (r) =>
+      r.status === "pending_approval" &&
+      (r.bookingType === "hotel" || r.type === "hotel")
+  ).length;
+
+  const totalFlight = filteredRequests.filter(
+    (r) => r.type === "flight"
+  ).length;
+
+  const totalHotels = filteredRequests.filter(
+    (r) => r.bookingType === "hotel" || r.type === "hotel"
+  ).length;
+
+  const totalEstimatedCost = filteredRequests.reduce(
+    (sum, r) => sum + r.estimatedCost,
+    0
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -204,18 +248,66 @@ export default function PendingTravelRequests() {
   return (
     <div className="min-h-screen p-6" style={{ backgroundColor: colors.light }}>
       <div className="max-w-7xl mx-auto space-y-8">
-        {/* HEADER */}
-        <div className="text-center">
-          <h1
-            className="text-3xl font-bold mb-2"
-            style={{ color: colors.primary }}
-          >
-            Pending Travel Requests
-          </h1>
-          <p className="text-gray-600">
-            Review, manage, and approve employee travel bookings
-          </p>
-        </div>
+        <HeaderWithStats
+          title="Pending Travel Requests"
+          subtitle="Requests awaiting approval from travel admin"
+          exportFileName="pending-travel-requests.csv"
+          exportHeaders={[
+            "id",
+            "employee",
+            "type",
+            "destination",
+            "departureDate",
+            "returnDate",
+            "estimatedCost",
+            "status",
+          ]}
+          exportData={filteredRequests}
+          stats={[
+            {
+              label: "Total Pending",
+              value: totalPending,
+              color: "#F59E0B",
+              bg: "#FEF3C7",
+              icon: <FiClock className="text-yellow-600 text-2xl" />,
+            },
+            {
+              label: "Pending Flights",
+              value: totalPendingFlights,
+              color: "#0A4D68",
+              bg: "#E0F2FE",
+              icon: <FaPlane className="text-[#0A4D68] text-2xl" />,
+            },
+            {
+              label: "Total Flights",
+              value: totalFlight,
+              color: "#0A4D68",
+              bg: "#E0F2FE",
+              icon: <FaPlane className="text-[#0A4D68] text-2xl" />,
+            },
+            {
+              label: "Pending Hotels",
+              value: totalPendingHotels,
+              color: "#F97316",
+              bg: "#FFEDD5",
+              icon: <FiHome className="text-[#F97316] text-2xl" />,
+            },
+            {
+              label: "Total Hotels",
+              value: totalHotels,
+              color: "#F97316",
+              bg: "#FFEDD5",
+              icon: <FiHome className="text-[#F97316] text-2xl" />,
+            },
+            {
+              label: "Estimated Cost",
+              value: `₹${totalEstimatedCost.toLocaleString()}`,
+              color: "#05BFDB",
+              bg: "#E0F2FE",
+              icon: <FiDollarSign className="text-[#05BFDB] text-2xl" />,
+            },
+          ]}
+        />
 
         {/* FILTERS */}
         <div className="bg-white p-4 rounded-lg shadow flex items-center gap-4">
@@ -232,7 +324,6 @@ export default function PendingTravelRequests() {
             <option value="hotel">Hotel</option>
           </select>
         </div>
-
         {/* LIST */}
         {filteredRequests.length === 0 ? (
           <div className="bg-white p-8 text-center rounded-lg shadow">
@@ -313,7 +404,7 @@ export default function PendingTravelRequests() {
                           : "bg-red-100 text-red-700"
                       }`}
                     >
-                      {r.status.replace("_", " ").toUpperCase()}
+                      {(r.status || "unknown").replace(/_/g, " ").toUpperCase()}
                     </span>
                   </div>
 
@@ -386,29 +477,39 @@ export default function PendingTravelRequests() {
                     value={r.reason}
                   />
                   <Detail
-                    icon={<FiClock />}
-                    label="Priority"
-                    value={r.priority}
+                    icon={<FiAlertCircle />}
+                    label="Cabin"
+                    value={r.cabin}
                   />
 
                   {/* ==== Fare Expiry Info ==== */}
-                  {r.fare &&
+                  {r.fareExpiry &&
                     (() => {
-                      const expiryDate = new Date(
-                        r.fareExpiry || r.pricing?.capturedAt
-                      );
-                      const now = new Date();
-                      const diffMs = expiryDate - now;
+                      const expiryIST = getDateInIST(r.fareExpiry);
+                      const nowIST = getDateInIST(new Date());
+
+                      if (!expiryIST || !nowIST) {
+                        return (
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <FiClock />
+                            <span>Fare expiry unavailable</span>
+                          </div>
+                        );
+                      }
+
+                      const diffMs = expiryIST - nowIST;
+
                       let expiryText = "Fare expired";
                       let expiryColor = "text-red-600";
 
                       if (diffMs > 0) {
-                        const diffMin = Math.floor(diffMs / 60000);
-                        const hours = Math.floor(diffMin / 60);
-                        const minutes = diffMin % 60;
+                        const mins = Math.floor(diffMs / 60000);
+                        const h = Math.floor(mins / 60);
+                        const m = mins % 60;
+
                         expiryText = `Fare expires in ${
-                          hours > 0 ? hours + "h " : ""
-                        }${minutes}m`;
+                          h ? h + "h " : ""
+                        }${m}m (IST)`;
                         expiryColor = "text-green-600";
                       }
 
@@ -458,32 +559,32 @@ export default function PendingTravelRequests() {
                               </tr>
                             </thead>
                             <tbody>
-                              {r.route.map((seg, idx) => (
+                              {r.segmentRows.map((seg, idx) => (
                                 <tr
                                   key={idx}
                                   className="odd:bg-white even:bg-gray-50 border-b border-gray-300"
                                 >
                                   <td className="px-4 py-2 text-sm text-gray-700">
-                                    {seg}
+                                    {seg.route}
                                   </td>
+
                                   <td className="px-4 py-2 text-sm text-gray-700">
-                                    {r.airline || "N/A"}
+                                    {seg.airlineDisplay}
                                   </td>
+
                                   <td className="px-4 py-2 text-sm text-gray-700">
-                                    {r.aircraft || "N/A"}
+                                    {seg.aircraft}
                                   </td>
+
                                   <td className="px-4 py-2 text-sm text-gray-700">
-                                    {r.departureDateTime
-                                      ? new Date(
-                                          r.departureDateTime
-                                        ).toLocaleString()
+                                    {seg.departure
+                                      ? new Date(seg.departure).toLocaleString()
                                       : "N/A"}
                                   </td>
+
                                   <td className="px-4 py-2 text-sm text-gray-700">
-                                    {r.arrivalDateTime
-                                      ? new Date(
-                                          r.arrivalDateTime
-                                        ).toLocaleString()
+                                    {seg.arrival
+                                      ? new Date(seg.arrival).toLocaleString()
                                       : "N/A"}
                                   </td>
                                 </tr>

@@ -52,6 +52,20 @@ export const fetchMyBookingRequestById = createAsyncThunk(
   }
 );
 
+export const fetchMyRejectedRequests = createAsyncThunk(
+  "bookingRequests/fetchMyRejected",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/bookings/my/rejected");
+      return data.data; // array of BookingRequest
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.error || "Failed to fetch my rejected requests"
+      );
+    }
+  }
+);
+
 // CONFIRM booking after approval
 export const confirmBooking = createAsyncThunk(
   "bookings/confirm",

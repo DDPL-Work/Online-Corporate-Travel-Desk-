@@ -32,6 +32,7 @@ import {
 import SeatSelectionModal from "./SeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
+import { CABIN_MAP } from "../../../utils/formatter";
 
 const normalizeFareRules = (fareRule) => {
   const rules = fareRule?.Response?.FareRules;
@@ -215,8 +216,8 @@ export default function OneFlightBooking() {
   const openSeatModal = (segmentIndex) => {
     if (!isSeatReady) return;
 
-     const segmentSeat =
-    ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[segmentIndex];
+    const segmentSeat =
+      ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[segmentIndex];
     const seatRows = segmentSeat?.RowSeats;
 
     if (!Array.isArray(seatRows) || seatRows.length === 0) {
@@ -461,10 +462,28 @@ export default function OneFlightBooking() {
     return baggage;
   };
 
+  const calculatePriorityFromDate = (travelDate) => {
+    if (!travelDate) return "LOW";
+
+    const today = new Date();
+    const travel = new Date(travelDate);
+
+    if (isNaN(travel.getTime())) return "LOW";
+
+    const diffDays = Math.ceil(
+      (travel.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (diffDays <= 5) return "HIGH";
+    if (diffDays <= 10) return "MEDIUM";
+    return "LOW";
+  };
+
   const buildBookingRequestPayload = () => {
     const segments = parsedFlightData?.segments || [];
     const firstSegment = segments[0];
     const lastSegment = segments[segments.length - 1];
+    const cabinClass = CABIN_MAP[firstSegment?.cabinClass] || "Economy";
 
     const bookingSnapshot = {
       bookingType: "flight",
@@ -472,6 +491,7 @@ export default function OneFlightBooking() {
       airline: segments.map((s) => s.airline).join(", ") || "N/A",
       travelDate: firstSegment?.dt || "N/A",
       returnDate: lastSegment?.at || "N/A",
+      cabinClass,
       amount:
         perAdultFare.base * travelers.length +
         perAdultFare.tax * travelers.length +
@@ -479,6 +499,12 @@ export default function OneFlightBooking() {
       purposeOfTravel: purposeOfTravel || "N/A",
       city: lastSegment?.to || "N/A",
     };
+
+    const TRACE_VALIDITY_MINUTES = 15;
+
+    const fareExpiry = new Date(
+      Date.now() + TRACE_VALIDITY_MINUTES * 60 * 1000
+    );
 
     return {
       bookingType: "flight",
@@ -496,7 +522,7 @@ export default function OneFlightBooking() {
           baggage: buildBaggageSSR(),
         },
 
-        fareExpiry: fareSnapshot.lastTicketDate,
+        fareExpiry,
       },
 
       travellers: travelers.map((t, idx) => ({
