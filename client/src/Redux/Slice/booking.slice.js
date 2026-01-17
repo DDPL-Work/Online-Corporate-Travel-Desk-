@@ -9,11 +9,13 @@ import {
   cancelBooking,
   fetchMyBookingRequests,
   fetchMyBookingRequestById,
+  fetchMyRejectedRequests,
 } from "../Actions/booking.thunks";
 
 const initialState = {
   list: [], // admin / all bookings
   myRequests: [], // ✅ employee bookings
+  myRejected: [],
   pagination: null,
   selected: null,
   loading: false,
@@ -69,6 +71,20 @@ const bookingSlice = createSlice({
         state.selected = action.payload; // 🔑 THIS IS IMPORTANT
       })
       .addCase(fetchMyBookingRequestById.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      /* ================= FETCH MY REJECTED ================= */
+      .addCase(fetchMyRejectedRequests.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchMyRejectedRequests.fulfilled, (state, action) => {
+        state.loading = false;
+        state.myRejected = action.payload || [];
+      })
+      .addCase(fetchMyRejectedRequests.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
@@ -136,4 +152,6 @@ const bookingSlice = createSlice({
 });
 
 export const { clearSelectedBooking } = bookingSlice.actions;
+export const selectMyRejectedRequests = (state) => state.bookings.myRejected;
+
 export default bookingSlice.reducer;

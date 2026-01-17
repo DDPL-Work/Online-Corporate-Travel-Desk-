@@ -1,7 +1,6 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { NavLink } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
-
 import {
   FaClipboardList,
   FaClock,
@@ -11,8 +10,6 @@ import {
   FaWallet,
   FaCreditCard,
   FaBuilding,
-  FaUserTie,
-  FaUser,
   FaCog,
   FaFileAlt,
   FaMoneyBillWave,
@@ -20,108 +17,72 @@ import {
   FaListAlt,
   FaShieldAlt,
   FaIdCard,
+  FaUser,
+  FaBars,
 } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCorporateAdmin } from "../Redux/Slice/corporateAdminSlice";
-import { useMemo } from "react";
 
 export default function Sidebar({ isOpen, onClose }) {
   const dispatch = useDispatch();
-  // --------------------------------------------------------
-  // READ JWT TOKEN FROM SESSION STORAGE + DECODE ROLE
-  // --------------------------------------------------------
   const token = sessionStorage.getItem("token");
 
   let role = "super-admin";
-
   if (token) {
     try {
       const decoded = jwtDecode(token);
       role = decoded.role || decoded.userRole || role;
-    } catch (err) {
-      console.error("Invalid token:", err);
+    } catch {
+      console.error("Invalid token");
     }
   }
 
-  // const { corporate } = useSelector((state) => state.corporateAdmin);
-  // const classification = corporate?.walletType;
-
   const { corporate, loading } = useSelector((state) => state.corporateAdmin);
+  const classification = corporate?.classification;
 
-  // if (role === "travel-admin" && loading) {
-  //   return null; // or loader
-  // }
-  const classification = corporate?.classification; // prepaid | postpaid
-
-  console.log("Corporate:", corporate);
-  console.log("Classification:", classification);
-
-  // Fetch corporate profile ONLY for travel-admin
   useEffect(() => {
     if (role === "travel-admin" && !corporate) {
       dispatch(fetchCorporateAdmin());
     }
   }, [role, corporate, dispatch]);
 
-  // --------------------------------------------------------
-  // ROLE-BASED MENU DEFINITIONS
-  // --------------------------------------------------------
-
+  // ========================= MENUS =========================
   const travelAdminMenu = useMemo(() => {
     const menu = [
       {
         to: "/total-bookings",
         label: "Total Bookings",
-        icon: <FaClipboardList size={18} />,
+        icon: <FaClipboardList />,
       },
-      {
-        to: "/pending-requests",
-        label: "Pending Requests",
-        icon: <FaClock size={18} />,
-      },
+      { to: "/pending-requests", label: "Pending Requests", icon: <FaClock /> },
       {
         to: "/approved-requests",
         label: "Approved Requests",
-        icon: <FaCheck size={18} />,
+        icon: <FaCheck />,
       },
       {
         to: "/rejected-requests",
         label: "Rejected Requests",
-        icon: <FaTimes size={18} />,
+        icon: <FaTimes />,
       },
-      {
-        to: "/upcoming-trips",
-        label: "Upcoming Trips",
-        icon: <FaClock size={18} />,
-      },
-      {
-        to: "/past-trips",
-        label: "Past Trips",
-        icon: <FaClipboardList size={18} />,
-      },
-      {
-        to: "/user-management",
-        label: "User Management",
-        icon: <FaUsers size={18} />,
-      },
+      { to: "/upcoming-trips", label: "Upcoming Trips", icon: <FaClock /> },
+      { to: "/past-trips", label: "Past Trips", icon: <FaClipboardList /> },
+      { to: "/user-management", label: "User Management", icon: <FaUsers /> },
     ];
-
     if (classification === "prepaid") {
       menu.push({
         to: "/corporate-wallet",
         label: "Corporate Wallet",
-        icon: <FaWallet size={18} />,
+        icon: <FaWallet />,
       });
     }
-
     if (classification === "postpaid") {
       menu.push({
         to: "/credit-utilization",
         label: "Credit Utilization",
-        icon: <FaCreditCard size={18} />,
+        icon: <FaCreditCard />,
       });
     }
-
     return menu;
   }, [classification]);
 
@@ -129,137 +90,116 @@ export default function Sidebar({ isOpen, onClose }) {
     {
       to: "/onboarded-corporates",
       label: "Onboarded Corporates",
-      icon: <FaBuilding size={18} />,
+      icon: <FaBuilding />,
     },
     {
       to: "/bookings-summary",
       label: "Bookings Summary",
-      icon: <FaClipboardList size={18} />,
+      icon: <FaClipboardList />,
     },
     {
       to: "/corporate-revenue",
       label: "Corporate Revenue",
-      icon: <FaMoneyBillWave size={18} />,
+      icon: <FaMoneyBillWave />,
     },
     {
       to: "/credit-status",
       label: "Credit Status & Alerts",
-      icon: <FaCreditCard size={18} />,
+      icon: <FaCreditCard />,
     },
     {
       to: "/wallet-recharge-logs",
       label: "Wallet Recharge Logs",
-      icon: <FaWallet size={18} />,
+      icon: <FaWallet />,
     },
     {
       to: "/corporate-access",
       label: "Corporate Access Control",
-      icon: <FaShieldAlt size={18} />,
+      icon: <FaShieldAlt />,
     },
     {
       to: "/pending-amendments",
       label: "Pending Amendments",
-      icon: <FaExchangeAlt size={18} />,
+      icon: <FaExchangeAlt />,
     },
     {
       to: "/commission-settings",
       label: "Commission Settings",
-      icon: <FaCog size={18} />,
+      icon: <FaCog />,
     },
     {
       to: "/api-configurations",
       label: "API Configurations",
-      icon: <FaListAlt size={18} />,
+      icon: <FaListAlt />,
     },
-    { to: "/system-logs", label: "System Logs", icon: <FaFileAlt size={18} /> },
+    { to: "/system-logs", label: "System Logs", icon: <FaFileAlt /> },
   ];
 
   const employeeMenu = [
-    {
-      to: "/my-bookings",
-      label: "Booked Trips",
-      icon: <FaClipboardList size={18} />,
-    },
-    {
-      to: "/my-upcoming-trips",
-      label: "Upcoming Trips",
-      icon: <FaClock size={18} />,
-    },
-    {
-      to: "/my-past-trips",
-      label: "Past Trips",
-      icon: <FaListAlt size={18} />,
-    },
+    { to: "/my-bookings", label: "Booked Trips", icon: <FaClipboardList /> },
+    { to: "/my-upcoming-trips", label: "Upcoming Trips", icon: <FaClock /> },
+    { to: "/my-past-trips", label: "Past Trips", icon: <FaListAlt /> },
     {
       to: "/my-pending-approvals",
       label: "Pending Approvals",
-      icon: <FaClock size={18} />,
+      icon: <FaClock />,
     },
     {
       to: "/my-rejected-requests",
       label: "Rejected Requests",
-      icon: <FaTimes size={18} />,
+      icon: <FaTimes />,
     },
-    { to: "/my-profile", label: "Profile Details", icon: <FaUser size={18} /> },
-    {
-      to: "/travel-documents",
-      label: "Travel Documents",
-      icon: <FaIdCard size={18} />,
-    },
+    { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
+    { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },
   ];
 
-  const sidebars = {
+  const menus = {
     "super-admin": travelCompanyMenu,
     "travel-admin": travelAdminMenu,
     employee: employeeMenu,
   };
-
-  const activeMenu = sidebars[role] || [];
+  const activeMenu = menus[role] || [];
 
   const roleLabels = {
     "super-admin": "Super Admin",
-    "travel-admin": "Travel Company",
+    "travel-admin": "Travel Admin",
     employee: "Employee",
   };
 
-  // --------------------------------------------------------
-  // SIDEBAR UI
-  // --------------------------------------------------------
+  // ========================= UI =========================
   return (
     <>
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-40 lg:hidden"
           onClick={onClose}
-        ></div>
+        />
       )}
 
       <aside
-        className={`
-        fixed lg:static top-0 left-0 h-full bg-white shadow-lg border-r z-50
-        transition-all duration-300
-        ${
-          isOpen
-            ? "w-64 translate-x-0"
-            : "-translate-x-full lg:translate-x-0 lg:w-64"
-        }
-      `}
+        className={`fixed lg:static bg-white border-r border-[#0A4D68] top-0 left-0 z-50 
+          flex flex-col transition-all duration-300 h-screen
+          ${
+            isOpen
+              ? "w-64 translate-x-0"
+              : "-translate-x-full lg:translate-x-0 lg:w-64"
+          }
+        `}
       >
-        <div className="p-4 border-b flex items-center justify-between bg-gray-50">
-          <h2 className="text-lg font-semibold text-[#0A4D68]">
-            {roleLabels[role] || "User"}
+        {/* ====== BRAND / HEADER ====== */}
+        <div className="p-4  flex items-center justify-between bg-[#0A4D68]">
+          <h2 className="text-md font-semibold text-white tracking-wide flex items-center gap-2">
+            <FaUser className="text-white/80" /> {roleLabels[role] || "User"}
           </h2>
-
-          <button className="lg:hidden" onClick={onClose}>
-            <FaTimes size={18} className="text-gray-600" />
+          <button className="lg:hidden text-white" onClick={onClose}>
+            <FaTimes size={16} />
           </button>
         </div>
 
-        <nav className="mt-4 space-y-1 px-4">
+        {/* ====== NAVIGATION ====== */}
+        <nav className="flex-1 overflow-y-auto mt-2 space-y-2 px-3">
           {role === "travel-admin" && loading ? (
-            <div className="text-sm text-gray-400 px-3 py-4">
-              Loading menu...
-            </div>
+            <div className="text-center text-gray-400 py-6">Loading...</div>
           ) : (
             activeMenu.map((m) => (
               <NavLink
@@ -267,16 +207,17 @@ export default function Sidebar({ isOpen, onClose }) {
                 to={m.to}
                 onClick={() => window.innerWidth < 1024 && onClose()}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-3 rounded-md text-sm transition
-                 ${
-                   isActive
-                     ? "bg-[#05BFDB] text-white"
-                     : "text-gray-700 hover:bg-gray-100"
-                 }
-                `
+                  `flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium transition-all duration-200
+                  ${
+                    isActive
+                      ? "bg-[#0A4D68] text-white shadow-sm"
+                      : "text-gray-700 hover:bg-gray-100 hover:text-[#0A4D68]"
+                  }`
                 }
               >
-                <span className="w-6 flex justify-center">{m.icon}</span>
+                <span className="w-5 h-5 flex items-center justify-center text-lg">
+                  {m.icon}
+                </span>
                 <span>{m.label}</span>
               </NavLink>
             ))

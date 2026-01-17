@@ -165,6 +165,28 @@ exports.getMyRequestById = asyncHandler(async (req, res) => {
     );
 });
 
+// @desc    Get my rejected booking requests
+// @route   GET /api/v1/bookings/my/rejected
+// @access  Private (Employee)
+exports.getMyRejectedRequests = asyncHandler(async (req, res) => {
+  const requests = await BookingRequest.find({
+    userId: req.user._id,
+    requestStatus: "rejected",
+  })
+    .populate("rejectedBy", "name email")
+    .sort({ rejectedAt: -1 });
+
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        requests,
+        "My rejected requests fetched successfully"
+      )
+    );
+});
+
 // @desc    Confirm booking after approval
 // @route   POST /api/v1/bookings/:id/confirm
 // @access  Private

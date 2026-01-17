@@ -1,8 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
-import { FaUserCircle, FaChevronDown, FaBell } from "react-icons/fa";
+import {
+  FaUserCircle,
+  FaChevronDown,
+  FaBell,
+  FaSignOutAlt,
+  FaHome,
+} from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { logoutUser } from "../../Redux/Slice/authSlice";
 import { useNavigate } from "react-router-dom";
+import { FiSettings } from "react-icons/fi";
 
 export default function EmployeeHeader() {
   const dispatch = useDispatch();
@@ -62,9 +69,7 @@ export default function EmployeeHeader() {
           <div className="w-9 h-9 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-lg">
             TD
           </div>
-          <span className="text-xl font-bold text-slate-900">
-            COTD
-          </span>
+          <span className="text-xl font-bold text-slate-900">COTD</span>
         </div>
 
         {/* RIGHT */}
@@ -115,24 +120,27 @@ export default function EmployeeHeader() {
 
             {profileOpen && (
               <div className="absolute right-0 mt-2 w-60 bg-white border rounded-lg shadow-lg z-50">
-                <div className="px-4 py-3 border-b">
-                  <p className="font-semibold">{fullName}</p>
-                  <p className="text-xs text-gray-500">{email}</p>
-                  <p className="text-xs text-gray-400">Employee</p>
-                </div>
-
+                <button
+                  onClick={() => navigate("/search-flight")}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <FaHome />
+                  Home
+                </button>
                 <button
                   onClick={goToProfile}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-slate-100"
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
                 >
+                  <FiSettings />
                   Profile Settings
                 </button>
 
-                <div className="border-t">
+                <div className="border-t border-gray-300">
                   <button
                     onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100 flex items-center gap-2"
                   >
+                    <FaSignOutAlt />
                     Logout
                   </button>
                 </div>

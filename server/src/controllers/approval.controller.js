@@ -7,124 +7,78 @@ const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 
-// @desc    Get booking approvals (pending / approved / rejected)
+// @desc    Get booking requests by status
 // @route   GET /api/v1/approvals
 // @access  Private (Travel Admin)
 exports.getAllApprovals = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, status = "pending_approval" } = req.query;
 
   if (req.user.role !== "travel-admin") {
-    throw new ApiError(403, "Only admin can view approvals");
+    throw new ApiError(403, "Only admin can view requests");
   }
 
   const skip = (Number(page) - 1) * Number(limit);
 
-  // ==============================
-  // 🔹 PENDING REQUESTS (QUEUE)
-  // ==============================
-  if (status === "pending_approval") {
-    const query = {
-      corporateId: req.user.corporateId,
-      requestStatus: "pending_approval",
-    };
-
-    const requests = await BookingRequest.find(query)
-      .populate("userId", "name email")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit));
-
-    const total = await BookingRequest.countDocuments(query);
-
-    return res.status(200).json(
-      new ApiResponse(
-        200,
-        {
-          approvals: requests,
-          pagination: {
-            total,
-            page: Number(page),
-            pages: Math.ceil(total / limit),
-          },
-        },
-        "Pending booking requests fetched successfully"
-      )
-    );
-  }
-
-  // ==============================
-  // 🔹 APPROVED / REJECTED (HISTORY)
-  // ==============================
   const query = {
     corporateId: req.user.corporateId,
-    status, // approved | rejected
+    requestStatus: status, // pending_approval | approved | rejected
   };
 
-  const approvals = await Approval.find(query)
-    .populate("requesterId", "name email")
-    .populate("approverId", "name email")
+  const requests = await BookingRequest.find(query)
+    .populate("userId", "name email")
+    .populate("approvedBy", "name email")
+    .populate("rejectedBy", "name email")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(Number(limit));
 
-  const total = await Approval.countDocuments(query);
+  const total = await BookingRequest.countDocuments(query);
 
   res.status(200).json(
     new ApiResponse(
       200,
       {
-        approvals,
+        approvals: requests,
         pagination: {
           total,
           page: Number(page),
           pages: Math.ceil(total / limit),
         },
       },
-      "Approval history fetched successfully"
+      "Booking requests fetched successfully"
     )
   );
 });
 
-// @desc    Get single approval (pending OR processed)
+// @desc    Get single booking request (any status)
 // @route   GET /api/v1/approvals/:id
 // @access  Private
 exports.getApproval = asyncHandler(async (req, res) => {
-  // 1️⃣ Check pending queue first
-  const bookingRequest = await BookingRequest.findById(req.params.id).populate(
-    "userId",
-    "name email"
-  );
+  const bookingRequest = await BookingRequest.findById(req.params.id)
+    .populate("userId", "name email")
+    .populate("approvedBy", "name email")
+    .populate("rejectedBy", "name email");
 
-  if (bookingRequest) {
-    const isAdmin = req.user.role === "travel-admin";
-    const isOwner = bookingRequest.userId._id.toString() === req.user.id;
-
-    if (!isAdmin && !isOwner) {
-      throw new ApiError(403, "Not authorized");
-    }
-
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(200, bookingRequest, "Pending booking request fetched")
-      );
+  if (!bookingRequest) {
+    throw new ApiError(404, "Booking request not found");
   }
 
-  // 2️⃣ Else check approval history
-  const approval = await Approval.findOne({
-    bookingRequestId: req.params.id,
-    corporateId: req.user.corporateId,
-  })
-    .populate("requesterId", "name email")
-    .populate("approverId", "name email");
+  const isAdmin = req.user.role === "travel-admin";
+  const isOwner = bookingRequest.userId._id.toString() === req.user.id;
 
-  if (!approval) {
-    throw new ApiError(404, "Approval record not found");
+  if (!isAdmin && !isOwner) {
+    throw new ApiError(403, "Not authorized");
   }
 
   res
     .status(200)
-    .json(new ApiResponse(200, approval, "Approval record fetched"));
+    .json(
+      new ApiResponse(
+        200,
+        bookingRequest,
+        "Booking request fetched successfully"
+      )
+    );
 });
 
 // @desc    Approve booking request
@@ -137,7 +91,6 @@ exports.approveRequest = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Only admin can approve requests");
   }
 
-  // 1️⃣ Find pending booking request
   const bookingRequest = await BookingRequest.findOne({
     _id: req.params.id,
     corporateId: req.user.corporateId,
@@ -148,57 +101,24 @@ exports.approveRequest = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Booking request not found or already processed");
   }
 
-  // 2️⃣ Create FULL approval snapshot
-  const approval = await Approval.create({
-    /* ================= REFERENCES ================= */
-    bookingRequestId: bookingRequest._id,
-    approvalReference: `APR-${Date.now()}`,
+  bookingRequest.$locals.previousStatus = bookingRequest.requestStatus;
 
-    corporateId: bookingRequest.corporateId,
-    requesterId: bookingRequest.userId,
-    approverId: req.user._id,
-
-    /* ================= APPROVAL META ================= */
-    status: "approved",
-    approvedAt: new Date(),
-    approverComments: comments || "",
-
-    /* ================= FULL BOOKING REQUEST COPY ================= */
-    bookingReference: bookingRequest.bookingReference,
-    bookingType: bookingRequest.bookingType,
-    purposeOfTravel: bookingRequest.purposeOfTravel,
-
-    travellers: bookingRequest.travellers,
-
-    flightRequest: bookingRequest.flightRequest,
-    pricingSnapshot: bookingRequest.pricingSnapshot,
-    bookingSnapshot: bookingRequest.bookingSnapshot,
-
-    /* ================= POLICY SNAPSHOT ================= */
-    policySnapshot: {
-      policyType: "corporate-policy",
-      maxAllowedAmount: null,
-      violationFlags: [],
-    },
-
-    /* ================= NOTIFICATION ================= */
-    notification: {
-      initialSent: false,
-      remindersSent: 0,
-    },
-  });
-
-  // 3️⃣ Update booking request state
   bookingRequest.requestStatus = "approved";
-  bookingRequest.approvalId = approval._id;
+  bookingRequest.approvedAt = new Date();
+  bookingRequest.approvedBy = req.user._id;
+  bookingRequest.approverComments = comments;
 
-  // 3️⃣ Remove from BookingRequest (queue)
-  // await BookingRequest.findByIdAndDelete(bookingRequest._id);
   await bookingRequest.save();
 
   res
     .status(200)
-    .json(new ApiResponse(200, approval, "Booking approved successfully"));
+    .json(
+      new ApiResponse(
+        200,
+        bookingRequest,
+        "Booking request approved successfully"
+      )
+    );
 });
 
 // @desc    Reject booking request
@@ -215,7 +135,6 @@ exports.rejectRequest = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Only admin can reject requests");
   }
 
-  // 1️⃣ Find pending booking request
   const bookingRequest = await BookingRequest.findOne({
     _id: req.params.id,
     corporateId: req.user.corporateId,
@@ -226,27 +145,22 @@ exports.rejectRequest = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Booking request not found or already processed");
   }
 
-  // 2️⃣ Create approval record (history)
-  const approval = await Approval.create({
-    bookingRequestId: bookingRequest._id,
-    corporateId: bookingRequest.corporateId,
-    requesterId: bookingRequest.userId,
-    approverId: req.user._id,
-    status: "rejected",
-    rejectedAt: new Date(),
-    approverComments: comments,
+  bookingRequest.$locals.previousStatus = bookingRequest.requestStatus;
 
-    bookingSnapshot: {
-      bookingType: bookingRequest.bookingType,
-      purposeOfTravel: bookingRequest.purposeOfTravel,
-      amount: bookingRequest.totalAmount,
-    },
-  });
+  bookingRequest.requestStatus = "rejected";
+  bookingRequest.rejectedAt = new Date();
+  bookingRequest.rejectedBy = req.user._id;
+  bookingRequest.approverComments = comments;
 
-  // 3️⃣ Remove from BookingRequest (queue)
-  await BookingRequest.findByIdAndDelete(bookingRequest._id);
+  await bookingRequest.save();
 
   res
     .status(200)
-    .json(new ApiResponse(200, approval, "Booking rejected successfully"));
+    .json(
+      new ApiResponse(
+        200,
+        bookingRequest,
+        "Booking request rejected successfully"
+      )
+    );
 });
