@@ -20,10 +20,10 @@ export const fetchApprovals = createAsyncThunk(
       return data.data; // { approvals, pagination }
     } catch (err) {
       return rejectWithValue(
-        err.response?.data?.error || "Failed to fetch approvals"
+        err.response?.data?.error || "Failed to fetch approvals",
       );
     }
-  }
+  },
 );
 
 /**
@@ -39,10 +39,10 @@ export const fetchApprovalById = createAsyncThunk(
       return data.data;
     } catch (err) {
       return rejectWithValue(
-        err.response?.data?.error || "Failed to fetch approval"
+        err.response?.data?.error || "Failed to fetch approval",
       );
     }
-  }
+  },
 );
 
 /**
@@ -62,7 +62,7 @@ export const approveApproval = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(err.response?.data?.error || "Approval failed");
     }
-  }
+  },
 );
 
 /**
@@ -82,7 +82,7 @@ export const rejectApproval = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(err.response?.data?.error || "Rejection failed");
     }
-  }
+  },
 );
 
 export const selectApprovals = (state) => state.approvals.list;

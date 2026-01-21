@@ -80,6 +80,25 @@ export const getSSR = createAsyncThunk(
   }
 );
 
+/* ---------------- FARE UPSELL ---------------- */
+export const getFareUpsell = createAsyncThunk(
+  "flights/fareUpsell",
+  async ({ traceId, resultIndex }, { rejectWithValue }) => {
+    try {
+      const { data } = await flightApi.post("/fare-upsell", {
+        traceId,
+        resultIndex,
+      });
+
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Fare upsell failed"
+      );
+    }
+  }
+);
+
 /* ---------------- BOOK ---------------- */
 export const bookFlight = createAsyncThunk(
   "flights/book",
@@ -94,17 +113,17 @@ export const bookFlight = createAsyncThunk(
 );
 
 /* ---------------- TICKET ---------------- */
-export const ticketFlight = createAsyncThunk(
-  "flights/ticket",
-  async ({ bookingId, pnr }, { rejectWithValue }) => {
-    try {
-      const { data } = await flightApi.post("/ticket", { bookingId, pnr });
-      return data.data;
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message);
-    }
-  }
-);
+// export const ticketFlight = createAsyncThunk(
+//   "flights/ticket",
+//   async ({ bookingId, pnr }, { rejectWithValue }) => {
+//     try {
+//       const { data } = await flightApi.post("/ticket", { bookingId, pnr });
+//       return data.data;
+//     } catch (err) {
+//       return rejectWithValue(err.response?.data?.message);
+//     }
+//   }
+// );
 
 /* ---------------- BOOKING DETAILS ---------------- */
 export const getBookingDetails = createAsyncThunk(

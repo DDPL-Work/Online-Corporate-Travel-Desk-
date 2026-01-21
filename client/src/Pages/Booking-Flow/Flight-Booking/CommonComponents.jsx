@@ -28,8 +28,8 @@ import { LuInfo } from "react-icons/lu";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
-import { selectRTSeatReady } from "../../../utils/selectRTSeatReady";
+import { airlineLogo, airlineThemes } from "../../../utils/formatter";
+import "./Fares.css"; // custom animation + minor overrides
 
 // Updated color scheme - clean and minimal
 export const orangeText = "text-blue-600";
@@ -39,15 +39,6 @@ export const blueText = "text-gray-800";
 export const grayText = "text-gray-500";
 export const greenText = "text-green-600";
 export const lightGreenBg = "bg-green-50";
-
-const normalizeTripInfos = (tripInfos) => {
-  if (!tripInfos) return [];
-  if (Array.isArray(tripInfos)) return tripInfos;
-  if (typeof tripInfos === "object") {
-    return Object.values(tripInfos).filter(Array.isArray);
-  }
-  return [];
-};
 
 // Helper functions
 export const formatTime = (dateTimeString) => {
@@ -584,10 +575,11 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
 
   const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  // 🔒 LOGIC UNCHANGED
   if (fareRulesStatus === "loading") {
     return (
-      <div className="border border-gray-200 bg-white rounded-xl shadow-sm p-6 text-center">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
+      <div className="flex flex-col items-center justify-center bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <div className="loader mb-3"></div>
         <p className="text-gray-600 text-sm">Loading fare rules...</p>
       </div>
     );
@@ -595,7 +587,7 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
 
   if (!fareRules) {
     return (
-      <div className="border border-gray-200 bg-white rounded-xl shadow-sm p-6 text-center text-gray-500 text-sm">
+      <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-500 text-sm">
         Fare rules not available for this fare.
       </div>
     );
@@ -650,81 +642,85 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
     },
   ];
 
+  // 🔒 RENDER LOGIC UNCHANGED — only classes & structure polished
   return (
-    <div className="space-y-4">
-      {sections.map((sec) =>
-        sec.hasData ? (
-          <div
-            key={sec.key}
-            className="border border-gray-200 bg-white rounded-xl shadow-sm overflow-hidden"
-          >
-            {/* Header */}
-            <button
-              onClick={() => toggle(sec.key)}
-              className="w-full flex items-center justify-between px-5 py-4 bg-gray-50 hover:bg-gray-100 transition"
+    <div className="space-y-5">
+      {sections.map(
+        (sec) =>
+          sec.hasData && (
+            <div
+              key={sec.key}
+              className="border border-gray-200 bg-white rounded-xl shadow-sm overflow-hidden transition-all hover:shadow-md"
             >
-              <div className="flex items-center gap-3">
-                <span className={`${sec.color}`}>{sec.icon}</span>
-                <span className="font-semibold text-gray-800 text-sm">
-                  {sec.title}
-                </span>
-              </div>
-              {open[sec.key] ? (
-                <IoChevronUp className="text-gray-500" size={18} />
-              ) : (
-                <IoChevronDown className="text-gray-500" size={18} />
-              )}
-            </button>
+              {/* Header */}
+              <button
+                onClick={() => toggle(sec.key)}
+                className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 hover:bg-gray-100 transition"
+              >
+                <div className="flex items-center gap-3">
+                  <span className={sec.color}>{sec.icon}</span>
+                  <span className="font-semibold text-gray-800 text-sm md:text-base">
+                    {sec.title}
+                  </span>
+                </div>
+                {open[sec.key] ? (
+                  <IoChevronUp className="text-gray-500" size={18} />
+                ) : (
+                  <IoChevronDown className="text-gray-500" size={18} />
+                )}
+              </button>
 
-            {/* Content */}
-            {open[sec.key] && (
-              <div className="bg-white divide-y divide-gray-100">
-                <div className="px-5 py-4 text-sm text-gray-700 space-y-3">
+              {/* Body */}
+              {open[sec.key] && (
+                <div className="px-6 py-4 bg-white border-t border-gray-100 animate-fadeIn space-y-3">
+                  {/* Cancellation */}
                   {sec.key === "cancellation" &&
                     sec.data.map((rule, i) => (
                       <div
                         key={i}
-                        className="flex justify-between items-start border-b border-gray-100 last:border-0 pb-2"
+                        className="flex justify-between items-start py-2 border-b last:border-0 border-gray-100"
                       >
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-800">
+                        <div className="flex-1 pr-4">
+                          <p className="font-medium text-gray-800 text-sm">
                             {formatTimeRange(rule.From, rule.To, rule.Unit)}
                           </p>
                           <p className="text-xs text-gray-500">
                             {rule.JourneyPoints}
                           </p>
                         </div>
-                        <p className="text-right text-sm font-semibold text-gray-900">
+                        <p className="text-right font-semibold text-gray-900 text-sm">
                           {rule.Details}
                         </p>
                       </div>
                     ))}
 
+                  {/* Date Change */}
                   {sec.key === "dateChange" &&
                     sec.data.map((rule, i) => (
                       <div
                         key={i}
-                        className="flex justify-between items-start border-b border-gray-100 last:border-0 pb-2"
+                        className="flex justify-between items-start py-2 border-b last:border-0 border-gray-100"
                       >
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-800">
+                        <div className="flex-1 pr-4">
+                          <p className="font-medium text-gray-800 text-sm">
                             {formatTimeRange(rule.From, rule.To, rule.Unit)}
                           </p>
                           <p className="text-xs text-gray-500">
                             {rule.JourneyPoints}
                           </p>
                         </div>
-                        <p className="text-right text-sm font-semibold text-gray-900">
+                        <p className="text-right font-semibold text-gray-900 text-sm">
                           {rule.Details}
                         </p>
                       </div>
                     ))}
 
+                  {/* Important */}
                   {sec.key === "important" && (
                     <div className="space-y-3">
                       {sec.data.fareBasisCode && (
                         <div className="p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
-                          <p className="text-xs text-gray-600 font-medium">
+                          <p className="text-xs text-gray-600 font-medium uppercase">
                             Fare Basis Code
                           </p>
                           <p className="font-semibold text-blue-900 text-sm">
@@ -732,7 +728,6 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
                           </p>
                         </div>
                       )}
-
                       {sec.data.isRefundable !== undefined && (
                         <div
                           className={`p-3 border-l-4 rounded ${
@@ -741,7 +736,7 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
                               : "bg-red-50 border-red-500"
                           }`}
                         >
-                          <p className="text-xs text-gray-600 font-medium">
+                          <p className="text-xs text-gray-600 font-medium uppercase">
                             Refund Policy
                           </p>
                           <p
@@ -757,13 +752,12 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
                           </p>
                         </div>
                       )}
-
                       {sec.data.airlineRemark && (
                         <div className="p-3 bg-gray-50 border-l-4 border-gray-400 rounded">
-                          <p className="text-xs text-gray-600 font-medium">
+                          <p className="text-xs text-gray-600 font-medium uppercase">
                             Airline Remark
                           </p>
-                          <p className="text-xs text-gray-700 mt-1">
+                          <p className="text-xs text-gray-700 mt-1 leading-relaxed">
                             {sec.data.airlineRemark.split(".")[0]}.
                           </p>
                         </div>
@@ -771,10 +765,9 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-          </div>
-        ) : null
+              )}
+            </div>
+          )
       )}
     </div>
   );
@@ -786,36 +779,55 @@ export const FareRulesAccordion = ({
 }) => {
   const [open, setOpen] = useState(true);
 
+  // ✅ Extract airline data dynamically from API
+  // ✅ Extract airline + routing details dynamically and safely
+  const airlineInfo =
+    fareRules?.data?.Response?.FareRules?.[0] ||
+    fareRules?.Response?.FareRules?.[0] ||
+    fareRules?.FareRules?.[0] ||
+    null;
+
+  // ✅ Normalize airline code (handles SG / 6E / AI / uk etc.)
+  const normalizeAirlineCode = (code = "") =>
+    code
+      .toString()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+
+  const airlineCode = normalizeAirlineCode(
+    airlineInfo?.AirlineCode || airlineInfo?.Airline || ""
+  );
+
+  // ✅ Dynamic airline name fallback
+  const airlineName =
+    airlineInfo?.AirlineName ||
+    airlineInfo?.Airline ||
+    airlineCode ||
+    "Unknown Airline";
+
+  const origin = airlineInfo?.Origin || "";
+  const destination = airlineInfo?.Destination || "";
+
+  // ✅ Theme gradient (dynamic from airlineThemes map)
+  const gradient =
+    airlineThemes[airlineCode]?.gradient || airlineThemes.DEFAULT.gradient;
+
+  // 🔒 Original Logic (Unchanged)
   const rules =
     fareRules?.FareRules ||
     fareRules?.Response?.FareRules ||
     fareRules?.data?.Response?.FareRules ||
     [];
 
-  // Helper function to parse the fare rule detail text
   const parseFareRuleDetail = (detail) => {
     if (!detail) return null;
-
-    // Extract fare basis code
     const fareBasisMatch = detail.match(/The FareBasisCode is:\s*(\w+)/i);
     const fareBasisCode = fareBasisMatch ? fareBasisMatch[1] : null;
-
-    // Split content into domestic and international sections
-    // const domesticMatch = detail.match(
-    //   /Domestic:([\s\S]*?)(?=International:|$)/i
-    // );
-    // const internationalMatch = detail.match(
-    //   /International:([\s\S]*?)(?=\*|$)/i
-    // );
-
     const domesticMatch = detail.match(
       /Domestic([\s\S]*?)(?=International|$)/i
     );
     const internationalMatch = detail.match(/International([\s\S]*?)(?=\*|$)/i);
-
-    // Extract important notes (lines starting with *)
     const importantNotes = detail.match(/\*[^\r\n]+/g) || [];
-
     return {
       fareBasisCode,
       domestic: domesticMatch ? domesticMatch[1].trim() : null,
@@ -826,30 +838,24 @@ export const FareRulesAccordion = ({
     };
   };
 
-  // Parse baggage allowance table
   const parseBaggageTable = (text) => {
     if (!text) return [];
-
     const lines = text.split(/\r\n/).filter((l) => l.trim());
     const baggageLines = lines.filter(
       (l) => l.includes("Ex ") && l.includes("Kgs")
     );
-
     return baggageLines
       .map((line) => {
         const parts = line.split(/\s+(\d+\s*Kgs?)/i);
         if (parts.length >= 2) {
-          return {
-            sector: parts[0].trim(),
-            allowance: parts[1].trim(),
-          };
+          return { sector: parts[0].trim(), allowance: parts[1].trim() };
         }
         return null;
       })
       .filter(Boolean);
   };
 
-  // Format fare rule content with proper styling
+  // 🔒 Data formatting preserved, UI enhanced
   const formatFareRuleContent = (detail) => {
     const parsed = parseFareRuleDetail(detail);
     if (!parsed) return null;
@@ -862,85 +868,78 @@ export const FareRulesAccordion = ({
       : [];
 
     return (
-      <div className="space-y-6">
-        {/* Fare Basis Code */}
+      <div className="space-y-8">
+        {/* Fare Basis Highlight */}
         {parsed.fareBasisCode && (
-          <div className="fare-basis-pill">
-            <span>Fare Basis Code</span>
-            <strong>{parsed.fareBasisCode}</strong>
+          <div
+            className={`flex items-center justify-between bg-linear-to-r ${gradient} text-white rounded-xl shadow p-4`}
+          >
+            <div>
+              <p className="text-xs opacity-90 uppercase tracking-wide">
+                Fare Basis Code
+              </p>
+              <h3 className="text-lg font-bold tracking-wider">
+                {parsed.fareBasisCode}
+              </h3>
+            </div>
+            <div className="bg-white/20 text-white px-3 py-1 rounded-md text-sm font-medium">
+              Airline Rule Info
+            </div>
           </div>
         )}
 
-        {/* Domestic Section */}
+        {/* Domestic Fare Section */}
         {parsed.domestic && (
-          <div className="rule-card">
-            <div className="rule-header">
-              <span className="rule-icon">✈️</span>
-              <h3>Domestic Fare Rules</h3>
-            </div>
-            <div className="rule-content">
-              <p>{parsed.domestic.split(/(?=Free baggage)/i)[0].trim()}</p>
-
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 bg-blue-50 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">✈️</span>
+                <h3 className="text-sm font-semibold text-gray-800">
+                  Domestic Fare Rules
+                </h3>
+              </div>
               {domesticBaggage.length > 0 && (
-                <div className="baggage-info">
-                  <div className="baggage-highlight">
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                      />
-                    </svg>
-                    <span>
-                      Free Baggage:{" "}
-                      <strong>{domesticBaggage[0]?.allowance}</strong>
-                    </span>
-                  </div>
+                <div className="bg-green-100 text-green-800 px-3 py-1 rounded-md text-xs font-semibold">
+                  Free Baggage: {domesticBaggage[0]?.allowance}
                 </div>
               )}
             </div>
+            <div className="p-5 text-sm text-gray-700 leading-relaxed">
+              <p>{parsed.domestic.split(/(?=Free baggage)/i)[0].trim()}</p>
+            </div>
           </div>
         )}
 
-        {/* International Section */}
+        {/* International Fare Section */}
         {parsed.international && (
-          <div className="rule-card">
-            <div className="rule-header">
-              <span className="rule-icon">🌍</span>
-              <h3>International Fare Rules</h3>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 bg-indigo-50 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🌍</span>
+                <h3 className="text-sm font-semibold text-gray-800">
+                  International Fare Rules
+                </h3>
+              </div>
             </div>
-            <div className="rule-content">
+
+            <div className="p-5 text-sm text-gray-700 leading-relaxed">
               <p>{parsed.international.split(/(?=Free baggage)/i)[0].trim()}</p>
 
               {internationalBaggage.length > 0 && (
-                <div className="baggage-table-wrapper">
-                  <div className="baggage-table-header">
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                      />
-                    </svg>
-                    <span>Free Baggage Allowance by Sector</span>
-                  </div>
-                  <div className="baggage-grid">
+                <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
+                    🧳 Free Baggage Allowance by Sector
+                  </h4>
+                  <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
                     {internationalBaggage.map((item, idx) => (
-                      <div key={idx} className="baggage-item">
-                        <span className="sector-name">{item.sector}</span>
-                        <span className="allowance-badge">
+                      <div
+                        key={idx}
+                        className="flex justify-between items-center px-3 py-2 bg-white rounded-md border border-gray-200 hover:border-blue-400 shadow-sm"
+                      >
+                        <span className="text-xs text-gray-700 font-medium">
+                          {item.sector}
+                        </span>
+                        <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
                           {item.allowance}
                         </span>
                       </div>
@@ -954,33 +953,30 @@ export const FareRulesAccordion = ({
 
         {/* Important Notes */}
         {parsed.importantNotes.length > 0 && (
-          <div className="important-notes">
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-gray-800">
+              Important Notes
+            </h4>
             {parsed.importantNotes.map((note, idx) => {
-              const isGstNote =
+              const isGst =
                 note.toUpperCase().includes("GST") ||
                 note.toUpperCase().includes("EXTRA");
-              const isTimeNote = note.toUpperCase().includes("HOURS BEFORE");
-
+              const isTime = note.toUpperCase().includes("HOURS BEFORE");
               return (
                 <div
                   key={idx}
-                  className={`note-item ${
-                    isGstNote ? "note-warning" : "note-info"
+                  className={`flex items-start gap-3 p-4 rounded-lg border text-sm shadow-sm ${
+                    isGst
+                      ? "bg-amber-50 border-amber-300 text-amber-800"
+                      : isTime
+                      ? "bg-yellow-50 border-yellow-300 text-yellow-800"
+                      : "bg-blue-50 border-blue-200 text-blue-800"
                   }`}
                 >
-                  <div className="note-icon">
-                    {isGstNote ? "⚠️" : isTimeNote ? "🕐" : "ℹ️"}
-                  </div>
-                  <div className="note-content">
-                    {note.includes(":") ? (
-                      <>
-                        <strong>{note.split(":")[0]}:</strong>
-                        {note.split(":").slice(1).join(":")}
-                      </>
-                    ) : (
-                      note
-                    )}
-                  </div>
+                  <span className="text-lg leading-none">
+                    {isGst ? "⚠️" : isTime ? "🕐" : "ℹ️"}
+                  </span>
+                  <p className="flex-1 leading-relaxed">{note}</p>
                 </div>
               );
             })}
@@ -990,330 +986,103 @@ export const FareRulesAccordion = ({
     );
   };
 
+  // 🔒 Core logic preserved
   if (fareRulesStatus === "loading") {
     return (
-      <div className="border border-gray-200 bg-white">
-        <div className="px-6 py-8 text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
-          <p className="text-gray-600 text-sm">Loading fare rules...</p>
-        </div>
+      <div className="border border-gray-200 bg-white rounded-xl p-8 text-center">
+        <div className="loader mx-auto mb-3"></div>
+        <p className="text-gray-600 text-sm">Loading fare rules...</p>
       </div>
     );
   }
 
-  // Handle both old format (important array) and new API format
   let fareRuleDetails = null;
-
-  // Debug: Log the entire fareRules object to console
-  console.log("Fare Rules Data:", fareRules);
-  console.log("Fare Rules Status:", fareRulesStatus);
-
-  if (fareRules?.important?.length) {
-    // Old format - array of HTML strings
-    fareRuleDetails = fareRules.important;
-    console.log("Using important array format");
-  } else if (fareRules?.data?.Response?.FareRules?.length) {
-    // New API format - nested data.Response
+  if (fareRules?.important?.length) fareRuleDetails = fareRules.important;
+  else if (fareRules?.data?.Response?.FareRules?.length)
     fareRuleDetails = fareRules.data.Response.FareRules.map(
-      (rule) => rule.FareRuleDetail
-    ).filter((detail) => detail && detail.trim());
-    console.log("Using data.Response.FareRules format");
-  } else if (fareRules?.Response?.FareRules?.length) {
-    // API format - direct Response
+      (r) => r.FareRuleDetail
+    ).filter(Boolean);
+  else if (fareRules?.Response?.FareRules?.length)
     fareRuleDetails = fareRules.Response.FareRules.map(
-      (rule) => rule.FareRuleDetail
-    ).filter((detail) => detail && detail.trim());
-    console.log("Using Response.FareRules format");
-  } else if (fareRules?.FareRules?.length) {
-    // Direct FareRules array
-    fareRuleDetails = fareRules.FareRules.map(
-      (rule) => rule.FareRuleDetail
-    ).filter((detail) => detail && detail.trim());
-    console.log("Using direct FareRules format");
-  } else if (Array.isArray(fareRules) && fareRules.length > 0) {
-    // If fareRules itself is an array
+      (r) => r.FareRuleDetail
+    ).filter(Boolean);
+  else if (fareRules?.FareRules?.length)
+    fareRuleDetails = fareRules.FareRules.map((r) => r.FareRuleDetail).filter(
+      Boolean
+    );
+  else if (Array.isArray(fareRules))
     fareRuleDetails = fareRules
-      .map((rule) =>
-        typeof rule === "string"
-          ? rule
-          : rule.FareRuleDetail || rule.important?.[0]
+      .map((r) =>
+        typeof r === "string" ? r : r.FareRuleDetail || r.important?.[0]
       )
-      .filter((detail) => detail && detail.trim());
-    console.log("Using direct array format");
-  } else if (fareRules && typeof fareRules === "object") {
-    // Last resort: check if fareRules has FareRuleDetail directly
-    if (fareRules.FareRuleDetail) {
-      fareRuleDetails = [fareRules.FareRuleDetail];
-      console.log("Using direct FareRuleDetail");
-    }
-  }
-
-  console.log("Processed Fare Rule Details:", fareRuleDetails);
-  console.log("Number of rules found:", fareRuleDetails?.length || 0);
+      .filter(Boolean);
+  else if (fareRules?.FareRuleDetail)
+    fareRuleDetails = [fareRules.FareRuleDetail];
 
   if (!fareRuleDetails || fareRuleDetails.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="px-6 py-8 text-center text-gray-500 text-sm">
-          Fare rules not available for this fare.
-          {fareRules && (
-            <div className="mt-2 text-xs text-gray-400">
-              Data structure: {JSON.stringify(Object.keys(fareRules))}
-            </div>
-          )}
-        </div>
+      <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500 text-sm">
+        Fare rules not available for this fare.
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      {/* Header */}
+    <div className="rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
+      {/* Accordion Header */}
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-6 py-4 bg-linear-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-200 border-b border-gray-200"
+        className={`w-full flex items-center justify-between px-6 py-4 bg-linear-to-r ${gradient} text-white font-semibold tracking-wide hover:brightness-110 transition`}
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center shadow-sm">
-            <AiOutlineInfoCircle className="text-white" size={20} />
+          <img
+            src={airlineLogo(airlineCode)}
+            alt={airlineName}
+            className="w-8 h-8 rounded-full bg-white p-1"
+          />
+          <div className="flex flex-col text-left">
+            <span className="text-sm font-medium">{airlineName}</span>
+            {origin && destination && (
+              <span className="text-xs opacity-80">
+                {origin} → {destination}
+              </span>
+            )}
           </div>
-          <span className="font-semibold text-gray-800 text-base">
-            Fare Rules & Policies
-          </span>
         </div>
-
         {open ? (
-          <IoChevronUp
-            className="text-gray-600 transition-transform"
-            size={20}
-          />
+          <IoChevronUp className="text-white" size={20} />
         ) : (
-          <IoChevronDown
-            className="text-gray-600 transition-transform"
-            size={20}
-          />
+          <IoChevronDown className="text-white" size={20} />
         )}
       </button>
 
-      {/* Content */}
+      {/* Accordion Content */}
       {open && (
-        <div className="bg-linear-to-br from-gray-50 to-white">
-          <div className="px-6 py-6">
-            {fareRuleDetails.map((detail, i) => (
-              <div key={i}>{formatFareRuleContent(detail)}</div>
-            ))}
-          </div>
+        <div className="bg-gray-50 px-6 py-6 animate-fadeIn space-y-10">
+          {fareRuleDetails.map((detail, i) => (
+            <div key={i}>{formatFareRuleContent(detail)}</div>
+          ))}
         </div>
       )}
 
+      {/* Animations */}
       <style>{`
-        /* Fare Basis Pill */
-        .fare-basis-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.75rem;
-          padding: 0.75rem 1.25rem;
-          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-          border-radius: 12px;
-          box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
-          margin-bottom: 1.5rem;
+        .loader {
+          width: 24px;
+          height: 24px;
+          border: 3px solid #3b82f6;
+          border-top-color: transparent;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
         }
-        
-        .fare-basis-pill span {
-          color: #bfdbfe;
-          font-size: 0.75rem;
-          font-weight: 500;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
-        
-        .fare-basis-pill strong {
-          color: white;
-          font-size: 1rem;
-          font-weight: 700;
-          letter-spacing: 1px;
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-
-        /* Rule Cards */
-        .rule-card {
-          background: white;
-          border-radius: 16px;
-          border: 1px solid #e5e7eb;
-          overflow: hidden;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-          margin-bottom: 1.25rem;
-        }
-        
-        .rule-header {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          padding: 1rem 1.25rem;
-          background: linear-gradient(to right, #f8fafc, #f1f5f9);
-          border-bottom: 1px solid #e5e7eb;
-        }
-        
-        .rule-icon {
-          font-size: 1.5rem;
-        }
-        
-        .rule-header h3 {
-          margin: 0;
-          font-size: 0.95rem;
-          font-weight: 600;
-          color: #1e293b;
-        }
-        
-        .rule-content {
-          padding: 1.25rem;
-        }
-        
-        .rule-content p {
-          color: #475569;
-          line-height: 1.7;
-          font-size: 0.875rem;
-          margin: 0 0 1rem 0;
-        }
-
-        /* Baggage Info */
-        .baggage-info {
-          margin-top: 1rem;
-        }
-        
-        .baggage-highlight {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.625rem 1rem;
-          background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-          border: 1px solid #86efac;
-          border-radius: 10px;
-          color: #065f46;
-          font-size: 0.875rem;
-        }
-        
-        .baggage-highlight svg {
-          width: 1.25rem;
-          height: 1.25rem;
-          color: #059669;
-        }
-        
-        .baggage-highlight strong {
-          color: #047857;
-          font-weight: 700;
-        }
-
-        /* Baggage Table */
-        .baggage-table-wrapper {
-          margin-top: 1.25rem;
-          background: #f8fafc;
-          border-radius: 12px;
-          padding: 1rem;
-          border: 1px solid #e2e8f0;
-        }
-        
-        .baggage-table-header {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          margin-bottom: 1rem;
-          color: #475569;
-          font-weight: 600;
-          font-size: 0.875rem;
-        }
-        
-        .baggage-table-header svg {
-          width: 1.25rem;
-          height: 1.25rem;
-          color: #3b82f6;
-        }
-        
-        .baggage-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 0.75rem;
-        }
-        
-        .baggage-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 0.75rem 1rem;
-          background: white;
-          border-radius: 8px;
-          border: 1px solid #e2e8f0;
-          transition: all 0.2s;
-        }
-        
-        .baggage-item:hover {
-          border-color: #3b82f6;
-          box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
-        }
-        
-        .sector-name {
-          color: #475569;
-          font-size: 0.8125rem;
-          font-weight: 500;
-        }
-        
-        .allowance-badge {
-          padding: 0.25rem 0.625rem;
-          background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-          color: #1e40af;
-          font-size: 0.75rem;
-          font-weight: 700;
-          border-radius: 6px;
-        }
-
-        /* Important Notes */
-        .important-notes {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-          margin-top: 1.5rem;
-        }
-        
-        .note-item {
-          display: flex;
-          gap: 0.875rem;
-          padding: 1rem;
-          border-radius: 12px;
-          font-size: 0.875rem;
-          line-height: 1.6;
-          border: 1px solid;
-        }
-        
-        .note-warning {
-          background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-          border-color: #fbbf24;
-          color: #92400e;
-        }
-        
-        .note-info {
-          background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-          border-color: #93c5fd;
-          color: #1e40af;
-        }
-        
-        .note-icon {
-          font-size: 1.25rem;
-          line-height: 1;
-          flex-shrink: 0;
-        }
-        
-        .note-content {
-          flex: 1;
-        }
-        
-        .note-content strong {
-          font-weight: 600;
-          display: inline-block;
-          margin-right: 0.25rem;
-        }
-
-        /* Utilities */
-        .w-5 { width: 1.25rem; }
-        .h-5 { height: 1.25rem; }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-in-out; }
       `}</style>
     </div>
   );
@@ -1750,7 +1519,7 @@ export const TravelerForm = ({
             </div>
           </div>
 
-          <button
+          {/* <button
             type="button"
             onClick={addTraveler}
             disabled={travelers.length >= maxTravelers}
@@ -1762,7 +1531,7 @@ export const TravelerForm = ({
           >
             <IoPersonAdd size={20} />
             <span>Add Adult</span>
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -1803,7 +1572,7 @@ export const TravelerForm = ({
             className="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition"
           >
             {/* ===== Traveler Header ===== */}
-            <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-200">
+            {/* <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-200">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center">
                   <FaUser className="text-white" />
@@ -1823,7 +1592,7 @@ export const TravelerForm = ({
                   Remove
                 </button>
               )}
-            </div>
+            </div> */}
 
             {/* ===== Name Section ===== */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
@@ -2086,7 +1855,7 @@ export const TravelerForm = ({
         ))}
 
         {/* ===== ADD NEW ADULT ===== */}
-        <div className="flex justify-center pt-4">
+        {/* <div className="flex justify-center pt-4">
           <button
             type="button"
             onClick={addTraveler}
@@ -2098,7 +1867,7 @@ export const TravelerForm = ({
           >
             <IoPersonAdd size={20} />+ ADD NEW ADULT
           </button>
-        </div>
+        </div> */}
       </div>
     </div>
   );

@@ -3,13 +3,14 @@
 import { createSlice } from "@reduxjs/toolkit";
 import {
   createBookingRequest,
-  confirmBooking,
-  fetchBookings,
-  fetchBookingById,
+  fetchMyBookings,
+  fetchMyBookingById,
   cancelBooking,
   fetchMyBookingRequests,
   fetchMyBookingRequestById,
   fetchMyRejectedRequests,
+  executeApprovedFlightBooking,
+  // ticketFlight,
 } from "../Actions/booking.thunks";
 
 const initialState = {
@@ -89,49 +90,78 @@ const bookingSlice = createSlice({
         state.error = action.payload;
       })
 
-      /* ================= CONFIRM ================= */
-      .addCase(confirmBooking.pending, (state) => {
+      /* ================= EXECUTE APPROVED FLIGHT ================= */
+      .addCase(executeApprovedFlightBooking.pending, (state) => {
         state.actionLoading = true;
+        state.error = null;
       })
-      .addCase(confirmBooking.fulfilled, (state, action) => {
-        state.actionLoading = false;
-        state.selected = action.payload;
 
-        const idx = state.list.findIndex((b) => b._id === action.payload._id);
-        if (idx !== -1) state.list[idx] = action.payload;
+      .addCase(executeApprovedFlightBooking.fulfilled, (state, action) => {
+        state.actionLoading = false;
+
+        state.selected = {
+          ...state.selected,
+          executionStatus: "ticketed",
+          bookingResult: {
+            ...(state.selected?.bookingResult || {}),
+            pnr: action.payload.pnr,
+          },
+        };
+
+        // Also update list if present
+        const idx = state.list.findIndex((b) => b._id === state.selected?._id);
+        if (idx !== -1) {
+          state.list[idx] = state.selected;
+        }
       })
-      .addCase(confirmBooking.rejected, (state, action) => {
+
+      .addCase(executeApprovedFlightBooking.rejected, (state, action) => {
         state.actionLoading = false;
         state.error = action.payload;
       })
 
       /* ================= FETCH ALL ================= */
-      .addCase(fetchBookings.pending, (state) => {
+      .addCase(fetchMyBookings.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchBookings.fulfilled, (state, action) => {
+      .addCase(fetchMyBookings.fulfilled, (state, action) => {
         state.loading = false;
         state.list = action.payload.bookings;
         state.pagination = action.payload.pagination;
       })
-      .addCase(fetchBookings.rejected, (state, action) => {
+      .addCase(fetchMyBookings.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
 
       /* ================= FETCH ONE ================= */
-      .addCase(fetchBookingById.pending, (state) => {
+      .addCase(fetchMyBookingById.pending, (state) => {
         state.loading = true;
       })
-      .addCase(fetchBookingById.fulfilled, (state, action) => {
+      .addCase(fetchMyBookingById.fulfilled, (state, action) => {
         state.loading = false;
         state.selected = action.payload;
       })
-      .addCase(fetchBookingById.rejected, (state, action) => {
+      .addCase(fetchMyBookingById.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+
+      /* ================= TICKETING ================= */
+      //   .addCase(ticketFlight.pending, (state) => {
+      //   state.loading = true;
+      //   state.error = null;
+      // })
+      // .addCase(ticketFlight.fulfilled, (state, action) => {
+      //   state.loading = false;
+      //   state.ticketStatus = "success";
+      // })
+      // .addCase(ticketFlight.rejected, (state, action) => {
+      //   state.loading = false;
+      //   state.ticketStatus = "failed";
+      //   state.error = action.payload;
+      // })
 
       /* ================= CANCEL ================= */
       .addCase(cancelBooking.pending, (state) => {
@@ -151,7 +181,7 @@ const bookingSlice = createSlice({
   },
 });
 
-export const { clearSelectedBooking } = bookingSlice.actions;
+export const { clearSelectedBookingRequest } = bookingSlice.actions;
 export const selectMyRejectedRequests = (state) => state.bookings.myRejected;
 
 export default bookingSlice.reducer;

@@ -1,5 +1,5 @@
 // src/components/Flights/OneFlightBooking.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
@@ -28,11 +28,15 @@ import {
   getFareQuote,
   getFareRule,
   getSSR,
+  getFareUpsell,
 } from "../../../Redux/Actions/flight.thunks";
+import { selectFareFamily } from "../../../Redux/Slice/flightSearchSlice";
 import SeatSelectionModal from "./SeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";
+// import FareUpsellModal from "./FareUpsellModal";
+import { FareDetailsModal } from "./FareDetailsModal";
 
 const normalizeFareRules = (fareRule) => {
   const rules = fareRule?.Response?.FareRules;
@@ -51,9 +55,10 @@ export default function OneFlightBooking() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const { traceId, fareQuote, fareRule, ssr } = useSelector(
-    (state) => state.flights
-  );
+  const hasCalledFareUpsell = React.useRef(false);
+
+  const { traceId, fareQuote, fareRule, ssr, fareUpsell, selectedFareFamily } =
+    useSelector((state) => state.flights);
 
   const { actionLoading } = useSelector((state) => state.bookings);
 
@@ -70,6 +75,8 @@ export default function OneFlightBooking() {
   const [activeSegmentIndex, setActiveSegmentIndex] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState({});
   const [selectedMeals, setSelectedMeals] = useState({});
+
+  // const [fareUpsellOpen, setFareUpsellOpen] = useState(false);
 
   const [selectedBaggage, setSelectedBaggage] = useState({});
 
@@ -147,15 +154,32 @@ export default function OneFlightBooking() {
   }, [ssr]);
 
   useEffect(() => {
-    if (!searchParams?.traceId || !selectedFlight?.ResultIndex) return;
+    if (!traceId || !selectedFlight?.ResultIndex) return;
+
+    // // 🔒 Call FareUpsell ONLY once, BEFORE FareQuote
+    // if (!hasCalledFareUpsell.current) {
+    //   hasCalledFareUpsell.current = true;
+
+    //   dispatch(
+    //     getFareUpsell({
+    //       traceId,
+    //       resultIndex: selectedFlight.ResultIndex,
+    //     })
+    //   );
+    // }
 
     dispatch(
       getFareQuote({
-        traceId: searchParams.traceId,
+        traceId: searchParams.traceId, // ✅ REDUX traceId
         resultIndex: selectedFlight.ResultIndex,
       })
     );
-  }, [dispatch, searchParams?.traceId, selectedFlight?.ResultIndex]);
+  }, [
+    dispatch,
+    traceId, // ✅ CRITICAL
+    selectedFlight?.ResultIndex,
+    fareUpsell,
+  ]);
 
   useEffect(() => {
     const quoteResult = fareQuote?.Response?.Results;
@@ -462,23 +486,6 @@ export default function OneFlightBooking() {
     return baggage;
   };
 
-  const calculatePriorityFromDate = (travelDate) => {
-    if (!travelDate) return "LOW";
-
-    const today = new Date();
-    const travel = new Date(travelDate);
-
-    if (isNaN(travel.getTime())) return "LOW";
-
-    const diffDays = Math.ceil(
-      (travel.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    if (diffDays <= 5) return "HIGH";
-    if (diffDays <= 10) return "MEDIUM";
-    return "LOW";
-  };
-
   const buildBookingRequestPayload = () => {
     const segments = parsedFlightData?.segments || [];
     const firstSegment = segments[0];
@@ -512,6 +519,11 @@ export default function OneFlightBooking() {
         traceId: searchParams.traceId,
         resultIndex: selectedFlight.ResultIndex,
 
+        fareQuote: {
+          Results: Array.isArray(fareQuote.Response.Results)
+            ? fareQuote.Response.Results
+            : [fareQuote.Response.Results],
+        },
         segments: fullSegments,
 
         fareSnapshot,
@@ -529,12 +541,17 @@ export default function OneFlightBooking() {
         title: t.title,
         firstName: t.firstName,
         lastName: t.lastName,
+
         email: t.email,
+        phoneWithCode: t.phoneWithCode, // ✅ THIS WAS MISSING
+
         gender: t.gender,
         dateOfBirth: t.dob,
+
         passportNumber: t.passportNumber,
         passportExpiry: t.passportExpiry,
         nationality: t.nationality,
+
         isLeadPassenger: idx === 0,
       })),
 
@@ -623,6 +640,10 @@ export default function OneFlightBooking() {
       });
     }
   };
+
+  const hasFareUpsell =
+    Array.isArray(fareUpsell?.data?.FareFamilies) &&
+    fareUpsell.data.FareFamilies.length > 0;
 
   if (loading) {
     return (
@@ -783,6 +804,36 @@ export default function OneFlightBooking() {
               )}
             </div>
 
+            {/* <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Fare Benefits
+                  </h3>
+                  <p className="text-sm text-slate-500">
+                    Choose a fare with better flexibility & benefits
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setFareUpsellOpen(true)}
+                  disabled={!hasFareUpsell}
+                  className={`px-5 py-2 rounded-lg text-sm font-semibold ${
+                    hasFareUpsell
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  View Fare Options
+                </button>
+              </div>
+
+              {selectedFareFamily && (
+                <div className="mt-4 text-sm text-green-700 font-medium">
+                  Selected Fare: {selectedFareFamily.name}
+                </div>
+              )}
+            </div> */}
             {/* Traveller Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <TravelerForm
@@ -798,56 +849,19 @@ export default function OneFlightBooking() {
               />
             </div>
 
-            {/* Fare Selection */}
-            <div className="bg-white rounded-2xl  shadow-sm p-6">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">
-                Fare Options
-              </h3>
-              <FareOptions
-                fareRules={fareQuote?.Response?.Results}
-                fareRulesStatus={
-                  fareQuote?.Response?.Results ? "succeeded" : "loading"
-                }
-              />
-
-              {ssr?.Response?.MealDynamic?.[0]?.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h3 className="text-lg font-bold mb-4">Meals</h3>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    {ssr.Response.MealDynamic[0].map((meal, idx) => (
-                      <div
-                        key={idx}
-                        className="border rounded-lg p-4 flex justify-between items-center"
-                      >
-                        <div>
-                          <p className="font-semibold">{meal.Description}</p>
-                          <p className="text-sm text-gray-500">{meal.Code}</p>
-                        </div>
-                        <p className="font-bold text-blue-600">₹{meal.Price}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Info & Baggage */}
-            <div className="space-y-6">
-              <div className="bg-white rounded-2xl  shadow-sm p-6">
-                <h3 className="text-lg font-bold mb-4">
-                  Important Information
-                </h3>
-                <FareRulesAccordion
-                  fareRules={normalizeFareRules(fareRule)}
-                  fareRulesStatus={!fareRule ? "loading" : "succeeded"}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              {/* Section Header */}
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg md:text-xl font-bold text-slate-900">
+                  Fare Rules & Policies
+                </h2>
+                {/* Button + Modal */}
+                <FareDetailsModal
+                  fareQuote={fareQuote}
+                  fareRule={fareRule}
+                  normalizeFareRules={normalizeFareRules}
                 />
               </div>
-
-              {/* <div className="bg-white rounded-2xl  shadow-sm p-6">
-                <h3 className="text-lg font-bold mb-4">Baggage & Inclusions</h3>
-                <BaggageTable baggageInfo={baggageInfo} />
-              </div> */}
             </div>
           </div>
 
@@ -893,6 +907,11 @@ export default function OneFlightBooking() {
           onSelectBaggage={handleSelectBaggage}
         />
       )}
+      {/* 
+      <FareUpsellModal
+        isOpen={fareUpsellOpen}
+        onClose={() => setFareUpsellOpen(false)}
+      /> */}
     </div>
   );
 }

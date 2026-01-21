@@ -12,6 +12,9 @@ const { generateBookingReference } = require("../utils/helpers");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
+const { getAgencyBalance } = require("../services/tboBalance.service");
+const logger = require("../utils/logger");
+const paymentService = require("../services/payment.service");
 
 // @desc    Create booking request (Approval-first)
 // @route   POST /api/v1/bookings
@@ -22,6 +25,11 @@ const sanitizeFlightRequest = (flightRequest) => ({
   resultIndex: flightRequest.resultIndex,
 
   segments: flightRequest.segments,
+  fareQuote: {
+    Results: Array.isArray(flightRequest.fareQuote.Results)
+      ? flightRequest.fareQuote.Results
+      : [flightRequest.fareQuote.Results],
+  },
   fareSnapshot: flightRequest.fareSnapshot,
   ssrSnapshot: flightRequest.ssrSnapshot,
 
@@ -69,6 +77,66 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, "At least one traveller is required");
   }
 
+  const leadPassenger =
+    travellers.find((t) => t.isLeadPassenger) || travellers[0];
+
+  if (!leadPassenger?.phoneWithCode) {
+    throw new ApiError(400, "Lead passenger phone number is required");
+  }
+
+  if (!leadPassenger?.email) {
+    throw new ApiError(400, "Lead passenger email is required");
+  }
+
+  const fareResult = Array.isArray(flightRequest.fareQuote?.Results)
+    ? flightRequest.fareQuote.Results[0]
+    : flightRequest.fareQuote?.Results;
+
+  if (!fareResult?.FareBreakdown || !fareResult.FareBreakdown.length) {
+    throw new ApiError(400, "Valid FareQuote is required");
+  }
+
+  /* ================= BALANCE CHECK ================= */
+  const env = process.env.TBO_ENV || "live";
+
+  const balance = await getAgencyBalance(env);
+
+  const availableBalance = balance.availableBalance;
+  const requiredAmount = Number(pricingSnapshot.totalAmount);
+
+  if (availableBalance < requiredAmount) {
+    throw new ApiError(
+      400,
+      `Insufficient agency balance. Available ₹${availableBalance}, Required ₹${requiredAmount}`,
+    );
+  }
+
+  let bookingSnapshot;
+
+  if (bookingType === "flight" && flightRequest?.segments?.length) {
+    const segment = flightRequest.segments[0];
+
+    bookingSnapshot = {
+      sectors: [
+        `${segment.origin.airportCode}-${segment.destination.airportCode}`,
+      ],
+      airline: segment.airlineName,
+      travelDate: segment.departureDateTime,
+      returnDate: segment.arrivalDateTime,
+      cabinClass:
+        segment.cabinClass === 1
+          ? "Economy"
+          : segment.cabinClass === 2
+            ? "Premium Economy"
+            : segment.cabinClass === 3
+              ? "Business"
+              : "Economy",
+      amount: pricingSnapshot.totalAmount,
+      purposeOfTravel,
+      city: segment.destination.city,
+    };
+  }
+
   /* ================= CREATE BOOKING REQUEST ================= */
 
   const bookingRequest = await BookingRequest.create({
@@ -95,7 +163,8 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
       currency: pricingSnapshot.currency || "INR",
       capturedAt: new Date(),
     },
-    bookingSnapshot: req.body.bookingSnapshot,
+    bookingSnapshot,
+    // bookingSnapshot: req.body.bookingSnapshot,
   });
 
   /* ================= NOTIFICATION ================= */
@@ -116,8 +185,8 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
         bookingReference: bookingRequest.bookingReference,
         requestStatus: bookingRequest.requestStatus,
       },
-      "Booking request submitted for approval"
-    )
+      "Booking request submitted for approval",
+    ),
   );
 });
 
@@ -131,7 +200,7 @@ exports.getMyRequests = asyncHandler(async (req, res) => {
   })
     .sort({ createdAt: -1 })
     .select(
-      "bookingType requestStatus flightRequest pricingSnapshot createdAt"
+      "bookingType requestStatus flightRequest pricingSnapshot createdAt",
     );
 
   res
@@ -160,8 +229,8 @@ exports.getMyRequestById = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         bookingRequest,
-        "Booking request fetched successfully"
-      )
+        "Booking request fetched successfully",
+      ),
     );
 });
 
@@ -182,102 +251,296 @@ exports.getMyRejectedRequests = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         requests,
-        "My rejected requests fetched successfully"
-      )
+        "My rejected requests fetched successfully",
+      ),
     );
 });
 
 // @desc    Confirm booking after approval
-// @route   POST /api/v1/bookings/:id/confirm
+// @route   POST /api/v1/bookings/:bookingId/execute-flight
 // @access  Private
 // Confirm booking after approval
-exports.confirmBooking = asyncHandler(async (req, res) => {
-  const booking = await Booking.findById(req.params.id);
+exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
 
+  const booking = await BookingRequest.findById(bookingId);
   if (!booking) throw new ApiError(404, "Booking not found");
+  if (booking.requestStatus !== "approved")
+    throw new ApiError(400, "Booking not approved");
+  if (booking.executionStatus === "ticketed")
+    throw new ApiError(400, "Booking already completed");
+  if (!booking.flightRequest) throw new ApiError(400, "Flight request missing");
 
-  if (booking.userId.toString() !== req.user.id) {
+  /* ---------- PASSENGERS ---------- */
+  const leadPassenger =
+    booking.travellers.find((t) => t.isLeadPassenger) || booking.travellers[0];
+
+  const paxTypeMap = { ADULT: 1, CHILD: 2, INFANT: 3 };
+
+  const passengers = booking.travellers.map((t, index) => ({
+    title: t.title,
+    firstName: t.firstName,
+    lastName: t.lastName,
+    paxType: paxTypeMap[t.paxType || "ADULT"],
+    dateOfBirth: t.dateOfBirth,
+    gender: String(t.gender).toUpperCase().startsWith("M") ? "Male" : "Female",
+    passportNo: t.passportNumber || "",
+    passportExpiry: t.passportExpiry || "",
+    isLeadPax: index === 0,
+    email: t.email || leadPassenger.email,
+    contactNo: t.phoneWithCode || leadPassenger.phoneWithCode,
+  }));
+
+  const corporate = await Corporate.findById(booking.corporateId);
+  const bookingAmount = Number(booking.pricingSnapshot.totalAmount);
+
+  const fareResult = Array.isArray(booking.flightRequest.fareQuote.Results)
+    ? booking.flightRequest.fareQuote.Results[0]
+    : booking.flightRequest.fareQuote.Results;
+
+  const isLCC = fareResult.IsLCC === true;
+
+  let tboBookingId = null;
+  let pnr = null;
+
+  try {
+    /* =========================================================
+       STEP 1: BOOK (NON-LCC ONLY)
+    ========================================================= */
+    if (!isLCC) {
+      booking.executionStatus = "booking_initiated";
+      await booking.save();
+
+      const bookResp = await tboService.bookFlight({
+        traceId: booking.flightRequest.traceId,
+        resultIndex: booking.flightRequest.resultIndex,
+        fareQuote: booking.flightRequest.fareQuote,
+        passengers,
+        ssr: booking.flightRequest.ssrSnapshot || {},
+      });
+
+      tboBookingId = bookResp.bookingId;
+      pnr = bookResp.pnr;
+
+      if (!tboBookingId && !pnr) {
+        booking.bookingResult = { providerResponse: bookResp.raw };
+        await booking.save();
+
+        return res
+          .status(200)
+          .json(
+            new ApiResponse(
+              200,
+              { bookingId: booking._id },
+              "Booking initiated. Awaiting airline confirmation",
+            ),
+          );
+      }
+
+      booking.bookingResult = {
+        providerBookingId: tboBookingId,
+        pnr,
+      };
+      await booking.save();
+    }
+
+    /* =========================================================
+       STEP 2: PAYMENT (LCC + NON-LCC)
+    ========================================================= */
+    // booking.executionStatus = "payment_processing";
+    // await booking.save();
+
+    await paymentService.processBookingPayment({
+      booking,
+      corporate,
+    });
+
+    /* =========================================================
+       STEP 3: TICKETING
+    ========================================================= */
+    // booking.executionStatus = "ticketing_initiated";
+    // await booking.save();
+
+    const ticketResp = await tboService.ticketFlight(
+      isLCC
+        ? {
+            IsLCC: true,
+            traceId: booking.flightRequest.traceId,
+            resultIndex: booking.flightRequest.resultIndex,
+            fareQuote: booking.flightRequest.fareQuote.Results[0],
+            passengers,
+          }
+        : {
+            IsLCC: false,
+            bookingId: tboBookingId,
+            pnr,
+          },
+    );
+
+    const finalPNR =
+      ticketResp?.Response?.PNR ||
+      ticketResp?.Response?.FlightItinerary?.PNR ||
+      ticketResp?.FlightItinerary?.PNR ||
+      ticketResp?.PNR ||
+      pnr;
+
+    if (!finalPNR) {
+      throw new ApiError(
+        500,
+        "Ticketing succeeded but PNR not returned by provider",
+      );
+    }
+
+    booking.executionStatus = "ticketed";
+    // booking.bookingResult.pnr = finalPNR;
+    booking.bookingResult = {
+      ...(booking.bookingResult || {}),
+      pnr: finalPNR,
+      ticketResponse: ticketResp,
+    };
+
+    booking.bookingResult.ticketResponse = ticketResp;
+    await booking.save();
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          { bookingId: booking._id, pnr: finalPNR },
+          "Flight booked & ticketed successfully",
+        ),
+      );
+  } catch (err) {
+    booking.executionStatus = "failed";
+    await booking.save();
+
+    // Wallet rollback (ONLY prepaid)
+    if (corporate.classification === "prepaid") {
+      const balanceBefore = corporate.walletBalance;
+
+      corporate.walletBalance += bookingAmount;
+      await corporate.save();
+
+      const balanceAfter = corporate.walletBalance;
+
+      await WalletTransaction.create({
+        corporateId: corporate._id,
+        bookingId: booking._id,
+        type: "credit",
+        amount: bookingAmount,
+        balanceBefore,
+        balanceAfter,
+        description: "Wallet refund due to booking failure",
+        status: "completed",
+      });
+    }
+
+    throw err;
+  }
+});
+
+// @desc    Download ticket PDF
+// @route   GET /api/v1/bookings/:id/ticket-pdf
+// @access  Private (Employee)
+exports.downloadTicketPdf = asyncHandler(async (req, res) => {
+  const booking = await BookingRequest.findById(req.params.id);
+
+  if (!booking) {
+    throw new ApiError(404, "Booking not found");
+  }
+
+  // 🔐 ownership check
+  if (booking.userId.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "Not authorized");
   }
 
-  if (booking.status !== "approved") {
-    throw new ApiError(400, "Booking must be approved first");
+  if (booking.executionStatus !== "ticketed") {
+    throw new ApiError(400, "Ticket not available yet");
   }
 
-  const corporate = await Corporate.findById(booking.corporateId);
-
-  /**
-   * 🔹 STEP 1: TBO Ticketing (Flight only)
-   */
-  if (booking.bookingType === "flight") {
-    if (!booking.flightDetails?.traceId || !booking.flightDetails?.priceId) {
-      throw new ApiError(400, "Missing TBO flight identifiers");
-    }
-
-    const ticketResponse = await tboService.ticketFlight({
-      traceId: booking.flightDetails.traceId,
-      priceId: booking.flightDetails.priceId,
-      passengers: booking.travellers,
-    });
-
-    booking.flightDetails.ticketResponse = ticketResponse;
-    booking.flightDetails.pnr = ticketResponse?.Response?.PNR;
-    booking.flightDetails.ticketStatus = "issued";
+  const pnr = booking.bookingResult?.pnr;
+  if (!pnr) {
+    throw new ApiError(400, "PNR missing");
   }
 
-  /**
-   * 🔹 STEP 2: Payment handling (your existing logic)
-   */
-  if (corporate.classification === "prepaid") {
-    if (corporate.walletBalance < booking.pricing.totalAmount) {
-      throw new ApiError(400, "Insufficient wallet balance");
-    }
+  // ✅ fetch booking details from TBO
+  const details = await tboService.getBookingDetails(pnr);
 
-    corporate.walletBalance -= booking.pricing.totalAmount;
-    await corporate.save();
-
-    await WalletTransaction.create({
-      corporateId: corporate._id,
-      bookingId: booking._id,
-      type: "debit",
-      amount: booking.pricing.totalAmount,
-      status: "completed",
-      description: `Booking ${booking.bookingReference}`,
-    });
-  } else {
-    corporate.currentCredit += booking.pricing.totalAmount;
-    await corporate.save();
-
-    await Ledger.create({
-      corporateId: corporate._id,
-      bookingId: booking._id,
-      amount: booking.pricing.totalAmount,
-      type: "booking",
-    });
-  }
-
-  /**
-   * 🔹 STEP 3: Voucher
-   */
-  booking.voucherUrl =
-    booking.bookingType === "flight"
-      ? await pdfService.generateFlightVoucher(booking, req.user, corporate)
-      : await pdfService.generateHotelVoucher(booking, req.user, corporate);
-
-  booking.status = "confirmed";
-  booking.paymentDetails.paymentStatus = "completed";
-
-  await booking.save();
-
-  await notificationService.sendBookingNotification(
+  // ✅ generate PDF
+  const pdfPath = await pdfService.generateFlightTicketPdf({
     booking,
-    req.user,
-    "confirmation"
+    tboDetails: details,
+  });
+
+  return res.download(pdfPath);
+});
+
+// @desc    Employee - Get my bookings (all statuses)
+// @route   GET /api/v1/bookings/my
+// @access  Private (Employee)
+exports.getMyBookings = asyncHandler(async (req, res) => {
+  const {
+    page = 1,
+    limit = 10,
+    bookingType = "flight", // default to flight
+  } = req.query;
+
+  const query = {
+    userId: req.user._id,
+    bookingType,
+    executionStatus: "ticketed", // ✅ only ticketed bookings
+  };
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const [bookings, total] = await Promise.all([
+    BookingRequest.find(query)
+      .select(
+        "bookingReference bookingType requestStatus executionStatus bookingSnapshot pricingSnapshot createdAt bookingResult",
+      )
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit)),
+    BookingRequest.countDocuments(query),
+  ]);
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        bookings,
+        pagination: {
+          total,
+          page: Number(page),
+          pages: Math.ceil(total / limit),
+        },
+      },
+      "Ticketed flight bookings fetched successfully",
+    ),
   );
+});
+
+// @desc    Employee - Get my booking by ID
+// @route   GET /api/v1/bookings/my/:id
+// @access  Private (Employee)
+exports.getMyBookingById = asyncHandler(async (req, res) => {
+  const booking = await BookingRequest.findById(req.params.id);
+
+  if (!booking) {
+    throw new ApiError(404, "Booking not found");
+  }
+
+  // 🔐 Ownership enforcement (MANDATORY)
+  if (booking.userId.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "Not authorized to view this booking");
+  }
 
   res
     .status(200)
-    .json(new ApiResponse(200, booking, "Booking confirmed successfully"));
+    .json(
+      new ApiResponse(200, booking, "Booking details fetched successfully"),
+    );
 });
 
 // @desc    Get all bookings
@@ -329,8 +592,8 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
           pages: Math.ceil(total / limit),
         },
       },
-      "Bookings fetched successfully"
-    )
+      "Bookings fetched successfully",
+    ),
   );
 });
 
@@ -358,7 +621,7 @@ exports.getBooking = asyncHandler(async (req, res) => {
   res
     .status(200)
     .json(
-      new ApiResponse(200, booking, "Booking details fetched successfully")
+      new ApiResponse(200, booking, "Booking details fetched successfully"),
     );
 });
 
@@ -383,7 +646,7 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
   if (!["confirmed", "approved"].includes(booking.status)) {
     throw new ApiError(
       400,
-      "Only confirmed or approved bookings can be cancelled"
+      "Only confirmed or approved bookings can be cancelled",
     );
   }
 
@@ -403,3 +666,17 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, booking, "Booking cancelled successfully"));
 });
+
+module.exports = {
+  createBookingRequest: exports.createBookingRequest,
+  getMyRequests: exports.getMyRequests,
+  getMyRequestById: exports.getMyRequestById,
+  getMyRejectedRequests: exports.getMyRejectedRequests,
+  executeApprovedFlightBooking: exports.executeApprovedFlightBooking,
+  downloadTicketPdf: exports.downloadTicketPdf,
+  getMyBookings: exports.getMyBookings,
+  getMyBookingById: exports.getMyBookingById,
+  getAllBookings: exports.getAllBookings,
+  getBooking: exports.getBooking,
+  cancelBooking: exports.cancelBooking,
+};

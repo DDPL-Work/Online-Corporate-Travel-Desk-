@@ -1,4 +1,4 @@
-// server/src/middlewares/corporate.middleware.js
+// server/src/middleware/corporate.middleware.js
 const Corporate = require("../models/Corporate");
 const ApiError = require("../utils/ApiError");
 

@@ -70,6 +70,7 @@ const bookingRequestSchema = new mongoose.Schema(
         firstName: String,
         lastName: String,
         email: String,
+        phoneWithCode: String,
         dateOfBirth: Date,
         gender: String,
         passportNumber: String,

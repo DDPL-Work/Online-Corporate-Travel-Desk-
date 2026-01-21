@@ -60,6 +60,7 @@ import FlightSearchResults from "../Pages/search-results/Flight-results/FlightSe
 import OneFlightBooking from "../Pages/Booking-Flow/Flight-Booking/OneFlightBooking";
 import RoundTripFlightBooking from "../Pages/Booking-Flow/Flight-Booking/RoundTripFlightBooking";
 import BookApprovedFlight from "../Pages/Booking-Flow/Flight-Booking/BookApprovedFlight";
+import BookingDetails from "../components/EmployeeDashboard/BookingDetails";
 
 export const appRouter = createBrowserRouter([
   // -------------------------------
@@ -160,6 +161,7 @@ export const appRouter = createBrowserRouter([
         element: <Layout />,
         children: [
           { path: "/my-bookings", element: <MyBookings /> },
+          { path: "/my-bookings/:id", element: <BookingDetails /> },
           { path: "/my-upcoming-trips", element: <MyUpcomingTrips /> },
           { path: "/my-past-trips", element: <MyPastTrips /> },
           { path: "/my-pending-approvals", element: <MyPendingApprovals /> },

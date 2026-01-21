@@ -63,11 +63,11 @@ export default function EmployeeHeader() {
       <div className="max-w-full mx-10  py-1  flex items-center justify-between">
         {/* LEFT: LOGO */}
         <div
-          onClick={() => navigate("/my-bookings")}
+          onClick={() => navigate("/search-flight")}
           className="flex items-center gap-2 cursor-pointer"
         >
           <div className="w-9 h-9 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-lg">
-            TD
+            ED
           </div>
           <span className="text-xl font-bold text-slate-900">COTD</span>
         </div>
@@ -121,7 +121,7 @@ export default function EmployeeHeader() {
             {profileOpen && (
               <div className="absolute right-0 mt-2 w-60 bg-white border rounded-lg shadow-lg z-50">
                 <button
-                  onClick={() => navigate("/search-flight")}
+                  onClick={() => navigate("/my-bookings")}
                   className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
                 >
                   <FaHome />
