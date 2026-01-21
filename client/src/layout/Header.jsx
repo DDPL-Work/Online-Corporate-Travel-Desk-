@@ -89,7 +89,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
       {/* LEFT */}
       <div className="flex items-center gap-4">
         <button
-          className="p-2 text-[#0A4D68] hover:bg-gray-100 rounded lg:hidden"
+          className="p-2 text-[#0A4D68] bg-gray-100 rounded lg:hidden"
           onClick={toggleSidebar}
         >
           <FaBars size={20} />

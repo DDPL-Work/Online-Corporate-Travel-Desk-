@@ -13,9 +13,10 @@ import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchMyBookingRequestById,
-  confirmBooking,
+  executeApprovedFlightBooking,
 } from "../../../Redux/Actions/booking.thunks";
 import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { formatDateWithYear, formatDateTime, getCabinClassLabel } from "../../../utils/formatter";
 
 export default function BookApprovedFlight() {
   const { id } = useParams();
@@ -32,14 +33,26 @@ export default function BookApprovedFlight() {
     dispatch(fetchMyBookingRequestById(id));
   }, [dispatch, id]);
 
+  const flight = booking?.flightRequest;
+  const fareExpiry = flight?.fareExpiry ? new Date(flight.fareExpiry) : null;
+  const isFareExpired = fareExpiry && new Date() > fareExpiry;
+
   const handleBookFlight = async () => {
     try {
-      await dispatch(confirmBooking(id)).unwrap();
+      if (isFareExpired) {
+        ToastWithTimer({
+          type: "error",
+          message: "Fare expired. Please create a new request.",
+        });
+        return;
+      }
+
+      await dispatch(executeApprovedFlightBooking(id)).unwrap();
       ToastWithTimer({
         type: "success",
         message: "Flight booked successfully!",
       });
-      navigate("/my-bookings");
+      navigate("/my-bookings", { replace: true });
     } catch (err) {
       ToastWithTimer({
         type: "error",
@@ -59,10 +72,6 @@ export default function BookApprovedFlight() {
     return (
       <div className="text-center mt-20 text-gray-600">Booking not found.</div>
     );
-
-  const flight = booking.flightRequest;
-  const fareExpiry = flight?.fareExpiry ? new Date(flight.fareExpiry) : null;
-  const isFareExpired = fareExpiry && new Date() > fareExpiry;
 
   const getStatusInfo = () => {
     if (booking.requestStatus === "pending_approval")
@@ -120,14 +129,14 @@ export default function BookApprovedFlight() {
         </div>
 
         {/* ===== STATUS BAR ===== */}
-        <div
+        {/* <div
           className={`flex items-center justify-center gap-2 py-3 mb-8 rounded-xl border ${statusInfo.bg}`}
         >
           <FiClock className={`${statusInfo.color}`} />
           <span className={`font-medium ${statusInfo.color}`}>
             {statusInfo.text}
           </span>
-        </div>
+        </div> */}
 
         {/* ===== BENTO GRID ===== */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -147,7 +156,8 @@ export default function BookApprovedFlight() {
               </p>
               <p>
                 <span className="font-medium">Requested:</span>{" "}
-                {new Date(booking.createdAt).toLocaleString()}
+                {/* {new Date(booking.createdAt).toLocaleString()} */}
+                {formatDateTime(booking.createdAt)}
               </p>
               <p>
                 <span className="font-medium">Total Amount:</span> ₹
@@ -192,7 +202,7 @@ export default function BookApprovedFlight() {
               <FiMapPin /> Flight Itinerary
             </h2>
             <div className="space-y-3">
-              {flight.segments.map((seg, idx) => (
+              {flight?.segments?.map((seg, idx) => (
                 <div
                   key={idx}
                   className="border border-orange-100 rounded-lg p-3 bg-white hover:shadow-md transition"
@@ -207,13 +217,15 @@ export default function BookApprovedFlight() {
                   <div className="grid sm:grid-cols-2 mt-2 text-sm text-gray-700">
                     <p>
                       <strong>Departure:</strong>{" "}
-                      {new Date(seg.departureDateTime).toLocaleString()}
+                      {/* {new Date(seg.departureDateTime).toLocaleString()} */}
+                      {formatDateTime(seg.departureDateTime)}
                     </p>
                     <p>
                       <strong>Arrival:</strong>{" "}
-                      {new Date(seg.arrivalDateTime).toLocaleString()}
+                      {/* {new Date(seg.arrivalDateTime).toLocaleString()}  */}
+                      {formatDateTime(seg.arrivalDateTime)}
                     </p>
-                    <p>Cabin: {seg.cabinClass}</p>
+                    <p>Cabin: {getCabinClassLabel(seg.cabinClass)}</p>
                     <p>Aircraft: {seg.aircraft}</p>
                   </div>
                 </div>
@@ -261,7 +273,8 @@ export default function BookApprovedFlight() {
                     <p>
                       DOB:{" "}
                       {t.dateOfBirth
-                        ? new Date(t.dateOfBirth).toLocaleDateString()
+                        ? //  new Date(t.dateOfBirth).toLocaleDateString()
+                          formatDateWithYear(t.dateOfBirth)
                         : "N/A"}
                     </p>
                     <p>Email: {t.email || "N/A"}</p>

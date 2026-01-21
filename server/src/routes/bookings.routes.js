@@ -1,41 +1,37 @@
 // server/src/routes/bookings.routes.js
 
 const router = require("express").Router();
-const {
-  verifyToken,
-  authorizeRoles,
-} = require("../middleware/auth.middleware");
+const { verifyToken } = require("../middleware/auth.middleware");
 const corporateContext = require("../middleware/corporate.middleware");
 const bookingsController = require("../controllers/booking.controller");
 
-// All booking routes are private
+// 🔐 all routes protected
 router.use(verifyToken);
 
-// Create booking
-// router.post("/", bookingsController.createBookingRequest);
+// create booking request
+router.post("/", corporateContext, bookingsController.createBookingRequest);
 
+// employee routes
+router.get("/my/rejected", bookingsController.getMyRejectedRequests);
+router.get("/my-bookings", bookingsController.getMyBookings);
+router.get("/my-requests", bookingsController.getMyRequests);
+router.get("/my-booking/:id", bookingsController.getMyBookingById);
+router.get("/my-request/:id", bookingsController.getMyRequestById);
+
+// execute approved flight
 router.post(
-  "/",
-  verifyToken,
-  corporateContext, // ensures req.corporate
-  bookingsController.createBookingRequest
+  "/:bookingId/execute-flight",
+  bookingsController.executeApprovedFlightBooking
 );
 
-// Confirm booking after approval
-router.post("/:id/confirm", bookingsController.confirmBooking);
+router.get(
+  "/:id/ticket-pdf",
+  bookingsController.downloadTicketPdf
+)
 
-router.get("/my/rejected", bookingsController.getMyRejectedRequests);
-router.get("/my", bookingsController.getMyRequests);
-
-router.get("/my/:id", bookingsController.getMyRequestById);
-
-// Get all bookings
-router.get("/", bookingsController.getAllBookings);
-
-// Get single booking
-router.get("/:id", bookingsController.getBooking);
-
-// Cancel booking
+// common / admin
+// router.get("/", bookingsController.getAllBookings);
+// router.get("/:id", bookingsController.getBooking);
 router.post("/:id/cancel", bookingsController.cancelBooking);
 
 module.exports = router;

@@ -17,6 +17,7 @@ import ReturnFlightList from "./ReturnFlight/ReturnFlightList";
 import { formatDate } from "../../../utils/formatter";
 import { useLocation } from "react-router-dom";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
+import FareUpsellModal from "../../Booking-Flow/Flight-Booking/FareUpsellModal";
 
 const extractRoutes = (flights, journeyType) => {
   if (!Array.isArray(flights) || flights.length === 0) return [];
@@ -112,6 +113,9 @@ export default function FlightSearchResults() {
   );
 
   const [activeTab, setActiveTab] = useState("onward");
+
+  const [fareUpsellOpen, setFareUpsellOpen] = useState(false);
+  const [selectedFareUpsell, setSelectedFareUpsell] = useState(null);
 
   /* ---------------- FILTER STATES ---------------- */
   const [filteredFlights, setFilteredFlights] = useState([]);
@@ -308,7 +312,7 @@ export default function FlightSearchResults() {
       result = result.filter((f) => {
         const stops = getSegments(f).length - 1;
 
-        if (selectedStops.includes("Direct")) return stops === 0;
+        if (selectedStops.includes("Non-stop")) return stops === 0;
         if (selectedStops.includes("1 stop")) return stops === 1;
         if (selectedStops.includes("2+ stops")) return stops >= 2;
         return true;
@@ -534,6 +538,10 @@ export default function FlightSearchResults() {
           flight={flight}
           traceId={traceId}
           travelClass={cabinClass}
+          onOpenFareUpsell={(fareData) => {
+            setSelectedFareUpsell(fareData);
+            setFareUpsellOpen(true);
+          }}
         />
       );
     }
@@ -785,6 +793,12 @@ export default function FlightSearchResults() {
           </section>
         </div>
       </div>
+
+      <FareUpsellModal
+        isOpen={fareUpsellOpen}
+        onClose={() => setFareUpsellOpen(false)}
+        fareUpsellData={selectedFareUpsell}
+      />
     </div>
   );
 }

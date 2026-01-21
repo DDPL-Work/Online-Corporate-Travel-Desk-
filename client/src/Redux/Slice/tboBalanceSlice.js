@@ -60,9 +60,9 @@ const tboBalanceSlice = createSlice({
         state.loading = false;
 
         // ✅ CORRECT MAPPING
-        state.balance = action.payload.CashBalance ?? 0;
-        state.creditLimit = action.payload.CreditBalance ?? 0;
-        state.currency = action.payload.PreferredCurrency || "INR";
+        state.balance = action.payload.availableBalance ?? 0;
+        state.creditLimit = action.payload.creditLimit ?? 0;
+        state.currency = action.payload.currency || "INR";
 
         state.lastUpdated = Date.now();
       })

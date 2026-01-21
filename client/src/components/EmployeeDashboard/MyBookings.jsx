@@ -1,115 +1,222 @@
-import React, { useState } from "react";
-import { FiSearch, FiEye } from "react-icons/fi";
-import { employeeBookings } from "../../data/dummyData";
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  FiSearch,
+  FiEye,
+  FiMapPin,
+  FiCalendar,
+  FiFilter,
+} from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchMyBookings } from "../../Redux/Actions/booking.thunks";
+import {
+  formatDateTime,
+  airlineLogo,
+  formatDateWithYear,
+} from "../../utils/formatter";
 
 const colors = {
   primary: "#0A4D68",
-  secondary: "#088395",
-  accent: "#05BFDB",
-  light: "#F8FAFC",
-  dark: "#1E293B",
 };
 
 export default function MyBookings() {
-  const [search, setSearch] = useState("");
   const navigate = useNavigate();
-
-  const filtered = employeeBookings.filter((b) =>
-    b.destination.toLowerCase().includes(search.toLowerCase())
+  const dispatch = useDispatch();
+  const { list: bookings = [], loading } = useSelector(
+    (state) => state.bookings
   );
 
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  useEffect(() => {
+    dispatch(fetchMyBookings());
+  }, [dispatch]);
+
+  /* ================= FILTER LOGIC ================= */
+
+  const filteredBookings = useMemo(() => {
+    return bookings.filter((b) => {
+      const flight = b.flightRequest?.segments?.[0];
+
+      const destinationCity =
+        flight?.destination?.city?.toLowerCase() || "";
+
+      const departureDate = flight?.departureDateTime
+        ? new Date(flight.departureDateTime)
+        : null;
+
+      const matchesStatus =
+        statusFilter === "All" ||
+        b.executionStatus?.toLowerCase() === statusFilter.toLowerCase();
+
+      const matchesType =
+        typeFilter === "All" ||
+        b.bookingType?.toLowerCase() === typeFilter.toLowerCase();
+
+      const matchesSearch =
+        !searchTerm ||
+        destinationCity.includes(searchTerm.toLowerCase());
+
+      const matchesStart =
+        !startDate ||
+        (departureDate &&
+          departureDate >= new Date(startDate + "T00:00:00"));
+
+      const matchesEnd =
+        !endDate ||
+        (departureDate &&
+          departureDate <= new Date(endDate + "T23:59:59"));
+
+      return (
+        matchesStatus &&
+        matchesType &&
+        matchesSearch &&
+        matchesStart &&
+        matchesEnd
+      );
+    });
+  }, [bookings, statusFilter, typeFilter, searchTerm, startDate, endDate]);
+
+  /* ================= UI ================= */
+
   return (
-    <div className="p-6" style={{ backgroundColor: colors.light }}>
-      <div className="flex items-center justify-between">
-      <h1 className="text-2xl font-bold mb-6" style={{ color: colors.dark }}>
-        My Bookings
-      </h1>
-
-      <div onClick={()=>navigate("/search-flight")} className="bg-[#035966] text-white text-center py-1.5 px-3 rounded-xl cursor-pointer">
-        Make Booking
-      </div>
-      </div>
-
-      {/* Search */}
-      <div className="bg-white p-4 rounded shadow flex items-center gap-3 mb-6">
-        <FiSearch className="text-gray-500" />
-        <input
-          type="text"
-          placeholder="Search by destination..."
-          className="w-full outline-none"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+    <div className="p-6 bg-[#F8FAFC] min-h-screen">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-[#0A4D68]">My Bookings</h1>
+        <button
+          onClick={() => navigate("/search-flight")}
+          className="bg-[#035966] text-white px-4 py-2 rounded-xl hover:bg-[#044652]"
+        >
+          Make Booking
+        </button>
       </div>
 
-      {/* Bookings List */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="w-full text-left">
-          <thead style={{ backgroundColor: colors.primary }}>
-            <tr>
-              {["Type", "Destination", "Dates", "Cost", "Status", "Actions"].map(
-                (h) => (
-                  <th
-                    key={h}
-                    className="px-6 py-3 text-white text-sm font-medium"
-                  >
-                    {h}
-                  </th>
-                )
-              )}
-            </tr>
-          </thead>
+      {/* Filters */}
+      <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <FiFilter className="text-[#0A4D68]" />
+          <h2 className="font-semibold text-[#0A4D68]">Filter Bookings</h2>
+        </div>
 
-          <tbody className="divide-y divide-gray-200">
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="py-8 text-center text-gray-500">
-                  No bookings found
-                </td>
-              </tr>
-            ) : (
-              filtered.map((book) => (
-                <tr key={book.id} className="hover:bg-gray-50 transition">
-                  <td className="px-6 py-4 text-sm font-medium">
-                    {book.type === "Flight" ? "✈️ Flight" : "🏨 Hotel"}
-                  </td>
+        <div className="grid md:grid-cols-5 gap-4">
+          <select
+            className="border p-2 rounded"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
+            <option>All</option>
+            <option>Flight</option>
+            <option>Hotel</option>
+          </select>
 
-                  <td className="px-6 py-4 text-sm">{book.destination}</td>
+          <select
+            className="border p-2 rounded"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option>All</option>
+            <option>ticketed</option>
+            <option>failed</option>
+          </select>
 
-                  <td className="px-6 py-4 text-sm">
-                    {book.startDate} → {book.endDate}
-                  </td>
+          <input
+            type="date"
+            className="border p-2 rounded"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
 
-                  <td className="px-6 py-4 text-sm font-semibold text-[#088395]">
-                    ₹{book.cost.toLocaleString()}
-                  </td>
+          <input
+            type="date"
+            className="border p-2 rounded"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
 
-                  <td className="px-6 py-4 text-sm">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        book.status === "Confirmed"
-                          ? "bg-green-100 text-green-700"
-                          : book.status === "Cancelled"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-yellow-100 text-yellow-700"
-                      }`}
-                    >
-                      {book.status}
-                    </span>
-                  </td>
-
-                  <td className="px-6 py-4 text-sm">
-                    <button className="flex items-center gap-1 px-3 py-2 rounded bg-gray-100 hover:bg-gray-200">
-                      <FiEye size={16} /> View
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-3 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search destination"
+              className="border pl-9 p-2 rounded w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
       </div>
+
+      {/* Cards */}
+      {loading ? (
+        <div className="text-center py-10">Loading...</div>
+      ) : filteredBookings.length === 0 ? (
+        <div className="text-center py-10 text-gray-500">
+          No bookings found
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredBookings.map((b) => {
+  const snapshot = b.bookingSnapshot;
+
+  const sector = snapshot?.sectors?.[0] || "N/A → N/A";
+  const [from, to] = sector.split("-");
+
+  return (
+    <div
+      key={b._id}
+      className="bg-white rounded-lg shadow-md p-5 border-l-4"
+      style={{ borderColor: colors.primary }}
+    >
+      {/* Header */}
+      <div className="flex justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-[#0A4D68]">
+            {snapshot?.airline || "Airline"}
+          </span>
+        </div>
+
+        <span className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded-full">
+          Booked
+        </span>
+      </div>
+
+      {/* Route */}
+      <div className="text-sm flex items-center gap-2">
+        <FiMapPin />
+        <span>
+          {from || "N/A"} → {to || "N/A"}
+        </span>
+      </div>
+
+      {/* Date */}
+      <div className="text-sm text-gray-600 mt-1 flex items-center gap-2">
+        <FiCalendar />
+        <span>{formatDateWithYear(snapshot?.travelDate)}</span>
+      </div>
+
+      {/* Fare */}
+      <div className="mt-3 font-bold text-[#088395]">
+        ₹{b.pricingSnapshot?.totalAmount}
+      </div>
+
+      {/* Action */}
+      <button
+        onClick={() => navigate(`/my-bookings/${b._id}`)}
+        className="mt-4 w-full bg-gray-100 py-2 rounded flex justify-center gap-2"
+      >
+        <FiEye /> View Details
+      </button>
+    </div>
+  );
+})}
+
+        </div>
+      )}
     </div>
   );
 }

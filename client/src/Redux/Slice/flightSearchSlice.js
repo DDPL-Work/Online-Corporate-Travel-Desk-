@@ -7,8 +7,9 @@ import {
   getFareRule,
   getSSR,
   bookFlight,
-  ticketFlight,
+  // ticketFlight,
   getBookingDetails,
+  getFareUpsell,
 } from "../Actions/flight.thunks";
 
 const initialState = {
@@ -20,6 +21,8 @@ const initialState = {
   fareQuote: null,
   fareRule: null,
   ssr: null,
+  fareUpsell: null,
+  selectedFareFamily: null,
 
   booking: null,
   ticket: null,
@@ -37,6 +40,9 @@ const flightSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    selectFareFamily: (state, action) => {
+      state.selectedFareFamily = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -50,7 +56,6 @@ const flightSlice = createSlice({
         state.traceId = action.payload.TraceId;
         state.journeyType = action.payload.journeyType;
         state.cabinClass = action.meta.arg.cabinClass;
-
 
         // 🔥 IMPORTANT: Flatten Results
         state.searchResults = action.payload.Results;
@@ -75,6 +80,10 @@ const flightSlice = createSlice({
       .addCase(getSSR.fulfilled, (state, action) => {
         state.ssr = action.payload;
       })
+      /* FARE UP SHELL */
+      .addCase(getFareUpsell.fulfilled, (state, action) => {
+        state.fareUpsell = action.payload;
+      })
 
       /* BOOK */
       .addCase(bookFlight.fulfilled, (state, action) => {
@@ -82,9 +91,9 @@ const flightSlice = createSlice({
       })
 
       /* TICKET */
-      .addCase(ticketFlight.fulfilled, (state, action) => {
-        state.ticket = action.payload;
-      })
+      // .addCase(ticketFlight.fulfilled, (state, action) => {
+      //   state.ticket = action.payload;
+      // })
 
       /* BOOKING DETAILS */
       .addCase(getBookingDetails.fulfilled, (state, action) => {
@@ -93,5 +102,6 @@ const flightSlice = createSlice({
   },
 });
 
-export const { resetFlights, clearError } = flightSlice.actions;
+export const { resetFlights, clearError, selectFareFamily } =
+  flightSlice.actions;
 export default flightSlice.reducer;
