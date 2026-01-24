@@ -1,15 +1,14 @@
 // FlightSearchResults.jsx
 import React, { useState, useEffect, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { BsCalendar4 } from "react-icons/bs";
 import { BiTrendingDown } from "react-icons/bi";
-
-import OneWayFlightCard from "./One-wayFlightCard";
-import FlightFilterSidebar from "./Filter-Sidebar";
-
+import { IoIosAirplane } from "react-icons/io";
 import { MdArrowBack } from "react-icons/md";
 import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
-import { useDispatch, useSelector } from "react-redux";
+import FlightFilterSidebar from "./Filter-Sidebar";
+import OneWayFlightCard from "./One-wayFlightCard";
 import MultiCityFlightCard from "./Multi-cityFlightCard";
 import SelectedTripSummary from "./ReturnFlight/SelectedTripSummary";
 import OnwardFlightList from "./ReturnFlight/OnwardFlightList";
@@ -18,6 +17,7 @@ import { formatDate } from "../../../utils/formatter";
 import { useLocation } from "react-router-dom";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
 import FareUpsellModal from "../../Booking-Flow/Flight-Booking/FareUpsellModal";
+import ReturnInternationalFlightCard from "./ReturnFlight/ReturnInternationalFlightCard";
 
 const extractRoutes = (flights, journeyType) => {
   if (!Array.isArray(flights) || flights.length === 0) return [];
@@ -34,26 +34,6 @@ const extractRoutes = (flights, journeyType) => {
       },
     ];
   }
-
-  // // ROUND TRIP
-  // if (journeyType === 2 && flights.length >= 2) {
-  //   const onward = flights[0]?.Segments?.[0]?.[0];
-  //   const ret = flights[1]?.Segments?.[0]?.[0];
-  //   if (!onward || !ret) return [];
-
-  //   return [
-  //     {
-  //       fromCity: onward.Origin.Airport.CityName,
-  //       toCity: onward.Destination.Airport.CityName,
-  //       depDate: onward.Origin.DepTime,
-  //     },
-  //     {
-  //       fromCity: ret.Origin.Airport.CityName,
-  //       toCity: ret.Destination.Airport.CityName,
-  //       depDate: ret.Origin.DepTime,
-  //     },
-  //   ];
-  // }
 
   // MULTI CITY
   if (journeyType === 3) {
@@ -103,13 +83,13 @@ export default function FlightSearchResults() {
 
   const onwardSearchDate = normalizeSearchDate(
     searchPayload?.Segments?.[0]?.PreferredDepartureTime ||
-      searchPayload?.departureDate
+      searchPayload?.departureDate,
   );
 
   const returnSearchDate = normalizeSearchDate(
     searchPayload?.returnDate ||
       searchPayload?.ReturnDate ||
-      searchPayload?.Segments?.[1]?.OriginTime
+      searchPayload?.Segments?.[1]?.OriginTime,
   );
 
   const [activeTab, setActiveTab] = useState("onward");
@@ -121,7 +101,6 @@ export default function FlightSearchResults() {
   const [filteredFlights, setFilteredFlights] = useState([]);
 
   const [priceValues, setPriceValues] = useState([1000, 70000]);
-  // const [selectedMaxPrice, setSelectedMaxPrice] = useState(70000);
 
   const [durationValues, setDurationValues] = useState([0, 1440]);
   const [selectedMaxDuration, setSelectedMaxDuration] = useState(1440);
@@ -159,16 +138,106 @@ export default function FlightSearchResults() {
     error,
   } = useSelector((state) => state.flights);
 
-  const normalizedFlights = useMemo(() => {
-    return Number(journeyType) === 2 ? flights.flat() : flights;
-  }, [flights, journeyType]);
-
   const [selectedOnward, setSelectedOnward] = useState(null);
   const [selectedReturn, setSelectedReturn] = useState(null);
 
-  const routes = useMemo(
-    () => extractRoutes(flights, Number(journeyType)),
-    [flights, journeyType]
+  const isInternationalReturnGrouped =
+    Number(journeyType) === 2 &&
+    Array.isArray(flights) &&
+    flights.some(
+      (f) =>
+        Array.isArray(f?.Segments) &&
+        f.Segments.length === 2 &&
+        Array.isArray(f.Segments[0]) &&
+        Array.isArray(f.Segments[1]),
+    );
+  const normalizedFlights = useMemo(() => {
+    if (Number(journeyType) !== 2) return flights;
+
+    // Domestic round trip → flat
+    if (!isInternationalReturnGrouped) {
+      return flights.flat();
+    }
+
+    // International return → KEEP grouped
+    return flights;
+  }, [flights, journeyType, isInternationalReturnGrouped]);
+
+  const routes = useMemo(() => {
+    if (Number(journeyType) === 3) {
+      return (searchPayload?.segments || []).map((seg) => ({
+        fromCity: seg.origin,
+        toCity: seg.destination,
+        depDate: seg.departureDate,
+      }));
+    }
+
+    return extractRoutes(flights, Number(journeyType));
+  }, [journeyType, flights, searchPayload]);
+
+  const priceRange = useMemo(() => {
+    if (!normalizedFlights.length) {
+      return { min: 0, max: 0 };
+    }
+
+    const prices = normalizedFlights
+      .map((f) => f?.Fare?.PublishedFare || 0)
+      .filter(Boolean);
+
+    if (!prices.length) {
+      return { min: 0, max: 0 };
+    }
+
+    return {
+      min: Math.floor(Math.min(...prices) / 100) * 100,
+      max: Math.ceil(Math.max(...prices) / 100) * 100,
+    };
+  }, [normalizedFlights]);
+
+  const activeFilters = useMemo(
+    () => ({
+      price:
+        priceValues[0] !== priceRange?.min ||
+        priceValues[1] !== priceRange?.max,
+
+      stops: selectedStops.length > 0,
+      airlines: selectedAirlines.length > 0,
+      fareTypes: selectedFareTypes.length > 0,
+      flightNumbers: selectedFlightNumbers.length > 0,
+      terminals: selectedTerminals.length > 0,
+      airports: selectedAirports.length > 0,
+      layovers: selectedLayoverAirports.length > 0,
+
+      departureTime: !!selectedTime,
+      arrivalTime: !!selectedArrivalTime,
+
+      duration:
+        durationValues[0] !== 0 || durationValues[1] !== selectedMaxDuration,
+
+      popular:
+        popularFilters.earlyMorning ||
+        popularFilters.refundable ||
+        popularFilters.directOnly ||
+        popularFilters.shortDuration,
+
+      lowCO2,
+    }),
+    [
+      priceValues,
+      selectedStops,
+      selectedAirlines,
+      selectedFareTypes,
+      selectedFlightNumbers,
+      selectedTerminals,
+      selectedAirports,
+      selectedLayoverAirports,
+      selectedTime,
+      selectedArrivalTime,
+      durationValues,
+      selectedMaxDuration,
+      popularFilters,
+      lowCO2,
+    ],
   );
 
   // ================= HEADER FLIGHT (SAFE) =================
@@ -177,9 +246,6 @@ export default function FlightSearchResults() {
 
   const firstSegment = segments[0];
   const lastSegment = segments[segments.length - 1];
-
-  const origin = firstSegment?.Origin;
-  const destination = firstSegment?.Destination;
 
   const fromCity = firstSegment?.Origin?.Airport?.CityName || "";
   const fromCode = firstSegment?.Origin?.Airport?.AirportCode || "";
@@ -214,23 +280,48 @@ export default function FlightSearchResults() {
   }, [filteredFlights, selectedOnward, toCode]);
 
   const routeHeader = useMemo(() => {
-    if (Number(journeyType) !== 2) {
-      return extractRoutes(flights, Number(journeyType));
+    const jt = Number(journeyType);
+
+    // MULTI CITY → derive from API flights
+    if (jt === 3) {
+      if (!Array.isArray(flights) || flights.length === 0) return [];
+
+      const firstItinerary = flights[0];
+
+      if (!Array.isArray(firstItinerary?.Segments)) return [];
+
+      return firstItinerary.Segments.map((leg) => {
+        const seg = leg?.[0];
+        if (!seg) return null;
+
+        return {
+          fromCity: seg.Origin?.Airport?.CityName || "",
+          toCity: seg.Destination?.Airport?.CityName || "",
+          depDate: seg.Origin?.DepTime || "",
+        };
+      }).filter(Boolean);
     }
 
-    return [
-      {
-        fromCity,
-        toCity,
-        depDate: onwardSearchDate,
-      },
-      {
-        fromCity: toCity,
-        toCity: fromCity,
-        depDate: returnSearchDate,
-      },
-    ];
-  }, [journeyType, fromCity, toCity, onwardSearchDate, returnSearchDate]);
+    // ROUND TRIP
+    if (jt === 2) {
+      return [
+        { fromCity, toCity, depDate: onwardSearchDate },
+        { fromCity: toCity, toCity: fromCity, depDate: returnSearchDate },
+      ];
+    }
+
+    // ONE WAY
+    return extractRoutes(flights, jt);
+  }, [
+    journeyType,
+    flights,
+    fromCity,
+    toCity,
+    onwardSearchDate,
+    returnSearchDate,
+  ]);
+
+  console.log("Header Route", routeHeader);
 
   const getSegments = (flight) => {
     if (!flight?.Segments) return [];
@@ -267,7 +358,7 @@ export default function FlightSearchResults() {
 
     const cheapestDate = cheapestFlight
       ? new Date(
-          getSegments(cheapestFlight)[0]?.Origin?.DepTime
+          getSegments(cheapestFlight)[0]?.Origin?.DepTime,
         ).toLocaleDateString("en-IN", {
           day: "2-digit",
           month: "short",
@@ -361,8 +452,8 @@ export default function FlightSearchResults() {
     if (selectedAirlines.length) {
       result = result.filter((f) =>
         getSegments(f).some((s) =>
-          selectedAirlines.includes(s?.Airline?.AirlineName)
-        )
+          selectedAirlines.includes(s?.Airline?.AirlineName),
+        ),
       );
     }
 
@@ -371,9 +462,9 @@ export default function FlightSearchResults() {
       result = result.filter((f) =>
         getSegments(f).some((s) =>
           selectedFlightNumbers.includes(
-            `${s?.Airline?.AirlineCode}-${s?.Airline?.FlightNumber}`
-          )
-        )
+            `${s?.Airline?.AirlineCode}-${s?.Airline?.FlightNumber}`,
+          ),
+        ),
       );
     }
 
@@ -426,12 +517,12 @@ export default function FlightSearchResults() {
         getSegments(f).some(
           (s) =>
             selectedTerminals.includes(
-              `Dep: ${s?.Origin?.Airport?.Terminal}`
+              `Dep: ${s?.Origin?.Airport?.Terminal}`,
             ) ||
             selectedTerminals.includes(
-              `Arr: ${s?.Destination?.Airport?.Terminal}`
-            )
-        )
+              `Arr: ${s?.Destination?.Airport?.Terminal}`,
+            ),
+        ),
       );
     }
 
@@ -441,8 +532,8 @@ export default function FlightSearchResults() {
         getSegments(f).some(
           (s) =>
             selectedAirports.includes(s?.Origin?.Airport?.AirportCode) ||
-            selectedAirports.includes(s?.Destination?.Airport?.AirportCode)
-        )
+            selectedAirports.includes(s?.Destination?.Airport?.AirportCode),
+        ),
       );
     }
 
@@ -454,8 +545,8 @@ export default function FlightSearchResults() {
           .slice(0, -1)
           .some((s) =>
             selectedLayoverAirports.includes(
-              s?.Destination?.Airport?.AirportCode
-            )
+              s?.Destination?.Airport?.AirportCode,
+            ),
           );
       });
     }
@@ -470,7 +561,7 @@ export default function FlightSearchResults() {
       case "Cheapest":
         result.sort(
           (a, b) =>
-            (a?.Fare?.PublishedFare || 0) - (b?.Fare?.PublishedFare || 0)
+            (a?.Fare?.PublishedFare || 0) - (b?.Fare?.PublishedFare || 0),
         );
         break;
 
@@ -478,7 +569,7 @@ export default function FlightSearchResults() {
         result.sort(
           (a, b) =>
             new Date(getSegments(a)[0]?.Origin?.DepTime) -
-            new Date(getSegments(b)[0]?.Origin?.DepTime)
+            new Date(getSegments(b)[0]?.Origin?.DepTime),
         );
         break;
 
@@ -486,7 +577,7 @@ export default function FlightSearchResults() {
         result.sort(
           (a, b) =>
             new Date(getSegments(b)[0]?.Origin?.DepTime) -
-            new Date(getSegments(a)[0]?.Origin?.DepTime)
+            new Date(getSegments(a)[0]?.Origin?.DepTime),
         );
         break;
 
@@ -549,9 +640,12 @@ export default function FlightSearchResults() {
     if (jt === 3) {
       return (
         <MultiCityFlightCard
-          key={`${flight.ResultIndex}`}
+          key={flight.ResultIndex}
           segments={flight.Segments}
+          fare={{ ...flight.Fare }} // 🔥 clone to avoid reference reuse
+          traceId={traceId}
           travelClass={cabinClass}
+          resultIndex={flight.ResultIndex}
         />
       );
     }
@@ -590,22 +684,34 @@ export default function FlightSearchResults() {
               Back to search
             </button>
 
-            {/* Routes */}
+            {/* ==================== ROUTES HEADER ==================== */}
             <div className="flex flex-col">
-              <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center flex-wrap gap-3">
                 {routeHeader.map((r, idx) => (
                   <React.Fragment key={idx}>
-                    <div className="flex items-center gap-3 justify-center">
-                      <h1 className="text-2xl font-bold text-gray-900">
-                        {r.fromCity} → {r.toCity}
-                      </h1>
-                      <span className="text-sm text-gray-500">
-                        ({formatDate(r.depDate)})
-                      </span>
+                    {/* Each Route Leg */}
+                    <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-2 shadow-sm hover:shadow-md transition-all duration-200">
+                      <div className="flex flex-col leading-tight">
+                        <h2 className="text-lg font-semibold flex items-center text-gray-900">
+                          {r.fromCity}
+                          <span className="mx-1 text-blue-600">
+                            <IoIosAirplane />{" "}
+                          </span>
+                          {r.toCity}
+                        </h2>
+
+                        <div className="flex items-center text-gray-500 text-xs font-medium mt-1">
+                          <BsCalendar4 className="mr-1.5 text-blue-500" />
+                          {formatDate(r.depDate)}
+                        </div>
+                      </div>
                     </div>
 
-                    {idx < routes.length - 1 && (
-                      <span className="text-gray-400 text-xl">◉</span>
+                    {/* Visual Connector (Between legs) */}
+                    {idx < routeHeader.length - 1 && (
+                      <div className="flex items-center justify-center text-gray-400 mx-1">
+                        <span className="text-lg">+</span>
+                      </div>
                     )}
                   </React.Fragment>
                 ))}
@@ -613,14 +719,16 @@ export default function FlightSearchResults() {
             </div>
 
             {/* Cheapest */}
-            <div className="flex items-center gap-2 text-sm">
-              <BiTrendingDown className="text-green-600" />
-              <span className="text-gray-600">Cheapest:</span>
-              <span className="font-bold text-gray-900">
-                {headerStats.minPrice
-                  ? `₹${headerStats.minPrice.toLocaleString()}`
-                  : "--"}
-              </span>
+            <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-2 ml-4">
+                <BiTrendingDown className="text-green-600" />
+                <span className="text-gray-600">Cheapest:</span>
+                <span className="font-bold text-gray-900">
+                  {headerStats.minPrice
+                    ? `₹${headerStats.minPrice.toLocaleString()}`
+                    : "--"}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -640,7 +748,7 @@ export default function FlightSearchResults() {
                   >
                     {tab}
                   </button>
-                )
+                ),
               )}
             </div>
 
@@ -713,7 +821,7 @@ export default function FlightSearchResults() {
             )}
 
             {/* Return Flight Tabs */}
-            {Number(journeyType) === 2 && (
+            {Number(journeyType) === 2 && !isInternationalReturnGrouped && (
               <div className="sticky top-[119px] z-30 bg-gray-300 border-b border-gray-200 rounded-lg shadow-sm">
                 <div className="flex gap-1 p-2">
                   <button
@@ -734,8 +842,8 @@ export default function FlightSearchResults() {
                       activeTab === "return"
                         ? "bg-blue-600 text-white shadow"
                         : selectedOnward
-                        ? "text-gray-600 hover:bg-gray-100"
-                        : "text-gray-400 cursor-not-allowed"
+                          ? "text-gray-600 hover:bg-gray-100"
+                          : "text-gray-400 cursor-not-allowed"
                     }`}
                   >
                     Return Flights {selectedReturn && "✓"}
@@ -744,8 +852,26 @@ export default function FlightSearchResults() {
               </div>
             )}
 
-            {Number(journeyType) === 2 ? (
+            {Number(journeyType) === 2 && isInternationalReturnGrouped ? (
+              filteredFlights.map((flight) => (
+                <ReturnInternationalFlightCard
+                  key={flight.ResultIndex}
+                  flight={flight}
+                  onContinue={() =>
+                    navigate("/round-trip-flight/booking", {
+                      state: {
+                        rawFlightData: flight, // ✅ PASS FULL GROUPED FLIGHT
+                        traceId,
+                        journeyType: 2,
+                        isInternational: true,
+                      },
+                    })
+                  }
+                />
+              ))
+            ) : Number(journeyType) === 2 ? (
               <>
+                {/* EXISTING DOMESTIC ROUND TRIP FLOW */}
                 {activeTab === "onward" && (
                   <OnwardFlightList
                     flights={onwardFlights}
@@ -784,7 +910,7 @@ export default function FlightSearchResults() {
               </>
             ) : (
               filteredFlights.map((flight, idx) =>
-                renderFlightCard(flight, idx)
+                renderFlightCard(flight, idx),
               )
             )}
 

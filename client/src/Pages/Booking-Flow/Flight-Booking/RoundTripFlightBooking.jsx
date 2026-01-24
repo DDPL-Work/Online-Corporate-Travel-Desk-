@@ -4,25 +4,15 @@ import { MdArrowBack, MdFlightTakeoff, MdFlightLand } from "react-icons/md";
 import { BsCalendar4 } from "react-icons/bs";
 import { AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
 import { useDispatch, useSelector } from "react-redux";
-import {  ToastWithTimer } from "../../../utils/ToastConfirm";
+import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import SeatSelectionModal from "./SeatSelectionModal";
 
 import {
-  formatTime,
   formatDate,
-  getAirlineLogo,
-  formatDuration,
   formatDurationCompact,
-  parseFlightData,
   RoundTripFlightTimeline,
   FareOptions,
   PriceSummary,
-  ImportantInformation,
-  BaggageTable,
-  orangeText,
-  orangeBg,
-  blueBg,
-  TravelerForm,
   FareRulesAccordion,
   Amenities,
   HotelHomeButton,
@@ -178,8 +168,8 @@ export default function RoundTripFlightBooking() {
     const hasSeats = (journeySSR) =>
       journeySSR?.Response?.SeatDynamic?.some((sd) =>
         sd?.SegmentSeat?.some(
-          (seg) => Array.isArray(seg?.RowSeats) && seg.RowSeats.length > 0
-        )
+          (seg) => Array.isArray(seg?.RowSeats) && seg.RowSeats.length > 0,
+        ),
       );
 
     return {
@@ -242,24 +232,14 @@ export default function RoundTripFlightBooking() {
   useEffect(() => {
     console.log(
       "ONWARD FareQuote Fare:",
-      fareQuote?.onward?.Response?.Results?.Fare
+      fareQuote?.onward?.Response?.Results?.Fare,
     );
     console.log(
       "RETURN FareQuote Fare:",
-      fareQuote?.return?.Response?.Results?.Fare
+      fareQuote?.return?.Response?.Results?.Fare,
     );
   }, [fareQuote]);
 
-  const baggageInfo = useMemo(() => {
-    if (!ssr?.onward?.Results?.Baggage?.length) return {};
-
-    const bag = ssr.onward.Results.Baggage[0];
-
-    return {
-      cB: "7 Kg",
-      iB: bag.Weight,
-    };
-  }, [ssr]);
 
   console.log("=== CORRECTED JOURNEY ASSIGNMENT ===");
   console.log("Onward:", onwardFrom, "→", onwardTo, "on", onwardDate);
@@ -304,7 +284,7 @@ export default function RoundTripFlightBooking() {
         traceId,
         resultIndex: rawFlightData.onward.ResultIndex,
         journeyType: "onward",
-      })
+      }),
     );
 
     dispatch(
@@ -312,7 +292,7 @@ export default function RoundTripFlightBooking() {
         traceId,
         resultIndex: rawFlightData.return.ResultIndex,
         journeyType: "return",
-      })
+      }),
     );
   }, [traceId, rawFlightData, dispatch]);
 
@@ -327,7 +307,7 @@ export default function RoundTripFlightBooking() {
         traceId,
         resultIndex: onwardIdx,
         journeyType: "onward",
-      })
+      }),
     );
 
     dispatch(
@@ -335,7 +315,7 @@ export default function RoundTripFlightBooking() {
         traceId,
         resultIndex: onwardIdx,
         journeyType: "onward",
-      })
+      }),
     );
 
     dispatch(
@@ -343,7 +323,7 @@ export default function RoundTripFlightBooking() {
         traceId,
         resultIndex: returnIdx,
         journeyType: "return",
-      })
+      }),
     );
 
     dispatch(
@@ -351,7 +331,7 @@ export default function RoundTripFlightBooking() {
         traceId,
         resultIndex: returnIdx,
         journeyType: "return",
-      })
+      }),
     );
   }, [traceId, rawFlightData, dispatch]);
 
@@ -369,40 +349,12 @@ export default function RoundTripFlightBooking() {
     console.log("SSR RETURN:", ssr?.return);
   }, [fareRule, ssr]);
 
-  const addTraveler = () => {
-    const newTraveler = {
-      id: travelers.length + 1,
-      title: "Mr.",
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      email: "",
-      mobile: "",
-      phoneWithCode: "",
-      passportNumber: "",
-      dob: "",
-      age: "",
-    };
-    setTravelers([...travelers, newTraveler]);
-  };
-
-  const removeTraveler = (id) => {
-    if (travelers.length > 1) {
-      setTravelers(travelers.filter((t) => t.id !== id));
-    }
-  };
-
-  const updateTraveler = (id, field, value) => {
-    setTravelers(
-      travelers.map((t) => (t.id === id ? { ...t, [field]: value } : t))
-    );
-  };
 
   const toggleSeatSelection = (
     journeyType,
     segmentIndex,
     seatNum,
-    price = 0
+    price = 0,
   ) => {
     setSelectedSeats((prev) => {
       const key = `${journeyType}|${segmentIndex}`;
@@ -471,7 +423,7 @@ export default function RoundTripFlightBooking() {
     journeyType,
     segmentIndex,
     meal,
-    travelersCount
+    travelersCount,
   ) => {
     const key = `${journeyType}|${segmentIndex}`;
 
@@ -534,7 +486,7 @@ export default function RoundTripFlightBooking() {
     const onwardDuration = parsedFlightData.totalDuration || 0;
     const returnDuration = parsedFlightData.returnTotalDuration || 0;
     return `${formatDurationCompact(onwardDuration)} + ${formatDurationCompact(
-      returnDuration
+      returnDuration,
     )}`;
   };
 
@@ -561,12 +513,12 @@ export default function RoundTripFlightBooking() {
 
   console.log(
     "ONWARD PRICE LIST:",
-    rawFlightData?.tripInfos?.ONWARD?.[0]?.totalPriceList
+    rawFlightData?.tripInfos?.ONWARD?.[0]?.totalPriceList,
   );
 
   console.log(
     "RETURN PRICE LIST:",
-    rawFlightData?.tripInfos?.RETURN?.[0]?.totalPriceList
+    rawFlightData?.tripInfos?.RETURN?.[0]?.totalPriceList,
   );
 
   if (loading) {
@@ -604,9 +556,7 @@ export default function RoundTripFlightBooking() {
   const returnSegments = parsedFlightData.returnSegments || [];
 
   const onwardDepartureDateTime = onwardSegments[0]?.dt;
-  const onwardArrivalDateTime = onwardSegments[onwardSegments.length - 1]?.at;
   const returnDepartureDateTime = returnSegments[0]?.dt;
-  const returnArrivalDateTime = returnSegments[returnSegments.length - 1]?.at;
 
   return (
     <div className="min-h-screen bg-slate-50 font-[DM Sans]">
@@ -620,11 +570,11 @@ export default function RoundTripFlightBooking() {
         travelers={travelers}
         resultIndex={showSeatModal.resultIndex}
         selectedSeats={selectedSeats}
-        selectedMeals={selectedMeals} 
-        selectedBaggage={selectedBaggage} 
+        selectedMeals={selectedMeals}
+        selectedBaggage={selectedBaggage}
         onSeatSelect={toggleSeatSelection}
         onToggleMeal={toggleMealSelection}
-        onSelectBaggage={handleSelectBaggage} 
+        onSelectBaggage={handleSelectBaggage}
         date={showSeatModal.date}
         flightIndex={showSeatModal.segmentIndex}
       />
@@ -770,7 +720,7 @@ export default function RoundTripFlightBooking() {
                           flight,
                           flightIdx,
                           "onward",
-                          rawFlightData.onward.ResultIndex
+                          rawFlightData.onward.ResultIndex,
                         )
                       }
                       isSeatReady={isRTSeatReady.onward}
@@ -827,7 +777,7 @@ export default function RoundTripFlightBooking() {
                           flight,
                           flightIdx,
                           "return",
-                          rawFlightData.return.ResultIndex
+                          rawFlightData.return.ResultIndex,
                         )
                       }
                       isSeatReady={isRTSeatReady.return}

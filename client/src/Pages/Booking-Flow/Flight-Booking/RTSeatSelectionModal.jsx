@@ -46,7 +46,7 @@ export default function RTSeatSelectionModal({
   const { seatMap, loading } = useSelector((state) => state.flightsRT);
   const fareQuote = useSelector((state) => state.flightsRT.fareQuoteRT);
   const ssr = useSelector(
-    (state) => state.flightsRT.ssrRT?.[journeyType]?.[resultIndex]
+    (state) => state.flightsRT.ssrRT?.[journeyType]?.[resultIndex],
   );
 
   const [seatsFlat, setSeatsFlat] = useState([]);
@@ -103,7 +103,7 @@ export default function RTSeatSelectionModal({
       rows[seat.row].push(seat);
     });
     Object.keys(rows).forEach((row) =>
-      rows[row].sort((a, b) => (a.col || 0) - (b.col || 0))
+      rows[row].sort((a, b) => (a.col || 0) - (b.col || 0)),
     );
     return rows;
   }, [seatsFlat]);
@@ -145,7 +145,7 @@ export default function RTSeatSelectionModal({
   // Meal/Baggage normalization
   const normalizedMeals = useMemo(
     () => normalizeSSRList(segmentSSR.meals),
-    [segmentSSR.meals]
+    [segmentSSR.meals],
   );
 
   const normalizeBaggage = (list = []) =>
@@ -156,7 +156,7 @@ export default function RTSeatSelectionModal({
 
   const normalizedBaggage = useMemo(
     () => normalizeBaggage(segmentSSR.baggage),
-    [segmentSSR.baggage]
+    [segmentSSR.baggage],
   );
 
   // Helpers
@@ -177,7 +177,7 @@ export default function RTSeatSelectionModal({
     } else {
       if (list.length >= travelers.length) {
         ToastWithTimer({
-          type:"info",
+          type: "info",
           message: `You can select max ${travelers.length} seats`,
         });
         return;
@@ -197,7 +197,7 @@ export default function RTSeatSelectionModal({
     const seatObj = selectedSeats[key] || { list: [], priceMap: {} };
     return seatObj.list.reduce(
       (total, seatNo) => total + (seatObj.priceMap[seatNo] || 0),
-      0
+      0,
     );
   };
 
@@ -243,8 +243,8 @@ export default function RTSeatSelectionModal({
           seat.isEmergencyExit
             ? "Emergency Exit"
             : seat.premium
-            ? "Premium"
-            : "Standard"
+              ? "Premium"
+              : "Standard"
         }\n${seat.price ? `Price: ₹${seat.price}` : "Free"}`;
 
     return (
@@ -359,7 +359,7 @@ export default function RTSeatSelectionModal({
     const hasPremium = seatsFlat.some((s) => s.premium && !s.occupied);
     const hasExit = seatsFlat.some((s) => s.isEmergencyExit && !s.occupied);
     const hasNonRecline = seatsFlat.some(
-      (s) => s.raw?.SeatType === 4 && !s.occupied
+      (s) => s.raw?.SeatType === 4 && !s.occupied,
     );
     const hasOccupied = seatsFlat.some((s) => s.occupied);
     const items = [];
@@ -590,7 +590,7 @@ export default function RTSeatSelectionModal({
                               journeyType,
                               segmentIndex,
                               seatNo,
-                              seatObj.priceMap[seatNo]
+                              seatObj.priceMap[seatNo],
                             )
                           }
                           className="text-gray-400 hover:text-red-500"
@@ -653,7 +653,7 @@ export default function RTSeatSelectionModal({
                           journeyType,
                           segmentIndex,
                           seatNo,
-                          seatObj.priceMap[seatNo]
+                          seatObj.priceMap[seatNo],
                         );
                       });
                     }

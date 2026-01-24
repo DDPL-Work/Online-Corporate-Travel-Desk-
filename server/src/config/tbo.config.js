@@ -1,7 +1,7 @@
 // server/src/config/tbo.config.js
 
 module.exports = {
-  timeout: 50000,
+  timeout: 500000,
 
   /* ---------------- COMMON ---------------- */
   common: {

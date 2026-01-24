@@ -52,8 +52,7 @@ const flightSlice = createSlice({
       // ---------------- SEARCH FAILURE ----------------
       .addCase(searchFlightsMC.rejected, (state, action) => {
         state.loading = false;
-        state.error =
-          action.payload || "Unable to fetch flight results";
+        state.error = action.payload || "Unable to fetch flight results";
       });
   },
 });
