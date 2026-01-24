@@ -112,18 +112,6 @@ export const bookFlight = createAsyncThunk(
   }
 );
 
-/* ---------------- TICKET ---------------- */
-// export const ticketFlight = createAsyncThunk(
-//   "flights/ticket",
-//   async ({ bookingId, pnr }, { rejectWithValue }) => {
-//     try {
-//       const { data } = await flightApi.post("/ticket", { bookingId, pnr });
-//       return data.data;
-//     } catch (err) {
-//       return rejectWithValue(err.response?.data?.message);
-//     }
-//   }
-// );
 
 /* ---------------- BOOKING DETAILS ---------------- */
 export const getBookingDetails = createAsyncThunk(

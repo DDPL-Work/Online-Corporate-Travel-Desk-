@@ -1,5 +1,11 @@
 import { useEffect, useState, useRef } from "react";
+import { GiMoonBats } from "react-icons/gi";
 import { FaChevronDown, FaChevronUp, FaLeaf } from "react-icons/fa";
+import {
+  WiDaySunny,
+  WiDayCloudy,
+  WiSunset,
+} from "react-icons/wi";
 
 // Two-thumb range slider component
 const RangeSlider = ({ min, max, values, onChange, formatValue }) => {
@@ -29,7 +35,7 @@ const RangeSlider = ({ min, max, values, onChange, formatValue }) => {
     const rect = slider.getBoundingClientRect();
     const percentage = Math.max(
       0,
-      Math.min(1, (e.clientX - rect.left) / rect.width)
+      Math.min(1, (e.clientX - rect.left) / rect.width),
     );
     const newValue = Math.round(min + percentage * (max - min));
 
@@ -212,35 +218,34 @@ const FlightFilterSidebar = ({
   // }, [flights]);
 
   useEffect(() => {
-  if (!flights.length) return;
+    if (!flights.length) return;
 
-  const prices = flights
-    .map((f) => f?.Fare?.PublishedFare || 0)
-    .filter(Boolean);
+    const prices = flights
+      .map((f) => f?.Fare?.PublishedFare || 0)
+      .filter(Boolean);
 
-  if (!prices.length) return;
+    if (!prices.length) return;
 
-  const min = Math.floor(Math.min(...prices) / 100) * 100;
-  const max = Math.ceil(Math.max(...prices) / 100) * 100;
+    const min = Math.floor(Math.min(...prices) / 100) * 100;
+    const max = Math.ceil(Math.max(...prices) / 100) * 100;
 
-  setPriceRange({ min, max });
-}, [flights]);
+    setPriceRange({ min, max });
+  }, [flights]);
 
-useEffect(() => {
-  if (!flights.length) return;
+  useEffect(() => {
+    if (!flights.length) return;
 
-  const durations = flights
-    .map((f) => getSegments(f)[0]?.Duration || 0)
-    .filter(Boolean);
+    const durations = flights
+      .map((f) => getSegments(f)[0]?.Duration || 0)
+      .filter(Boolean);
 
-  if (!durations.length) return;
+    if (!durations.length) return;
 
-  const minDur = Math.min(...durations);
-  const maxDur = Math.max(...durations);
+    const minDur = Math.min(...durations);
+    const maxDur = Math.max(...durations);
 
-  setDurationRange({ min: minDur, max: maxDur });
-}, [flights]);
-
+    setDurationRange({ min: minDur, max: maxDur });
+  }, [flights]);
 
   // Handle price range change
   const handlePriceChange = (newValues) => {
@@ -394,7 +399,7 @@ useEffect(() => {
     setSelectedStops((prev) =>
       prev.includes(option)
         ? prev.filter((item) => item !== option)
-        : [...prev, option]
+        : [...prev, option],
     );
   };
 
@@ -402,7 +407,7 @@ useEffect(() => {
     setSelectedAirlines((prev) =>
       prev.includes(airline)
         ? prev.filter((a) => a !== airline)
-        : [...prev, airline]
+        : [...prev, airline],
     );
   };
 
@@ -410,13 +415,13 @@ useEffect(() => {
     setSelectedFlightNumbers((prev) =>
       prev.includes(number)
         ? prev.filter((n) => n !== number)
-        : [...prev, number]
+        : [...prev, number],
     );
   };
 
   const toggleFareType = (type) => {
     setSelectedFareTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
     );
   };
 
@@ -424,19 +429,19 @@ useEffect(() => {
     setSelectedTerminals((prev) =>
       prev.includes(terminal)
         ? prev.filter((t) => t !== terminal)
-        : [...prev, terminal]
+        : [...prev, terminal],
     );
   };
 
   const toggleAirport = (code) => {
     setSelectedAirports((prev) =>
-      prev.includes(code) ? prev.filter((a) => a !== code) : [...prev, code]
+      prev.includes(code) ? prev.filter((a) => a !== code) : [...prev, code],
     );
   };
 
   const toggleLayoverAirport = (code) => {
     setSelectedLayoverAirports((prev) =>
-      prev.includes(code) ? prev.filter((a) => a !== code) : [...prev, code]
+      prev.includes(code) ? prev.filter((a) => a !== code) : [...prev, code],
     );
   };
 
@@ -470,15 +475,31 @@ useEffect(() => {
   };
 
   const times = [
-    { label: "Morning", range: "06:00–12:00" },
-    { label: "Afternoon", range: "12:00–18:00" },
-    { label: "Evening", range: "18:00–00:00" },
-    { label: "Night", range: "00:00–06:00" },
+    {
+      label: "Morning",
+      range: "06:00–12:00",
+      icon: <WiDaySunny className="text-yellow-500 text-2xl" />,
+    },
+    {
+      label: "Afternoon",
+      range: "12:00–18:00",
+      icon: <WiDayCloudy className="text-orange-400 text-2xl" />,
+    },
+    {
+      label: "Evening",
+      range: "18:00–00:00",
+      icon: <WiSunset className="text-pink-500 text-2xl" />,
+    },
+    {
+      label: "Night",
+      range: "00:00–06:00",
+      icon: <GiMoonBats className="text-indigo-500 text-2xl" />,
+    },
   ];
 
   const stopOptions = [
     {
-      label: "Direct",
+      label: "Non-Stop",
       count: flights.filter((f) => getSegments(f).length === 1).length,
     },
     {
@@ -654,19 +675,20 @@ useEffect(() => {
         isExpanded={expandedSections.departureTime}
         onToggle={() => toggleSection("departureTime")}
       >
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {times.map((t) => (
             <div
               key={t.label}
               onClick={() =>
                 setSelectedTime(selectedTime === t.label ? "" : t.label)
               }
-              className={`border rounded px-2 py-2 text-xs text-center cursor-pointer transition ${
+              className={`flex flex-col items-center justify-center border rounded-md px-2 py-2 text-xs cursor-pointer transition ${
                 selectedTime === t.label
                   ? "bg-blue-500 text-white border-blue-500"
                   : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
               }`}
             >
+              <div className="mb-1">{t.icon}</div>
               <div className="font-medium">{t.label}</div>
               <div className="text-[10px] mt-0.5">{t.range}</div>
             </div>
@@ -686,7 +708,7 @@ useEffect(() => {
               key={t.label}
               onClick={() =>
                 setSelectedArrivalTime(
-                  selectedArrivalTime === t.label ? "" : t.label
+                  selectedArrivalTime === t.label ? "" : t.label,
                 )
               }
               className={`border rounded px-2 py-2 text-xs text-center cursor-pointer transition ${

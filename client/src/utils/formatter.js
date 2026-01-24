@@ -64,8 +64,17 @@ export const formatStops = (stops) => {
   return `${stops} Stops`;
 };
 
+export const getStopsLabel = (segments = []) => {
+  const stops = segments.length - 1;
+  if (stops <= 0) return "Non-stop";
+  return `${stops} Stop${stops > 1 ? "s" : ""}`;
+};
+
 export const formatDuration = (mins = 0) =>
   `${Math.floor(mins / 60)}h ${mins % 60}m`;
+
+export const getTotalDuration = (segments = []) =>
+  segments.reduce((sum, s) => sum + (s.Duration || 0), 0);
 
 const IST_OFFSET_MINUTES = 330; // +5:30
 
@@ -81,10 +90,12 @@ export const getDateInIST = (input) => {
 };
 
 export const CABIN_MAP = {
-  1: "Economy",
-  2: "Premium Economy",
-  3: "Business",
-  4: "First",
+  1: "all",
+  2: "economy",
+  3: "premium_economy",
+  4: "business",
+  5: "premium_business",
+  6: "first",
 };
 
 // Airline color themes

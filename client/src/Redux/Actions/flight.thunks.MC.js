@@ -1,48 +1,40 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import flightApi from "../../API/flightAPI";
 
-
 /* ---------------- SEARCH ---------------- */
 export const searchFlightsMC = createAsyncThunk(
-  "flights/search",
+  "flights/searchMC",
   async (payload, { rejectWithValue }) => {
     try {
       const { data } = await flightApi.post("/search", payload);
+      const response = data?.data;
 
-      const response = data?.data?.Response;
-
-      if (!response || response.ResponseStatus !== 1) {
-        return rejectWithValue("Flight search failed");
+      // ❌ Only real failure
+      if (response?.ResponseStatus === 3) {
+        return rejectWithValue(response.Error);
       }
 
-      let results;
+      let results = [];
 
-      // ---------------- MULTI-CITY ----------------
       if (payload.journeyType === 3) {
-        // Keep results grouped by segment
-        results = (response.Results || []).map(
-          (segmentResults, segmentIndex) => ({
-            segmentIndex,
-            flights: segmentResults || [],
-          })
-        );
-      }
-      // ---------------- ONE-WAY / ROUND-TRIP ----------------
-      else {
+        // Each index = one segment
+        results = (response.Results || []).map((segmentFlights, index) => ({
+          segmentIndex: index,
+          flights: segmentFlights || [],
+        }));
+      } else {
         results = (response.Results || []).flat();
       }
-
       return {
         TraceId: response.TraceId,
         Origin: response.Origin,
         Destination: response.Destination,
-        Results: results,
         journeyType: payload.journeyType,
+        Results: results,
+        noResults: response.ResponseStatus === 2,
       };
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data?.message || "Search failed"
-      );
+      return rejectWithValue(err.response?.data?.message || "Search failed");
     }
-  }
+  },
 );

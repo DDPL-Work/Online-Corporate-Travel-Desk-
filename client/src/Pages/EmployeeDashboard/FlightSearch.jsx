@@ -23,6 +23,8 @@ import { airportDatabase } from "../../data/airportDatabase";
 import { useFlightSearch } from "../../context/FlightSearchContext";
 import { useDispatch } from "react-redux";
 import { searchFlights } from "../../Redux/Actions/flight.thunks";
+import { searchFlightsMC } from "../../Redux/Actions/flight.thunks.MC";
+import { ToastWithTimer } from "../../utils/ToastConfirm";
 
 // Autocomplete Airport Search Component
 const AirportSearchInput = ({ value, onChange, placeholder, id }) => {
@@ -156,18 +158,12 @@ export default function FlightSearchPage() {
   const [multiCityFlights, setMultiCityFlights] = useState([
     { from: "", to: "", date: "" },
   ]);
-  // const [travelerData, setTravelerData] = useState({
-  //   adults: 1,
-  //   children: 0,
-  //   childAges: [],
-  //   travelClass: "Economy",
-  //   directOnly: false,
-  // });
+
   const [fromAirport, setFromAirport] = useState({
     code: "DEL",
     city: "New Delhi",
   });
-  const [toAirport, setToAirport] = useState({ code: "BOM", city: "Mumbai" });
+  const [toAirport, setToAirport] = useState({ code: "CCU", city: "Kolkata" });
   const [departureDate, setDepartureDate] = useState("");
 
   // Get flight search context
@@ -195,18 +191,23 @@ export default function FlightSearchPage() {
   const validateSearch = () => {
     const newErrors = {};
 
+    // ---------------- COMMON ----------------
     if (!fromAirport?.code) {
       newErrors.from = "Please select origin airport";
     }
 
-    if (!toAirport?.code) {
+    if (!toAirport?.code && tripType !== "multi-city") {
       newErrors.to = "Please select destination airport";
     }
 
-    if (!departureDate) {
-      newErrors.departureDate = "Please select departure date";
+    // ---------------- ONE WAY / ROUND TRIP ----------------
+    if (tripType !== "multi-city") {
+      if (!departureDate) {
+        newErrors.departureDate = "Please select departure date";
+      }
     }
 
+    // ---------------- ROUND TRIP ----------------
     if (tripType === "round-trip") {
       if (!returnDate) {
         newErrors.returnDate = "Please select return date";
@@ -215,6 +216,7 @@ export default function FlightSearchPage() {
       }
     }
 
+    // ---------------- MULTI CITY ----------------
     if (tripType === "multi-city") {
       multiCityFlights.forEach((f, idx) => {
         if (!f.from?.code || !f.to?.code || !f.date) {
@@ -232,55 +234,69 @@ export default function FlightSearchPage() {
   const handleSearch = async () => {
     if (!validateSearch()) return;
 
-    const payload = {
-      journeyType:
-        tripType === "one-way" ? 1 : tripType === "round-trip" ? 2 : 3,
+    const journeyType =
+      tripType === "one-way" ? 1 : tripType === "round-trip" ? 2 : 3;
 
+    let payload = {
+      journeyType,
       adults,
       children,
       infants: 0,
-
-      // cabinClass: travelClass.toLowerCase(),
-      cabinClass: CABIN_CLASS_MAP[travelClass] || 1,
-
+      cabinClass: CABIN_CLASS_MAP[travelClass] || "economy",
       directFlight: directOnly,
-
-      origin: fromAirport.code,
-      destination: toAirport.code,
-
-      // departureDate: formatDate(departureDate),
-      departureDate,
       nearbyAirportsFrom,
       nearbyAirportsTo,
       flexibleDates,
     };
 
-    if (tripType === "round-trip" && returnDate) {
-      // payload.returnDate = formatDate(returnDate);
+    // -------- ONE WAY & ROUND TRIP ONLY --------
+    if (journeyType !== 3) {
+      payload.origin = fromAirport.code;
+      payload.destination = toAirport.code;
+      payload.departureDate = departureDate;
+    }
+
+    // -------- ROUND TRIP ONLY --------
+    if (journeyType === 2) {
       payload.returnDate = returnDate;
     }
 
-    if (tripType === "multi-city") {
-      payload.segments = multiCityFlights.map((f) => ({
-        origin: f.from.code,
-        destination: f.to.code,
-        departureDate: f.date,
-        nearbyFrom: Boolean(f.nearbyFrom),
-        nearbyTo: Boolean(f.nearbyTo),
-      }));
+    // -------- MULTI CITY ONLY --------
+    if (journeyType === 3) {
+      payload = {
+        journeyType: 3,
+        adults,
+        children,
+        infants: 0,
+        cabinClass: CABIN_CLASS_MAP[travelClass] || "economy",
+        directFlight: directOnly,
+
+        segments: multiCityFlights.map((f) => ({
+          origin: f.from.code,
+          destination: f.to.code,
+          departureDate: f.date,
+        })),
+      };
     }
 
     try {
       setLoading(true);
-      await dispatch(searchFlights(payload)).unwrap();
+
+      if (journeyType === 3) {
+        await dispatch(searchFlightsMC(payload)).unwrap();
+      } else {
+        await dispatch(searchFlights(payload)).unwrap();
+      }
+
       navigate("/search-flight-results", {
-        state: {
-          searchPayload: payload,
-        },
+        state: { searchPayload: payload },
       });
     } catch (err) {
       console.error("Flight search failed:", err);
-      alert("Flight search failed. Please try again.");
+      ToastWithTimer({
+        message: "Flight search failed. Please try again.",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -292,20 +308,62 @@ export default function FlightSearchPage() {
     setTo(temp);
   };
 
-  const addMultiCityFlight = () => {
-    setMultiCityFlights((prev) => [...prev, { from: "", to: "", date: "" }]);
-  };
-
-  const removeMultiCityFlight = (index) => {
-    setMultiCityFlights((prev) => prev.filter((_, i) => i !== index));
-  };
-
+  // 🧩 Update multi-city flight details dynamically
   const updateMultiCityFlight = (index, field, value) => {
-    setMultiCityFlights((prev) =>
-      prev.map((flight, i) =>
-        i === index ? { ...flight, [field]: value } : flight
-      )
-    );
+    setMultiCityFlights((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+
+      // --- AUTO LINK LOGIC ---
+      // If "to" field of this flight changes, update the "from" of next flight
+      if (field === "to" && index < updated.length - 1 && value?.code) {
+        updated[index + 1].from = value;
+      }
+
+      // If "date" changes, set next flight date +1 day (if empty)
+      if (field === "date" && index < updated.length - 1 && value) {
+        const nextDate = new Date(value);
+        nextDate.setDate(nextDate.getDate() + 1);
+
+        if (!updated[index + 1].date) {
+          updated[index + 1].date = nextDate.toISOString().split("T")[0];
+        }
+      }
+
+      return updated;
+    });
+  };
+
+  // ➕ Add flight while linking previous destination
+  const addMultiCityFlight = () => {
+    setMultiCityFlights((prev) => {
+      const lastFlight = prev[prev.length - 1];
+
+      // Auto-fill next flight's from = last flight's to
+      const newFlight = {
+        from: lastFlight?.to || "",
+        to: "",
+        date: "",
+      };
+
+      return [...prev, newFlight];
+    });
+  };
+
+  // 🗑️ Remove a flight while keeping logical flow
+  const removeMultiCityFlight = (index) => {
+    setMultiCityFlights((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+
+      // After removal, link continuity again
+      for (let i = 0; i < updated.length - 1; i++) {
+        if (updated[i].to && !updated[i + 1].from) {
+          updated[i + 1].from = updated[i].to;
+        }
+      }
+
+      return updated;
+    });
   };
 
   const getTripIconConfig = () => {
@@ -438,7 +496,7 @@ export default function FlightSearchPage() {
                                     updateMultiCityFlight(
                                       index,
                                       "nearbyFrom",
-                                      !flight.nearbyFrom
+                                      !flight.nearbyFrom,
                                     )
                                   }
                                   className="h-3 w-3 md:h-4 md:w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
@@ -479,7 +537,7 @@ export default function FlightSearchPage() {
                                     updateMultiCityFlight(
                                       index,
                                       "nearbyTo",
-                                      !flight.nearbyTo
+                                      !flight.nearbyTo,
                                     )
                                   }
                                   className="h-3 w-3 md:h-4 md:w-4 cursor-pointer text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
@@ -505,7 +563,7 @@ export default function FlightSearchPage() {
                                   updateMultiCityFlight(
                                     index,
                                     "date",
-                                    e.target.value
+                                    e.target.value,
                                   )
                                 }
                                 className="w-full p-2 md:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm md:text-base"

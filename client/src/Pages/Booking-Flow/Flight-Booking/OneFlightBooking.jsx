@@ -1,9 +1,6 @@
 // src/components/Flights/OneFlightBooking.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import PhoneInput from "react-phone-input-2";
-import "react-phone-input-2/lib/style.css";
-
 import { MdArrowBack, MdFlightTakeoff, MdFlightLand } from "react-icons/md";
 import { BsCalendar4 } from "react-icons/bs";
 import { AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
@@ -12,14 +9,10 @@ import {
   formatDate,
   parseFlightData,
   FlightTimeline,
-  FareOptions,
   PriceSummary,
-  ImportantInformation,
-  BaggageTable,
   Amenities,
   HotelHomeButton,
   CTABox,
-  FareRulesAccordion,
   TravelerForm,
 } from "./CommonComponents";
 import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
@@ -28,14 +21,11 @@ import {
   getFareQuote,
   getFareRule,
   getSSR,
-  getFareUpsell,
 } from "../../../Redux/Actions/flight.thunks";
-import { selectFareFamily } from "../../../Redux/Slice/flightSearchSlice";
 import SeatSelectionModal from "./SeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";
-// import FareUpsellModal from "./FareUpsellModal";
 import { FareDetailsModal } from "./FareDetailsModal";
 
 const normalizeFareRules = (fareRule) => {
@@ -55,10 +45,9 @@ export default function OneFlightBooking() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const hasCalledFareUpsell = React.useRef(false);
-
-  const { traceId, fareQuote, fareRule, ssr, fareUpsell, selectedFareFamily } =
-    useSelector((state) => state.flights);
+  const { traceId, fareQuote, fareRule, ssr } = useSelector(
+    (state) => state.flights,
+  );
 
   const { actionLoading } = useSelector((state) => state.bookings);
 
@@ -75,8 +64,6 @@ export default function OneFlightBooking() {
   const [activeSegmentIndex, setActiveSegmentIndex] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState({});
   const [selectedMeals, setSelectedMeals] = useState({});
-
-  // const [fareUpsellOpen, setFareUpsellOpen] = useState(false);
 
   const [selectedBaggage, setSelectedBaggage] = useState({});
 
@@ -142,43 +129,19 @@ export default function OneFlightBooking() {
     }));
   };
 
-  const baggageInfo = React.useMemo(() => {
-    if (!ssr?.Results?.Baggage?.length) return {};
-
-    const bag = ssr.Results.Baggage[0];
-
-    return {
-      cB: "7 Kg",
-      iB: bag.Weight,
-    };
-  }, [ssr]);
-
   useEffect(() => {
     if (!traceId || !selectedFlight?.ResultIndex) return;
-
-    // // 🔒 Call FareUpsell ONLY once, BEFORE FareQuote
-    // if (!hasCalledFareUpsell.current) {
-    //   hasCalledFareUpsell.current = true;
-
-    //   dispatch(
-    //     getFareUpsell({
-    //       traceId,
-    //       resultIndex: selectedFlight.ResultIndex,
-    //     })
-    //   );
-    // }
 
     dispatch(
       getFareQuote({
         traceId: searchParams.traceId, // ✅ REDUX traceId
         resultIndex: selectedFlight.ResultIndex,
-      })
+      }),
     );
   }, [
     dispatch,
     traceId, // ✅ CRITICAL
     selectedFlight?.ResultIndex,
-    fareUpsell,
   ]);
 
   useEffect(() => {
@@ -190,14 +153,14 @@ export default function OneFlightBooking() {
       getFareRule({
         traceId: searchParams.traceId,
         resultIndex: quoteResult.ResultIndex, // 🔑 USE THIS
-      })
+      }),
     );
 
     dispatch(
       getSSR({
         traceId: searchParams.traceId,
         resultIndex: quoteResult.ResultIndex,
-      })
+      }),
     );
   }, [
     fareQuote?.Response?.Results?.ResultIndex,
@@ -294,7 +257,7 @@ export default function OneFlightBooking() {
     journeyType,
     segmentIndex,
     meal,
-    travelersCount
+    travelersCount,
   ) => {
     const key = `${journeyType}|${segmentIndex}`;
 
@@ -326,22 +289,9 @@ export default function OneFlightBooking() {
     }));
   };
 
-  const maxTravelers =
-    searchParams?.passengers?.adults || searchParams?.adults || 1;
-
-  const addTraveler = () => {
-    if (travelers.length >= maxTravelers) return;
-
-    setTravelers((prev) => [...prev, initialTraveler(Date.now())]);
-  };
-
-  const removeTraveler = (id) => {
-    setTravelers((prev) => prev.filter((t) => t.id !== id));
-  };
-
   const updateTraveler = (id, field, value) => {
     setTravelers((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, [field]: value } : t))
+      prev.map((t) => (t.id === id ? { ...t, [field]: value } : t)),
     );
   };
 
@@ -510,7 +460,7 @@ export default function OneFlightBooking() {
     const TRACE_VALIDITY_MINUTES = 15;
 
     const fareExpiry = new Date(
-      Date.now() + TRACE_VALIDITY_MINUTES * 60 * 1000
+      Date.now() + TRACE_VALIDITY_MINUTES * 60 * 1000,
     );
 
     return {
@@ -589,8 +539,8 @@ export default function OneFlightBooking() {
           (s) =>
             s?.origin?.country &&
             s?.destination?.country &&
-            s.origin.country !== s.destination.country
-        )
+            s.origin.country !== s.destination.country,
+        ),
       );
 
       if (isInternational && !t.passportNumber?.trim()) {
@@ -640,10 +590,6 @@ export default function OneFlightBooking() {
       });
     }
   };
-
-  const hasFareUpsell =
-    Array.isArray(fareUpsell?.data?.FareFamilies) &&
-    fareUpsell.data.FareFamilies.length > 0;
 
   if (loading) {
     return (
@@ -804,46 +750,13 @@ export default function OneFlightBooking() {
               )}
             </div>
 
-            {/* <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">
-                    Fare Benefits
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    Choose a fare with better flexibility & benefits
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => setFareUpsellOpen(true)}
-                  disabled={!hasFareUpsell}
-                  className={`px-5 py-2 rounded-lg text-sm font-semibold ${
-                    hasFareUpsell
-                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  }`}
-                >
-                  View Fare Options
-                </button>
-              </div>
-
-              {selectedFareFamily && (
-                <div className="mt-4 text-sm text-green-700 font-medium">
-                  Selected Fare: {selectedFareFamily.name}
-                </div>
-              )}
-            </div> */}
             {/* Traveller Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <TravelerForm
                 travelers={travelers}
-                addTraveler={addTraveler}
-                removeTraveler={removeTraveler}
                 updateTraveler={updateTraveler}
                 errors={travelerErrors}
                 parsedFlightData={parsedFlightData}
-                maxTravelers={maxTravelers}
                 purposeOfTravel={purposeOfTravel}
                 setPurposeOfTravel={setPurposeOfTravel}
               />
@@ -907,11 +820,6 @@ export default function OneFlightBooking() {
           onSelectBaggage={handleSelectBaggage}
         />
       )}
-      {/* 
-      <FareUpsellModal
-        isOpen={fareUpsellOpen}
-        onClose={() => setFareUpsellOpen(false)}
-      /> */}
     </div>
   );
 }

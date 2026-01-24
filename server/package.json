@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.940.0",
+    "@sparticuz/chromium": "^143.0.4",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "bull": "^4.16.5",
@@ -37,6 +38,9 @@
     "passport-azure-ad": "^4.3.5",
     "passport-google-oauth20": "^2.0.0",
     "pdfkit": "^0.17.2",
+    "puppeteer": "^24.36.0",
+    "puppeteer-core": "^24.36.0",
+    "qrcode": "^1.5.4",
     "razorpay": "^2.9.6",
     "redis": "^5.10.0",
     "sharp": "^0.34.5",

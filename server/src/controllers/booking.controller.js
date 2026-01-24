@@ -15,6 +15,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const { getAgencyBalance } = require("../services/tboBalance.service");
 const logger = require("../utils/logger");
 const paymentService = require("../services/payment.service");
+const checkApprovedRequestPriceService = require("../services/tektravels/checkApprovedRequestPrice.service");
 
 // @desc    Create booking request (Approval-first)
 // @route   POST /api/v1/bookings
@@ -190,22 +191,30 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   );
 });
 
-// @desc    Get logged-in user's booking requests
+// @desc    Get logged-in user's approved flight requests pending booking
 // @route   GET /api/v1/bookings/my
 // @access  Private (Employee)
 exports.getMyRequests = asyncHandler(async (req, res) => {
   const bookings = await BookingRequest.find({
     userId: req.user._id, // 🔐 ownership enforced
     bookingType: "flight",
+    requestStatus: "approved", // ✅ only approved
+    executionStatus: { $ne: "ticketed" }, // ✅ not booked
   })
     .sort({ createdAt: -1 })
     .select(
-      "bookingType requestStatus flightRequest pricingSnapshot createdAt",
+      "bookingType requestStatus executionStatus flightRequest pricingSnapshot createdAt",
     );
 
   res
     .status(200)
-    .json(new ApiResponse(200, bookings, "My bookings fetched successfully"));
+    .json(
+      new ApiResponse(
+        200,
+        bookings,
+        "Approved requests pending booking fetched",
+      ),
+    );
 });
 
 // @desc    Get single booking request (Employee)
@@ -269,174 +278,181 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Booking not approved");
   if (booking.executionStatus === "ticketed")
     throw new ApiError(400, "Booking already completed");
-  if (!booking.flightRequest) throw new ApiError(400, "Flight request missing");
 
-  /* ---------- PASSENGERS ---------- */
+  const corporate = await Corporate.findById(booking.corporateId);
+  if (!corporate) throw new ApiError(404, "Corporate not found");
+
   const leadPassenger =
     booking.travellers.find((t) => t.isLeadPassenger) || booking.travellers[0];
 
-  const paxTypeMap = { ADULT: 1, CHILD: 2, INFANT: 3 };
-
-  const passengers = booking.travellers.map((t, index) => ({
+  const passengers = booking.travellers.map((t) => ({
     title: t.title,
     firstName: t.firstName,
     lastName: t.lastName,
-    paxType: paxTypeMap[t.paxType || "ADULT"],
+    paxType: t.paxType || "ADULT",
     dateOfBirth: t.dateOfBirth,
-    gender: String(t.gender).toUpperCase().startsWith("M") ? "Male" : "Female",
-    passportNo: t.passportNumber || "",
-    passportExpiry: t.passportExpiry || "",
-    isLeadPax: index === 0,
+    gender: t.gender,
+    passportNo: t.passportNumber,
+    passportExpiry: t.passportExpiry,
     email: t.email || leadPassenger.email,
     contactNo: t.phoneWithCode || leadPassenger.phoneWithCode,
   }));
-
-  const corporate = await Corporate.findById(booking.corporateId);
-  const bookingAmount = Number(booking.pricingSnapshot.totalAmount);
 
   const fareResult = Array.isArray(booking.flightRequest.fareQuote.Results)
     ? booking.flightRequest.fareQuote.Results[0]
     : booking.flightRequest.fareQuote.Results;
 
-  const isLCC = fareResult.IsLCC === true;
-
-  let tboBookingId = null;
-  let pnr = null;
+  const isLCC = fareResult?.IsLCC === true;
 
   try {
-    /* =========================================================
-       STEP 1: BOOK (NON-LCC ONLY)
-    ========================================================= */
-    if (!isLCC) {
-      booking.executionStatus = "booking_initiated";
-      await booking.save();
+    // Price Validation
+    // await checkApprovedRequestPriceService(booking);
+    // Price Validation
+    const priceCheckResult = await checkApprovedRequestPriceService(booking);
 
+    /* =====================================================
+       STEP 1 — BOOKING (PNR CREATION)
+    ===================================================== */
+
+    booking.executionStatus = "booking_initiated";
+    await booking.save();
+
+    let pnr;
+
+    if (isLCC) {
+      // LCC: Book + Ticket happens in ONE call
       const bookResp = await tboService.bookFlight({
+        IsLCC: true,
         traceId: booking.flightRequest.traceId,
         resultIndex: booking.flightRequest.resultIndex,
-        fareQuote: booking.flightRequest.fareQuote,
+        // fareQuote: booking.flightRequest.fareQuote,
+        result: booking.flightRequest.fareQuote.Results[0],
         passengers,
-        ssr: booking.flightRequest.ssrSnapshot || {},
+        ssr: booking.flightRequest.ssrSnapshot,
       });
 
-      tboBookingId = bookResp.bookingId;
-      pnr = bookResp.pnr;
+      pnr =
+        bookResp?.Response?.PNR ||
+        bookResp?.Response?.FlightItinerary?.PNR ||
+        bookResp?.pnr;
 
-      if (!tboBookingId && !pnr) {
-        booking.bookingResult = { providerResponse: bookResp.raw };
+      if (!pnr) {
+        booking.executionStatus = "failed";
+        booking.bookingResult = { providerResponse: bookResp };
         await booking.save();
-
-        return res
-          .status(200)
-          .json(
-            new ApiResponse(
-              200,
-              { bookingId: booking._id },
-              "Booking initiated. Awaiting airline confirmation",
-            ),
-          );
+        throw new ApiError(500, "LCC booking failed: PNR not returned");
       }
 
       booking.bookingResult = {
-        providerBookingId: tboBookingId,
         pnr,
+        providerBookingResponse: bookResp,
       };
-      await booking.save();
+    } else {
+      // NON-LCC: Only booking (PNR creation)
+      const bookResp = await tboService.bookFlight({
+        IsLCC: false,
+        traceId: booking.flightRequest.traceId,
+        resultIndex: booking.flightRequest.resultIndex,
+        fareQuote: booking.flightRequest.fareQuote,
+        result: booking.flightRequest.fareQuote.Results[0],
+        passengers,
+        ssr: booking.flightRequest.ssrSnapshot,
+      });
+
+      const extractedPNR =
+        bookResp?.pnr ||
+        bookResp?.raw?.Response?.Response?.PNR ||
+        bookResp?.raw?.Response?.Response?.FlightItinerary?.PNR ||
+        null;
+
+      const extractedBookingId =
+        bookResp?.bookingId ||
+        bookResp?.raw?.Response?.Response?.BookingId ||
+        bookResp?.raw?.Response?.Response?.FlightItinerary?.BookingId ||
+        null;
+
+      if (!extractedPNR || !extractedBookingId) {
+        booking.executionStatus = "failed";
+        booking.bookingResult = { providerResponse: bookResp.raw };
+        await booking.save();
+        throw new ApiError(
+          500,
+          "Non-LCC booking failed: PNR or BookingId missing",
+        );
+      }
+
+      booking.bookingResult = {
+        pnr: extractedPNR,
+        bookingId: extractedBookingId,
+        providerResponse: bookResp.raw,
+      };
     }
 
-    /* =========================================================
-       STEP 2: PAYMENT (LCC + NON-LCC)
-    ========================================================= */
-    // booking.executionStatus = "payment_processing";
-    // await booking.save();
+    // PNR exists → booking is successful
+    booking.executionStatus = "booked";
+    await booking.save();
 
-    await paymentService.processBookingPayment({
-      booking,
-      corporate,
-    });
+    /* =====================================================
+       STEP 2 — PAYMENT
+    ===================================================== */
 
-    /* =========================================================
-       STEP 3: TICKETING
-    ========================================================= */
-    // booking.executionStatus = "ticketing_initiated";
-    // await booking.save();
+    await paymentService.processBookingPayment({ booking, corporate });
 
-    const ticketResp = await tboService.ticketFlight(
-      isLCC
-        ? {
-            IsLCC: true,
-            traceId: booking.flightRequest.traceId,
-            resultIndex: booking.flightRequest.resultIndex,
-            fareQuote: booking.flightRequest.fareQuote.Results[0],
-            passengers,
-          }
-        : {
-            IsLCC: false,
-            bookingId: tboBookingId,
-            pnr,
-          },
-    );
+    /* =====================================================
+       STEP 3 — TICKETING (NON-LCC ONLY)
+    ===================================================== */
 
-    const finalPNR =
-      ticketResp?.Response?.PNR ||
-      ticketResp?.Response?.FlightItinerary?.PNR ||
-      ticketResp?.FlightItinerary?.PNR ||
-      ticketResp?.PNR ||
-      pnr;
+    if (!isLCC) {
+      const ticketResp = await tboService.ticketFlight({
+        bookingId: booking.bookingResult.bookingId,
+        pnr: booking.bookingResult.pnr, // optional but safe
+      });
 
-    if (!finalPNR) {
-      throw new ApiError(
-        500,
-        "Ticketing succeeded but PNR not returned by provider",
-      );
+      const ticketPNR =
+        ticketResp?.Response?.Response?.PNR ||
+        ticketResp?.Response?.Response?.FlightItinerary?.PNR ||
+        booking.bookingResult.pnr; // SAFE FALLBACK
+
+      // 🔒 If still no PNR → only then fail
+      if (!ticketPNR) {
+        booking.executionStatus = "failed";
+        booking.bookingResult = {
+          ...booking.bookingResult,
+          ticketResponse: ticketResp,
+        };
+        await booking.save();
+        throw new ApiError(500, "Ticketing failed: PNR not returned");
+      }
+
+      booking.bookingResult = {
+        ...booking.bookingResult,
+        ticketResponse: ticketResp,
+        pnr: ticketPNR,
+      };
     }
+
+    /* =====================================================
+       FINAL STATE
+    ===================================================== */
 
     booking.executionStatus = "ticketed";
-    // booking.bookingResult.pnr = finalPNR;
-    booking.bookingResult = {
-      ...(booking.bookingResult || {}),
-      pnr: finalPNR,
-      ticketResponse: ticketResp,
-    };
-
-    booking.bookingResult.ticketResponse = ticketResp;
     await booking.save();
 
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          { bookingId: booking._id, pnr: finalPNR },
-          "Flight booked & ticketed successfully",
-        ),
-      );
-  } catch (err) {
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          bookingId: booking._id,
+          pnr: booking.bookingResult.pnr,
+          priceCheck: priceCheckResult, 
+        },
+        "Flight booked & ticketed successfully",
+      ),
+    );
+  } catch (error) {
     booking.executionStatus = "failed";
     await booking.save();
-
-    // Wallet rollback (ONLY prepaid)
-    if (corporate.classification === "prepaid") {
-      const balanceBefore = corporate.walletBalance;
-
-      corporate.walletBalance += bookingAmount;
-      await corporate.save();
-
-      const balanceAfter = corporate.walletBalance;
-
-      await WalletTransaction.create({
-        corporateId: corporate._id,
-        bookingId: booking._id,
-        type: "credit",
-        amount: bookingAmount,
-        balanceBefore,
-        balanceAfter,
-        description: "Wallet refund due to booking failure",
-        status: "completed",
-      });
-    }
-
-    throw err;
+    throw error;
   }
 });
 
@@ -480,30 +496,46 @@ exports.downloadTicketPdf = asyncHandler(async (req, res) => {
 // @route   GET /api/v1/bookings/my
 // @access  Private (Employee)
 exports.getMyBookings = asyncHandler(async (req, res) => {
-  const {
-    page = 1,
-    limit = 10,
-    bookingType = "flight", // default to flight
-  } = req.query;
+  const { page = 1, limit = 10, bookingType = "flight" } = req.query;
 
   const query = {
     userId: req.user._id,
     bookingType,
-    executionStatus: "ticketed", // ✅ only ticketed bookings
+    executionStatus: "ticketed",
   };
 
   const skip = (Number(page) - 1) * Number(limit);
 
-  const [bookings, total] = await Promise.all([
+  const [rawBookings, total] = await Promise.all([
     BookingRequest.find(query)
       .select(
         "bookingReference bookingType requestStatus executionStatus bookingSnapshot pricingSnapshot createdAt bookingResult",
       )
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(Number(limit)),
+      .limit(Number(limit))
+      .lean(), // IMPORTANT for safe mutation
     BookingRequest.countDocuments(query),
   ]);
+
+  const bookings = rawBookings.map((booking) => {
+    const providerResponse =
+      booking?.bookingResult?.providerResponse?.Response?.Response;
+
+    const flightItinerary = providerResponse?.FlightItinerary;
+
+    // PNR resolution priority
+    const pnr =
+      providerResponse?.PNR ||
+      flightItinerary?.PNR ||
+      flightItinerary?.Segments?.[0]?.AirlinePNR ||
+      null;
+
+    return {
+      ...booking,
+      pnr,
+    };
+  });
 
   res.status(200).json(
     new ApiResponse(

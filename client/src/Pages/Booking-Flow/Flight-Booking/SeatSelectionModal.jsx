@@ -456,7 +456,7 @@ export default function SeatSelectionModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
-        <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-blue-700 to-blue-600 text-white">
+        <div className="flex items-center justify-between px-5 py-3 bg-linear-to-r from-blue-700 to-blue-600 text-white">
           <div className="flex items-center gap-3 font-semibold text-lg">
             ✈️ Seat Selection
           </div>
@@ -513,7 +513,7 @@ export default function SeatSelectionModal({
               </div>
 
               {/* Seat Map Container */}
-              <div className="relative bg-gradient-to-b from-sky-100 to-white rounded-2xl shadow-inner p-5">
+              <div className="relative bg-linear-to-b from-sky-100 to-white rounded-2xl shadow-inner p-5">
                 {/* Cockpit */}
                 <div className="flex justify-center mb-4">
                   <div className="w-48 sm:w-56">

@@ -93,19 +93,37 @@ export const formatDuration = (totalMinutes) => {
 // Flight Data Parsing Functions
 export const parseFlightData = (rawFlightData) => {
   if (!rawFlightData?.Segments?.length) return null;
+
+  // ✅ MULTI-CITY ONLY
+  if (rawFlightData.Segments.length > 1) {
+    return {
+      type: "multi-city",
+
+      allSegmentsData: rawFlightData.Segments.map((leg, idx) => {
+        const parsed = parseOneWayData({ ...rawFlightData, Segments: [leg] });
+
+        return {
+          legIndex: idx,
+          from: parsed.flightData.from,
+          to: parsed.flightData.to,
+          date: parsed.flightData.date,
+          segments: parsed.segments,
+        };
+      }),
+
+      // Header helpers (used ONLY in booking page)
+      flightData: {
+        from: rawFlightData.Segments[0][0].Origin.Airport.CityName,
+        to: rawFlightData.Segments[rawFlightData.Segments.length - 1].slice(
+          -1,
+        )[0].Destination.Airport.CityName,
+        date: rawFlightData.Segments[0][0].Origin.DepTime,
+      },
+    };
+  }
+
+  // 🔒 ONE-WAY & ROUND-TRIP UNCHANGED
   return parseOneWayData(rawFlightData);
-};
-
-const _norm = (v = "") => (v || "").toString().trim().toUpperCase();
-
-const formatPassengers = (passengers = {}) => {
-  const adults = passengers.adults || 1;
-  const children = passengers.children || 0;
-  const infants = passengers.infants || 0;
-  let result = `${adults} Adult${adults > 1 ? "s" : ""}`;
-  if (children > 0) result += `, ${children} Child${children > 1 ? "ren" : ""}`;
-  if (infants > 0) result += `, ${infants} Infant${infants > 1 ? "s" : ""}`;
-  return result;
 };
 
 export const parseOneWayData = (result) => {
@@ -149,7 +167,7 @@ export const parseOneWayData = (result) => {
             0,
             (new Date(next.Origin.DepTime) -
               new Date(seg.Destination.ArrTime)) /
-              60000
+              60000,
           )
         : 0,
     };
@@ -423,6 +441,60 @@ export const RoundTripFlightTimeline = ({
   );
 };
 
+/* ======================================================
+   MULTI CITY FLIGHT TIMELINE
+   ====================================================== */
+
+export const MultiCityFlightTimeline = ({
+  allSegmentsData = [],
+  selectedSeats = {},
+  openSeatModal,
+  isSeatReady = false,
+}) => {
+  if (!Array.isArray(allSegmentsData) || allSegmentsData.length === 0) {
+    return (
+      <p className="text-sm text-gray-500 text-center py-6">
+        No flight details available.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-12">
+      {allSegmentsData.map((leg, legIndex) => (
+        <div
+          key={legIndex}
+          className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
+        >
+          {/* ===== LEG HEADER ===== */}
+          <div className="px-6 py-4 bg-linear-to-r from-blue-50 to-blue-100 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  {leg.from} → {leg.to}
+                </h3>
+              </div>
+            </div>
+          </div>
+
+          {/* ===== LEG BODY ===== */}
+          <div className="p-6 bg-slate-50">
+            <FlightTimeline
+              segments={leg.segments}
+              selectedSeats={selectedSeats}
+              openSeatModal={(segmentIndex) =>
+                openSeatModal?.("multi-city", legIndex, segmentIndex)
+              }
+              journeyType={`multi-${legIndex}`}
+              isSeatReady={isSeatReady}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export const normalizeSSRList = (list = []) => {
   if (!Array.isArray(list)) return [];
 
@@ -454,7 +526,7 @@ export const MealSelectionCards = ({
   onConfirm,
 }) => {
   const normalizedMeals = normalizeSSRList(meals).filter(
-    (m) => m.Code !== "NoMeal"
+    (m) => m.Code !== "NoMeal",
   );
 
   if (!normalizedMeals.length) {
@@ -599,7 +671,7 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
     : [];
 
   const cancellationRules = miniFareRules.filter(
-    (rule) => rule.Type === "Cancellation"
+    (rule) => rule.Type === "Cancellation",
   );
   const reissueRules = miniFareRules.filter((rule) => rule.Type === "Reissue");
 
@@ -767,7 +839,7 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
                 </div>
               )}
             </div>
-          )
+          ),
       )}
     </div>
   );
@@ -795,7 +867,7 @@ export const FareRulesAccordion = ({
       .replace(/[^A-Z0-9]/g, "");
 
   const airlineCode = normalizeAirlineCode(
-    airlineInfo?.AirlineCode || airlineInfo?.Airline || ""
+    airlineInfo?.AirlineCode || airlineInfo?.Airline || "",
   );
 
   // ✅ Dynamic airline name fallback
@@ -824,7 +896,7 @@ export const FareRulesAccordion = ({
     const fareBasisMatch = detail.match(/The FareBasisCode is:\s*(\w+)/i);
     const fareBasisCode = fareBasisMatch ? fareBasisMatch[1] : null;
     const domesticMatch = detail.match(
-      /Domestic([\s\S]*?)(?=International|$)/i
+      /Domestic([\s\S]*?)(?=International|$)/i,
     );
     const internationalMatch = detail.match(/International([\s\S]*?)(?=\*|$)/i);
     const importantNotes = detail.match(/\*[^\r\n]+/g) || [];
@@ -833,7 +905,7 @@ export const FareRulesAccordion = ({
       domestic: domesticMatch ? domesticMatch[1].trim() : null,
       international: internationalMatch ? internationalMatch[1].trim() : null,
       importantNotes: importantNotes.map((note) =>
-        note.replace(/^\*\s*/, "").trim()
+        note.replace(/^\*\s*/, "").trim(),
       ),
     };
   };
@@ -842,7 +914,7 @@ export const FareRulesAccordion = ({
     if (!text) return [];
     const lines = text.split(/\r\n/).filter((l) => l.trim());
     const baggageLines = lines.filter(
-      (l) => l.includes("Ex ") && l.includes("Kgs")
+      (l) => l.includes("Ex ") && l.includes("Kgs"),
     );
     return baggageLines
       .map((line) => {
@@ -969,8 +1041,8 @@ export const FareRulesAccordion = ({
                     isGst
                       ? "bg-amber-50 border-amber-300 text-amber-800"
                       : isTime
-                      ? "bg-yellow-50 border-yellow-300 text-yellow-800"
-                      : "bg-blue-50 border-blue-200 text-blue-800"
+                        ? "bg-yellow-50 border-yellow-300 text-yellow-800"
+                        : "bg-blue-50 border-blue-200 text-blue-800"
                   }`}
                 >
                   <span className="text-lg leading-none">
@@ -1000,20 +1072,20 @@ export const FareRulesAccordion = ({
   if (fareRules?.important?.length) fareRuleDetails = fareRules.important;
   else if (fareRules?.data?.Response?.FareRules?.length)
     fareRuleDetails = fareRules.data.Response.FareRules.map(
-      (r) => r.FareRuleDetail
+      (r) => r.FareRuleDetail,
     ).filter(Boolean);
   else if (fareRules?.Response?.FareRules?.length)
     fareRuleDetails = fareRules.Response.FareRules.map(
-      (r) => r.FareRuleDetail
+      (r) => r.FareRuleDetail,
     ).filter(Boolean);
   else if (fareRules?.FareRules?.length)
     fareRuleDetails = fareRules.FareRules.map((r) => r.FareRuleDetail).filter(
-      Boolean
+      Boolean,
     );
   else if (Array.isArray(fareRules))
     fareRuleDetails = fareRules
       .map((r) =>
-        typeof r === "string" ? r : r.FareRuleDetail || r.important?.[0]
+        typeof r === "string" ? r : r.FareRuleDetail || r.important?.[0],
       )
       .filter(Boolean);
   else if (fareRules?.FareRuleDetail)
@@ -1448,7 +1520,7 @@ const isInternationalTrip = (parsedFlightData) => {
       (s) =>
         s?.da?.countryCode &&
         s?.aa?.countryCode &&
-        s.da.countryCode !== s.aa.countryCode
+        s.da.countryCode !== s.aa.countryCode,
     );
 
   if (parsedFlightData.type === "one-way") {
@@ -1464,7 +1536,7 @@ const isInternationalTrip = (parsedFlightData) => {
 
   if (parsedFlightData.type === "multi-city") {
     return (parsedFlightData.allSegmentsData || []).some((seg) =>
-      checkSegments(seg.segments)
+      checkSegments(seg.segments),
     );
   }
 
@@ -1489,12 +1561,9 @@ const calculateAgeFromDOB = (dob) => {
 
 export const TravelerForm = ({
   travelers = [],
-  addTraveler,
-  removeTraveler,
   updateTraveler,
   errors = {},
   parsedFlightData,
-  maxTravelers,
   purposeOfTravel,
   setPurposeOfTravel,
 }) => {
@@ -1518,20 +1587,6 @@ export const TravelerForm = ({
               </p>
             </div>
           </div>
-
-          {/* <button
-            type="button"
-            onClick={addTraveler}
-            disabled={travelers.length >= maxTravelers}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition shadow-md  ${
-              travelers.length >= maxTravelers
-                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                : "bg-[#0A4D68]/60 hover:bg-[#0A4D68] text-white"
-            }`}
-          >
-            <IoPersonAdd size={20} />
-            <span>Add Adult</span>
-          </button> */}
         </div>
       </div>
 
@@ -1571,29 +1626,6 @@ export const TravelerForm = ({
             key={traveler.id ?? index}
             className="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition"
           >
-            {/* ===== Traveler Header ===== */}
-            {/* <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center">
-                  <FaUser className="text-white" />
-                </div>
-                <h3 className="font-bold text-blue-900 text-lg">
-                  {`${index + 1} Adult (12yrs+) `}
-                </h3>
-              </div>
-
-              {travelers.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeTraveler(traveler.id)}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-semibold transition border border-red-200"
-                >
-                  <IoPersonRemove size={18} />
-                  Remove
-                </button>
-              )}
-            </div> */}
-
             {/* ===== Name Section ===== */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
               <div>
@@ -1626,7 +1658,7 @@ export const TravelerForm = ({
                     updateTraveler(
                       traveler.id,
                       "firstName",
-                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, "")
+                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
                     )
                   }
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
@@ -1645,7 +1677,7 @@ export const TravelerForm = ({
                     updateTraveler(
                       traveler.id,
                       "middleName",
-                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, "")
+                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
                     )
                   }
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
@@ -1663,7 +1695,7 @@ export const TravelerForm = ({
                     updateTraveler(
                       traveler.id,
                       "lastName",
-                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, "")
+                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
                     )
                   }
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
@@ -1711,7 +1743,7 @@ export const TravelerForm = ({
                           updateTraveler(
                             traveler.id,
                             "nationality",
-                            nationality
+                            nationality,
                           );
                         } catch (err) {
                           console.warn("Failed to resolve country name:", err);
@@ -1815,7 +1847,7 @@ export const TravelerForm = ({
                       updateTraveler(
                         traveler.id,
                         "passportNumber",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
@@ -1834,7 +1866,7 @@ export const TravelerForm = ({
                       updateTraveler(
                         traveler.id,
                         "passportExpiry",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
@@ -1853,21 +1885,6 @@ export const TravelerForm = ({
             </div>
           </div>
         ))}
-
-        {/* ===== ADD NEW ADULT ===== */}
-        {/* <div className="flex justify-center pt-4">
-          <button
-            type="button"
-            onClick={addTraveler}
-            className={`flex items-center gap-2 px-6 py-3 border-2  border-dashed rounded-xl font-bold transition ${
-              travelers.length >= maxTravelers
-                ? " text-gray-500 cursor-not-allowed"
-                : "text-[#0A4D68] cursor-pointer"
-            }`}
-          >
-            <IoPersonAdd size={20} />+ ADD NEW ADULT
-          </button>
-        </div> */}
       </div>
     </div>
   );

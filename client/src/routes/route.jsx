@@ -61,6 +61,7 @@ import OneFlightBooking from "../Pages/Booking-Flow/Flight-Booking/OneFlightBook
 import RoundTripFlightBooking from "../Pages/Booking-Flow/Flight-Booking/RoundTripFlightBooking";
 import BookApprovedFlight from "../Pages/Booking-Flow/Flight-Booking/BookApprovedFlight";
 import BookingDetails from "../components/EmployeeDashboard/BookingDetails";
+import MultiCityFlightBooking from "../Pages/Booking-Flow/Flight-Booking/MultiWayFlightBooking";
 
 export const appRouter = createBrowserRouter([
   // -------------------------------
@@ -177,6 +178,10 @@ export const appRouter = createBrowserRouter([
       {
         path: "/round-trip-flight/booking",
         element: <RoundTripFlightBooking />,
+      },
+      {
+        path: "/multi-city-flight/booking",
+        element: <MultiCityFlightBooking />,
       },
       { path: "/bookings/:id/book", element: <BookApprovedFlight /> },
     ],

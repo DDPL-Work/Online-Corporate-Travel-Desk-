@@ -16,7 +16,14 @@ import {
   executeApprovedFlightBooking,
 } from "../../../Redux/Actions/booking.thunks";
 import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
-import { formatDateWithYear, formatDateTime, getCabinClassLabel } from "../../../utils/formatter";
+import {
+  formatDateWithYear,
+  formatDateTime,
+  getCabinClassLabel,
+  CABIN_MAP,
+} from "../../../utils/formatter";
+import { searchFlights } from "../../../Redux/Actions/flight.thunks";
+import Swal from "sweetalert2";
 
 export default function BookApprovedFlight() {
   const { id } = useParams();
@@ -47,16 +54,122 @@ export default function BookApprovedFlight() {
         return;
       }
 
-      await dispatch(executeApprovedFlightBooking(id)).unwrap();
+      const response = await dispatch(
+        executeApprovedFlightBooking(id),
+      ).unwrap();
+
+      const priceCheck = response?.priceCheck;
+      // 🔔 SWEET ALERT (FROM BACKEND MESSAGE)
+      if (priceCheck?.message) {
+        await Swal.fire({
+          icon: priceCheck.priceChanged ? "warning" : "success",
+          title: priceCheck.priceChanged ? "Fare Updated" : "Fare Verified",
+          text: priceCheck.message,
+          confirmButtonText: "Continue",
+          confirmButtonColor: "#0A4D68",
+        });
+      }
+
       ToastWithTimer({
         type: "success",
         message: "Flight booked successfully!",
       });
+
       navigate("/my-bookings", { replace: true });
     } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Booking Failed",
+        text: err?.message || "Something went wrong while booking",
+        confirmButtonColor: "#DC2626",
+      });
+    }
+  };
+
+  const buildSearchPayloadFromApprovedRequest = () => {
+    const segments = booking.flightRequest?.segments || [];
+
+    if (!segments.length) {
+      throw new Error("No flight segments found in booking");
+    }
+
+    // -----------------------------
+    // 1. DERIVE JOURNEY TYPE
+    // -----------------------------
+    const journeyType =
+      segments.length === 1 ? 1 : segments.length === 2 ? 2 : 3;
+
+    // -----------------------------
+    // 2. PASSENGER COUNTS (FROM DB)
+    // -----------------------------
+    // 2️⃣ Passenger counts (DB-safe)
+    const adults = booking.travellers.length;
+    const children = 0;
+    const infants = 0;
+
+    // -----------------------------
+    // 3. COMMON PAYLOAD
+    // -----------------------------
+    const payload = {
+      journeyType,
+      adults,
+      children,
+      infants,
+
+      cabinClass: CABIN_MAP[segments[0].cabinClass] || "economy",
+      directFlight: !segments.some((s) => s.stopOver),
+
+      nearbyAirportsFrom: false,
+      nearbyAirportsTo: false,
+      flexibleDates: false,
+    };
+
+    // -----------------------------
+    // 4. ONE-WAY & ROUND-TRIP
+    // -----------------------------
+    if (journeyType === 1 || journeyType === 2) {
+      payload.origin = segments[0].origin.airportCode;
+      payload.destination =
+        segments[segments.length - 1].destination.airportCode;
+      payload.departureDate = segments[0].departureDateTime.split("T")[0];
+    }
+
+    // -----------------------------
+    // 5. ROUND-TRIP RETURN DATE
+    // -----------------------------
+    if (journeyType === 2) {
+      payload.returnDate =
+        segments[segments.length - 1].departureDateTime.split("T")[0];
+    }
+
+    // -----------------------------
+    // 6. MULTI-CITY
+    // -----------------------------
+    if (journeyType === 3) {
+      payload.segments = segments.map((seg) => ({
+        origin: seg.origin.airportCode,
+        destination: seg.destination.airportCode,
+        departureDate: seg.departureDateTime.split("T")[0],
+      }));
+    }
+
+    return payload;
+  };
+
+  const handleCreateNewRequest = async () => {
+    try {
+      const payload = buildSearchPayloadFromApprovedRequest();
+
+      await dispatch(searchFlights(payload)).unwrap();
+
+      navigate("/search-flight-results", {
+        state: { searchPayload: payload },
+      });
+    } catch (err) {
+      console.error("Re-search failed", err);
       ToastWithTimer({
         type: "error",
-        message: err || "Booking failed",
+        message: "Flight search failed. Please try again.",
       });
     }
   };
@@ -239,10 +352,25 @@ export default function BookApprovedFlight() {
               <FiDollarSign /> Fare Breakdown
             </h2>
             <div className="text-sm text-gray-700 space-y-1">
-              <p>Base Fare: ₹{flight.fareSnapshot.baseFare}</p>
-              <p>Tax: ₹{flight.fareSnapshot.tax}</p>
+              {/* <p>Base Fare: ₹{flight.fareSnapshot.baseFare}</p> */}
+              {flight?.fareSnapshot ? (
+                <>
+                  <p>Base Fare: ₹{flight.fareSnapshot.baseFare}</p>
+                  <p>Tax: ₹{flight.fareSnapshot.tax}</p>
+                  <p>
+                    Refundable: {flight.fareSnapshot.refundable ? "Yes" : "No"}
+                  </p>
+                  <p>Fare Type: {flight.fareSnapshot.fareType}</p>
+                </>
+              ) : (
+                <p className="text-gray-500 text-sm">
+                  Fare details not available
+                </p>
+              )}
+
+              {/* <p>Tax: ₹{flight.fareSnapshot.tax}</p>
               <p>Refundable: {flight.fareSnapshot.refundable ? "Yes" : "No"}</p>
-              <p>Fare Type: {flight.fareSnapshot.fareType}</p>
+              <p>Fare Type: {flight.fareSnapshot.fareType}</p> */}
             </div>
           </div>
 
@@ -292,7 +420,7 @@ export default function BookApprovedFlight() {
                 <FiAlertTriangle /> This fare has expired.
               </div>
               <button
-                onClick={() => navigate("/search-flight")}
+                onClick={handleCreateNewRequest}
                 className="text-sm font-semibold px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition"
               >
                 Create New Request
