@@ -1,8 +1,52 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { IoClose } from "react-icons/io5";
 import { AiOutlineInfoCircle } from "react-icons/ai";
 import { FareOptions, FareRulesAccordion } from "./CommonComponents";
-import "./Fares.css"; // animations
+import "./Fares.css";
+
+/* ===========================
+   Helpers
+=========================== */
+
+const formatCurrency = (v) =>
+  typeof v === "number" ? `₹${v.toLocaleString("en-IN")}` : "—";
+
+const getSegmentKey = (seg) =>
+  `${seg.Origin.Airport.CityName}-${seg.Destination.Airport.CityName}`;
+
+const extractSegmentsFromFareQuote = (fareQuote) => {
+  // ONE-WAY
+  if (fareQuote?.Response?.Results?.Segments) {
+    return fareQuote.Response.Results.Segments.flat();
+  }
+
+  // ROUND-TRIP
+  const onwardSegs =
+    fareQuote?.onward?.Response?.Results?.Segments?.flat() || [];
+  const returnSegs =
+    fareQuote?.return?.Response?.Results?.Segments?.flat() || [];
+
+  return [...onwardSegs, ...returnSegs];
+};
+
+const extractFareFromQuote = (fareQuote, index) => {
+  // Per-segment fare is usually SAME for all segments
+  // We still map segment-wise for UI clarity
+  if (fareQuote?.Response?.Results?.Fare)
+    return fareQuote.Response.Results.Fare;
+
+  if (fareQuote?.onward && fareQuote?.return) {
+    return index < fareQuote.onward.Response.Results.Segments.flat().length
+      ? fareQuote.onward.Response.Results.Fare
+      : fareQuote.return.Response.Results.Fare;
+  }
+
+  return null;
+};
+
+/* ===========================
+   Component
+=========================== */
 
 export const FareDetailsModal = ({
   fareQuote,
@@ -10,91 +54,178 @@ export const FareDetailsModal = ({
   normalizeFareRules,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("rules");
+  const [activeTab, setActiveTab] = useState("summary");
 
-  const toggleModal = () => setIsOpen(!isOpen);
+  const toggleModal = () => setIsOpen((v) => !v);
+
+  const isRoundTrip = Boolean(fareQuote?.onward && fareQuote?.return);
+
+  /* ===========================
+     SEGMENT DATA
+  =========================== */
+
+  const segments = useMemo(
+    () => extractSegmentsFromFareQuote(fareQuote),
+    [fareQuote],
+  );
+
+  const segmentColumns = useMemo(
+    () =>
+      segments.map((seg) => ({
+        key: getSegmentKey(seg),
+        from: seg.Origin.Airport.CityName,
+        to: seg.Destination.Airport.CityName,
+      })),
+    [segments],
+  );
+
+  const fareRows = useMemo(() => {
+    return segmentColumns.map((_, idx) => {
+      const fare = extractFareFromQuote(fareQuote, idx);
+      if (!fare) return null;
+
+      return {
+        base: fare.BaseFare ?? fare.PublishedFare ?? 0,
+        tax: fare.Tax ?? 0,
+        total: fare.PublishedFare ?? fare.BaseFare + fare.Tax,
+        refundable: fare.Refundable ? "Yes" : "No",
+        cabin: fare.CabinClass || "Economy",
+      };
+    });
+  }, [fareQuote, segmentColumns]);
+
+  /* ===========================
+     RULES DATA (shared logic)
+  =========================== */
+
+  const resolvedFareRule = isRoundTrip ? fareRule?.onward : fareRule;
 
   return (
     <>
-      {/* Trigger Button */}
+      {/* Trigger */}
       <button
         onClick={toggleModal}
-        className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow transition-all duration-200"
+        className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow"
       >
         View Fare Rules
       </button>
 
-      {/* Modal Overlay */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
-          {/* Modal Container */}
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 max-h-[90vh] flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-linear-to-r from-blue-50 to-indigo-50">
-              <div className="flex items-center gap-2 text-gray-800 font-semibold text-lg">
-                <AiOutlineInfoCircle className="text-blue-600" size={22} />
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-linear-to-r from-blue-50 to-indigo-50">
+              <div className="flex items-center gap-2 text-lg font-semibold">
+                <AiOutlineInfoCircle className="text-blue-600" />
                 Fare Details
               </div>
-              <button
-                onClick={toggleModal}
-                className="text-gray-500 hover:text-gray-700 transition"
-              >
+              <button onClick={toggleModal}>
                 <IoClose size={22} />
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-gray-200 bg-white">
-              <button
-                onClick={() => setActiveTab("rules")}
-                className={`flex-1 py-3 text-sm font-medium transition-all duration-200 ${
-                  activeTab === "rules"
-                    ? "border-b-2 border-blue-600 text-blue-700"
-                    : "text-gray-600 hover:text-blue-600"
-                }`}
-              >
-                Fare Rules 
-              </button>
-              <button
-                onClick={() => setActiveTab("options")}
-                className={`flex-1 py-3 text-sm font-medium transition-all duration-200 ${
-                  activeTab === "options"
-                    ? "border-b-2 border-blue-600 text-blue-700"
-                    : "text-gray-600 hover:text-blue-600"
-                }`}
-              >
-                Charges & Policies
-              </button>
+            <div className="flex border-b">
+              {[
+                { id: "summary", label: "Fare Summary" },
+                { id: "rules", label: "Fare Rules" },
+                { id: "options", label: "Charges & Policies" },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  className={`flex-1 py-3 text-sm font-medium ${
+                    activeTab === t.id
+                      ? "border-b-2 border-blue-600 text-blue-700"
+                      : "text-gray-600 hover:text-blue-600"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
 
-            {/* Modal Content */}
+            {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-              {activeTab === "rules" && (
-                <div className="space-y-6">
-                  <FareRulesAccordion
-                    fareRules={normalizeFareRules(fareRule)}
-                    fareRulesStatus={!fareRule ? "loading" : "succeeded"}
-                  />
+              {/* =======================
+                 FARE SUMMARY TABLE
+              ======================= */}
+              {activeTab === "summary" && (
+                <div className="overflow-x-auto bg-white rounded-xl border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-3 text-left">Fare Component</th>
+                        {segmentColumns.map((c) => (
+                          <th
+                            key={c.key}
+                            className="px-4 py-3 text-center font-semibold"
+                          >
+                            {c.from} → {c.to}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: "Base Fare", key: "base" },
+                        { label: "Taxes", key: "tax" },
+                        { label: "Total Fare", key: "total", bold: true },
+                        { label: "Refundable", key: "refundable" },
+                        { label: "Cabin Class", key: "cabin" },
+                      ].map((row) => (
+                        <tr key={row.key} className="border-t">
+                          <td className="px-4 py-3 font-medium">
+                            {row.label}
+                          </td>
+                          {fareRows.map((r, idx) => (
+                            <td
+                              key={idx}
+                              className={`px-4 py-3 text-center ${
+                                row.bold ? "font-semibold" : ""
+                              }`}
+                            >
+                              {row.key.includes("Fare") || row.key === "total"
+                                ? formatCurrency(r?.[row.key])
+                                : r?.[row.key] ?? "—"}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
+              {/* =======================
+                 FARE RULES
+              ======================= */}
+              {activeTab === "rules" && (
+                <FareRulesAccordion
+                  fareRules={normalizeFareRules(resolvedFareRule)}
+                  fareRulesStatus={resolvedFareRule ? "succeeded" : "loading"}
+                />
+              )}
+
+              {/* =======================
+                 OPTIONS
+              ======================= */}
               {activeTab === "options" && (
-                <div className="space-y-6">
-                  <FareOptions
-                    fareRules={fareQuote?.Response?.Results}
-                    fareRulesStatus={
-                      fareQuote?.Response?.Results ? "succeeded" : "loading"
-                    }
-                  />
-                </div>
+                <FareOptions
+                  fareRules={
+                    fareQuote?.Response?.Results ||
+                    fareQuote?.onward?.Response?.Results
+                  }
+                  fareRulesStatus="succeeded"
+                />
               )}
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end p-4 border-t border-gray-200 bg-white">
+            <div className="flex justify-end p-4 border-t bg-white">
               <button
                 onClick={toggleModal}
-                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded-lg font-medium transition-all"
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium"
               >
                 Close
               </button>

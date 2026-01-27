@@ -70,7 +70,7 @@ export default function BookingDetails() {
   };
 
   return (
-    <div className="min-h-screen p-6 bg-gradient-to-br from-[#F8FAFC] to-[#E0F7FA]">
+    <div className="min-h-screen p-6 bg-linear-to-br from-[#F8FAFC] to-[#E0F7FA]">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <button
@@ -86,7 +86,7 @@ export default function BookingDetails() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ✈️ Flight Summary */}
         <div
-          className={`col-span-2 bg-gradient-to-r ${airlineTheme.gradient} rounded-xl shadow-lg p-6 text-white`}
+          className={`col-span-2 bg-linear-to-r ${airlineTheme.gradient} rounded-xl shadow-lg p-6 text-white`}
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
