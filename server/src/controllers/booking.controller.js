@@ -47,6 +47,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     travellers,
     purposeOfTravel,
     pricingSnapshot,
+    bookingSnapshot: clientBookingSnapshot,
   } = req.body;
 
   const corporate = req.corporate;
@@ -112,9 +113,9 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     );
   }
 
-  let bookingSnapshot;
+  let bookingSnapshot = clientBookingSnapshot;
 
-  if (bookingType === "flight" && flightRequest?.segments?.length) {
+  if (!bookingSnapshot && bookingType === "flight" && flightRequest?.segments?.length) {
     const segment = flightRequest.segments[0];
 
     bookingSnapshot = {

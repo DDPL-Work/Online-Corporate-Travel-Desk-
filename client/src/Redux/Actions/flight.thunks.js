@@ -12,11 +12,13 @@ export const searchFlights = createAsyncThunk(
 
       const response = data?.data?.Response;
 
-      if (!response || response.ResponseStatus !== 1) {
-        return rejectWithValue("Flight search failed");
-      }
-
       // 🔥 FLATTEN TBO RESULTS
+      if (!response || response.ResponseStatus !== 1) {
+        console.error("❌ FLIGHT SEARCH FAILED (API Response):", response);
+        return rejectWithValue(
+          response?.Error?.ErrorMessage || "Flight search failed",
+        );
+      }
       const flatResults = (response.Results || []).flat();
 
       return {

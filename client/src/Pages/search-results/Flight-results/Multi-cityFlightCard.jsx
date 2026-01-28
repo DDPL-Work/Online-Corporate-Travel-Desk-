@@ -1,3 +1,4 @@
+//src/Pages/search-results/Flight-results/Multi-cityFlightCard.jsx
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
@@ -41,7 +42,7 @@ export default function MultiCityFlightCard({
     );
   }, [legs]);
 
-  const totalPrice = fare?.PublishedFare ?? 0;
+  const totalPrice = fare?.OfferedFare || fare?.PublishedFare || 0;
 
   const getLegPrice = (leg) => {
     if (!totalDuration || !totalPrice) return 0;
@@ -223,7 +224,17 @@ export default function MultiCityFlightCard({
             </div>
           </div>
           <button
-            onClick={() =>
+            onClick={() => {
+              const isInternational = legs.some((leg) =>
+                leg.some(
+                  (s) =>
+                    s.Origin?.Airport?.CountryCode &&
+                    s.Destination?.Airport?.CountryCode &&
+                    s.Origin.Airport.CountryCode !==
+                      s.Destination.Airport.CountryCode,
+                ),
+              );
+
               navigate("/multi-city-flight/booking", {
                 state: {
                   selectedFlight: {
@@ -237,9 +248,10 @@ export default function MultiCityFlightCard({
                     traceId,
                   },
                   tripType: "multi-city",
+                  isInternational,
                 },
-              })
-            }
+              });
+            }}
             className="relative group px-8 py-3.5 bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 cursor-pointer"
           >
             <span className="relative z-10">Select</span>

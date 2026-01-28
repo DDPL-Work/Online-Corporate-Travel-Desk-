@@ -52,8 +52,9 @@ export default function RoundTripFlightBooking() {
   const {
     selectedFlight,
     searchParams,
-    rawFlightData,
+    // rawFlightData,
     tripType = "round-trip",
+    isInternational = false,
   } = location.state || {};
 
   const [expandedSections, setExpandedSections] = useState({
@@ -109,6 +110,26 @@ export default function RoundTripFlightBooking() {
 
   const traceId = location.state?.traceId || reduxTraceId || null;
 
+  // ✅ INTERNATIONAL NORMALIZATION (ADD THIS)
+  const rawFlightData = useMemo(() => {
+    const raw = location.state?.rawFlightData;
+    if (!raw) return null;
+
+    if (
+      isInternational &&
+      Array.isArray(raw.Segments) &&
+      Array.isArray(raw.Segments[0])
+    ) {
+      return {
+        onward: { ...raw, Segments: [raw.Segments[0]] },
+        return: { ...raw, Segments: [raw.Segments[1]] },
+        isInternational: true,
+      };
+    }
+
+    return raw;
+  }, [location.state?.rawFlightData, isInternational]);
+
   const extractFareParts = (quote) => {
     const fare = quote?.Response?.Results?.Fare;
     if (!fare) return { base: 0, tax: 0 };
@@ -134,30 +155,53 @@ export default function RoundTripFlightBooking() {
   };
 
   const isRTSeatReady = useMemo(() => {
-    const onwardResultIndex = rawFlightData?.onward?.ResultIndex;
-    const returnResultIndex = rawFlightData?.return?.ResultIndex;
+    const onwardIdx = rawFlightData?.onward?.ResultIndex?.toString().trim();
+    const returnIdx = rawFlightData?.return?.ResultIndex?.toString().trim();
 
-    const onwardSSR = ssr?.onward?.[onwardResultIndex];
-    const returnSSR = ssr?.return?.[returnResultIndex];
+    const onwardSSR = ssr?.onward?.[onwardIdx];
+    const returnSSR = ssr?.return?.[returnIdx];
 
-    const hasSeats = (journeySSR) => {
+    const hasSeats = (journeySSR, journeyType) => {
+      // if (ssrLoading?.[journeyType]) return "loading";
+      // if (ssrError?.[journeyType]) return "error";
+      if (!journeySSR) return false;
+
+      let root =
+        journeySSR.Response ||
+        journeySSR.Results ||
+        Object.values(journeySSR)[0]?.Response ||
+        Object.values(journeySSR)[0]?.Results ||
+        journeySSR;
+
       const seatSource =
-        journeySSR?.Response?.SeatDynamic ||
-        journeySSR?.Results?.SeatDynamic ||
+        root?.SeatDynamic?.[0]?.SegmentSeat ||
+        root?.Seat?.[0]?.SegmentSeat ||
+        root?.SeatDynamic ||
+        root?.Seat ||
         [];
 
-      return seatSource.some((sd) =>
-        sd?.SegmentSeat?.some(
-          (seg) => Array.isArray(seg?.RowSeats) && seg.RowSeats.length > 0,
-        ),
+      // if (!Array.isArray(seatSource) || seatSource.length === 0) return "none";
+
+      return (
+        Array.isArray(seatSource) &&
+        seatSource.some(
+          (s) => Array.isArray(s?.RowSeats) && s.RowSeats.length > 0,
+        )
       );
     };
 
+    // 🔥 INTERNATIONAL: same SSR for both legs
+    if (isInternational) {
+      const status = hasSeats(onwardSSR);
+      return { onward: status, return: status };
+    }
+
+    // Domestic
     return {
       onward: hasSeats(onwardSSR),
       return: hasSeats(returnSSR),
     };
-  }, [ssr, rawFlightData]);
+  }, [ssr, rawFlightData, isInternational]);
 
   useEffect(() => {
     console.log("🟢 Seat Ready Check", {
@@ -195,6 +239,28 @@ export default function RoundTripFlightBooking() {
     setParsedFlightData(parsed);
     setLoading(false);
   }, [rawFlightData, navigate]);
+
+  const onwardRoute = useMemo(() => {
+    const segs = parsedFlightData?.onwardSegments;
+    if (!Array.isArray(segs) || segs.length === 0) return null;
+
+    return {
+      from: segs[0]?.da?.city || "",
+      to: segs[segs.length - 1]?.aa?.city || "",
+      dateTime: segs[0]?.dt,
+    };
+  }, [parsedFlightData]);
+
+  const returnRoute = useMemo(() => {
+    const segs = parsedFlightData?.returnSegments;
+    if (!Array.isArray(segs) || segs.length === 0) return null;
+
+    return {
+      from: segs[0]?.da?.city || "",
+      to: segs[segs.length - 1]?.aa?.city || "",
+      dateTime: segs[0]?.dt,
+    };
+  }, [parsedFlightData]);
 
   const onwardFrom = searchParams?.from?.city || searchParams?.from || "Delhi";
   const onwardTo = searchParams?.to?.city || searchParams?.to || "Mumbai";
@@ -290,13 +356,25 @@ export default function RoundTripFlightBooking() {
       }),
     );
 
+    // ALWAYS call onward
     dispatch(
       getRTSSR({
         traceId,
-        resultIndex: onwardIdx,
+        resultIndex: rawFlightData.onward.ResultIndex,
         journeyType: "onward",
       }),
     );
+
+    // ONLY call return for domestic
+    if (!isInternational) {
+      dispatch(
+        getRTSSR({
+          traceId,
+          resultIndex: rawFlightData.return.ResultIndex,
+          journeyType: "return",
+        }),
+      );
+    }
 
     dispatch(
       getRTFareRule({
@@ -368,11 +446,38 @@ export default function RoundTripFlightBooking() {
   };
 
   const openSeatModal = (segment, segmentIndex, journeyType, resultIndex) => {
-    const journeySSR = ssr?.[journeyType]?.[resultIndex];
+    // 🔥 INTERNATIONAL FIX
+    const ssrJourneyType = isInternational ? "onward" : journeyType;
+    const ssrResultIndex = (
+      isInternational ? rawFlightData.onward.ResultIndex : resultIndex
+    )
+      ?.toString()
+      .trim();
 
-    const seatData = journeySSR?.Response?.SeatDynamic;
+    let actualSegmentIndex = segmentIndex;
 
-    if (!Array.isArray(seatData) || seatData.length === 0) {
+    // 🔥 INTERNATIONAL segment offset
+    if (isInternational && journeyType === "return") {
+      actualSegmentIndex =
+        (parsedFlightData?.onwardSegments?.length || 0) + segmentIndex;
+    }
+
+    const journeySSR = ssr?.[ssrJourneyType]?.[ssrResultIndex];
+
+    let root =
+      journeySSR?.Response ||
+      journeySSR?.Results ||
+      Object.values(journeySSR || {})[0]?.Response ||
+      Object.values(journeySSR || {})[0]?.Results ||
+      journeySSR;
+
+    const seatData =
+      root?.SeatDynamic?.[0]?.SegmentSeat ||
+      root?.Seat?.[0]?.SegmentSeat ||
+      root?.SeatDynamic ||
+      root?.Seat;
+
+    if (!seatData || seatData.length === 0) {
       ToastWithTimer({
         type: "info",
         message: "Seat selection not available for this flight.",
@@ -383,10 +488,11 @@ export default function RoundTripFlightBooking() {
     setShowSeatModal({
       show: true,
       segment,
-      segmentIndex,
-      journeyType,
-      resultIndex,
+      segmentIndex: actualSegmentIndex,
+      journeyType, // keep UI context
+      resultIndex: ssrResultIndex,
       date: segment?.dt,
+      ssrData: journeySSR, // ✅ important
     });
   };
 
@@ -955,10 +1061,10 @@ export default function RoundTripFlightBooking() {
                     value={
                       <>
                         <div className="font-semibold">
-                          {onwardFrom} → {onwardTo}
+                          {onwardRoute?.from} → {onwardRoute?.to}
                         </div>
                         <div className="text-xs text-slate-500">
-                          {formatDateTime(onwardDepartureDateTime)}
+                          {formatDateTime(onwardRoute?.dateTime)}
                         </div>
                       </>
                     }
@@ -970,10 +1076,10 @@ export default function RoundTripFlightBooking() {
                     value={
                       <>
                         <div className="font-semibold">
-                          {returnFrom} → {returnTo}
+                          {returnRoute?.from} → {returnRoute?.to}
                         </div>
                         <div className="text-xs text-slate-500">
-                          {formatDateTime(returnDepartureDateTime)}
+                          {formatDateTime(returnRoute?.dateTime)}
                         </div>
                       </>
                     }
@@ -1020,7 +1126,8 @@ export default function RoundTripFlightBooking() {
                         Onward Journey
                       </p>
                       <p className="text-sm text-gray-700 font-medium">
-                        {onwardFrom} → {onwardTo} • {onwardDate}
+                        {onwardRoute?.from} → {onwardRoute?.to} •{" "}
+                        {formatDate(onwardRoute?.dateTime)}
                       </p>
                       <p className="text-xs text-gray-600">
                         {parsedFlightData.onwardSegments?.length || 0} Flight
@@ -1077,7 +1184,8 @@ export default function RoundTripFlightBooking() {
                         Return Journey
                       </p>
                       <p className="text-sm text-gray-700 font-medium">
-                        {returnFrom} → {returnTo} • {returnDate}
+                        {returnRoute?.from} → {returnRoute?.to} •{" "}
+                        {formatDate(returnRoute?.dateTime)}
                       </p>
                       <p className="text-xs text-gray-600">
                         {parsedFlightData.returnSegments?.length || 0} Flight
@@ -1128,6 +1236,7 @@ export default function RoundTripFlightBooking() {
                 parsedFlightData={parsedFlightData}
                 purposeOfTravel={purposeOfTravel}
                 setPurposeOfTravel={setPurposeOfTravel}
+                isInternational={isInternational}
               />
             </div>
 

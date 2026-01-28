@@ -1,3 +1,4 @@
+//src/Pages/EmployeeDashboard/FlightSearch.jsx
 import React, { useEffect, useRef, useState } from "react";
 import SearchHeader from "../../components/search-layout/SearchHeader";
 import SearchCard from "../../components/search-layout/SearchCard";
@@ -164,7 +165,11 @@ export default function FlightSearchPage() {
     city: "New Delhi",
   });
   const [toAirport, setToAirport] = useState({ code: "CCU", city: "Kolkata" });
-  const [departureDate, setDepartureDate] = useState("");
+  const [departureDate, setDepartureDate] = useState(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split("T")[0];
+  });
 
   // Get flight search context
   const {
@@ -294,7 +299,10 @@ export default function FlightSearchPage() {
     } catch (err) {
       console.error("Flight search failed:", err);
       ToastWithTimer({
-        message: "Flight search failed. Please try again.",
+        message:
+          typeof err === "string"
+            ? err
+            : "Flight search failed. Please try again.",
         type: "error",
       });
     } finally {

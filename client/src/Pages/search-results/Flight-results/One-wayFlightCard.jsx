@@ -1,3 +1,4 @@
+//src/Pages/search-results/Flight-results/One-wayFlightCard.jsx
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { MdAirlineSeatReclineNormal, MdOutlineFlight } from "react-icons/md";
@@ -40,7 +41,7 @@ export default function OneWayFlightCard({
       getFareUpsell({
         traceId,
         resultIndex: flight.ResultIndex,
-      })
+      }),
     );
 
     // Pass fetched data up to parent
@@ -87,7 +88,7 @@ export default function OneWayFlightCard({
   const baggage = flight.Fare?.Baggage?.iB || "15 Kg";
 
   const refundable = flight.IsRefundable;
-  const price = flight.Fare?.PublishedFare;
+  const price = flight.Fare?.OfferedFare || flight.Fare?.PublishedFare;
 
   return (
     <div className="max-w-[1060px] bg-linear-to-br from-white via-blue-50/30 to-white border border-blue-200 rounded-2xl transition-all duration-300 overflow-hidden">
@@ -233,16 +234,25 @@ export default function OneWayFlightCard({
               {/* Action Buttons */}
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() =>
+                  onClick={() => {
+                    const isInternational = segments.some(
+                      (s) =>
+                        s.Origin?.Airport?.CountryCode &&
+                        s.Destination?.Airport?.CountryCode &&
+                        s.Origin.Airport.CountryCode !==
+                          s.Destination.Airport.CountryCode,
+                    );
+
                     navigate("/one-way-flight/booking", {
                       state: {
                         selectedFlight: flight,
                         rawFlightData: flight,
                         searchParams: { traceId },
                         tripType: "one-way",
+                        isInternational,
                       },
-                    })
-                  }
+                    });
+                  }}
                   className="relative group px-8 py-3.5 bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
                 >
                   <span className="relative z-10">Book Now</span>
@@ -252,44 +262,6 @@ export default function OneWayFlightCard({
             </div>
           </div>
         </div>
-
-        {/* <div className="bg-linear-to-r from-slate-50 to-blue-50/60 px-6 py-5 flex flex-col sm:flex-row justify-between items-center gap-4 border-t border-blue-100 rounded-b-xl shadow-sm"> */}
-        {/* Price Info */}
-        {/* <div className="flex flex-col text-center sm:text-left">
-            <div className="flex items-baseline justify-center sm:justify-start gap-2">
-              <span className="text-3xl font-bold bg-linear-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
-                ₹{price?.toLocaleString()}
-              </span>
-            </div>
-            <div className="text-xs text-slate-600 mt-1 flex flex-wrap justify-center sm:justify-start items-center gap-1">
-              <span>Total for 1 Adult</span>
-              <span className="text-blue-600">•</span>
-              <span className="text-blue-600 font-medium">
-                All taxes included
-              </span>
-            </div>
-          </div> */}
-
-        {/* Action Buttons */}
-        {/* <div className="flex items-center gap-3">
-            <button
-              onClick={() =>
-                navigate("/one-way-flight/booking", {
-                  state: {
-                    selectedFlight: flight,
-                    rawFlightData: flight,
-                    searchParams: { traceId },
-                    tripType: "one-way",
-                  },
-                })
-              }
-              className="relative group px-8 py-3.5 bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
-            >
-              <span className="relative z-10">Book Now</span>
-              <div className="absolute inset-0 bg-white/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            </button>
-          </div> */}
-        {/* </div> */}
       </div>
     </div>
   );

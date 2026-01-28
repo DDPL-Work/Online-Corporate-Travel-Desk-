@@ -155,11 +155,24 @@ class FlightService {
       Sources: null,
     };
 
+    console.log("🚀 TBO SEARCH REQUEST:", JSON.stringify(payload, null, 2));
+
     const { data } = await axios.post(
       `${cfg.base}${cfg.endpoints.flightSearch}`,
       payload,
       { timeout: config.timeout }
     );
+
+    console.log(
+      "✅ TBO SEARCH RESPONSE STATUS:",
+      data?.Response?.ResponseStatus,
+    );
+    if (data?.Response?.Error) {
+      console.log(
+        "❌ TBO SEARCH ERROR:",
+        JSON.stringify(data.Response.Error, null, 2),
+      );
+    }
 
     return data;
   }
@@ -236,6 +249,8 @@ class FlightService {
 
   /* ---------------- REAL SSR ---------------- */
   async getSSR(traceId, resultIndex) {
+    console.log("✈️ TBO SSR REQUEST:", { traceId, resultIndex });
+
     // Dummy for non-production
     if (process.env.NODE_ENV !== "production") {
       return {
@@ -250,7 +265,7 @@ class FlightService {
     }
 
     // LIVE SSR
-    return this.postLive(
+    const response = await this.postLive(
       config.live.endpoints.flightSSR,
       {
         TraceId: traceId,
@@ -258,10 +273,22 @@ class FlightService {
       },
       "live"
     );
+
+    console.log(
+      "✈️ TBO SSR RESPONSE [STATUS]:",
+      response?.Response?.ResponseStatus,
+    );
+    if (response?.Response?.Error) {
+      console.error("❌ TBO SSR ERROR:", response.Response.Error);
+    }
+    // console.log("✈️ TBO SSR FULL RESPONSE:", JSON.stringify(response, null, 2));
+
+    return response;
   }
 
   /* ---------------- SEAT MAP ---------------- */
   async getSeatMap(traceId, resultIndex) {
+    console.log("💺 TBO SEAT MAP REQUEST:", { traceId, resultIndex });
     if (!traceId || !resultIndex) {
       throw new ApiError(400, "traceId and resultIndex are required");
     }
@@ -450,7 +477,7 @@ class FlightService {
       if (!traceId || !resultIndex) {
         throw new ApiError(
           400,
-          "traceId and resultIndex are required for LCC ticketing"
+          "traceId and resultIndex are required for LCC ticketing",
         );
       }
 
@@ -463,7 +490,7 @@ class FlightService {
       if (!bookingId && !pnr) {
         throw new ApiError(
           400,
-          "bookingId or pnr required for Non-LCC ticketing"
+          "bookingId or pnr required for Non-LCC ticketing",
         );
       }
 
@@ -475,7 +502,7 @@ class FlightService {
 
     logger.info(
       "TBO TICKET PAYLOAD",
-      JSON.stringify({ isLCC, payload }, null, 2)
+      JSON.stringify({ isLCC, payload }, null, 2),
     );
 
     return this.postLive(config.live.endpoints.flightTicket, payload, "live");

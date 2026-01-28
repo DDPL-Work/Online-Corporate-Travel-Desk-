@@ -104,16 +104,55 @@ export const parseSingleJourney = (segs = []) => {
 };
 
 export const normalizeSSRBySegment = (ssr) => {
-  if (!ssr?.Response) return [];
+  if (!ssr) return [];
 
-  const seatDynamic = ssr.Response.SeatDynamic?.[0]?.SegmentSeat || [];
-  const mealDynamic = ssr.Response.MealDynamic?.[0] || [];
-  const baggageDynamic = ssr.Response.Baggage?.[0] || [];
+  // 🔍 Find the root object (Response or Results)
+  // TBO sometimes wraps the response in a dynamic hash key
+  let root = ssr.Response || ssr.Results;
 
-  return seatDynamic.map((segmentSeat) => ({
-    seats: Array.isArray(segmentSeat.RowSeats)
-      ? segmentSeat.RowSeats
-      : [],
+  if (!root) {
+    // Look into keys
+    const firstKey = Object.keys(ssr)[0];
+    if (firstKey && ssr[firstKey]) {
+      root = ssr[firstKey].Response || ssr[firstKey].Results || ssr[firstKey];
+    }
+  }
+
+  if (!root) root = ssr;
+
+  // 🔍 Find Seat Data (SeatDynamic or Seat)
+  const seatSource =
+    root.SeatDynamic?.[0]?.SegmentSeat ||
+    root.Seat?.[0]?.SegmentSeat ||
+    root.SeatDynamic ||
+    root.Seat ||
+    [];
+
+  // 🔍 Find Meal Data
+  const mealDynamic = root.MealDynamic?.[0] || root.Meal?.[0] || [];
+
+  // 🔍 Find Baggage Data
+  const baggageDynamic = root.Baggage?.[0] || [];
+
+  // If seatSource is not an array of segments, it might be the flat list itself?
+  // TBO usually gives [ { Value: ..., SegmentSeat: [...] } ]
+  // But if we found SegmentSeat directly, we are good.
+
+  // If seatSource is empty, return empty
+  if (!Array.isArray(seatSource)) return [];
+
+  // If seatSource has SegmentSeat inside (it was the outer array), map it
+  if (seatSource[0]?.SegmentSeat) {
+    return seatSource[0].SegmentSeat.map((segmentSeat) => ({
+      seats: Array.isArray(segmentSeat.RowSeats) ? segmentSeat.RowSeats : [],
+      meals: mealDynamic,
+      baggage: baggageDynamic,
+    }));
+  }
+
+  // If seatSource IS the array of SegmentSeats (because we found it deep)
+  return seatSource.map((segmentSeat) => ({
+    seats: Array.isArray(segmentSeat.RowSeats) ? segmentSeat.RowSeats : [],
     meals: mealDynamic,
     baggage: baggageDynamic,
   }));
@@ -135,5 +174,3 @@ export const normalizeSSRBySegmentOW = (ssr) => {
     baggage,   // journey-level
   }));
 };
-
-
