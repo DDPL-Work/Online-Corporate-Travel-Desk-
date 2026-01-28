@@ -66,7 +66,7 @@ class FlightService {
       return this.tokens[type].value;
     } catch (err) {
       logger.error(
-        `TBO ${type} auth error, err?.response?.data ` || err.message,
+        `TBO ${type} auth error, err?.response?.data ` || err.message
       );
       throw new ApiError(500, `TBO ${type} authentication failed`);
     }
@@ -118,7 +118,7 @@ class FlightService {
           Destination: params.origin,
           PreferredDepartureTime: toTboDate(params.returnDate),
           FlightCabinClass: cabinMap[params.cabinClass?.toLowerCase()] || 1,
-        },
+        }
       );
     }
 
@@ -160,7 +160,7 @@ class FlightService {
     const { data } = await axios.post(
       `${cfg.base}${cfg.endpoints.flightSearch}`,
       payload,
-      { timeout: config.timeout },
+      { timeout: config.timeout }
     );
 
     console.log(
@@ -209,7 +209,7 @@ class FlightService {
         TraceId: traceId,
         ResultIndex: resultIndex,
       },
-      "live",
+      "live"
     );
   }
 
@@ -243,7 +243,7 @@ class FlightService {
         TraceId: traceId,
         ResultIndex: resultIndex,
       },
-      "live",
+      "live"
     );
   }
 
@@ -271,7 +271,7 @@ class FlightService {
         TraceId: traceId,
         ResultIndex: resultIndex,
       },
-      "live",
+      "live"
     );
 
     console.log(
@@ -329,7 +329,7 @@ class FlightService {
         TraceId: traceId,
         ResultIndex: resultIndex,
       },
-      "live",
+      "live"
     );
   }
 
@@ -384,7 +384,7 @@ class FlightService {
     const response = await this.postLive(
       "/BookingEngineService_Air/AirService.svc/rest/FareUpsell",
       { TraceId: traceId, ResultIndex: resultIndex },
-      "live",
+      "live"
     );
     const upsellList = response?.UpsellOptionsList?.UpsellList || [];
 
@@ -419,7 +419,7 @@ class FlightService {
     if (!result.IsLCC && passengers.length !== result.FareBreakdown.length) {
       throw new ApiError(
         400,
-        `Passenger count (${passengers.length}) does not match FareBreakdown (${result.FareBreakdown.length})`,
+        `Passenger count (${passengers.length}) does not match FareBreakdown (${result.FareBreakdown.length})`
       );
     }
 
@@ -447,13 +447,13 @@ class FlightService {
     const response = await this.postLive(
       config.live.endpoints.flightBook,
       payload,
-      "live",
+      "live"
     );
 
     if (response?.Response?.ResponseStatus !== 1) {
       throw new ApiError(
         400,
-        response?.Response?.Error?.ErrorMessage || "Booking failed",
+        response?.Response?.Error?.ErrorMessage || "Booking failed"
       );
     }
 
@@ -517,7 +517,7 @@ class FlightService {
     return this.postLive(
       config.live.endpoints.flightBookingDetails,
       { PNR: pnr },
-      "live",
+      "live"
     );
   }
 
@@ -532,8 +532,8 @@ class FlightService {
         pax.paxType === "ADULT" || pax.paxType === 1
           ? 1
           : pax.paxType === "CHILD" || pax.paxType === 2
-            ? 2
-            : 3,
+          ? 2
+          : 3,
 
       DateOfBirth: pax.dateOfBirth
         ? new Date(pax.dateOfBirth).toISOString().split("T")[0]
@@ -569,7 +569,7 @@ class FlightService {
           TokenId: token,
           ...payload,
         },
-        { timeout: config.timeout },
+        { timeout: config.timeout }
       );
       return data;
     } catch (err) {
@@ -583,7 +583,7 @@ class FlightService {
         500,
         err.response?.data?.Response?.Error?.ErrorMessage ||
           err.response?.data?.Error?.ErrorMessage ||
-          "TBO live request failed",
+          "TBO live request failed"
       );
     }
   }

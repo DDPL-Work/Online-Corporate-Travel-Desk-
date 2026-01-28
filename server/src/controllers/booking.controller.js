@@ -129,10 +129,10 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
         segment.cabinClass === 1
           ? "Economy"
           : segment.cabinClass === 2
-            ? "Premium Economy"
-            : segment.cabinClass === 3
-              ? "Business"
-              : "Economy",
+          ? "Premium Economy"
+          : segment.cabinClass === 3
+          ? "Business"
+          : "Economy",
       amount: pricingSnapshot.totalAmount,
       purposeOfTravel,
       city: segment.destination.city,
