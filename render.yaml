@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: online-corporate-travel-desk
+    env: node
+    plan: starter
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
+    aptPackages:
+      - chromium
