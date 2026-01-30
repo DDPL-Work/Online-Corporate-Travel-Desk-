@@ -117,6 +117,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   if (bookingType === "flight" && Array.isArray(flightRequest?.segments)) {
     const segments = flightRequest.segments;
 
+// <<<<<<< HEAD
     // ONE-WAY (existing behavior preserved)
     if (segments.length === 1) {
       const s = segments[0];
@@ -203,6 +204,27 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
         city: lastSeg.Destination?.Airport?.CityName,
       };
     }
+// =======
+//     bookingSnapshot = {
+//       sectors: [
+//         `${segment.origin.airportCode}-${segment.destination.airportCode}`,
+//       ],
+//       airline: segment.airlineName,
+//       travelDate: segment.departureDateTime,
+//       returnDate: segment.arrivalDateTime,
+//       cabinClass:
+//         segment.cabinClass === 1
+//           ? "Economy"
+//           : segment.cabinClass === 2
+//           ? "Premium Economy"
+//           : segment.cabinClass === 3
+//           ? "Business"
+//           : "Economy",
+//       amount: pricingSnapshot.totalAmount,
+//       purposeOfTravel,
+//       city: segment.destination.city,
+//     };
+// >>>>>>> d5de6b9290f0417c8d6b38e9aa73e68f776f4f0f
   }
 
   /* ================= CREATE BOOKING REQUEST ================= */
