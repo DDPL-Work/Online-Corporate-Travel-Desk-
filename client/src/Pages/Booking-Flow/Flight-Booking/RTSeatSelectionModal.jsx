@@ -41,13 +41,16 @@ export default function RTSeatSelectionModal({
   onSelectBaggage,
   routes,
   segments,
+  ssrData, // ✅ Accept explicit SSR data
 }) {
   const dispatch = useDispatch();
   const { seatMap, loading } = useSelector((state) => state.flightsRT);
   const fareQuote = useSelector((state) => state.flightsRT.fareQuoteRT);
-  const ssr = useSelector(
-    (state) => state.flightsRT.ssrRT?.[journeyType]?.[resultIndex],
+  const reduxSSR = useSelector(
+    (state) => state.flightsRT.ssrRT?.[journeyType]?.[resultIndex?.toString().trim()],
   );
+
+  const ssr = ssrData || reduxSSR;
 
   const [seatsFlat, setSeatsFlat] = useState([]);
   const [seatModalOpen, setSeatModalOpen] = useState(true);
@@ -239,18 +242,16 @@ export default function RTSeatSelectionModal({
 
     const tooltipText = seat.occupied
       ? "This seat is already selected"
-      : `Seat: ${seat.seatNo}\nType: ${
-          seat.isEmergencyExit
-            ? "Emergency Exit"
-            : seat.premium
-              ? "Premium"
-              : "Standard"
-        }\n${seat.price ? `Price: ₹${seat.price}` : "Free"}`;
+      : `Seat: ${seat.seatNo}\nType: ${seat.isEmergencyExit
+        ? "Emergency Exit"
+        : seat.premium
+          ? "Premium"
+          : "Standard"
+      }\n${seat.price ? `Price: ₹${seat.price}` : "Free"}`;
 
     return (
-      <div className="relative">
+      <div key={`${seat.row}-${seat.col}`} className="relative">
         <button
-          key={`${seat.row}-${seat.col}`}
           onClick={() => tryToggle(seat)}
           disabled={seat.occupied}
           className={seatClasses}
@@ -441,13 +442,12 @@ export default function RTSeatSelectionModal({
             <button
               key={key}
               onClick={() => handleSSR(key)}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-medium text-sm transition-all ${
-                (key === "seat" && seatModalOpen) ||
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-medium text-sm transition-all ${(key === "seat" && seatModalOpen) ||
                 (key === "meal" && mealModalOpen) ||
                 (key === "baggage" && baggageModalOpen)
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "bg-white text-blue-600 border border-blue-200 hover:bg-blue-100"
-              }`}
+                ? "bg-blue-600 text-white shadow-sm"
+                : "bg-white text-blue-600 border border-blue-200 hover:bg-blue-100"
+                }`}
             >
               <Icon className="text-base" /> {label}
             </button>

@@ -127,7 +127,13 @@ export const parseFlightData = (rawFlightData) => {
 };
 
 export const parseOneWayData = (result) => {
-  const segmentGroup = result.Segments?.[0] || [];
+  // const segmentGroup = result.Segments?.[0] || [];
+  const segmentGroup =
+    result?.Segments?.[0] ||
+    result?.FareQuote?.Results?.[0]?.Segments?.[0] ||
+    result?.Results?.[0]?.Segments?.[0] ||
+    [];
+
   if (!segmentGroup.length) return null;
 
   const segments = segmentGroup.map((seg, idx) => {
@@ -142,6 +148,7 @@ export const parseOneWayData = (result) => {
         code: seg.Origin.Airport.AirportCode,
         name: seg.Origin.Airport.AirportName,
         terminal: seg.Origin.Airport.Terminal,
+        countryCode: seg.Origin.Airport.CountryCode,
       },
 
       aa: {
@@ -149,6 +156,7 @@ export const parseOneWayData = (result) => {
         code: seg.Destination.Airport.AirportCode,
         name: seg.Destination.Airport.AirportName,
         terminal: seg.Destination.Airport.Terminal,
+        countryCode: seg.Destination.Airport.CountryCode,
       },
 
       fD: {
@@ -239,7 +247,7 @@ export const parseRoundTripBooking = ({ onward, return: ret }) => {
 export const FlightTimeline = ({
   segments = [],
   selectedSeats = {},
-  segmentIndex,
+  baseSegmentIndex = 0,
   openSeatModal,
   journeyType = "onward",
   isSeatReady = false,
@@ -326,7 +334,8 @@ export const FlightTimeline = ({
                               <div>
                                 {/* Selected seats */}
                                 {(() => {
-                                  const seatKey = `${journeyType}|${segmentIndex}`;
+                                  const actualIndex = baseSegmentIndex + idx;
+                                  const seatKey = `${journeyType}|${actualIndex}`;
                                   const seats =
                                     selectedSeats?.[seatKey]?.list || [];
                                   if (!seats.length) return null;
@@ -346,20 +355,39 @@ export const FlightTimeline = ({
                           Duration: {formatDurationCompact(segment.duration)} •{" "}
                           {segment.fD?.eT || "Aircraft"}
                         </p>
-                        <button
-                          onClick={() => !seatDisabled && openSeatModal(idx)}
-                          disabled={seatDisabled}
-                          className={`mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-lg py-2 transition
-    ${
-      seatDisabled
-        ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
-        : "text-blue-600 border border-blue-600 hover:border-[#0A4D68] hover:bg-[#0A4D68] hover:text-white"
-    }
-  `}
-                        >
-                          <MdEventSeat />
-                          {seatDisabled ? "Seats loading…" : "Select Seats"}
-                        </button>
+                        {(() => {
+                          const getSeatButtonText = () => {
+                            if (isSeatReady === "loading")
+                              return "Seats loading…";
+                            if (isSeatReady === "error")
+                              return "Unable to load seats";
+                            if (isSeatReady === "none")
+                              return "No seats available";
+                            if (isSeatReady === true) return "Select Seats";
+                            return "Seats loading…";
+                          };
+
+                          const seatDisabled = isSeatReady !== true;
+
+                          return (
+                            <button
+                              onClick={() =>
+                                !seatDisabled && openSeatModal(idx)
+                              }
+                              disabled={seatDisabled}
+                              className={`mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-lg py-2 transition
+        ${
+          seatDisabled
+            ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
+            : "text-blue-600 border border-blue-600 hover:border-[#0A4D68] hover:bg-[#0A4D68] hover:text-white"
+        }
+      `}
+                            >
+                              <MdEventSeat />
+                              {getSeatButtonText()}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -418,26 +446,25 @@ export const RoundTripFlightTimeline = ({
   selectedSeats = {},
   openSeatModal,
   isSeatReady,
+  isInternational = false,
+  onwardCount = 0,
 }) => {
   const journeyType = isReturnJourney ? "return" : "onward";
   const seatReady = Boolean(isSeatReady);
 
+  if (!segments.length) return null;
+
   return (
-    <div className="space-y-6">
-      {segments.map((segment, segmentIndex) => (
-        <FlightTimeline
-          key={segmentIndex}
-          segmentIndex={segmentIndex}
-          segments={[segment]}
-          journeyType={journeyType}
-          selectedSeats={selectedSeats}
-          openSeatModal={() =>
-            openSeatModal(segment, segmentIndex, journeyType)
-          }
-          isSeatReady={seatReady}
-        />
-      ))}
-    </div>
+    <FlightTimeline
+      segments={segments}
+      journeyType={journeyType}
+      selectedSeats={selectedSeats}
+      baseSegmentIndex={isReturnJourney && isInternational ? onwardCount : 0}
+      openSeatModal={(segmentIndex) =>
+        openSeatModal(segments[segmentIndex], segmentIndex, journeyType)
+      }
+      isSeatReady={seatReady}
+    />
   );
 };
 
@@ -1566,10 +1593,12 @@ export const TravelerForm = ({
   parsedFlightData,
   purposeOfTravel,
   setPurposeOfTravel,
+  isInternational: isIntlFromProp,
 }) => {
   if (!Array.isArray(travelers)) travelers = [];
 
-  const isInternational = isInternationalTrip(parsedFlightData);
+  const isInternational =
+    isIntlFromProp ?? isInternationalTrip(parsedFlightData);
 
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">

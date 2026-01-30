@@ -102,6 +102,7 @@ const bookingRequestSchema = new mongoose.Schema(
         "not_started",
         "booking_initiated",
         "booked",
+        "ticket_pending",
         "ticketed",
         "failed",
       ],
@@ -166,7 +167,7 @@ const bookingRequestSchema = new mongoose.Schema(
       refundStatus: String,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 /* ======================================================
@@ -201,7 +202,7 @@ bookingRequestSchema.pre("save", function () {
 
   if (!ALLOWED_STATUS_TRANSITIONS[previousStatus]?.includes(nextStatus)) {
     throw new Error(
-      `Invalid request status transition: ${previousStatus} → ${nextStatus}`
+      `Invalid request status transition: ${previousStatus} → ${nextStatus}`,
     );
   }
 });

@@ -47,6 +47,18 @@ export default function BookingDetails() {
     if (id) dispatch(fetchMyBookingById(id));
   }, [id, dispatch]);
 
+  useEffect(() => {
+    if (!booking?._id) return;
+
+    if (booking.executionStatus !== "ticket_pending") return;
+
+    const interval = setInterval(() => {
+      dispatch(fetchMyBookingById(booking._id));
+    }, 15000); // every 15 seconds
+
+    return () => clearInterval(interval);
+  }, [booking?._id, booking?.executionStatus, dispatch]);
+
   if (loading || !booking) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500">
@@ -59,7 +71,8 @@ export default function BookingDetails() {
   const traveller = booking.travellers?.[0];
   const fare = booking.pricingSnapshot;
   const pnr = booking.bookingResult?.pnr;
-  const paymentSuccessful = booking.executionStatus === "ticketed";
+  const paymentSuccessful = booking.payment?.status === "completed";
+
   const airlineTheme =
     airlineThemes[flight?.airlineCode] || airlineThemes.DEFAULT;
 
@@ -70,7 +83,7 @@ export default function BookingDetails() {
   };
 
   return (
-    <div className="min-h-screen p-6 bg-gradient-to-br from-[#F8FAFC] to-[#E0F7FA]">
+    <div className="min-h-screen p-6 bg-linear-to-br from-[#F8FAFC] to-[#E0F7FA]">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <button
@@ -86,7 +99,7 @@ export default function BookingDetails() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ✈️ Flight Summary */}
         <div
-          className={`col-span-2 bg-gradient-to-r ${airlineTheme.gradient} rounded-xl shadow-lg p-6 text-white`}
+          className={`col-span-2 bg-linear-to-r ${airlineTheme.gradient} rounded-xl shadow-lg p-6 text-white`}
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -234,7 +247,21 @@ export default function BookingDetails() {
                 <b>Purpose of Travel:</b> {booking.purposeOfTravel}
               </p>
               <p>
-                <b>PNR:</b> {pnr || "Not Assigned"}
+                <b>Ticket Status:</b>{" "}
+                {booking.executionStatus === "ticketed" && (
+                  <span className="text-green-600 font-semibold">
+                    Ticket Issued
+                  </span>
+                )}
+                {booking.executionStatus === "ticket_pending" && (
+                  <span className="text-orange-600 font-semibold">
+                    Ticket is being issued (please wait)
+                  </span>
+                )}
+              </p>
+
+              <p>
+                <b>PNR:</b> {pnr || "Awaiting assignment"}
               </p>
             </div>
 

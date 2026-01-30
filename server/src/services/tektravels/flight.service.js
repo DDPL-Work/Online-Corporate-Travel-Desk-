@@ -450,7 +450,7 @@ class FlightService {
       if (!traceId || !resultIndex) {
         throw new ApiError(
           400,
-          "traceId and resultIndex are required for LCC ticketing"
+          "traceId and resultIndex are required for LCC ticketing",
         );
       }
 
@@ -463,7 +463,7 @@ class FlightService {
       if (!bookingId && !pnr) {
         throw new ApiError(
           400,
-          "bookingId or pnr required for Non-LCC ticketing"
+          "bookingId or pnr required for Non-LCC ticketing",
         );
       }
 
@@ -475,7 +475,7 @@ class FlightService {
 
     logger.info(
       "TBO TICKET PAYLOAD",
-      JSON.stringify({ isLCC, payload }, null, 2)
+      JSON.stringify({ isLCC, payload }, null, 2),
     );
 
     return this.postLive(config.live.endpoints.flightTicket, payload, "live");

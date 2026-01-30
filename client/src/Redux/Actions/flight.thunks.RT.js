@@ -84,7 +84,7 @@ export const getRTSSR = createAsyncThunk(
 
     return {
       journeyType,
-      resultIndex,
+      resultIndex: resultIndex?.toString().trim(),
       data: data.data,
     };
   }

@@ -50,12 +50,14 @@ export default function OneFlightBooking() {
   );
 
   const { actionLoading } = useSelector((state) => state.bookings);
+  const { user } = useSelector((state) => state.auth);
 
   const {
     selectedFlight,
     searchParams,
     rawFlightData,
     tripType = "one-way",
+    isInternational = false,
   } = location.state || {};
 
   const [parsedFlightData, setParsedFlightData] = useState(null);
@@ -95,11 +97,56 @@ export default function OneFlightBooking() {
     dob: "",
   });
 
-  const [travelers, setTravelers] = useState(() => {
-    const count = searchParams?.passengers?.adults || searchParams?.adults || 1;
+  const [travelers, setTravelers] = useState([]);
 
-    return Array.from({ length: count }, (_, i) => initialTraveler(i + 1));
-  });
+  // ✅ AUTO-FILL LEAD TRAVELER
+  useEffect(() => {
+    const adultCount =
+      searchParams?.passengers?.adults || searchParams?.adults || 1;
+    const childCount =
+      searchParams?.passengers?.children || searchParams?.children || 0;
+    const infantCount =
+      searchParams?.passengers?.infants || searchParams?.infants || 0;
+    const totalCount = adultCount + childCount + infantCount;
+
+    const initial = Array.from({ length: totalCount || 1 }, (_, i) => ({
+      id: i + 1,
+      title: "MR",
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      gender: "",
+      age: "",
+      email: "",
+      mobile: "",
+      phoneWithCode: "",
+      passportNumber: "",
+      passportExpiry: "",
+      nationality: "India",
+      dob: "",
+    }));
+
+    // Pre-fill first traveler if user is logged in
+    if (user && initial[0]) {
+      if (user.name && typeof user.name === "object") {
+        initial[0].firstName = (user.name.firstName || "").toUpperCase();
+        initial[0].lastName = (user.name.lastName || "").toUpperCase();
+      } else {
+        const rawName = user.name || user.displayName || "";
+        const fullName = typeof rawName === "string" ? rawName : "";
+        const names = fullName.trim().split(/\s+/);
+
+        initial[0].firstName = (names[0] || "").toUpperCase();
+        initial[0].lastName = (names.slice(1).join(" ") || "").toUpperCase();
+      }
+
+      initial[0].email = user.email || "";
+      initial[0].phoneWithCode =
+        user.phone || user.mobile || user.phoneWithCode || "";
+    }
+
+    setTravelers(initial);
+  }, [user, searchParams]);
 
   const formatDateTime = (dateString) => {
     if (!dateString) return "N/A";
@@ -711,10 +758,10 @@ export default function OneFlightBooking() {
 
                         {formatDate(departureDateTime) !==
                           formatDate(arrivalDateTime) && (
-                          <div className="text-xs text-slate-500">
-                            Arrives {formatDate(arrivalDateTime)}
-                          </div>
-                        )}
+                            <div className="text-xs text-slate-500">
+                              Arrives {formatDate(arrivalDateTime)}
+                            </div>
+                          )}
                       </>
                     }
                   />
@@ -759,6 +806,7 @@ export default function OneFlightBooking() {
                 parsedFlightData={parsedFlightData}
                 purposeOfTravel={purposeOfTravel}
                 setPurposeOfTravel={setPurposeOfTravel}
+                isInternational={isInternational}
               />
             </div>
 

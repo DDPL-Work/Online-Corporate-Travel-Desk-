@@ -181,7 +181,7 @@ export default function FlightSearchResults() {
     }
 
     const prices = normalizedFlights
-      .map((f) => f?.Fare?.PublishedFare || 0)
+      .map((f) => f?.Fare?.OfferedFare || f?.Fare?.PublishedFare || 0)
       .filter(Boolean);
 
     if (!prices.length) {
@@ -193,6 +193,13 @@ export default function FlightSearchResults() {
       max: Math.ceil(Math.max(...prices) / 100) * 100,
     };
   }, [normalizedFlights]);
+
+  // ✅ Auto-update price filter when range changes
+  useEffect(() => {
+    if (priceRange.max > 0) {
+      setPriceValues([priceRange.min, priceRange.max]);
+    }
+  }, [priceRange]);
 
   const activeFilters = useMemo(
     () => ({
@@ -344,7 +351,7 @@ export default function FlightSearchResults() {
     let cheapestFlight = null;
 
     normalizedFlights.forEach((f) => {
-      const price = f?.Fare?.PublishedFare ?? 0;
+      const price = f?.Fare?.OfferedFare || f?.Fare?.PublishedFare || 0;
       if (!price) return;
 
       if (price < minPrice) {
@@ -394,25 +401,45 @@ export default function FlightSearchResults() {
     // );
 
     result = result.filter((f) => {
-      const price = f?.Fare?.PublishedFare ?? 0;
+      const price = f?.Fare?.OfferedFare || f?.Fare?.PublishedFare || 0;
       return price >= priceValues[0] && price <= priceValues[1];
     });
 
     /* ---------------- STOPS ---------------- */
     if (selectedStops.length) {
       result = result.filter((f) => {
-        const stops = getSegments(f).length - 1;
+        let stops = 0;
+        // FOR INTERNATIONAL GROUPED: Count max stops per leg
+        if (Array.isArray(f.Segments[0])) {
+          stops = Math.max(...f.Segments.map((leg) => leg.length - 1));
+        } else {
+          stops = getSegments(f).length - 1;
+        }
 
-        if (selectedStops.includes("Non-stop")) return stops === 0;
-        if (selectedStops.includes("1 stop")) return stops === 1;
-        if (selectedStops.includes("2+ stops")) return stops >= 2;
-        return true;
+        if (
+          selectedStops.includes("Non-Stop") ||
+          selectedStops.includes("Non-stop")
+        ) {
+          if (stops === 0) return true;
+        }
+        if (selectedStops.includes("1 stop")) {
+          if (stops === 1) return true;
+        }
+        if (selectedStops.includes("2+ stops")) {
+          if (stops >= 2) return true;
+        }
+        return false;
       });
     }
 
     /* ---------------- DIRECT ONLY ---------------- */
     if (popularFilters.directOnly) {
-      result = result.filter((f) => getSegments(f).length === 1);
+      result = result.filter((f) => {
+        if (Array.isArray(f.Segments[0])) {
+          return f.Segments.every((leg) => leg.length === 1);
+        }
+        return getSegments(f).length === 1;
+      });
     }
 
     /* ---------------- REFUNDABLE ---------------- */
@@ -499,12 +526,6 @@ export default function FlightSearchResults() {
     }
 
     /* ---------------- DURATION ---------------- */
-    // if (Number(journeyType) !== 2) {
-    //   result = result.filter((f) => {
-    //     const duration = getSegments(f)[0]?.Duration || 0;
-    //     return duration <= selectedMaxDuration;
-    //   });
-    // }
 
     result = result.filter((f) => {
       const duration = getSegments(f)[0]?.Duration || 0;
@@ -559,10 +580,11 @@ export default function FlightSearchResults() {
     /* ---------------- SORTING ---------------- */
     switch (sortKey) {
       case "Cheapest":
-        result.sort(
-          (a, b) =>
-            (a?.Fare?.PublishedFare || 0) - (b?.Fare?.PublishedFare || 0),
-        );
+        result.sort((a, b) => {
+          const priceA = a?.Fare?.OfferedFare || a?.Fare?.PublishedFare || 0;
+          const priceB = b?.Fare?.OfferedFare || b?.Fare?.PublishedFare || 0;
+          return priceA - priceB;
+        });
         break;
 
       case "Early depart":
@@ -584,8 +606,9 @@ export default function FlightSearchResults() {
       case "Best":
       default:
         result.sort((a, b) => {
-          const priceDiff =
-            (a?.Fare?.PublishedFare || 0) - (b?.Fare?.PublishedFare || 0);
+          const priceA = a?.Fare?.OfferedFare || a?.Fare?.PublishedFare || 0;
+          const priceB = b?.Fare?.OfferedFare || b?.Fare?.PublishedFare || 0;
+          const priceDiff = priceA - priceB;
 
           const durDiff =
             (getSegments(a)[0]?.Duration || 0) -
@@ -824,17 +847,19 @@ export default function FlightSearchResults() {
             {Number(journeyType) === 2 && !isInternationalReturnGrouped && (
               <div className="sticky top-[119px] z-30 bg-gray-300 border-b border-gray-200 rounded-lg shadow-sm">
                 <div className="flex gap-1 p-2">
+                  {/* ONWARD ROUTE */}
                   <button
                     onClick={() => setActiveTab("onward")}
                     className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-sm transition ${
                       activeTab === "onward"
                         ? "bg-blue-600 text-white shadow"
-                        : "text-gray-600 hover:bg-gray-100"
+                        : "text-gray-700 hover:bg-gray-100"
                     }`}
                   >
-                    Onward Flights {selectedOnward && "✓"}
+                    {fromCity} → {toCity} {selectedOnward && "✓"}
                   </button>
 
+                  {/* RETURN ROUTE */}
                   <button
                     onClick={() => setActiveTab("return")}
                     disabled={!selectedOnward}
@@ -842,11 +867,11 @@ export default function FlightSearchResults() {
                       activeTab === "return"
                         ? "bg-blue-600 text-white shadow"
                         : selectedOnward
-                          ? "text-gray-600 hover:bg-gray-100"
+                          ? "text-gray-700 hover:bg-gray-100"
                           : "text-gray-400 cursor-not-allowed"
                     }`}
                   >
-                    Return Flights {selectedReturn && "✓"}
+                    {toCity} → {fromCity} {selectedReturn && "✓"}
                   </button>
                 </div>
               </div>
@@ -895,7 +920,26 @@ export default function FlightSearchResults() {
                 <SelectedTripSummary
                   onward={selectedOnward}
                   ret={selectedReturn}
-                  onContinue={() =>
+                  onContinue={() => {
+                    const onwardSegments = selectedOnward?.Segments?.[0] || [];
+                    const returnSegments = selectedReturn?.Segments?.[0] || [];
+
+                    const isInternational =
+                      onwardSegments.some(
+                        (s) =>
+                          s.Origin?.Airport?.CountryCode &&
+                          s.Destination?.Airport?.CountryCode &&
+                          s.Origin.Airport.CountryCode !==
+                            s.Destination.Airport.CountryCode,
+                      ) ||
+                      returnSegments.some(
+                        (s) =>
+                          s.Origin?.Airport?.CountryCode &&
+                          s.Destination?.Airport?.CountryCode &&
+                          s.Origin.Airport.CountryCode !==
+                            s.Destination.Airport.CountryCode,
+                      );
+
                     navigate("/round-trip-flight/booking", {
                       state: {
                         rawFlightData: {
@@ -903,9 +947,10 @@ export default function FlightSearchResults() {
                           return: selectedReturn,
                         },
                         traceId,
+                        isInternational,
                       },
-                    })
-                  }
+                    });
+                  }}
                 />
               </>
             ) : (
