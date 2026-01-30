@@ -127,7 +127,13 @@ export const parseFlightData = (rawFlightData) => {
 };
 
 export const parseOneWayData = (result) => {
-  const segmentGroup = result.Segments?.[0] || [];
+  // const segmentGroup = result.Segments?.[0] || [];
+  const segmentGroup =
+    result?.Segments?.[0] ||
+    result?.FareQuote?.Results?.[0]?.Segments?.[0] ||
+    result?.Results?.[0]?.Segments?.[0] ||
+    [];
+
   if (!segmentGroup.length) return null;
 
   const segments = segmentGroup.map((seg, idx) => {
@@ -166,11 +172,11 @@ export const parseOneWayData = (result) => {
 
       layoverTime: next
         ? Math.max(
-          0,
-          (new Date(next.Origin.DepTime) -
-            new Date(seg.Destination.ArrTime)) /
-          60000,
-        )
+            0,
+            (new Date(next.Origin.DepTime) -
+              new Date(seg.Destination.ArrTime)) /
+              60000,
+          )
         : 0,
     };
   });
@@ -311,8 +317,8 @@ export const FlightTimeline = ({
                               alt="airline"
                               className="w-8 h-8 rounded"
                               onError={(e) =>
-                              (e.target.src =
-                                "https://via.placeholder.com/40")
+                                (e.target.src =
+                                  "https://via.placeholder.com/40")
                               }
                             />
                             <div className="flex items-center gap-4">
@@ -351,9 +357,12 @@ export const FlightTimeline = ({
                         </p>
                         {(() => {
                           const getSeatButtonText = () => {
-                            if (isSeatReady === "loading") return "Seats loading…";
-                            if (isSeatReady === "error") return "Unable to load seats";
-                            if (isSeatReady === "none") return "No seats available";
+                            if (isSeatReady === "loading")
+                              return "Seats loading…";
+                            if (isSeatReady === "error")
+                              return "Unable to load seats";
+                            if (isSeatReady === "none")
+                              return "No seats available";
                             if (isSeatReady === true) return "Select Seats";
                             return "Seats loading…";
                           };
@@ -362,13 +371,16 @@ export const FlightTimeline = ({
 
                           return (
                             <button
-                              onClick={() => !seatDisabled && openSeatModal(idx)}
+                              onClick={() =>
+                                !seatDisabled && openSeatModal(idx)
+                              }
                               disabled={seatDisabled}
                               className={`mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-lg py-2 transition
-        ${seatDisabled
-                                  ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
-                                  : "text-blue-600 border border-blue-600 hover:border-[#0A4D68] hover:bg-[#0A4D68] hover:text-white"
-                                }
+        ${
+          seatDisabled
+            ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
+            : "text-blue-600 border border-blue-600 hover:border-[#0A4D68] hover:bg-[#0A4D68] hover:text-white"
+        }
       `}
                             >
                               <MdEventSeat />
@@ -578,21 +590,24 @@ export const MealSelectionCards = ({
           return (
             <div
               key={idx}
-              className={`group relative border rounded-2xl p-4 flex flex-col justify-between shadow-sm transition-all duration-200 hover:shadow-lg ${isSelected
-                ? "border-green-500 bg-green-50"
-                : "border-gray-200 bg-white hover:border-orange-400"
-                }`}
+              className={`group relative border rounded-2xl p-4 flex flex-col justify-between shadow-sm transition-all duration-200 hover:shadow-lg ${
+                isSelected
+                  ? "border-green-500 bg-green-50"
+                  : "border-gray-200 bg-white hover:border-orange-400"
+              }`}
             >
               {/* Top Section */}
               <div className="flex gap-4 items-center">
                 {/* Icon */}
                 <div
-                  className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 transition ${isSelected ? "bg-green-100" : "bg-orange-50"
-                    }`}
+                  className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 transition ${
+                    isSelected ? "bg-green-100" : "bg-orange-50"
+                  }`}
                 >
                   <PiForkKnifeBold
-                    className={`text-2xl transition ${isSelected ? "text-green-600" : "text-orange-600"
-                      }`}
+                    className={`text-2xl transition ${
+                      isSelected ? "text-green-600" : "text-orange-600"
+                    }`}
                   />
                 </div>
 
@@ -616,10 +631,11 @@ export const MealSelectionCards = ({
                   onClick={() =>
                     onToggleMeal(journeyType, flightIndex, meal, travelersCount)
                   }
-                  className={`px-4 py-1.5 text-sm font-semibold rounded-full shadow-sm transition-all duration-200 ${isSelected
-                    ? "bg-red-500 text-white hover:bg-red-600"
-                    : "bg-orange-600 text-white hover:bg-orange-700"
-                    }`}
+                  className={`px-4 py-1.5 text-sm font-semibold rounded-full shadow-sm transition-all duration-200 ${
+                    isSelected
+                      ? "bg-red-500 text-white hover:bg-red-600"
+                      : "bg-orange-600 text-white hover:bg-orange-700"
+                  }`}
                 >
                   {isSelected ? "Remove" : "Add Meal"}
                 </button>
@@ -813,19 +829,21 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
                       )}
                       {sec.data.isRefundable !== undefined && (
                         <div
-                          className={`p-3 border-l-4 rounded ${sec.data.isRefundable
-                            ? "bg-green-50 border-green-500"
-                            : "bg-red-50 border-red-500"
-                            }`}
+                          className={`p-3 border-l-4 rounded ${
+                            sec.data.isRefundable
+                              ? "bg-green-50 border-green-500"
+                              : "bg-red-50 border-red-500"
+                          }`}
                         >
                           <p className="text-xs text-gray-600 font-medium uppercase">
                             Refund Policy
                           </p>
                           <p
-                            className={`font-semibold text-sm ${sec.data.isRefundable
-                              ? "text-green-800"
-                              : "text-red-800"
-                              }`}
+                            className={`font-semibold text-sm ${
+                              sec.data.isRefundable
+                                ? "text-green-800"
+                                : "text-red-800"
+                            }`}
                           >
                             {sec.data.isRefundable
                               ? "Refundable"
@@ -1046,12 +1064,13 @@ export const FareRulesAccordion = ({
               return (
                 <div
                   key={idx}
-                  className={`flex items-start gap-3 p-4 rounded-lg border text-sm shadow-sm ${isGst
-                    ? "bg-amber-50 border-amber-300 text-amber-800"
-                    : isTime
-                      ? "bg-yellow-50 border-yellow-300 text-yellow-800"
-                      : "bg-blue-50 border-blue-200 text-blue-800"
-                    }`}
+                  className={`flex items-start gap-3 p-4 rounded-lg border text-sm shadow-sm ${
+                    isGst
+                      ? "bg-amber-50 border-amber-300 text-amber-800"
+                      : isTime
+                        ? "bg-yellow-50 border-yellow-300 text-yellow-800"
+                        : "bg-blue-50 border-blue-200 text-blue-800"
+                  }`}
                 >
                   <span className="text-lg leading-none">
                     {isGst ? "⚠️" : isTime ? "🕐" : "ℹ️"}
@@ -1301,10 +1320,11 @@ export const PriceSummary = ({
         <div
           onClick={!loading ? onSendForApproval : undefined}
           className={`text-white font-bold px-3 py-1.5 flex items-center justify-center rounded-xl
-    ${loading
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-[#0A4D68] cursor-pointer"
-            }
+    ${
+      loading
+        ? "bg-gray-400 cursor-not-allowed"
+        : "bg-blue-600 hover:bg-[#0A4D68] cursor-pointer"
+    }
   `}
         >
           {loading ? "Submitting..." : "Send For Approval"}
@@ -1327,23 +1347,23 @@ export const ImportantInformation = ({
       title: "Fare Rules",
       content: fareRules
         ? [
-          "Cancellation Policy:",
-          ...fareRules.cancellation.map((x) => "• " + x),
-          "",
-          "Date Change Policy:",
-          ...fareRules.dateChange.map((x) => "• " + x),
-          "",
-          "Baggage Rules:",
-          ...fareRules.baggage.map((x) => "• " + x),
-          "",
-          "Important Information:",
-          ...fareRules.important.map((x) => "• " + x),
-        ]
+            "Cancellation Policy:",
+            ...fareRules.cancellation.map((x) => "• " + x),
+            "",
+            "Date Change Policy:",
+            ...fareRules.dateChange.map((x) => "• " + x),
+            "",
+            "Baggage Rules:",
+            ...fareRules.baggage.map((x) => "• " + x),
+            "",
+            "Important Information:",
+            ...fareRules.important.map((x) => "• " + x),
+          ]
         : [
-          fareRulesStatus === "loading"
-            ? "Fetching fare rules..."
-            : "No fare rules available for this fare.",
-        ],
+            fareRulesStatus === "loading"
+              ? "Fetching fare rules..."
+              : "No fare rules available for this fare.",
+          ],
     },
     {
       key: "checkIn",
@@ -1440,21 +1460,24 @@ export const BaggageTable = ({
           return (
             <div
               key={idx}
-              className={`relative border rounded-2xl p-5 shadow-sm transition-all duration-200 hover:shadow-md flex flex-col justify-between ${isAdded
-                ? "border-blue-600 bg-blue-50"
-                : "border-gray-200 bg-white hover:border-blue-300"
-                }`}
+              className={`relative border rounded-2xl p-5 shadow-sm transition-all duration-200 hover:shadow-md flex flex-col justify-between ${
+                isAdded
+                  ? "border-blue-600 bg-blue-50"
+                  : "border-gray-200 bg-white hover:border-blue-300"
+              }`}
             >
               <div className="flex items-center justify-between mb-3">
                 {/* Left: Baggage Info */}
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-12 h-12 rounded-lg flex items-center justify-center ${isAdded ? "bg-blue-100" : "bg-sky-50"
-                      }`}
+                    className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                      isAdded ? "bg-blue-100" : "bg-sky-50"
+                    }`}
                   >
                     <BsLuggage
-                      className={`text-xl ${isAdded ? "text-blue-700" : "text-blue-500"
-                        }`}
+                      className={`text-xl ${
+                        isAdded ? "text-blue-700" : "text-blue-500"
+                      }`}
                     />
                   </div>
                   <div>
@@ -1474,10 +1497,11 @@ export const BaggageTable = ({
                   <button
                     onClick={() => onAddBaggage?.(bag)}
                     disabled={isAdded}
-                    className={`px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-all duration-200 shadow-sm ${isAdded
-                      ? "bg-gray-300 text-gray-700 cursor-default"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
-                      }`}
+                    className={`px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-all duration-200 shadow-sm ${
+                      isAdded
+                        ? "bg-gray-300 text-gray-700 cursor-default"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}
                   >
                     {isAdded ? "Added" : "Add"}
                   </button>
@@ -1573,7 +1597,8 @@ export const TravelerForm = ({
 }) => {
   if (!Array.isArray(travelers)) travelers = [];
 
-  const isInternational = isIntlFromProp ?? isInternationalTrip(parsedFlightData);
+  const isInternational =
+    isIntlFromProp ?? isInternationalTrip(parsedFlightData);
 
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
@@ -1607,8 +1632,9 @@ export const TravelerForm = ({
             value={purposeOfTravel || ""}
             onChange={(e) => setPurposeOfTravel(e.target.value)}
             placeholder="E.g. Client meeting, Project deployment, Training, Conference"
-            className={`w-full px-4 py-3 border-2 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.purposeOfTravel ? "border-red-400" : "border-gray-300"
-              }`}
+            className={`w-full px-4 py-3 border-2 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              errors.purposeOfTravel ? "border-red-400" : "border-gray-300"
+            }`}
             required
           />
 

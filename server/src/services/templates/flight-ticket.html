@@ -1,685 +1,626 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Boarding Pass - {{airlineName}}</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flight Ticket</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        color: #000;
+        background: #fff;
+        line-height: 1.4;
+        font-size: 12px;
+      }
+
+      .ticket-container {
+        max-width: 210mm;
+        margin: 0 auto;
+        padding: 20px;
+        background: white;
+      }
+
+      /* Header */
+      .header {
+        text-align: right;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .header .date {
+        font-size: 11px;
+        color: #666;
+        margin-bottom: 5px;
+      }
+
+      .header .partner-text {
+        font-size: 11px;
+        color: #666;
+        margin: 3px 0;
+      }
+
+      .header .brand-name {
+        font-size: 20px;
+        font-weight: bold;
+        color: #e23744;
+        margin-top: 5px;
+      }
+
+      /* Main Title */
+      .main-title {
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #000;
+      }
+
+      /* Booking Info */
+      .booking-info {
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .booking-id {
+        font-size: 13px;
+        font-weight: bold;
+        margin-bottom: 3px;
+      }
+
+      .booking-date {
+        font-size: 11px;
+        color: #666;
+        margin-bottom: 15px;
+      }
+
+      .barcode-info {
+        background: #f5f5f5;
+        padding: 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        margin-bottom: 5px;
+      }
+
+      .barcode-note {
+        font-size: 11px;
+        color: #666;
+        text-align: center;
+        margin-top: 5px;
+      }
+
+      /* Passenger Name */
+      .passenger-name {
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        margin: 25px 0;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+
+      /* Section Title */
+      .section-title {
+        font-size: 13px;
+        font-weight: bold;
+        background: #f5f5f5;
+        padding: 8px 12px;
+        margin: 20px 0 15px 0;
+        border-left: 4px solid #e23744;
+      }
+
+      /* Route Section */
+      .route-section {
+        text-align: center;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 4px;
+        margin-bottom: 20px;
+      }
+
+      .route-city {
+        font-size: 20px;
+        font-weight: bold;
+        color: #e23744;
+        margin-bottom: 8px;
+      }
+
+      .flight-info {
+        font-size: 12px;
+        color: #666;
+      }
+
+      /* Airline Section */
+      .airline-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 0;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .airline-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .airline-logo-wrapper {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 2px solid #e0e0e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: white;
+      }
+
+      .airline-logo {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .airline-name {
+        font-size: 16px;
+        font-weight: bold;
+        color: #003366;
+      }
+
+      .flight-number {
+        font-size: 15px;
+        font-weight: bold;
+        color: #000;
+      }
+
+      /* Flight Details Grid */
+      .flight-details-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      .flight-detail-item {
+        background: #f9f9f9;
+        padding: 15px;
+        border-radius: 4px;
+        border-left: 3px solid #e23744;
+      }
+
+      .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #ddd;
+      }
+
+      .city-info {
+        flex: 1;
+      }
+
+      .city-code {
+        font-size: 22px;
+        font-weight: bold;
+        color: #003366;
+        margin-bottom: 3px;
+      }
+
+      .city-name {
+        font-size: 11px;
+        color: #666;
+      }
+
+      .time-info {
+        text-align: right;
+      }
+
+      .time {
+        font-size: 18px;
+        font-weight: bold;
+        color: #000;
+      }
+
+      .date {
+        font-size: 11px;
+        color: #666;
+        margin-top: 2px;
+      }
+
+      .airport {
+        font-size: 10px;
+        color: #666;
+        margin-top: 5px;
+      }
+
+      .terminal {
+        font-size: 10px;
+        color: #e23744;
+        font-weight: bold;
+        margin-top: 3px;
+      }
+
+      /* Fare Section */
+      .fare-section {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+      }
+
+      .fare-item {
+        border: 1px solid #e0e0e0;
+        padding: 12px;
+        border-radius: 4px;
+        text-align: center;
+        background: white;
+      }
+
+      .fare-label {
+        font-size: 10px;
+        color: #666;
+        margin-bottom: 5px;
+      }
+
+      .fare-value {
+        font-size: 13px;
+        font-weight: bold;
+        color: #000;
+      }
+
+      /* Passenger Table */
+      .passenger-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+        font-size: 11px;
+      }
+
+      .passenger-table th,
+      .passenger-table td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: left;
+      }
+
+      .passenger-table th {
+        background: #f0f0f0;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 10px;
+      }
+
+      /* Special Request */
+      .special-request {
+        background: #fff8e1;
+        padding: 15px;
+        border-left: 4px solid #ff9800;
+        margin-bottom: 20px;
+        font-size: 11px;
+        line-height: 1.6;
+      }
+
+      .special-request strong {
+        display: block;
+        margin-bottom: 5px;
+        color: #856404;
+      }
+
+      /* Payment Info */
+      .payment-info {
+        text-align: right;
+        background: #f9f9f9;
+        padding: 15px 20px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        border-radius: 4px;
+        font-size: 16px;
+      }
+
+      /* Important Information */
+      .important-info {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 2px solid #e0e0e0;
+      }
+
+      .important-title {
+        font-size: 14px;
+        font-weight: bold;
+        margin-bottom: 15px;
+        text-transform: uppercase;
+      }
+
+      .info-item {
+        margin-bottom: 12px;
+        font-size: 10px;
+        line-height: 1.6;
+      }
+
+      .info-item strong {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 11px;
+      }
+
+      /* Footer */
+      .footer {
+        text-align: center;
+        font-size: 10px;
+        color: #666;
+        border-top: 1px solid #e0e0e0;
+        padding-top: 15px;
+        margin-top: 20px;
+      }
+
+      .footer p {
+        margin: 5px 0;
+      }
+
+      /* PNR Highlight */
+      .pnr-box {
+        display: inline-block;
+        background: #e23744;
+        color: white;
+        padding: 8px 15px;
+        border-radius: 4px;
+        font-weight: bold;
+        font-size: 14px;
+        letter-spacing: 1px;
+        margin-left: 10px;
+      }
+
+      /* Duration Display */
+      .duration-display {
+        text-align: center;
+        padding: 10px;
+        background: #e8f4f8;
+        border-radius: 4px;
+        margin: 15px 0;
+        font-size: 13px;
+        font-weight: bold;
+        color: #003366;
+      }
+
+      @media print {
         body {
-            font-family: Arial, Helvetica, sans-serif;
-            background: white;
-            padding: 0;
+          margin: 0;
+          background: white;
         }
-        
-        .page {
-            width: 210mm;
-            margin: 0 auto;
-            background: white;
-            page-break-after: always;
+        .ticket-container {
+          max-width: 100%;
+          padding: 10mm;
         }
-        
-        /* Real Boarding Pass Layout */
-        .boarding-pass-container {
-            background: white;
-            border: 2px solid #000;
-        }
-        
-        /* Top Section */
-        .top-section {
-            border-bottom: 2px dashed #000;
-            padding: 20px;
-        }
-        
-        .airline-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #ccc;
-        }
-        
-        .airline-logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .logo-circle {
-            width: 40px;
-            height: 40px;
-            background: #003366;
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 18px;
-        }
-        
-        .airline-name {
-            font-size: 20px;
-            font-weight: bold;
-            color: #003366;
-        }
-        
-        .boarding-pass-title {
-            font-size: 18px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        
-        /* Passenger Details Row */
-        .passenger-row {
-            display: flex;
-            gap: 30px;
-            margin-bottom: 20px;
-        }
-        
-        .field {
-            flex: 1;
-        }
-        
-        .field-label {
-            font-size: 9px;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #666;
-            margin-bottom: 3px;
-        }
-        
-        .field-value {
-            font-size: 14px;
-            font-weight: bold;
-            color: #000;
-        }
-        
-        /* Flight Route */
-        .flight-route-section {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 25px 0;
-            padding: 15px 0;
-            border-top: 1px solid #ccc;
-            border-bottom: 1px solid #ccc;
-        }
-        
-        .city-block {
-            text-align: center;
-            flex: 1;
-        }
-        
-        .city-code {
-            font-size: 36px;
-            font-weight: bold;
-            color: #000;
-            letter-spacing: 2px;
-        }
-        
-        .city-name {
-            font-size: 11px;
-            color: #666;
-            margin-top: 5px;
-        }
-        
-        .city-time {
-            font-size: 16px;
-            font-weight: bold;
-            margin-top: 8px;
-        }
-        
-        .city-date {
-            font-size: 10px;
-            color: #666;
-            text-transform: uppercase;
-        }
-        
-        .arrow-section {
-            flex: 0.5;
-            text-align: center;
-            position: relative;
-        }
-        
-        .arrow-line {
-            width: 100%;
-            height: 2px;
-            background: #000;
-            position: relative;
-        }
-        
-        .arrow-line:after {
-            content: '▶';
-            position: absolute;
-            right: -10px;
-            top: -8px;
-            font-size: 16px;
-        }
-        
-        .flight-duration {
-            font-size: 10px;
-            color: #666;
-            margin-top: 5px;
-        }
-        
-        /* Flight Details Grid */
-        .details-grid {
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            gap: 15px;
-            margin: 20px 0;
-        }
-        
-        .detail-item {
-            text-align: left;
-        }
-        
-        .detail-label {
-            font-size: 8px;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #666;
-            margin-bottom: 3px;
-        }
-        
-        .detail-value {
-            font-size: 13px;
-            font-weight: bold;
-            color: #000;
-        }
-        
-        /* Barcode Section */
-        .barcode-section {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #ccc;
-        }
-        
-        .qr-code {
-            width: 80px;
-            height: 80px;
-            background: white;
-            border: 2px solid #000;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .qr-code img {
-            width: 100%;
-            height: 100%;
-        }
-        
-        .barcode-area {
-            flex: 1;
-        }
-        
-        .barcode-graphic {
-            height: 50px;
-            background: repeating-linear-gradient(90deg, #000, #000 1px, #fff 1px, #fff 2px);
-            margin-bottom: 5px;
-        }
-        
-        .barcode-text {
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            letter-spacing: 1px;
-            text-align: center;
-        }
-        
-        .sequence-box {
-            text-align: center;
-            border-left: 2px solid #ccc;
-            padding-left: 20px;
-        }
-        
-        .sequence-label {
-            font-size: 8px;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #666;
-        }
-        
-        .sequence-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #000;
-        }
-        
-        /* Bottom Coupon Section */
-        .bottom-section {
-            padding: 15px 20px;
-            background: #f5f5f5;
-        }
-        
-        .coupon-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        
-        .passenger-copy {
-            font-size: 10px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        
-        .coupon-details {
-            display: flex;
-            justify-content: space-between;
-            gap: 20px;
-        }
-        
-        .coupon-field {
-            flex: 1;
-        }
-        
-        .coupon-label {
-            font-size: 8px;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #666;
-        }
-        
-        .coupon-value {
-            font-size: 12px;
-            font-weight: bold;
-            color: #000;
-        }
-        
-        /* Important Notice */
-        .notice-box {
-            background: #fffbeb;
-            border: 2px solid #fbbf24;
-            padding: 15px;
-            margin: 20px;
-            font-size: 11px;
-            line-height: 1.6;
-        }
-        
-        .notice-title {
-            font-weight: bold;
-            color: #92400e;
-            margin-bottom: 8px;
-            font-size: 12px;
-        }
-        
-        /* Terms Page */
-        .terms-page {
-            padding: 30px;
-        }
-        
-        .terms-header {
-            text-align: center;
-            border-bottom: 2px solid #000;
-            padding-bottom: 15px;
-            margin-bottom: 25px;
-        }
-        
-        .terms-title {
-            font-size: 22px;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-        
-        .terms-section {
-            margin-bottom: 20px;
-        }
-        
-        .terms-section h3 {
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #003366;
-        }
-        
-        .terms-section p, .terms-section ul {
-            font-size: 11px;
-            line-height: 1.6;
-            color: #333;
-        }
-        
-        .terms-section ul {
-            margin-left: 20px;
-            margin-top: 8px;
-        }
-        
-        .terms-section li {
-            margin-bottom: 6px;
-        }
-        
-        .highlight-box {
-            background: #f0f0f0;
-            border-left: 4px solid #003366;
-            padding: 12px;
-            margin: 15px 0;
-            font-size: 11px;
-        }
-        
-        .footer-info {
-            text-align: center;
-            font-size: 10px;
-            color: #666;
-            padding: 15px;
-            border-top: 1px solid #ccc;
-            margin-top: 20px;
-        }
-        
-        @media print {
-            body {
-                background: white;
-                padding: 0;
-            }
-            .page {
-                margin: 0;
-            }
-        }
+      }
+
+      @page {
+        size: A4;
+        margin: 10mm;
+      }
     </style>
-</head>
-<body>
-    <!-- Page 1: Boarding Pass -->
-    <div class="page">
-        <div class="boarding-pass-container">
-            <!-- Top Section (Boarding Pass) -->
-            <div class="top-section">
-                <div class="airline-header">
-                    <div class="airline-logo">
-                        <div class="logo-circle">{{airlineCode}}</div>
-                        <div class="airline-name">{{airlineName}}</div>
-                    </div>
-                    <div class="boarding-pass-title">Boarding Pass</div>
-                </div>
-                
-                <div class="passenger-row">
-                    <div class="field">
-                        <div class="field-label">Name of Passenger</div>
-                        <div class="field-value">{{passengerName}}</div>
-                    </div>
-                    <div class="field">
-                        <div class="field-label">From</div>
-                        <div class="field-value">{{originCity}}</div>
-                    </div>
-                    <div class="field">
-                        <div class="field-label">To</div>
-                        <div class="field-value">{{destinationCity}}</div>
-                    </div>
-                </div>
-                
-                <div class="passenger-row">
-                    <div class="field">
-                        <div class="field-label">Flight</div>
-                        <div class="field-value">{{flightNumber}}</div>
-                    </div>
-                    <div class="field">
-                        <div class="field-label">Date</div>
-                        <div class="field-value">{{departureDate}}</div>
-                    </div>
-                    <div class="field">
-                        <div class="field-label">Time</div>
-                        <div class="field-value">{{departureTime}}</div>
-                    </div>
-                    <div class="field">
-                        <div class="field-label">Gate</div>
-                        <div class="field-value">{{gate}}</div>
-                    </div>
-                    <div class="field">
-                        <div class="field-label">Seat</div>
-                        <div class="field-value">{{seatNumber}}</div>
-                    </div>
-                    <div class="field">
-                        <div class="field-label">Boarding Time</div>
-                        <div class="field-value">{{boardingTime}}</div>
-                    </div>
-                </div>
-                
-                <div class="flight-route-section">
-                    <div class="city-block">
-                        <div class="city-code">{{originCode}}</div>
-                        <div class="city-name">{{originAirport}}</div>
-                        <div class="city-name">{{originCity}}, {{originCountry}}</div>
-                        <div class="city-time">{{departureTime}}</div>
-                        <div class="city-date">{{departureDate}}</div>
-                    </div>
-                    
-                    <div class="arrow-section">
-                        <div class="arrow-line"></div>
-                        <div class="flight-duration">{{duration}}</div>
-                    </div>
-                    
-                    <div class="city-block">
-                        <div class="city-code">{{destinationCode}}</div>
-                        <div class="city-name">{{destinationAirport}}</div>
-                        <div class="city-name">{{destinationCity}}, {{destinationCountry}}</div>
-                        <div class="city-time">{{arrivalTime}}</div>
-                        <div class="city-date">{{arrivalDate}}</div>
-                    </div>
-                </div>
-                
-                <div class="details-grid">
-                    <div class="detail-item">
-                        <div class="detail-label">Class</div>
-                        <div class="detail-value">{{cabinClass}}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Terminal</div>
-                        <div class="detail-value">{{terminal}}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Baggage</div>
-                        <div class="detail-value">{{baggage}}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">PNR</div>
-                        <div class="detail-value">{{pnr}}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">E-Ticket</div>
-                        <div class="detail-value">{{eTicket}}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">FF Number</div>
-                        <div class="detail-value">{{ffNumber}}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Status</div>
-                        <div class="detail-value">{{status}}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Carrier</div>
-                        <div class="detail-value">{{airlineName}}</div>
-                    </div>
-                </div>
-                
-                <div class="barcode-section">
-                    <div class="qr-code">
-                        <img src="{{qrCode}}" alt="QR Code" />
-                    </div>
-                    <div class="barcode-area">
-                        <div class="barcode-graphic"></div>
-                        <div class="barcode-text">{{barcodeText}}</div>
-                    </div>
-                    <div class="sequence-box">
-                        <div class="sequence-label">Seq No</div>
-                        <div class="sequence-number">{{sequenceNumber}}</div>
-                    </div>
-                </div>
+  </head>
+  <body>
+    <div class="ticket-container">
+      <!-- Header -->
+      <div class="header">
+        <div class="date">{{currentDate}}</div>
+        <div class="partner-text">Partner</div>
+        <div class="brand-name">Try COTD</div>
+      </div>
+
+      <!-- Main Title -->
+      <div class="main-title">Flight Ticket (One way)</div>
+
+      <!-- Booking Info -->
+      <div class="booking-info">
+        <div class="booking-id">
+          Booking ID: {{bookingReference}}
+          <span class="pnr-box">PNR {{pnr}}</span>
+        </div>
+        <div class="booking-date">(Booked on {{bookedDate}})</div>
+        <div class="barcode-info">
+          <strong
+            >Barcode(s) for your journey
+            {{originCity}}-{{destinationCity}}</strong
+          >
+        </div>
+        <div class="barcode-note">on {{airlineName}}</div>
+      </div>
+
+      <!-- Passenger Name -->
+      <div class="passenger-name">{{passengerName}}</div>
+
+      <!-- Booking Details Section -->
+      <div class="section-title">BOOKING DETAILS</div>
+
+      <!-- Route Section -->
+      <div class="route-section">
+        <div class="route-city">{{originCity}} - {{destinationCity}}</div>
+        <div class="flight-info">
+          {{travelDate}} • {{flightType}} • {{duration}} duration
+        </div>
+      </div>
+
+      <!-- Airline Section -->
+      <div class="airline-section">
+        <div class="airline-info">
+          <div class="airline-logo-wrapper">
+            <img
+              src="https://images.kiwi.com/airlines/64x64/{{code}}.png"
+              alt="{{airlineName}}"
+              class="airline-logo"
+              onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect fill=%22%23003366%22 width=%2264%22 height=%2264%22/%3E%3Ctext x=%2232%22 y=%2240%22 font-size=%2224%22 fill=%22white%22 text-anchor=%22middle%22 font-weight=%22bold%22%3E{{airlineCode}}%3C/text%3E%3C/svg%3E';"
+            />
+          </div>
+          <div class="airline-name">{{airlineName}}</div>
+        </div>
+        <div class="flight-number">{{flightNumber}}</div>
+      </div>
+
+      <!-- Duration Display -->
+      <div class="duration-display">{{duration}}</div>
+
+      <!-- Flight Details Grid -->
+      <div class="flight-details-grid">
+        <!-- Departure -->
+        <div class="flight-detail-item">
+          <div class="detail-header">
+            <div class="city-info">
+              <div class="city-code">{{originCode}}</div>
+              <div class="city-name">{{originCity}}</div>
             </div>
-            
-            <!-- Bottom Section (Passenger Coupon) -->
-            <div class="bottom-section">
-                <div class="coupon-header">
-                    <div class="passenger-copy">PASSENGER COUPON / RECEIPT</div>
-                    <div class="airline-logo">
-                        <div class="logo-circle">{{airlineCode}}</div>
-                    </div>
-                </div>
-                
-                <div class="coupon-details">
-                    <div class="coupon-field">
-                        <div class="coupon-label">Passenger Name</div>
-                        <div class="coupon-value">{{passengerName}}</div>
-                    </div>
-                    <div class="coupon-field">
-                        <div class="coupon-label">Flight</div>
-                        <div class="coupon-value">{{flightNumber}}</div>
-                    </div>
-                    <div class="coupon-field">
-                        <div class="coupon-label">From</div>
-                        <div class="coupon-value">{{originCode}}</div>
-                    </div>
-                    <div class="coupon-field">
-                        <div class="coupon-label">To</div>
-                        <div class="coupon-value">{{destinationCode}}</div>
-                    </div>
-                    <div class="coupon-field">
-                        <div class="coupon-label">Date</div>
-                        <div class="coupon-value">{{departureDate}}</div>
-                    </div>
-                    <div class="coupon-field">
-                        <div class="coupon-label">Class</div>
-                        <div class="coupon-value">{{cabinClass}}</div>
-                    </div>
-                    <div class="coupon-field">
-                        <div class="coupon-label">Seat</div>
-                        <div class="coupon-value">{{seatNumber}}</div>
-                    </div>
-                    <div class="coupon-field">
-                        <div class="coupon-label">PNR</div>
-                        <div class="coupon-value">{{pnr}}</div>
-                    </div>
-                </div>
+            <div class="time-info">
+              <div class="time">{{departureTime}}</div>
+              <div class="date">{{departureDate}}</div>
             </div>
+          </div>
+          <div class="airport">{{originAirport}}</div>
+          <div class="terminal">{{originTerminal}}</div>
         </div>
-        
-        <div class="notice-box">
-            <div class="notice-title">⚠ IMPORTANT INFORMATION</div>
-            <p><strong>Check-in:</strong> Passengers must complete check-in at least 60 minutes before departure. Web check-in closes 1 hour before departure.</p>
-            <p><strong>Boarding:</strong> Boarding gates close 25 minutes before scheduled departure. Late passengers will not be accommodated.</p>
-            <p><strong>Identification:</strong> Valid government-issued photo ID required. Passport mandatory for international travel.</p>
-            <p><strong>Baggage:</strong> Check airline website for current baggage allowance. Excess baggage charges apply.</p>
+
+        <!-- Arrival -->
+        <div class="flight-detail-item">
+          <div class="detail-header">
+            <div class="city-info">
+              <div class="city-code">{{destinationCode}}</div>
+              <div class="city-name">{{destinationCity}}</div>
+            </div>
+            <div class="time-info">
+              <div class="time">{{arrivalTime}}</div>
+              <div class="date">{{arrivalDate}}</div>
+            </div>
+          </div>
+          <div class="airport">{{destinationAirport}}</div>
+          <div class="terminal">{{destinationTerminal}}</div>
         </div>
-        
-        <div class="footer-info">
-            <p><strong>{{airlineName}}</strong> | www.{{airlineWebsite}} | Customer Care: {{customerCare}}</p>
-            <p>This is an electronic boarding pass. Keep this with you throughout your journey.</p>
+      </div>
+
+      <!-- Fare Section -->
+      <div class="fare-section">
+        <div class="fare-item">
+          <div class="fare-label">Defence Fare</div>
+          <div class="fare-value">{{defenceFare}}</div>
         </div>
+        <div class="fare-item">
+          <div class="fare-label">Economy</div>
+          <div class="fare-value">{{cabinClass}}</div>
+        </div>
+        <div class="fare-item">
+          <div class="fare-label">Armed Forces Fare</div>
+          <div class="fare-value">{{armedForcesFare}}</div>
+        </div>
+      </div>
+
+      <!-- Baggage Info -->
+      <div class="fare-section">
+        <div class="fare-item">
+          <div class="fare-label">Check-in Baggage</div>
+          <div class="fare-value">{{checkInBaggage}}</div>
+        </div>
+        <div class="fare-item">
+          <div class="fare-label">Cabin Baggage</div>
+          <div class="fare-value">{{cabinBaggage}}</div>
+        </div>
+        <div class="fare-item">
+          <div class="fare-label">Fare Type</div>
+          <div class="fare-value">{{fareType}}</div>
+        </div>
+      </div>
+
+      <!-- Passenger Table -->
+      <table class="passenger-table">
+        <thead>
+          <tr>
+            <th>Traveller</th>
+            <th>Seat</th>
+            <th>Meal</th>
+            <th>E-Ticket No</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{{passengerTitle}} {{passengerFullName}}</td>
+            <td>{{seatNumber}}</td>
+            <td>{{mealOption}}</td>
+            <td>{{eTicketNumber}}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Special Request (if applicable) -->
+      {{specialRequest}}
+
+      <!-- Payment Info -->
+      <div class="payment-info">You have paid {{paymentAmount}}</div>
+
+      <!-- Important Information -->
+      <div class="important-info">
+        <div class="important-title">IMPORTANT INFORMATION</div>
+
+        <div class="info-item">
+          <strong>• Check-in Time:</strong>
+          We advise you to reach the airport atleast 3 hours before departure.
+          Check-in counter generally closes 60 minutes before scheduled
+          departure. It may vary from airline to airline and so it is advisable
+          to check with the airline once.
+        </div>
+
+        <div class="info-item">
+          <strong>• DGCA passenger charter:</strong>
+          Please refer to passenger charter by clicking on the DGCA website.
+        </div>
+
+        <div class="info-item">
+          <strong>• Check travel guidelines and baggage information:</strong>
+          Carry no more than 1 check-in baggage and 1 hand baggage per
+          passenger. If violated, airline may levy extra charges.
+        </div>
+
+        <div class="info-item">
+          <strong>• Availability of Boarding Pass:</strong>
+          Once web check-in is completed, your boarding pass will be available
+          within 6 hours of your flight departure.
+        </div>
+
+        <div class="info-item">
+          <strong>• Unaccompanied Minors Travelling:</strong>
+          An unaccompanied minor usually refers to a child traveling without an
+          adult aged 18 or older. Please check with the airline for their rules
+          and regulations regarding unaccompanied minors, as these can differ
+          between airlines.
+        </div>
+
+        <div class="info-item">
+          <strong>• Valid ID proof needed:</strong>
+          Carry a valid photo identification proof (Driver Licence, Aadhar Card,
+          Pan Card or any other Government recognised photo identification).
+        </div>
+
+        <div class="info-item">
+          <strong>• Cancellation & Date Change:</strong>
+          {{cancellationPolicy}}
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <p>Please carry a valid government ID.</p>
+        <p>Visit {{airlineWebsite}} for support</p>
+        <p>Contact myPartner: {{contactNumber}}</p>
+        <p>© {{year}} Try COTD</p>
+      </div>
     </div>
-    
-    <!-- Page 2: Terms & Conditions -->
-    <div class="page terms-page">
-        <div class="terms-header">
-            <div class="terms-title">TERMS & CONDITIONS OF CARRIAGE</div>
-            <p>Passenger Ticket and Baggage Rules</p>
-        </div>
-        
-        <div class="terms-section">
-            <h3>1. CHECK-IN REQUIREMENTS</h3>
-            <ul>
-                <li><strong>Web Check-in:</strong> Available 48 hours to 1 hour before departure through website or mobile app.</li>
-                <li><strong>Airport Check-in:</strong> Counters open 3 hours (international) or 2 hours (domestic) before departure.</li>
-                <li><strong>Document Requirements:</strong> Valid photo ID mandatory (Aadhar/PAN/Passport/Driving License for domestic; Passport for international).</li>
-                <li>Passengers without valid identification will be denied boarding without refund.</li>
-            </ul>
-        </div>
-        
-        <div class="terms-section">
-            <h3>2. BAGGAGE ALLOWANCE & RESTRICTIONS</h3>
-            <ul>
-                <li><strong>Check-in Baggage:</strong> {{baggage}}</li>
-                <li><strong>Cabin Baggage:</strong> {{cabinBaggage}}</li>
-                <li><strong>Prohibited Items:</strong> Flammable liquids, explosives, weapons, sharp objects, lithium batteries in checked baggage.</li>
-                <li><strong>Liquids in Cabin:</strong> Maximum 100ml per container in transparent resealable bag (1 liter capacity).</li>
-                <li>Additional baggage can be purchased online at discounted rates or at airport (subject to availability).</li>
-                <li>Airline not liable for fragile items in checked baggage. Declare valuables and purchase excess valuation.</li>
-            </ul>
-        </div>
-        
-        <div class="highlight-box">
-            <strong>GATE CLOSURE POLICY:</strong> Boarding gates close 25 minutes before departure. No exceptions. Passengers reporting after gate closure treated as no-show with no refund or rebooking.
-        </div>
-        
-        <div class="terms-section">
-            <h3>3. CANCELLATION & REFUND POLICY</h3>
-            <ul>
-                <li><strong>Refundable:</strong> {{refundable}}</li>
-                <li><strong>Cancellation Charges:</strong> {{cancellationCharges}}</li>
-                <li><strong>Reissue Charges:</strong> {{reissueCharges}}</li>
-                <li><strong>No-Show:</strong> Entire ticket amount forfeited. No refund, credit, or rebooking permitted.</li>
-            </ul>
-        </div>
-        
-        <div class="footer-info">
-            <p><strong>{{airlineName}}</strong></p>
-            <p>Customer Care: {{customerCare}} | Email: {{customerEmail}}</p>
-        </div>
-    </div>
-    
-    <!-- Page 3: Additional Information -->
-    <div class="page terms-page">
-        <div class="terms-header">
-            <div class="terms-title">PASSENGER INFORMATION & REGULATIONS</div>
-        </div>
-        
-        <div class="terms-section">
-            <h3>4. SECURITY REGULATIONS</h3>
-            <ul>
-                <li>All passengers and baggage subject to security screening by CISF/Airport Authority.</li>
-                <li>Electronic devices must be removed and switched on if requested during security check.</li>
-                <li>Sharp objects, tools, sporting equipment not permitted in cabin baggage.</li>
-                <li>Cooperation with security mandatory. Refusal may result in denial of boarding.</li>
-            </ul>
-        </div>
-        
-        <div class="terms-section">
-            <h3>5. IN-FLIGHT SERVICES & CONDUCT</h3>
-            <ul>
-                <li><strong>Meals:</strong> {{mealService}}</li>
-                <li>Smoking (including e-cigarettes) strictly prohibited.</li>
-                <li>Passengers must comply with crew instructions.</li>
-                <li>Portable electronic devices in flight mode only.</li>
-            </ul>
-        </div>
-        
-        <div class="highlight-box">
-            <strong>UNRULY PASSENGER WARNING:</strong> Assault, intimidation, or unruly behavior towards crew or passengers is a criminal offense. Penalties include imprisonment and placement on no-fly list.
-        </div>
-        
-        <div class="terms-section">
-            <h3>6. PASSENGER RIGHTS & COMPENSATION</h3>
-            <ul>
-                <li><strong>Flight Delay (2+ hours):</strong> Refreshments and communication facilities provided.</li>
-                <li><strong>Denied Boarding:</strong> Compensation as per aviation rules.</li>
-                <li><strong>Airline Cancellation:</strong> Full refund or alternate flight at no extra cost.</li>
-            </ul>
-        </div>
-        
-        <div class="terms-section">
-            <h3>7. CUSTOMER SUPPORT</h3>
-            <p><strong>24/7 Customer Service:</strong></p>
-            <ul>
-                <li>Phone: {{customerCare}}</li>
-                <li>Email: {{customerEmail}}</li>
-                <li>Website: {{airlineWebsite}}</li>
-            </ul>
-        </div>
-        
-        <div class="footer-info">
-            <p><strong>Thank you for choosing {{airlineName}}!</strong></p>
-            <p>Have a pleasant journey</p>
-            <p style="margin-top: 10px; font-size: 11px;">© 2026 {{airlineName}}. All rights reserved.</p>
-        </div>
-    </div>
-</body>
+  </body>
 </html>
