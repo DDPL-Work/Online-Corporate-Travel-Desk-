@@ -66,21 +66,23 @@ export default function RoundTripFlightBooking() {
     travelDocs: false,
     terms: false,
   });
-  const [travelers, setTravelers] = useState([
-    {
-      id: 1,
-      title: "Mr.",
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      email: "",
-      mobile: "",
-      phoneWithCode: "",
-      passportNumber: "",
-      dob: "",
-      age: "",
-    },
-  ]);
+  // ===== Traveler State =====
+  const initialTraveler = (id) => ({
+    id,
+    title: "MR",
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    gender: "",
+    age: "",
+    email: "",
+    phoneWithCode: "",
+    passportNumber: "",
+    passportExpiry: "",
+    nationality: "",
+    dob: "",
+  });
+  const [travelers, setTravelers] = useState([]);
   const [selectedSeats, setSelectedSeats] = useState({});
   const [showSeatModal, setShowSeatModal] = useState({
     flight: null,
@@ -107,6 +109,7 @@ export default function RoundTripFlightBooking() {
   const ssr = useSelector((state) => state.flightsRT.ssrRT);
   // const traceId = useSelector((state) => state.flightsRT.traceId);
   const reduxTraceId = useSelector((state) => state.flightsRT.traceId);
+  const { user } = useSelector((state) => state.auth);
 
   const traceId = location.state?.traceId || reduxTraceId || null;
 
@@ -202,6 +205,55 @@ export default function RoundTripFlightBooking() {
       return: hasSeats(returnSSR),
     };
   }, [ssr, rawFlightData, isInternational]);
+
+  // ✅ AUTO-FILL LEAD TRAVELER
+  useEffect(() => {
+    const adultCount =
+      searchParams?.passengers?.adults || searchParams?.adults || 1;
+    const childCount =
+      searchParams?.passengers?.children || searchParams?.children || 0;
+    const infantCount =
+      searchParams?.passengers?.infants || searchParams?.infants || 0;
+    const totalCount = adultCount + childCount + infantCount;
+
+    const initial = Array.from({ length: totalCount || 1 }, (_, i) => ({
+      id: i + 1,
+      title: "MR",
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      gender: "",
+      age: "",
+      email: "",
+      mobile: "",
+      phoneWithCode: "",
+      passportNumber: "",
+      passportExpiry: "",
+      nationality: "India",
+      dob: "",
+    }));
+
+    // Pre-fill first traveler if user is logged in
+    if (user && initial[0]) {
+      if (user.name && typeof user.name === "object") {
+        initial[0].firstName = (user.name.firstName || "").toUpperCase();
+        initial[0].lastName = (user.name.lastName || "").toUpperCase();
+      } else {
+        const rawName = user.name || user.displayName || "";
+        const fullName = typeof rawName === "string" ? rawName : "";
+        const names = fullName.trim().split(/\s+/);
+
+        initial[0].firstName = (names[0] || "").toUpperCase();
+        initial[0].lastName = (names.slice(1).join(" ") || "").toUpperCase();
+      }
+
+      initial[0].email = user.email || "";
+      initial[0].phoneWithCode =
+        user.phone || user.mobile || user.phoneWithCode || "";
+    }
+
+    setTravelers(initial);
+  }, [user, searchParams]);
 
   useEffect(() => {
     console.log("🟢 Seat Ready Check", {
@@ -652,46 +704,52 @@ export default function RoundTripFlightBooking() {
   const buildFullSegments = () => {
     const segments = [];
 
-    const pushSegments = (list, journeyType) => {
-      list.forEach((s, idx) => {
-        segments.push({
-          segmentIndex: segments.length,
-          journeyType, // onward | return
+    const pushSegments = (segmentGroups, journeyType) => {
+      if (!Array.isArray(segmentGroups)) return;
 
-          airlineCode: s.airlineCode,
-          airlineName: s.airline,
-          flightNumber: s.flightNumber,
-          fareClass: s.fareClass,
-          cabinClass: s.cabinClass,
+      segmentGroups.forEach((group) => {
+        if (!Array.isArray(group)) return;
 
-          origin: {
-            airportCode: s.fromCode,
-            city: s.from,
-            country: s.fromCountry,
-            terminal: s.fromTerminal,
-          },
+        group.forEach((seg) => {
+          segments.push({
+            segmentIndex: segments.length,
+            journeyType,
 
-          destination: {
-            airportCode: s.toCode,
-            city: s.to,
-            country: s.toCountry,
-            terminal: s.toTerminal,
-          },
+            airlineName: seg.Airline?.AirlineName || null,
+            airlineCode: seg.Airline?.AirlineCode || null,
+            flightNumber: seg.Airline?.FlightNumber || null,
+            aircraft: seg.Craft || null,
 
-          departureDateTime: s.dt,
-          arrivalDateTime: s.at,
-          durationMinutes: s.duration,
+            origin: {
+              airportCode: seg.Origin?.Airport?.AirportCode,
+              city: seg.Origin?.Airport?.CityName,
+              country: seg.Origin?.Airport?.CountryCode,
+              terminal: seg.Origin?.Airport?.Terminal,
+            },
 
-          baggage: {
-            checkIn: s.baggage,
-            cabin: s.cabinBaggage,
-          },
+            destination: {
+              airportCode: seg.Destination?.Airport?.AirportCode,
+              city: seg.Destination?.Airport?.CityName,
+              country: seg.Destination?.Airport?.CountryCode,
+              terminal: seg.Destination?.Airport?.Terminal,
+            },
+
+            departureDateTime: seg.Origin?.DepTime,
+            arrivalDateTime: seg.Destination?.ArrTime,
+            durationMinutes: seg.Duration,
+
+            baggage: {
+              checkIn: seg.Baggage || null,
+              cabin: seg.CabinBaggage || null,
+            },
+          });
         });
       });
     };
 
-    pushSegments(parsedFlightData.onwardSegments || [], "onward");
-    pushSegments(parsedFlightData.returnSegments || [], "return");
+    // ✅ USE RAW SEARCH DATA (KEY FIX)
+    pushSegments(rawFlightData?.onward?.Segments || [], "onward");
+    pushSegments(rawFlightData?.return?.Segments || [], "return");
 
     return segments;
   };
@@ -798,18 +856,22 @@ export default function RoundTripFlightBooking() {
 
     const bookingSnapshot = {
       bookingType: "flight",
-      sectors: segments.map((s) => `${s.from}-${s.to}`),
-      airline: segments.map((s) => s.airline).join(", ") || "N/A",
-      travelDate: firstSegment?.dt || "N/A",
-      returnDate: lastSegment?.at || "N/A",
+
+      sectors: segments.map(
+        (s) => `${s.origin.airportCode}-${s.destination.airportCode}`,
+      ),
+
+      airline: [
+        ...new Set(segments.map((s) => s.airlineName).filter(Boolean)),
+      ].join(", "),
+
+      travelDate: segments[0]?.departureDateTime || "N/A",
+      returnDate: segments.at(-1)?.departureDateTime || "N/A",
+
       cabinClass,
-      amount:
-        // perAdultFare.base * travelers.length +
-        // perAdultFare.tax * travelers.length +
-        // calculateSSRTotal(),
-        totalPayableAmount,
+      amount: totalPayableAmount,
       purposeOfTravel: purposeOfTravel || "N/A",
-      city: lastSegment?.to || "N/A",
+      city: segments.at(-1)?.destination?.city || "N/A",
     };
 
     const TRACE_VALIDITY_MINUTES = 15;
@@ -829,7 +891,10 @@ export default function RoundTripFlightBooking() {
           return: rawFlightData.return.ResultIndex,
         },
         // fareQuote: buildConsolidatedFareQuote(),
-        fareQuote: fareQuote?.onward?.Response, // ✅ contains FareBreakdown
+        // fareQuote: fareQuote?.onward?.Response, // ✅ contains FareBreakdown
+        fareQuote: {
+          Results: [fareQuote?.onward?.Response?.Results],
+        },
 
         segments: buildFullSegments(),
 

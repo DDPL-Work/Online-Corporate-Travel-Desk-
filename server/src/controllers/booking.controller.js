@@ -47,7 +47,6 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     travellers,
     purposeOfTravel,
     pricingSnapshot,
-    bookingSnapshot: clientBookingSnapshot,
   } = req.body;
 
   const corporate = req.corporate;
@@ -109,34 +108,101 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   if (availableBalance < requiredAmount) {
     throw new ApiError(
       400,
-      `Insufficient agency balance. Available ₹${availableBalance}, Required ₹${requiredAmount}`
+      `Insufficient agency balance. Available ₹${availableBalance}, Required ₹${requiredAmount}`,
     );
   }
 
-  let bookingSnapshot = clientBookingSnapshot;
+  let bookingSnapshot;
 
-  if (!bookingSnapshot && bookingType === "flight" && flightRequest?.segments?.length) {
-    const segment = flightRequest.segments[0];
+  if (bookingType === "flight" && Array.isArray(flightRequest?.segments)) {
+    const segments = flightRequest.segments;
 
-    bookingSnapshot = {
-      sectors: [
-        `${segment.origin.airportCode}-${segment.destination.airportCode}`,
-      ],
-      airline: segment.airlineName,
-      travelDate: segment.departureDateTime,
-      returnDate: segment.arrivalDateTime,
-      cabinClass:
-        segment.cabinClass === 1
-          ? "Economy"
-          : segment.cabinClass === 2
-            ? "Premium Economy"
-            : segment.cabinClass === 3
-              ? "Business"
-              : "Economy",
-      amount: pricingSnapshot.totalAmount,
-      purposeOfTravel,
-      city: segment.destination.city,
-    };
+    // ONE-WAY (existing behavior preserved)
+    if (segments.length === 1) {
+      const s = segments[0];
+
+      bookingSnapshot = {
+        sectors: [`${s.origin.airportCode}-${s.destination.airportCode}`],
+        airline: s.airlineName,
+        travelDate: s.departureDateTime,
+        returnDate: null,
+        cabinClass:
+          s.cabinClass === 1
+            ? "Economy"
+            : s.cabinClass === 2
+              ? "Premium Economy"
+              : s.cabinClass === 3
+                ? "Business"
+                : "Economy",
+        amount: pricingSnapshot.totalAmount,
+        purposeOfTravel,
+        city: s.destination.city,
+      };
+    }
+
+    // ROUND-TRIP (NEW)
+    else {
+      const fareResult = Array.isArray(flightRequest.fareQuote?.Results)
+        ? flightRequest.fareQuote.Results[0]
+        : flightRequest.fareQuote?.Results;
+
+      // ONWARD segments (already present)
+      const onwardSegments = fareResult?.Segments?.flat?.() || [];
+
+      // RETURN segments MUST be fetched separately
+      let returnSegments = [];
+
+      if (flightRequest.resultIndex?.return) {
+        const returnFare = await tboService.getFareQuote(
+          flightRequest.traceId,
+          flightRequest.resultIndex.return,
+        );
+
+        const returnResult = Array.isArray(returnFare?.Results)
+          ? returnFare.Results[0]
+          : returnFare?.Results;
+
+        returnSegments = returnResult?.Segments?.flat?.() || [];
+      }
+
+      const allSegments = [...onwardSegments, ...returnSegments];
+
+      if (!allSegments.length) {
+        throw new ApiError(400, "Invalid RT fare segments");
+      }
+
+      const firstSeg = allSegments[0];
+      const lastSeg = allSegments[allSegments.length - 1];
+
+      bookingSnapshot = {
+        sectors: allSegments.map(
+          (s) =>
+            `${s.Origin?.Airport?.AirportCode}-${s.Destination?.Airport?.AirportCode}`,
+        ),
+
+        airline: [
+          ...new Set(
+            allSegments.map((s) => s.Airline?.AirlineName).filter(Boolean),
+          ),
+        ].join(", "),
+
+        travelDate: firstSeg.Origin?.DepTime,
+        returnDate: lastSeg.Origin?.DepTime,
+
+        cabinClass:
+          firstSeg.CabinClass === 1
+            ? "Economy"
+            : firstSeg.CabinClass === 2
+              ? "Premium Economy"
+              : firstSeg.CabinClass === 3
+                ? "Business"
+                : "Economy",
+
+        amount: pricingSnapshot.totalAmount,
+        purposeOfTravel,
+        city: lastSeg.Destination?.Airport?.CityName,
+      };
+    }
   }
 
   /* ================= CREATE BOOKING REQUEST ================= */
@@ -152,10 +218,12 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
     purposeOfTravel,
     travellers,
-
     flightRequest:
       bookingType === "flight"
-        ? sanitizeFlightRequest(flightRequest)
+        ? {
+            ...sanitizeFlightRequest(flightRequest),
+            segments: flightRequest.segments, // ✅ FULL SEGMENTS
+          }
         : undefined,
 
     hotelRequest: bookingType === "hotel" ? hotelRequest : undefined,
@@ -187,8 +255,8 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
         bookingReference: bookingRequest.bookingReference,
         requestStatus: bookingRequest.requestStatus,
       },
-      "Booking request submitted for approval"
-    )
+      "Booking request submitted for approval",
+    ),
   );
 });
 
@@ -204,7 +272,7 @@ exports.getMyRequests = asyncHandler(async (req, res) => {
   })
     .sort({ createdAt: -1 })
     .select(
-      "bookingType requestStatus executionStatus flightRequest pricingSnapshot createdAt"
+      "bookingType requestStatus executionStatus flightRequest pricingSnapshot createdAt",
     );
 
   res
@@ -213,8 +281,8 @@ exports.getMyRequests = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         bookings,
-        "Approved requests pending booking fetched"
-      )
+        "Approved requests pending booking fetched",
+      ),
     );
 });
 
@@ -239,8 +307,8 @@ exports.getMyRequestById = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         bookingRequest,
-        "Booking request fetched successfully"
-      )
+        "Booking request fetched successfully",
+      ),
     );
 });
 
@@ -261,8 +329,8 @@ exports.getMyRejectedRequests = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         requests,
-        "My rejected requests fetched successfully"
-      )
+        "My rejected requests fetched successfully",
+      ),
     );
 });
 
@@ -303,21 +371,145 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
     : booking.flightRequest.fareQuote.Results;
 
   const isLCC = fareResult?.IsLCC === true;
+  const VALID_LCC_STATUSES = [1, 2, 3];
 
   try {
     /* =====================================================
-       STEP 0 — PRICE VALIDATION
-    ===================================================== */
-    const priceCheckResult = await checkApprovedRequestPriceService(booking);
-
-    /* =====================================================
-       STEP 1 — BOOKING (NON-LCC ONLY)
+       STEP 1 — BOOKING (PNR CREATION)
     ===================================================== */
 
     booking.executionStatus = "booking_initiated";
     await booking.save();
 
-    if (!isLCC) {
+    // if (isLCC) {
+    //   // LCC: Book + Ticket in ONE call
+    //   const bookResp = await tboService.bookFlight({
+    //     IsLCC: true,
+    //     traceId: booking.flightRequest.traceId,
+    //     resultIndex: booking.flightRequest.resultIndex,
+    //     result: booking.flightRequest.fareQuote.Results[0],
+    //     passengers,
+    //     ssr: booking.flightRequest.ssrSnapshot,
+    //   });
+
+    //   const pnr =
+    //     bookResp?.Response?.Response?.PNR ||
+    //     bookResp?.Response?.Response?.FlightItinerary?.PNR ||
+    //     bookResp?.pnr;
+
+    //   if (!pnr) {
+    //     booking.executionStatus = "failed";
+    //     booking.bookingResult = { providerResponse: bookResp };
+    //     await booking.save();
+    //     throw new ApiError(500, "LCC booking failed: PNR not returned");
+    //   }
+
+    //   booking.bookingResult = {
+    //     pnr,
+    //     providerResponse: bookResp,
+    //   };
+    // } else {
+    //   // NON-LCC: Booking only (PNR creation)
+    //   const bookResp = await tboService.bookFlight({
+    //     IsLCC: false,
+    //     traceId: booking.flightRequest.traceId,
+    //     resultIndex: booking.flightRequest.resultIndex,
+    //     fareQuote: booking.flightRequest.fareQuote,
+    //     result: booking.flightRequest.fareQuote.Results[0],
+    //     passengers,
+    //     ssr: booking.flightRequest.ssrSnapshot,
+    //   });
+
+    //   const extractedPNR =
+    //     bookResp?.pnr ||
+    //     bookResp?.raw?.Response?.Response?.PNR ||
+    //     bookResp?.raw?.Response?.Response?.FlightItinerary?.PNR ||
+    //     null;
+
+    //   const extractedBookingId =
+    //     bookResp?.bookingId ||
+    //     bookResp?.raw?.Response?.Response?.BookingId ||
+    //     bookResp?.raw?.Response?.Response?.FlightItinerary?.BookingId ||
+    //     null;
+
+    //   if (!extractedPNR || !extractedBookingId) {
+    //     booking.executionStatus = "failed";
+    //     booking.bookingResult = { providerResponse: bookResp.raw };
+    //     await booking.save();
+    //     throw new ApiError(
+    //       500,
+    //       "Non-LCC booking failed: PNR or BookingId missing",
+    //     );
+    //   }
+
+    //   booking.bookingResult = {
+    //     pnr: extractedPNR,
+    //     bookingId: extractedBookingId,
+    //     providerResponse: bookResp.raw,
+    //   };
+    // }
+
+    if (isLCC) {
+      /* ==========================================
+     LCC FLOW — PAY → TICKET → FETCH PNR
+  ========================================== */
+
+      booking.executionStatus = "ticket_pending";
+      await booking.save();
+
+      // 💰 PAYMENT (ONCE)
+      await paymentService.processBookingPayment({ booking, corporate });
+
+      // 🎫 TICKET
+      const ticketResp = await tboService.ticketFlight({
+        isLCC: true,
+        traceId: booking.flightRequest.traceId,
+        resultIndex: booking.flightRequest.resultIndex,
+      });
+
+      const ticketStatus = ticketResp?.Response?.ResponseStatus;
+
+      if (ticketStatus === 0) {
+        booking.executionStatus = "failed";
+        booking.bookingResult = { ticketResp };
+        await booking.save();
+        throw new ApiError(500, "LCC ticketing rejected by TBO");
+      }
+
+      // ⏳ FETCH BOOKING DETAILS TO GET PNR
+      const detailsResp = await tboService.getBookingDetails(
+        ticketResp?.Response?.PNR || booking.flightRequest.traceId,
+      );
+
+      const itinerary = detailsResp?.Response?.Response?.FlightItinerary;
+
+      let pnr = null;
+
+      if (ticketResp?.Response?.PNR) {
+        pnr = ticketResp.Response.PNR;
+      }
+
+      booking.bookingResult = {
+        ticketResponse: ticketResp,
+      };
+
+      booking.executionStatus =
+        ticketStatus === 1 ? "ticketed" : "ticket_pending";
+
+      await booking.save();
+
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            bookingId: booking._id,
+            status: booking.executionStatus,
+          },
+          "LCC ticketing initiated",
+        ),
+      );
+    } else {
+      //   // NON-LCC: Booking only (PNR creation)
       const bookResp = await tboService.bookFlight({
         IsLCC: false,
         traceId: booking.flightRequest.traceId,
@@ -329,11 +521,13 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
       });
 
       const extractedPNR =
+        bookResp?.pnr ||
         bookResp?.raw?.Response?.Response?.PNR ||
         bookResp?.raw?.Response?.Response?.FlightItinerary?.PNR ||
         null;
 
       const extractedBookingId =
+        bookResp?.bookingId ||
         bookResp?.raw?.Response?.Response?.BookingId ||
         bookResp?.raw?.Response?.Response?.FlightItinerary?.BookingId ||
         null;
@@ -344,110 +538,57 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
         await booking.save();
         throw new ApiError(
           500,
-          "Non-LCC booking failed: PNR or BookingId missing"
+          "Non-LCC booking failed: PNR or BookingId missing",
         );
       }
 
       booking.bookingResult = {
         pnr: extractedPNR,
         bookingId: extractedBookingId,
-        providerBookingResponse: bookResp.raw,
+        providerResponse: bookResp.raw,
       };
-
-      booking.executionStatus = "booked";
-      await booking.save();
     }
 
+    booking.executionStatus = "booked";
+    await booking.save();
+
     /* =====================================================
-       STEP 2 — PAYMENT (LCC + NON-LCC)
+       STEP 2 — PAYMENT
     ===================================================== */
 
     await paymentService.processBookingPayment({ booking, corporate });
 
     /* =====================================================
-       STEP 3 — TICKETING
-       • LCC  → Direct ticket (NO BOOK)
-       • Non-LCC → Ticket after booking
+       STEP 3 — TICKETING (NON-LCC ONLY)
     ===================================================== */
 
-    const ticketResp = await tboService.ticketFlight({
-      traceId: booking.flightRequest.traceId,
-      resultIndex: booking.flightRequest.resultIndex,
-      bookingId: isLCC ? undefined : booking.bookingResult.bookingId,
-      pnr: booking.bookingResult?.pnr,
-      passengers,
-      ssr: booking.flightRequest.ssrSnapshot,
-      isLCC,
-    });
+    if (!isLCC) {
+      const ticketResp = await tboService.ticketFlight({
+        bookingId: booking.bookingResult.bookingId,
+        pnr: booking.bookingResult.pnr,
+      });
 
-    // const ticketPNR =
-    //   ticketResp?.Response?.Response?.PNR ||
-    //   ticketResp?.Response?.Response?.FlightItinerary?.PNR;
+      const ticketPNR =
+        ticketResp?.Response?.Response?.PNR ||
+        ticketResp?.Response?.Response?.FlightItinerary?.PNR ||
+        booking.bookingResult.pnr; // fallback
 
-    const rootResponse = ticketResp?.Response;
-
-    const ticketResponseData = rootResponse?.Response || rootResponse || {};
-
-    const ticketPNR =
-      ticketResponseData.PNR ||
-      ticketResponseData?.FlightItinerary?.PNR ||
-      null;
-
-    const ticketBookingId =
-      ticketResponseData.BookingId ||
-      ticketResponseData?.FlightItinerary?.BookingId ||
-      null;
-
-    // if (!ticketPNR) {
-    //   booking.executionStatus = "failed";
-    //   booking.bookingResult = {
-    //     ...booking.bookingResult,
-    //     ticketResponse: ticketResp,
-    //   };
-    //   await booking.save();
-    //   throw new ApiError(500, "Ticketing failed: PNR not returned");
-    // }
-
-    let finalPNR = ticketPNR;
-
-    if (!finalPNR && isLCC) {
-      // 🔁 LCC fallback: fetch PNR from booking details
-      try {
-        const detailsResp = await tboService.getBookingDetails(
-          ticketBookingId || booking.bookingResult?.bookingId
-        );
-
-        finalPNR =
-          detailsResp?.Response?.Response?.PNR ||
-          detailsResp?.Response?.Response?.FlightItinerary?.PNR ||
-          null;
-      } catch (e) {
-        logger.warn("LCC PNR fallback failed", e.message);
+      if (!ticketPNR) {
+        booking.executionStatus = "failed";
+        booking.bookingResult = {
+          ...booking.bookingResult,
+          ticketResponse: ticketResp,
+        };
+        await booking.save();
+        throw new ApiError(500, "Ticketing failed: PNR not returned");
       }
-    }
 
-    if (!finalPNR) {
-      booking.executionStatus = "failed";
+      // DO NOT overwrite PNR
       booking.bookingResult = {
         ...booking.bookingResult,
         ticketResponse: ticketResp,
       };
-      await booking.save();
-      throw new ApiError(500, "Ticketing failed: PNR not returned");
     }
-
-    booking.bookingResult = {
-      ...booking.bookingResult,
-      pnr: finalPNR,
-      bookingId: ticketBookingId,
-      providerTicketResponse: ticketResp,
-    };
-
-    // booking.bookingResult = {
-    //   ...booking.bookingResult,
-    //   pnr: ticketPNR,
-    //   ticketResponse: ticketResp,
-    // };
 
     /* =====================================================
        FINAL STATE
@@ -462,10 +603,9 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
         {
           bookingId: booking._id,
           pnr: booking.bookingResult.pnr,
-          priceCheck: priceCheckResult,
         },
-        "Flight booked & ticketed successfully"
-      )
+        "Flight booked & ticketed successfully",
+      ),
     );
   } catch (error) {
     booking.executionStatus = "failed";
@@ -519,7 +659,7 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
   const query = {
     userId: req.user._id,
     bookingType,
-    executionStatus: "ticketed",
+    executionStatus: ["ticketed", "ticket_pending"],
   };
 
   const skip = (Number(page) - 1) * Number(limit);
@@ -527,7 +667,7 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
   const [rawBookings, total] = await Promise.all([
     BookingRequest.find(query)
       .select(
-        "bookingReference bookingType requestStatus executionStatus bookingSnapshot pricingSnapshot createdAt bookingResult"
+        "bookingReference bookingType requestStatus executionStatus bookingSnapshot pricingSnapshot createdAt bookingResult",
       )
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -566,8 +706,8 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
           pages: Math.ceil(total / limit),
         },
       },
-      "Ticketed flight bookings fetched successfully"
-    )
+      "Ticketed flight bookings fetched successfully",
+    ),
   );
 });
 
@@ -575,21 +715,42 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
 // @route   GET /api/v1/bookings/my/:id
 // @access  Private (Employee)
 exports.getMyBookingById = asyncHandler(async (req, res) => {
-  const booking = await BookingRequest.findById(req.params.id);
+  const booking = await BookingRequest.findById(req.params.id).lean();
 
   if (!booking) {
     throw new ApiError(404, "Booking not found");
   }
 
-  // 🔐 Ownership enforcement (MANDATORY)
+  // 🔐 Ownership check
   if (booking.userId.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "Not authorized to view this booking");
   }
 
-  res
+  // ✅ DERIVE PAYMENT STATUS FROM WALLET
+  const paymentTxn = await WalletTransaction.findOne({
+    bookingId: booking._id,
+    type: "debit",
+    status: "completed",
+  })
+    .sort({ createdAt: -1 })
+    .select("_id amount createdAt");
+
+  booking.payment = paymentTxn
+    ? {
+        status: "completed",
+        method: "wallet",
+        amount: paymentTxn.amount,
+        paidAt: paymentTxn.createdAt,
+        transactionId: paymentTxn._id,
+      }
+    : {
+        status: "pending",
+      };
+
+  return res
     .status(200)
     .json(
-      new ApiResponse(200, booking, "Booking details fetched successfully")
+      new ApiResponse(200, booking, "Booking details fetched successfully"),
     );
 });
 
@@ -642,8 +803,8 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
           pages: Math.ceil(total / limit),
         },
       },
-      "Bookings fetched successfully"
-    )
+      "Bookings fetched successfully",
+    ),
   );
 });
 
@@ -671,7 +832,7 @@ exports.getBooking = asyncHandler(async (req, res) => {
   res
     .status(200)
     .json(
-      new ApiResponse(200, booking, "Booking details fetched successfully")
+      new ApiResponse(200, booking, "Booking details fetched successfully"),
     );
 });
 
@@ -696,7 +857,7 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
   if (!["confirmed", "approved"].includes(booking.status)) {
     throw new ApiError(
       400,
-      "Only confirmed or approved bookings can be cancelled"
+      "Only confirmed or approved bookings can be cancelled",
     );
   }
 
