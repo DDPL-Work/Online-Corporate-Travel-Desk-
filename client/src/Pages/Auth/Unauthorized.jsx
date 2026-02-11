@@ -6,7 +6,7 @@ export default function Unauthorized() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-gray-100 to-gray-300 p-6 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 via-gray-100 to-gray-300 p-6 relative overflow-hidden">
 
       {/* Soft background accents */}
       <div className="absolute top-10 left-10 w-40 h-40 bg-blue-300 rounded-full opacity-20 blur-[70px]" />
@@ -36,7 +36,7 @@ export default function Unauthorized() {
 
         {/* Login Button */}
         <button
-          onClick={() => navigate("/login")}
+          onClick={() => navigate("/sso-login")}
           className="w-full bg-blue-600 text-white py-3.5 px-6 rounded-xl font-semibold
                      shadow-lg hover:bg-blue-700 hover:shadow-xl transition-all duration-300
                      transform hover:scale-[1.03]"

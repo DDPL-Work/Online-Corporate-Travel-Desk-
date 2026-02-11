@@ -88,15 +88,6 @@ const SSOLogin = () => {
               <span className="text-sm text-gray-500">or</span>
               <div className="flex-1 h-px bg-gray-300"></div>
             </div>
-
-            {/* Back Button */}
-            <button
-              onClick={() => navigate("/login")}
-              className="w-full py-3 rounded-xl border border-gray-300 font-semibold text-blue-700 hover:bg-gray-100 transition"
-            >
-              Back to Password Login
-            </button>
-
             <p className="mt-6 text-center text-xs text-gray-500 leading-relaxed">
               By continuing, you agree to your organization’s SSO policy.
             </p>

@@ -36,7 +36,7 @@ const colors = {
 export default function PendingTravelRequests() {
   const dispatch = useDispatch();
   const { list, loading, actionLoading } = useSelector(
-    (state) => state.approvals
+    (state) => state.approvals,
   );
 
   const [filters, setFilters] = useState({ type: "All" });
@@ -73,7 +73,7 @@ export default function PendingTravelRequests() {
                 (s) =>
                   `${s?.origin?.city || "Unknown"} → ${
                     s?.destination?.city || "Unknown"
-                  }`
+                  }`,
               )
               .join(", ")
           : "N/A",
@@ -128,7 +128,7 @@ export default function PendingTravelRequests() {
         arrivalDateTime: lastSegment?.arrivalDateTime,
         durationMinutes: segments.reduce(
           (sum, s) => sum + (s?.durationMinutes || 0),
-          0
+          0,
         ),
         baggage: segments.map((s) => s?.baggage || {}),
         seats: ssr.seats || [],
@@ -142,7 +142,7 @@ export default function PendingTravelRequests() {
   }, [list]);
 
   const filteredRequests = requests.filter(
-    (r) => filters.type === "All" || r.type === filters.type
+    (r) => filters.type === "All" || r.type === filters.type,
   );
 
   const handleApprove = async (id) => {
@@ -162,7 +162,7 @@ export default function PendingTravelRequests() {
         approveApproval({
           id,
           comments: "", // intentionally empty
-        })
+        }),
       )
         .unwrap()
         .then(() => {
@@ -198,7 +198,7 @@ export default function PendingTravelRequests() {
         rejectApproval({
           id,
           comments: result.value.trim(), // always string here
-        })
+        }),
       )
         .unwrap()
         .then(() => {
@@ -215,26 +215,26 @@ export default function PendingTravelRequests() {
   const totalPendingFlights = filteredRequests.filter(
     (r) =>
       r.status === "pending_approval" &&
-      (r.bookingType === "flight" || r.type === "flight")
+      (r.bookingType === "flight" || r.type === "flight"),
   ).length;
 
   const totalPendingHotels = filteredRequests.filter(
     (r) =>
       r.status === "pending_approval" &&
-      (r.bookingType === "hotel" || r.type === "hotel")
+      (r.bookingType === "hotel" || r.type === "hotel"),
   ).length;
 
   const totalFlight = filteredRequests.filter(
-    (r) => r.type === "flight"
+    (r) => r.type === "flight",
   ).length;
 
   const totalHotels = filteredRequests.filter(
-    (r) => r.bookingType === "hotel" || r.type === "hotel"
+    (r) => r.bookingType === "hotel" || r.type === "hotel",
   ).length;
 
   const totalEstimatedCost = filteredRequests.reduce(
     (sum, r) => sum + r.estimatedCost,
-    0
+    0,
   );
 
   if (loading) {
@@ -246,7 +246,10 @@ export default function PendingTravelRequests() {
   }
 
   return (
-    <div className="min-h-screen p-6" style={{ backgroundColor: colors.light }}>
+    <div
+      className="min-h-screen px-3 sm:px-4 md:px-6 py-4"
+      style={{ backgroundColor: colors.light }}
+    >
       <div className="max-w-7xl mx-auto space-y-8">
         <HeaderWithStats
           title="Pending Travel Requests"
@@ -310,14 +313,14 @@ export default function PendingTravelRequests() {
         />
 
         {/* FILTERS */}
-        <div className="bg-white p-4 rounded-lg shadow flex items-center gap-4">
+        <div className="bg-white p-4 rounded-lg shadow flex flex-col sm:flex-row sm:items-center gap-3">
           <FiFilter size={20} />
           <select
             value={filters.type}
             onChange={(e) =>
               setFilters((f) => ({ ...f, type: e.target.value }))
             }
-            className="border rounded px-3 py-2"
+            className="border rounded px-3 py-2 w-full sm:w-auto"
           >
             <option>All</option>
             <option value="flight">Flight</option>
@@ -339,7 +342,7 @@ export default function PendingTravelRequests() {
               >
                 {/* HEADER */}
                 <div
-                  className="flex justify-between items-center px-6 py-4 cursor-pointer bg-linear-to-r from-[#05BFDB] to-white text-gray-900"
+                  className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-4 px-4 sm:px-6 py-4 cursor-pointer bg-linear-to-r from-[#05BFDB] to-white text-gray-900"
                   onClick={() =>
                     setExpanded((prev) => (prev === r.id ? null : r.id))
                   }
@@ -351,7 +354,7 @@ export default function PendingTravelRequests() {
                       ) : (
                         <FaHotel className="text-[#0A4D68] text-xl" />
                       )}
-                      <h3 className="text-lg font-semibold text-[#0A4D68] flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-semibold wrap-break-word text-[#0A4D68] flex items-center gap-2">
                         <span>{r.cityFrom}</span>
                         <span className="text-gray-500">→</span>
                         <span>{r.cityTo}</span>
@@ -364,9 +367,9 @@ export default function PendingTravelRequests() {
                           r.travellers.map((t, idx) => (
                             <div
                               key={idx}
-                              className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white border rounded-md p-3"
+                              className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white border rounded-md p-3 gap-2"
                             >
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap gap-2 justify-end">
                                 <FiUser className="text-[#0A4D68]" />
                                 <span className="font-medium">
                                   {t.name}
@@ -400,15 +403,15 @@ export default function PendingTravelRequests() {
                         r.status === "pending_approval"
                           ? "bg-yellow-100 text-yellow-700"
                           : r.status === "approved"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
                       }`}
                     >
                       {(r.status || "unknown").replace(/_/g, " ").toUpperCase()}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <span className="font-semibold text-[#0A4D68]">
                       ₹{r.estimatedCost.toLocaleString()}
                     </span>
@@ -445,7 +448,7 @@ export default function PendingTravelRequests() {
                 </div>
 
                 {/* SUMMARY VIEW */}
-                <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="px-6 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                   <Detail
                     icon={<FiCalendar />}
                     label="Departure Date"
@@ -537,8 +540,8 @@ export default function PendingTravelRequests() {
                         <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
                           Flight Segments
                         </h5>
-                        <div className="overflow-x-auto mb-6">
-                          <table className="min-w-full border border-gray-300 bg-white rounded-md shadow-sm">
+                        <div className="overflow-x-auto -mx-3 sm:mx-0">
+                          <table className="min-w-[800px] border border-gray-300 bg-white rounded-md shadow-sm">
                             <thead className="bg-[#05BFDB]/20 text-[#0A4D68]">
                               <tr>
                                 <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
@@ -599,8 +602,8 @@ export default function PendingTravelRequests() {
                             <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
                               Baggage Details
                             </h5>
-                            <div className="overflow-x-auto mb-6">
-                              <table className="min-w-full border border-gray-200 bg-white rounded-md shadow-sm">
+                            <div className="overflow-x-auto -mx-3 sm:mx-0">
+                              <table className="min-w-[800px] border border-gray-300 bg-white rounded-md shadow-sm">
                                 <thead className="bg-[#05BFDB]/20 text-[#0A4D68]">
                                   <tr>
                                     <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
@@ -643,8 +646,8 @@ export default function PendingTravelRequests() {
                             <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
                               Selected Seats
                             </h5>
-                            <div className="overflow-x-auto mb-6">
-                              <table className="min-w-full border border-gray-200 bg-white rounded-md shadow-sm">
+                            <div className="overflow-x-auto -mx-3 sm:mx-0">
+                              <table className="min-w-[800px] border border-gray-300 bg-white rounded-md shadow-sm">
                                 <thead className="bg-[#05BFDB]/20 text-[#0A4D68]">
                                   <tr>
                                     <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
@@ -681,8 +684,8 @@ export default function PendingTravelRequests() {
                             <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
                               Meal Preferences
                             </h5>
-                            <div className="overflow-x-auto mb-6">
-                              <table className="min-w-full border border-gray-200 bg-white rounded-md shadow-sm">
+                            <div className="overflow-x-auto -mx-3 sm:mx-0">
+                              <table className="min-w-[800px] border border-gray-300 bg-white rounded-md shadow-sm">
                                 <thead className="bg-[#05BFDB]/20 text-[#0A4D68]">
                                   <tr>
                                     <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
@@ -719,8 +722,8 @@ export default function PendingTravelRequests() {
                             <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
                               Extra Baggage
                             </h5>
-                            <div className="overflow-x-auto mb-6">
-                              <table className="min-w-full border border-gray-200 bg-white rounded-md shadow-sm">
+                            <div className="overflow-x-auto -mx-3 sm:mx-0">
+                              <table className="min-w-[800px] border border-gray-300 bg-white rounded-md shadow-sm">
                                 <thead className="bg-[#05BFDB]/20 text-[#0A4D68]">
                                   <tr>
                                     <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">

@@ -126,3 +126,25 @@ export const FLIGHT_STATUS_MAP = {
     className: "bg-red-50 text-red-700 border border-red-200",
   },
 };
+
+
+
+export const groupSegmentsByJourney = (segments = []) => {
+  const grouped = {
+    onward: [],
+    return: [],
+    multi: [],
+  };
+
+  segments.forEach((seg, index) => {
+    if (seg.journeyType === "onward") {
+      grouped.onward.push(seg);
+    } else if (seg.journeyType === "return") {
+      grouped.return.push(seg);
+    } else {
+      grouped.multi.push({ ...seg, routeIndex: index + 1 });
+    }
+  });
+
+  return grouped;
+};

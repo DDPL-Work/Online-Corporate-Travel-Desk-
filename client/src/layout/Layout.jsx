@@ -51,15 +51,13 @@ export default function Layout() {
   // REDIRECT IF NOT AUTHENTICATED
   // =============================
   if (!isAuthenticated || !token) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/sso-login" replace />;
   }
 
   // =============================
   // ROLE-BASED ROOT REDIRECTS
   // =============================
   if (location.pathname === "/") {
-    if (role === "super-admin")
-      return <Navigate to="/total-bookings" replace />;
     if (role === "travel-admin")
       return <Navigate to="/pending-requests" replace />;
     if (role === "employee") return <Navigate to="/my-bookings" replace />;

@@ -21,7 +21,7 @@ import {
   getFareRule,
   getSSR,
 } from "../../../Redux/Actions/flight.thunks";
-import SeatSelectionModal from "./SeatSelectionModal";
+import SeatSelectionModal from "./SSR/SeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";

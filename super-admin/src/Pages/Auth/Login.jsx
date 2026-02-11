@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MdEmail, MdLock } from "react-icons/md";
+import { MdEmail, MdLock, MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { loginUser } from "../../Redux/Slice/authSlice";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +12,7 @@ const travelBg =
 
 const Login = () => {
   const [form, setForm] = useState({ email: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ const Login = () => {
       loginUser({
         email: form.email,
         password: form.password,
-      })
+      }),
     )
       .unwrap()
       .then((data) => {
@@ -42,16 +43,8 @@ const Login = () => {
           const role = decoded.role || decoded.userRole;
 
           switch (role) {
-            case "travel-company":
-              navigate("/total-bookings");
-              break;
-
             case "super-admin":
               navigate("/onboarded-corporates");
-              break;
-
-            case "employee":
-              navigate("/my-bookings");
               break;
 
             default:
@@ -97,18 +90,6 @@ const Login = () => {
               alt="img2"
             />
           </div> */}
-
-          <div className="absolute left-35 top-10 flex flex-col justify-center items-center text-white z-10 px-10">
-            <h1 className="text-5xl font-bold mb-4  drop-shadow-xl text-blue-600">
-              WELCOME!
-            </h1>
-            <p className="text-gray-200 mb-6 text-lg">
-              Your corporate travel journey starts here
-            </p>
-            <button onClick={()=> navigate('/sso-login')} className="bg-white text-blue-700 font-semibold py-2 px-8 rounded-2xl shadow-lg hover:bg-gray-200 transition">
-              SIGN UP
-            </button>
-          </div>
         </div>
 
         {/* LEFT LOGIN FORM — OVERLAYED */}
@@ -133,26 +114,52 @@ const Login = () => {
                 required
                 className="w-full py-3 pl-12 pr-4 border rounded-xl bg-white/70 backdrop-blur-sm focus:bg-white transition outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <label className="absolute left-12 top-3 text-gray-500 pointer-events-none transition-all group-focus-within:-top-3 group-focus-within:text-sm group-focus-within:text-blue-600 bg-white px-1">
+              <label
+                className={`absolute left-12 bg-white px-1 transition-all pointer-events-none
+      ${form.email ? "-top-3 text-sm text-blue-600" : "top-3 text-gray-500"}
+      peer-focus:-top-3 peer-focus:text-sm peer-focus:text-blue-600`}
+              >
                 Email Address
               </label>
             </div>
 
             {/* Password */}
+            {/* Password */}
             <div className="relative group">
               <MdLock className="absolute left-4 top-3.5 text-blue-600 text-xl" />
+
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 name="password"
                 placeholder=" "
                 value={form.password}
                 onChange={handleChange}
                 required
-                className="w-full py-3 pl-12 pr-4 border rounded-xl bg-white/70 backdrop-blur-sm focus:bg-white transition outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full py-3 pl-12 pr-12 border rounded-xl bg-white/70 backdrop-blur-sm focus:bg-white transition outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <label className="absolute left-12 top-3 text-gray-500 pointer-events-none transition-all group-focus-within:-top-3 group-focus-within:text-sm group-focus-within:text-blue-600 bg-white px-1">
+
+              {/* Floating Label */}
+              <label
+                className={`absolute left-12 bg-white px-1 transition-all pointer-events-none
+      ${form.password ? "-top-3 text-sm text-blue-600" : "top-3 text-gray-500"}
+      peer-focus:-top-3 peer-focus:text-sm peer-focus:text-blue-600`}
+              >
                 Password
               </label>
+
+              {/* Show / Hide Button */}
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-4 top-3.5 text-gray-600 hover:text-blue-600 transition"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <MdVisibilityOff size={22} />
+                ) : (
+                  <MdVisibility size={22} />
+                )}
+              </button>
             </div>
 
             {/* Remember + Forgot */}
