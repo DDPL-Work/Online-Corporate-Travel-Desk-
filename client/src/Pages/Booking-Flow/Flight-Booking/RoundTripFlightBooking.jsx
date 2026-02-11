@@ -22,7 +22,7 @@ import {
   getRTFareRule,
   getRTSSR,
 } from "../../../Redux/Actions/flight.thunks.RT";
-import RTSeatSelectionModal from "./RTSeatSelectionModal";
+import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { CABIN_MAP } from "../../../utils/formatter";

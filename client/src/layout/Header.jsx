@@ -49,8 +49,6 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
   // -------------------------
   const getDashboardTitle = () => {
     switch (userRole) {
-      case "super-admin":
-        return "Super Admin Dashboard";
       case "travel-admin":
         return "Travel Admin Dashboard";
       case "employee":
@@ -62,7 +60,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
 
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate("/login", { replace: true });
+    navigate("/sso-login", { replace: true });
   };
 
   const handleProfileNavigation = () => {
@@ -75,12 +73,8 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
         navigate("/employee-profile-settings");
         break;
 
-      case "super-admin":
-        navigate("/super-admin-profile-settings");
-        break;
-
       default:
-        navigate("/login");
+        navigate("/sso-login");
     }
   };
 

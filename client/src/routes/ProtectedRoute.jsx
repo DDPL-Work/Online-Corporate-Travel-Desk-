@@ -8,7 +8,7 @@ export default function ProtectedRoute({ allowedRoles }) {
   const token = auth.token || localStorage.getItem("token");
   const role = auth.role;
 
-  if (!token) return <Navigate to="/login" replace />;
+  if (!token) return <Navigate to="/sso-login" replace />;
 
   if (allowedRoles && !allowedRoles.includes(role)) {
     return <Navigate to="/unauthorized" replace />;

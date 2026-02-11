@@ -137,8 +137,14 @@ const bookingRequestSchema = new mongoose.Schema(
     bookingSnapshot: {
       sectors: [String],
       airline: String,
-      travelDate: String,
-      returnDate: String,
+      travelDate: {
+        type: Date,
+        required: true,
+      },
+
+      returnDate: {
+        type: Date,
+      },
       cabinClass: {
         type: String,
         enum: ["Economy", "Premium Economy", "Business", "First"],

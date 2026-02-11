@@ -1,5 +1,6 @@
 const Approval = require("../models/Approval");
 const Booking = require("../models/Booking");
+const BookingIntent = require("../models/BookingIntent");
 const BookingRequest = require("../models/BookingRequest");
 const User = require("../models/User");
 const notificationService = require("../services/notification.service");
@@ -45,8 +46,8 @@ exports.getAllApprovals = asyncHandler(async (req, res) => {
           pages: Math.ceil(total / limit),
         },
       },
-      "Booking requests fetched successfully"
-    )
+      "Booking requests fetched successfully",
+    ),
   );
 });
 
@@ -76,8 +77,8 @@ exports.getApproval = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         bookingRequest,
-        "Booking request fetched successfully"
-      )
+        "Booking request fetched successfully",
+      ),
     );
 });
 
@@ -110,14 +111,79 @@ exports.approveRequest = asyncHandler(async (req, res) => {
 
   await bookingRequest.save();
 
+  /* ================= CREATE BOOKING INTENT ================= */
+
+  const snapshot = bookingRequest.bookingSnapshot;
+
+  // ONE-WAY handling
+  // const [origin, destination] = snapshot.sectors[0].split("-");
+  const isRoundTrip = snapshot.sectors.length === 2;
+
+  const [origin, destination] = snapshot.sectors[0].split("-");
+  const [, returnDestination] = isRoundTrip
+    ? snapshot.sectors[1].split("-")
+    : [];
+
+  const travelDate = new Date(snapshot.travelDate);
+  const now = new Date();
+
+  const validUntil = new Date(
+    Math.min(
+      travelDate.getTime() - 24 * 60 * 60 * 1000,
+      now.getTime() + 24 * 60 * 60 * 1000, // at least 24h validity
+    ),
+  );
+
+  const approvedSegment = bookingRequest.flightRequest.segments[0];
+
+  const fareResult = bookingRequest.flightRequest.fareQuote.Results[0];
+
+  // FIRST LEG, FIRST SEGMENT (OW / RT safe)
+  const providerSegment = fareResult.Segments[0][0];
+
+  const airlineCodes = [
+    ...new Set(bookingRequest.flightRequest.segments.map((s) => s.airlineCode)),
+  ];
+
+  // const maxApprovedPrice = isRoundTrip
+  //   ? bookingRequest.pricingSnapshot.totalAmount
+  //   : fareResult.Fare.PublishedFare;
+
+  const maxApprovedPrice = fareResult.Fare.PublishedFare;
+
+
+  await BookingIntent.create({
+    bookingRequestId: bookingRequest._id,
+    corporateId: bookingRequest.corporateId,
+    userId: bookingRequest.userId,
+
+    origin,
+    destination,
+
+    travelDate: snapshot.travelDate,
+    returnDate: snapshot.returnDate,
+
+    journeyType: isRoundTrip ? "RT" : "OW",
+
+    // ✅ EXACT DATA AS APPROVED (NO MAPPING)
+    cabinClass: snapshot.cabinClass, // "Premium Economy"
+    // airlineCodes: [approvedSegment.airlineCode], // ["6E"]
+    airlineCodes,
+
+    maxApprovedPrice,
+
+    approvedAt: new Date(),
+    validUntil,
+  });
+
   res
     .status(200)
     .json(
       new ApiResponse(
         200,
         bookingRequest,
-        "Booking request approved successfully"
-      )
+        "Booking request approved successfully",
+      ),
     );
 });
 
@@ -160,7 +226,7 @@ exports.rejectRequest = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         bookingRequest,
-        "Booking request rejected successfully"
-      )
+        "Booking request rejected successfully",
+      ),
     );
 });

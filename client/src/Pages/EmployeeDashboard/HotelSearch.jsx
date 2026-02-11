@@ -4,8 +4,10 @@ import SearchHeader from "../../components/search-layout/SearchHeader";
 import SearchCard from "../../components/search-layout/SearchCard";
 import GuestsRoomsDropdown from "../../components/hotel-search/GuestsRoomsDropdown";
 import EmployeeHeader from "./Employee-Header";
+import { useNavigate } from "react-router-dom";
 
 export default function HotelSearchPage() {
+  const navigate = useNavigate();
   const [activePage, setActivePage] = useState("hotel");
   const [city, setCity] = useState("");
   const [checkIn, setCheckIn] = useState("");
@@ -13,12 +15,7 @@ export default function HotelSearchPage() {
   const [roomsData, setRoomsData] = useState([]);
 
   const handleSearch = () => {
-    const payload = {
-      city,
-      checkIn,
-      checkOut,
-      rooms: roomsData,
-    };
+    navigate("/search-hotel-results");
   };
   return (
     <div className="min-h-screen relative">

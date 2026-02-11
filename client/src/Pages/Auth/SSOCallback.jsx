@@ -21,7 +21,7 @@ const SSOCallback = () => {
     }
 
     if (!token) {
-      navigate("/login", { replace: true });
+      navigate("/sso-login", { replace: true });
       return;
     }
 
@@ -49,7 +49,7 @@ const SSOCallback = () => {
         navigate("/my-bookings", { replace: true });
       }
     } catch (err) {
-      navigate("/login", { replace: true });
+      navigate("/sso-login", { replace: true });
     }
   }, [dispatch, navigate, params]);
 

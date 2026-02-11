@@ -4,8 +4,8 @@ const path = require("path");
 const { randomUUID } = require("crypto");
 const logger = require("../utils/logger");
 const QRCode = require("qrcode");
-// const puppeteer = require("puppeteer");
-const puppeteer = require("puppeteer-core");
+const puppeteer = require("puppeteer");
+// const puppeteer = require("puppeteer-core");
 
 class PDFService {
   constructor() {
@@ -154,22 +154,22 @@ class PDFService {
 
       /* ================= GENERATE PDF ================= */
 
-      // const browser = await puppeteer.launch({
-      //   headless: "new",
-      //   args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      // });
-
       const browser = await puppeteer.launch({
-        executablePath: "/usr/bin/chromium",
         headless: "new",
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-gpu",
-          "--single-process",
-        ],
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
+
+      // const browser = await puppeteer.launch({
+      //   executablePath: "/usr/bin/chromium",
+      //   headless: "new",
+      //   args: [
+      //     "--no-sandbox",
+      //     "--disable-setuid-sandbox",
+      //     "--disable-dev-shm-usage",
+      //     "--disable-gpu",
+      //     "--single-process",
+      //   ],
+      // });
 
       const page = await browser.newPage();
 
