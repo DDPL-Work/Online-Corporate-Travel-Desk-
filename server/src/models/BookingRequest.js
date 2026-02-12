@@ -110,11 +110,28 @@ const bookingRequestSchema = new mongoose.Schema(
       index: true,
     },
 
+    // bookingResult: {
+    //   pnr: String,
+    //   ticketNumbers: [String],
+    //   providerBookingId: String,
+    //   providerResponse: mongoose.Schema.Types.Mixed,
+    // },
+
     bookingResult: {
       pnr: String,
+
+      // ✅ ROUND TRIP SUPPORT
+      onwardPNR: String,
+      returnPNR: String,
+
+      onwardResponse: mongoose.Schema.Types.Mixed,
+      returnResponse: mongoose.Schema.Types.Mixed,
+
+      // ✅ KEEP for ONE WAY compatibility
+      providerResponse: mongoose.Schema.Types.Mixed,
+
       ticketNumbers: [String],
       providerBookingId: String,
-      providerResponse: mongoose.Schema.Types.Mixed,
     },
 
     /* ================= PAYMENT ================= */

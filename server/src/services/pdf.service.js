@@ -26,7 +26,7 @@ class PDFService {
      FLIGHT TICKET PDF (HTML → PUPPETEER → PDF)
   ====================================================== */
 
-  async generateFlightTicketPdf({ booking }) {
+  async generateFlightTicketPdf({ booking, journeyType }) {
     try {
       const filename = `ticket-${booking.bookingReference}-${randomUUID()}.pdf`;
       const filepath = path.join(this.ticketDir, filename);
@@ -63,7 +63,11 @@ class PDFService {
 
       /* ================= EXTRACT DATA ================= */
 
-      const segment = booking.flightRequest.segments[0];
+      // const segment = booking.flightRequest.segments[0];
+      const segment =
+        booking.flightRequest.segments.find(
+          (s) => s.journeyType === journeyType,
+        ) || booking.flightRequest.segments[0];
 
       const passenger =
         booking.travellers.find((t) => t.isLeadPassenger) ||
@@ -83,6 +87,11 @@ class PDFService {
         booking.bookingResult?.Response?.Response?.FlightItinerary?.Fare
           ?.PublishedFare ||
         "—";
+
+      const pnr =
+        journeyType === "return"
+          ? booking.bookingResult.returnPNR
+          : booking.bookingResult.onwardPNR || booking.bookingResult.pnr;
 
       const replacements = {
         date: formatDate(new Date()),
@@ -120,7 +129,8 @@ class PDFService {
         arrivalTime: formatTime(segment.arrivalDateTime),
         arrivalDate: formatShortDate(segment.arrivalDateTime),
 
-        pnr: booking.bookingResult.pnr,
+        // pnr: booking.bookingResult.pnr,
+        pnr: pnr,
 
         cabinBaggage: segment.baggage?.cabin || "7 Kgs",
         checkInBaggage: segment.baggage?.checkIn || "15 Kgs (1 piece)",
