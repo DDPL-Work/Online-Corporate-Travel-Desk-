@@ -145,11 +145,11 @@ exports.approveRequest = asyncHandler(async (req, res) => {
     ...new Set(bookingRequest.flightRequest.segments.map((s) => s.airlineCode)),
   ];
 
-  // const maxApprovedPrice = isRoundTrip
-  //   ? bookingRequest.pricingSnapshot.totalAmount
-  //   : fareResult.Fare.PublishedFare;
+  const maxApprovedPrice = isRoundTrip
+    ? bookingRequest.pricingSnapshot.totalAmount
+    : fareResult.Fare.PublishedFare;
 
-  const maxApprovedPrice = fareResult.Fare.PublishedFare;
+  // const maxApprovedPrice = fareResult.Fare.PublishedFare;
 
 
   await BookingIntent.create({

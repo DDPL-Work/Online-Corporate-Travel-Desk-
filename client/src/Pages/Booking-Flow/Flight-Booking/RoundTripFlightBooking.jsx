@@ -890,10 +890,16 @@ export default function RoundTripFlightBooking() {
           onward: rawFlightData.onward.ResultIndex,
           return: rawFlightData.return.ResultIndex,
         },
+        // resultIndex: rawFlightData.onward.ResultIndex,
+
         // fareQuote: buildConsolidatedFareQuote(),
         // fareQuote: fareQuote?.onward?.Response, // ✅ contains FareBreakdown
         fareQuote: {
-          Results: [fareQuote?.onward?.Response?.Results],
+          Results: [
+            fareQuote?.onward?.Response?.Results,
+            fareQuote?.return?.Response?.Results,
+          ],
+          // Results: [fareQuote?.return?.Response?.Results],
         },
 
         segments: buildFullSegments(),
