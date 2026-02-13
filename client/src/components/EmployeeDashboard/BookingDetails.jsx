@@ -101,6 +101,9 @@ export default function BookingDetails() {
   const handleDownloadTicket = async (journeyType) => {
     const pnr = pnrsByJourney[journeyType];
     if (!pnr) return;
+    if (!pnrsByJourney.onward && booking.bookingResult?.pnr) {
+      pnrsByJourney.onward = booking.bookingResult.pnr;
+    }
 
     setDownloading(journeyType);
 
@@ -125,6 +128,7 @@ export default function BookingDetails() {
       {/* Bento Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ✈️ Flight Summary */}
+          <div className="lg:col-span-2 space-y-6">  
         {flights.map((flight, index) => {
           const airlineTheme =
             airlineThemes[flight?.airlineCode] || airlineThemes.DEFAULT;
@@ -213,18 +217,23 @@ export default function BookingDetails() {
                   <div>
                     <p className="text-sm opacity-90">PNR</p>
                     <p className="font-bold text-lg">
-                      {pnrsByJourney[flight.journeyType] || "Awaiting"}
+                      {/* {pnrsByJourney[flight.journeyType] || "Awaiting"} */}
+                      {flight.journeyType === "return"
+                        ? pnrsByJourney.return
+                        : pnrsByJourney.onward || "Awaiting"}
                     </p>
                   </div>
 
-                  {pnrsByJourney[flight.journeyType] && (
+                  {(pnrsByJourney[flight.journeyType] || pnr) && (
                     <button
-                      onClick={() => handleDownloadTicket(flight.journeyType)}
-                      disabled={downloading === flights.journeyType}
+                      onClick={() =>
+                        handleDownloadTicket(flight.journeyType || "onward")
+                      }
+                      disabled={downloading === flight.journeyType}
                       className="flex items-center px-4 py-2 bg-white text-[#0A4D68] font-semibold rounded-lg hover:bg-gray-100 transition"
                     >
                       <FiDownload className="mr-2" />
-                      {downloading === flights.journeyType
+                      {downloading === flight.journeyType
                         ? "Downloading..."
                         : "Download Ticket"}
                     </button>
@@ -234,6 +243,7 @@ export default function BookingDetails() {
             </div>
           );
         })}
+        </div>
 
         {/* 👤 Traveller Info */}
         <div className="bg-white shadow-md rounded-xl p-6 border-t-4 border-[#088395] hover:shadow-xl transition">
@@ -332,7 +342,7 @@ export default function BookingDetails() {
               </p>
             </div>
 
-            {pnr && paymentSuccessful ? (
+            {/* {pnr && paymentSuccessful ? (
               <button
                 onClick={handleDownloadTicket}
                 disabled={downloading === flights.journeyType}
@@ -347,7 +357,10 @@ export default function BookingDetails() {
               <div className="text-sm text-gray-500 italic">
                 Ticket not available (No PNR)
               </div>
-            )}
+            )} */}
+            <div className="text-sm text-gray-500 italic">
+              Ticket available above
+            </div>
           </div>
         </div>
       </div>

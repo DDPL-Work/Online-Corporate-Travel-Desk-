@@ -1,29 +1,79 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
-const hotelController = require('../controllers/hotel.controller');
-const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
-const validate = require('../middleware/validate.middleware'); // ✅ FIX
-const { bookingValidation } = require('../validations');
-const { searchLimiter } = require('../middleware/rateLimit.middleware');
+const hotelSearchController = require("../controllers/hotelSearch.controller");
+const hotelBookingController = require("../controllers/hotelBooking.controller");
 
-// Protect all routes
+const bookingValidation = require("../validations/booking.validation");
+const {
+  authorizeRoles,
+  verifyToken,
+} = require("../middleware/auth.middleware");
+const { searchLimiter } = require("../middleware/rateLimit.middleware");
+const validate = require("../middleware/validate.middleware");
+
 router.use(verifyToken);
 
-// Hotel search (POST)
+/* ======================================================
+   HOTEL SEARCH
+====================================================== */
+
 router.post(
-  '/search',
-  authorizeRoles('manager', 'travel-admin', 'corporateAdmin'),
+  "/search",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
   searchLimiter,
   validate(bookingValidation.searchHotel),
-  hotelController.searchHotels
+  hotelSearchController.searchHotels,
 );
 
-// Hotel details (GET)
+/* ======================================================
+   HOTEL DETAILS
+====================================================== */
+
+router.post(
+  "/details",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  hotelSearchController.getHotelDetails,
+);
+
+/* ======================================================
+   ROOM INFO
+====================================================== */
+
+router.post(
+  "/rooms",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  hotelSearchController.getRoomInfo,
+);
+
+/* ======================================================
+   HOTEL BOOK
+====================================================== */
+
+router.post(
+  "/book",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  hotelBookingController.bookHotel,
+);
+
+/* ======================================================
+   BOOKING DETAILS
+====================================================== */
+
 router.get(
-  '/:hotelCode',
-  authorizeRoles('manager', 'travel-admin', 'corporateAdmin'),
-  hotelController.getHotelDetails
+  "/booking/:bookingId",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  hotelBookingController.getBookingDetails,
+);
+
+/* ======================================================
+   CANCEL HOTEL
+====================================================== */
+
+router.post(
+  "/cancel",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  hotelBookingController.cancelHotel,
 );
 
 module.exports = router;

@@ -79,7 +79,19 @@ export default function BookApprovedFlight() {
 
       navigate("/my-bookings", { replace: true });
     } catch (err) {
-      if (err?.message?.toLowerCase().includes("revalidate")) {
+      const errorMessage = err?.message?.toLowerCase() || "";
+
+      // 🔴 INSUFFICIENT BALANCE → SHOW TOAST
+      if (errorMessage.includes("insufficient balance")) {
+        ToastWithTimer({
+          type: "error",
+          message: "Insufficient wallet balance. Please recharge your account.",
+        });
+        return;
+      }
+
+      // ⚠️ REVALIDATION CASE
+      if (errorMessage.includes("revalidate")) {
         await Swal.fire({
           icon: "warning",
           title: "Approval Expired",
@@ -92,6 +104,7 @@ export default function BookApprovedFlight() {
         return;
       }
 
+      // ❌ DEFAULT ERROR
       Swal.fire({
         icon: "error",
         title: "Booking Failed",
