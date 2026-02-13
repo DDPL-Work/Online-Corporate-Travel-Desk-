@@ -130,7 +130,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
       bookingSnapshot = {
         sectors: [`${s.origin.airportCode}-${s.destination.airportCode}`],
         airline: s.airlineName,
-        travelDate: new Date(s.departureDateTime),
+        travelDate: s.departureDateTime,
         returnDate: null,
         cabinClass:
           s.cabinClass === 1
@@ -161,8 +161,8 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
           `${ret.origin.airportCode}-${ret.destination.airportCode}`,
         ],
         airline: [...new Set(segments.map((s) => s.airlineName))].join(", "),
-        travelDate: new Date(onward.departureDateTime),
-        returnDate: new Date(ret.departureDateTime),
+        travelDate: onward.departureDateTime,
+        returnDate: ret.departureDateTime,
         cabinClass: "Economy", // frontend controlled
         amount: pricingSnapshot.totalAmount,
         purposeOfTravel,
@@ -389,32 +389,6 @@ const isTraceExpiredError = (err) => {
   );
 };
 
-const toTboDateTime = (value) => {
-  if (!value) {
-    throw new Error("Invalid date value");
-  }
-
-  // Case 1: already correct TBO format
-  if (
-    typeof value === "string" &&
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(value)
-  ) {
-    return value;
-  }
-
-  // Case 2: ISO string from Mongo / JS
-  if (typeof value === "string" && !isNaN(Date.parse(value))) {
-    return new Date(value).toISOString().slice(0, 19);
-  }
-
-  // Case 3: Date object
-  if (value instanceof Date) {
-    return value.toISOString().slice(0, 19);
-  }
-
-  throw new Error(`Invalid TBO date format: ${value}`);
-};
-
 const cabinClassToCode = (cabin) =>
   ({
     Economy: 2,
@@ -434,6 +408,9 @@ const buildTboRevalidationSearchPayload = (booking, intent) => {
     throw new ApiError(400, "At least one adult is required for TBO search");
   }
 
+  console.log("ORIGINAL STORED SEGMENT:", booking.flightRequest.segments[0]);
+
+
   const basePayload = {
     AdultCount: adultCount,
     ChildCount: booking.travellers.filter((t) => t.paxType === "CHILD").length,
@@ -443,34 +420,39 @@ const buildTboRevalidationSearchPayload = (booking, intent) => {
     OneStopFlight: false,
     JourneyType: isRoundTrip ? 2 : 1,
     Segments: [],
-    Sources: intent.airlineCodes?.length ? intent.airlineCodes : null,
+    // Sources: intent.airlineCodes?.length ? intent.airlineCodes : null,
   };
 
   // ✅ ONE-WAY (UNCHANGED BEHAVIOR)
   if (!isRoundTrip) {
+    const segment = segments[0];
+
     basePayload.Segments.push({
-      Origin: intent.origin,
-      Destination: intent.destination,
-      FlightCabinClass: cabinClassToCode(intent.cabinClass),
-      PreferredDepartureTime: toTboDateTime(intent.travelDate),
+      Origin: segment.origin.airportCode,
+      Destination: segment.destination.airportCode,
+      FlightCabinClass: segment.cabinClass,
+      PreferredDepartureTime: segment.departureDateTime.slice(0, 19),
     });
 
     return basePayload;
   }
 
   // ✅ ROUND-TRIP (TBO COMPLIANT)
+  const onward = segments[0];
+  const ret = segments[1];
+
   basePayload.Segments.push(
     {
-      Origin: intent.origin,
-      Destination: intent.destination,
-      FlightCabinClass: cabinClassToCode(intent.cabinClass),
-      PreferredDepartureTime: toTboDateTime(intent.travelDate),
+      Origin: onward.origin.airportCode,
+      Destination: onward.destination.airportCode,
+      FlightCabinClass: onward.cabinClass,
+      PreferredDepartureTime: onward.departureDateTime.slice(0, 19),
     },
     {
-      Origin: intent.destination,
-      Destination: intent.origin,
-      FlightCabinClass: cabinClassToCode(intent.cabinClass),
-      PreferredDepartureTime: toTboDateTime(intent.returnDate),
+      Origin: ret.origin.airportCode,
+      Destination: ret.destination.airportCode,
+      FlightCabinClass: ret.cabinClass,
+      PreferredDepartureTime: ret.departureDateTime.slice(0, 19),
     },
   );
 
@@ -776,8 +758,11 @@ const findBestMatchingFlight = ({ searchResp, intent }) => {
     if (!seg) return false;
 
     return (
-      intent.airlineCodes.includes(seg.Airline?.AirlineCode) &&
-      seg.CabinClass === cabinClassToCode(intent.cabinClassCode) &&
+      // intent.airlineCodes.includes(seg.Airline?.AirlineCode)
+      intent.airlineCodes.includes(seg.Airline?.AirlineCode?.trim()) &&
+      // seg.CabinClass === cabinClassToCode(intent.cabinClassCode)
+
+      seg.CabinClass === cabinClassToCode(intent.cabinClass) &&
       r.Fare.PublishedFare <= intent.maxApprovedPrice
     );
   });
@@ -829,29 +814,25 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
 
   const fare = booking.flightRequest.fareQuote.Results[0].Fare;
 
-const passengers = booking.travellers.map((t) => ({
-  title:
-    t.gender?.toUpperCase() === "MALE"
-      ? "Mr"
-      : "Ms",
+  const passengers = booking.travellers.map((t) => ({
+    title: t.gender?.toUpperCase() === "MALE" ? "Mr" : "Ms",
 
-  firstName: t.firstName?.trim(),
-  lastName: t.lastName?.trim(),
+    firstName: t.firstName?.trim(),
+    lastName: t.lastName?.trim(),
 
-  paxType: 1, // always adult
+    paxType: 1, // always adult
 
-  dateOfBirth: t.dateOfBirth,
-  gender: t.gender,
+    dateOfBirth: t.dateOfBirth,
+    gender: t.gender,
 
-  passportNo: t.passportNumber,
-  passportExpiry: t.passportExpiry,
+    passportNo: t.passportNumber,
+    passportExpiry: t.passportExpiry,
 
-  email: t.email || leadPassenger.email,
-  contactNo: t.phoneWithCode || leadPassenger.phoneWithCode,
+    email: t.email || leadPassenger.email,
+    contactNo: t.phoneWithCode || leadPassenger.phoneWithCode,
 
-  isLeadPax: true,
-}));
-
+    isLeadPax: true,
+  }));
 
   const fareResult = booking.flightRequest.fareQuote.Results[0];
   const isLCC = fareResult?.IsLCC === true;
@@ -876,53 +857,60 @@ const passengers = booking.travellers.map((t) => ({
     });
 
     if (isTraceExpiredError(err)) {
-      logger.warn("TRACE EXPIRED → REVALIDATING", {
-        bookingId: booking._id,
-        oldTraceId: booking.flightRequest.traceId,
-      });
+      try {
+        logger.warn("TRACE EXPIRED → REVALIDATING", {
+          bookingId: booking._id,
+          oldTraceId: booking.flightRequest.traceId,
+        });
 
-      const searchPayload = buildTboRevalidationSearchPayload(booking, intent);
+        const searchPayload = buildTboRevalidationSearchPayload(
+          booking,
+          intent,
+        );
 
-      logger.info("TBO REVALIDATION SEARCH PAYLOAD", searchPayload);
+        logger.info("TBO REVALIDATION SEARCH PAYLOAD", searchPayload);
 
-      const searchResp = await tboService.searchFlights(searchPayload);
-      logger.info("REVALIDATION SEARCH RESULT COUNT", {
-        count: Array.isArray(searchResp.Results)
-          ? searchResp.Results.length
-          : 0,
-      });
+        const searchResp = await tboService.searchFlights(searchPayload);
 
-      const matched = findBestMatchingFlight({
-        searchResp,
-        // booking,
-        intent,
-      });
+        const matched = findBestMatchingFlight({
+          searchResp,
+          intent,
+        });
 
-      const fareQuote = await tboService.getFareQuote(
-        searchResp.TraceId,
-        matched.ResultIndex,
-      );
+        const fareQuote = await tboService.getFareQuote(
+          searchResp.TraceId,
+          matched.ResultIndex,
+        );
 
-      booking.flightRequest.traceId = searchResp.TraceId;
-      booking.flightRequest.resultIndex = matched.ResultIndex;
-      // booking.flightRequest.resultIndex =
-      //   typeof matched.ResultIndex === "object"
-      //     ? matched.ResultIndex.onward
-      //     : matched.ResultIndex;
+        booking.flightRequest.traceId = searchResp.TraceId;
+        booking.flightRequest.resultIndex = matched.ResultIndex;
+        booking.flightRequest.fareQuote = fareQuote;
+        await booking.save();
 
-      booking.flightRequest.fareQuote = fareQuote;
-      await booking.save();
+        const result = await performBooking({
+          booking,
+          passengers,
+          corporate,
+          isLCC,
+        });
 
-      const result = await performBooking({
-        booking,
-        passengers,
-        corporate,
-        isLCC,
-      });
+        return res
+          .status(200)
+          .json(new ApiResponse(200, result, "Flight revalidated & booked"));
+      } catch (revalidationError) {
+        logger.error("REVALIDATION FAILED", {
+          bookingId: booking._id,
+          error: revalidationError.message,
+        });
 
-      return res
-        .status(200)
-        .json(new ApiResponse(200, result, "Flight revalidated & booked"));
+        booking.executionStatus = "failed";
+        await booking.save();
+
+        throw new ApiError(
+          409,
+          "Flight session expired and revalidation failed. Please search again.",
+        );
+      }
     }
 
     booking.executionStatus = "failed";
