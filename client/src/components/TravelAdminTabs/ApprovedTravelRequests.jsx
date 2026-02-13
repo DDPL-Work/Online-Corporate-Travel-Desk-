@@ -79,6 +79,21 @@ export default function ApprovedTravelRequests() {
     return () => clearInterval(interval);
   }, [approvals]);
 
+  const getCity = (seg, type = "origin") => {
+    return (
+      seg?.[type]?.city ||
+      seg?.[type]?.City ||
+      seg?.[type]?.Airport?.CityName ||
+      "N/A"
+    );
+  };
+
+  const getAirportCode = (seg, type = "origin") => {
+    return (
+      seg?.[type]?.airportCode || seg?.[type]?.Airport?.AirportCode || "N/A"
+    );
+  };
+
   const normalizedRequests = useMemo(() => {
     return approvals.map((a) => {
       const segments = a.flightRequest?.segments || [];
@@ -110,9 +125,10 @@ export default function ApprovedTravelRequests() {
         // 🛫 FIXED: show only start → final destination
         destination:
           segments.length > 0
-            ? `${segments[0].origin.city}  → ${
-                segments[segments.length - 1].destination.city
-              }`
+            ? `${getCity(segments[0], "origin")} → ${getCity(
+                segments[segments.length - 1],
+                "destination",
+              )}`
             : "N/A",
 
         departureDate: firstSeg?.departureDateTime,
@@ -137,24 +153,24 @@ export default function ApprovedTravelRequests() {
   const totalApproved = filteredRequests.length;
 
   const totalFlights = filteredRequests.filter(
-    (r) => r.bookingType === "flight"
+    (r) => r.bookingType === "flight",
   ).length;
 
   const totalHotels = filteredRequests.filter(
-    (r) => r.bookingType === "hotel"
+    (r) => r.bookingType === "hotel",
   ).length;
 
   const totalPendingBookingFlights = filteredRequests.filter(
-    (r) => r.bookingStatus === "Pending Booking" && r.bookingType === "flight"
+    (r) => r.bookingStatus === "Pending Booking" && r.bookingType === "flight",
   ).length;
 
   const totalPendingBookingHotels = filteredRequests.filter(
-    (r) => r.bookingStatus === "Pending Booking" && r.bookingType === "hotel"
+    (r) => r.bookingStatus === "Pending Booking" && r.bookingType === "hotel",
   ).length;
 
   const totalEstimatedCost = filteredRequests.reduce(
     (sum, r) => sum + r.estimatedCost,
-    0
+    0,
   );
 
   return (
@@ -239,7 +255,7 @@ export default function ApprovedTravelRequests() {
               {[...new Set(normalizedRequests.map((r) => r.department))].map(
                 (d) => (
                   <option key={d}>{d}</option>
-                )
+                ),
               )}
             </select>
           </div>
@@ -435,7 +451,7 @@ export default function ApprovedTravelRequests() {
                   <Info
                     label="Approved Date"
                     value={new Date(
-                      selectedRequest.approvedAt
+                      selectedRequest.approvedAt,
                     ).toLocaleString()}
                   />
                   <Info
@@ -457,7 +473,11 @@ export default function ApprovedTravelRequests() {
                   </h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
                     <p className="text-base font-semibold text-gray-800">
-                      {selectedRequest.flightRequest.segments[0].origin.city} (
+                      {getCity(
+                        selectedRequest.flightRequest.segments[0],
+                        "origin",
+                      )}{" "}
+                      (
                       {
                         selectedRequest.flightRequest.segments[0].origin
                           .airportCode
@@ -478,13 +498,14 @@ export default function ApprovedTravelRequests() {
                     </p>
                     <p className="text-sm text-gray-600 mt-1">
                       {new Date(
-                        selectedRequest.flightRequest.segments[0].departureDateTime
+                        selectedRequest.flightRequest.segments[0]
+                          .departureDateTime,
                       ).toLocaleString()}{" "}
                       →{" "}
                       {new Date(
                         selectedRequest.flightRequest.segments[
                           selectedRequest.flightRequest.segments.length - 1
-                        ].arrivalDateTime
+                        ].arrivalDateTime,
                       ).toLocaleString()}
                     </p>
                   </div>
@@ -543,8 +564,9 @@ export default function ApprovedTravelRequests() {
                           </p>
                         </div>
                         <p className="text-sm text-gray-700 mt-1">
-                          {seg.origin.city} ({seg.origin.airportCode}) →{" "}
-                          {seg.destination.city} ({seg.destination.airportCode})
+                          {getCity(seg, "origin")} ({seg.origin.airportCode}) →{" "}
+                          {getCity(seg, "destination")} (
+                          {seg.destination.airportCode})
                         </p>
                         <p className="text-sm text-gray-600">
                           Departure:{" "}

@@ -22,7 +22,7 @@ import {
   getRTFareRule,
   getRTSSR,
 } from "../../../Redux/Actions/flight.thunks.RT";
-import RTSeatSelectionModal from "./RTSeatSelectionModal";
+import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { CABIN_MAP } from "../../../utils/formatter";
@@ -890,10 +890,16 @@ export default function RoundTripFlightBooking() {
           onward: rawFlightData.onward.ResultIndex,
           return: rawFlightData.return.ResultIndex,
         },
+        // resultIndex: rawFlightData.onward.ResultIndex,
+
         // fareQuote: buildConsolidatedFareQuote(),
         // fareQuote: fareQuote?.onward?.Response, // ✅ contains FareBreakdown
         fareQuote: {
-          Results: [fareQuote?.onward?.Response?.Results],
+          Results: [
+            fareQuote?.onward?.Response?.Results,
+            fareQuote?.return?.Response?.Results,
+          ],
+          // Results: [fareQuote?.return?.Response?.Results],
         },
 
         segments: buildFullSegments(),

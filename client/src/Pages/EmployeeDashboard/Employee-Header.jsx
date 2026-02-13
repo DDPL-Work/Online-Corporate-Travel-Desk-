@@ -51,7 +51,7 @@ export default function EmployeeHeader() {
   /* ================= ACTIONS ================= */
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate("/login", { replace: true });
+    navigate("/sso-login", { replace: true });
   };
 
   const goToProfile = () => {

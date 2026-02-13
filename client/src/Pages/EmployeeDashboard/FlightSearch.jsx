@@ -5,18 +5,11 @@ import SearchCard from "../../components/search-layout/SearchCard";
 import {
   FaExchangeAlt,
   FaCalendarAlt,
-  FaSearch,
   FaPlaneDeparture,
   FaPlaneArrival,
   FaUser,
 } from "react-icons/fa";
-import {
-  MdFlight,
-  MdFlightTakeoff,
-  MdFlightLand,
-  MdArrowForward,
-  MdAltRoute,
-} from "react-icons/md";
+import { MdArrowForward, MdAltRoute } from "react-icons/md";
 import TravelersClassModal from "../../components/FlightSearchComponents/TravelersClassModal";
 import { useNavigate } from "react-router-dom";
 import EmployeeHeader from "./Employee-Header";
@@ -182,15 +175,15 @@ export default function FlightSearchPage() {
     flexibleDates,
     setFlexibleDates,
     displayText,
-    toggleModal,
+    // toggleModal,
     isModalOpen,
     modalPosition,
     handleApply,
     adults,
-    children,
-    childAges,
     travelClass,
     directOnly,
+    openDropdown,
+    closeDropdown,
   } = useFlightSearch();
 
   const validateSearch = () => {
@@ -245,8 +238,6 @@ export default function FlightSearchPage() {
     let payload = {
       journeyType,
       adults,
-      children,
-      infants: 0,
       cabinClass: CABIN_CLASS_MAP[travelClass] || "economy",
       directFlight: directOnly,
       nearbyAirportsFrom,
@@ -271,8 +262,7 @@ export default function FlightSearchPage() {
       payload = {
         journeyType: 3,
         adults,
-        children,
-        infants: 0,
+
         cabinClass: CABIN_CLASS_MAP[travelClass] || "economy",
         directFlight: directOnly,
 
@@ -586,7 +576,7 @@ export default function FlightSearchPage() {
                                 </label>
                                 <div
                                   className="flex items-center justify-between p-2 md:p-3 border border-gray-300 rounded-lg cursor-pointer bg-white text-sm md:text-base"
-                                  onClick={(e) => toggleModal(e)}
+                                  onClick={(e) => openDropdown(e)}
                                 >
                                   <span className="text-gray-700 truncate">
                                     {displayText}
@@ -626,7 +616,7 @@ export default function FlightSearchPage() {
                     // One-way and Round-trip Layout
                     <div
                       className={`grid grid-cols-1 ${
-                        tripType === "Round-trip"
+                        tripType === "round-trip"
                           ? "md:grid-cols-5"
                           : "md:grid-cols-4"
                       } gap-3 md:gap-4 mb-4 md:mb-6 flex-1`}
@@ -771,7 +761,7 @@ export default function FlightSearchPage() {
                         </label>
                         <div
                           className="flex items-center justify-between p-2 md:p-3 border border-gray-300 rounded-lg cursor-pointer bg-white text-sm md:text-base"
-                          onClick={(e) => toggleModal(e)}
+                          onClick={(e) => openDropdown(e)}
                         >
                           <span className="text-gray-700">{displayText}</span>
                           <svg
@@ -856,13 +846,11 @@ export default function FlightSearchPage() {
       {/* Travelers & Class Modal */}
       {isModalOpen && (
         <TravelersClassModal
-          onClose={toggleModal}
+          onClose={closeDropdown}
           onApply={handleApply}
           modalPosition={modalPosition}
           initialData={{
             adults,
-            children,
-            childAges,
             travelClass,
             directOnly,
           }}
