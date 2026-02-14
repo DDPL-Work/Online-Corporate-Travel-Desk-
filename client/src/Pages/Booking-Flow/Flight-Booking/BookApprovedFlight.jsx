@@ -523,8 +523,9 @@ export default function BookApprovedFlight() {
               {/* <p>Base Fare: ₹{flight.fareSnapshot.baseFare}</p> */}
               {flight?.fareSnapshot ? (
                 <>
-                  <p>Base Fare: ₹{flight.fareSnapshot.w}</p>
+                  <p>Base Fare: ₹{flight.fareSnapshot.baseFare}</p>
                   <p>Tax: ₹{flight.fareSnapshot.tax}</p>
+                  <p>Total Amount: ₹{flight.fareSnapshot.publishedFare}</p>
                   <p>
                     Refundable: {flight.fareSnapshot.refundable ? "Yes" : "No"}
                   </p>
