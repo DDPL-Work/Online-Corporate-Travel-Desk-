@@ -347,8 +347,9 @@ export default function OneFlightBooking() {
     if (!fare) return { base: 0, tax: 0 };
 
     return {
-      base: Number(fare.BaseFare || fare.PublishedFare || 0),
-      tax: Number(fare.Tax || 0),
+      base: Number(Math.ceil(fare.BaseFare) || fare.PublishedFare || 0),
+      tax: Number(Math.ceil(fare.Tax) || 0),
+      otherCharges: Number(Math.ceil(fare.OtherCharges) || 0),
     };
   }, [fareQuote]);
 
@@ -499,6 +500,7 @@ export default function OneFlightBooking() {
       amount:
         perAdultFare.base * travelers.length +
         perAdultFare.tax * travelers.length +
+        perAdultFare.otherCharges * travelers.length +
         calculateSSRTotal(),
       purposeOfTravel: purposeOfTravel || "N/A",
       city: lastSegment?.to || "N/A",
@@ -558,6 +560,7 @@ export default function OneFlightBooking() {
         totalAmount:
           perAdultFare.base * travelers.length +
           perAdultFare.tax * travelers.length +
+          perAdultFare.otherCharges * travelers.length +
           calculateSSRTotal(),
         currency: "INR",
       },
@@ -758,10 +761,10 @@ export default function OneFlightBooking() {
 
                         {formatDate(departureDateTime) !==
                           formatDate(arrivalDateTime) && (
-                            <div className="text-xs text-slate-500">
-                              Arrives {formatDate(arrivalDateTime)}
-                            </div>
-                          )}
+                          <div className="text-xs text-slate-500">
+                            Arrives {formatDate(arrivalDateTime)}
+                          </div>
+                        )}
                       </>
                     }
                   />
@@ -834,6 +837,7 @@ export default function OneFlightBooking() {
                   ...parsedFlightData,
                   baseFare: perAdultFare.base * travelers.length,
                   taxFare: perAdultFare.tax * travelers.length,
+                  otherCharges: perAdultFare.otherCharges * travelers.length,
                 }}
                 travelers={travelers}
                 selectedSeats={selectedSeats}

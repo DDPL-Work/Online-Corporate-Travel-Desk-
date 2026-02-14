@@ -744,7 +744,7 @@ export default function RoundTripFlightBooking() {
   }, [fareQuote, isInternational]);
 
   const totalPayableAmount =
-    (perAdultFare.base + perAdultFare.tax + perAdultFare.otherCharges) *
+    Math.ceil(perAdultFare.base + perAdultFare.tax + perAdultFare.otherCharges) *
       travelers.length +
     calculateSSRTotal();
 

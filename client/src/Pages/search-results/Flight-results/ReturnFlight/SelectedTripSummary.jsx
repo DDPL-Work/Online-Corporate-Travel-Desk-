@@ -30,8 +30,8 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
   const onwardData = getJourney(onward);
   const returnData = ret ? getJourney(ret) : null;
 
-  const onwardFare = onward?.Fare?.PublishedFare || 0;
-  const returnFare = ret?.Fare?.PublishedFare || 0;
+  const onwardFare = Math.ceil(onward?.Fare?.PublishedFare) || 0;
+  const returnFare = Math.ceil(ret?.Fare?.PublishedFare) || 0;
   const totalFare = onwardFare + returnFare;
 
   return (
