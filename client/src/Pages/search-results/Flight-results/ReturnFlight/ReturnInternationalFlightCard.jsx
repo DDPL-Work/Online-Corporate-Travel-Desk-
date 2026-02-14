@@ -27,7 +27,7 @@ export default function ReturnInternationalFlightCard({ flight, onContinue }) {
 
   const totalPrice = flight?.Fare?.PublishedFare ?? 0;
   const discount = flight?.Fare?.Discount ?? 0;
-  const finalPrice = flight?.Fare?.OfferedFare ?? totalPrice;
+  const finalPrice = Math.ceil(flight?.Fare?.PublishedFare) ?? totalPrice;
   const refundable = flight?.IsRefundable === true;
 
   const travelClass = getCabinClassLabel(flight?.Fare?.CabinClass ?? 2);

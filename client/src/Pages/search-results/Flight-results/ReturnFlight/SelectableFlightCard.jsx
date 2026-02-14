@@ -4,7 +4,7 @@ import { FlightSegment } from "./FlightSegment";
 
 export default function SelectableFlightCard({ flight, selected, onClick }) {
   const journey = parseSingleJourney(flight.Segments[0]);
-  const fare = flight.Fare?.PublishedFare;
+  const fare = Math.ceil(flight.Fare?.PublishedFare);
 
   return (
     <div
