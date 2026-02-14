@@ -1080,8 +1080,8 @@ export const PriceSummary = ({
 
   const travelerCount = Math.max(travelers.length || 1);
 
-  const baseFare = parsedFlightData.baseFare || 0;
-  const taxFare = parsedFlightData.taxFare || 0;
+  const baseFare = Math.ceil(parsedFlightData.baseFare) || 0;
+  const taxFare = Math.ceil(parsedFlightData.taxFare) +  Math.ceil(parsedFlightData.otherCharges);
 
   const totalSeatPrice = useMemo(() => {
     let sum = 0;
@@ -1119,7 +1119,8 @@ export const PriceSummary = ({
   }, [selectedBaggage, travelers.length]);
 
   const subtotal =
-    baseFare + taxFare + totalSeatPrice + totalMealPrice + totalBaggagePrice;
+    baseFare + taxFare+ totalSeatPrice + totalMealPrice + totalBaggagePrice;
+  
 
   const totalAmount = Math.max(0, subtotal - discountAmount);
 

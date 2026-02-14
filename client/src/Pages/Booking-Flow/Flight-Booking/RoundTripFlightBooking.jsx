@@ -325,8 +325,58 @@ export default function RoundTripFlightBooking() {
   const onwardFare = extractFareParts(fareQuote?.onward);
   const returnFare = extractFareParts(fareQuote?.return);
 
-  const totalBaseFare = onwardFare.base + returnFare.base;
-  const totalTaxFare = onwardFare.tax + returnFare.tax;
+  // const totalBaseFare = onwardFare.base + returnFare.base;
+  // const totalTaxFare = onwardFare.tax + returnFare.tax;
+
+  const totalBaseFare = useMemo(() => {
+    if (!fareQuote) return 0;
+
+    // 🔥 INTERNATIONAL FIX
+    if (isInternational) {
+      const fare = fareQuote?.onward?.Response?.Results?.Fare;
+      return Number(fare?.BaseFare || 0);
+    }
+
+    // Domestic logic (unchanged)
+    const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
+    const returnFare = fareQuote?.return?.Response?.Results?.Fare;
+
+    return (
+      Number(onwardFare?.BaseFare || 0) + Number(returnFare?.BaseFare || 0)
+    );
+  }, [fareQuote, isInternational]);
+
+  const totalTaxFare = useMemo(() => {
+    if (!fareQuote) return 0;
+
+    // 🔥 INTERNATIONAL FIX
+    if (isInternational) {
+      const fare = fareQuote?.onward?.Response?.Results?.Fare;
+      return Number(fare?.Tax || 0);
+    }
+
+    // Domestic logic
+    const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
+    const returnFare = fareQuote?.return?.Response?.Results?.Fare;
+
+    return Number(onwardFare?.Tax || 0) + Number(returnFare?.Tax || 0);
+  }, [fareQuote, isInternational]);
+
+  const totalOtherCharges = useMemo(() => {
+    if (!fareQuote) return 0;
+
+    // 🔥 INTERNATIONAL FIX
+    if (isInternational) {
+      const fare = fareQuote?.onward?.Response?.Results?.Fare;
+      return Number(fare?.OtherCharges || 0);
+    }
+
+    // Domestic logic
+    const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
+    const returnFare = fareQuote?.return?.Response?.Results?.Fare;
+
+    return Number(onwardFare?.OtherCharges || 0) + Number(returnFare?.OtherCharges || 0);
+  }, [fareQuote, isInternational]);
 
   useEffect(() => {
     console.log(
@@ -666,19 +716,36 @@ export default function RoundTripFlightBooking() {
   };
 
   const perAdultFare = useMemo(() => {
+    if (!fareQuote) return { base: 0, tax: 0 };
+
+    // 🔥 INTERNATIONAL FIX
+    if (isInternational) {
+      const fare = fareQuote?.onward?.Response?.Results?.Fare;
+
+      return {
+        base: Number(fare?.BaseFare || 0),
+        tax: Number(fare?.Tax || 0),
+        otherCharges: Number(fare?.OtherCharges || 0),
+      };
+    }
+
+    // Domestic logic
     const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
     const returnFare = fareQuote?.return?.Response?.Results?.Fare;
 
     return {
       base:
-        Number(onwardFare?.BaseFare || onwardFare?.PublishedFare || 0) +
-        Number(returnFare?.BaseFare || returnFare?.PublishedFare || 0),
+        Number(onwardFare?.BaseFare || 0) + Number(returnFare?.BaseFare || 0),
       tax: Number(onwardFare?.Tax || 0) + Number(returnFare?.Tax || 0),
+      otherCharges:
+        Number(onwardFare?.OtherCharges || 0) +
+        Number(returnFare?.OtherCharges || 0),
     };
-  }, [fareQuote]);
+  }, [fareQuote, isInternational]);
 
   const totalPayableAmount =
-    (perAdultFare.base + perAdultFare.tax) * travelers.length +
+    (perAdultFare.base + perAdultFare.tax + perAdultFare.otherCharges) *
+      travelers.length +
     calculateSSRTotal();
 
   const buildMealSSR = () => {
@@ -1334,6 +1401,7 @@ export default function RoundTripFlightBooking() {
                 parsedFlightData={{
                   baseFare: totalBaseFare,
                   taxFare: totalTaxFare,
+                  otherCharges: totalOtherCharges,
                 }}
                 selectedSeats={selectedSeats}
                 selectedMeals={selectedMeals}

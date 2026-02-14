@@ -88,7 +88,7 @@ export default function OneWayFlightCard({
   const baggage = flight.Fare?.Baggage?.iB || "15 Kg";
 
   const refundable = flight.IsRefundable;
-  const price = flight.Fare?.OfferedFare || flight.Fare?.PublishedFare;
+  const price =  Math.ceil(flight.Fare?.PublishedFare);
 
   return (
     <div className="max-w-[1060px] bg-linear-to-br from-white via-blue-50/30 to-white border border-blue-200 rounded-2xl transition-all duration-300 overflow-hidden">
