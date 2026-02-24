@@ -36,7 +36,7 @@ export default function Unauthorized() {
 
         {/* Login Button */}
         <button
-          onClick={() => navigate("/sso-login")}
+          onClick={() => navigate("/landing")}
           className="w-full bg-blue-600 text-white py-3.5 px-6 rounded-xl font-semibold
                      shadow-lg hover:bg-blue-700 hover:shadow-xl transition-all duration-300
                      transform hover:scale-[1.03]"

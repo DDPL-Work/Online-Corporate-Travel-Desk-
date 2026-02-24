@@ -21,6 +21,42 @@ const BookingIntent = require("../models/BookingIntent");
 // @route   POST /api/v1/bookings
 // @access  Private
 
+const logLccTicketPayload = ({
+  bookingId,
+  traceId,
+  resultIndex,
+  passengers,
+  ssr,
+  segmentType,
+}) => {
+  logger.info("🟢 LCC DIRECT TICKETING INITIATED", {
+    bookingId,
+    segmentType,
+    traceId,
+    resultIndex,
+    passengerCount: passengers.length,
+  });
+
+  logger.debug("🟢 LCC TICKET PAYLOAD", {
+    bookingId,
+    segmentType,
+    payload: {
+      TraceId: traceId,
+      ResultIndex: resultIndex,
+      Passengers: passengers.map((p) => ({
+        title: p.title,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        paxType: p.paxType,
+        isLeadPax: p.isLeadPax,
+        city: p.city,
+        countryCode: p.countryCode,
+      })),
+      SSR: ssr,
+    },
+  });
+};
+
 const sanitizeFlightRequest = (flightRequest) => ({
   traceId: flightRequest.traceId,
   resultIndex: flightRequest.resultIndex,
@@ -124,36 +160,77 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
     // <<<<<<< HEAD
     // ONE-WAY (existing behavior preserved)
-    if (segments.length === 1) {
-      const s = segments[0];
+    // if (segments.length === 1) {
+    //   const s = segments[0];
+
+    //   bookingSnapshot = {
+    //     sectors: [`${s.origin.airportCode}-${s.destination.airportCode}`],
+    //     airline: s.airlineName,
+    //     travelDate: s.departureDateTime,
+    //     returnDate: null,
+    //     cabinClass:
+    //       s.cabinClass === 1
+    //         ? "Economy"
+    //         : s.cabinClass === 2
+    //           ? "Premium Economy"
+    //           : s.cabinClass === 3
+    //             ? "Business"
+    //             : "Economy",
+    //     amount: pricingSnapshot.totalAmount,
+    //     purposeOfTravel,
+    //     city: s.destination.city,
+    //   };
+    // }
+
+    // // ROUND-TRIP (NEW)
+    // else {
+    //   const onward = segments.find((s) => s.journeyType === "onward");
+    //   const ret = segments.find((s) => s.journeyType === "return");
+
+    //   if (!onward || !ret) {
+    //     throw new ApiError(400, "Invalid round-trip segments");
+    //   }
+
+    //   bookingSnapshot = {
+    //     sectors: [
+    //       `${onward.origin.airportCode}-${onward.destination.airportCode}`,
+    //       `${ret.origin.airportCode}-${ret.destination.airportCode}`,
+    //     ],
+    //     airline: [...new Set(segments.map((s) => s.airlineName))].join(", "),
+    //     travelDate: onward.departureDateTime,
+    //     returnDate: ret.departureDateTime,
+    //     cabinClass: "Economy", // frontend controlled
+    //     amount: pricingSnapshot.totalAmount,
+    //     purposeOfTravel,
+    //     city: ret.destination.city,
+    //   };
+    // }
+
+    const hasReturn = segments.some((s) => s.journeyType === "return");
+
+    if (!hasReturn) {
+      // ✅ ONE WAY (even if multiple segments due to layover)
+
+      const first = segments[0];
+      const last = segments[segments.length - 1];
 
       bookingSnapshot = {
-        sectors: [`${s.origin.airportCode}-${s.destination.airportCode}`],
-        airline: s.airlineName,
-        travelDate: s.departureDateTime,
+        sectors: [
+          `${first.origin.airportCode}-${last.destination.airportCode}`,
+        ],
+        airline: [...new Set(segments.map((s) => s.airlineName))].join(", "),
+        travelDate: first.departureDateTime,
         returnDate: null,
-        cabinClass:
-          s.cabinClass === 1
-            ? "Economy"
-            : s.cabinClass === 2
-              ? "Premium Economy"
-              : s.cabinClass === 3
-                ? "Business"
-                : "Economy",
+        cabinClass: "Economy",
         amount: pricingSnapshot.totalAmount,
         purposeOfTravel,
-        city: s.destination.city,
+        city: last.destination.city,
       };
-    }
+    } else {
+      // ✅ TRUE ROUND TRIP
 
-    // ROUND-TRIP (NEW)
-    else {
       const onward = segments.find((s) => s.journeyType === "onward");
       const ret = segments.find((s) => s.journeyType === "return");
-
-      if (!onward || !ret) {
-        throw new ApiError(400, "Invalid round-trip segments");
-      }
 
       bookingSnapshot = {
         sectors: [
@@ -163,7 +240,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
         airline: [...new Set(segments.map((s) => s.airlineName))].join(", "),
         travelDate: onward.departureDateTime,
         returnDate: ret.departureDateTime,
-        cabinClass: "Economy", // frontend controlled
+        cabinClass: "Economy",
         amount: pricingSnapshot.totalAmount,
         purposeOfTravel,
         city: ret.destination.city,
@@ -398,6 +475,36 @@ const cabinClassToCode = (cabin) =>
     First: 6,
   })[cabin] || 2;
 
+const getCorporateAddressForPassenger = async (employeeEmail) => {
+  const domain = employeeEmail.split("@")[1]?.toLowerCase();
+
+  if (!domain) {
+    throw new ApiError(400, "Invalid employee email domain");
+  }
+
+  const corporate = await Corporate.findOne({
+    "ssoConfig.domain": domain,
+    isActive: true,
+  });
+
+  if (!corporate) {
+    throw new ApiError(404, `No corporate found for domain ${domain}`);
+  }
+
+  const addr = corporate.registeredAddress;
+
+  if (!addr?.street || !addr?.city || !addr?.country) {
+    throw new ApiError(400, "Corporate registered address incomplete");
+  }
+
+  return {
+    AddressLine1: addr.street,
+    City: addr.city,
+    CountryCode: "IN", // map properly if multi-country later
+    CountryName: addr.country,
+  };
+};
+
 const buildTboRevalidationSearchPayload = (booking, intent) => {
   const segments = booking.flightRequest.segments;
   const isRoundTrip = segments.length === 2;
@@ -409,7 +516,6 @@ const buildTboRevalidationSearchPayload = (booking, intent) => {
   }
 
   console.log("ORIGINAL STORED SEGMENT:", booking.flightRequest.segments[0]);
-
 
   const basePayload = {
     AdultCount: adultCount,
@@ -582,8 +688,8 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         pnr: `${onwardPNR} / ${returnPNR}`,
         onwardPNR,
         returnPNR,
-        onwardResponse: onwardResp.raw,
-        returnResponse: returnResp.raw,
+        onwardResponse: onwardResp,
+        returnResponse: returnResp,
       };
 
       booking.executionStatus = "ticketed";
@@ -634,8 +740,8 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: `${onwardPNR} / ${returnPNR}`,
       onwardPNR,
       returnPNR,
-      onwardResponse: onwardResp.raw,
-      returnResponse: returnResp.raw,
+      onwardResponse: onwardResp,
+      returnResponse: returnResp,
     };
 
     booking.executionStatus = "booked";
@@ -658,6 +764,15 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
   =================================================== */
 
   if (isLCC) {
+    logLccTicketPayload({
+      bookingId: booking._id,
+      traceId: booking.flightRequest.traceId,
+      resultIndex: rawResultIndex,
+      passengers,
+      ssr: booking.flightRequest.ssrSnapshot,
+      // segmentType: "onward",
+    });
+
     const ticketResp = await tboService.ticketFlight({
       traceId: booking.flightRequest.traceId,
       resultIndex: rawResultIndex,
@@ -682,7 +797,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
 
     booking.bookingResult = {
       pnr: extractedPNR,
-      providerResponse: ticketResp.raw,
+      providerResponse: ticketResp,
     };
 
     booking.executionStatus = "ticketed";
@@ -717,7 +832,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
 
   booking.bookingResult = {
     pnr: extractedPNR,
-    providerResponse: bookResp.raw,
+    providerResponse: bookResp,
   };
 
   booking.executionStatus = "booked";
@@ -799,20 +914,9 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
   const leadPassenger =
     booking.travellers.find((t) => t.isLeadPassenger) || booking.travellers[0];
 
-  // const passengers = booking.travellers.map((t) => ({
-  //   title: t.title,
-  //   firstName: t.firstName,
-  //   lastName: t.lastName,
-  //   paxType: t.paxType || "ADULT",
-  //   dateOfBirth: t.dateOfBirth,
-  //   gender: t.gender,
-  //   passportNo: t.passportNumber,
-  //   passportExpiry: t.passportExpiry,
-  //   email: t.email || leadPassenger.email,
-  //   contactNo: t.phoneWithCode || leadPassenger.phoneWithCode,
-  // }));
-
-  const fare = booking.flightRequest.fareQuote.Results[0].Fare;
+  const corporateAddress = await getCorporateAddressForPassenger(
+    leadPassenger.email,
+  );
 
   const passengers = booking.travellers.map((t) => ({
     title: t.gender?.toUpperCase() === "MALE" ? "Mr" : "Ms",
@@ -828,10 +932,18 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
     passportNo: t.passportNumber,
     passportExpiry: t.passportExpiry,
 
+    nationality: t.nationality?.toUpperCase() || "IN",
+
     email: t.email || leadPassenger.email,
     contactNo: t.phoneWithCode || leadPassenger.phoneWithCode,
 
     isLeadPax: true,
+
+    // 🔥 Inject corporate address for TBO validation
+    addressLine1: corporateAddress.AddressLine1,
+    city: corporateAddress.City,
+    countryCode: corporateAddress.CountryCode,
+    countryName: corporateAddress.CountryName,
   }));
 
   const fareResult = booking.flightRequest.fareQuote.Results[0];

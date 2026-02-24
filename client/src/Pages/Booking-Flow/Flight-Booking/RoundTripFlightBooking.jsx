@@ -26,6 +26,7 @@ import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { CABIN_MAP } from "../../../utils/formatter";
+import { getMyTravelAdmin } from "../../../Redux/Actions/travelAdmin.thunks";
 
 // ✅ NORMALIZE FULL FARE RULE API RESPONSE (FareRule API)
 const normalizeFareRules = (fareRule) => {
@@ -110,6 +111,11 @@ export default function RoundTripFlightBooking() {
   // const traceId = useSelector((state) => state.flightsRT.traceId);
   const reduxTraceId = useSelector((state) => state.flightsRT.traceId);
   const { user } = useSelector((state) => state.auth);
+  const {
+    approver,
+    loading: approverLoading,
+    error: approverError,
+  } = useSelector((state) => state.travelAdmin);
 
   const traceId = location.state?.traceId || reduxTraceId || null;
 
@@ -205,6 +211,12 @@ export default function RoundTripFlightBooking() {
       return: hasSeats(returnSSR),
     };
   }, [ssr, rawFlightData, isInternational]);
+
+  useEffect(() => {
+    if (user?.role === "employee") {
+      dispatch(getMyTravelAdmin());
+    }
+  }, [dispatch, user]);
 
   // ✅ AUTO-FILL LEAD TRAVELER
   useEffect(() => {
@@ -375,7 +387,10 @@ export default function RoundTripFlightBooking() {
     const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
     const returnFare = fareQuote?.return?.Response?.Results?.Fare;
 
-    return Number(onwardFare?.OtherCharges || 0) + Number(returnFare?.OtherCharges || 0);
+    return (
+      Number(onwardFare?.OtherCharges || 0) +
+      Number(returnFare?.OtherCharges || 0)
+    );
   }, [fareQuote, isInternational]);
 
   useEffect(() => {
@@ -462,7 +477,7 @@ export default function RoundTripFlightBooking() {
     dispatch(
       getRTSSR({
         traceId,
-        resultIndex: rawFlightData.onward.ResultIndex,
+        resultIndex: onwardIdx,
         journeyType: "onward",
       }),
     );
@@ -472,7 +487,7 @@ export default function RoundTripFlightBooking() {
       dispatch(
         getRTSSR({
           traceId,
-          resultIndex: rawFlightData.return.ResultIndex,
+          resultIndex: onwardIdx,
           journeyType: "return",
         }),
       );
@@ -744,7 +759,9 @@ export default function RoundTripFlightBooking() {
   }, [fareQuote, isInternational]);
 
   const totalPayableAmount =
-    Math.ceil(perAdultFare.base + perAdultFare.tax + perAdultFare.otherCharges) *
+    Math.ceil(
+      perAdultFare.base + perAdultFare.tax + perAdultFare.otherCharges,
+    ) *
       travelers.length +
     calculateSSRTotal();
 
@@ -1055,6 +1072,14 @@ export default function RoundTripFlightBooking() {
   };
 
   const handleSendForApproval = async () => {
+    if (!approver) {
+      ToastWithTimer({
+        type: "error",
+        message: "No approver assigned. Please contact admin.",
+      });
+      return;
+    }
+
     if (!purposeOfTravel) {
       ToastWithTimer({
         type: "error",
@@ -1407,6 +1432,9 @@ export default function RoundTripFlightBooking() {
                 selectedMeals={selectedMeals}
                 selectedBaggage={selectedBaggage}
                 travelers={travelers}
+                approver={approver}
+                approverLoading={approverLoading}
+                approverError={approverError}
                 onSendForApproval={handleSendForApproval}
               />
 

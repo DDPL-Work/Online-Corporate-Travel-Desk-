@@ -19,6 +19,9 @@ const employeeRoutes = require("./employee.routes");
 const corporateAdmin = require("./corporateAdmin.routes");
 const walletLogsRoutes = require("./wallet-logs.routes");
 const validatePrice = require("./checkApprovedRequestPrice.routes");
+const travelAdmin = require("./travelAdmin.routes");
+const postPaidCorporate = require("./postPaid.corporate.routes");
+const flightAmendment = require("./flightAmendment.routes");
 // const tboRoutes = require('./tbo.routes')
 
 // ------------------ ✅ IMPORTANT FIX ------------------
@@ -41,6 +44,9 @@ router.use("/corporate-admin", corporateAdmin);
 router.use("/wallet-logs", walletLogsRoutes);
 // router.use("/tbo", tboRoutes);
 router.use("/validate-price", validatePrice);
+router.use("/my-travel-admin", travelAdmin);
+router.use("/postpaid", postPaidCorporate);
+router.use("/flights/amendments", flightAmendment);
 
 // ------------------ API Info ------------------
 router.get("/", (req, res) => {
@@ -64,6 +70,10 @@ router.get("/", (req, res) => {
       walletLogsRoutes: "/api/v1/wallet-logs",
       // tboRoutes: '/api/v1/tbo'
       validatePrice: "api/v1/validate-price",
+      travelAdmin: "api/v1/my-travel-admin",
+      corporateSuperAdmin: "api/v1/corporate-super-admin",
+      postPaidCorporate: "api/v1/postpaid",
+      flightAmendment: "api/v1/flights/amendments",
     },
   });
 });

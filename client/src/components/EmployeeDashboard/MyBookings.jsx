@@ -23,7 +23,7 @@ export default function MyBookings() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { list: bookings = [], loading } = useSelector(
-    (state) => state.bookings
+    (state) => state.bookings,
   );
 
   const [statusFilter, setStatusFilter] = useState("All");
@@ -42,8 +42,7 @@ export default function MyBookings() {
     return bookings.filter((b) => {
       const flight = b.flightRequest?.segments?.[0];
 
-      const destinationCity =
-        flight?.destination?.city?.toLowerCase() || "";
+      const destinationCity = flight?.destination?.city?.toLowerCase() || "";
 
       const departureDate = flight?.departureDateTime
         ? new Date(flight.departureDateTime)
@@ -58,18 +57,15 @@ export default function MyBookings() {
         b.bookingType?.toLowerCase() === typeFilter.toLowerCase();
 
       const matchesSearch =
-        !searchTerm ||
-        destinationCity.includes(searchTerm.toLowerCase());
+        !searchTerm || destinationCity.includes(searchTerm.toLowerCase());
 
       const matchesStart =
         !startDate ||
-        (departureDate &&
-          departureDate >= new Date(startDate + "T00:00:00"));
+        (departureDate && departureDate >= new Date(startDate + "T00:00:00"));
 
       const matchesEnd =
         !endDate ||
-        (departureDate &&
-          departureDate <= new Date(endDate + "T23:59:59"));
+        (departureDate && departureDate <= new Date(endDate + "T23:59:59"));
 
       return (
         matchesStatus &&
@@ -155,66 +151,83 @@ export default function MyBookings() {
       {loading ? (
         <div className="text-center py-10">Loading...</div>
       ) : filteredBookings.length === 0 ? (
-        <div className="text-center py-10 text-gray-500">
-          No bookings found
-        </div>
+        <div className="text-center py-10 text-gray-500">No bookings found</div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredBookings.map((b) => {
-  const snapshot = b.bookingSnapshot;
+          {filteredBookings.map((b) => {
+            const snapshot = b.bookingSnapshot;
 
-  const sector = snapshot?.sectors?.[0] || "N/A → N/A";
-  const [from, to] = sector.split("-");
+            const sector = snapshot?.sectors?.[0] || "N/A → N/A";
+            const [from, to] = sector.split("-");
 
-  return (
-    <div
-      key={b._id}
-      className="bg-white rounded-lg shadow-md p-5 border-l-4"
-      style={{ borderColor: colors.primary }}
-    >
-      {/* Header */}
-      <div className="flex justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-[#0A4D68]">
-            {snapshot?.airline || "Airline"}
-          </span>
-        </div>
+            const sectors = snapshot?.sectors || [];
 
-        <span className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded-full">
-          Booked
-        </span>
-      </div>
+            const formattedRoute =
+              sectors.length === 1
+                ? sectors[0].replace("-", " → ")
+                : sectors.length === 2
+                  ? `${sectors[0].replace("-", " → ")}  |  ${sectors[1].replace(
+                      "-",
+                      " → ",
+                    )}`
+                  : "N/A → N/A";
 
-      {/* Route */}
-      <div className="text-sm flex items-center gap-2">
-        <FiMapPin />
-        <span>
-          {from || "N/A"} → {to || "N/A"}
-        </span>
-      </div>
+            return (
+              <div
+                key={b._id}
+                className="bg-white rounded-lg shadow-md p-5 border-l-4"
+                style={{ borderColor: colors.primary }}
+              >
+                {/* Header */}
+                <div className="flex justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-[#0A4D68]">
+                      {snapshot?.airline || "Airline"}
+                    </span>
+                  </div>
 
-      {/* Date */}
-      <div className="text-sm text-gray-600 mt-1 flex items-center gap-2">
-        <FiCalendar />
-        <span>{formatDateWithYear(snapshot?.travelDate)}</span>
-      </div>
+                  <span className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded-full">
+                    Booked
+                  </span>
+                </div>
 
-      {/* Fare */}
-      <div className="mt-3 font-bold text-[#088395]">
-        ₹{b.pricingSnapshot?.totalAmount}
-      </div>
+                {/* Route */}
+                <div className="text-sm flex items-center gap-2">
+                  <FiMapPin />
+                  <span>{formattedRoute}</span>
+                </div>
 
-      {/* Action */}
-      <button
-        onClick={() => navigate(`/my-bookings/${b._id}`)}
-        className="mt-4 w-full bg-gray-100 py-2 rounded flex justify-center gap-2"
-      >
-        <FiEye /> View Details
-      </button>
-    </div>
-  );
-})}
+                {/* Date */}
+                <div className="text-sm text-gray-600 mt-1 flex items-center gap-2">
+                  <FiCalendar />
+                  <span>
+                    {snapshot?.returnDate
+                      ? `${formatDateWithYear(snapshot?.travelDate)}  |  ${formatDateWithYear(
+                          snapshot?.returnDate,
+                        )}`
+                      : formatDateWithYear(snapshot?.travelDate)}
+                  </span>
+                </div>
 
+                <div className="text-xs text-gray-500 mt-1">
+                  Booked on {formatDateWithYear(b.createdAt)}
+                </div>
+
+                {/* Fare */}
+                <div className="mt-3 font-bold text-[#088395]">
+                  ₹{b.pricingSnapshot?.totalAmount}
+                </div>
+
+                {/* Action */}
+                <button
+                  onClick={() => navigate(`/my-bookings/${b._id}`)}
+                  className="mt-4 w-full bg-gray-100 py-2 rounded flex justify-center gap-2"
+                >
+                  <FiEye /> View Details
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

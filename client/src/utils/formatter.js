@@ -98,16 +98,6 @@ export const CABIN_MAP = {
   6: "first",
 };
 
-// Airline color themes
-export const airlineThemes = {
-  AI: { gradient: "from-[#8B0000] to-[#B71C1C]" },
-  "6E": { gradient: "from-[#3A5FD8] to-[#1E3A8A]" },
-  SG: { gradient: "from-[#D32F2F] to-[#B71C1C]" },
-  IX: { gradient: "from-[#E53935] to-[#C62828]" },
-  UK: { gradient: "from-[#673AB7] to-[#4527A0]" },
-  DEFAULT: { gradient: "from-blue-500 to-indigo-600" },
-};
-
 export const FLIGHT_STATUS_MAP = {
   Confirmed: {
     label: "Confirmed",
@@ -127,8 +117,6 @@ export const FLIGHT_STATUS_MAP = {
   },
 };
 
-
-
 export const groupSegmentsByJourney = (segments = []) => {
   const grouped = {
     onward: [],
@@ -147,4 +135,56 @@ export const groupSegmentsByJourney = (segments = []) => {
   });
 
   return grouped;
+};
+
+export const airlineThemes = {
+  // 🇮🇳 INDIA
+
+  AI: { primary: "#8B0000", secondary: "#B22222", accent: "#D4AF37" }, // Air India
+  IX: { primary: "#C8102E", secondary: "#E03C31", accent: "#FFFFFF" }, // Air India Express
+  "6E": { primary: "#002D72", secondary: "#0057B8", accent: "#FFFFFF" }, // IndiGo
+  UK: { primary: "#4B0082", secondary: "#6A0DAD", accent: "#C5A253" }, // Vistara
+  SG: { primary: "#D71920", secondary: "#F44336", accent: "#FFFFFF" }, // SpiceJet
+  G8: { primary: "#7CFC00", secondary: "#32CD32", accent: "#000000" }, // Go First
+  I5: { primary: "#FF6F00", secondary: "#FF8F00", accent: "#FFFFFF" }, // AirAsia India
+  S5: { primary: "#003DA5", secondary: "#005EB8", accent: "#FFFFFF" }, // Star Air
+  QP: { primary: "#2C2C2C", secondary: "#555555", accent: "#F7C948" }, // Akasa Air
+  "9I": { primary: "#1E90FF", secondary: "#00BFFF", accent: "#FFFFFF" }, // Alliance Air
+
+  // 🌏 MIDDLE EAST
+
+  EK: { primary: "#C8102E", secondary: "#8B0000", accent: "#D4AF37" }, // Emirates
+  EY: { primary: "#B38B59", secondary: "#7A5C2E", accent: "#FFFFFF" }, // Etihad
+  QR: { primary: "#5C0E3E", secondary: "#8A1538", accent: "#FFFFFF" }, // Qatar Airways
+  GF: { primary: "#A40000", secondary: "#D32F2F", accent: "#FFFFFF" }, // Gulf Air
+  KU: { primary: "#002F6C", secondary: "#005EB8", accent: "#FFFFFF" }, // Kuwait Airways
+  SV: { primary: "#006C35", secondary: "#0A8754", accent: "#FFFFFF" }, // Saudia
+  WY: { primary: "#B22222", secondary: "#8B0000", accent: "#FFFFFF" }, // Oman Air
+
+  // 🌍 EUROPE
+
+  BA: { primary: "#00247D", secondary: "#CF142B", accent: "#FFFFFF" }, // British Airways
+  LH: { primary: "#05164D", secondary: "#002D62", accent: "#F9BA00" }, // Lufthansa
+  AF: { primary: "#002157", secondary: "#0055A4", accent: "#EF4135" }, // Air France
+  KL: { primary: "#00A1DE", secondary: "#005EB8", accent: "#FFFFFF" }, // KLM
+  TK: { primary: "#C8102E", secondary: "#8B0000", accent: "#FFFFFF" }, // Turkish Airlines
+  AZ: { primary: "#006341", secondary: "#009639", accent: "#FFFFFF" }, // ITA Airways
+  IB: { primary: "#D71920", secondary: "#AA151B", accent: "#F1BF00" }, // Iberia
+
+  // 🌎 AMERICAS
+
+  AA: { primary: "#002F6C", secondary: "#B31942", accent: "#FFFFFF" }, // American Airlines
+  DL: { primary: "#C8102E", secondary: "#003A70", accent: "#FFFFFF" }, // Delta
+  UA: { primary: "#005DAA", secondary: "#002244", accent: "#FFFFFF" }, // United
+  AC: { primary: "#D80621", secondary: "#000000", accent: "#FFFFFF" }, // Air Canada
+  B6: { primary: "#003876", secondary: "#0076CE", accent: "#FFFFFF" }, // JetBlue
+
+  // 🌏 ASIA PACIFIC
+
+  SQ: { primary: "#072B61", secondary: "#F1B434", accent: "#FFFFFF" }, // Singapore Airlines
+  CX: { primary: "#006564", secondary: "#009688", accent: "#FFFFFF" }, // Cathay Pacific
+  NH: { primary: "#005BAC", secondary: "#002D62", accent: "#FFFFFF" }, // ANA
+  JL: { primary: "#C8102E", secondary: "#8B0000", accent: "#FFFFFF" }, // Japan Airlines
+  OZ: { primary: "#E60012", secondary: "#B00020", accent: "#FFFFFF" }, // Asiana
+  TG: { primary: "#4B0082", secondary: "#8A2BE2", accent: "#FFD700" }, // Thai Airways
 };

@@ -11,15 +11,29 @@ if (!fs.existsSync(logsDir)) {
 const logFormat = winston.format.combine(
   winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
   winston.format.errors({ stack: true }),
-  winston.format.json()
+  winston.format.json(),
 );
- 
+
+const safeStringify = (obj) => {
+  const seen = new WeakSet();
+  return JSON.stringify(obj, (key, value) => {
+    if (typeof value === "object" && value !== null) {
+      if (seen.has(value)) {
+        return "[Circular]";
+      }
+      seen.add(value);
+    }
+    return value;
+  });
+};
+
 const consoleFormat = winston.format.combine(
   winston.format.colorize(),
   winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-  winston.format.printf(({ timestamp, level, message, ...meta }) =>
-    `${timestamp} [${level}]: ${message} ${Object.keys(meta).length ? JSON.stringify(meta) : ""}`
-  )
+  winston.format.printf(
+    ({ timestamp, level, message, ...meta }) =>
+      `${timestamp} [${level}]: ${message} ${Object.keys(meta).length ? safeStringify(meta) : ""}`,
+  ),
 );
 
 const transports = [

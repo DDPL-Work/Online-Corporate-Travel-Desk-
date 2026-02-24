@@ -84,6 +84,24 @@ module.exports = {
         "/BookingEngineService_Air/AirService.svc/rest/GetBookingDetails",
       flightCancel: "/BookingEngineService_Air/AirService.svc/rest/Cancel",
 
+      /* -------- Amendments / Change -------- */
+
+      // Release PNR (If PNR held but not ticketed)
+      flightReleasePNR:
+        "/BookingEngineService_Air/AirService.svc/rest/ReleasePNR",
+
+      // Send Change Request (Amendment / Cancellation)
+      flightSendChangeRequest:
+        "/BookingEngineService_Air/AirService.svc/rest/SendChangeRequest",
+
+      // Get Change Request Status
+      flightGetChangeRequestStatus:
+        "/BookingEngineService_Air/AirService.svc/rest/GetChangeRequestStatus",
+
+      // Get Cancellation Charges
+      flightCancellationCharges:
+        "/BookingEngineService_Air/AirService.svc/rest/GetCancellationCharges",
+
       // SSR / Extras
       flightSSR: "/BookingEngineService_Air/AirService.svc/rest/SSR",
       flightSeatMap: "/BookingEngineService_Air/AirService.svc/rest/SeatMap",

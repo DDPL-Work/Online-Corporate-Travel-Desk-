@@ -149,6 +149,8 @@ export default function FlightSearchPage() {
   const [to, setTo] = useState("");
   const [returnDate, setReturnDate] = useState("");
 
+  const today = new Date().toISOString().split("T")[0];
+
   const [multiCityFlights, setMultiCityFlights] = useState([
     { from: "", to: "", date: "" },
   ]);
@@ -185,6 +187,12 @@ export default function FlightSearchPage() {
     openDropdown,
     closeDropdown,
   } = useFlightSearch();
+
+  useEffect(() => {
+    if (returnDate && departureDate && returnDate < departureDate) {
+      setReturnDate(departureDate);
+    }
+  }, [departureDate]);
 
   const validateSearch = () => {
     const newErrors = {};
@@ -711,6 +719,7 @@ export default function FlightSearchPage() {
                         <input
                           type="date"
                           value={departureDate}
+                          min={today}
                           onChange={(e) => setDepartureDate(e.target.value)}
                           className="w-full p-2 md:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm md:text-base"
                         />
@@ -744,6 +753,7 @@ export default function FlightSearchPage() {
                           <input
                             type="date"
                             value={returnDate}
+                            min={departureDate}
                             onChange={(e) => setReturnDate(e.target.value)}
                             className="w-full p-2 md:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm md:text-base"
                           />
