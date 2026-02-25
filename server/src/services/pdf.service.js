@@ -1,15 +1,11 @@
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
-// const { v4: uuidv4 } = require('uuid');
 const { randomUUID } = require("crypto");
 const logger = require("../utils/logger");
 const QRCode = require("qrcode");
-
 const puppeteer = require("puppeteer");
-
 // const puppeteer = require("puppeteer-core");
-// const chromium = require("@sparticuz/chromium");
 
 class PDFService {
   constructor() {
@@ -26,7 +22,11 @@ class PDFService {
     });
   }
 
-  async generateFlightTicketPdf({ booking, tboDetails }) {
+  /* ======================================================
+     FLIGHT TICKET PDF (HTML → PUPPETEER → PDF)
+  ====================================================== */
+
+  async generateFlightTicketPdf({ booking }) {
     try {
       const filename = `ticket-${booking.bookingReference}-${randomUUID()}.pdf`;
       const filepath = path.join(this.ticketDir, filename);
@@ -40,6 +40,27 @@ class PDFService {
 
       let html = fs.readFileSync(templatePath, "utf8");
 
+      /* ================= HELPERS ================= */
+
+      const formatDate = (date) =>
+        new Date(date).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        });
+
+      const formatShortDate = (date) =>
+        new Date(date).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+        });
+
+      const formatTime = (date) =>
+        new Date(date).toLocaleTimeString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
       /* ================= EXTRACT DATA ================= */
 
       const segment = booking.flightRequest.segments[0];
@@ -48,121 +69,107 @@ class PDFService {
         booking.travellers.find((t) => t.isLeadPassenger) ||
         booking.travellers[0];
 
-      const qrCodeBase64 = await QRCode.toDataURL(
-        `PNR:${booking.bookingResult.pnr}`,
-      );
+      const duration = `${Math.floor(segment.durationMinutes / 60)}h ${
+        segment.durationMinutes % 60
+      }m`;
+
+      // ================= SAFE TOTAL AMOUNT RESOLUTION =================
+      const totalAmount =
+        booking.pricing?.totalAmount ||
+        booking.bookingSnapshot?.totalAmount ||
+        booking.bookingResult?.fare?.TotalFare ||
+        booking.bookingResult?.fare?.PublishedFare ||
+        booking.bookingResult?.fare?.OfferedFare ||
+        booking.bookingResult?.Response?.Response?.FlightItinerary?.Fare
+          ?.PublishedFare ||
+        "—";
 
       const replacements = {
+        date: formatDate(new Date()),
+        year: new Date().getFullYear(),
+
+        bookingId: booking.bookingReference,
+        bookingDate: formatDate(booking.createdAt),
+
+        journeyRoute: `${segment.origin.city}–${segment.destination.city}`,
+
         airlineName: segment.airlineName,
         airlineCode: segment.airlineCode,
 
-        passengerName: `${passenger.lastName}/${passenger.firstName} ${passenger.title}`,
+        passengerName:
+          `${passenger.firstName} ${passenger.lastName}`.toUpperCase(),
+        passengerTitle: passenger.title,
 
-        originCity: segment.origin.city,
-        destinationCity: segment.destination.city,
+        flightDate: formatDate(segment.departureDateTime),
+        flightType: segment.isNonStop ? "Non stop" : "Connecting",
+        duration: duration,
+
+        flightNumber: `${segment.airlineCode}-${segment.flightNumber}`,
 
         originCode: segment.origin.airportCode,
-        destinationCode: segment.destination.airportCode,
-
+        originCity: segment.origin.city,
         originAirport: segment.origin.airportName,
+
+        destinationCode: segment.destination.airportCode,
+        destinationCity: segment.destination.city,
         destinationAirport: segment.destination.airportName,
 
-        originCountry: segment.origin.country,
-        destinationCountry: segment.destination.country,
+        departureTime: formatTime(segment.departureDateTime),
+        departureDate: formatShortDate(segment.departureDateTime),
 
-        flightNumber: `${segment.airlineCode} ${segment.flightNumber}`,
+        arrivalTime: formatTime(segment.arrivalDateTime),
+        arrivalDate: formatShortDate(segment.arrivalDateTime),
 
-        departureDate: new Date(segment.departureDateTime).toDateString(),
-        arrivalDate: new Date(segment.arrivalDateTime).toDateString(),
+        pnr: booking.bookingResult.pnr,
 
-        departureTime: new Date(segment.departureDateTime).toLocaleTimeString(
-          [],
-          {
-            hour: "2-digit",
-            minute: "2-digit",
-          },
-        ),
+        cabinBaggage: segment.baggage?.cabin || "7 Kgs",
+        checkInBaggage: segment.baggage?.checkIn || "15 Kgs (1 piece)",
 
-        arrivalTime: new Date(segment.arrivalDateTime).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-
-        duration: `${Math.floor(segment.durationMinutes / 60)}h ${
-          segment.durationMinutes % 60
-        }m`,
-
-        cabinClass: booking.bookingSnapshot.cabinClass,
-        terminal: segment.origin.terminal || "—",
-
-        baggage: segment.baggage.checkIn,
-        cabinBaggage: segment.baggage.cabin,
+        defenceFare: "₹ Defence Fare",
+        economyFare: "₹ Economy",
+        armedForcesFare: "₹ Armed Forces Fare",
 
         seatNumber:
           booking.flightRequest.ssrSnapshot?.seats?.[0]?.seatNo || "—",
 
-        pnr: booking.bookingResult.pnr,
-
-        eTicket:
-          booking.bookingResult.providerResponse.Response.Response
-            .FlightItinerary.TBOConfNo || "—",
-
-        refundable: booking.flightRequest.fareSnapshot.refundable
-          ? "Yes"
-          : "No",
-
-        cancellationCharges:
-          booking.flightRequest.fareSnapshot.miniFareRules?.[0]?.find(
-            (r) => r.Type === "Cancellation",
-          )?.Details || "As per airline rules",
-
-        reissueCharges:
-          booking.flightRequest.fareSnapshot.miniFareRules?.[0]?.find(
-            (r) => r.Type === "Reissue",
-          )?.Details || "As per airline rules",
-
-        qrCode: qrCodeBase64,
-
-        barcodeText:
-          `M1${passenger.lastName}/${passenger.firstName} ` +
-          `${booking.bookingResult.pnr} ` +
-          `${segment.origin.airportCode}${segment.destination.airportCode} ` +
-          `${segment.airlineCode}${segment.flightNumber}`,
-
-        sequenceNumber: "001",
-
-        airlineWebsite: "airindia.com",
-        customerCare: "1800-233-1407",
-        customerEmail: "support@airindia.com",
-
-        mealService: booking.flightRequest.fareQuote.Results[0]
-          .IsFreeMealAvailable
+        mealOption: booking.flightRequest.fareQuote?.Results?.[0]
+          ?.IsFreeMealAvailable
           ? "Complimentary"
-          : "Buy on board",
+          : "-",
 
-        status: "CONFIRMED",
-        ffNumber: passenger.FFNumber || "—",
+        eTicketNumber:
+          booking.bookingResult.providerResponse?.Response?.Response
+            ?.FlightItinerary?.TBOConfNo || booking.bookingResult.pnr,
+
+        paymentAmount: totalAmount !== "—" ? `INR ${totalAmount}` : "—",
+
+        airlineWebsite: "airindiaexpress.com",
       };
 
-      /* ================= APPLY REPLACEMENTS ================= */
+      /* ================= APPLY PLACEHOLDER REPLACEMENTS ================= */
 
-      for (const [key, value] of Object.entries(replacements)) {
+      Object.entries(replacements).forEach(([key, value]) => {
         html = html.replaceAll(`{{${key}}}`, value ?? "");
-      }
+      });
 
-      /* ================= GENERATE PDF USING PUPPETEER ================= */
-
-      // const browser = await puppeteer.launch({
-      //   args: chromium.args,
-      //   defaultViewport: chromium.defaultViewport,
-      //   executablePath: await chromium.executablePath(),
-      //   headless: chromium.headless,
-      // });
+      /* ================= GENERATE PDF ================= */
 
       const browser = await puppeteer.launch({
         headless: "new",
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
+
+      // const browser = await puppeteer.launch({
+      //   executablePath: "/usr/bin/chromium",
+      //   headless: "new",
+      //   args: [
+      //     "--no-sandbox",
+      //     "--disable-setuid-sandbox",
+      //     "--disable-dev-shm-usage",
+      //     "--disable-gpu",
+      //     "--single-process",
+      //   ],
+      // });
 
       const page = await browser.newPage();
 
