@@ -52,16 +52,29 @@ exports.updateProfile = async (req, res, next) => {
 // ===============================
 exports.getEmployee = async (req, res, next) => {
   try {
-    let emp = null;
+    const admin = await User.findById(req.user.id);
+    if (!admin) return next(new ApiError(401, "Unauthorized"));
+
     const id = req.params.id;
 
+    let emp = null;
+
     if (mongoose.Types.ObjectId.isValid(id)) {
-      emp = await Employee.findById(id);
+      emp = await Employee.findOne({
+        _id: id,
+        corporateId: admin.corporateId,
+      });
     }
+
     if (!emp) {
-      emp = await Employee.findOne({ userId: id });
+      emp = await Employee.findOne({
+        userId: id,
+        corporateId: admin.corporateId,
+      });
     }
-    if (!emp) return next(new ApiError(404, "Employee not found"));
+
+    if (!emp)
+      return next(new ApiError(404, "Employee not found or not in your domain"));
 
     res.json({ success: true, employee: emp });
   } catch (err) {
@@ -74,13 +87,18 @@ exports.getEmployee = async (req, res, next) => {
 // ===============================
 exports.getAllEmployees = async (req, res, next) => {
   try {
-    const employees = await Employee.find().select("-__v");
+    const admin = await User.findById(req.user.id);
+    if (!admin) return next(new ApiError(401, "Unauthorized"));
+
+    const employees = await Employee.find({
+      corporateId: admin.corporateId,
+    }).select("-__v");
+
     res.json({ success: true, employees });
   } catch (err) {
     next(err);
   }
 };
-
 // ===============================
 // ADMIN: UPDATE EMPLOYEE
 // ===============================

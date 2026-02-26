@@ -39,15 +39,21 @@ import BookingDetails from "../components/EmployeeDashboard/BookingDetails";
 import MultiCityFlightBooking from "../Pages/Booking-Flow/Flight-Booking/MultiWayFlightBooking";
 import HotelSearchResults from "../Pages/search-results/Hotel-results/Hotel-Search-Results";
 import HotelDetailsPage from "../Pages/Booking-Flow/Hotel-Booking/HoteldetailsPage";
+import LandingPage from "../Pages/Auth/Landign";
+import CorporateSuperAdminDashboard from "../components/CorporateSuperAdmin/CorporateSuperAdminDashboard";
+import TravelAdminManagement from "../components/CorporateSuperAdmin/TravelAdminManagement";
+import CorporateTotalBookings from "../components/CorporateSuperAdmin/TotalBookings";
+import EmployeeManagement from "../components/CorporateSuperAdmin/EmployeeManagement";
 
 export const appRouter = createBrowserRouter([
   // -------------------------------
   // PUBLIC ROUTES
   // -------------------------------
-  {
-    path: "/sso-login",
-    element: <SSOLogin />,
-  },
+  // {
+  //   path: "/sso-login",
+  //   element: <SSOLogin />,
+  // },
+  { path: "/landing", element: <LandingPage /> },
   {
     path: "/sso/callback",
     element: <SSOCallback />, // ✅ REQUIRED
@@ -104,29 +110,65 @@ export const appRouter = createBrowserRouter([
           { path: "/my-rejected-requests", element: <MyRejectedRequests /> },
           { path: "/my-profile", element: <MyProfile /> },
           { path: "/travel-documents", element: <TravelDocuments /> },
+          { path: "/bookings/:id/book", element: <BookApprovedFlight /> },
         ],
       },
-      { path: "/search-flight", element: <FlightSearch /> },
-      { path: "/search-flight-results", element: <FlightSearchResults /> },
-      { path: "/one-way-flight/booking", element: <OneFlightBooking /> },
-      {
-        path: "/round-trip-flight/booking",
-        element: <RoundTripFlightBooking />,
-      },
-      {
-        path: "/multi-city-flight/booking",
-        element: <MultiCityFlightBooking />,
-      },
-      { path: "/bookings/:id/book", element: <BookApprovedFlight /> },
-      { path: "/search-hotel", element: <HotelSearchPage /> },
-      { path: "/search-hotel-results", element: <HotelSearchResults /> },
-      { path: "/one-hotel-details", element: <HotelDetailsPage /> },
     ],
   },
+
+  // -------------------------------
+  // CORPORATE SUPER ADMIN ROUTES
+  // -------------------------------
+  {
+    element: <ProtectedRoute allowedRoles={["corporate-super-admin"]} />,
+    children: [
+      {
+        path: "/",
+        element: <Layout />,
+        children: [
+          {
+            path: "/corporate-dashboard",
+            element: <CorporateSuperAdminDashboard />,
+          },
+          {
+            path: "/admin-management",
+            element: <TravelAdminManagement />,
+          },
+          {
+            path: "/employee-management",
+            element: <EmployeeManagement />,
+          },
+          {
+            path: "/corporate-total-bookings",
+            element: <CorporateTotalBookings />,
+          },
+        ],
+      },
+    ],
+  },
+
+  //SHARED ROUTES
+
+  { path: "/landing", element: <LandingPage /> },
+  { path: "/search-flight", element: <FlightSearch /> },
+  { path: "/search-flight-results", element: <FlightSearchResults /> },
+  { path: "/one-way-flight/booking", element: <OneFlightBooking /> },
+  {
+    path: "/round-trip-flight/booking",
+    element: <RoundTripFlightBooking />,
+  },
+  {
+    path: "/multi-city-flight/booking",
+    element: <MultiCityFlightBooking />,
+  },
+  { path: "/search-hotel", element: <HotelSearchPage /> },
+  { path: "/search-hotel-results", element: <HotelSearchResults /> },
+  { path: "/one-hotel-details", element: <HotelDetailsPage /> },
 
   // DEFAULT REDIRECT
   {
     path: "*",
-    element: <SSOLogin />,
+    // element: <SSOLogin />,
+    element: <LandingPage />,
   },
 ]);

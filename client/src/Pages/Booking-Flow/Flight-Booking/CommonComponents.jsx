@@ -7,7 +7,12 @@ import {
   MdInfo,
   MdLuggage,
 } from "react-icons/md";
-import { FaWifi, FaUser, FaPlaneArrival } from "react-icons/fa";
+import {
+  FaWifi,
+  FaUser,
+  FaPlaneArrival,
+  FaConciergeBell,
+} from "react-icons/fa";
 import { BsLuggage, BsTag, BsInfoCircleFill } from "react-icons/bs";
 import {
   AiOutlineInfoCircle,
@@ -358,13 +363,13 @@ export const FlightTimeline = ({
                         {(() => {
                           const getSeatButtonText = () => {
                             if (isSeatReady === "loading")
-                              return "Seats loading…";
+                              return "SSR loading…";
                             if (isSeatReady === "error")
-                              return "Unable to load seats";
+                              return "Unable to load ssr";
                             if (isSeatReady === "none")
-                              return "No seats available";
-                            if (isSeatReady === true) return "Select Seats";
-                            return "Seats loading…";
+                              return "No ssr available";
+                            if (isSeatReady === true) return "Select SSR";
+                            return "SSR loading…";
                           };
 
                           const seatDisabled = isSeatReady !== true;
@@ -383,7 +388,7 @@ export const FlightTimeline = ({
         }
       `}
                             >
-                              <MdEventSeat />
+                              <FaConciergeBell />
                               {getSeatButtonText()}
                             </button>
                           );
@@ -541,7 +546,6 @@ export const normalizeSSRList = (list = []) => {
 
   return Array.from(map.values());
 };
-
 
 export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
   const [open, setOpen] = useState({
@@ -1073,6 +1077,9 @@ export const PriceSummary = ({
   selectedMeals = {},
   selectedBaggage = {},
   travelers = [],
+  approver,
+  approverLoading,
+  approverError,
   onSendForApproval,
   loading = false,
 }) => {
@@ -1081,7 +1088,9 @@ export const PriceSummary = ({
   const travelerCount = Math.max(travelers.length || 1);
 
   const baseFare = Math.ceil(parsedFlightData.baseFare) || 0;
-  const taxFare = Math.ceil(parsedFlightData.taxFare) +  Math.ceil(parsedFlightData.otherCharges);
+  const taxFare =
+    Math.ceil(parsedFlightData.taxFare) +
+    Math.ceil(parsedFlightData.otherCharges);
 
   const totalSeatPrice = useMemo(() => {
     let sum = 0;
@@ -1119,8 +1128,7 @@ export const PriceSummary = ({
   }, [selectedBaggage, travelers.length]);
 
   const subtotal =
-    baseFare + taxFare+ totalSeatPrice + totalMealPrice + totalBaggagePrice;
-  
+    baseFare + taxFare + totalSeatPrice + totalMealPrice + totalBaggagePrice;
 
   const totalAmount = Math.max(0, subtotal - discountAmount);
 
@@ -1207,6 +1215,28 @@ export const PriceSummary = ({
   `}
         >
           {loading ? "Submitting..." : "Send For Approval"}
+        </div>
+        {/* Approver Message */}
+        <div className="mt-3 text-sm text-center">
+          {approverLoading && (
+            <p className="text-gray-500">Fetching approver details...</p>
+          )}
+
+          {approverError && <p className="text-red-500">{approverError}</p>}
+
+          {!approverLoading && approver && (
+            <p className="text-gray-700">
+              Your request will be sent to{" "}
+              <span className="font-semibold">{approver.name}</span> (
+              {approver.email})
+            </p>
+          )}
+
+          {!approverLoading && !approver && !approverError && (
+            <p className="text-red-500">
+              No approver assigned to your account.
+            </p>
+          )}
         </div>
       </div>
     </div>

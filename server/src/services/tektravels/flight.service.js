@@ -600,7 +600,42 @@ class FlightService {
   }
 
   /* ---------------- PASSENGER MAPPER ---------------- */
+  // mapPassenger(pax) {
+  //   return {
+  //     Title: pax.title,
+  //     FirstName: pax.firstName,
+  //     LastName: pax.lastName,
+
+  //     PaxType:
+  //       pax.paxType === "ADULT" || pax.paxType === 1
+  //         ? 1
+  //         : pax.paxType === "CHILD" || pax.paxType === 2
+  //           ? 2
+  //           : 3,
+
+  //     DateOfBirth: pax.dateOfBirth
+  //       ? new Date(pax.dateOfBirth).toISOString().split("T")[0]
+  //       : null,
+
+  //     Gender: pax.gender === "Male" || pax.gender === 1 ? 1 : 2,
+
+  //     PassportNo: pax.passportNo || "",
+  //     PassportExpiry: pax.passportExpiry || "",
+
+  //     AddressLine1: "NA",
+  //     City: "DELHI",
+  //     CountryCode: "356",
+  //     CountryName: "India",
+
+  //     ContactNo: pax.contactNo,
+  //     Email: pax.email,
+  //     IsLeadPax: pax.isLeadPax === true,
+  //     Nationality: "IN",
+  //   };
+  // }
+
   mapPassenger(pax) {
+    const nationalityCode = (pax.nationality || "IN").toUpperCase();
     return {
       Title: pax.title,
       FirstName: pax.firstName,
@@ -617,20 +652,35 @@ class FlightService {
         ? new Date(pax.dateOfBirth).toISOString().split("T")[0]
         : null,
 
-      Gender: pax.gender === "Male" || pax.gender === 1 ? 1 : 2,
+      Gender:
+        pax.gender === "Male" || pax.gender === "MALE" || pax.gender === 1
+          ? 1
+          : 2,
 
       PassportNo: pax.passportNo || "",
       PassportExpiry: pax.passportExpiry || "",
 
-      AddressLine1: "NA",
-      City: "DELHI",
-      CountryCode: "356",
-      CountryName: "India",
+      PassportIssueCountryCode: nationalityCode,
+      PassportIssueCountry: nationalityCode,
+
+      /* ===============================
+       🔥 DYNAMIC ADDRESS SUPPORT
+    =============================== */
+
+      AddressLine1: pax.addressLine1 || pax.AddressLine1 || "NA",
+
+      City: pax.city || pax.City || "DELHI",
+
+      CountryCode: pax.countryCode || pax.CountryCode || "IN",
+
+      CountryName: pax.countryName || pax.CountryName || "India",
+
+      /* =============================== */
 
       ContactNo: pax.contactNo,
       Email: pax.email,
       IsLeadPax: pax.isLeadPax === true,
-      Nationality: "IN",
+      Nationality: nationalityCode,
     };
   }
 

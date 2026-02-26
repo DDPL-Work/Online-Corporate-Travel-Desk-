@@ -1,11 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { GiMoonBats } from "react-icons/gi";
 import { FaChevronDown, FaChevronUp, FaLeaf } from "react-icons/fa";
-import {
-  WiDaySunny,
-  WiDayCloudy,
-  WiSunset,
-} from "react-icons/wi";
+import { WiDaySunny, WiDayCloudy, WiSunset } from "react-icons/wi";
 
 // Two-thumb range slider component
 const RangeSlider = ({ min, max, values, onChange, formatValue }) => {
@@ -396,60 +392,65 @@ const FlightFilterSidebar = ({
   };
 
   const toggleStop = (option) => {
-    setSelectedStops((prev) =>
-      prev.includes(option)
-        ? prev.filter((item) => item !== option)
-        : [...prev, option],
-    );
+    const updated = selectedStops.includes(option)
+      ? selectedStops.filter((item) => item !== option)
+      : [...selectedStops, option];
+
+    setSelectedStops(updated);
   };
 
   const toggleAirline = (airline) => {
-    setSelectedAirlines((prev) =>
-      prev.includes(airline)
-        ? prev.filter((a) => a !== airline)
-        : [...prev, airline],
-    );
+    const updated = selectedAirlines.includes(airline)
+      ? selectedAirlines.filter((a) => a !== airline)
+      : [...selectedAirlines, airline];
+
+    setSelectedAirlines(updated);
   };
 
   const toggleFlightNumber = (number) => {
-    setSelectedFlightNumbers((prev) =>
-      prev.includes(number)
-        ? prev.filter((n) => n !== number)
-        : [...prev, number],
-    );
-  };
+    const updated = selectedFlightNumbers.includes(number)
+      ? selectedFlightNumbers.filter((n) => n != number)
+      : [...selectedFlightNumbers, number];
 
+    setSelectedFlightNumbers(updated);
+  };
   const toggleFareType = (type) => {
-    setSelectedFareTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
-    );
+    const updated = selectedFareTypes.includes(type)
+      ? selectedFareTypes.filter((t) => t !== type)
+      : [...selectedFareTypes, type];
+
+    setSelectedFareTypes(updated);
   };
 
   const toggleTerminal = (terminal) => {
-    setSelectedTerminals((prev) =>
-      prev.includes(terminal)
-        ? prev.filter((t) => t !== terminal)
-        : [...prev, terminal],
-    );
+    const updated = selectedTerminals.includes(terminal)
+      ? selectedTerminals.filter((t) => t !== terminal)
+      : [...selectedTerminals, terminal];
+
+    setSelectedTerminals(updated);
   };
 
   const toggleAirport = (code) => {
-    setSelectedAirports((prev) =>
-      prev.includes(code) ? prev.filter((a) => a !== code) : [...prev, code],
-    );
+    const updated = selectedAirports.includes(code)
+      ? selectedAirports.filter((a) => a !== code)
+      : [...selectedAirports, code];
+
+    setSelectedAirports(updated);
   };
 
   const toggleLayoverAirport = (code) => {
-    setSelectedLayoverAirports((prev) =>
-      prev.includes(code) ? prev.filter((a) => a !== code) : [...prev, code],
-    );
+    const updated = selectedLayoverAirports.includes(code)
+      ? selectedLayoverAirports.filter((a) => a !== code)
+      : [...selectedLayoverAirports, code];
+
+    setSelectedLayoverAirports(updated);
   };
 
   const togglePopularFilter = (filter) => {
-    setPopularFilters((prev) => ({
-      ...prev,
-      [filter]: !prev[filter],
-    }));
+    setPopularFilters({
+      ...popularFilters,
+      [filter]: !popularFilters[filter],
+    });
   };
 
   const resetAllFilters = () => {
@@ -702,7 +703,7 @@ const FlightFilterSidebar = ({
         isExpanded={expandedSections.arrivalTime}
         onToggle={() => toggleSection("arrivalTime")}
       >
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {times.map((t) => (
             <div
               key={t.label}
@@ -711,12 +712,13 @@ const FlightFilterSidebar = ({
                   selectedArrivalTime === t.label ? "" : t.label,
                 )
               }
-              className={`border rounded px-2 py-2 text-xs text-center cursor-pointer transition ${
+              className={`flex flex-col items-center justify-center border rounded-md px-2 py-2 text-xs cursor-pointer transition ${
                 selectedArrivalTime === t.label
                   ? "bg-blue-500 text-white border-blue-500"
                   : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
               }`}
             >
+              <div className="mb-1">{t.icon}</div>
               <div className="font-medium">{t.label}</div>
               <div className="text-[10px] mt-0.5">{t.range}</div>
             </div>
@@ -773,16 +775,16 @@ const FlightFilterSidebar = ({
                 />
                 <span className="text-xs">{name}</span>
               </div>
-              <span className="text-gray-500 text-xs">
+              {/* <span className="text-gray-500 text-xs">
                 ₹{price.toLocaleString()}
-              </span>
+              </span> */}
             </label>
           ))}
         </div>
       </FilterSection>
 
       {/* Fare Type */}
-      <FilterSection
+      {/* <FilterSection
         title="Fare Type"
         isExpanded={expandedSections.fareType}
         onToggle={() => toggleSection("fareType")}
@@ -803,7 +805,7 @@ const FlightFilterSidebar = ({
             </label>
           ))}
         </div>
-      </FilterSection>
+      </FilterSection> */}
 
       {/* Terminal */}
       <FilterSection

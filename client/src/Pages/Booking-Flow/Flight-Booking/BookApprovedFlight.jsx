@@ -9,7 +9,6 @@ import {
   FiDollarSign,
   FiMapPin,
 } from "react-icons/fi";
-import { GrLinkPrevious } from "react-icons/gr";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -278,6 +277,27 @@ export default function BookApprovedFlight() {
   const onwardFare = fare?.onwardFare || null;
   const returnFare = fare?.returnFare || null;
 
+  const fareResults = flight?.fareQuote?.Results || [];
+
+  const isRoundTrip = fareResults.length === 2;
+
+  let baseFare = 0;
+  let tax = 0;
+  let total = 0;
+  let refundable = false;
+
+  fareResults.forEach((result) => {
+    const fare = result?.Fare;
+
+    if (!fare) return;
+
+    baseFare += fare.BaseFare || 0;
+    tax += fare.Tax || 0;
+    total += fare.PublishedFare || 0;
+
+    if (result?.IsRefundable) refundable = true;
+  });
+
   if (loading)
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
@@ -332,16 +352,16 @@ export default function BookApprovedFlight() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-10">
-      <EmployeeHeader />
+      {/* <EmployeeHeader /> */}
 
       {/* 🔙 BACK BUTTON */}
       <div className="max-w-7xl mx-auto mt-4 px-4">
-        <button
+        {/* <button
           onClick={() => navigate("/my-pending-approvals")}
           className="inline-flex items-center gap-2 text-sm font-medium text-[#0A4D68] hover:text-[#083a50] transition"
         >
           <GrLinkPrevious /> Back to My Pending Approvals
-        </button>
+        </button> */}
       </div>
 
       {/* 🧊 MAIN CONTAINER */}
@@ -523,13 +543,32 @@ export default function BookApprovedFlight() {
               {/* <p>Base Fare: ₹{flight.fareSnapshot.baseFare}</p> */}
               {flight?.fareSnapshot ? (
                 <>
-                  <p>Base Fare: ₹{flight.fareSnapshot.baseFare}</p>
-                  <p>Tax: ₹{flight.fareSnapshot.tax}</p>
-                  <p>Total Amount: ₹{flight.fareSnapshot.publishedFare}</p>
-                  <p>
-                    Refundable: {flight.fareSnapshot.refundable ? "Yes" : "No"}
-                  </p>
-                  <p>Fare Type: {flight.fareSnapshot.fareType}</p>
+                  <div className="text-sm text-gray-700 space-y-1">
+                    <p>Base Fare: ₹{Math.ceil(baseFare)}</p>
+                    <p>Tax: ₹{Math.ceil(tax)}</p>
+
+                    {isRoundTrip && (
+                      <div className="mt-2 text-xs text-gray-500 space-y-1">
+                        <p className="font-semibold text-gray-700">
+                          Breakdown:
+                        </p>
+                        <p>
+                          Onward: ₹
+                          {flight?.fareQuote?.Results?.[0]?.Fare
+                            ?.PublishedFare || 0}
+                        </p>
+                        <p>
+                          Return: ₹
+                          {flight?.fareQuote?.Results?.[1]?.Fare
+                            ?.PublishedFare || 0}
+                        </p>
+                      </div>
+                    )}
+
+                    <p className="font-semibold mt-2">Total Amount: ₹{Math.ceil(total)}</p>
+
+                    <p>Refundable: {refundable ? "Yes" : "No"}</p>
+                  </div>
                 </>
               ) : (
                 <p className="text-gray-500 text-sm">

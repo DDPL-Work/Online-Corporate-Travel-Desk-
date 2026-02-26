@@ -107,3 +107,12 @@ exports.verifySuperAdmin = (req, res, next) => {
   }
   next();
 };
+exports.verifyCorporateSuperAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== "corporate-super-admin") {
+    return res.status(403).json({
+      success: false,
+      message: "corporate Super Admin access only",
+    });
+  }
+  next();
+};

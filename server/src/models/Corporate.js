@@ -29,12 +29,22 @@ const corporateSchema = new mongoose.Schema({
   primaryContact: {
     name: { type: String, required: true },
     email: { type: String, required: true, lowercase: true, trim: true },
-    mobile: { type: String, required: true }
+    mobile: { type: String, required: true },
+    role: {
+    type: String,
+    enum: ["corporate-super-admin"],
+    default: "corporate-super-admin"
+  }
   },
   secondaryContact: {
     name: String,
     email: { type: String, lowercase: true, trim: true },
-    mobile: String
+    mobile: String,
+    role: {
+    type: String,
+    enum: ["travel-admin"],
+    default: "travel-admin"
+  }
   },
   billingDepartment: {
     name: String,

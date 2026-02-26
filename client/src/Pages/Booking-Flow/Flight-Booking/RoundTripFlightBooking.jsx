@@ -26,6 +26,7 @@ import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { CABIN_MAP } from "../../../utils/formatter";
+import { getMyTravelAdmin } from "../../../Redux/Actions/travelAdmin.thunks";
 
 // ✅ NORMALIZE FULL FARE RULE API RESPONSE (FareRule API)
 const normalizeFareRules = (fareRule) => {
@@ -110,6 +111,11 @@ export default function RoundTripFlightBooking() {
   // const traceId = useSelector((state) => state.flightsRT.traceId);
   const reduxTraceId = useSelector((state) => state.flightsRT.traceId);
   const { user } = useSelector((state) => state.auth);
+  const {
+    approver,
+    loading: approverLoading,
+    error: approverError,
+  } = useSelector((state) => state.travelAdmin);
 
   const traceId = location.state?.traceId || reduxTraceId || null;
 
@@ -158,23 +164,15 @@ export default function RoundTripFlightBooking() {
   };
 
   const isRTSeatReady = useMemo(() => {
-    const onwardIdx = rawFlightData?.onward?.ResultIndex?.toString().trim();
-    const returnIdx = rawFlightData?.return?.ResultIndex?.toString().trim();
+    const getSeatStatus = (journeyType, resultIndex) => {
+      if (!resultIndex) return false;
 
-    const onwardSSR = ssr?.onward?.[onwardIdx];
-    const returnSSR = ssr?.return?.[returnIdx];
+      const key = resultIndex.toString().trim();
+      const journeySSR = ssr?.[journeyType]?.[key];
 
-    const hasSeats = (journeySSR, journeyType) => {
-      // if (ssrLoading?.[journeyType]) return "loading";
-      // if (ssrError?.[journeyType]) return "error";
       if (!journeySSR) return false;
 
-      let root =
-        journeySSR.Response ||
-        journeySSR.Results ||
-        Object.values(journeySSR)[0]?.Response ||
-        Object.values(journeySSR)[0]?.Results ||
-        journeySSR;
+      const root = journeySSR?.Response || journeySSR;
 
       const seatSource =
         root?.SeatDynamic?.[0]?.SegmentSeat ||
@@ -182,8 +180,6 @@ export default function RoundTripFlightBooking() {
         root?.SeatDynamic ||
         root?.Seat ||
         [];
-
-      // if (!Array.isArray(seatSource) || seatSource.length === 0) return "none";
 
       return (
         Array.isArray(seatSource) &&
@@ -193,18 +189,17 @@ export default function RoundTripFlightBooking() {
       );
     };
 
-    // 🔥 INTERNATIONAL: same SSR for both legs
-    if (isInternational) {
-      const status = hasSeats(onwardSSR);
-      return { onward: status, return: status };
-    }
-
-    // Domestic
     return {
-      onward: hasSeats(onwardSSR),
-      return: hasSeats(returnSSR),
+      onward: getSeatStatus("onward", rawFlightData?.onward?.ResultIndex),
+      return: getSeatStatus("return", rawFlightData?.return?.ResultIndex),
     };
-  }, [ssr, rawFlightData, isInternational]);
+  }, [ssr, rawFlightData]);
+
+  useEffect(() => {
+    if (user?.role === "employee") {
+      dispatch(getMyTravelAdmin());
+    }
+  }, [dispatch, user]);
 
   // ✅ AUTO-FILL LEAD TRAVELER
   useEffect(() => {
@@ -375,7 +370,10 @@ export default function RoundTripFlightBooking() {
     const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
     const returnFare = fareQuote?.return?.Response?.Results?.Fare;
 
-    return Number(onwardFare?.OtherCharges || 0) + Number(returnFare?.OtherCharges || 0);
+    return (
+      Number(onwardFare?.OtherCharges || 0) +
+      Number(returnFare?.OtherCharges || 0)
+    );
   }, [fareQuote, isInternational]);
 
   useEffect(() => {
@@ -462,7 +460,7 @@ export default function RoundTripFlightBooking() {
     dispatch(
       getRTSSR({
         traceId,
-        resultIndex: rawFlightData.onward.ResultIndex,
+        resultIndex: onwardIdx,
         journeyType: "onward",
       }),
     );
@@ -472,7 +470,7 @@ export default function RoundTripFlightBooking() {
       dispatch(
         getRTSSR({
           traceId,
-          resultIndex: rawFlightData.return.ResultIndex,
+          resultIndex: onwardIdx,
           journeyType: "return",
         }),
       );
@@ -566,18 +564,28 @@ export default function RoundTripFlightBooking() {
 
     const journeySSR = ssr?.[ssrJourneyType]?.[ssrResultIndex];
 
-    let root =
-      journeySSR?.Response ||
-      journeySSR?.Results ||
-      Object.values(journeySSR || {})[0]?.Response ||
-      Object.values(journeySSR || {})[0]?.Results ||
-      journeySSR;
+    // let root =
+    //   journeySSR?.Response ||
+    //   journeySSR?.Results ||
+    //   Object.values(journeySSR || {})[0]?.Response ||
+    //   Object.values(journeySSR || {})[0]?.Results ||
+    //   journeySSR;
+
+    // const seatData =
+    //   root?.SeatDynamic?.[0]?.SegmentSeat ||
+    //   root?.Seat?.[0]?.SegmentSeat ||
+    //   root?.SeatDynamic ||
+    //   root?.Seat;
+
+    const root =
+      journeySSR?.Response?.Results || journeySSR?.Response || journeySSR;
 
     const seatData =
       root?.SeatDynamic?.[0]?.SegmentSeat ||
       root?.Seat?.[0]?.SegmentSeat ||
       root?.SeatDynamic ||
-      root?.Seat;
+      root?.Seat ||
+      [];
 
     if (!seatData || seatData.length === 0) {
       ToastWithTimer({
@@ -744,7 +752,9 @@ export default function RoundTripFlightBooking() {
   }, [fareQuote, isInternational]);
 
   const totalPayableAmount =
-    Math.ceil(perAdultFare.base + perAdultFare.tax + perAdultFare.otherCharges) *
+    Math.ceil(
+      perAdultFare.base + perAdultFare.tax + perAdultFare.otherCharges,
+    ) *
       travelers.length +
     calculateSSRTotal();
 
@@ -1055,6 +1065,14 @@ export default function RoundTripFlightBooking() {
   };
 
   const handleSendForApproval = async () => {
+    if (!approver) {
+      ToastWithTimer({
+        type: "error",
+        message: "No approver assigned. Please contact admin.",
+      });
+      return;
+    }
+
     if (!purposeOfTravel) {
       ToastWithTimer({
         type: "error",
@@ -1407,6 +1425,9 @@ export default function RoundTripFlightBooking() {
                 selectedMeals={selectedMeals}
                 selectedBaggage={selectedBaggage}
                 travelers={travelers}
+                approver={approver}
+                approverLoading={approverLoading}
+                approverError={approverError}
                 onSendForApproval={handleSendForApproval}
               />
 
