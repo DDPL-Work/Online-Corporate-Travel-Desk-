@@ -19,6 +19,8 @@ import travelAdminReducer from "./Slice/travelAdmin.slice";
 import corporateSuperAdminReducer from "./Slice/corporateSuperAdmin.slice.js";
 import postpaidReducer from "./Slice/postpaidSlice.js";
 import amendmentReducer from "./Slice/amendmentSlice.js";
+//hotel
+import hotelReducer from "./Slice/hotelSlice.js";
 
 export const store = configureStore({
   reducer: {
@@ -31,16 +33,22 @@ export const store = configureStore({
     employeeAction: employeeActionReducer,
     corporateAdmin: corporateAdminReducer,
     wallet: walletReducer,
+    walletRechargeLogs: walletRechargeLogsReducer,
+    postpaid: postpaidReducer,
+
+    tboBalance: tboBalanceReducer,
+    travelAdmin: travelAdminReducer,
+    corporateSuperAdmin: corporateSuperAdminReducer,
+    approvals: approvalReducer,
+
+    //Flight Reducers
     flights: flightReducer,
     flightsRT: flightReducerRT,
     flightsMC: flightReducerMC,
-    walletRechargeLogs: walletRechargeLogsReducer,
-    tboBalance: tboBalanceReducer,
-    approvals: approvalReducer,
     bookings: bookingReducer,
-    travelAdmin: travelAdminReducer,
-    corporateSuperAdmin: corporateSuperAdminReducer,
-    postpaid: postpaidReducer,
     amendment: amendmentReducer,
+
+    //Hotel
+    hotel: hotelReducer,
   },
 });

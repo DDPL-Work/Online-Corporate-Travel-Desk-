@@ -208,34 +208,23 @@ const fareQuote = Joi.object({
 });
 
 const searchHotel = Joi.object({
-  checkInDate: Joi.string()
+  CheckIn: Joi.string()
     .pattern(/^\d{4}-\d{2}-\d{2}$/)
-    .required()
-    .messages({
-      "string.pattern.base": "checkInDate must be YYYY-MM-DD",
-    }),
-
-  checkOutDate: Joi.string()
+    .required(),
+  CheckOut: Joi.string()
     .pattern(/^\d{4}-\d{2}-\d{2}$/)
-    .required()
-    .messages({
-      "string.pattern.base": "checkOutDate must be YYYY-MM-DD",
-    }),
+    .required(),
+  CityCode: Joi.string().required(),
+  GuestNationality: Joi.string().length(2).optional(),
 
-  cityId: Joi.string().required(),
+  NoOfRooms: Joi.number().min(1).required(),
 
-  noOfRooms: Joi.number().min(1).default(1),
-
-  currency: Joi.string().default("INR"),
-
-  nationality: Joi.string().length(2).default("IN"),
-
-  roomGuests: Joi.array()
+  PaxRooms: Joi.array()
     .items(
       Joi.object({
-        NoOfAdults: Joi.number().min(1).required(),
-        NoOfChild: Joi.number().min(0).default(0),
-        ChildAge: Joi.array().items(Joi.number()).default([]),
+        Adults: Joi.number().min(1).required(),
+        Children: Joi.number().min(0).required(),
+        ChildrenAges: Joi.array().items(Joi.number()).required(),
       }),
     )
     .min(1)
