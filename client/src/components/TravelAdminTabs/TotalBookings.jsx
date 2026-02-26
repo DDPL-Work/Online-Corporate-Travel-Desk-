@@ -9,6 +9,7 @@ import {
 } from "react-icons/fi";
 import { FaPlane } from "react-icons/fa";
 import { bookingsData } from "../../data/dummyData";
+import { useNavigate } from "react-router-dom";
 
 const colors = {
   primary: "#0A4D68",
@@ -34,6 +35,7 @@ const getEmployeeName = (employee) => {
 };
 
 export default function BookingsDashboard() {
+  const navigate = useNavigate();
   const [startDate, setStartDate] = useState("2024-01-01");
   const [endDate, setEndDate] = useState("2024-12-31");
   const [selectedDepartment, setSelectedDepartment] = useState("All");
@@ -52,8 +54,8 @@ export default function BookingsDashboard() {
       bookingsData.map((b) =>
         typeof b.employee === "string"
           ? b.employee
-          : `${b.employee.firstName} ${b.employee.lastName}`
-      )
+          : `${b.employee.firstName} ${b.employee.lastName}`,
+      ),
     ),
   ];
 
@@ -65,12 +67,10 @@ export default function BookingsDashboard() {
 
     const dateMatch = bookingDate >= start && bookingDate <= end;
     const deptMatch =
-      selectedDepartment === "All" ||
-      booking.department === selectedDepartment;
+      selectedDepartment === "All" || booking.department === selectedDepartment;
 
     const empName = getEmployeeName(booking.employee);
-    const empMatch =
-      selectedEmployee === "All" || empName === selectedEmployee;
+    const empMatch = selectedEmployee === "All" || empName === selectedEmployee;
 
     return dateMatch && deptMatch && empMatch;
   });
@@ -79,36 +79,49 @@ export default function BookingsDashboard() {
   const totalBookings = filteredBookings.length;
   const totalAmount = filteredBookings.reduce(
     (sum, b) => sum + (b.amount || 0),
-    0
+    0,
   );
   const flightBookings = filteredBookings.filter(
-    (b) => b.type === "Flight"
+    (b) => b.type === "Flight",
   ).length;
   const hotelBookings = filteredBookings.filter(
-    (b) => b.type === "Hotel"
+    (b) => b.type === "Hotel",
   ).length;
 
   return (
     <div className="min-h-screen p-6" style={{ backgroundColor: colors.light }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1
-            className="text-3xl font-bold mb-2"
-            style={{ color: colors.dark }}
-          >
-            Travel Bookings Dashboard
-          </h1>
-          <p className="text-gray-600">
-            Track and manage flight and hotel bookings
-          </p>
+        <div className="flex items-center justify-between ">
+          <div className="mb-8">
+            <h1
+              className="text-3xl font-bold mb-2"
+              style={{ color: colors.dark }}
+            >
+              Travel Bookings Dashboard
+            </h1>
+            <p className="text-gray-600">
+              Track and manage flight and hotel bookings
+            </p>
+          </div>
+          {/* <div>
+            <button
+              onClick={() => navigate("/search-flight")}
+              className="bg-[#035966] text-white px-4 py-2 rounded-xl hover:bg-[#044652]"
+            >
+              Make Booking
+            </button>
+          </div> */}
         </div>
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <FiFilter size={20} style={{ color: colors.primary }} />
-            <h2 className="text-lg font-semibold" style={{ color: colors.dark }}>
+            <h2
+              className="text-lg font-semibold"
+              style={{ color: colors.dark }}
+            >
               Filters
             </h2>
           </div>
@@ -184,10 +197,30 @@ export default function BookingsDashboard() {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-          <StatCard title="Total Bookings" value={totalBookings} icon={<FiTrendingUp />} color={colors.primary} />
-          <StatCard title="Flight Bookings" value={flightBookings} icon={<FaPlane />} color={colors.secondary} />
-          <StatCard title="Hotel Bookings" value={hotelBookings} icon={<FiHome />} color={colors.accent} />
-          <StatCard title="Total Amount" value={`₹${totalAmount}`} icon={<span>💰</span>} color={colors.dark} />
+          <StatCard
+            title="Total Bookings"
+            value={totalBookings}
+            icon={<FiTrendingUp />}
+            color={colors.primary}
+          />
+          <StatCard
+            title="Flight Bookings"
+            value={flightBookings}
+            icon={<FaPlane />}
+            color={colors.secondary}
+          />
+          <StatCard
+            title="Hotel Bookings"
+            value={hotelBookings}
+            icon={<FiHome />}
+            color={colors.accent}
+          />
+          <StatCard
+            title="Total Amount"
+            value={`₹${totalAmount}`}
+            icon={<span>💰</span>}
+            color={colors.dark}
+          />
         </div>
 
         {/* Table */}
@@ -200,20 +233,31 @@ export default function BookingsDashboard() {
             <table className="w-full">
               <thead style={{ backgroundColor: colors.primary }}>
                 <tr>
-                  {["Date", "Type", "Destination", "Employee", "Department", "Amount"].map(
-                    (h) => (
-                      <th key={h} className="px-6 py-3 text-left text-white text-sm">
-                        {h}
-                      </th>
-                    )
-                  )}
+                  {[
+                    "Date",
+                    "Type",
+                    "Destination",
+                    "Employee",
+                    "Department",
+                    "Amount",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="px-6 py-3 text-left text-white text-sm"
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
 
               <tbody className="divide-y">
                 {filteredBookings.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                    <td
+                      colSpan="6"
+                      className="px-6 py-8 text-center text-gray-500"
+                    >
                       No bookings found
                     </td>
                   </tr>
@@ -255,7 +299,10 @@ export default function BookingsDashboard() {
  * Reusable Stat Card
  */
 const StatCard = ({ title, value, icon, color }) => (
-  <div className="bg-white rounded-lg shadow-md p-6" style={{ borderTop: `4px solid ${color}` }}>
+  <div
+    className="bg-white rounded-lg shadow-md p-6"
+    style={{ borderTop: `4px solid ${color}` }}
+  >
     <div className="flex items-center justify-between">
       <div>
         <p className="text-gray-600 text-sm mb-1">{title}</p>

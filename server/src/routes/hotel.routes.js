@@ -1,8 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const hotelSearchController = require("../controllers/hotelSearch.controller");
-const hotelBookingController = require("../controllers/hotelBooking.controller");
+const hotelController = require("../controllers/hotel.controller");
 
 const bookingValidation = require("../validations/booking.validation");
 const {
@@ -15,7 +14,25 @@ const validate = require("../middleware/validate.middleware");
 router.use(verifyToken);
 
 /* ======================================================
-   HOTEL SEARCH
+   STATIC SERVICES
+====================================================== */
+
+router.get(
+  "/countries",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  hotelController.getCountryList,
+);
+
+router.get("/country-list", hotelController.getCountriesFromDB);
+
+router.get(
+  "/cities",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  hotelController.getCityList,
+);
+
+/* ======================================================
+HOTEL SEARCH
 ====================================================== */
 
 router.post(
@@ -23,57 +40,16 @@ router.post(
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
   searchLimiter,
   validate(bookingValidation.searchHotel),
-  hotelSearchController.searchHotels,
+  hotelController.searchHotels,
 );
 
 /* ======================================================
-   HOTEL DETAILS
+HOTEL DETAILS
 ====================================================== */
-
 router.post(
   "/details",
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  hotelSearchController.getHotelDetails,
-);
-
-/* ======================================================
-   ROOM INFO
-====================================================== */
-
-router.post(
-  "/rooms",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  hotelSearchController.getRoomInfo,
-);
-
-/* ======================================================
-   HOTEL BOOK
-====================================================== */
-
-router.post(
-  "/book",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  hotelBookingController.bookHotel,
-);
-
-/* ======================================================
-   BOOKING DETAILS
-====================================================== */
-
-router.get(
-  "/booking/:bookingId",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  hotelBookingController.getBookingDetails,
-);
-
-/* ======================================================
-   CANCEL HOTEL
-====================================================== */
-
-router.post(
-  "/cancel",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  hotelBookingController.cancelHotel,
+  hotelController.getStaticHotelDetails,
 );
 
 module.exports = router;

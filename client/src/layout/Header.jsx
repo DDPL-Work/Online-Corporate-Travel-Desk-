@@ -60,7 +60,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
 
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate("/sso-login", { replace: true });
+    navigate("/landing", { replace: true });
   };
 
   const handleProfileNavigation = () => {
@@ -74,7 +74,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
         break;
 
       default:
-        navigate("/sso-login");
+        navigate("/landing");
     }
   };
 

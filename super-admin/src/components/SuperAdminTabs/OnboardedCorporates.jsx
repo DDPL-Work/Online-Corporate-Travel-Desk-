@@ -28,12 +28,12 @@ export default function OnboardedCorporates() {
             Onboarded Corporates
           </h1>
 
-          <button
+          {/* <button
             onClick={() => setOpenAddModal(true)}
             className="flex items-center gap-2 px-5 py-2 bg-[#0A4D68] text-white rounded-md shadow"
           >
             <FiPlusCircle /> Onboard Corporate
-          </button>
+          </button> */}
         </div>
 
         {/* TABLE */}

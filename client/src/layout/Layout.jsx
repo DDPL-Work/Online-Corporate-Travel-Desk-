@@ -51,7 +51,7 @@ export default function Layout() {
   // REDIRECT IF NOT AUTHENTICATED
   // =============================
   if (!isAuthenticated || !token) {
-    return <Navigate to="/sso-login" replace />;
+    return <Navigate to="/landing" replace />;
   }
 
   // =============================

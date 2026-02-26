@@ -259,13 +259,26 @@ export default function MyUpcomingTrips() {
                 {/* Sector */}
                 <div className="flex items-center gap-2 text-gray-600">
                   <FiMapPin />
-                  <span>{snapshot?.sectors?.[0] || "N/A"}</span>
+                  <span>
+                    {(snapshot?.sectors || [])
+                      .map((s) => s.replace("-", " → "))
+                      .join("  |  ") || "N/A"}
+                  </span>
                 </div>
 
                 {/* Date */}
                 <div className="flex items-center gap-2 text-gray-600">
                   <FiCalendar />
-                  <span>{formatDateWithYear(snapshot.travelDate)}</span>
+                  <span>
+                    {[snapshot?.travelDate, snapshot?.returnDate]
+                      .filter(Boolean)
+                      .map((d) => formatDateWithYear(d))
+                      .join("  |  ")}
+                  </span>
+                </div>
+
+                <div className="text-xs text-gray-500">
+                  Booked on {formatDateWithYear(trip.createdAt)}
                 </div>
 
                 {/* Footer */}

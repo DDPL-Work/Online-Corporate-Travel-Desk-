@@ -24,10 +24,10 @@ const C = {
 };
 
 // ─── PAGE CONSTANTS ───────────────────────────────────────────────────────────
-const PW = 595.28; // A4 width  (pt)
-const PH = 841.89; // A4 height (pt)
-const M = 28; // margin
-const CW = PW - M * 2; // content width  539.28
+const PW = 595.28;
+const PH = 841.89;
+const M = 28;
+const CW = PW - M * 2;
 
 // ─── DATE/TIME HELPERS ────────────────────────────────────────────────────────
 const fmtLong = (d) =>
@@ -98,6 +98,45 @@ function drawBarcode(doc, x, y, w, h) {
   }
 }
 
+// FIX: Draw plane icon using shapes instead of emoji (emoji renders as ' in Helvetica)
+function drawPlaneIcon(doc, cx, cy, size = 14) {
+  doc.save();
+  // Draw a simple plane shape using lines/polygons
+  // Fuselage
+  doc
+    .moveTo(cx - size * 0.6, cy)
+    .lineTo(cx + size * 0.6, cy)
+    .lineWidth(2.5)
+    .stroke(C.white);
+  // Nose
+  doc
+    .moveTo(cx + size * 0.4, cy)
+    .lineTo(cx + size * 0.6, cy - size * 0.2)
+    .lineWidth(1.5)
+    .stroke(C.white);
+  doc
+    .moveTo(cx + size * 0.4, cy)
+    .lineTo(cx + size * 0.6, cy + size * 0.2)
+    .lineWidth(1.5)
+    .stroke(C.white);
+  // Wings
+  doc
+    .moveTo(cx - size * 0.1, cy)
+    .lineTo(cx + size * 0.1, cy - size * 0.5)
+    .lineTo(cx + size * 0.3, cy - size * 0.4)
+    .lineTo(cx + size * 0.15, cy)
+    .lineWidth(1)
+    .stroke(C.white);
+  doc
+    .moveTo(cx - size * 0.1, cy)
+    .lineTo(cx + size * 0.1, cy + size * 0.5)
+    .lineTo(cx + size * 0.3, cy + size * 0.4)
+    .lineTo(cx + size * 0.15, cy)
+    .lineWidth(1)
+    .stroke(C.white);
+  doc.restore();
+}
+
 function prohibCircle(doc, cx, cy, r) {
   doc.save().circle(cx, cy, r).lineWidth(1.4).stroke(C.redL).restore();
   const a = Math.PI / 4;
@@ -108,6 +147,114 @@ function prohibCircle(doc, cx, cy, r) {
     .lineWidth(1.4)
     .stroke(C.redL)
     .restore();
+}
+
+// FIX: Enhanced prohibition icon with filled red circle, white interior, and diagonal slash
+
+function drawSimpleIcon(doc, type, cx, cy, size = 8) {
+  doc.save().strokeColor(C.redL).lineWidth(1.2);
+
+  switch (type) {
+    case "lighter":
+      doc.rect(cx - 3, cy - 4, 6, 8).stroke();
+      doc
+        .moveTo(cx, cy - 6)
+        .lineTo(cx, cy - 4)
+        .stroke();
+      break;
+
+    case "bottle":
+      doc.rect(cx - 3, cy - 4, 6, 8).stroke();
+      doc.rect(cx - 1.5, cy - 6, 3, 2).stroke();
+      break;
+
+    case "toxic":
+      doc.circle(cx - 2, cy, 2).stroke();
+      doc.circle(cx + 2, cy, 2).stroke();
+      doc.circle(cx, cy - 3, 2).stroke();
+      break;
+
+    case "corrosive":
+      doc
+        .moveTo(cx - 4, cy - 2)
+        .lineTo(cx + 4, cy - 2)
+        .stroke();
+      doc
+        .moveTo(cx - 2, cy)
+        .lineTo(cx + 2, cy + 4)
+        .stroke();
+      break;
+
+    case "spray":
+      doc.rect(cx - 3, cy - 4, 6, 8).stroke();
+      doc
+        .moveTo(cx + 3, cy - 2)
+        .lineTo(cx + 6, cy - 3)
+        .stroke();
+      break;
+
+    case "gas":
+      doc.circle(cx, cy, 4).stroke();
+      break;
+
+    case "ecig":
+      doc.rect(cx - 5, cy - 1, 10, 2).stroke();
+      break;
+
+    case "bio":
+      doc.circle(cx, cy, 4).stroke();
+      doc
+        .moveTo(cx - 4, cy)
+        .lineTo(cx + 4, cy)
+        .stroke();
+      doc
+        .moveTo(cx, cy - 4)
+        .lineTo(cx, cy + 4)
+        .stroke();
+      break;
+
+    case "radio":
+      doc.circle(cx, cy, 4).stroke();
+      doc.circle(cx, cy, 1).fill(C.redL);
+      break;
+
+    case "explosive":
+      doc
+        .moveTo(cx - 4, cy + 3)
+        .lineTo(cx, cy - 4)
+        .lineTo(cx + 4, cy + 3)
+        .stroke();
+      break;
+  }
+
+  doc.restore();
+}
+
+function drawProhibIcon(doc, cx, cy, r, iconType) {
+  // Red circle
+  doc.save().circle(cx, cy, r).fill(C.redL).restore();
+
+  // White inner circle
+  doc
+    .save()
+    .circle(cx, cy, r * 0.75)
+    .fill(C.white)
+    .restore();
+
+  // Draw specific icon
+  drawSimpleIcon(doc, iconType, cx, cy);
+
+  // Red slash
+  doc.save();
+  const a = Math.PI / 4;
+  const slashLen = r * 1.2;
+  doc
+    .moveTo(cx - slashLen * Math.cos(a), cy - slashLen * Math.sin(a))
+    .lineTo(cx + slashLen * Math.cos(a), cy + slashLen * Math.sin(a))
+    .lineWidth(2)
+    .strokeColor(C.redL)
+    .stroke();
+  doc.restore();
 }
 
 function drawChip(doc, x, y, label, bg = C.bg, tc = C.primary, bc = C.border) {
@@ -137,14 +284,11 @@ function secHeading(doc, x, y, label) {
 async function fetchAirlineLogoBuffer(code) {
   try {
     if (!code) return null;
-
     const url = `https://images.kiwi.com/airlines/64x64/${code}.png`;
-
     const response = await axios.get(url, {
       responseType: "arraybuffer",
       timeout: 5000,
     });
-
     return Buffer.from(response.data);
   } catch (err) {
     console.log("Airline logo fetch failed:", err.message);
@@ -154,12 +298,6 @@ async function fetchAirlineLogoBuffer(code) {
 
 // ─── MAIN FUNCTION ────────────────────────────────────────────────────────────
 
-/**
- * @param {Object} booking      – Full MongoDB booking document
- * @param {string} journeyType  – "onward" | "return"
- * @param {string} outputDir    – Directory to save PDF
- * @returns {Promise<string>}   – Resolved filepath
- */
 async function generateFlightTicketPdfKit({
   booking,
   journeyType = "onward",
@@ -167,20 +305,53 @@ async function generateFlightTicketPdfKit({
 }) {
   return new Promise(async (resolve, reject) => {
     try {
-      // ══════════════════════════════════════════════════════════════
-      // A. EXTRACT & DERIVE ALL DATA FROM BOOKING DOCUMENT
-      // ══════════════════════════════════════════════════════════════
+      // const segment =
+      //   booking.flightRequest.segments.find(
+      //     (s) => s.journeyType === journeyType,
+      //   ) || booking.flightRequest.segments[0];
 
-      const segment =
-        booking.flightRequest.segments.find(
-          (s) => s.journeyType === journeyType,
-        ) || booking.flightRequest.segments[0];
+      let journeyResponse = null;
+
+      const br = booking?.bookingResult;
+
+      // 1️⃣ Round-trip structure
+      if (br?.onwardResponse || br?.returnResponse) {
+        const selected =
+          journeyType === "return" ? br.returnResponse : br.onwardResponse;
+
+        journeyResponse =
+          selected?.raw?.Response?.Response || // <-- THIS FIXES ROUNDTRIP
+          selected?.Response?.Response ||
+          selected?.Response ||
+          null;
+      }
+
+      // 2️⃣ One-way (providerResponse WITHOUT raw)
+      if (!journeyResponse && br?.providerResponse?.Response) {
+        journeyResponse = br.providerResponse?.Response?.Response;
+      }
+
+      // 3️⃣ One-way (providerResponse WITH raw)
+      if (!journeyResponse && br?.providerResponse?.raw?.Response) {
+        journeyResponse = br.providerResponse?.raw?.Response?.Response;
+      }
+
+      // Final safety
+      if (!journeyResponse) {
+        console.error("Unsupported bookingResult structure:", br);
+        throw new Error("Invalid bookingResult structure");
+      }
+
+      const journeySegments = journeyResponse?.FlightItinerary?.Segments || [];
+
+      if (!journeySegments.length) {
+        throw new Error(`No segments found for ${journeyType} journey`);
+      }
 
       const passenger =
         booking.travellers.find((t) => t.isLeadPassenger) ||
         booking.travellers[0];
 
-      // PNR
       const pnr =
         journeyType === "return"
           ? booking.bookingResult?.returnPNR || "—"
@@ -188,14 +359,8 @@ async function generateFlightTicketPdfKit({
             booking.bookingResult?.pnr ||
             "—";
 
-      // E-Ticket / TBO Conf No
-      const eTicket =
-        booking.bookingResult?.providerResponse?.Response?.Response
-          ?.FlightItinerary?.TBOConfNo ||
-        pnr ||
-        "—";
+      const eTicket = journeyResponse?.FlightItinerary?.TBOConfNo || pnr || "—";
 
-      // Total amount paid
       const totalAmount =
         booking.pricingSnapshot?.totalAmount ||
         booking.pricing?.totalAmount ||
@@ -203,83 +368,152 @@ async function generateFlightTicketPdfKit({
           ?.FlightItinerary?.Fare?.PublishedFare ||
         "—";
 
-      // SSR – seat
       const seatNo =
         booking.flightRequest?.ssrSnapshot?.seats?.[0]?.seatNo || "—";
 
-      // SSR – meal
       const hasMeal =
         booking.flightRequest?.fareQuote?.Results?.[0]?.IsFreeMealAvailable;
       const mealOption = hasMeal ? "Complimentary" : "—";
 
-      // SSR – wheelchair (check Ssr array in passenger or ssrSnapshot)
       const ssrList =
-        booking.bookingResult?.providerResponse?.Response?.Response
-          ?.FlightItinerary?.Passenger?.[0]?.Ssr || [];
+        journeyResponse?.FlightItinerary?.Passenger?.[0]?.Ssr || [];
+
       const hasWheelchair = ssrList.some((s) =>
         /wheel/i.test(JSON.stringify(s)),
       );
+      const firstLeg = journeySegments[0];
+      const checkInBag = firstLeg?.Baggage || "15 KG";
+      const cabinBag = firstLeg?.CabinBaggage || "7 KG";
 
-      // Baggage
-      const checkInBag = segment.baggage?.checkIn || "15 Kgs (1 piece)";
-      const cabinBag = segment.baggage?.cabin || "7 Kgs";
-
-      // Fare type & cabin
       const fareType =
         booking.flightRequest?.fareQuote?.Results?.[0]?.ResultFareType ||
         booking.bookingSnapshot?.fareType ||
         "Regular Fare";
+
       const cabinMap = {
-        1: "First",
+        1: "All Classes",
         2: "Economy",
         3: "Premium Economy",
         4: "Business",
+        5: "Premium Business",
+        6: "First",
       };
+
       const cabinClass =
-        cabinMap[segment.cabinClass] ||
+        cabinMap[firstLeg?.CabinClass] ||
         booking.bookingSnapshot?.cabinClass ||
         "Economy";
 
-      // Non-stop
-      const isNonStop = !segment.stopOver;
+      // const isNonStop = !segment.stopOver;
+      const stopCount = journeySegments.length - 1;
+      const isNonStop = stopCount === 0;
 
-      // Formatted values
+      let layoverInfo = null;
+
+      if (stopCount > 0) {
+        const layovers = [];
+
+        for (let i = 0; i < journeySegments.length - 1; i++) {
+          const currentLeg = journeySegments[i];
+          const nextLeg = journeySegments[i + 1];
+
+          const arrivalTime = new Date(currentLeg?.Destination?.ArrTime);
+          const departureTime = new Date(nextLeg?.Origin?.DepTime);
+
+          const layoverMinutes = Math.max(
+            0,
+            Math.round((departureTime - arrivalTime) / (1000 * 60)),
+          );
+
+          const airportName =
+            currentLeg?.Destination?.Airport?.CityName ||
+            currentLeg?.Destination?.Airport?.AirportCode ||
+            "Unknown";
+
+          layovers.push({
+            airport: airportName,
+            duration: fmtDur(layoverMinutes),
+          });
+        }
+
+        layoverInfo = layovers;
+      }
+
       const passengerName =
         `${passenger.title.toUpperCase()}. ${passenger.firstName} ${passenger.lastName}`.toUpperCase();
-      const originCity = segment.origin.city;
-      const destCity = segment.destination.city;
-      const originCode = segment.origin.airportCode;
-      const destCode = segment.destination.airportCode;
+      // const originCity = segment.origin.city;
+      // const destCity = segment.destination.city;
+      const lastLeg = journeySegments[journeySegments.length - 1];
+
+      const originCity = firstLeg?.Origin?.Airport?.CityName || "—";
+      const destCity = lastLeg?.Destination?.Airport?.CityName || "—";
+
+      const originCode = firstLeg?.Origin?.Airport?.AirportCode || "—";
+      const destCode = lastLeg?.Destination?.Airport?.AirportCode || "—";
+
       const originAirport =
-        segment.origin.airportName +
-        (segment.origin.terminal ? ` T${segment.origin.terminal}` : "");
-      const destAirport =
-        segment.destination.airportName +
-        (segment.destination.terminal
-          ? ` T${segment.destination.terminal}`
+        firstLeg?.Origin?.Airport?.AirportName +
+        (firstLeg?.Origin?.Airport?.Terminal
+          ? ` T${firstLeg.Origin.Airport.Terminal}`
           : "");
-      const depTime = fmtTime(segment.departureDateTime);
-      const arrTime = fmtTime(segment.arrivalDateTime);
-      const depDate = `${fmtDow(segment.departureDateTime)}, ${fmtShort(segment.departureDateTime)}`;
-      const arrDate = `${fmtDow(segment.arrivalDateTime)}, ${fmtShort(segment.arrivalDateTime)}`;
-      const duration = fmtDur(segment.durationMinutes);
-      const flightNum = `${segment.airlineCode}-${segment.flightNumber}`;
-      const airlineName = segment.airlineName.toUpperCase();
+
+      const destAirport =
+        lastLeg?.Destination?.Airport?.AirportName +
+        (lastLeg?.Destination?.Airport?.Terminal
+          ? ` T${lastLeg.Destination.Airport.Terminal}`
+          : "");
+
+      const depTime = fmtTime(firstLeg?.Origin?.DepTime);
+      const arrTime = fmtTime(lastLeg?.Destination?.ArrTime);
+
+      const depDate = `${fmtDow(firstLeg?.Origin?.DepTime)}, ${fmtShort(firstLeg?.Origin?.DepTime)}`;
+      const arrDate = `${fmtDow(lastLeg?.Destination?.ArrTime)}, ${fmtShort(lastLeg?.Destination?.ArrTime)}`;
+
+      // const duration = fmtDur(segment.durationMinutes);
+
+      let duration;
+
+      if (stopCount === 0) {
+        // Non-stop → show total duration
+        const totalDuration = journeySegments.reduce(
+          (sum, s) => sum + (s?.Duration || 0),
+          0,
+        );
+        duration = fmtDur(totalDuration);
+      } else {
+        // With layover → show each leg duration separately
+        duration = journeySegments
+          .map((s) => fmtDur(s?.Duration || 0))
+          .join(" + ");
+      }
+
+      // const duration = fmtDur(totalDuration);
+      // const flightNum = `${segment.airlineCode}-${segment.flightNumber}`;
+      // const airlineName = segment.airlineName.toUpperCase();
+
+      const airlineName = firstLeg?.Airline?.AirlineName?.toUpperCase() || "—";
+
+      const flightNum = journeySegments
+        .map(
+          (leg) => `${leg?.Airline?.AirlineCode}-${leg?.Airline?.FlightNumber}`,
+        )
+        .join(" / ");
+
       const airlineLogoBuffer = await fetchAirlineLogoBuffer(
-        segment.airlineCode,
+        firstLeg?.Airline?.AirlineCode,
       );
+
       const downloadDate = fmtLong(new Date());
       const bookingDate = fmtShort(booking.createdAt);
 
-      const fareBreakup =
-        booking.bookingResult?.providerResponse?.Response?.Response
-          ?.FlightItinerary?.Fare;
+      // const fareBreakup =
+      //   booking.bookingResult?.providerResponse?.Response?.Response
+      //     ?.FlightItinerary?.Fare;
+
+      const fareBreakup = journeyResponse?.FlightItinerary?.Fare;
 
       const baseFare = Number(fareBreakup?.BaseFare || 0);
       const tax = Number(fareBreakup?.Tax || 0);
-    //   const yqTax = Number(fareBreakup?.YQTax || 0);
-    //   const otherCharges = Number(fareBreakup?.OtherCharges || 0);
-    //   const serviceFee = Number(fareBreakup?.ServiceFee || 0);
       const seatCharges = Number(
         booking.flightRequest?.ssrSnapshot?.totalSeatAmount || 0,
       );
@@ -287,25 +521,17 @@ async function generateFlightTicketPdfKit({
         booking.flightRequest?.ssrSnapshot?.totalMealAmount || 0,
       );
 
-      const grandTotal =
-        baseFare +
-        tax +
-        // yqTax +
-        // otherCharges +
-        // serviceFee +
-        seatCharges +
-        mealCharges;
+      const grandTotal = baseFare + tax + seatCharges + mealCharges;
 
-      // ══════════════════════════════════════════════════════════════
-      // B. CREATE PDF DOCUMENT
-      // ══════════════════════════════════════════════════════════════
-
+      // ── CREATE PDF — autoFirstPage:false to prevent blank pages ──
       const filename = `ticket-${booking.bookingReference}-${randomUUID()}.pdf`;
       const filepath = path.join(outputDir, filename);
 
+      // FIX: Use autoFirstPage:false and manually add page to avoid blank page issues
       const doc = new PDFDocument({
         size: "A4",
         margins: { top: M, bottom: M, left: M, right: M },
+        autoFirstPage: false,
         info: {
           Title: `Flight Ticket – ${originCity} to ${destCity}`,
           Author: "TravelPortal",
@@ -316,14 +542,15 @@ async function generateFlightTicketPdfKit({
       const writeStream = fs.createWriteStream(filepath);
       doc.pipe(writeStream);
 
+      // Add first page manually
+      doc.addPage();
+
       // ── PAGE BACKGROUND ──
       fillR(doc, 0, 0, PW, PH, 0, C.bg);
 
       let Y = M;
 
-      // ══════════════════════════════════════════════════════════════
       // 1. DATE LINE
-      // ══════════════════════════════════════════════════════════════
       doc
         .font("Helvetica")
         .fontSize(8)
@@ -331,11 +558,7 @@ async function generateFlightTicketPdfKit({
         .text(downloadDate, M, Y, { lineBreak: false });
       Y += 16;
 
-      // ══════════════════════════════════════════════════════════════
-      // 2. TOP HEADER — Brand LEFT  |  Ticket Info RIGHT
-      // ══════════════════════════════════════════════════════════════
-
-      // "my" orange pill
+      // 2. TOP HEADER
       fillR(doc, M, Y, 24, 17, 3, C.accent);
       doc
         .font("Helvetica-Bold")
@@ -343,7 +566,6 @@ async function generateFlightTicketPdfKit({
         .fillColor(C.white)
         .text("CTD", M + 4, Y + 4, { lineBreak: false });
 
-      // "Partner" + "by MakeMyTrip"
       doc
         .font("Helvetica-Bold")
         .fontSize(13)
@@ -355,7 +577,6 @@ async function generateFlightTicketPdfKit({
         .fillColor(C.muted)
         .text("by Corporate Travel Desk", M + 30, Y + 14, { lineBreak: false });
 
-      // Right: "Flight Ticket (One way)"
       const rightW = 220;
       const rightX = PW - M - rightW;
       doc
@@ -367,11 +588,7 @@ async function generateFlightTicketPdfKit({
           align: "right",
           lineBreak: false,
         });
-      // "(One way)" suffix — measure and place inline
-      const ftW = doc
-        .font("Helvetica-Bold")
-        .fontSize(9.5)
-        .widthOfString("Flight E-Ticket");
+
       doc
         .font("Helvetica")
         .fontSize(8)
@@ -385,8 +602,6 @@ async function generateFlightTicketPdfKit({
           { lineBreak: false },
         );
 
-      // Booking ID line
-      // Booking ID + Date (clean single-line right aligned)
       doc
         .font("Helvetica")
         .fontSize(8)
@@ -415,13 +630,10 @@ async function generateFlightTicketPdfKit({
 
       Y += 34;
 
-      // ══════════════════════════════════════════════════════════════
       // 3. BARCODE CARD
-      // ══════════════════════════════════════════════════════════════
       const bcCardH = 72;
       fillStrokeR(doc, M, Y, CW, bcCardH, 8, C.card, C.border, 1.2);
 
-      // Journey label row
       doc
         .font("Helvetica")
         .fontSize(8.5)
@@ -457,15 +669,6 @@ async function generateFlightTicketPdfKit({
         .fillColor(C.accent)
         .text(airlineName, lx, Y + 12, { lineBreak: false });
 
-      // Passenger name
-      //   doc.font("Helvetica-Bold").fontSize(11).fillColor(C.text)
-      //      .text(passengerName.toLowerCase(), M + 14, Y + 32, { lineBreak: false });
-      //   doc
-      //     .font("Helvetica-Bold")
-      //     .fontSize(16) // Increased from 11 → 16
-      //     .fillColor(C.primary)
-      //     .text(passengerName, M + 14, Y + 30, { lineBreak: false });
-
       doc
         .font("Helvetica")
         .fontSize(9)
@@ -478,18 +681,14 @@ async function generateFlightTicketPdfKit({
         .fillColor(C.primary)
         .text(passengerName, M + 14, Y + 32);
 
-      // Barcode
       drawBarcode(doc, PW - M - 128, Y + 16, 114, 38);
 
       Y += bcCardH + 12;
 
-      // ══════════════════════════════════════════════════════════════
       // 4. BOOKING DETAILS HEADING
-      // ══════════════════════════════════════════════════════════════
       secHeading(doc, M, Y, "Booking Details");
       Y += 22;
 
-      // Route big title
       doc
         .font("Helvetica-Bold")
         .fontSize(18)
@@ -497,9 +696,8 @@ async function generateFlightTicketPdfKit({
         .text(`${originCity} – ${destCity}`, M, Y, { lineBreak: false });
       Y += 22;
 
-      // Route sub-line: date • stop type • duration
       let sx = M;
-      const subStr1 = `${depDate} ${new Date(segment.departureDateTime).getFullYear()} • `;
+      const subStr1 = `${depDate} ${new Date(firstLeg?.Origin?.DepTime).getFullYear()} • `;
       const subStr2 = isNonStop ? "Non stop" : "Connecting";
       const subStr3 = ` • ${duration} duration`;
       doc
@@ -521,39 +719,33 @@ async function generateFlightTicketPdfKit({
         .text(subStr3, sx, Y, { lineBreak: false });
       Y += 14;
 
-      // ══════════════════════════════════════════════════════════════
       // 5. MAIN TICKET CARD
-      // ══════════════════════════════════════════════════════════════
       const tcardY = Y;
       const tblRowsH = booking.travellers.length * 26;
       const tcardH =
         42 + 90 + 26 + 26 + 14 + 14 + tblRowsH + (hasWheelchair ? 42 : 8);
       fillStrokeR(doc, M, tcardY, CW, tcardH, 8, C.card, C.border, 1.2);
 
-      // ── 5a. AIRLINE STRIP ──
+      // 5a. AIRLINE STRIP
       const stripH = 42;
       doc.save().roundedRect(M, tcardY, CW, stripH, 8).clip();
       fillR(doc, M, tcardY, CW, stripH, 0, C.primary);
       doc.restore();
 
-      // Airline code pill
-      // Airline Logo
       if (airlineLogoBuffer) {
         doc.image(airlineLogoBuffer, M + 12, tcardY + 8, {
           width: 28,
           height: 28,
         });
       } else {
-        // fallback to code if image fails
         fillR(doc, M + 12, tcardY + 12, 28, 14, 3, C.accent);
         doc
           .font("Helvetica-Bold")
           .fontSize(8.5)
           .fillColor(C.white)
-          .text(segment.airlineCode, M + 14, tcardY + 15);
+          .text(firstLeg?.Airline?.AirlineCode || "", M + 14, tcardY + 15);
       }
 
-      // Airline name + flight number
       doc
         .font("Helvetica-Bold")
         .fontSize(8.5)
@@ -565,7 +757,6 @@ async function generateFlightTicketPdfKit({
         .fillColor("rgba(255,255,255,0.55)")
         .text(flightNum, M + 46, tcardY + 22, { lineBreak: false });
 
-      // PNR
       fillR(doc, M + 200, tcardY + 12, 26, 14, 3, C.accent);
       doc
         .font("Helvetica-Bold")
@@ -582,10 +773,9 @@ async function generateFlightTicketPdfKit({
           characterSpacing: 1.5,
         });
 
-      // ── 5b. FLIGHT TIMES SECTION ──
+      // 5b. FLIGHT TIMES SECTION
       const tY = tcardY + stripH + 10;
 
-      // LEFT — Origin
       doc
         .font("Helvetica-Bold")
         .fontSize(11)
@@ -601,20 +791,6 @@ async function generateFlightTicketPdfKit({
         .fontSize(26)
         .fillColor(C.primary)
         .text(depTime, M + 12, tY + 22, { lineBreak: false });
-      //   doc
-      //     .font("Helvetica")
-      //     .fontSize(7)
-      //     .fillColor(C.muted)
-      //     .text(
-      //       "hrs",
-      //       M +
-      //         12 +
-      //         doc.font("Helvetica-Bold").fontSize(26).widthOfString(depTime) +
-      //         3,
-      //       tY + 34,
-      //       { lineBreak: false },
-      //     );
-
       doc
         .font("Helvetica")
         .fontSize(7.5)
@@ -633,11 +809,11 @@ async function generateFlightTicketPdfKit({
       const leftLineEnd = M + 158;
       const rightLineStart = M + CW - 158;
 
-      doc
-        .font("Helvetica")
-        .fontSize(9)
-        .fillColor(C.muted)
-        .text(duration, midX - 35, tY + 2, { width: 70, align: "center" });
+      // doc
+      //   .font("Helvetica")
+      //   .fontSize(9)
+      //   .fillColor(C.muted)
+      //   .text(duration, midX - 35, tY + 2, { width: 70, align: "center" });
 
       // Left dot
       doc
@@ -648,13 +824,47 @@ async function generateFlightTicketPdfKit({
         .restore();
       // Left line
       hLine(doc, leftLineEnd + dotR, midX - 14, lineY2, C.accent, 1.2);
-      // Plane circle (orange)
+      // FIX: Plane circle — draw plane using shapes instead of emoji
       fillR(doc, midX - 13, lineY2 - 7, 26, 14, 7, C.accent);
+      // Draw simple plane as lines (no emoji)
+      doc.save();
+      const px = midX;
+      const py = lineY2;
+      // fuselage
       doc
-        .font("Helvetica-Bold")
-        .fontSize(11)
-        .fillColor(C.white)
-        .text("✈", midX - 8, lineY2 - 5, { lineBreak: false });
+        .moveTo(px - 7, py)
+        .lineTo(px + 7, py)
+        .lineWidth(2)
+        .strokeColor(C.white)
+        .stroke();
+      // wings
+      doc
+        .moveTo(px - 1, py)
+        .lineTo(px + 2, py - 5)
+        .lineTo(px + 5, py - 4)
+        .lineTo(px + 3, py)
+        .lineWidth(0.8)
+        .strokeColor(C.white)
+        .stroke();
+      doc
+        .moveTo(px - 1, py)
+        .lineTo(px + 2, py + 5)
+        .lineTo(px + 5, py + 4)
+        .lineTo(px + 3, py)
+        .lineWidth(0.8)
+        .strokeColor(C.white)
+        .stroke();
+      // tail
+      doc
+        .moveTo(px - 5, py)
+        .lineTo(px - 3, py - 3)
+        .lineTo(px - 1, py - 2)
+        .lineTo(px - 2, py)
+        .lineWidth(0.6)
+        .strokeColor(C.white)
+        .stroke();
+      doc.restore();
+
       // Right line
       hLine(doc, midX + 13, rightLineStart - dotR, lineY2, C.accent, 1.5);
       // Right dot
@@ -665,7 +875,13 @@ async function generateFlightTicketPdfKit({
         .stroke(C.accent)
         .restore();
 
-      const stopLabel = isNonStop ? "NON STOP" : "1 STOP";
+      // const stopLabel = isNonStop ? "NON STOP" : "1 STOP";
+      // const stopCount = journeySegments.length - 1;
+
+      const stopLabel =
+        stopCount === 0
+          ? "NON STOP"
+          : `${stopCount} STOP${stopCount > 1 ? "S" : ""}`;
 
       doc
         .font("Helvetica-Bold")
@@ -676,8 +892,23 @@ async function generateFlightTicketPdfKit({
           align: "center",
         });
 
+      // Layover details (if any)
+      if (layoverInfo && layoverInfo.length) {
+        const layoverText = layoverInfo
+          .map((l) => `Layover at ${l.airport} • ${l.duration}`)
+          .join("  |  ");
+
+        doc
+          .font("Helvetica")
+          .fontSize(7)
+          .fillColor(C.muted)
+          .text(layoverText, midX - 100, lineY2 + 24, {
+            width: 200,
+            align: "center",
+          });
+      }
+
       // RIGHT — Destination
-      const rCol = PW - M - 12;
       doc
         .font("Helvetica-Bold")
         .fontSize(11)
@@ -724,20 +955,19 @@ async function generateFlightTicketPdfKit({
           lineBreak: true,
         });
 
-      // ── 5c. DASHED DIVIDER 1 ──
+      // 5c. DASHED DIVIDER 1
       const div1Y = tcardY + stripH + 96;
       hDash(doc, M + 8, M + CW - 8, div1Y);
 
-      // ── 5d. FARE CHIPS ──
+      // 5d. FARE CHIPS
       const chipRowY = div1Y + 8;
       let chipX2 = M + 12;
       chipX2 += drawChip(doc, chipX2, chipRowY, fareType);
       chipX2 += drawChip(doc, chipX2, chipRowY, cabinClass);
       drawChip(doc, chipX2, chipRowY, "Armed Forces Fare");
 
-      // ── 5e. BAGGAGE ROW ──
+      // 5e. BAGGAGE ROW
       const bagRowY = chipRowY + 24;
-      // Check-in bag
       fillR(doc, M + 12, bagRowY + 1, 9, 8, 1, C.accent);
       fillR(doc, M + 15, bagRowY - 1, 3, 3, 1, C.accent);
       doc
@@ -757,7 +987,6 @@ async function generateFlightTicketPdfKit({
           bagRowY + 2,
           { lineBreak: false },
         );
-      // Cabin bag
       fillR(doc, M + 230, bagRowY + 1, 9, 8, 1, C.accent2);
       doc
         .font("Helvetica-Bold")
@@ -777,11 +1006,11 @@ async function generateFlightTicketPdfKit({
           { lineBreak: false },
         );
 
-      // ── 5f. DASHED DIVIDER 2 ──
+      // 5f. DASHED DIVIDER 2
       const div2Y = bagRowY + 20;
       hDash(doc, M + 8, M + CW - 8, div2Y);
 
-      // ── 5g. TRAVELLER TABLE HEADER ──
+      // 5g. TRAVELLER TABLE HEADER
       const thY = div2Y + 8;
       const cols = [M + 12, M + 220, M + 300, M + 370];
       ["TRAVELLER", "SEAT", "MEAL", "E-TICKET NO"].forEach((h, i) => {
@@ -792,7 +1021,7 @@ async function generateFlightTicketPdfKit({
           .text(h, cols[i], thY, { lineBreak: false, characterSpacing: 0.5 });
       });
 
-      // ── 5h. TRAVELLER ROWS (dynamic — all travellers) ──
+      // 5h. TRAVELLER ROWS
       let trY = thY + 14;
       booking.travellers.forEach((t) => {
         const tName =
@@ -833,7 +1062,7 @@ async function generateFlightTicketPdfKit({
         trY += 26;
       });
 
-      // ── 5i. WHEELCHAIR / SSR NOTICE (only if applicable) ──
+      // 5i. WHEELCHAIR NOTICE
       if (hasWheelchair) {
         const wcY = trY + 4;
         fillR(doc, M + 8, wcY, CW - 16, 34, 5, "#fff8f3");
@@ -849,7 +1078,7 @@ async function generateFlightTicketPdfKit({
           .fontSize(8.5)
           .fillColor(C.text)
           .text(
-            "♿  Wheelchair request has been accepted* by the airline.",
+            "Wheelchair request has been accepted* by the airline.",
             M + 16,
             wcY + 5,
             { lineBreak: false },
@@ -868,10 +1097,7 @@ async function generateFlightTicketPdfKit({
 
       Y = tcardY + tcardH + 12;
 
-      // ══════════════════════════════════════════════════════════════
       // 6. PAYMENT BREAKDOWN
-      // ══════════════════════════════════════════════════════════════
-
       const payCardH = 120;
       fillStrokeR(doc, M, Y, CW, payCardH, 8, C.card, C.border, 1.2);
 
@@ -880,24 +1106,19 @@ async function generateFlightTicketPdfKit({
       let payY = Y + 32;
 
       const fareRows = [
-        ["Base Fare", baseFare],
-        ["Tax", tax],
-        // ["YQ Tax", yqTax],
-        // ["Other Charges", otherCharges],
-        // ["Service Fee", serviceFee],
+        ["Base Fare", Math.ceil(baseFare)],
+        ["Tax", Math.ceil(tax)],
         ["Seat Charges", seatCharges],
         ["Meal Charges", mealCharges],
       ];
 
       fareRows.forEach(([label, amount]) => {
         if (!amount) return;
-
         doc
           .font("Helvetica")
           .fontSize(8)
           .fillColor(C.text)
           .text(label, M + 20, payY);
-
         doc
           .font("Helvetica")
           .fontSize(8)
@@ -906,35 +1127,29 @@ async function generateFlightTicketPdfKit({
             width: 80,
             align: "right",
           });
-
         payY += 14;
       });
 
-      // Divider
       hLine(doc, M + 20, PW - M - 20, payY);
       payY += 8;
 
-      // Grand Total
       doc
         .font("Helvetica-Bold")
         .fontSize(11)
         .fillColor(C.primary)
         .text("Grand Total", M + 20, payY);
-
       doc
         .font("Helvetica-Bold")
         .fontSize(12)
         .fillColor(C.primary)
-        .text(`INR ${grandTotal.toFixed(2)}`, PW - M - 100, payY, {
+        .text(`INR ${Math.ceil(grandTotal).toFixed(2)}`, PW - M - 100, payY, {
           width: 80,
           align: "right",
         });
 
       Y += payCardH + 12;
 
-      // ══════════════════════════════════════════════════════════════
       // 7. PROHIBITED ITEMS SECTION
-      // ══════════════════════════════════════════════════════════════
       const icCardH = 110;
       fillStrokeR(doc, M, Y, CW, icCardH, 8, C.card, C.border, 1.2);
 
@@ -952,37 +1167,40 @@ async function generateFlightTicketPdfKit({
           lineBreak: false,
         });
 
-      // Two rows of prohibited items
+      // FIX: Use improved prohibition icons (filled red circle with slash)
       const prohibited = [
         [
-          "Lighters,\nMatchsticks",
-          "Flammable\nLiquids",
-          "Toxic",
-          "Corrosives",
-          "Pepper\nSpray",
+          { label: "Lighters,\nMatchsticks", icon: "lighter" },
+          { label: "Flammable\nLiquids", icon: "bottle" },
+          { label: "Toxic", icon: "toxic" },
+          { label: "Corrosives", icon: "corrosive" },
+          { label: "Pepper\nSpray", icon: "spray" },
         ],
         [
-          "Flammable\nGas",
-          "E-Cigarette",
-          "Infectious\nSubstances",
-          "Radioactive\nMaterials",
-          "Explosives\nAmmunition",
+          { label: "Flammable\nGas", icon: "gas" },
+          { label: "E-Cigarette", icon: "ecig" },
+          { label: "Infectious\nSubstances", icon: "bio" },
+          { label: "Radioactive\nMaterials", icon: "radio" },
+          { label: "Explosives\nAmmunition", icon: "explosive" },
         ],
       ];
+
       const iconSpc = (leftColW - 16) / 5;
       prohibited.forEach((row, ri) => {
         const ry = Y + 32 + ri * 36;
-        row.forEach((lbl, ci) => {
+
+        row.forEach((item, ci) => {
           const icx = M + 8 + iconSpc * ci + iconSpc / 2;
-          prohibCircle(doc, icx, ry + 10, 10);
+
+          drawProhibIcon(doc, icx, ry + 10, 11, item.icon);
+
           doc
             .font("Helvetica")
             .fontSize(5.5)
             .fillColor(C.text)
-            .text(lbl, icx - iconSpc / 2 + 2, ry + 22, {
+            .text(item.label, icx - iconSpc / 2 + 2, ry + 22, {
               width: iconSpc - 4,
               align: "center",
-              lineBreak: true,
             });
         });
       });
@@ -1004,39 +1222,42 @@ async function generateFlightTicketPdfKit({
           lineBreak: true,
         });
 
-      // Lithium batteries icon (simple rect)
-      fillR(doc, rpX + 44, Y + 44, 18, 22, 2, "rgba(255,255,255,0.25)");
-      fillR(doc, rpX + 49, Y + 41, 8, 4, 1, "rgba(255,255,255,0.25)");
+      // Lithium battery icon (improved)
+      // Battery body
+      fillR(doc, rpX + 40, Y + 44, 22, 26, 2, "rgba(255,255,255,0.30)");
+      // Battery terminal
+      fillR(doc, rpX + 47, Y + 41, 8, 5, 1, "rgba(255,255,255,0.30)");
+      // Plus sign
       doc
         .font("Helvetica-Bold")
-        .fontSize(11)
+        .fontSize(14)
         .fillColor(C.white)
-        .text("+", rpX + 48, Y + 50, { lineBreak: false });
+        .text("+", rpX + 46, Y + 50, { lineBreak: false });
       doc
-        .font("Helvetica")
+        .font("Helvetica-Bold")
         .fontSize(5.5)
         .fillColor(C.white)
-        .text("LITHIUM\nBATTERIES", rpX + 4, Y + 68, {
+        .text("LITHIUM\nBATTERIES", rpX + 4, Y + 72, {
           width: rpW - 8,
           align: "center",
         });
 
-      // Power bank icon
-      fillR(doc, rpX + 43, Y + 83, 20, 12, 2, "rgba(255,255,255,0.25)");
+      // Power bank icon (improved)
+      fillR(doc, rpX + 39, Y + 84, 24, 14, 2, "rgba(255,255,255,0.30)");
+      // USB port indicator
+      fillR(doc, rpX + 61, Y + 89, 4, 4, 1, "rgba(255,255,255,0.50)");
       doc
-        .font("Helvetica")
+        .font("Helvetica-Bold")
         .fontSize(5.5)
         .fillColor(C.white)
-        .text("POWER\nBANKS", rpX + 4, Y + 97, {
+        .text("POWER\nBANKS", rpX + 4, Y + 99, {
           width: rpW - 8,
           align: "center",
         });
 
       Y += icCardH + 12;
 
-      // ══════════════════════════════════════════════════════════════
       // 8. IMPORTANT INFORMATION
-      // ══════════════════════════════════════════════════════════════
       const infoItems = [
         {
           bold: "Airport Reporting Time :",
@@ -1068,8 +1289,7 @@ async function generateFlightTicketPdfKit({
         },
       ];
 
-      // ── Measure info card height first ──
-      let infoInnerH = 24; // heading
+      let infoInnerH = 24;
       infoItems.forEach((item) => {
         const fullText = (item.bold ? item.bold + " " : "") + item.text;
         const measuredH = doc
@@ -1080,19 +1300,25 @@ async function generateFlightTicketPdfKit({
       });
       const infoCardH = infoInnerH + 8;
 
+      // FIX: Check if info card fits on current page, if not add new page
+      const remainingSpace = PH - M - Y;
+      if (infoCardH + 60 > remainingSpace) {
+        doc.addPage();
+        fillR(doc, 0, 0, PW, PH, 0, C.bg);
+        Y = M;
+      }
+
       fillStrokeR(doc, M, Y, CW, infoCardH, 8, C.card, C.border, 1.2);
       secHeading(doc, M + 12, Y + 10, "Important Information");
 
       let infoY = Y + 28;
       infoItems.forEach((item) => {
-        // Bullet dot
         fillR(doc, M + 13, infoY + 4, 3, 3, 1.5, C.accent);
-
         doc
           .font("Helvetica")
           .fontSize(7.5)
           .fillColor(C.text)
-          .text("", M + 22, infoY); // move cursor
+          .text("", M + 22, infoY);
 
         if (item.bold) {
           doc
@@ -1124,9 +1350,7 @@ async function generateFlightTicketPdfKit({
 
       Y += infoCardH + 12;
 
-      // ══════════════════════════════════════════════════════════════
       // 9. FOOTER
-      // ══════════════════════════════════════════════════════════════
       doc
         .font("Helvetica")
         .fontSize(7.5)
@@ -1180,7 +1404,6 @@ async function generateFlightTicketPdfKit({
           { lineBreak: false },
         );
 
-      // ── FINALIZE ──
       doc.end();
       writeStream.on("finish", () => resolve(filepath));
       writeStream.on("error", reject);
@@ -1189,20 +1412,5 @@ async function generateFlightTicketPdfKit({
     }
   });
 }
-
-// ─── INTEGRATION SNIPPET ─────────────────────────────────────────────────────
-// In your PDFService class (pdf.service.js), replace the puppeteer-based
-// generateFlightTicketPdf method with:
-//
-//   const { generateFlightTicketPdfKit } = require("./flight_ticket_pdfkit");
-//
-//   async generateFlightTicketPdf({ booking, journeyType }) {
-//     return generateFlightTicketPdfKit({
-//       booking,
-//       journeyType,
-//       outputDir: this.ticketDir,
-//     });
-//   }
-//
 
 module.exports = { generateFlightTicketPdfKit };

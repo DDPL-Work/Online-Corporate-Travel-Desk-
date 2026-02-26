@@ -2,7 +2,6 @@ const axios = require("axios");
 const config = require("../../config/tbo.hotel.config");
 const logger = require("../../utils/logger");
 const ApiError = require("../../utils/ApiError");
-const { env } = require("../../config");
 
 class HotelService {
   constructor() {
@@ -12,12 +11,16 @@ class HotelService {
     };
   }
 
-  /* ---------------- ENV ---------------- */
+  /* =====================================================
+     ENV
+  ====================================================== */
   getEnv() {
     return process.env.NODE_ENV === "production" ? "live" : "dummy";
   }
 
-  /* ---------------- TOKEN ---------------- */
+  /* =====================================================
+     TOKEN HANDLING
+  ====================================================== */
   isExpired(token) {
     return !token.value || Date.now() >= token.expiry;
   }
@@ -26,17 +29,16 @@ class HotelService {
     const cfg = config[type];
 
     try {
-      const payload = {
-        ClientId: cfg.credentials.clientId,
-        UserName: cfg.credentials.username,
-        Password: cfg.credentials.password,
-        EndUserIp: cfg.endUserIp,
-      };
-
-      const url = `${cfg.sharedBase || cfg.base}${cfg.endpoints.authenticate}`;
-      const { data } = await axios.post(url, payload, {
-        timeout: config.timeout,
-      });
+      const { data } = await axios.post(
+        `${cfg.sharedBase}${cfg.endpoints.authenticate}`,
+        {
+          ClientId: cfg.credentials.clientId,
+          UserName: cfg.credentials.username,
+          Password: cfg.credentials.password,
+          EndUserIp: cfg.endUserIp,
+        },
+        { timeout: config.timeout },
+      );
 
       if (data?.Status !== 1 && data?.Status !== "Success") {
         throw new Error(data?.Error?.ErrorMessage || "Auth failed");
@@ -44,15 +46,13 @@ class HotelService {
 
       this.tokens[type] = {
         value: data.TokenId || data.Token,
-        expiry: Date.now() + 24 * 60 * 60 * 1000,
+        expiry: Date.now() + 23 * 60 * 60 * 1000,
       };
 
       return this.tokens[type].value;
     } catch (err) {
-      logger.error(
-        `TBO ${type} auth error, err?.response?.data ` || err.message,
-      );
-      throw new ApiError(500, `TBO ${type} authentication failed`);
+      logger.error("TBO AUTH ERROR", err.response?.data || err.message);
+      throw new ApiError(500, "TBO authentication failed");
     }
   }
 
@@ -64,188 +64,74 @@ class HotelService {
   }
 
   /* =====================================================
-     HOTEL SEARCH
+     STATIC API HELPER (Static Credentials)
   ====================================================== */
-  async searchHotels(params) {
+  async staticGet(endpoint, query = "") {
+    const env = this.getEnv();
+    const cfg = config[env];
+
+    try {
+      const { data } = await axios.get(`${cfg.staticBase}${endpoint}${query}`, {
+        auth: {
+          username: cfg.credentials.tboUSerName,
+          password: cfg.credentials.tboPassword,
+        },
+        timeout: config.timeout,
+      });
+
+      return data;
+    } catch (err) {
+      logger.error("TBO STATIC ERROR", err.response?.data || err.message);
+      throw new ApiError(500, "TBO static API failed");
+    }
+  }
+
+  /* =====================================================
+     AFFILIATE API HELPER (Search / PreBook)
+     Basic Auth + Token
+  ====================================================== */
+  async affiliatePost(endpoint, payload) {
     const env = this.getEnv();
     const cfg = config[env];
     const token = await this.getToken(env);
-
-    // 🔹 Convert YYYY-MM-DD → DD/MM/YYYY
-    const formatDate = (dateStr) => {
-      const [year, month, day] = dateStr.split("-");
-      return `${day}/${month}/${year}`;
-    };
-
-    // 🔹 Calculate NoOfNights
-    const checkIn = new Date(params.checkInDate + "T00:00:00");
-    const checkOut = new Date(params.checkOutDate + "T00:00:00");
-
-    const diffTime = checkOut - checkIn;
-    const noOfNights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    const payload = {
-      EndUserIp: cfg.endUserIp,
-      TokenId: token,
-
-      CheckInDate: formatDate(params.checkInDate),
-      NoOfNights: noOfNights.toString(),
-
-      CountryCode: "IN",
-      CityId: params.cityId,
-
-      ResultCount: null,
-      PreferredCurrency: params.currency || "INR",
-      GuestNationality: params.nationality || "IN",
-
-      NoOfRooms: params.noOfRooms?.toString() || "1",
-      MaxRating: 5,
-      MinRating: 0,
-      ReviewScore: null,
-      IsNearBySearchAllowed: false,
-
-      RoomGuests: params.roomGuests.map((room) => ({
-        NoOfAdults: room.NoOfAdults,
-        NoOfChild: room.NoOfChild,
-        ChildAge: room.NoOfChild > 0 ? room.ChildAge : null,
-      })),
-    };
-
-    const { data } = await axios.post(
-      `${cfg.base}${cfg.endpoints.hotelSearch}`,
-      payload,
-      { timeout: config.timeout },
-    );
-
-    return data;
-  }
-
-  /* =====================================================
-     HOTEL DETAILS
-  ====================================================== */
-  async getHotelDetails(hotelCode, traceId, resultIndex) {
-    const env = this.getEnv();
-    const cfg = config[env];
-    const token = await this.getToken(env);
-
-    if (!hotelCode || !traceId) {
-      throw new ApiError(400, "hotelCode and traceId are required");
-    }
-
-    return this.postLive(
-      config[env].endpoints.hotelInfo,
-      {
-        EndUserIp: cfg.endUserIp,
-        TokenId: token,
-        HotelCode: hotelCode,
-        ResultIndex: resultIndex,
-        TraceId: traceId,
-      },
-      env,
-    );
-  }
-
-  /* =====================================================
-     ROOM INFO
-  ====================================================== */
-  async getRoomInfo(hotelCode, traceId, resultIndex) {
-    const env = this.getEnv();
-    const cfg = config[env];
-    const token = await this.getToken(env);
-    if (!hotelCode || !traceId || !resultIndex) {
-      throw new ApiError(
-        400,
-        "hotelCode, resultIndex and traceId are required",
-      );
-    }
-
-    return this.postLive(
-      config[env].endpoints.hotelRoom,
-      {
-        EndUserIp: cfg.endUserIp,
-        TokenId: token,
-        HotelCode: hotelCode,
-        ResultIndex: resultIndex,
-        TraceId: traceId,
-      },
-      env,
-    );
-  }
-
-  /* =====================================================
-     HOTEL BOOK
-  ====================================================== */
-  async bookHotel({ traceId, hotelCode, roomIndex, guests }) {
-    if (!traceId || !hotelCode || !roomIndex) {
-      throw new ApiError(400, "Missing required booking parameters");
-    }
-
-    const payload = {
-      TraceId: traceId,
-      HotelCode: hotelCode,
-      RoomIndex: roomIndex,
-      GuestDetails: guests,
-    };
-
-    logger.info("TBO HOTEL BOOK PAYLOAD", JSON.stringify(payload, null, 2));
-
-    const response = await this.postLive(
-      config.live.endpoints.hotelBook,
-      payload,
-      "live",
-    );
-
-    if (response?.Status !== 1) {
-      throw new ApiError(
-        400,
-        response?.Error?.ErrorMessage || "Hotel booking failed",
-      );
-    }
-
-    return response;
-  }
-
-  /* =====================================================
-     BOOKING DETAILS
-  ====================================================== */
-  async getBookingDetails(bookingId) {
-    if (!bookingId) {
-      throw new ApiError(400, "bookingId is required");
-    }
-
-    return this.postLive(
-      config.live.endpoints.hotelBookingDetails,
-      { BookingId: bookingId },
-      "live",
-    );
-  }
-
-  /* =====================================================
-     CANCEL HOTEL
-  ====================================================== */
-  async cancelHotel(bookingId) {
-    if (!bookingId) {
-      throw new ApiError(400, "bookingId is required for cancellation");
-    }
-
-    return this.postLive(
-      config.live.endpoints.hotelCancel,
-      { BookingId: bookingId },
-      "live",
-    );
-  }
-
-  /* =====================================================
-     GENERIC LIVE POST
-  ====================================================== */
-  async postLive(endpoint, payload, type = "live") {
-    const token = await this.getToken(type);
 
     try {
       const { data } = await axios.post(
-        `${config[type].base}${endpoint}`,
+        `${cfg.base1}${endpoint}`,
         {
-          EndUserIp: config[type].endUserIp,
+          EndUserIp: cfg.endUserIp,
+          TokenId: token,
+          ...payload,
+        },
+        {
+          auth: {
+            username: cfg.credentials.username,
+            password: cfg.credentials.password,
+          },
+          timeout: config.timeout,
+        },
+      );
+
+      return data;
+    } catch (err) {
+      logger.error("TBO AFFILIATE ERROR", err.response?.data || err.message);
+      throw new ApiError(500, "TBO affiliate API failed");
+    }
+  }
+
+  /* =====================================================
+     TOKEN BASED POST (base / base2 selectable)
+  ====================================================== */
+  async tokenPost(endpoint, payload, baseType = "base") {
+    const env = this.getEnv();
+    const cfg = config[env];
+    const token = await this.getToken(env);
+
+    try {
+      const { data } = await axios.post(
+        `${cfg[baseType]}${endpoint}`,
+        {
+          EndUserIp: cfg.endUserIp,
           TokenId: token,
           ...payload,
         },
@@ -254,18 +140,187 @@ class HotelService {
 
       return data;
     } catch (err) {
-      logger.error("TBO HOTEL ERROR", {
-        status: err.response?.status,
-        data: err.response?.data,
-        payload,
-      });
-
-      throw new ApiError(
-        500,
-        err.response?.data?.Error?.ErrorMessage ||
-          "TBO hotel live request failed",
-      );
+      logger.error("TBO TOKEN ERROR", err.response?.data || err.message);
+      throw new ApiError(500, "TBO token API failed");
     }
+  }
+
+  /* =====================================================
+     STATIC SERVICES
+  ====================================================== */
+
+  async getCountryList() {
+    const env = this.getEnv();
+    return this.staticGet(config[env].endpoints.countryList);
+  }
+
+  async getCityList(countryCode) {
+    const env = this.getEnv();
+    const cfg = config[env];
+
+    try {
+      const { data } = await axios.post(
+        `${cfg.staticBase}${cfg.endpoints.cityLIst}`,
+        {
+          CountryCode: countryCode,
+        },
+        {
+          auth: {
+            username: cfg.credentials.tboUSerName,
+            password: cfg.credentials.tboPassword,
+          },
+          timeout: config.timeout,
+        },
+      );
+
+      return data;
+    } catch (err) {
+      logger.error("TBO CITY POST ERROR", err.response?.data || err.message);
+      throw new ApiError(500, "TBO city API failed");
+    }
+  }
+
+  async getTBOHotelCodeList(cityCode, pageIndex = 1) {
+    if (!cityCode) throw new ApiError(400, "cityCode required");
+
+    const env = this.getEnv();
+    const cfg = config[env];
+
+    try {
+      const { data } = await axios.post(
+        `${cfg.staticBase}${cfg.endpoints.hotelCodeList}`,
+        {
+          CityCode: cityCode,
+          PageIndex: pageIndex,
+        },
+        {
+          auth: {
+            username: cfg.credentials.tboUSerName,
+            password: cfg.credentials.tboPassword,
+          },
+          timeout: config.timeout,
+        },
+      );
+
+      return data;
+    } catch (err) {
+      logger.error(
+        "TBO HOTEL CODE LIST ERROR",
+        err.response?.data || err.message,
+      );
+      throw new ApiError(500, "TBO hotel code list failed");
+    }
+  }
+
+  async getStaticHotelDetails(hotelCode) {
+    if (!hotelCode) throw new ApiError(400, "hotelCode required");
+
+    const env = this.getEnv();
+    const cfg = config[env];
+
+    try {
+      const { data } = await axios.post(
+        `${cfg.staticBase}${cfg.endpoints.hotelDetails}`,
+        {
+          Hotelcodes: hotelCode,
+        },
+        {
+          auth: {
+            username: cfg.credentials.tboUSerName,
+            password: cfg.credentials.tboPassword,
+          },
+          timeout: config.timeout,
+        },
+      );
+
+      return data;
+    } catch (err) {
+      console.log(
+        "STATIC HOTEL DETAILS ERROR:",
+        err.response?.data || err.message,
+      );
+      throw new ApiError(500, "TBO static hotel details failed");
+    }
+  }
+  /* =====================================================
+     HOTEL SEARCH (base1 + Basic + Token)
+  ====================================================== */
+  async searchHotels(params) {
+    const env = this.getEnv();
+    const cfg = config[env];
+
+    try {
+      const { data } = await axios.post(
+        `${cfg.base1}${cfg.endpoints.hotelSearch}`,
+        {
+          CheckIn: params.CheckIn,
+          CheckOut: params.CheckOut,
+          HotelCodes: params.HotelCodes,
+          GuestNationality: params.GuestNationality || "IN",
+          NoOfRooms: params.NoOfRooms,
+          PaxRooms: params.PaxRooms,
+          IsDetailedResponse: true,
+          Filters: {
+            Refundable: false,
+            MealType: "All",
+          },
+        },
+        {
+          auth: {
+            username: cfg.credentials.username,
+            password: cfg.credentials.password,
+          },
+          timeout: config.timeout,
+        },
+      );
+
+      return data;
+    } catch (err) {
+      console.log("FULL ERROR:", err.response?.data || err.message);
+      throw new ApiError(500, "TBO hotel search request failed");
+    }
+  }
+  /* =====================================================
+     HOTEL PRE BOOK (base1 + Basic + Token)
+  ====================================================== */
+  async preBookHotel(payload) {
+    return this.affiliatePost(
+      config[this.getEnv()].endpoints.hotelPreBook,
+      payload,
+    );
+  }
+
+  /* =====================================================
+     HOTEL BOOK (base)
+  ====================================================== */
+  async bookHotel(payload) {
+    return this.tokenPost(
+      config[this.getEnv()].endpoints.hotelBook,
+      payload,
+      "base",
+    );
+  }
+
+  /* =====================================================
+     GENERATE VOUCHER (base)
+  ====================================================== */
+  async generateVoucher(payload) {
+    return this.tokenPost(
+      config[this.getEnv()].endpoints.generateVoucher,
+      payload,
+      "base",
+    );
+  }
+
+  /* =====================================================
+     DYNAMIC HOTEL DETAILS (base2)
+  ====================================================== */
+  async getHotelDetails(payload) {
+    return this.tokenPost(
+      config[this.getEnv()].endpoints.hotelDetails,
+      payload,
+      "base2",
+    );
   }
 }
 

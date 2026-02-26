@@ -27,6 +27,7 @@ import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { FareDetailsModal } from "./FareDetailsModal";
+import { getMyTravelAdmin } from "../../../Redux/Actions/travelAdmin.thunks";
 
 const normalizeFareRules = (fareRule) => {
   const rules = fareRule?.Response?.FareRules;
@@ -51,6 +52,12 @@ export default function OneFlightBooking() {
 
   const { actionLoading } = useSelector((state) => state.bookings);
   const { user } = useSelector((state) => state.auth);
+
+  const {
+    approver,
+    loading: approverLoading,
+    error: approverError,
+  } = useSelector((state) => state.travelAdmin);
 
   const {
     selectedFlight,
@@ -175,6 +182,12 @@ export default function OneFlightBooking() {
       [key]: !prev[key],
     }));
   };
+
+  useEffect(() => {
+    if (user?.role === "employee") {
+      dispatch(getMyTravelAdmin());
+    }
+  }, [dispatch, user]);
 
   useEffect(() => {
     if (!traceId || !selectedFlight?.ResultIndex) return;
@@ -843,6 +856,9 @@ export default function OneFlightBooking() {
                 selectedSeats={selectedSeats}
                 selectedMeals={selectedMeals}
                 selectedBaggage={selectedBaggage}
+                approver={approver}
+                approverLoading={approverLoading}
+                approverError={approverError}
                 onSendForApproval={handleSendForApproval}
                 loading={actionLoading}
               />

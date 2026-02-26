@@ -21,7 +21,7 @@ const SSOCallback = () => {
     }
 
     if (!token) {
-      navigate("/sso-login", { replace: true });
+      navigate("/landing", { replace: true });
       return;
     }
 
@@ -34,7 +34,7 @@ const SSOCallback = () => {
         ssoLoginSuccess({
           token,
           user: decoded,
-        })
+        }),
       );
 
       // ✅ Fetch dashboard immediately
@@ -47,9 +47,11 @@ const SSOCallback = () => {
         navigate("/onboarded-corporates", { replace: true });
       } else if (role === "employee") {
         navigate("/my-bookings", { replace: true });
+      } else if (role === "corporate-super-admin") {
+        navigate("/corporate-dashboard", { replace: true });
       }
     } catch (err) {
-      navigate("/sso-login", { replace: true });
+      navigate("/landing", { replace: true });
     }
   }, [dispatch, navigate, params]);
 
