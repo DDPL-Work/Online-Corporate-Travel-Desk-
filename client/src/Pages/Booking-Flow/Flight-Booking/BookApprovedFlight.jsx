@@ -9,7 +9,6 @@ import {
   FiDollarSign,
   FiMapPin,
 } from "react-icons/fi";
-import { GrLinkPrevious } from "react-icons/gr";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -545,8 +544,8 @@ export default function BookApprovedFlight() {
               {flight?.fareSnapshot ? (
                 <>
                   <div className="text-sm text-gray-700 space-y-1">
-                    <p>Base Fare: ₹{baseFare}</p>
-                    <p>Tax: ₹{tax}</p>
+                    <p>Base Fare: ₹{Math.ceil(baseFare)}</p>
+                    <p>Tax: ₹{Math.ceil(tax)}</p>
 
                     {isRoundTrip && (
                       <div className="mt-2 text-xs text-gray-500 space-y-1">
@@ -566,7 +565,7 @@ export default function BookApprovedFlight() {
                       </div>
                     )}
 
-                    <p className="font-semibold mt-2">Total Amount: ₹{total}</p>
+                    <p className="font-semibold mt-2">Total Amount: ₹{Math.ceil(total)}</p>
 
                     <p>Refundable: {refundable ? "Yes" : "No"}</p>
                   </div>

@@ -1154,25 +1154,77 @@ exports.getMyBookingById = asyncHandler(async (req, res) => {
   }
 
   // ✅ DERIVE PAYMENT STATUS FROM WALLET
-  const paymentTxn = await WalletTransaction.findOne({
-    bookingId: booking._id,
-    type: "debit",
-    status: "completed",
-  })
-    .sort({ createdAt: -1 })
-    .select("_id amount createdAt");
+  // const paymentTxn = await WalletTransaction.findOne({
+  //   bookingId: booking._id,
+  //   type: "debit",
+  //   status: "completed",
+  // })
+  //   .sort({ createdAt: -1 })
+  //   .select("_id amount createdAt");
 
-  booking.payment = paymentTxn
-    ? {
-        status: "completed",
-        method: "wallet",
-        amount: paymentTxn.amount,
-        paidAt: paymentTxn.createdAt,
-        transactionId: paymentTxn._id,
-      }
-    : {
-        status: "pending",
-      };
+  // booking.payment = paymentTxn
+  //   ? {
+  //       status: "completed",
+  //       method: "wallet",
+  //       amount: paymentTxn.amount,
+  //       paidAt: paymentTxn.createdAt,
+  //       transactionId: paymentTxn._id,
+  //     }
+  //   : {
+  //       status: "pending",
+  //     };
+
+  // 🔎 Determine corporate type
+  const corporate = await Corporate.findById(booking.corporateId).select(
+    "classification",
+  );
+
+  // ================= PREPAID =================
+  if (corporate?.classification === "prepaid") {
+    const walletTxn = await WalletTransaction.findOne({
+      bookingId: booking._id,
+      type: "debit",
+      status: "completed",
+    })
+      .sort({ createdAt: -1 })
+      .select("_id amount createdAt");
+
+    booking.payment = walletTxn
+      ? {
+          status: "completed",
+          method: "wallet",
+          amount: walletTxn.amount,
+          paidAt: walletTxn.createdAt,
+          transactionId: walletTxn._id,
+        }
+      : { status: "pending" };
+  }
+
+  // ================= POSTPAID =================
+  else if (corporate?.classification === "postpaid") {
+    const ledgerEntry = await Ledger.findOne({
+      bookingId: booking._id,
+      type: "booking",
+      status: "paid",
+    })
+      .sort({ createdAt: -1 })
+      .select("_id amount paidDate");
+
+    booking.payment = ledgerEntry
+      ? {
+          status: "completed",
+          method: "agency",
+          amount: ledgerEntry.amount,
+          paidAt: ledgerEntry.paidDate,
+          transactionId: ledgerEntry._id,
+        }
+      : { status: "pending" };
+  }
+
+  // ================= FALLBACK (safety) =================
+  else {
+    booking.payment = { status: "pending" };
+  }
 
   return res
     .status(200)

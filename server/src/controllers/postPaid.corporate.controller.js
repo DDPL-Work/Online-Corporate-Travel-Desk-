@@ -1,5 +1,6 @@
 const Corporate = require("../models/Corporate");
 const CreditTransaction = require("../models/CreditTransaction");
+const Ledger = require("../models/Ledger");
 const User = require("../models/User");
 const { ApiError } = require("../utils/ApiError");
 
@@ -16,15 +17,20 @@ exports.getPostpaidBalance = async (req, res, next) => {
 
     const corporate = await Corporate.findById(corporateId);
 
-    if (!corporate)
-      return next(new ApiError(404, "Corporate not found"));
+    if (!corporate) return next(new ApiError(404, "Corporate not found"));
 
     if (corporate.classification !== "postpaid")
       return next(new ApiError(400, "Not a postpaid corporate"));
 
     // 🔹 Calculate used credit via aggregation (more efficient)
-    const result = await CreditTransaction.aggregate([
-      { $match: { corporateId: corporate._id } },
+    const result = await Ledger.aggregate([
+      {
+        $match: {
+          corporateId: corporate._id,
+          type: "booking",
+          status: { $in: ["paid", "pending"] }, // count confirmed bookings
+        },
+      },
       {
         $group: {
           _id: null,
@@ -53,13 +59,7 @@ exports.getPostpaidBalance = async (req, res, next) => {
 // =======================================
 exports.getPostpaidTransactions = async (req, res, next) => {
   try {
-    const {
-      startDate,
-      endDate,
-      department,
-      page = 1,
-      limit = 10,
-    } = req.query;
+    const { startDate, endDate, department, page = 1, limit = 10 } = req.query;
 
     const corporateId = req.user.corporateId;
 
@@ -67,28 +67,27 @@ exports.getPostpaidTransactions = async (req, res, next) => {
       return next(new ApiError(403, "Corporate access required"));
     }
 
-    const filter = { corporateId };
+    const filter = {
+      corporateId,
+      type: "booking",
+    };
 
     if (startDate && endDate) {
-      filter.date = {
+      filter.createdAt = {
         $gte: new Date(startDate),
         $lte: new Date(endDate),
       };
     }
 
-    if (department && department !== "All") {
-      filter.department = department;
-    }
-
     const skip = (Number(page) - 1) * Number(limit);
 
     const [transactions, total] = await Promise.all([
-      CreditTransaction.find(filter)
-        .populate("employeeId", "name email")
-        .sort({ date: -1 })
+      Ledger.find(filter)
+        .populate("createdBy", "name email")
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),
-      CreditTransaction.countDocuments(filter),
+      Ledger.countDocuments(filter),
     ]);
 
     res.json({
@@ -105,7 +104,6 @@ exports.getPostpaidTransactions = async (req, res, next) => {
     next(err);
   }
 };
-
 
 exports.createCreditUsage = async (req, res, next) => {
   try {

@@ -198,7 +198,9 @@ export default function CreditUtilizationPostpaid() {
                   safeTransactions.map((t) => (
                     <tr key={t._id} className="hover:bg-gray-50 transition">
                       <td className="px-6 py-4 text-sm">
-                        {new Date(t.date).toLocaleDateString()}
+                        {new Date(
+                          t.paidDate || t.createdAt,
+                        ).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 text-sm">
                         {t.employeeId?.name?.firstName || ""}{" "}

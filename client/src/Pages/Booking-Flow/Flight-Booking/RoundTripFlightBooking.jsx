@@ -164,23 +164,15 @@ export default function RoundTripFlightBooking() {
   };
 
   const isRTSeatReady = useMemo(() => {
-    const onwardIdx = rawFlightData?.onward?.ResultIndex?.toString().trim();
-    const returnIdx = rawFlightData?.return?.ResultIndex?.toString().trim();
+    const getSeatStatus = (journeyType, resultIndex) => {
+      if (!resultIndex) return false;
 
-    const onwardSSR = ssr?.onward?.[onwardIdx];
-    const returnSSR = ssr?.return?.[returnIdx];
+      const key = resultIndex.toString().trim();
+      const journeySSR = ssr?.[journeyType]?.[key];
 
-    const hasSeats = (journeySSR, journeyType) => {
-      // if (ssrLoading?.[journeyType]) return "loading";
-      // if (ssrError?.[journeyType]) return "error";
       if (!journeySSR) return false;
 
-      let root =
-        journeySSR.Response ||
-        journeySSR.Results ||
-        Object.values(journeySSR)[0]?.Response ||
-        Object.values(journeySSR)[0]?.Results ||
-        journeySSR;
+      const root = journeySSR?.Response || journeySSR;
 
       const seatSource =
         root?.SeatDynamic?.[0]?.SegmentSeat ||
@@ -188,8 +180,6 @@ export default function RoundTripFlightBooking() {
         root?.SeatDynamic ||
         root?.Seat ||
         [];
-
-      // if (!Array.isArray(seatSource) || seatSource.length === 0) return "none";
 
       return (
         Array.isArray(seatSource) &&
@@ -199,18 +189,11 @@ export default function RoundTripFlightBooking() {
       );
     };
 
-    // 🔥 INTERNATIONAL: same SSR for both legs
-    if (isInternational) {
-      const status = hasSeats(onwardSSR);
-      return { onward: status, return: status };
-    }
-
-    // Domestic
     return {
-      onward: hasSeats(onwardSSR),
-      return: hasSeats(returnSSR),
+      onward: getSeatStatus("onward", rawFlightData?.onward?.ResultIndex),
+      return: getSeatStatus("return", rawFlightData?.return?.ResultIndex),
     };
-  }, [ssr, rawFlightData, isInternational]);
+  }, [ssr, rawFlightData]);
 
   useEffect(() => {
     if (user?.role === "employee") {
@@ -581,18 +564,28 @@ export default function RoundTripFlightBooking() {
 
     const journeySSR = ssr?.[ssrJourneyType]?.[ssrResultIndex];
 
-    let root =
-      journeySSR?.Response ||
-      journeySSR?.Results ||
-      Object.values(journeySSR || {})[0]?.Response ||
-      Object.values(journeySSR || {})[0]?.Results ||
-      journeySSR;
+    // let root =
+    //   journeySSR?.Response ||
+    //   journeySSR?.Results ||
+    //   Object.values(journeySSR || {})[0]?.Response ||
+    //   Object.values(journeySSR || {})[0]?.Results ||
+    //   journeySSR;
+
+    // const seatData =
+    //   root?.SeatDynamic?.[0]?.SegmentSeat ||
+    //   root?.Seat?.[0]?.SegmentSeat ||
+    //   root?.SeatDynamic ||
+    //   root?.Seat;
+
+    const root =
+      journeySSR?.Response?.Results || journeySSR?.Response || journeySSR;
 
     const seatData =
       root?.SeatDynamic?.[0]?.SegmentSeat ||
       root?.Seat?.[0]?.SegmentSeat ||
       root?.SeatDynamic ||
-      root?.Seat;
+      root?.Seat ||
+      [];
 
     if (!seatData || seatData.length === 0) {
       ToastWithTimer({

@@ -2,7 +2,9 @@ const { razorpay, config } = require("../config/payment.config");
 const crypto = require("crypto");
 const logger = require("../utils/logger");
 const ApiError = require("../utils/ApiError");
-const WalletTransaction = require("../models/Wallet")
+const WalletTransaction = require("../models/Wallet");
+const { getAgencyBalance } = require("./tboBalance.service");
+const Ledger = require("../models/Ledger");
 
 class PaymentService {
   async createOrder(amount, bookingReference, corporateId) {
@@ -80,20 +82,27 @@ class PaymentService {
 
     // POSTPAID (Agency)
     if (corporate.classification === "postpaid") {
-      const balance = await getAgencyBalance("live");
+      const env = process.env.TBO_ENV || "live";
+
+      const balance = await getAgencyBalance(env);
 
       if (balance.availableBalance < amount) {
         throw new ApiError(400, "Insufficient agency balance");
       }
 
       await Ledger.create({
+        corporateId: corporate._id,
         bookingId: booking._id,
         amount,
-        type: "debit_confirmed",
+        type: "booking", // ✅ valid enum
+        status: "paid", // ✅ valid enum
+        description: "Postpaid booking - agency balance debited",
+        paidDate: new Date(),
       });
 
       return { method: "agency" };
     }
+    throw new ApiError(400, "Invalid corporate classification");
   }
 
   async refundPayment(paymentId, amount) {

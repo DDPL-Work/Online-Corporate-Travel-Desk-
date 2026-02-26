@@ -310,27 +310,35 @@ async function generateFlightTicketPdfKit({
       //     (s) => s.journeyType === journeyType,
       //   ) || booking.flightRequest.segments[0];
 
-      let journeyResponse;
+      let journeyResponse = null;
 
-      // Case 1: Round-trip structure (your current DB)
-      if (
-        booking.bookingResult?.onwardResponse &&
-        booking.bookingResult?.returnResponse
-      ) {
+      const br = booking?.bookingResult;
+
+      // 1️⃣ Round-trip structure
+      if (br?.onwardResponse || br?.returnResponse) {
+        const selected =
+          journeyType === "return" ? br.returnResponse : br.onwardResponse;
+
         journeyResponse =
-          journeyType === "return"
-            ? booking.bookingResult?.returnResponse?.Response?.Response
-            : booking.bookingResult?.onwardResponse?.Response?.Response;
+          selected?.raw?.Response?.Response || // <-- THIS FIXES ROUNDTRIP
+          selected?.Response?.Response ||
+          selected?.Response ||
+          null;
       }
 
-      // Case 2: Legacy / one-way structure
-      else if (booking.bookingResult?.providerResponse?.raw) {
-        journeyResponse =
-          booking.bookingResult?.providerResponse?.raw?.Response?.Response;
+      // 2️⃣ One-way (providerResponse WITHOUT raw)
+      if (!journeyResponse && br?.providerResponse?.Response) {
+        journeyResponse = br.providerResponse?.Response?.Response;
       }
 
-      // Case 3: Fallback safety
-      else {
+      // 3️⃣ One-way (providerResponse WITH raw)
+      if (!journeyResponse && br?.providerResponse?.raw?.Response) {
+        journeyResponse = br.providerResponse?.raw?.Response?.Response;
+      }
+
+      // Final safety
+      if (!journeyResponse) {
+        console.error("Unsupported bookingResult structure:", br);
         throw new Error("Invalid bookingResult structure");
       }
 
@@ -1098,8 +1106,8 @@ async function generateFlightTicketPdfKit({
       let payY = Y + 32;
 
       const fareRows = [
-        ["Base Fare", baseFare],
-        ["Tax", tax],
+        ["Base Fare", Math.ceil(baseFare)],
+        ["Tax", Math.ceil(tax)],
         ["Seat Charges", seatCharges],
         ["Meal Charges", mealCharges],
       ];
@@ -1134,7 +1142,7 @@ async function generateFlightTicketPdfKit({
         .font("Helvetica-Bold")
         .fontSize(12)
         .fillColor(C.primary)
-        .text(`INR ${grandTotal.toFixed(2)}`, PW - M - 100, payY, {
+        .text(`INR ${Math.ceil(grandTotal).toFixed(2)}`, PW - M - 100, payY, {
           width: 80,
           align: "right",
         });

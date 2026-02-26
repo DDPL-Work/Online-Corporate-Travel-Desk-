@@ -147,6 +147,7 @@ function FlightCard({
   index,
   total,
   showDownloadPerSegment,
+  seatSelections,
 }) {
   const pnr =
     flight.journeyType === "return"
@@ -160,6 +161,8 @@ function FlightCard({
   const journeyKey = flight.journeyType || "onward";
   const isDownloading = downloading === journeyKey;
   const isMulti = total > 1;
+
+  const segmentSeat = seatSelections?.find((s) => s.segmentIndex === index);
 
   const theme = airlineThemes?.[flight?.airlineCode] || {
     primary: "#0A2540",
@@ -323,6 +326,30 @@ function FlightCard({
                 {isDownloading ? "Downloading…" : "Download Ticket"}
               </button>
             )}
+
+            {segmentSeat && (
+              <div className="pt-4 border-b border-white/10 pb-4">
+                <div className="flex items-center justify-between bg-white/10 rounded-xl px-4 py-3 border border-white/15">
+                  <div>
+                    <p className="text-[9px] uppercase tracking-widest text-white/40 font-bold mb-1">
+                      Seat Selected
+                    </p>
+                    <p className="text-sm font-semibold text-white">
+                      {segmentSeat.seatNo}
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-[9px] uppercase tracking-widest text-white/40 font-bold mb-1">
+                      Seat Price
+                    </p>
+                    <p className="text-sm font-semibold text-white">
+                      ₹{segmentSeat.price}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -467,7 +494,6 @@ function CancelScreen({ booking, onClose }) {
       </div>
     </div>
   );
-
 }
 
 function RescheduleScreen({ booking, onClose }) {
@@ -475,10 +501,12 @@ function RescheduleScreen({ booking, onClose }) {
   const [newDate, setNewDate] = useState("");
 
   const handleReschedule = async () => {
-    await dispatch(rescheduleBookingThunk({
-      bookingId: booking._id,
-      newDate
-    }));
+    await dispatch(
+      rescheduleBookingThunk({
+        bookingId: booking._id,
+        newDate,
+      }),
+    );
     onClose();
   };
 
@@ -519,10 +547,12 @@ function ModifyTravellerScreen({ booking, onClose }) {
   const [phone, setPhone] = useState(traveller?.phoneWithCode || "");
 
   const handleUpdate = async () => {
-    await dispatch(updateTravellerThunk({
-      bookingId: booking._id,
-      phone
-    }));
+    await dispatch(
+      updateTravellerThunk({
+        bookingId: booking._id,
+        phone,
+      }),
+    );
     onClose();
   };
 
@@ -567,7 +597,7 @@ export default function BookingDetails() {
   const [amendmentType, setAmendmentType] = useState(null);
   // values: "cancel" | "reschedule" | "modify" | null
 
-  const isCancelled = booking.executionStatus === "cancelled";
+  const isCancelled = booking?.executionStatus === "cancelled";
 
   useEffect(() => {
     if (id) dispatch(fetchMyBookingById(id));
@@ -622,6 +652,13 @@ export default function BookingDetails() {
   };
 
   const fareSnapshot = booking.flightRequest?.fareSnapshot;
+
+  const seatSelections = booking.flightRequest?.ssrSnapshot?.seats || [];
+
+  const totalSeatPrice = seatSelections.reduce(
+    (sum, seat) => sum + (seat?.price || 0),
+    0,
+  );
 
   // const isRoundTrip = fareSnapshot?.onwardFare && fareSnapshot?.returnFare;
   const journeyTypes = [
@@ -708,6 +745,7 @@ export default function BookingDetails() {
                 downloading={downloading}
                 onDownload={handleDownloadTicket}
                 showDownloadPerSegment={isRoundTrip}
+                seatSelections={seatSelections}
               />
             </div>
           );
@@ -761,6 +799,10 @@ export default function BookingDetails() {
           <InfoRow label="Base Fare" value={`₹${baseFare}`} />
 
           <InfoRow label="Tax" value={`₹${tax}`} />
+
+          {totalSeatPrice > 0 && (
+            <InfoRow label="Seat Charges" value={`₹${totalSeatPrice}`} />
+          )}
 
           {isRoundTrip && (
             <div className="mt-4 space-y-2 text-xs text-slate-500">
