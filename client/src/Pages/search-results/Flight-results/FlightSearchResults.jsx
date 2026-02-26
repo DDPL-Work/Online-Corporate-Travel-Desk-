@@ -97,37 +97,62 @@ export default function FlightSearchResults() {
   const [fareUpsellOpen, setFareUpsellOpen] = useState(false);
   const [selectedFareUpsell, setSelectedFareUpsell] = useState(null);
 
+  const initialFilterState = {
+    priceValues: [1000, 70000],
+    durationValues: [0, 1440],
+    selectedMaxDuration: 1440,
+    selectedStops: [],
+    selectedTime: "",
+    selectedArrivalTime: "",
+    selectedAirlines: [],
+    selectedFlightNumbers: [],
+    selectedFareTypes: [],
+    selectedTerminals: [],
+    selectedAirports: [],
+    selectedLayoverAirports: [],
+    lowCO2: false,
+    popularFilters: {
+      earlyMorning: false,
+      refundable: false,
+      directOnly: false,
+      shortDuration: false,
+    },
+  };
+
   /* ---------------- FILTER STATES ---------------- */
   const [filteredFlights, setFilteredFlights] = useState([]);
 
-  const [priceValues, setPriceValues] = useState([1000, 70000]);
+  // const [priceValues, setPriceValues] = useState([1000, 70000]);
 
-  const [durationValues, setDurationValues] = useState([0, 1440]);
-  const [selectedMaxDuration, setSelectedMaxDuration] = useState(1440);
+  // const [durationValues, setDurationValues] = useState([0, 1440]);
+  // const [selectedMaxDuration, setSelectedMaxDuration] = useState(1440);
 
-  const [selectedStops, setSelectedStops] = useState([]);
-  const [selectedTime, setSelectedTime] = useState("");
-  const [selectedArrivalTime, setSelectedArrivalTime] = useState("");
+  // const [selectedStops, setSelectedStops] = useState([]);
+  // const [selectedTime, setSelectedTime] = useState("");
+  // const [selectedArrivalTime, setSelectedArrivalTime] = useState("");
 
-  const [selectedAirlines, setSelectedAirlines] = useState([]);
-  const [selectedFlightNumbers, setSelectedFlightNumbers] = useState([]);
-  const [selectedFareTypes, setSelectedFareTypes] = useState([]);
-  const [selectedTerminals, setSelectedTerminals] = useState([]);
-  const [selectedAirports, setSelectedAirports] = useState([]);
-  const [selectedLayoverAirports, setSelectedLayoverAirports] = useState([]);
-  const [lowCO2, setLowCO2] = useState(false);
+  // const [selectedAirlines, setSelectedAirlines] = useState([]);
+  // const [selectedFlightNumbers, setSelectedFlightNumbers] = useState([]);
+  // const [selectedFareTypes, setSelectedFareTypes] = useState([]);
+  // const [selectedTerminals, setSelectedTerminals] = useState([]);
+  // const [selectedAirports, setSelectedAirports] = useState([]);
+  // const [selectedLayoverAirports, setSelectedLayoverAirports] = useState([]);
+  // const [lowCO2, setLowCO2] = useState(false);
 
   const [sortKey, setSortKey] = useState("Best");
 
   const PAGE_SIZE = 5;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const [popularFilters, setPopularFilters] = useState({
-    earlyMorning: false,
-    refundable: false,
-    directOnly: false,
-    shortDuration: false,
-  });
+  // const [popularFilters, setPopularFilters] = useState({
+  //   earlyMorning: false,
+  //   refundable: false,
+  //   directOnly: false,
+  //   shortDuration: false,
+  // });
+
+  const [onwardFilters, setOnwardFilters] = useState(initialFilterState);
+  const [returnFilters, setReturnFilters] = useState(initialFilterState);
 
   const {
     searchResults: flights,
@@ -151,6 +176,21 @@ export default function FlightSearchResults() {
         Array.isArray(f.Segments[0]) &&
         Array.isArray(f.Segments[1]),
     );
+  const isDomesticRoundTrip =
+    Number(journeyType) === 2 && !isInternationalReturnGrouped;
+
+  const activeFiltersState = isDomesticRoundTrip
+    ? activeTab === "onward"
+      ? onwardFilters
+      : returnFilters
+    : onwardFilters; // for other trips, use onwardFilters only
+
+  const setActiveFilters = isDomesticRoundTrip
+    ? activeTab === "onward"
+      ? setOnwardFilters
+      : setReturnFilters
+    : setOnwardFilters;
+
   const normalizedFlights = useMemo(() => {
     if (Number(journeyType) !== 2) return flights;
 
@@ -175,13 +215,15 @@ export default function FlightSearchResults() {
     return extractRoutes(flights, Number(journeyType));
   }, [journeyType, flights, searchPayload]);
 
+  /* ---------------- DOMESTIC ROUND TRIP SPLIT ---------------- */
+
   const priceRange = useMemo(() => {
     if (!normalizedFlights.length) {
       return { min: 0, max: 0 };
     }
 
     const prices = normalizedFlights
-      .map((f) => f?.Fare?.PublishedFare || 0)
+      .map((f) => f?.Fare?.OfferedFare || f?.Fare?.PublishedFare || 0)
       .filter(Boolean);
 
     if (!prices.length) {
@@ -194,53 +236,77 @@ export default function FlightSearchResults() {
     };
   }, [normalizedFlights]);
 
-  const activeFilters = useMemo(
-    () => ({
-      price:
-        priceValues[0] !== priceRange?.min ||
-        priceValues[1] !== priceRange?.max,
+  // ✅ Auto-update price filter when range changes
+  // useEffect(() => {
+  //   if (priceRange.max > 0) {
+  //     setPriceValues([priceRange.min, priceRange.max]);
+  //   }
+  // }, [priceRange]);
 
-      stops: selectedStops.length > 0,
-      airlines: selectedAirlines.length > 0,
-      fareTypes: selectedFareTypes.length > 0,
-      flightNumbers: selectedFlightNumbers.length > 0,
-      terminals: selectedTerminals.length > 0,
-      airports: selectedAirports.length > 0,
-      layovers: selectedLayoverAirports.length > 0,
+  useEffect(() => {
+    if (priceRange.max > 0) {
+      setOnwardFilters((prev) =>
+        prev.priceValues[0] === 1000 && prev.priceValues[1] === 70000
+          ? { ...prev, priceValues: [priceRange.min, priceRange.max] }
+          : prev,
+      );
 
-      departureTime: !!selectedTime,
-      arrivalTime: !!selectedArrivalTime,
+      setReturnFilters((prev) =>
+        prev.priceValues[0] === 1000 && prev.priceValues[1] === 70000
+          ? { ...prev, priceValues: [priceRange.min, priceRange.max] }
+          : prev,
+      );
+    }
+  }, [priceRange]);
 
-      duration:
-        durationValues[0] !== 0 || durationValues[1] !== selectedMaxDuration,
+  // const activeFilters = useMemo(
+  //   () => ({
+  //     price:
+  //       priceValues[0] !== priceRange?.min ||
+  //       priceValues[1] !== priceRange?.max,
 
-      popular:
-        popularFilters.earlyMorning ||
-        popularFilters.refundable ||
-        popularFilters.directOnly ||
-        popularFilters.shortDuration,
+  //     stops: selectedStops.length > 0,
+  //     airlines: selectedAirlines.length > 0,
+  //     fareTypes: selectedFareTypes.length > 0,
+  //     flightNumbers: selectedFlightNumbers.length > 0,
+  //     terminals: selectedTerminals.length > 0,
+  //     airports: selectedAirports.length > 0,
+  //     layovers: selectedLayoverAirports.length > 0,
 
-      lowCO2,
-    }),
-    [
-      priceValues,
-      selectedStops,
-      selectedAirlines,
-      selectedFareTypes,
-      selectedFlightNumbers,
-      selectedTerminals,
-      selectedAirports,
-      selectedLayoverAirports,
-      selectedTime,
-      selectedArrivalTime,
-      durationValues,
-      selectedMaxDuration,
-      popularFilters,
-      lowCO2,
-    ],
-  );
+  //     departureTime: !!selectedTime,
+  //     arrivalTime: !!selectedArrivalTime,
+
+  //     duration:
+  //       durationValues[0] !== 0 || durationValues[1] !== selectedMaxDuration,
+
+  //     popular:
+  //       popularFilters.earlyMorning ||
+  //       popularFilters.refundable ||
+  //       popularFilters.directOnly ||
+  //       popularFilters.shortDuration,
+
+  //     lowCO2,
+  //   }),
+  //   [
+  //     priceValues,
+  //     selectedStops,
+  //     selectedAirlines,
+  //     selectedFareTypes,
+  //     selectedFlightNumbers,
+  //     selectedTerminals,
+  //     selectedAirports,
+  //     selectedLayoverAirports,
+  //     selectedTime,
+  //     selectedArrivalTime,
+  //     durationValues,
+  //     selectedMaxDuration,
+  //     popularFilters,
+  //     lowCO2,
+  //   ],
+  // );
 
   // ================= HEADER FLIGHT (SAFE) =================
+
   const firstFlight = flights?.[0];
   const segments = firstFlight?.Segments?.[0] || [];
 
@@ -262,6 +328,22 @@ export default function FlightSearchResults() {
     : "";
 
   const flightsCount = filteredFlights.length || normalizedFlights.length || 0;
+
+  const domesticOnwardFlights = useMemo(() => {
+    if (Number(journeyType) !== 2 || isInternationalReturnGrouped) return [];
+    return normalizedFlights.filter((f) => {
+      const seg = f.Segments?.[0]?.[0];
+      return seg?.Origin?.Airport?.AirportCode === fromCode;
+    });
+  }, [normalizedFlights, journeyType, isInternationalReturnGrouped, fromCode]);
+
+  const domesticReturnFlights = useMemo(() => {
+    if (Number(journeyType) !== 2 || isInternationalReturnGrouped) return [];
+    return normalizedFlights.filter((f) => {
+      const seg = f.Segments?.[0]?.[0];
+      return seg?.Origin?.Airport?.AirportCode === toCode;
+    });
+  }, [normalizedFlights, journeyType, isInternationalReturnGrouped, toCode]);
 
   const onwardFlights = useMemo(() => {
     if (Number(journeyType) !== 2) return [];
@@ -344,7 +426,7 @@ export default function FlightSearchResults() {
     let cheapestFlight = null;
 
     normalizedFlights.forEach((f) => {
-      const price = f?.Fare?.PublishedFare ?? 0;
+      const price = f?.Fare?.OfferedFare || f?.Fare?.PublishedFare || 0;
       if (!price) return;
 
       if (price < minPrice) {
@@ -381,12 +463,40 @@ export default function FlightSearchResults() {
 
   /* ---------------- FILTER LOGIC ---------------- */
   useEffect(() => {
+    const {
+      priceValues,
+      durationValues,
+      selectedMaxDuration,
+      selectedStops,
+      selectedTime,
+      selectedArrivalTime,
+      selectedAirlines,
+      selectedFlightNumbers,
+      selectedFareTypes,
+      selectedTerminals,
+      selectedAirports,
+      selectedLayoverAirports,
+      lowCO2,
+      popularFilters,
+    } = activeFiltersState;
+
     if (!Array.isArray(normalizedFlights) || normalizedFlights.length === 0) {
       setFilteredFlights([]);
       return;
     }
 
-    let result = [...normalizedFlights];
+    // let result = [...normalizedFlights];
+
+    let baseFlights;
+
+    if (Number(journeyType) === 2 && !isInternationalReturnGrouped) {
+      baseFlights =
+        activeTab === "onward" ? domesticOnwardFlights : domesticReturnFlights;
+    } else {
+      baseFlights = normalizedFlights;
+    }
+
+    let result = [...baseFlights];
 
     /* ---------------- PRICE ---------------- */
     // result = result.filter(
@@ -394,25 +504,45 @@ export default function FlightSearchResults() {
     // );
 
     result = result.filter((f) => {
-      const price = f?.Fare?.PublishedFare ?? 0;
+      const price = f?.Fare?.OfferedFare || f?.Fare?.PublishedFare || 0;
       return price >= priceValues[0] && price <= priceValues[1];
     });
 
     /* ---------------- STOPS ---------------- */
     if (selectedStops.length) {
       result = result.filter((f) => {
-        const stops = getSegments(f).length - 1;
+        let stops = 0;
+        // FOR INTERNATIONAL GROUPED: Count max stops per leg
+        if (Array.isArray(f.Segments[0])) {
+          stops = Math.max(...f.Segments.map((leg) => leg.length - 1));
+        } else {
+          stops = getSegments(f).length - 1;
+        }
 
-        if (selectedStops.includes("Non-stop")) return stops === 0;
-        if (selectedStops.includes("1 stop")) return stops === 1;
-        if (selectedStops.includes("2+ stops")) return stops >= 2;
-        return true;
+        if (
+          selectedStops.includes("Non-Stop") ||
+          selectedStops.includes("Non-stop")
+        ) {
+          if (stops === 0) return true;
+        }
+        if (selectedStops.includes("1 stop")) {
+          if (stops === 1) return true;
+        }
+        if (selectedStops.includes("2+ stops")) {
+          if (stops >= 2) return true;
+        }
+        return false;
       });
     }
 
     /* ---------------- DIRECT ONLY ---------------- */
     if (popularFilters.directOnly) {
-      result = result.filter((f) => getSegments(f).length === 1);
+      result = result.filter((f) => {
+        if (Array.isArray(f.Segments[0])) {
+          return f.Segments.every((leg) => leg.length === 1);
+        }
+        return getSegments(f).length === 1;
+      });
     }
 
     /* ---------------- REFUNDABLE ---------------- */
@@ -499,12 +629,6 @@ export default function FlightSearchResults() {
     }
 
     /* ---------------- DURATION ---------------- */
-    // if (Number(journeyType) !== 2) {
-    //   result = result.filter((f) => {
-    //     const duration = getSegments(f)[0]?.Duration || 0;
-    //     return duration <= selectedMaxDuration;
-    //   });
-    // }
 
     result = result.filter((f) => {
       const duration = getSegments(f)[0]?.Duration || 0;
@@ -559,10 +683,11 @@ export default function FlightSearchResults() {
     /* ---------------- SORTING ---------------- */
     switch (sortKey) {
       case "Cheapest":
-        result.sort(
-          (a, b) =>
-            (a?.Fare?.PublishedFare || 0) - (b?.Fare?.PublishedFare || 0),
-        );
+        result.sort((a, b) => {
+          const priceA = a?.Fare?.OfferedFare || a?.Fare?.PublishedFare || 0;
+          const priceB = b?.Fare?.OfferedFare || b?.Fare?.PublishedFare || 0;
+          return priceA - priceB;
+        });
         break;
 
       case "Early depart":
@@ -584,8 +709,9 @@ export default function FlightSearchResults() {
       case "Best":
       default:
         result.sort((a, b) => {
-          const priceDiff =
-            (a?.Fare?.PublishedFare || 0) - (b?.Fare?.PublishedFare || 0);
+          const priceA = a?.Fare?.OfferedFare || a?.Fare?.PublishedFare || 0;
+          const priceB = b?.Fare?.OfferedFare || b?.Fare?.PublishedFare || 0;
+          const priceDiff = priceA - priceB;
 
           const durDiff =
             (getSegments(a)[0]?.Duration || 0) -
@@ -601,23 +727,45 @@ export default function FlightSearchResults() {
       setVisibleCount(PAGE_SIZE);
     }
   }, [
+    // normalizedFlights,
+    // priceValues,
+    // durationValues,
+    // selectedStops,
+    // selectedTime,
+    // selectedArrivalTime,
+    // selectedAirlines,
+    // selectedFlightNumbers,
+    // selectedFareTypes,
+    // selectedTerminals,
+    // selectedAirports,
+    // selectedLayoverAirports,
+    // selectedMaxDuration,
+    // popularFilters,
+    // lowCO2,
+    // sortKey,
     normalizedFlights,
-    priceValues,
-    durationValues,
-    selectedStops,
-    selectedTime,
-    selectedArrivalTime,
-    selectedAirlines,
-    selectedFlightNumbers,
-    selectedFareTypes,
-    selectedTerminals,
-    selectedAirports,
-    selectedLayoverAirports,
-    selectedMaxDuration,
-    popularFilters,
-    lowCO2,
+    activeFiltersState,
     sortKey,
+    activeTab,
+    journeyType,
+    isInternationalReturnGrouped,
   ]);
+
+  // useEffect(() => {
+  //   if (Number(journeyType) === 2 && !isInternationalReturnGrouped) {
+  //     setPriceValues([priceRange.min, priceRange.max]);
+  //     setSelectedStops([]);
+  //     setSelectedAirlines([]);
+  //     setSelectedFlightNumbers([]);
+  //     setSelectedFareTypes([]);
+  //     setSelectedTerminals([]);
+  //     setSelectedAirports([]);
+  //     setSelectedLayoverAirports([]);
+  //     setSelectedTime("");
+  //     setSelectedArrivalTime("");
+  //     setLowCO2(false);
+  //   }
+  // }, [activeTab]);
 
   const renderFlightCard = (flight, idx) => {
     const jt = Number(journeyType);
@@ -771,37 +919,121 @@ export default function FlightSearchResults() {
           <aside className="lg:col-span-3">
             <div className="sticky top-[120px] h-[calc(100vh-120px)] overflow-y-auto pr-2">
               <FlightFilterSidebar
+                // flights={normalizedFlights}
+                // // selectedMaxPrice={selectedMaxPrice}
+                // // setSelectedMaxPrice={setSelectedMaxPrice}
+                // selectedStops={selectedStops}
+                // setSelectedStops={setSelectedStops}
+                // selectedTime={selectedTime}
+                // setSelectedTime={setSelectedTime}
+                // selectedArrivalTime={selectedArrivalTime}
+                // setSelectedArrivalTime={setSelectedArrivalTime}
+                // selectedAirlines={selectedAirlines}
+                // setSelectedAirlines={setSelectedAirlines}
+                // selectedFlightNumbers={selectedFlightNumbers}
+                // setSelectedFlightNumbers={setSelectedFlightNumbers}
+                // selectedFareTypes={selectedFareTypes}
+                // setSelectedFareTypes={setSelectedFareTypes}
+                // selectedTerminals={selectedTerminals}
+                // setSelectedTerminals={setSelectedTerminals}
+                // selectedAirports={selectedAirports}
+                // setSelectedAirports={setSelectedAirports}
+                // selectedLayoverAirports={selectedLayoverAirports}
+                // setSelectedLayoverAirports={setSelectedLayoverAirports}
+                // lowCO2={lowCO2}
+                // setLowCO2={setLowCO2}
+                // popularFilters={popularFilters}
+                // setPopularFilters={setPopularFilters}
+                // priceValues={priceValues}
+                // setPriceValues={setPriceValues}
+                // durationValues={durationValues}
+                // setDurationValues={setDurationValues}
+                // selectedMaxDuration={selectedMaxDuration}
+                // setSelectedMaxDuration={setSelectedMaxDuration}
+
                 flights={normalizedFlights}
-                // selectedMaxPrice={selectedMaxPrice}
-                // setSelectedMaxPrice={setSelectedMaxPrice}
-                selectedStops={selectedStops}
-                setSelectedStops={setSelectedStops}
-                selectedTime={selectedTime}
-                setSelectedTime={setSelectedTime}
-                selectedArrivalTime={selectedArrivalTime}
-                setSelectedArrivalTime={setSelectedArrivalTime}
-                selectedAirlines={selectedAirlines}
-                setSelectedAirlines={setSelectedAirlines}
-                selectedFlightNumbers={selectedFlightNumbers}
-                setSelectedFlightNumbers={setSelectedFlightNumbers}
-                selectedFareTypes={selectedFareTypes}
-                setSelectedFareTypes={setSelectedFareTypes}
-                selectedTerminals={selectedTerminals}
-                setSelectedTerminals={setSelectedTerminals}
-                selectedAirports={selectedAirports}
-                setSelectedAirports={setSelectedAirports}
-                selectedLayoverAirports={selectedLayoverAirports}
-                setSelectedLayoverAirports={setSelectedLayoverAirports}
-                lowCO2={lowCO2}
-                setLowCO2={setLowCO2}
-                popularFilters={popularFilters}
-                setPopularFilters={setPopularFilters}
-                priceValues={priceValues}
-                setPriceValues={setPriceValues}
-                durationValues={durationValues}
-                setDurationValues={setDurationValues}
-                selectedMaxDuration={selectedMaxDuration}
-                setSelectedMaxDuration={setSelectedMaxDuration}
+                selectedStops={activeFiltersState.selectedStops}
+                setSelectedStops={(val) =>
+                  setActiveFilters((prev) => ({ ...prev, selectedStops: val }))
+                }
+                selectedTime={activeFiltersState.selectedTime}
+                setSelectedTime={(val) =>
+                  setActiveFilters((prev) => ({ ...prev, selectedTime: val }))
+                }
+                selectedArrivalTime={activeFiltersState.selectedArrivalTime}
+                setSelectedArrivalTime={(val) =>
+                  setActiveFilters((prev) => ({
+                    ...prev,
+                    selectedArrivalTime: val,
+                  }))
+                }
+                selectedAirlines={activeFiltersState.selectedAirlines}
+                setSelectedAirlines={(val) =>
+                  setActiveFilters((prev) => ({
+                    ...prev,
+                    selectedAirlines: val,
+                  }))
+                }
+                selectedFlightNumbers={activeFiltersState.selectedFlightNumbers}
+                setSelectedFlightNumbers={(val) =>
+                  setActiveFilters((prev) => ({
+                    ...prev,
+                    selectedFlightNumbers: val,
+                  }))
+                }
+                selectedFareTypes={activeFiltersState.selectedFareTypes}
+                setSelectedFareTypes={(val) =>
+                  setActiveFilters((prev) => ({
+                    ...prev,
+                    selectedFareTypes: val,
+                  }))
+                }
+                selectedTerminals={activeFiltersState.selectedTerminals}
+                setSelectedTerminals={(val) =>
+                  setActiveFilters((prev) => ({
+                    ...prev,
+                    selectedTerminals: val,
+                  }))
+                }
+                selectedAirports={activeFiltersState.selectedAirports}
+                setSelectedAirports={(val) =>
+                  setActiveFilters((prev) => ({
+                    ...prev,
+                    selectedAirports: val,
+                  }))
+                }
+                selectedLayoverAirports={
+                  activeFiltersState.selectedLayoverAirports
+                }
+                setSelectedLayoverAirports={(val) =>
+                  setActiveFilters((prev) => ({
+                    ...prev,
+                    selectedLayoverAirports: val,
+                  }))
+                }
+                lowCO2={activeFiltersState.lowCO2}
+                setLowCO2={(val) =>
+                  setActiveFilters((prev) => ({ ...prev, lowCO2: val }))
+                }
+                popularFilters={activeFiltersState.popularFilters}
+                setPopularFilters={(val) =>
+                  setActiveFilters((prev) => ({ ...prev, popularFilters: val }))
+                }
+                priceValues={activeFiltersState.priceValues}
+                setPriceValues={(val) =>
+                  setActiveFilters((prev) => ({ ...prev, priceValues: val }))
+                }
+                durationValues={activeFiltersState.durationValues}
+                setDurationValues={(val) =>
+                  setActiveFilters((prev) => ({ ...prev, durationValues: val }))
+                }
+                selectedMaxDuration={activeFiltersState.selectedMaxDuration}
+                setSelectedMaxDuration={(val) =>
+                  setActiveFilters((prev) => ({
+                    ...prev,
+                    selectedMaxDuration: val,
+                  }))
+                }
               />
             </div>
           </aside>
@@ -824,17 +1056,19 @@ export default function FlightSearchResults() {
             {Number(journeyType) === 2 && !isInternationalReturnGrouped && (
               <div className="sticky top-[119px] z-30 bg-gray-300 border-b border-gray-200 rounded-lg shadow-sm">
                 <div className="flex gap-1 p-2">
+                  {/* ONWARD ROUTE */}
                   <button
                     onClick={() => setActiveTab("onward")}
                     className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-sm transition ${
                       activeTab === "onward"
                         ? "bg-blue-600 text-white shadow"
-                        : "text-gray-600 hover:bg-gray-100"
+                        : "text-gray-700 hover:bg-gray-100"
                     }`}
                   >
-                    Onward Flights {selectedOnward && "✓"}
+                    {fromCity} → {toCity} {selectedOnward && "✓"}
                   </button>
 
+                  {/* RETURN ROUTE */}
                   <button
                     onClick={() => setActiveTab("return")}
                     disabled={!selectedOnward}
@@ -842,11 +1076,11 @@ export default function FlightSearchResults() {
                       activeTab === "return"
                         ? "bg-blue-600 text-white shadow"
                         : selectedOnward
-                          ? "text-gray-600 hover:bg-gray-100"
+                          ? "text-gray-700 hover:bg-gray-100"
                           : "text-gray-400 cursor-not-allowed"
                     }`}
                   >
-                    Return Flights {selectedReturn && "✓"}
+                    {toCity} → {fromCity} {selectedReturn && "✓"}
                   </button>
                 </div>
               </div>
@@ -872,6 +1106,26 @@ export default function FlightSearchResults() {
             ) : Number(journeyType) === 2 ? (
               <>
                 {/* EXISTING DOMESTIC ROUND TRIP FLOW */}
+                {/* {activeTab === "onward" &&  (
+                  <OnwardFlightList
+                    flights={onwardFlights}
+                    selectedFlight={selectedOnward}
+                    onSelect={(flight) => {
+                      setSelectedOnward(flight);
+                      setActiveTab("return");
+                    }}
+                  />
+                )}
+
+                {activeTab === "return" && (
+                  <ReturnFlightList
+                    flights={returnFlights}
+                    enabled={!!selectedOnward}
+                    selectedFlight={selectedReturn}
+                    onSelect={setSelectedReturn}
+                  />
+                )} */}
+
                 {activeTab === "onward" && (
                   <OnwardFlightList
                     flights={onwardFlights}
@@ -895,7 +1149,26 @@ export default function FlightSearchResults() {
                 <SelectedTripSummary
                   onward={selectedOnward}
                   ret={selectedReturn}
-                  onContinue={() =>
+                  onContinue={() => {
+                    const onwardSegments = selectedOnward?.Segments?.[0] || [];
+                    const returnSegments = selectedReturn?.Segments?.[0] || [];
+
+                    const isInternational =
+                      onwardSegments.some(
+                        (s) =>
+                          s.Origin?.Airport?.CountryCode &&
+                          s.Destination?.Airport?.CountryCode &&
+                          s.Origin.Airport.CountryCode !==
+                            s.Destination.Airport.CountryCode,
+                      ) ||
+                      returnSegments.some(
+                        (s) =>
+                          s.Origin?.Airport?.CountryCode &&
+                          s.Destination?.Airport?.CountryCode &&
+                          s.Origin.Airport.CountryCode !==
+                            s.Destination.Airport.CountryCode,
+                      );
+
                     navigate("/round-trip-flight/booking", {
                       state: {
                         rawFlightData: {
@@ -903,9 +1176,10 @@ export default function FlightSearchResults() {
                           return: selectedReturn,
                         },
                         traceId,
+                        isInternational,
                       },
-                    })
-                  }
+                    });
+                  }}
                 />
               </>
             ) : (

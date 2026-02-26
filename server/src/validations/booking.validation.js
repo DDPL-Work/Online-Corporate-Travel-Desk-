@@ -1,20 +1,18 @@
 // booking.validation.js
 const Joi = require("joi");
 
-
-
 /* ---------------- COMMON SSR SCHEMAS ---------------- */
 
 const seatSSR = Joi.object({
   segmentIndex: Joi.number().min(0).required(),
   paxIndex: Joi.number().min(0).required(), // passenger index
-  seatCode: Joi.string().required(),        // e.g. 12A
-  seatType: Joi.string().optional(),        // WINDOW / AISLE / MIDDLE
+  seatCode: Joi.string().required(), // e.g. 12A
+  seatType: Joi.string().optional(), // WINDOW / AISLE / MIDDLE
   row: Joi.number().optional(),
   column: Joi.string().optional(),
   price: Joi.number().min(0).default(0),
   currency: Joi.string().default("INR"),
-  isChargeable: Joi.boolean().default(false)
+  isChargeable: Joi.boolean().default(false),
 });
 
 const mealSSR = Joi.object({
@@ -23,7 +21,7 @@ const mealSSR = Joi.object({
   code: Joi.string().required(),
   description: Joi.string().optional(),
   price: Joi.number().min(0).default(0),
-  currency: Joi.string().default("INR")
+  currency: Joi.string().default("INR"),
 });
 
 const baggageSSR = Joi.object({
@@ -32,9 +30,8 @@ const baggageSSR = Joi.object({
   code: Joi.string().required(),
   weight: Joi.string().optional(), // e.g. 15KG
   price: Joi.number().min(0).default(0),
-  currency: Joi.string().default("INR")
+  currency: Joi.string().default("INR"),
 });
-
 
 /* ---------------- SSR ---------------- */
 const ssr = Joi.object({
@@ -43,9 +40,8 @@ const ssr = Joi.object({
 
   seat: Joi.array().items(seatSSR).optional(),
   meal: Joi.array().items(mealSSR).optional(),
-  baggage: Joi.array().items(baggageSSR).optional()
+  baggage: Joi.array().items(baggageSSR).optional(),
 });
-
 
 // Create booking
 const createBooking = Joi.object({
@@ -76,7 +72,7 @@ const bookFlight = Joi.object({
     AdditionalTxnFeePub: Joi.number().optional(),
     AirTransFee: Joi.number().optional(),
     PublishedFare: Joi.number().required(),
-    OfferedFare: Joi.number().optional()
+    OfferedFare: Joi.number().optional(),
   }).required(),
 
   // Passengers
@@ -94,7 +90,8 @@ const bookFlight = Joi.object({
         passportNo: Joi.string().optional(),
         passportExpiry: Joi.date().optional(),
         passportIssueDate: Joi.date().optional(),
-        Fare: Joi.object({  // Optional now
+        Fare: Joi.object({
+          // Optional now
           Currency: Joi.string().required(),
           BaseFare: Joi.number().required(),
           Tax: Joi.number().required(),
@@ -104,9 +101,9 @@ const bookFlight = Joi.object({
           AdditionalTxnFeePub: Joi.number().optional(),
           AirTransFee: Joi.number().optional(),
           PublishedFare: Joi.number().required(),
-          OfferedFare: Joi.number().optional()
-        }).optional()
-      })
+          OfferedFare: Joi.number().optional(),
+        }).optional(),
+      }),
     )
     .min(1)
     .required(),
@@ -114,10 +111,10 @@ const bookFlight = Joi.object({
   ssr: Joi.object({
     baggage: Joi.array().optional(),
     meal: Joi.array().optional(),
-    seat: Joi.array().optional()
+    seat: Joi.array().optional(),
   }).optional(),
 
-  isHold: Joi.boolean().default(false)
+  isHold: Joi.boolean().default(false),
 });
 
 // Approve / Reject
@@ -140,13 +137,13 @@ const searchFlights = Joi.object({
   origin: Joi.when("journeyType", {
     is: Joi.valid(1, 2),
     then: Joi.string().length(3).required(),
-    otherwise: Joi.forbidden()
+    otherwise: Joi.forbidden(),
   }),
 
   destination: Joi.when("journeyType", {
     is: Joi.valid(1, 2),
     then: Joi.string().length(3).required(),
-    otherwise: Joi.forbidden()
+    otherwise: Joi.forbidden(),
   }),
 
   departureDate: Joi.when("journeyType", {
@@ -155,9 +152,9 @@ const searchFlights = Joi.object({
       .pattern(/^\d{4}-\d{2}-\d{2}$/)
       .required()
       .messages({
-        "string.pattern.base": "departureDate must be YYYY-MM-DD"
+        "string.pattern.base": "departureDate must be YYYY-MM-DD",
       }),
-    otherwise: Joi.forbidden()
+    otherwise: Joi.forbidden(),
   }),
 
   returnDate: Joi.when("journeyType", {
@@ -166,9 +163,9 @@ const searchFlights = Joi.object({
       .pattern(/^\d{4}-\d{2}-\d{2}$/)
       .required()
       .messages({
-        "string.pattern.base": "returnDate must be YYYY-MM-DD"
+        "string.pattern.base": "returnDate must be YYYY-MM-DD",
       }),
-    otherwise: Joi.forbidden()
+    otherwise: Joi.forbidden(),
   }),
 
   // MULTI-CITY
@@ -183,13 +180,13 @@ const searchFlights = Joi.object({
             .pattern(/^\d{4}-\d{2}-\d{2}$/)
             .required()
             .messages({
-              "string.pattern.base": "segment departureDate must be YYYY-MM-DD"
-            })
-        })
+              "string.pattern.base": "segment departureDate must be YYYY-MM-DD",
+            }),
+        }),
       )
       .min(2)
       .required(),
-    otherwise: Joi.forbidden()
+    otherwise: Joi.forbidden(),
   }),
 
   adults: Joi.number().min(1).required(),
@@ -201,10 +198,8 @@ const searchFlights = Joi.object({
     .default("economy"),
 
   directFlight: Joi.boolean().default(false),
-  oneStop: Joi.boolean().default(false)
+  oneStop: Joi.boolean().default(false),
 });
-
-
 
 // Other validations
 const fareQuote = Joi.object({
@@ -213,11 +208,27 @@ const fareQuote = Joi.object({
 });
 
 const searchHotel = Joi.object({
-  cityCode: Joi.string().required(),
-  checkIn: Joi.date().required(),
-  checkOut: Joi.date().required(),
-  rooms: Joi.number().min(1).required(),
-  guests: Joi.number().min(1).required(),
+  CheckIn: Joi.string()
+    .pattern(/^\d{4}-\d{2}-\d{2}$/)
+    .required(),
+  CheckOut: Joi.string()
+    .pattern(/^\d{4}-\d{2}-\d{2}$/)
+    .required(),
+  CityCode: Joi.string().required(),
+  GuestNationality: Joi.string().length(2).optional(),
+
+  NoOfRooms: Joi.number().min(1).required(),
+
+  PaxRooms: Joi.array()
+    .items(
+      Joi.object({
+        Adults: Joi.number().min(1).required(),
+        Children: Joi.number().min(0).required(),
+        ChildrenAges: Joi.array().items(Joi.number()).required(),
+      }),
+    )
+    .min(1)
+    .required(),
 });
 
 const ticketFlight = Joi.object({
@@ -232,7 +243,7 @@ const fareUpsell = Joi.object({
 
 const fareRule = Joi.object({
   traceId: Joi.string().required(),
-  resultIndex: Joi.string().required()
+  resultIndex: Joi.string().required(),
 });
 
 module.exports = {
@@ -250,5 +261,4 @@ module.exports = {
   ticketFlight,
   fareUpsell,
   fareRule,
-
 };

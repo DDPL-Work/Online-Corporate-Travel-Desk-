@@ -1,13 +1,13 @@
 // server/src/controllers/corporate.controller.js
 
-const Corporate = require('../models/Corporate');
-const User = require('../models/User');
-const ApiError = require('../utils/ApiError');
-const ApiResponse = require('../utils/ApiResponse');
-const asyncHandler = require('../utils/asyncHandler');
-const { calculateNextBillingDate } = require('../utils/helpers');
-const emailService = require('../services/email.service');
-const crypto = require('crypto');
+const Corporate = require("../models/Corporate");
+const User = require("../models/User");
+const ApiError = require("../utils/ApiError");
+const ApiResponse = require("../utils/ApiResponse");
+const asyncHandler = require("../utils/asyncHandler");
+const { calculateNextBillingDate } = require("../utils/helpers");
+const emailService = require("../services/email.service");
+const crypto = require("crypto");
 
 // -----------------------------------------------------
 // ONBOARD CORPORATE - PUBLIC (Pending Status)
@@ -30,12 +30,20 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
     walletBalance,
     defaultApprover,
     creditTermsNotes,
-    metadata
+    metadata,
   } = req.body;
 
   // Required validations
-  if (!corporateName || !primaryContact?.name || !primaryContact?.email || !primaryContact?.mobile)
-    throw new ApiError(400, "Primary contact name, email & mobile are required");
+  if (
+    !corporateName ||
+    !primaryContact?.name ||
+    !primaryContact?.email ||
+    !primaryContact?.mobile
+  )
+    throw new ApiError(
+      400,
+      "Primary contact name, email & mobile are required",
+    );
 
   if (!ssoConfig?.type || !ssoConfig?.domain)
     throw new ApiError(400, "SSO config type & domain are required");
@@ -44,9 +52,10 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Corporate classification is required");
 
   // Prevent duplicate domain
-  const existingDomain = await Corporate.findOne({ "ssoConfig.domain": ssoConfig.domain });
-  if (existingDomain)
-    throw new ApiError(400, "Domain already registered");
+  const existingDomain = await Corporate.findOne({
+    "ssoConfig.domain": ssoConfig.domain,
+  });
+  if (existingDomain) throw new ApiError(400, "Domain already registered");
 
   // Create corporate in pending status
   const corporate = await Corporate.create({
@@ -63,7 +72,10 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
     currentCredit: 0,
     billingCycle: billingCycle || "30days",
     customBillingDays: billingCycle === "custom" ? customBillingDays : null,
-    travelPolicy: travelPolicy || { allowedCabinClass: ["Economy"], allowAncillaryServices: true },
+    travelPolicy: travelPolicy || {
+      allowedCabinClass: ["Economy"],
+      allowAncillaryServices: true,
+    },
     walletBalance: walletBalance || 0,
     defaultApprover: defaultApprover || "travel-admin",
     status: "pending",
@@ -71,9 +83,15 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
     metadata: metadata || {},
   });
 
-  res.status(201).json(
-    new ApiResponse(201, corporate, "Corporate onboarded (pending approval).")
-  );
+  res
+    .status(201)
+    .json(
+      new ApiResponse(
+        201,
+        corporate,
+        "Corporate onboarded (pending approval).",
+      ),
+    );
 });
 
 // -----------------------------------------------------
@@ -83,64 +101,107 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
   const corporate = await Corporate.findById(req.params.id);
   if (!corporate) throw new ApiError(404, "Corporate not found");
 
-  if (corporate.status === "inactive" || corporate.status === "disabled")
-    throw new ApiError(400, "Corporate is inactive and cannot be approved");
+  if (["inactive", "disabled"].includes(corporate.status))
+    throw new ApiError(400, "Corporate cannot be approved");
 
-  // Update corporate status and verify SSO
   corporate.status = "active";
   corporate.onboardedAt = new Date();
   corporate.ssoConfig.verified = true;
   corporate.ssoConfig.verifiedAt = new Date();
   corporate.nextBillingDate = calculateNextBillingDate(
     corporate.billingCycle,
-    corporate.customBillingDays
+    corporate.customBillingDays,
   );
+
+  corporate.primaryContact.role = "corporate-super-admin";
+
+  if (corporate.secondaryContact?.email) {
+    corporate.secondaryContact.role = "travel-admin";
+  }
 
   await corporate.save();
 
-  // -----------------------------
-  // CREATE / UPDATE TRAVEL ADMIN
-  // -----------------------------
-  let adminUser = await User.findOne({ email: corporate.primaryContact.email });
-  const [firstName, ...lastParts] = corporate.primaryContact.name.trim().split(" ");
+  // Helper
+  const createOrUpdateUserWithRole = async (contact, role) => {
+    if (!contact?.email) return null;
 
-  // Generate set-password token
-  const token = crypto.randomBytes(32).toString("hex");
-  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    const email = contact.email.toLowerCase().trim();
+    const [firstName, ...lastParts] = contact.name?.trim().split(" ") || [];
 
-  if (!adminUser) {
-    // Create new travel admin
-    adminUser = await User.create({
-      email: corporate.primaryContact.email,
-      name: { firstName, lastName: lastParts.join(" ") || "Admin" },
-      mobile: corporate.primaryContact.mobile,
+    const token = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    let user = await User.findOne({
+      email,
       corporateId: corporate._id,
-      role: "travel-admin",
-      passwordResetToken: hashedToken,
-      passwordResetExpires: Date.now() + 24 * 60 * 60 * 1000, // 24h
-      isActive: true
     });
 
-    console.log("Created new travel admin:", adminUser.email);
-  } else {
-    // Update reset token for existing admin
-    adminUser.passwordResetToken = hashedToken;
-    adminUser.passwordResetExpires = Date.now() + 24 * 60 * 60 * 1000;
-    await adminUser.save();
-    console.log("Updated token for existing travel admin:", adminUser.email);
-  }
+    if (!user) {
+      user = await User.create({
+        email,
+        name: {
+          firstName: firstName || "",
+          lastName: lastParts.join(" ") || "",
+        },
+        mobile: contact.mobile || "",
+        corporateId: corporate._id,
+        role,
+        passwordResetToken: hashedToken,
+        passwordResetExpires: Date.now() + 24 * 60 * 60 * 1000,
+        isActive: true,
+      });
+    } else {
+      // user.role = "travel-admin";
+      user.role = role;
+      user.passwordResetToken = hashedToken;
+      user.passwordResetExpires = Date.now() + 24 * 60 * 60 * 1000;
+      user.isActive = true;
+      await user.save();
+    }
 
-  // Send onboarding email
-  try {
-    await emailService.sendCorporateOnboarding(corporate, token);
-    console.log("Onboarding email sent successfully");
-  } catch (err) {
-    console.error("Failed to send onboarding email:", err);
-  }
+    return { user, token };
+  };
 
-  res.status(200).json(
-    new ApiResponse(200, corporate, "Corporate approved successfully. Set-password email sent.")
+  // const primaryAdmin = await createOrUpdateTravelAdmin(
+  //   corporate.primaryContact,
+  // );
+  // const secondaryAdmin = await createOrUpdateTravelAdmin(
+  //   corporate.secondaryContact,
+  // );
+
+  const primaryAdmin = await createOrUpdateUserWithRole(
+    corporate.primaryContact,
+    "corporate-super-admin",
   );
+
+  const secondaryAdmin = await createOrUpdateUserWithRole(
+    corporate.secondaryContact,
+    "travel-admin",
+  );
+
+  try {
+    if (primaryAdmin) {
+      await emailService.sendCorporateOnboarding(
+        corporate,
+        primaryAdmin.token,
+        primaryAdmin.user,
+      );
+    }
+
+    if (secondaryAdmin) {
+      await emailService.sendCorporateOnboarding(
+        corporate,
+        secondaryAdmin.token,
+        secondaryAdmin.user,
+      );
+    }
+  } catch (err) {
+    console.error("Email sending failed:", err);
+  }
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, corporate, "Corporate approved successfully."));
 });
 
 // -----------------------------------------------------
@@ -188,8 +249,7 @@ exports.toggleCorporateStatus = asyncHandler(async (req, res) => {
 
   await corporate.save();
 
-  res.status(200).json(
-    new ApiResponse(200, corporate, "Corporate status updated")
-  );
+  res
+    .status(200)
+    .json(new ApiResponse(200, corporate, "Corporate status updated"));
 });
-

@@ -3,8 +3,11 @@ const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
 const logger = require("../utils/logger");
-const QRCode = require("qrcode");
-const puppeteer = require("puppeteer");
+// const QRCode = require("qrcode");
+// const puppeteer = require("puppeteer");
+const {
+  generateFlightTicketPdfKit,
+} = require("./templates/flight_ticket_pdfkit");
 // const puppeteer = require("puppeteer-core");
 
 class PDFService {
@@ -26,172 +29,195 @@ class PDFService {
      FLIGHT TICKET PDF (HTML → PUPPETEER → PDF)
   ====================================================== */
 
-  async generateFlightTicketPdf({ booking }) {
+  // async generateFlightTicketPdf({ booking, journeyType }) {
+  //   try {
+  //     const filename = `ticket-${booking.bookingReference}-${randomUUID()}.pdf`;
+  //     const filepath = path.join(this.ticketDir, filename);
+
+  //     /* ================= LOAD HTML TEMPLATE ================= */
+
+  //     const templatePath = path.join(
+  //       __dirname,
+  //       "./templates/flight-ticket.html",
+  //     );
+
+  //     let html = fs.readFileSync(templatePath, "utf8");
+
+  //     /* ================= HELPERS ================= */
+
+  //     const formatDate = (date) =>
+  //       new Date(date).toLocaleDateString("en-GB", {
+  //         day: "2-digit",
+  //         month: "long",
+  //         year: "numeric",
+  //       });
+
+  //     const formatShortDate = (date) =>
+  //       new Date(date).toLocaleDateString("en-GB", {
+  //         day: "2-digit",
+  //         month: "short",
+  //       });
+
+  //     const formatTime = (date) =>
+  //       new Date(date).toLocaleTimeString("en-GB", {
+  //         hour: "2-digit",
+  //         minute: "2-digit",
+  //       });
+
+  //     /* ================= EXTRACT DATA ================= */
+
+  //     // const segment = booking.flightRequest.segments[0];
+  //     const segment =
+  //       booking.flightRequest.segments.find(
+  //         (s) => s.journeyType === journeyType,
+  //       ) || booking.flightRequest.segments[0];
+
+  //     const passenger =
+  //       booking.travellers.find((t) => t.isLeadPassenger) ||
+  //       booking.travellers[0];
+
+  //     const duration = `${Math.floor(segment.durationMinutes / 60)}h ${
+  //       segment.durationMinutes % 60
+  //     }m`;
+
+  //     // ================= SAFE TOTAL AMOUNT RESOLUTION =================
+  //     const totalAmount =
+  //       booking.pricing?.totalAmount ||
+  //       booking.bookingSnapshot?.totalAmount ||
+  //       booking.bookingResult?.fare?.TotalFare ||
+  //       booking.bookingResult?.fare?.PublishedFare ||
+  //       booking.bookingResult?.fare?.OfferedFare ||
+  //       booking.bookingResult?.Response?.Response?.FlightItinerary?.Fare
+  //         ?.PublishedFare ||
+  //       "—";
+
+  //     const pnr =
+  //       journeyType === "return"
+  //         ? booking.bookingResult.returnPNR
+  //         : booking.bookingResult.onwardPNR || booking.bookingResult.pnr;
+
+  //     const replacements = {
+  //       date: formatDate(new Date()),
+  //       year: new Date().getFullYear(),
+
+  //       bookingId: booking.bookingReference,
+  //       bookingDate: formatDate(booking.createdAt),
+
+  //       journeyRoute: `${segment.origin.city}–${segment.destination.city}`,
+
+  //       airlineName: segment.airlineName,
+  //       airlineCode: segment.airlineCode,
+
+  //       passengerName:
+  //         `${passenger.firstName} ${passenger.lastName}`.toUpperCase(),
+  //       passengerTitle: passenger.title,
+
+  //       flightDate: formatDate(segment.departureDateTime),
+  //       flightType: segment.isNonStop ? "Non stop" : "Connecting",
+  //       duration: duration,
+
+  //       flightNumber: `${segment.airlineCode}-${segment.flightNumber}`,
+
+  //       originCode: segment.origin.airportCode,
+  //       originCity: segment.origin.city,
+  //       originAirport: segment.origin.airportName,
+
+  //       destinationCode: segment.destination.airportCode,
+  //       destinationCity: segment.destination.city,
+  //       destinationAirport: segment.destination.airportName,
+
+  //       departureTime: formatTime(segment.departureDateTime),
+  //       departureDate: formatShortDate(segment.departureDateTime),
+
+  //       arrivalTime: formatTime(segment.arrivalDateTime),
+  //       arrivalDate: formatShortDate(segment.arrivalDateTime),
+
+  //       // pnr: booking.bookingResult.pnr,
+  //       pnr: pnr,
+
+  //       cabinBaggage: segment.baggage?.cabin || "7 Kgs",
+  //       checkInBaggage: segment.baggage?.checkIn || "15 Kgs (1 piece)",
+
+  //       defenceFare: "₹ Defence Fare",
+  //       economyFare: "₹ Economy",
+  //       armedForcesFare: "₹ Armed Forces Fare",
+
+  //       seatNumber:
+  //         booking.flightRequest.ssrSnapshot?.seats?.[0]?.seatNo || "—",
+
+  //       mealOption: booking.flightRequest.fareQuote?.Results?.[0]
+  //         ?.IsFreeMealAvailable
+  //         ? "Complimentary"
+  //         : "-",
+
+  //       eTicketNumber:
+  //         booking.bookingResult.providerResponse?.Response?.Response
+  //           ?.FlightItinerary?.TBOConfNo || booking.bookingResult.pnr,
+
+  //       paymentAmount: totalAmount !== "—" ? `INR ${totalAmount}` : "—",
+
+  //       airlineWebsite: "airindiaexpress.com",
+  //     };
+
+  //     /* ================= APPLY PLACEHOLDER REPLACEMENTS ================= */
+
+  //     Object.entries(replacements).forEach(([key, value]) => {
+  //       html = html.replaceAll(`{{${key}}}`, value ?? "");
+  //     });
+
+  //     /* ================= GENERATE PDF ================= */
+
+  //     const browser = await puppeteer.launch({
+  //       headless: "new",
+  //       args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  //     });
+
+  //     // const browser = await puppeteer.launch({
+  //     //   executablePath: "/usr/bin/chromium",
+  //     //   headless: "new",
+  //     //   args: [
+  //     //     "--no-sandbox",
+  //     //     "--disable-setuid-sandbox",
+  //     //     "--disable-dev-shm-usage",
+  //     //     "--disable-gpu",
+  //     //     "--single-process",
+  //     //   ],
+  //     // });
+
+  //     const page = await browser.newPage();
+
+  //     await page.setContent(html, {
+  //       waitUntil: "networkidle0",
+  //     });
+
+  //     await page.pdf({
+  //       path: filepath,
+  //       format: "A4",
+  //       printBackground: true,
+  //       margin: {
+  //         top: "10mm",
+  //         bottom: "10mm",
+  //         left: "10mm",
+  //         right: "10mm",
+  //       },
+  //     });
+
+  //     await browser.close();
+
+  //     return filepath;
+  //   } catch (error) {
+  //     logger.error("Flight ticket PDF generation failed", error);
+  //     throw error;
+  //   }
+  // }
+
+  async generateFlightTicketPdf({ booking, journeyType }) {
     try {
-      const filename = `ticket-${booking.bookingReference}-${randomUUID()}.pdf`;
-      const filepath = path.join(this.ticketDir, filename);
-
-      /* ================= LOAD HTML TEMPLATE ================= */
-
-      const templatePath = path.join(
-        __dirname,
-        "./templates/flight-ticket.html",
-      );
-
-      let html = fs.readFileSync(templatePath, "utf8");
-
-      /* ================= HELPERS ================= */
-
-      const formatDate = (date) =>
-        new Date(date).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "long",
-          year: "numeric",
-        });
-
-      const formatShortDate = (date) =>
-        new Date(date).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-        });
-
-      const formatTime = (date) =>
-        new Date(date).toLocaleTimeString("en-GB", {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-
-      /* ================= EXTRACT DATA ================= */
-
-      const segment = booking.flightRequest.segments[0];
-
-      const passenger =
-        booking.travellers.find((t) => t.isLeadPassenger) ||
-        booking.travellers[0];
-
-      const duration = `${Math.floor(segment.durationMinutes / 60)}h ${
-        segment.durationMinutes % 60
-      }m`;
-
-      // ================= SAFE TOTAL AMOUNT RESOLUTION =================
-      const totalAmount =
-        booking.pricing?.totalAmount ||
-        booking.bookingSnapshot?.totalAmount ||
-        booking.bookingResult?.fare?.TotalFare ||
-        booking.bookingResult?.fare?.PublishedFare ||
-        booking.bookingResult?.fare?.OfferedFare ||
-        booking.bookingResult?.Response?.Response?.FlightItinerary?.Fare
-          ?.PublishedFare ||
-        "—";
-
-      const replacements = {
-        date: formatDate(new Date()),
-        year: new Date().getFullYear(),
-
-        bookingId: booking.bookingReference,
-        bookingDate: formatDate(booking.createdAt),
-
-        journeyRoute: `${segment.origin.city}–${segment.destination.city}`,
-
-        airlineName: segment.airlineName,
-        airlineCode: segment.airlineCode,
-
-        passengerName:
-          `${passenger.firstName} ${passenger.lastName}`.toUpperCase(),
-        passengerTitle: passenger.title,
-
-        flightDate: formatDate(segment.departureDateTime),
-        flightType: segment.isNonStop ? "Non stop" : "Connecting",
-        duration: duration,
-
-        flightNumber: `${segment.airlineCode}-${segment.flightNumber}`,
-
-        originCode: segment.origin.airportCode,
-        originCity: segment.origin.city,
-        originAirport: segment.origin.airportName,
-
-        destinationCode: segment.destination.airportCode,
-        destinationCity: segment.destination.city,
-        destinationAirport: segment.destination.airportName,
-
-        departureTime: formatTime(segment.departureDateTime),
-        departureDate: formatShortDate(segment.departureDateTime),
-
-        arrivalTime: formatTime(segment.arrivalDateTime),
-        arrivalDate: formatShortDate(segment.arrivalDateTime),
-
-        pnr: booking.bookingResult.pnr,
-
-        cabinBaggage: segment.baggage?.cabin || "7 Kgs",
-        checkInBaggage: segment.baggage?.checkIn || "15 Kgs (1 piece)",
-
-        defenceFare: "₹ Defence Fare",
-        economyFare: "₹ Economy",
-        armedForcesFare: "₹ Armed Forces Fare",
-
-        seatNumber:
-          booking.flightRequest.ssrSnapshot?.seats?.[0]?.seatNo || "—",
-
-        mealOption: booking.flightRequest.fareQuote?.Results?.[0]
-          ?.IsFreeMealAvailable
-          ? "Complimentary"
-          : "-",
-
-        eTicketNumber:
-          booking.bookingResult.providerResponse?.Response?.Response
-            ?.FlightItinerary?.TBOConfNo || booking.bookingResult.pnr,
-
-        paymentAmount: totalAmount !== "—" ? `INR ${totalAmount}` : "—",
-
-        airlineWebsite: "airindiaexpress.com",
-      };
-
-      /* ================= APPLY PLACEHOLDER REPLACEMENTS ================= */
-
-      Object.entries(replacements).forEach(([key, value]) => {
-        html = html.replaceAll(`{{${key}}}`, value ?? "");
+      return await generateFlightTicketPdfKit({
+        booking,
+        journeyType,
+        outputDir: this.ticketDir,
       });
-
-      /* ================= GENERATE PDF ================= */
-
-      const browser = await puppeteer.launch({
-        headless: "new",
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      });
-
-      // const browser = await puppeteer.launch({
-      //   executablePath: "/usr/bin/chromium",
-      //   headless: "new",
-      //   args: [
-      //     "--no-sandbox",
-      //     "--disable-setuid-sandbox",
-      //     "--disable-dev-shm-usage",
-      //     "--disable-gpu",
-      //     "--single-process",
-      //   ],
-      // });
-
-      const page = await browser.newPage();
-
-      await page.setContent(html, {
-        waitUntil: "networkidle0",
-      });
-
-      await page.pdf({
-        path: filepath,
-        format: "A4",
-        printBackground: true,
-        margin: {
-          top: "10mm",
-          bottom: "10mm",
-          left: "10mm",
-          right: "10mm",
-        },
-      });
-
-      await browser.close();
-
-      return filepath;
     } catch (error) {
       logger.error("Flight ticket PDF generation failed", error);
       throw error;

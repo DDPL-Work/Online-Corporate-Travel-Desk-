@@ -178,9 +178,10 @@ export const cancelBooking = createAsyncThunk(
 
 export const downloadTicketPdf = createAsyncThunk(
   "bookings/downloadTicketPdf",
-  async (bookingId, { rejectWithValue }) => {
+  async ({bookingId, journeyType}, { rejectWithValue }) => {
     try {
       const response = await api.get(`/bookings/${bookingId}/ticket-pdf`, {
+        params: {journeyType},
         responseType: "blob",
       });
 
@@ -191,7 +192,7 @@ export const downloadTicketPdf = createAsyncThunk(
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = `ticket_${bookingId}.pdf`;
+      a.download = `ticket_${bookingId}_${journeyType}.pdf`;
       a.click();
 
       window.URL.revokeObjectURL(url);

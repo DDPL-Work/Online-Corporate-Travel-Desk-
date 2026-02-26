@@ -4,11 +4,24 @@ const approvalSchema = new mongoose.Schema(
   {
     /* ================= REFERENCES ================= */
 
+    // bookingRequestId: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "BookingRequest",
+    //   index: true,
+    //   required: true,
+    // },
+
     bookingRequestId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "BookingRequest",
-      index: true,
       required: true,
+      refPath: "bookingRequestModel",
+      index: true,
+    },
+
+    bookingRequestModel: {
+      type: String,
+      required: true,
+      enum: ["BookingRequest", "HotelBookingRequest"],
     },
 
     approvalReference: {
@@ -78,7 +91,7 @@ const approvalSchema = new mongoose.Schema(
       lastReminderAt: Date,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 /* ================= METHODS ================= */
@@ -102,6 +115,5 @@ approvalSchema.pre("save", function () {
     throw new Error("Approval snapshot is immutable");
   }
 });
-
 
 module.exports = mongoose.model("Approval", approvalSchema);

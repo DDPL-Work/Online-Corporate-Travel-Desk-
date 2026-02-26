@@ -44,25 +44,74 @@ export default function MyPendingApprovals() {
         const last = segments[segments.length - 1];
 
         const fareExpiry = b.flightRequest?.fareExpiry;
-        const fareExpired = fareExpiry && new Date() > new Date(fareExpiry);
+        const fareExpired =
+          b.requestStatus !== "approved" &&
+          fareExpiry &&
+          new Date() > new Date(fareExpiry);
 
         return {
           id: b._id,
           type: b.bookingType === "hotel" ? "Hotel" : "Flight",
           status: b.requestStatus,
-          destination: segments.length
-            ? `${first?.origin?.city || "N/A"} → ${
-                last?.destination?.city || "N/A"
-              }`
-            : "N/A",
-          startDate: first?.departureDateTime,
-          endDate: last?.arrivalDateTime,
+          destination: (() => {
+            if (!segments.length) return "N/A";
+
+            const firstOrigin = segments[0]?.origin?.airportCode;
+            const lastDestination =
+              segments[segments.length - 1]?.destination?.airportCode;
+
+            // Detect round trip (comes back to origin)
+            const isRoundTrip =
+              segments.length > 1 && firstOrigin === lastDestination;
+
+            if (!isRoundTrip) {
+              // One-way (even if layover)
+              return `${firstOrigin} → ${lastDestination}`;
+            }
+
+            // ROUND TRIP LOGIC
+            // Split into two halves (outbound + inbound)
+            const midIndex = Math.floor(segments.length / 2);
+
+            const onwardSegments = segments.slice(0, midIndex);
+            const returnSegments = segments.slice(midIndex);
+
+            const onwardOrigin = onwardSegments[0]?.origin?.airportCode;
+            const onwardDestination =
+              onwardSegments[onwardSegments.length - 1]?.destination
+                ?.airportCode;
+
+            const returnOrigin = returnSegments[0]?.origin?.airportCode;
+            const returnDestination =
+              returnSegments[returnSegments.length - 1]?.destination
+                ?.airportCode;
+
+            return `${onwardOrigin} → ${onwardDestination}  |  ${returnOrigin} → ${returnDestination}`;
+          })(),
+
+          // startDate: first?.departureDateTime || null,
+          endDate: last?.arrivalDateTime || null,
+          startDate: segments.length ? segments[0]?.departureDateTime : null,
+
+          returnDate: (() => {
+            if (!segments.length) return null;
+
+            const firstOrigin = segments[0]?.origin?.airportCode;
+            const lastDestination =
+              segments[segments.length - 1]?.destination?.airportCode;
+
+            // Real round trip (comes back to origin)
+            if (firstOrigin === lastDestination && segments.length > 1) {
+              return segments[segments.length - 1]?.departureDateTime;
+            }
+
+            return null; // layover only
+          })(),
+
           createdAt: b.createdAt,
-          fareExpired, // ✅ NEW
-          fareExpiry, // optional (for tooltip / info)
+          fareExpired,
         };
       })
-      .filter((t) => t.startDate)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [myRequests]);
 
@@ -150,10 +199,8 @@ export default function MyPendingApprovals() {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
-                {["All", "pending", "approved"].map((s) => (
-                  <option key={s}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                  </option>
+                {["All", "pending_approval", "approved"].map((s) => (
+                  <option key={s}>{s.replace("_", " ").toUpperCase()}</option>
                 ))}
               </select>
             </div>
@@ -262,13 +309,16 @@ export default function MyPendingApprovals() {
                 <div className="flex items-center gap-2 text-gray-600">
                   <FiCalendar />
                   <span>
-                    {trip.startDate
-                      ? new Date(trip.startDate).toLocaleDateString()
-                      : "N/A"}{" "}
-                    →{" "}
-                    {trip.endDate
-                      ? new Date(trip.endDate).toLocaleDateString()
-                      : "N/A"}
+                    {[trip.startDate, trip.returnDate]
+                      .filter(Boolean)
+                      .map((d) =>
+                        new Date(d).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        }),
+                      )
+                      .join("  |  ") || "N/A"}
                   </span>
                 </div>
 
@@ -284,11 +334,11 @@ export default function MyPendingApprovals() {
 
                 {/* Footer */}
                 <div className="flex justify-between">
-                    {trip.fareExpired && (
-                      <span className="px-3 py-1 flex items-center text-xs rounded-full font-medium bg-red-100 text-red-700">
-                        FARE EXPIRED
-                      </span>
-                    )}
+                  {trip.fareExpired && (
+                    <span className="px-3 py-1 flex items-center text-xs rounded-full font-medium bg-red-100 text-red-700">
+                      FARE EXPIRED
+                    </span>
+                  )}
                   <button
                     onClick={() => navigate(`/bookings/${trip.id}/book`)}
                     className="flex items-center gap-2 px-4 py-2 rounded bg-[#0A4D68] text-white text-sm hover:bg-[#083a50] transition"

@@ -5,7 +5,11 @@ const { generateSSOToken } = require('../utils/jwt');
 
 const router = express.Router();
 
-// Start Google SSO - Public route
+/* --------------------------------------------------
+   GOOGLE SSO
+-------------------------------------------------- */
+
+// Start Google SSO
 router.get(
   '/google',
   passport.authenticate('google', {
@@ -14,35 +18,83 @@ router.get(
   })
 );
 
-// Google callback - Public route, returns JWT
+// Google callback → returns JWT
 router.get(
   '/google/callback',
-  passport.authenticate('google', { failureRedirect: '/api/v1/auth/sso/failure', session: false }),
+  passport.authenticate('google', {
+    failureRedirect: '/api/v1/auth/sso/failure',
+    session: false
+  }),
   generateSSOToken
 );
 
-// Microsoft SSO - Start
+
+/* --------------------------------------------------
+   MICROSOFT SSO
+-------------------------------------------------- */
+
+// Start Microsoft SSO
 router.get(
   '/microsoft',
-  passport.authenticate('azuread-openidconnect', { session: false, prompt: 'login' })
+  passport.authenticate('azuread-openidconnect', {
+    session: false,
+    prompt: 'login'
+  })
 );
 
 // Microsoft callback (POST from Azure)
 router.post(
   '/microsoft/callback',
-  passport.authenticate('azuread-openidconnect', { failureRedirect: '/api/v1/auth/sso/failure', session: false }),
+  passport.authenticate('azuread-openidconnect', {
+    failureRedirect: '/api/v1/auth/sso/failure',
+    session: false
+  }),
   generateSSOToken
 );
 
-// SSO Failure
-router.get('/failure', (req, res) => res.status(401).json({ success: false, message: 'SSO failed' }));
 
-// Logout (optional)
-// SSO Logout (JWT + Optional Provider Logout)
+/* --------------------------------------------------
+   ZOHO SSO
+-------------------------------------------------- */
+
+// Start Zoho SSO
+router.get(
+  '/zoho',
+  passport.authenticate('zoho', {
+    session: false
+  })
+);
+
+// Zoho callback → returns JWT (consistent with others)
+router.get(
+  '/zoho/callback',
+  passport.authenticate('zoho', {
+    failureRedirect: '/api/v1/auth/sso/failure',
+    session: false
+  }),
+  generateSSOToken
+);
+
+
+/* --------------------------------------------------
+   FAILURE HANDLER
+-------------------------------------------------- */
+
+router.get('/failure', (req, res) =>
+  res.status(401).json({
+    success: false,
+    message: 'SSO failed'
+  })
+);
+
+
+/* --------------------------------------------------
+   LOGOUT
+-------------------------------------------------- */
+
 router.post('/logout', (req, res) => {
   try {
-    // If you're using cookies in future:
-    res.clearCookie('token');
+    res.clearCookie('token'); // if cookies used later
 
     return res.status(200).json({
       success: true,
@@ -56,6 +108,5 @@ router.post('/logout', (req, res) => {
     });
   }
 });
-
 
 module.exports = router;

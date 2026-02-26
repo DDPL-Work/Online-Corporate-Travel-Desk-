@@ -153,16 +153,41 @@ export default function Sidebar({ isOpen, onClose }) {
     { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },
   ];
 
+  const corporateSuperAdminMenu = [
+    {
+      to: "/corporate-dashboard",
+      label: "Dashboard",
+      icon: <FaClipboardList />,
+    },
+    {
+      to: "/admin-management",
+      label: "Admin Management",
+      icon: <FaShieldAlt />,
+    },
+    {
+      to: "/employee-management",
+      label: "Employee Management",
+      icon: <FaUsers />,
+    },
+    {
+      to: "/corporate-total-bookings",
+      label: "Total Bookings",
+      icon: <FaListAlt />,
+    },
+  ];
+
   const menus = {
     "super-admin": travelCompanyMenu,
     "travel-admin": travelAdminMenu,
     employee: employeeMenu,
+    "corporate-super-admin": corporateSuperAdminMenu,
   };
   const activeMenu = menus[role] || [];
 
   const roleLabels = {
     "super-admin": "Super Admin",
-    "travel-admin": "Travel Admin",
+    "travel-admin": "Corporate Admin",
+    "corporate-super-admin": "Corporate Super Admin",
     employee: "Employee",
   };
 

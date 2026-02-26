@@ -1,7 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FiFilter } from "react-icons/fi";
 import { FaRupeeSign } from "react-icons/fa";
-import { creditUtilizationData } from "../../data/dummyData";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  fetchPostpaidBalance,
+  fetchPostpaidTransactions,
+} from "../../Redux/Actions/postpaidThunks";
 
 const colors = {
   primary: "#0A4D68",
@@ -12,33 +16,55 @@ const colors = {
 };
 
 export default function CreditUtilizationPostpaid() {
-  const [startDate, setStartDate] = useState("2024-01-01");
-  const [endDate, setEndDate] = useState("2024-12-31");
+  const dispatch = useDispatch();
+
+  const today = new Date();
+
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+    .toISOString()
+    .split("T")[0];
+
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+    .toISOString()
+    .split("T")[0];
+
+  const [startDate, setStartDate] = useState(firstDay);
+  const [endDate, setEndDate] = useState(lastDay);
   const [department, setDepartment] = useState("All");
 
-  const departments = ["All", ...new Set(creditUtilizationData.map((x) => x.department))];
+  const { balance, transactions, loadingBalance, loadingTransactions } =
+    useSelector((state) => state.postpaid);
 
-  const totalLimit = 200000; // Example corporate limit
+  // ✅ Fetch balance once
+  useEffect(() => {
+    dispatch(fetchPostpaidBalance());
+  }, [dispatch]);
 
-  // FILTER LOGIC
-  const filtered = creditUtilizationData.filter((t) => {
-    const d = new Date(t.date);
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+  // ✅ Fetch transactions when filters change
+  useEffect(() => {
+    const params = {
+      startDate,
+      endDate,
+    };
 
-    const dateMatch = d >= start && d <= end;
-    const deptMatch = department === "All" || t.department === department;
+    if (department !== "All") {
+      params.department = department;
+    }
 
-    return dateMatch && deptMatch;
-  });
+    dispatch(fetchPostpaidTransactions(params));
+  }, [dispatch, startDate, endDate, department]);
 
-  const usedCredit = filtered.reduce((sum, t) => sum + t.amount, 0);
-  const availableCredit = totalLimit - usedCredit;
+  // ✅ Safe array fallback
+  const safeTransactions = transactions || [];
+
+  const departments = [
+    "All",
+    ...new Set(safeTransactions.map((t) => t.department)),
+  ];
 
   return (
     <div className="p-6" style={{ backgroundColor: colors.light }}>
       <div className="max-w-6xl mx-auto">
-
         {/* HEADER */}
         <h1 className="text-3xl font-bold mb-6" style={{ color: colors.dark }}>
           Credit Utilization (Postpaid)
@@ -46,14 +72,19 @@ export default function CreditUtilizationPostpaid() {
 
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-
           <div
             className="bg-white shadow rounded-lg p-6"
             style={{ borderLeft: `6px solid ${colors.primary}` }}
           >
             <p className="text-gray-600">Total Credit Limit</p>
-            <h2 className="text-3xl font-bold flex items-center gap-1 mt-2" style={{ color: colors.primary }}>
-              <FaRupeeSign /> {totalLimit.toLocaleString()}
+            <h2
+              className="text-3xl font-bold flex items-center gap-1 mt-2"
+              style={{ color: colors.primary }}
+            >
+              <FaRupeeSign />
+              {loadingBalance
+                ? "..."
+                : balance?.totalLimit?.toLocaleString() || 0}
             </h2>
           </div>
 
@@ -63,7 +94,10 @@ export default function CreditUtilizationPostpaid() {
           >
             <p className="text-gray-600">Used Credit</p>
             <h2 className="text-3xl font-bold flex items-center gap-1 mt-2 text-[#F59E0B]">
-              <FaRupeeSign /> {usedCredit.toLocaleString()}
+              <FaRupeeSign />
+              {loadingBalance
+                ? "..."
+                : balance?.usedCredit?.toLocaleString() || 0}
             </h2>
           </div>
 
@@ -73,22 +107,22 @@ export default function CreditUtilizationPostpaid() {
           >
             <p className="text-gray-600">Available Credit</p>
             <h2 className="text-3xl font-bold flex items-center gap-1 mt-2 text-[#10B981]">
-              <FaRupeeSign /> {availableCredit.toLocaleString()}
+              <FaRupeeSign />
+              {loadingBalance
+                ? "..."
+                : balance?.availableCredit?.toLocaleString() || 0}
             </h2>
           </div>
-
         </div>
 
         {/* FILTERS */}
         <div className="bg-white shadow rounded-lg p-6 mb-6">
-
           <div className="flex items-center gap-2 mb-4">
             <FiFilter className="text-[#0A4D68]" size={22} />
             <h2 className="text-lg font-semibold">Filters</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-
             <div>
               <label className="text-sm font-medium">Start Date</label>
               <input
@@ -121,7 +155,6 @@ export default function CreditUtilizationPostpaid() {
                 ))}
               </select>
             </div>
-
           </div>
         </div>
 
@@ -143,31 +176,38 @@ export default function CreditUtilizationPostpaid() {
                       >
                         {h}
                       </th>
-                    )
+                    ),
                   )}
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-gray-200">
-                {filtered.length === 0 ? (
+                {loadingTransactions ? (
                   <tr>
-                    <td
-                      colSpan="5"
-                      className="text-center py-8 text-gray-500"
-                    >
+                    <td colSpan="5" className="text-center py-8 text-gray-500">
+                      Loading...
+                    </td>
+                  </tr>
+                ) : safeTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="text-center py-8 text-gray-500">
                       No usage found for the selected filters
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((t) => (
-                    <tr key={t.id} className="hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 text-sm">{t.date}</td>
-                      <td className="px-6 py-4 text-sm">{t.employee}</td>
+                  safeTransactions.map((t) => (
+                    <tr key={t._id} className="hover:bg-gray-50 transition">
+                      <td className="px-6 py-4 text-sm">
+                        {new Date(t.date).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        {t.employeeId?.name?.firstName || ""}{" "}
+                        {t.employeeId?.name?.lastName || ""}
+                      </td>
                       <td className="px-6 py-4 text-sm">{t.department}</td>
                       <td className="px-6 py-4 text-sm">{t.purpose}</td>
-
                       <td className="px-6 py-4 text-sm font-semibold text-red-600">
-                        - ₹{t.amount.toLocaleString()}
+                        - ₹{t.amount?.toLocaleString()}
                       </td>
                     </tr>
                   ))
@@ -175,7 +215,6 @@ export default function CreditUtilizationPostpaid() {
               </tbody>
             </table>
           </div>
-
         </div>
       </div>
     </div>

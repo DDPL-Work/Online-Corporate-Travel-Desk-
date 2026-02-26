@@ -5,19 +5,16 @@ import { BsCalendar4 } from "react-icons/bs";
 import { AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
 import { useDispatch, useSelector } from "react-redux";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
-import SeatSelectionModal from "./SeatSelectionModal";
-
 import {
   formatDate,
   formatDurationCompact,
   RoundTripFlightTimeline,
-  FareOptions,
   PriceSummary,
-  FareRulesAccordion,
   Amenities,
   HotelHomeButton,
   CTABox,
   parseRoundTripBooking,
+  TravelerForm,
 } from "./CommonComponents";
 import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
 import {
@@ -25,46 +22,22 @@ import {
   getRTFareRule,
   getRTSSR,
 } from "../../../Redux/Actions/flight.thunks.RT";
-import { IoChevronDown, IoChevronUp } from "react-icons/io5";
-import RTSeatSelectionModal from "./RTSeatSelectionModal";
+import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
+import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import { FareDetailsModal } from "./FareDetailsModal";
+import { CABIN_MAP } from "../../../utils/formatter";
+import { getMyTravelAdmin } from "../../../Redux/Actions/travelAdmin.thunks";
 
 // ✅ NORMALIZE FULL FARE RULE API RESPONSE (FareRule API)
 const normalizeFareRules = (fareRule) => {
   const list = fareRule?.Response?.FareRules;
   if (!Array.isArray(list)) return null;
-
   return {
-    cancellation: [],
-    dateChange: [],
-    baggage: [],
-    important: list.map((r) => r.FareRuleDetail).filter(Boolean),
+    cancellation: list.filter((r) => r.Category === "CANCELLATION"),
+    dateChange: list.filter((r) => r.Category === "DATECHANGE"),
+    baggage: list.filter((r) => r.Category === "BAGGAGE"),
+    important: list.filter((r) => r.Category === "IMPORTANT"),
   };
-};
-
-const ExpandableSection = ({ title, defaultOpen = false, children }) => {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-200">
-      {/* Header */}
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 hover:bg-gray-100 transition"
-      >
-        <h3 className="text-lg font-bold text-gray-800">{title}</h3>
-        {open ? (
-          <IoChevronUp size={20} className="text-gray-600" />
-        ) : (
-          <IoChevronDown size={20} className="text-gray-600" />
-        )}
-      </button>
-
-      {/* Content */}
-      {open && (
-        <div className="p-6 border-t border-gray-200 bg-white">{children}</div>
-      )}
-    </div>
-  );
 };
 
 export default function RoundTripFlightBooking() {
@@ -80,8 +53,9 @@ export default function RoundTripFlightBooking() {
   const {
     selectedFlight,
     searchParams,
-    rawFlightData,
+    // rawFlightData,
     tripType = "round-trip",
+    isInternational = false,
   } = location.state || {};
 
   const [expandedSections, setExpandedSections] = useState({
@@ -93,21 +67,23 @@ export default function RoundTripFlightBooking() {
     travelDocs: false,
     terms: false,
   });
-  const [travelers, setTravelers] = useState([
-    {
-      id: 1,
-      title: "Mr.",
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      email: "",
-      mobile: "",
-      phoneWithCode: "",
-      passportNumber: "",
-      dob: "",
-      age: "",
-    },
-  ]);
+  // ===== Traveler State =====
+  const initialTraveler = (id) => ({
+    id,
+    title: "MR",
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    gender: "",
+    age: "",
+    email: "",
+    phoneWithCode: "",
+    passportNumber: "",
+    passportExpiry: "",
+    nationality: "",
+    dob: "",
+  });
+  const [travelers, setTravelers] = useState([]);
   const [selectedSeats, setSelectedSeats] = useState({});
   const [showSeatModal, setShowSeatModal] = useState({
     flight: null,
@@ -126,13 +102,42 @@ export default function RoundTripFlightBooking() {
   const [selectedMeals, setSelectedMeals] = useState({});
   const [selectedBaggage, setSelectedBaggage] = useState({});
 
+  const [travelerErrors, setTravelerErrors] = useState({});
+  const [purposeOfTravel, setPurposeOfTravel] = useState("");
+
   const fareQuote = useSelector((state) => state.flightsRT.fareQuoteRT);
   const fareRule = useSelector((state) => state.flightsRT.fareRuleRT);
   const ssr = useSelector((state) => state.flightsRT.ssrRT);
   // const traceId = useSelector((state) => state.flightsRT.traceId);
   const reduxTraceId = useSelector((state) => state.flightsRT.traceId);
+  const { user } = useSelector((state) => state.auth);
+  const {
+    approver,
+    loading: approverLoading,
+    error: approverError,
+  } = useSelector((state) => state.travelAdmin);
 
   const traceId = location.state?.traceId || reduxTraceId || null;
+
+  // ✅ INTERNATIONAL NORMALIZATION (ADD THIS)
+  const rawFlightData = useMemo(() => {
+    const raw = location.state?.rawFlightData;
+    if (!raw) return null;
+
+    if (
+      isInternational &&
+      Array.isArray(raw.Segments) &&
+      Array.isArray(raw.Segments[0])
+    ) {
+      return {
+        onward: { ...raw, Segments: [raw.Segments[0]] },
+        return: { ...raw, Segments: [raw.Segments[1]] },
+        isInternational: true,
+      };
+    }
+
+    return raw;
+  }, [location.state?.rawFlightData, isInternational]);
 
   const extractFareParts = (quote) => {
     const fare = quote?.Response?.Results?.Fare;
@@ -159,24 +164,108 @@ export default function RoundTripFlightBooking() {
   };
 
   const isRTSeatReady = useMemo(() => {
-    const onwardResultIndex = rawFlightData?.onward?.ResultIndex;
-    const returnResultIndex = rawFlightData?.return?.ResultIndex;
+    const onwardIdx = rawFlightData?.onward?.ResultIndex?.toString().trim();
+    const returnIdx = rawFlightData?.return?.ResultIndex?.toString().trim();
 
-    const onwardSSR = ssr?.onward?.[onwardResultIndex];
-    const returnSSR = ssr?.return?.[returnResultIndex];
+    const onwardSSR = ssr?.onward?.[onwardIdx];
+    const returnSSR = ssr?.return?.[returnIdx];
 
-    const hasSeats = (journeySSR) =>
-      journeySSR?.Response?.SeatDynamic?.some((sd) =>
-        sd?.SegmentSeat?.some(
-          (seg) => Array.isArray(seg?.RowSeats) && seg.RowSeats.length > 0,
-        ),
+    const hasSeats = (journeySSR, journeyType) => {
+      // if (ssrLoading?.[journeyType]) return "loading";
+      // if (ssrError?.[journeyType]) return "error";
+      if (!journeySSR) return false;
+
+      let root =
+        journeySSR.Response ||
+        journeySSR.Results ||
+        Object.values(journeySSR)[0]?.Response ||
+        Object.values(journeySSR)[0]?.Results ||
+        journeySSR;
+
+      const seatSource =
+        root?.SeatDynamic?.[0]?.SegmentSeat ||
+        root?.Seat?.[0]?.SegmentSeat ||
+        root?.SeatDynamic ||
+        root?.Seat ||
+        [];
+
+      // if (!Array.isArray(seatSource) || seatSource.length === 0) return "none";
+
+      return (
+        Array.isArray(seatSource) &&
+        seatSource.some(
+          (s) => Array.isArray(s?.RowSeats) && s.RowSeats.length > 0,
+        )
       );
+    };
 
+    // 🔥 INTERNATIONAL: same SSR for both legs
+    if (isInternational) {
+      const status = hasSeats(onwardSSR);
+      return { onward: status, return: status };
+    }
+
+    // Domestic
     return {
       onward: hasSeats(onwardSSR),
       return: hasSeats(returnSSR),
     };
-  }, [ssr, rawFlightData]);
+  }, [ssr, rawFlightData, isInternational]);
+
+  useEffect(() => {
+    if (user?.role === "employee") {
+      dispatch(getMyTravelAdmin());
+    }
+  }, [dispatch, user]);
+
+  // ✅ AUTO-FILL LEAD TRAVELER
+  useEffect(() => {
+    const adultCount =
+      searchParams?.passengers?.adults || searchParams?.adults || 1;
+    const childCount =
+      searchParams?.passengers?.children || searchParams?.children || 0;
+    const infantCount =
+      searchParams?.passengers?.infants || searchParams?.infants || 0;
+    const totalCount = adultCount + childCount + infantCount;
+
+    const initial = Array.from({ length: totalCount || 1 }, (_, i) => ({
+      id: i + 1,
+      title: "MR",
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      gender: "",
+      age: "",
+      email: "",
+      mobile: "",
+      phoneWithCode: "",
+      passportNumber: "",
+      passportExpiry: "",
+      nationality: "India",
+      dob: "",
+    }));
+
+    // Pre-fill first traveler if user is logged in
+    if (user && initial[0]) {
+      if (user.name && typeof user.name === "object") {
+        initial[0].firstName = (user.name.firstName || "").toUpperCase();
+        initial[0].lastName = (user.name.lastName || "").toUpperCase();
+      } else {
+        const rawName = user.name || user.displayName || "";
+        const fullName = typeof rawName === "string" ? rawName : "";
+        const names = fullName.trim().split(/\s+/);
+
+        initial[0].firstName = (names[0] || "").toUpperCase();
+        initial[0].lastName = (names.slice(1).join(" ") || "").toUpperCase();
+      }
+
+      initial[0].email = user.email || "";
+      initial[0].phoneWithCode =
+        user.phone || user.mobile || user.phoneWithCode || "";
+    }
+
+    setTravelers(initial);
+  }, [user, searchParams]);
 
   useEffect(() => {
     console.log("🟢 Seat Ready Check", {
@@ -215,6 +304,28 @@ export default function RoundTripFlightBooking() {
     setLoading(false);
   }, [rawFlightData, navigate]);
 
+  const onwardRoute = useMemo(() => {
+    const segs = parsedFlightData?.onwardSegments;
+    if (!Array.isArray(segs) || segs.length === 0) return null;
+
+    return {
+      from: segs[0]?.da?.city || "",
+      to: segs[segs.length - 1]?.aa?.city || "",
+      dateTime: segs[0]?.dt,
+    };
+  }, [parsedFlightData]);
+
+  const returnRoute = useMemo(() => {
+    const segs = parsedFlightData?.returnSegments;
+    if (!Array.isArray(segs) || segs.length === 0) return null;
+
+    return {
+      from: segs[0]?.da?.city || "",
+      to: segs[segs.length - 1]?.aa?.city || "",
+      dateTime: segs[0]?.dt,
+    };
+  }, [parsedFlightData]);
+
   const onwardFrom = searchParams?.from?.city || searchParams?.from || "Delhi";
   const onwardTo = searchParams?.to?.city || searchParams?.to || "Mumbai";
   const onwardDate = formatDate(parsedFlightData?.onwardSegments?.[0]?.dt);
@@ -226,8 +337,61 @@ export default function RoundTripFlightBooking() {
   const onwardFare = extractFareParts(fareQuote?.onward);
   const returnFare = extractFareParts(fareQuote?.return);
 
-  const totalBaseFare = onwardFare.base + returnFare.base;
-  const totalTaxFare = onwardFare.tax + returnFare.tax;
+  // const totalBaseFare = onwardFare.base + returnFare.base;
+  // const totalTaxFare = onwardFare.tax + returnFare.tax;
+
+  const totalBaseFare = useMemo(() => {
+    if (!fareQuote) return 0;
+
+    // 🔥 INTERNATIONAL FIX
+    if (isInternational) {
+      const fare = fareQuote?.onward?.Response?.Results?.Fare;
+      return Number(fare?.BaseFare || 0);
+    }
+
+    // Domestic logic (unchanged)
+    const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
+    const returnFare = fareQuote?.return?.Response?.Results?.Fare;
+
+    return (
+      Number(onwardFare?.BaseFare || 0) + Number(returnFare?.BaseFare || 0)
+    );
+  }, [fareQuote, isInternational]);
+
+  const totalTaxFare = useMemo(() => {
+    if (!fareQuote) return 0;
+
+    // 🔥 INTERNATIONAL FIX
+    if (isInternational) {
+      const fare = fareQuote?.onward?.Response?.Results?.Fare;
+      return Number(fare?.Tax || 0);
+    }
+
+    // Domestic logic
+    const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
+    const returnFare = fareQuote?.return?.Response?.Results?.Fare;
+
+    return Number(onwardFare?.Tax || 0) + Number(returnFare?.Tax || 0);
+  }, [fareQuote, isInternational]);
+
+  const totalOtherCharges = useMemo(() => {
+    if (!fareQuote) return 0;
+
+    // 🔥 INTERNATIONAL FIX
+    if (isInternational) {
+      const fare = fareQuote?.onward?.Response?.Results?.Fare;
+      return Number(fare?.OtherCharges || 0);
+    }
+
+    // Domestic logic
+    const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
+    const returnFare = fareQuote?.return?.Response?.Results?.Fare;
+
+    return (
+      Number(onwardFare?.OtherCharges || 0) +
+      Number(returnFare?.OtherCharges || 0)
+    );
+  }, [fareQuote, isInternational]);
 
   useEffect(() => {
     console.log(
@@ -239,7 +403,6 @@ export default function RoundTripFlightBooking() {
       fareQuote?.return?.Response?.Results?.Fare,
     );
   }, [fareQuote]);
-
 
   console.log("=== CORRECTED JOURNEY ASSIGNMENT ===");
   console.log("Onward:", onwardFrom, "→", onwardTo, "on", onwardDate);
@@ -310,6 +473,7 @@ export default function RoundTripFlightBooking() {
       }),
     );
 
+    // ALWAYS call onward
     dispatch(
       getRTSSR({
         traceId,
@@ -317,6 +481,17 @@ export default function RoundTripFlightBooking() {
         journeyType: "onward",
       }),
     );
+
+    // ONLY call return for domestic
+    if (!isInternational) {
+      dispatch(
+        getRTSSR({
+          traceId,
+          resultIndex: onwardIdx,
+          journeyType: "return",
+        }),
+      );
+    }
 
     dispatch(
       getRTFareRule({
@@ -348,7 +523,6 @@ export default function RoundTripFlightBooking() {
     console.log("SSR ONWARD:", ssr?.onward);
     console.log("SSR RETURN:", ssr?.return);
   }, [fareRule, ssr]);
-
 
   const toggleSeatSelection = (
     journeyType,
@@ -389,11 +563,38 @@ export default function RoundTripFlightBooking() {
   };
 
   const openSeatModal = (segment, segmentIndex, journeyType, resultIndex) => {
-    const journeySSR = ssr?.[journeyType]?.[resultIndex];
+    // 🔥 INTERNATIONAL FIX
+    const ssrJourneyType = isInternational ? "onward" : journeyType;
+    const ssrResultIndex = (
+      isInternational ? rawFlightData.onward.ResultIndex : resultIndex
+    )
+      ?.toString()
+      .trim();
 
-    const seatData = journeySSR?.Response?.SeatDynamic;
+    let actualSegmentIndex = segmentIndex;
 
-    if (!Array.isArray(seatData) || seatData.length === 0) {
+    // 🔥 INTERNATIONAL segment offset
+    if (isInternational && journeyType === "return") {
+      actualSegmentIndex =
+        (parsedFlightData?.onwardSegments?.length || 0) + segmentIndex;
+    }
+
+    const journeySSR = ssr?.[ssrJourneyType]?.[ssrResultIndex];
+
+    let root =
+      journeySSR?.Response ||
+      journeySSR?.Results ||
+      Object.values(journeySSR || {})[0]?.Response ||
+      Object.values(journeySSR || {})[0]?.Results ||
+      journeySSR;
+
+    const seatData =
+      root?.SeatDynamic?.[0]?.SegmentSeat ||
+      root?.Seat?.[0]?.SegmentSeat ||
+      root?.SeatDynamic ||
+      root?.Seat;
+
+    if (!seatData || seatData.length === 0) {
       ToastWithTimer({
         type: "info",
         message: "Seat selection not available for this flight.",
@@ -404,10 +605,11 @@ export default function RoundTripFlightBooking() {
     setShowSeatModal({
       show: true,
       segment,
-      segmentIndex,
-      journeyType,
-      resultIndex,
+      segmentIndex: actualSegmentIndex,
+      journeyType, // keep UI context
+      resultIndex: ssrResultIndex,
       date: segment?.dt,
+      ssrData: journeySSR, // ✅ important
     });
   };
 
@@ -469,13 +671,6 @@ export default function RoundTripFlightBooking() {
     return total;
   }, [selectedSeats]);
 
-  const toggleFareSection = (key) => {
-    setExpandFare((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  };
-
   useEffect(() => {
     console.log("SELECTED SEATS:", selectedSeats);
     console.log("TOTAL SEAT PRICE:", totalSeatPrice);
@@ -509,6 +704,412 @@ export default function RoundTripFlightBooking() {
     });
 
     return `${date}, ${time}`;
+  };
+
+  const calculateSSRTotal = () => {
+    let total = 0;
+
+    Object.values(selectedSeats).forEach((v) => {
+      v?.list?.forEach((seat) => (total += Number(v.priceMap?.[seat] || 0)));
+    });
+
+    Object.values(selectedMeals).forEach((meals) => {
+      meals?.forEach((m) => (total += Number(m.Price || 0)));
+    });
+
+    Object.values(selectedBaggage).forEach((bag) => {
+      if (bag?.Price) total += Number(bag.Price) * travelers.length;
+    });
+
+    return total;
+  };
+
+  const updateTraveler = (id, field, value) => {
+    setTravelers((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, [field]: value } : t)),
+    );
+  };
+
+  const perAdultFare = useMemo(() => {
+    if (!fareQuote) return { base: 0, tax: 0 };
+
+    // 🔥 INTERNATIONAL FIX
+    if (isInternational) {
+      const fare = fareQuote?.onward?.Response?.Results?.Fare;
+
+      return {
+        base: Number(fare?.BaseFare || 0),
+        tax: Number(fare?.Tax || 0),
+        otherCharges: Number(fare?.OtherCharges || 0),
+      };
+    }
+
+    // Domestic logic
+    const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
+    const returnFare = fareQuote?.return?.Response?.Results?.Fare;
+
+    return {
+      base:
+        Number(onwardFare?.BaseFare || 0) + Number(returnFare?.BaseFare || 0),
+      tax: Number(onwardFare?.Tax || 0) + Number(returnFare?.Tax || 0),
+      otherCharges:
+        Number(onwardFare?.OtherCharges || 0) +
+        Number(returnFare?.OtherCharges || 0),
+    };
+  }, [fareQuote, isInternational]);
+
+  const totalPayableAmount =
+    Math.ceil(
+      perAdultFare.base + perAdultFare.tax + perAdultFare.otherCharges,
+    ) *
+      travelers.length +
+    calculateSSRTotal();
+
+  const buildMealSSR = () => {
+    const meals = [];
+
+    Object.entries(selectedMeals).forEach(([key, mealList]) => {
+      const [, segmentIndex] = key.split("|");
+
+      mealList.forEach((meal, travelerIndex) => {
+        meals.push({
+          segmentIndex: Number(segmentIndex),
+          travelerId: travelers[travelerIndex]?.id,
+          code: meal.Code,
+          description: meal.Description,
+          price: meal.Price,
+        });
+      });
+    });
+
+    return meals;
+  };
+
+  const buildFullSegments = () => {
+    const segments = [];
+
+    const pushSegments = (segmentGroups, journeyType) => {
+      if (!Array.isArray(segmentGroups)) return;
+
+      segmentGroups.forEach((group) => {
+        if (!Array.isArray(group)) return;
+
+        group.forEach((seg) => {
+          segments.push({
+            segmentIndex: segments.length,
+            journeyType,
+
+            airlineName: seg.Airline?.AirlineName || null,
+            airlineCode: seg.Airline?.AirlineCode || null,
+            flightNumber: seg.Airline?.FlightNumber || null,
+            aircraft: seg.Craft || null,
+
+            origin: {
+              airportCode: seg.Origin?.Airport?.AirportCode,
+              city: seg.Origin?.Airport?.CityName,
+              country: seg.Origin?.Airport?.CountryCode,
+              terminal: seg.Origin?.Airport?.Terminal,
+            },
+
+            destination: {
+              airportCode: seg.Destination?.Airport?.AirportCode,
+              city: seg.Destination?.Airport?.CityName,
+              country: seg.Destination?.Airport?.CountryCode,
+              terminal: seg.Destination?.Airport?.Terminal,
+            },
+
+            departureDateTime: seg.Origin?.DepTime,
+            arrivalDateTime: seg.Destination?.ArrTime,
+            durationMinutes: seg.Duration,
+
+            baggage: {
+              checkIn: seg.Baggage || null,
+              cabin: seg.CabinBaggage || null,
+            },
+          });
+        });
+      });
+    };
+
+    // ✅ USE RAW SEARCH DATA (KEY FIX)
+    pushSegments(rawFlightData?.onward?.Segments || [], "onward");
+    pushSegments(rawFlightData?.return?.Segments || [], "return");
+
+    return segments;
+  };
+
+  const fareSnapshot = {
+    currency: fareQuote?.onward?.Response?.Results?.Fare?.Currency || "INR",
+
+    onwardFare: fareQuote?.onward?.Response?.Results?.Fare,
+    returnFare: fareQuote?.return?.Response?.Results?.Fare,
+
+    refundable: selectedFlight?.IsRefundable,
+    fareType: selectedFlight?.ResultFareType,
+    lastTicketDate:
+      fareQuote?.onward?.Response?.Results?.LastTicketDate ||
+      fareQuote?.return?.Response?.Results?.LastTicketDate,
+  };
+
+  const buildBaggageSSR = () => {
+    const baggage = [];
+
+    Object.entries(selectedBaggage).forEach(([key, bag]) => {
+      if (!bag) return;
+
+      const [, segmentIndex] = key.split("|");
+
+      baggage.push({
+        segmentIndex: Number(segmentIndex),
+        code: bag.Code,
+        weight: bag.Weight,
+        price: bag.Price,
+      });
+    });
+
+    return baggage;
+  };
+
+  const buildSeatSSR = () => {
+    const seats = [];
+
+    Object.entries(selectedSeats).forEach(([key, value]) => {
+      const [, segmentIndex] = key.split("|");
+
+      value.list.forEach((seatCode, travelerIndex) => {
+        // seats.push({
+        //   segmentIndex: Number(segmentIndex),
+        //   travelerIndex,
+        //   seatNo: seatCode,
+        //   price: value.priceMap[seatCode] || 0,
+        // });
+        seats.push({
+          segmentIndex: Number(segmentIndex),
+          travelerId: travelers[travelerIndex]?.id,
+          seatNo: seatCode,
+          price: value.priceMap[seatCode] || 0,
+        });
+      });
+    });
+
+    return seats;
+  };
+
+  const buildConsolidatedFareQuote = () => {
+    // ONE-WAY (unchanged behavior)
+    if (!fareQuote?.onward && fareQuote?.Response?.Results) {
+      return fareQuote;
+    }
+
+    // ROUND-TRIP → consolidate
+    const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
+    const returnFare = fareQuote?.return?.Response?.Results?.Fare;
+
+    if (!onwardFare || !returnFare) return null;
+
+    return {
+      Response: {
+        Results: {
+          Fare: {
+            Currency: onwardFare.Currency,
+            BaseFare:
+              Number(onwardFare.BaseFare || 0) +
+              Number(returnFare.BaseFare || 0),
+            Tax: Number(onwardFare.Tax || 0) + Number(returnFare.Tax || 0),
+            PublishedFare:
+              Number(onwardFare.PublishedFare || 0) +
+              Number(returnFare.PublishedFare || 0),
+            Refundable: onwardFare.Refundable && returnFare.Refundable,
+          },
+          IsLCC:
+            fareQuote.onward.Response.Results.IsLCC ||
+            fareQuote.return.Response.Results.IsLCC,
+          LastTicketDate:
+            fareQuote.onward.Response.Results.LastTicketDate ||
+            fareQuote.return.Response.Results.LastTicketDate,
+        },
+      },
+    };
+  };
+
+  const buildBookingRequestPayload = () => {
+    const segments = buildFullSegments();
+    const firstSegment = segments[0];
+    const lastSegment = segments[segments.length - 1];
+    const cabinClass = CABIN_MAP[firstSegment?.cabinClass] || "Economy";
+
+    const bookingSnapshot = {
+      bookingType: "flight",
+
+      sectors: segments.map(
+        (s) => `${s.origin.airportCode}-${s.destination.airportCode}`,
+      ),
+
+      airline: [
+        ...new Set(segments.map((s) => s.airlineName).filter(Boolean)),
+      ].join(", "),
+
+      travelDate: segments[0]?.departureDateTime || "N/A",
+      returnDate: segments.at(-1)?.departureDateTime || "N/A",
+
+      cabinClass,
+      amount: totalPayableAmount,
+      purposeOfTravel: purposeOfTravel || "N/A",
+      city: segments.at(-1)?.destination?.city || "N/A",
+    };
+
+    const TRACE_VALIDITY_MINUTES = 15;
+
+    const fareExpiry = new Date(
+      Date.now() + TRACE_VALIDITY_MINUTES * 60 * 1000,
+    );
+
+    return {
+      bookingType: "flight",
+      flightRequest: {
+        // traceId: searchParams.traceId,
+        traceId,
+        // resultIndex: selectedFlight.ResultIndex,
+        resultIndex: {
+          onward: rawFlightData.onward.ResultIndex,
+          return: rawFlightData.return.ResultIndex,
+        },
+        // resultIndex: rawFlightData.onward.ResultIndex,
+
+        // fareQuote: buildConsolidatedFareQuote(),
+        // fareQuote: fareQuote?.onward?.Response, // ✅ contains FareBreakdown
+        fareQuote: {
+          Results: [
+            fareQuote?.onward?.Response?.Results,
+            fareQuote?.return?.Response?.Results,
+          ],
+          // Results: [fareQuote?.return?.Response?.Results],
+        },
+
+        segments: buildFullSegments(),
+
+        fareSnapshot,
+
+        ssrSnapshot: {
+          seats: buildSeatSSR(),
+          meals: buildMealSSR(),
+          baggage: buildBaggageSSR(),
+        },
+
+        fareExpiry,
+      },
+
+      travellers: travelers.map((t, idx) => ({
+        title: t.title,
+        firstName: t.firstName,
+        lastName: t.lastName,
+
+        email: t.email,
+        phoneWithCode: t.phoneWithCode, // ✅ THIS WAS MISSING
+
+        gender: t.gender,
+        dateOfBirth: t.dob,
+
+        passportNumber: t.passportNumber,
+        passportExpiry: t.passportExpiry,
+        nationality: t.nationality,
+
+        isLeadPassenger: idx === 0,
+      })),
+
+      purposeOfTravel,
+      bookingSnapshot, // ✅ include summary for backend to save
+      pricingSnapshot: {
+        totalAmount:
+          // perAdultFare.base * travelers.length +
+          // perAdultFare.tax * travelers.length +
+          // calculateSSRTotal(),
+          totalPayableAmount,
+        currency: "INR",
+      },
+    };
+  };
+
+  const validateTravelers = () => {
+    const errors = {};
+    let isValid = true;
+
+    travelers.forEach((t, idx) => {
+      const e = {};
+
+      if (!t.firstName?.trim()) e.firstName = "First name is required";
+      if (!t.lastName?.trim()) e.lastName = "Last name is required";
+      if (!t.gender?.trim()) e.gender = "Gender is required";
+      if (!t.email?.trim()) e.email = "Email is required";
+      if (!t.dob?.trim()) e.dob = "Date of birth is required";
+      if (!t.phoneWithCode?.trim())
+        e.phoneWithCode = "Phone number is required";
+      if (!t.nationality?.trim()) e.nationality = "Nationality is required";
+
+      // passportNumber validation: only if flight is international
+      const isInternational = Boolean(
+        parsedFlightData?.segments?.some(
+          (s) =>
+            s?.origin?.country &&
+            s?.destination?.country &&
+            s.origin.country !== s.destination.country,
+        ),
+      );
+
+      if (isInternational && !t.passportNumber?.trim()) {
+        e.passportNumber =
+          "Passport number is required for international flights";
+      }
+
+      if (Object.keys(e).length > 0) {
+        errors[idx] = e;
+        isValid = false;
+      }
+    });
+
+    setTravelerErrors(errors);
+    return isValid;
+  };
+
+  const handleSendForApproval = async () => {
+    if (!approver) {
+      ToastWithTimer({
+        type: "error",
+        message: "No approver assigned. Please contact admin.",
+      });
+      return;
+    }
+
+    if (!purposeOfTravel) {
+      ToastWithTimer({
+        type: "error",
+        message: "Please enter purpose of travel",
+      });
+      return;
+    }
+
+    // Validate traveler details before submission
+    if (!validateTravelers()) {
+      ToastWithTimer({
+        type: "error",
+        message: "Please fill all required traveler details correctly.",
+      });
+      return;
+    }
+
+    try {
+      const payload = buildBookingRequestPayload();
+      await dispatch(createBookingRequest(payload)).unwrap();
+
+      navigate("/my-bookings", {
+        state: { success: true },
+      });
+    } catch (err) {
+      ToastWithTimer({
+        type: "error",
+        message: "Failed to submit booking request",
+      });
+    }
   };
 
   console.log(
@@ -623,10 +1224,10 @@ export default function RoundTripFlightBooking() {
                     value={
                       <>
                         <div className="font-semibold">
-                          {onwardFrom} → {onwardTo}
+                          {onwardRoute?.from} → {onwardRoute?.to}
                         </div>
                         <div className="text-xs text-slate-500">
-                          {formatDateTime(onwardDepartureDateTime)}
+                          {formatDateTime(onwardRoute?.dateTime)}
                         </div>
                       </>
                     }
@@ -638,10 +1239,10 @@ export default function RoundTripFlightBooking() {
                     value={
                       <>
                         <div className="font-semibold">
-                          {returnFrom} → {returnTo}
+                          {returnRoute?.from} → {returnRoute?.to}
                         </div>
                         <div className="text-xs text-slate-500">
-                          {formatDateTime(returnDepartureDateTime)}
+                          {formatDateTime(returnRoute?.dateTime)}
                         </div>
                       </>
                     }
@@ -688,7 +1289,8 @@ export default function RoundTripFlightBooking() {
                         Onward Journey
                       </p>
                       <p className="text-sm text-gray-700 font-medium">
-                        {onwardFrom} → {onwardTo} • {onwardDate}
+                        {onwardRoute?.from} → {onwardRoute?.to} •{" "}
+                        {formatDate(onwardRoute?.dateTime)}
                       </p>
                       <p className="text-xs text-gray-600">
                         {parsedFlightData.onwardSegments?.length || 0} Flight
@@ -745,7 +1347,8 @@ export default function RoundTripFlightBooking() {
                         Return Journey
                       </p>
                       <p className="text-sm text-gray-700 font-medium">
-                        {returnFrom} → {returnTo} • {returnDate}
+                        {returnRoute?.from} → {returnRoute?.to} •{" "}
+                        {formatDate(returnRoute?.dateTime)}
                       </p>
                       <p className="text-xs text-gray-600">
                         {parsedFlightData.returnSegments?.length || 0} Flight
@@ -786,176 +1389,33 @@ export default function RoundTripFlightBooking() {
                 </div>
               )}
             </div>
-            {/* Fare Quote */}
-            <div className="space-y-5">
-              {/* Fare  - Onward */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                {/* Header */}
-                <button
-                  onClick={() => toggleFareSection("onward")}
-                  className="w-full bg-linear-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center shadow-md">
-                      <MdFlightTakeoff className="text-white text-xl" />
-                    </div>
-                    <div className="text-left">
-                      <h3 className="text-lg font-bold text-gray-900">
-                        Onward Journey
-                      </h3>
-                      <p className="text-xs text-gray-600">
-                        Fare details & add-ons
-                      </p>
-                    </div>
-                  </div>
 
-                  {expandFare.onward ? (
-                    <AiOutlineMinus className="text-green-700 text-lg" />
-                  ) : (
-                    <AiOutlinePlus className="text-green-700 text-lg" />
-                  )}
-                </button>
+            {/* Traveller Details */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <TravelerForm
+                travelers={travelers}
+                updateTraveler={updateTraveler}
+                errors={travelerErrors}
+                parsedFlightData={parsedFlightData}
+                purposeOfTravel={purposeOfTravel}
+                setPurposeOfTravel={setPurposeOfTravel}
+                isInternational={isInternational}
+              />
+            </div>
 
-                {/* Content */}
-                {expandFare.onward && (
-                  <div className="p-6 space-y-6">
-                    {/* Fare Options */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="w-1 h-5 bg-green-600 rounded-full"></div>
-                        <h4 className="text-base font-semibold text-gray-900">
-                          Fare Rules & Charges
-                        </h4>
-                      </div>
-                      <FareOptions
-                        fareRules={fareQuote?.onward}
-                        fareRulesStatus={
-                          fareQuote?.onward?.Response?.Results?.MiniFareRules
-                            ? "succeeded"
-                            : "loading"
-                        }
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-              {/* Fare  - Return */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                {/* Header */}
-                <button
-                  onClick={() => toggleFareSection("return")}
-                  className="w-full bg-linear-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center shadow-md">
-                      <MdFlightTakeoff className="text-white text-xl" />
-                    </div>
-                    <div className="text-left">
-                      <h3 className="text-lg font-bold text-gray-900">
-                        Return Journey
-                      </h3>
-                      <p className="text-xs text-gray-600">
-                        Fare details & add-ons
-                      </p>
-                    </div>
-                  </div>
-
-                  {expandFare.return ? (
-                    <AiOutlineMinus className="text-green-700 text-lg" />
-                  ) : (
-                    <AiOutlinePlus className="text-green-700 text-lg" />
-                  )}
-                </button>
-
-                {/* Content */}
-                {expandFare.return && (
-                  <div className="p-6 space-y-6">
-                    {/* Fare Options */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="w-1 h-5 bg-purple-600 rounded-full"></div>
-                        <h4 className="text-base font-semibold text-gray-900">
-                          Fare Rules & Charges
-                        </h4>
-                      </div>
-                      <FareOptions
-                        fareRules={fareQuote?.return}
-                        fareRulesStatus={
-                          fareQuote?.return?.Response?.Results?.MiniFareRules
-                            ? "succeeded"
-                            : "loading"
-                        }
-                      />
-                    </div>
-
-                    {/* Meals Section */}
-                    {ssr?.return?.Results?.Meal?.length > 0 && (
-                      <div className="border-t border-gray-200 pt-6">
-                        <div className="flex items-center gap-2 mb-4">
-                          <div className="w-1 h-5 bg-orange-500 rounded-full"></div>
-                          <h4 className="text-base font-semibold text-gray-900">
-                            In-Flight Meals
-                          </h4>
-                          <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-semibold rounded-full">
-                            {ssr.return.Results.Meal.length} Available
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {ssr.return.Results.Meal.map((meal, idx) => (
-                            <div
-                              key={idx}
-                              className="border border-gray-200 rounded-lg p-4 hover:border-orange-300 hover:shadow-md transition-all duration-200 group"
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="w-12 h-12 bg-orange-50 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-orange-100 transition-colors">
-                                  <PiForkKnifeBold className="text-orange-600 text-xl" />
-                                </div>
-                                <div className="flex-1">
-                                  <p className="font-semibold text-gray-900 text-sm mb-1">
-                                    {meal.Description}
-                                  </p>
-                                  <p className="text-xs text-gray-500 mb-2">
-                                    {meal.Code}
-                                  </p>
-                                  <div className="flex items-center justify-between">
-                                    <p className="text-lg font-bold text-orange-600">
-                                      ₹{meal.Price}
-                                    </p>
-                                    <button className="px-3 py-1.5 bg-orange-600 text-white text-xs font-semibold rounded-md hover:bg-orange-700 transition-colors">
-                                      Add
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <ExpandableSection
-                title="Important Information — Onward"
-                defaultOpen={false}
-              >
-                <FareRulesAccordion
-                  fareRules={normalizeFareRules(fareRule?.onward)}
-                  fareRulesStatus={fareRule?.onward ? "succeeded" : "loading"}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              {/* Section Header */}
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg md:text-xl font-bold text-slate-900">
+                  Fare Rules & Policies
+                </h2>
+                {/* Button + Modal */}
+                <FareDetailsModal
+                  fareQuote={fareQuote}
+                  fareRule={fareRule}
+                  normalizeFareRules={normalizeFareRules}
                 />
-              </ExpandableSection>
-
-              <ExpandableSection
-                title="Important Information — Return"
-                defaultOpen={false}
-              >
-                <FareRulesAccordion
-                  fareRules={normalizeFareRules(fareRule?.return)}
-                  fareRulesStatus={fareRule?.return ? "succeeded" : "loading"}
-                />
-              </ExpandableSection>
+              </div>
             </div>
           </div>
 
@@ -966,11 +1426,16 @@ export default function RoundTripFlightBooking() {
                 parsedFlightData={{
                   baseFare: totalBaseFare,
                   taxFare: totalTaxFare,
+                  otherCharges: totalOtherCharges,
                 }}
                 selectedSeats={selectedSeats}
                 selectedMeals={selectedMeals}
                 selectedBaggage={selectedBaggage}
                 travelers={travelers}
+                approver={approver}
+                approverLoading={approverLoading}
+                approverError={approverError}
+                onSendForApproval={handleSendForApproval}
               />
 
               <Amenities />

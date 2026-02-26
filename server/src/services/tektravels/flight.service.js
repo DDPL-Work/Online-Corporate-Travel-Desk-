@@ -487,43 +487,103 @@ class FlightService {
   /* ---------------- TICKET ---------------- */
 
   /* ---------------- TICKET ---------------- */
-  async ticketFlight({ traceId, resultIndex, bookingId, pnr, isLCC }) {
-    let payload;
+  // async ticketFlight({ traceId, resultIndex, bookingId, pnr, isLCC }) {
+  //   let payload;
 
-    if (isLCC) {
-      // ✅ LCC → NO PNR, NO BOOKING ID
-      if (!traceId || !resultIndex) {
-        throw new ApiError(
-          400,
-          "traceId and resultIndex are required for LCC ticketing",
-        );
-      }
+  //   if (isLCC) {
+  //     // ✅ LCC → NO PNR, NO BOOKING ID
+  //     if (!traceId || !resultIndex) {
+  //       throw new ApiError(
+  //         400,
+  //         "traceId and resultIndex are required for LCC ticketing",
+  //       );
+  //     }
 
-      payload = {
-        TraceId: traceId,
-        ResultIndex: resultIndex,
-      };
-    } else {
-      // ✅ Non-LCC → requires BookingId or PNR
-      if (!bookingId && !pnr) {
-        throw new ApiError(
-          400,
-          "bookingId or pnr required for Non-LCC ticketing",
-        );
-      }
+  //     payload = {
+  //       TraceId: traceId,
+  //       ResultIndex: resultIndex,
+  //     };
+  //   } else {
+  //     // ✅ Non-LCC → requires BookingId or PNR
+  //     if (!bookingId && !pnr) {
+  //       throw new ApiError(
+  //         400,
+  //         "bookingId or pnr required for Non-LCC ticketing",
+  //       );
+  //     }
 
-      payload = {
-        BookingId: bookingId,
-        PNR: pnr,
-      };
+  //     payload = {
+  //       BookingId: bookingId,
+  //       PNR: pnr,
+  //     };
+  //   }
+
+  //   logger.info(
+  //     "TBO TICKET PAYLOAD",
+  //     JSON.stringify({ isLCC, payload }, null, 2),
+  //   );
+
+  //   return this.postLive(config.live.endpoints.flightTicket, payload, "live");
+  // }
+
+  async ticketFlight({ traceId, resultIndex, result, passengers, ssr, isLCC }) {
+    if (!traceId || !resultIndex) {
+      throw new ApiError(
+        400,
+        "traceId and resultIndex are required for LCC ticketing",
+      );
     }
 
-    logger.info(
-      "TBO TICKET PAYLOAD",
-      JSON.stringify({ isLCC, payload }, null, 2),
+    if (!result || !result.Fare || !result.FareBreakdown) {
+      throw new ApiError(400, "Fare data missing for ticketing");
+    }
+
+    const payload = {
+      TraceId: traceId,
+      ResultIndex: resultIndex,
+      IsLCC: true,
+      Fare: result.Fare,
+
+      Passengers: passengers.map((p, i) => ({
+        ...this.mapPassenger(p),
+
+        // 🔥 THIS IS CRITICAL FOR LCC
+        Fare: result.FareBreakdown[0],
+      })),
+
+      SSR:
+        ssr && (ssr.baggage?.length || ssr.meals?.length || ssr.seats?.length)
+          ? {
+              Baggage: ssr.baggage || [],
+              Meal: ssr.meals || [],
+              Seat: ssr.seats || [],
+            }
+          : null,
+    };
+
+    logger.info("TBO TICKET PAYLOAD", JSON.stringify(payload, null, 2));
+
+    const response = await this.postLive(
+      config.live.endpoints.flightTicket,
+      payload,
+      "live",
     );
 
-    return this.postLive(config.live.endpoints.flightTicket, payload, "live");
+    if (response?.Response?.ResponseStatus !== 1) {
+      logger.error(
+        "LCC TICKET SUPPLIER ERROR",
+        JSON.stringify(response, null, 2),
+      );
+
+      throw new ApiError(
+        400,
+        response?.Response?.Error?.ErrorMessage ||
+          response?.Response?.Error?.ErrorDescription ||
+          "Ticketing failed from supplier",
+      );
+    }
+
+    return response;
   }
 
   /* ---------------- BOOKING DETAILS ---------------- */
@@ -540,7 +600,42 @@ class FlightService {
   }
 
   /* ---------------- PASSENGER MAPPER ---------------- */
+  // mapPassenger(pax) {
+  //   return {
+  //     Title: pax.title,
+  //     FirstName: pax.firstName,
+  //     LastName: pax.lastName,
+
+  //     PaxType:
+  //       pax.paxType === "ADULT" || pax.paxType === 1
+  //         ? 1
+  //         : pax.paxType === "CHILD" || pax.paxType === 2
+  //           ? 2
+  //           : 3,
+
+  //     DateOfBirth: pax.dateOfBirth
+  //       ? new Date(pax.dateOfBirth).toISOString().split("T")[0]
+  //       : null,
+
+  //     Gender: pax.gender === "Male" || pax.gender === 1 ? 1 : 2,
+
+  //     PassportNo: pax.passportNo || "",
+  //     PassportExpiry: pax.passportExpiry || "",
+
+  //     AddressLine1: "NA",
+  //     City: "DELHI",
+  //     CountryCode: "356",
+  //     CountryName: "India",
+
+  //     ContactNo: pax.contactNo,
+  //     Email: pax.email,
+  //     IsLeadPax: pax.isLeadPax === true,
+  //     Nationality: "IN",
+  //   };
+  // }
+
   mapPassenger(pax) {
+    const nationalityCode = (pax.nationality || "IN").toUpperCase();
     return {
       Title: pax.title,
       FirstName: pax.firstName,
@@ -557,20 +652,35 @@ class FlightService {
         ? new Date(pax.dateOfBirth).toISOString().split("T")[0]
         : null,
 
-      Gender: pax.gender === "Male" || pax.gender === 1 ? 1 : 2,
+      Gender:
+        pax.gender === "Male" || pax.gender === "MALE" || pax.gender === 1
+          ? 1
+          : 2,
 
       PassportNo: pax.passportNo || "",
       PassportExpiry: pax.passportExpiry || "",
 
-      AddressLine1: "NA",
-      City: "DELHI",
-      CountryCode: "356",
-      CountryName: "India",
+      PassportIssueCountryCode: nationalityCode,
+      PassportIssueCountry: nationalityCode,
+
+      /* ===============================
+       🔥 DYNAMIC ADDRESS SUPPORT
+    =============================== */
+
+      AddressLine1: pax.addressLine1 || pax.AddressLine1 || "NA",
+
+      City: pax.city || pax.City || "DELHI",
+
+      CountryCode: pax.countryCode || pax.CountryCode || "IN",
+
+      CountryName: pax.countryName || pax.CountryName || "India",
+
+      /* =============================== */
 
       ContactNo: pax.contactNo,
       Email: pax.email,
       IsLeadPax: pax.isLeadPax === true,
-      Nationality: "IN",
+      Nationality: nationalityCode,
     };
   }
 

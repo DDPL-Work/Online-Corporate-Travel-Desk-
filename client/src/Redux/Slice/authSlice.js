@@ -27,7 +27,7 @@ export const loginUser = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(err.response?.data?.message);
     }
-  }
+  },
 );
 
 // ---------------- AUTH SLICE ----------------

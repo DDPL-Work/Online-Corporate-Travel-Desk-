@@ -11,6 +11,7 @@ const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const emailService = require("../services/email.service");
+const { default: mongoose } = require("mongoose");
 
 // Map collections to roles
 const USER_TYPES = [
@@ -87,11 +88,16 @@ exports.login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) throw new ApiError(400, "Email & password required");
 
+    const normalizedEmail = email.toLowerCase().trim();
+
+  console.log("Connected DB:", mongoose.connection.name);
+  console.log("Searching email:", normalizedEmail);
+
   let foundUser = null;
 
   // Search in all tables
   for (const { model, role } of USER_TYPES) {
-    const user = await model.findOne({ email }).select("+password");
+    const user = await model.findOne({ email: normalizedEmail }).select("+password");
     if (user) {
       foundUser = { user, role };
       break;
@@ -133,6 +139,7 @@ exports.login = asyncHandler(async (req, res) => {
     },
   });
 });
+
 
 // ----------------------
 // GET PROFILE

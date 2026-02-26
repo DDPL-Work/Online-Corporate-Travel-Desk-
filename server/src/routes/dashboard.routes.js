@@ -8,8 +8,32 @@ const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware')
 
 router.use(verifyToken);
 
-router.get('/employee', authorizeRoles('employee'), dashboardController.getEmployeeDashboard);
-router.get('/travel-admin', authorizeRoles('travel-admin'), dashboardController.getTravelAdminDashboard);
-router.get('/super-admin', authorizeRoles('super-admin'), dashboardController.getSuperAdminDashboard);
+/* ==========================================
+   EMPLOYEE DASHBOARD
+========================================== */
+router.get(
+  '/employee',
+  authorizeRoles('employee'),
+  dashboardController.getEmployeeDashboard
+);
+
+/* ==========================================
+   CORPORATE DASHBOARD
+   (Travel Admin + Corporate Super Admin)
+========================================== */
+router.get(
+  '/corporate',
+  authorizeRoles('travel-admin', 'corporate-super-admin'),
+  dashboardController.getCorporateDashboard
+);
+
+/* ==========================================
+   PLATFORM SUPER ADMIN DASHBOARD
+========================================== */
+router.get(
+  '/super-admin',
+  authorizeRoles('super-admin'),
+  dashboardController.getSuperAdminDashboard
+);
 
 module.exports = router;

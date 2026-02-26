@@ -1,67 +1,114 @@
-// TBO Hotel Service Configuration
 module.exports = {
   timeout: 500000,
 
-  /* -------------------------------------------------------------------------- */
-  /*                                  COMMON                                    */
-  /* -------------------------------------------------------------------------- */
+  /* ---------------- COMMON ---------------- */
   common: {
-    // Core API (HotelInfo, Block, Book)
-    base: "https://api.tektravels.com",
-
-    // Hotel Search / Voucher / Internal
-    hotelBase: "https://HotelBE.tektravels.com",
-
-    // Shared static data
-    sharedBase: "https://api.tektravels.com",
+    base: "https://HotelBE.tektravels.com",
+    base1: "https://affiliate.tektravels.com",
+    base2: "https://hotelbe.tektravels.com",
+    sharedBase: "https://Sharedapi.tektravels.com",
+    staticBase: "http://api.tbotechnology.in",
   },
 
-  /* -------------------------------------------------------------------------- */
-  /*                                   LIVE                                     */
-  /* -------------------------------------------------------------------------- */
-  live: {
+  /* ---------------- DUMMY (SEARCH ONLY / TEST) ---------------- */
+  dummy: {
+    base: "https://HotelBE.tektravels.com",
+    base1: "https://affiliate.tektravels.com",
+    base2: "https://hotelbe.tektravels.com",
+    sharedBase: "https://Sharedapi.tektravels.com",
+    staticBase: "http://api.tbotechnology.in",
+
     endUserIp: process.env.TBO_END_USER_IP,
 
     credentials: {
-      // ⚠️ Only ClientId is needed here (username/password live in tbo.config.js)
-      clientId: process.env.TBO_LIVE_CLIENT_ID,
+      username: process.env.TBO_DUMMY_USERNAME,
+      password: process.env.TBO_DUMMY_PASSWORD,
+      clientId: process.env.TBO_DUMMY_CLIENT_ID,
+      tboUSerName: process.env.TBO_STATIC_USERNAME,
+      tboPassword: process.env.TBO_STATIC_PASSWORD,
     },
 
-    // ❌ NO TOKENS HERE
-    // Tokens are generated dynamically via Authenticate API (tboAuth)
+    tokens: {
+      tokenId: process.env.TBO_DUMMY_TOKEN_ID,
+      agencyId: process.env.TBO_DUMMY_TOKEN_AGENCY_ID,
+      memberId: process.env.TBO_DUMMY_TOKEN_MEMBER_ID,
+    },
 
     endpoints: {
-      /* -------------------------- STATIC / SHARED -------------------------- */
-      countryList:
-        "/SharedServices/SharedData.svc/rest/CountryList",
+      /* Authentication */
+      authenticate: "/SharedData.svc/rest/Authenticate",
+      getAgencyBalance: "/SharedData.svc/rest/GetAgencyBalance",
 
-      topDestinations:
-        "/SharedServices/SharedData.svc/rest/TopDestinationList",
+      /* Hotel Static Data */
+      countryList: "/TBOHolidays_HotelAPI/CountryList",
+      cityLIst: "/TBOHolidays_HotelAPI/CityList",
+      hotelCodeList: "/TBOHolidays_HotelAPI/TBOHotelCodeList",
+      hotelDetails: "/TBOHolidays_HotelAPI/Hoteldetails",
 
-      destinationSearch:
-        "/SharedServices/StaticData.svc/rest/GetDestinationSearchStaticData",
+      /* Hotel Search */
+      hotelSearch: "/HotelAPI/Search",
 
-      /* ----------------------------- SEARCH -------------------------------- */
-      hotelSearch:
-        "/hotelservice.svc/rest/Gethotelresult",
+      /* Booking Flow */
+      hotelPreBook: "/HotelAPI/PreBook",
+      hotelBook: "/hotelservice.svc/rest/book",
+      generateVoucher: "/hotelservice.svc/rest/GenerateVoucher",
 
-      /* ----------------------------- INFO ---------------------------------- */
-      hotelInfo:
-        "/BookingEngineService_Hotel/hotelservice.svc/rest/GetHotelInfo",
+      /* Post Booking */
+      getBookingDetails: "/hotelservice.svc/rest/Getbookingdetail",
+      getChangeRequestStatus:
+        "/internalhotelservice.svc/rest/GetChangeRequestStatus",
+      sendChangeRequest: "/internalhotelservice.svc/rest/SendChangeRequest",
+    },
+  },
 
-      /* --------------------------- BLOCK / BOOK ----------------------------- */
-      blockRoom:
-        "/BookingEngineService_Hotel/hotelservice.svc/rest/BlockRoom",
+  /* ---------------- LIVE (FULL FLOW) ---------------- */
+  live: {
+    base: "https://HotelBE.tektravels.com",
+    base1: "https://affiliate.tektravels.com",
+    base2: "https://hotelbe.tektravels.com",
+    sharedBase: "https://Sharedapi.tektravels.com",
+    staticBase: "http://api.tbotechnology.in",
 
-      bookHotel:
-        "/BookingEngineService_Hotel/hotelservice.svc/rest/Book",
+    endUserIp: process.env.TBO_END_USER_IP,
 
-      /* -------------------------- POST BOOKING ------------------------------ */
-      generateVoucher:
-        "/hotelservice.svc/rest/GenerateVoucher",
+    credentials: {
+      username: process.env.TBO_LIVE_USERNAME,
+      password: process.env.TBO_LIVE_PASSWORD,
+      clientId: process.env.TBO_LIVE_CLIENT_ID,
+      tboUSerName: process.env.TBO_STATIC_USERNAME,
+      tboPassword: process.env.TBO_STATIC_PASSWORD,
+    },
 
-      getBookingDetails:
-        "/internalhotelservice.svc/rest/GetBookingDetail",
+    tokens: {
+      tokenId: process.env.TBO_LIVE_TOKEN_ID,
+      agencyId: process.env.TBO_LIVE_TOKEN_AGENCY_ID,
+      memberId: process.env.TBO_LIVE_TOKEN_MEMBER_ID,
+    },
+
+    endpoints: {
+      /* Authentication */
+      authenticate: "/SharedData.svc/rest/Authenticate",
+      getAgencyBalance: "/SharedData.svc/rest/GetAgencyBalance",
+
+      /* Hotel Static Data */
+      countryList: "/TBOHolidays_HotelAPI/CountryList",
+      cityLIst: "/TBOHolidays_HotelAPI/CityList",
+      hotelCodeList: "/TBOHolidays_HotelAPI/TBOHotelCodeList",
+      hotelDetails: "/TBOHolidays_HotelAPI/Hoteldetails",
+
+      /* Hotel Search */
+      hotelSearch: "/HotelAPI/Search",
+
+      /* Booking Flow */
+      hotelPreBook: "/HotelAPI/PreBook",
+      hotelBook: "/hotelservice.svc/rest/book",
+      generateVoucher: "/hotelservice.svc/rest/GenerateVoucher",
+
+      /* Post Booking */
+      getBookingDetails: "/hotelservice.svc/rest/Getbookingdetail",
+      getChangeRequestStatus:
+        "/internalhotelservice.svc/rest/GetChangeRequestStatus",
+      sendChangeRequest: "/internalhotelservice.svc/rest/SendChangeRequest",
     },
   },
 };

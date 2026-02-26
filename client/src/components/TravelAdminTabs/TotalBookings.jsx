@@ -9,6 +9,7 @@ import {
 } from "react-icons/fi";
 import { FaPlane } from "react-icons/fa";
 import { bookingsData } from "../../data/dummyData";
+import { useNavigate } from "react-router-dom";
 
 const colors = {
   primary: "#0A4D68",
@@ -34,6 +35,7 @@ const getEmployeeName = (employee) => {
 };
 
 export default function BookingsDashboard() {
+  const navigate = useNavigate();
   const [startDate, setStartDate] = useState("2024-01-01");
   const [endDate, setEndDate] = useState("2024-12-31");
   const [selectedDepartment, setSelectedDepartment] = useState("All");
@@ -92,7 +94,8 @@ export default function BookingsDashboard() {
     <div className="min-h-screen p-6" style={{ backgroundColor: colors.light }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
+        <div className="flex items-center justify-between ">
+          <div className="mb-8">
           <h1
             className="text-3xl font-bold mb-2"
             style={{ color: colors.dark }}
@@ -102,6 +105,15 @@ export default function BookingsDashboard() {
           <p className="text-gray-600">
             Track and manage flight and hotel bookings
           </p>
+        </div>
+        <div>
+           <button
+          onClick={() => navigate("/search-flight")}
+          className="bg-[#035966] text-white px-4 py-2 rounded-xl hover:bg-[#044652]"
+        >
+          Make Booking
+        </button>
+        </div>
         </div>
 
         {/* Filters */}

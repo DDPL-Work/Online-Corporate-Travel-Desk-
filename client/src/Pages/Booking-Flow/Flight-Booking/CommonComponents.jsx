@@ -7,7 +7,12 @@ import {
   MdInfo,
   MdLuggage,
 } from "react-icons/md";
-import { FaWifi, FaUser, FaPlaneArrival } from "react-icons/fa";
+import {
+  FaWifi,
+  FaUser,
+  FaPlaneArrival,
+  FaConciergeBell,
+} from "react-icons/fa";
 import { BsLuggage, BsTag, BsInfoCircleFill } from "react-icons/bs";
 import {
   AiOutlineInfoCircle,
@@ -127,7 +132,13 @@ export const parseFlightData = (rawFlightData) => {
 };
 
 export const parseOneWayData = (result) => {
-  const segmentGroup = result.Segments?.[0] || [];
+  // const segmentGroup = result.Segments?.[0] || [];
+  const segmentGroup =
+    result?.Segments?.[0] ||
+    result?.FareQuote?.Results?.[0]?.Segments?.[0] ||
+    result?.Results?.[0]?.Segments?.[0] ||
+    [];
+
   if (!segmentGroup.length) return null;
 
   const segments = segmentGroup.map((seg, idx) => {
@@ -142,6 +153,7 @@ export const parseOneWayData = (result) => {
         code: seg.Origin.Airport.AirportCode,
         name: seg.Origin.Airport.AirportName,
         terminal: seg.Origin.Airport.Terminal,
+        countryCode: seg.Origin.Airport.CountryCode,
       },
 
       aa: {
@@ -149,6 +161,7 @@ export const parseOneWayData = (result) => {
         code: seg.Destination.Airport.AirportCode,
         name: seg.Destination.Airport.AirportName,
         terminal: seg.Destination.Airport.Terminal,
+        countryCode: seg.Destination.Airport.CountryCode,
       },
 
       fD: {
@@ -239,7 +252,7 @@ export const parseRoundTripBooking = ({ onward, return: ret }) => {
 export const FlightTimeline = ({
   segments = [],
   selectedSeats = {},
-  segmentIndex,
+  baseSegmentIndex = 0,
   openSeatModal,
   journeyType = "onward",
   isSeatReady = false,
@@ -326,7 +339,8 @@ export const FlightTimeline = ({
                               <div>
                                 {/* Selected seats */}
                                 {(() => {
-                                  const seatKey = `${journeyType}|${segmentIndex}`;
+                                  const actualIndex = baseSegmentIndex + idx;
+                                  const seatKey = `${journeyType}|${actualIndex}`;
                                   const seats =
                                     selectedSeats?.[seatKey]?.list || [];
                                   if (!seats.length) return null;
@@ -346,20 +360,39 @@ export const FlightTimeline = ({
                           Duration: {formatDurationCompact(segment.duration)} •{" "}
                           {segment.fD?.eT || "Aircraft"}
                         </p>
-                        <button
-                          onClick={() => !seatDisabled && openSeatModal(idx)}
-                          disabled={seatDisabled}
-                          className={`mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-lg py-2 transition
-    ${
-      seatDisabled
-        ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
-        : "text-blue-600 border border-blue-600 hover:border-[#0A4D68] hover:bg-[#0A4D68] hover:text-white"
-    }
-  `}
-                        >
-                          <MdEventSeat />
-                          {seatDisabled ? "Seats loading…" : "Select Seats"}
-                        </button>
+                        {(() => {
+                          const getSeatButtonText = () => {
+                            if (isSeatReady === "loading")
+                              return "SSR loading…";
+                            if (isSeatReady === "error")
+                              return "Unable to load ssr";
+                            if (isSeatReady === "none")
+                              return "No ssr available";
+                            if (isSeatReady === true) return "Select SSR";
+                            return "SSR loading…";
+                          };
+
+                          const seatDisabled = isSeatReady !== true;
+
+                          return (
+                            <button
+                              onClick={() =>
+                                !seatDisabled && openSeatModal(idx)
+                              }
+                              disabled={seatDisabled}
+                              className={`mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-lg py-2 transition
+        ${
+          seatDisabled
+            ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
+            : "text-blue-600 border border-blue-600 hover:border-[#0A4D68] hover:bg-[#0A4D68] hover:text-white"
+        }
+      `}
+                            >
+                              <FaConciergeBell />
+                              {getSeatButtonText()}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -418,26 +451,25 @@ export const RoundTripFlightTimeline = ({
   selectedSeats = {},
   openSeatModal,
   isSeatReady,
+  isInternational = false,
+  onwardCount = 0,
 }) => {
   const journeyType = isReturnJourney ? "return" : "onward";
   const seatReady = Boolean(isSeatReady);
 
+  if (!segments.length) return null;
+
   return (
-    <div className="space-y-6">
-      {segments.map((segment, segmentIndex) => (
-        <FlightTimeline
-          key={segmentIndex}
-          segmentIndex={segmentIndex}
-          segments={[segment]}
-          journeyType={journeyType}
-          selectedSeats={selectedSeats}
-          openSeatModal={() =>
-            openSeatModal(segment, segmentIndex, journeyType)
-          }
-          isSeatReady={seatReady}
-        />
-      ))}
-    </div>
+    <FlightTimeline
+      segments={segments}
+      journeyType={journeyType}
+      selectedSeats={selectedSeats}
+      baseSegmentIndex={isReturnJourney && isInternational ? onwardCount : 0}
+      openSeatModal={(segmentIndex) =>
+        openSeatModal(segments[segmentIndex], segmentIndex, journeyType)
+      }
+      isSeatReady={seatReady}
+    />
   );
 };
 
@@ -513,129 +545,6 @@ export const normalizeSSRList = (list = []) => {
   });
 
   return Array.from(map.values());
-};
-
-export const MealSelectionCards = ({
-  meals = [],
-  selectedMeals = {},
-  onToggleMeal,
-  journeyType,
-  flightIndex,
-  travelersCount = 1,
-  onClearMeals,
-  onConfirm,
-}) => {
-  const normalizedMeals = normalizeSSRList(meals).filter(
-    (m) => m.Code !== "NoMeal",
-  );
-
-  if (!normalizedMeals.length) {
-    return (
-      <p className="text-sm text-gray-500 text-center py-6">
-        No meals available for this flight
-      </p>
-    );
-  }
-
-  const key = `${journeyType}|${flightIndex}`;
-  const selected = selectedMeals[key] || [];
-
-  return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
-          🍱 Choose Your Meal
-        </h2>
-        <button
-          onClick={() => onClearMeals?.(journeyType, flightIndex)}
-          className="text-sm font-semibold text-gray-500 hover:text-red-600"
-        >
-          Clear All
-        </button>
-      </div>
-
-      {/* Meal Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {normalizedMeals.map((meal, idx) => {
-          const isSelected = selected.some((m) => m.Code === meal.Code);
-
-          return (
-            <div
-              key={idx}
-              className={`group relative border rounded-2xl p-4 flex flex-col justify-between shadow-sm transition-all duration-200 hover:shadow-lg ${
-                isSelected
-                  ? "border-green-500 bg-green-50"
-                  : "border-gray-200 bg-white hover:border-orange-400"
-              }`}
-            >
-              {/* Top Section */}
-              <div className="flex gap-4 items-center">
-                {/* Icon */}
-                <div
-                  className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 transition ${
-                    isSelected ? "bg-green-100" : "bg-orange-50"
-                  }`}
-                >
-                  <PiForkKnifeBold
-                    className={`text-2xl transition ${
-                      isSelected ? "text-green-600" : "text-orange-600"
-                    }`}
-                  />
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-800 text-sm sm:text-base truncate">
-                    {meal.AirlineDescription || "Meal Option"}
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5 truncate">
-                    {meal.Description || "Delicious in-flight meal"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Price + Button */}
-              <div className="mt-4 flex justify-between items-center">
-                <div className="text-lg font-bold text-orange-600">
-                  ₹{meal.Price}
-                </div>
-                <button
-                  onClick={() =>
-                    onToggleMeal(journeyType, flightIndex, meal, travelersCount)
-                  }
-                  className={`px-4 py-1.5 text-sm font-semibold rounded-full shadow-sm transition-all duration-200 ${
-                    isSelected
-                      ? "bg-red-500 text-white hover:bg-red-600"
-                      : "bg-orange-600 text-white hover:bg-orange-700"
-                  }`}
-                >
-                  {isSelected ? "Remove" : "Add Meal"}
-                </button>
-              </div>
-
-              {/* Selection Ribbon (MMT style) */}
-              {isSelected && (
-                <div className="absolute top-0 right-0 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">
-                  Selected
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Footer Actions */}
-      <div className="flex justify-end items-center gap-3 pt-3 border-t border-gray-200">
-        <button
-          onClick={onConfirm}
-          className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
-        >
-          Confirm Selection
-        </button>
-      </div>
-    </div>
-  );
 };
 
 export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
@@ -1168,6 +1077,9 @@ export const PriceSummary = ({
   selectedMeals = {},
   selectedBaggage = {},
   travelers = [],
+  approver,
+  approverLoading,
+  approverError,
   onSendForApproval,
   loading = false,
 }) => {
@@ -1175,8 +1087,10 @@ export const PriceSummary = ({
 
   const travelerCount = Math.max(travelers.length || 1);
 
-  const baseFare = parsedFlightData.baseFare || 0;
-  const taxFare = parsedFlightData.taxFare || 0;
+  const baseFare = Math.ceil(parsedFlightData.baseFare) || 0;
+  const taxFare =
+    Math.ceil(parsedFlightData.taxFare) +
+    Math.ceil(parsedFlightData.otherCharges);
 
   const totalSeatPrice = useMemo(() => {
     let sum = 0;
@@ -1302,6 +1216,28 @@ export const PriceSummary = ({
         >
           {loading ? "Submitting..." : "Send For Approval"}
         </div>
+        {/* Approver Message */}
+        <div className="mt-3 text-sm text-center">
+          {approverLoading && (
+            <p className="text-gray-500">Fetching approver details...</p>
+          )}
+
+          {approverError && <p className="text-red-500">{approverError}</p>}
+
+          {!approverLoading && approver && (
+            <p className="text-gray-700">
+              Your request will be sent to{" "}
+              <span className="font-semibold">{approver.name}</span> (
+              {approver.email})
+            </p>
+          )}
+
+          {!approverLoading && !approver && !approverError && (
+            <p className="text-red-500">
+              No approver assigned to your account.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1389,129 +1325,6 @@ export const ImportantInformation = ({
   );
 };
 
-// Baggage Table Component
-export const BaggageTable = ({
-  baggage = [],
-  selectable = false,
-  selectedBaggage = null,
-  onAddBaggage,
-  onClearBaggage,
-  onConfirm,
-}) => {
-  if (!Array.isArray(baggage) || baggage.length === 0) {
-    return (
-      <p className="text-sm text-gray-500 text-center py-6">
-        No baggage information available
-      </p>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center gap-2">
-          🧳 Choose Your Baggage
-        </h2>
-        {selectable && (
-          <button
-            onClick={onClearBaggage}
-            className="text-sm font-semibold text-gray-500 hover:text-red-600 transition"
-          >
-            Clear All
-          </button>
-        )}
-      </div>
-
-      {/* Baggage Options Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {baggage.map((bag, idx) => {
-          const isAdded =
-            selectedBaggage?.Code === bag.Code &&
-            selectedBaggage?.Weight === bag.Weight;
-
-          return (
-            <div
-              key={idx}
-              className={`relative border rounded-2xl p-5 shadow-sm transition-all duration-200 hover:shadow-md flex flex-col justify-between ${
-                isAdded
-                  ? "border-blue-600 bg-blue-50"
-                  : "border-gray-200 bg-white hover:border-blue-300"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                {/* Left: Baggage Info */}
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                      isAdded ? "bg-blue-100" : "bg-sky-50"
-                    }`}
-                  >
-                    <BsLuggage
-                      className={`text-xl ${
-                        isAdded ? "text-blue-700" : "text-blue-500"
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-800 text-sm sm:text-base">
-                      {bag.Weight === 0
-                        ? "No Extra Baggage"
-                        : `${bag.Weight} Kg Extra`}
-                    </h4>
-                    <p className="text-xs text-gray-500">
-                      {bag.Description || "Add more luggage allowance"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Right: Action Button */}
-                {selectable && (
-                  <button
-                    onClick={() => onAddBaggage?.(bag)}
-                    disabled={isAdded}
-                    className={`px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-all duration-200 shadow-sm ${
-                      isAdded
-                        ? "bg-gray-300 text-gray-700 cursor-default"
-                        : "bg-blue-600 text-white hover:bg-blue-700"
-                    }`}
-                  >
-                    {isAdded ? "Added" : "Add"}
-                  </button>
-                )}
-              </div>
-
-              {/* Price */}
-              <div className="flex justify-between items-center">
-                <p className="text-lg sm:text-xl font-bold text-blue-700">
-                  ₹{bag.Price}
-                </p>
-                {isAdded && (
-                  <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-                    Selected
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Footer Actions */}
-      {selectable && (
-        <div className="flex justify-end items-center gap-3 pt-4 border-t border-gray-200">
-          <button
-            onClick={onConfirm}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition"
-          >
-            Confirm Selection
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
-
 const isInternationalTrip = (parsedFlightData) => {
   if (!parsedFlightData) return false;
 
@@ -1566,10 +1379,12 @@ export const TravelerForm = ({
   parsedFlightData,
   purposeOfTravel,
   setPurposeOfTravel,
+  isInternational: isIntlFromProp,
 }) => {
   if (!Array.isArray(travelers)) travelers = [];
 
-  const isInternational = isInternationalTrip(parsedFlightData);
+  const isInternational =
+    isIntlFromProp ?? isInternationalTrip(parsedFlightData);
 
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
@@ -1973,11 +1788,9 @@ export default {
   FareOptions,
   PriceSummary,
   ImportantInformation,
-  BaggageTable,
   TravelerForm,
   FareRulesAccordion,
   CTABox,
   HotelHomeButton,
   Amenities,
-  MealSelectionCards,
 };
