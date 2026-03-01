@@ -8,32 +8,52 @@ const asyncHandler = require("../utils/asyncHandler");
 const { calculateNextBillingDate } = require("../utils/helpers");
 const emailService = require("../services/email.service");
 const crypto = require("crypto");
+const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
 
 // -----------------------------------------------------
 // ONBOARD CORPORATE - PUBLIC (Pending Status)
 // -----------------------------------------------------
 exports.onboardCorporate = asyncHandler(async (req, res) => {
-  const {
-    corporateName,
-    registeredAddress,
-    gstCertificate,
-    panCard,
-    primaryContact,
-    secondaryContact,
-    billingDepartment,
-    ssoConfig,
-    classification,
-    creditLimit,
-    billingCycle,
-    customBillingDays,
-    travelPolicy,
-    walletBalance,
-    defaultApprover,
-    creditTermsNotes,
-    metadata,
-  } = req.body;
+  console.log("BODY:", req.body);
+  // 🟢 Keep original destructuring
+  // BASIC
+  const corporateName = req.body.corporateName;
+  const classification = req.body.classification || "prepaid";
+  const defaultApprover = req.body.defaultApprover || "travel-admin";
+  const creditTermsNotes = req.body.creditTermsNotes;
+  const metadata = req.body.metadata || {};
 
-  // Required validations
+  // PRIMARY CONTACT
+ const primaryContact = req.body.primaryContact || {};
+const secondaryContact = req.body.secondaryContact || {};
+const billingDepartment = req.body.billingDepartment || {};
+const registeredAddress = req.body.registeredAddress || {};
+const ssoConfig = req.body.ssoConfig || {};
+const gstDetails = req.body.gstDetails || {};
+
+  const travelPolicy = {
+    allowedCabinClass: Array.isArray(
+      req.body["travelPolicy[allowedCabinClass][]"],
+    )
+      ? req.body["travelPolicy[allowedCabinClass][]"]
+      : req.body["travelPolicy[allowedCabinClass][]"]
+        ? [req.body["travelPolicy[allowedCabinClass][]"]]
+        : ["Economy"],
+
+    allowAncillaryServices:
+      req.body["travelPolicy[allowAncillaryServices]"] === "true",
+
+    advanceBookingDays: Number(
+      req.body["travelPolicy[advanceBookingDays]"] || 0,
+    ),
+
+    maxBookingAmount: Number(req.body["travelPolicy[maxBookingAmount]"] || 0),
+  };
+
+  // --------------------------------------------------
+  // VALIDATIONS (UNCHANGED)
+  // --------------------------------------------------
   if (
     !corporateName ||
     !primaryContact?.name ||
@@ -51,36 +71,91 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
   if (!classification)
     throw new ApiError(400, "Corporate classification is required");
 
-  // Prevent duplicate domain
   const existingDomain = await Corporate.findOne({
     "ssoConfig.domain": ssoConfig.domain,
   });
+
   if (existingDomain) throw new ApiError(400, "Domain already registered");
 
-  // Create corporate in pending status
+  // --------------------------------------------------
+  // 🟢 CLOUDINARY UPLOAD SECTION (NEW)
+  // --------------------------------------------------
+
+  let gstCertificate = {};
+  let panCard = {};
+
+  if (req.files?.gstCertificate?.[0]) {
+    const result = await cloudinary.uploader.upload(
+      req.files.gstCertificate[0].path,
+      {
+        folder: "corporates/gst",
+        resource_type: "auto",
+      },
+    );
+
+    gstCertificate = {
+      publicId: result.public_id,
+      url: result.secure_url,
+      uploadedAt: new Date(),
+      verified: false,
+    };
+
+    fs.unlinkSync(req.files.gstCertificate[0].path);
+  }
+
+  if (req.files?.panCard?.[0]) {
+    const result = await cloudinary.uploader.upload(req.files.panCard[0].path, {
+      folder: "corporates/pan",
+      resource_type: "auto",
+    });
+
+    panCard = {
+      publicId: result.public_id,
+      url: result.secure_url,
+      uploadedAt: new Date(),
+      verified: false,
+    };
+
+    fs.unlinkSync(req.files.panCard[0].path);
+  }
+
+  // URL fallback
+  if (req.body["gstCertificate[url]"]) {
+    gstCertificate.url = req.body["gstCertificate[url]"];
+  }
+
+  if (req.body["panCard[url]"]) {
+    panCard.url = req.body["panCard[url]"];
+  }
+
+  // --------------------------------------------------
+  // CREATE CORPORATE (STRUCTURE SAME AS YOUR OLD)
+  // --------------------------------------------------
+
   const corporate = await Corporate.create({
     corporateName,
     registeredAddress,
-    gstCertificate,
-    panCard,
     primaryContact,
     secondaryContact,
     billingDepartment,
+
     ssoConfig: { ...ssoConfig, verified: false },
-    classification,
-    creditLimit: classification === "postpaid" ? creditLimit || 0 : 0,
-    currentCredit: 0,
-    billingCycle: billingCycle || "30days",
-    customBillingDays: billingCycle === "custom" ? customBillingDays : null,
-    travelPolicy: travelPolicy || {
-      allowedCabinClass: ["Economy"],
-      allowAncillaryServices: true,
+
+    gstDetails: {
+      ...gstDetails,
+      verified: false,
     },
-    walletBalance: walletBalance || 0,
-    defaultApprover: defaultApprover || "travel-admin",
+
+    gstCertificate,
+    panCard,
+
+    classification,
+    travelPolicy,
+
+    defaultApprover,
     status: "pending",
     creditTermsNotes,
-    metadata: metadata || {},
+    metadata,
   });
 
   res
@@ -104,14 +179,64 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
   if (["inactive", "disabled"].includes(corporate.status))
     throw new ApiError(400, "Corporate cannot be approved");
 
+  // ----------------------------
+  // 🔹 Extract Financial Config
+  // ----------------------------
+  const {
+    classification,
+    billingCycle,
+    customBillingDays,
+    creditLimit,
+    walletBalance,
+  } = req.body;
+
+  if (!classification)
+    throw new ApiError(400, "Account classification is required");
+
+  if (!["prepaid", "postpaid"].includes(classification))
+    throw new ApiError(400, "Invalid classification");
+
+  // ----------------------------
+  // 🔹 Financial Validation
+  // ----------------------------
+  if (classification === "postpaid") {
+    if (!creditLimit || Number(creditLimit) <= 0)
+      throw new ApiError(400, "Valid credit limit required for postpaid");
+
+    if (!billingCycle)
+      throw new ApiError(400, "Billing cycle required for postpaid");
+
+    corporate.creditLimit = Number(creditLimit);
+    corporate.walletBalance = 0;
+    corporate.billingCycle = billingCycle;
+    corporate.customBillingDays =
+      billingCycle === "custom" ? Number(customBillingDays || 0) : null;
+
+    corporate.nextBillingDate = calculateNextBillingDate(
+      billingCycle,
+      customBillingDays,
+    );
+  }
+
+  if (classification === "prepaid") {
+    corporate.walletBalance = Number(walletBalance || 0);
+    corporate.creditLimit = 0;
+    corporate.billingCycle = null;
+    corporate.customBillingDays = null;
+    corporate.nextBillingDate = null;
+  }
+
+  corporate.classification = classification;
+
+  // ----------------------------
+  // 🔹 Activate Corporate
+  // ----------------------------
   corporate.status = "active";
+  corporate.isActive = true;
   corporate.onboardedAt = new Date();
+
   corporate.ssoConfig.verified = true;
   corporate.ssoConfig.verifiedAt = new Date();
-  corporate.nextBillingDate = calculateNextBillingDate(
-    corporate.billingCycle,
-    corporate.customBillingDays,
-  );
 
   corporate.primaryContact.role = "corporate-super-admin";
 
@@ -121,7 +246,9 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
 
   await corporate.save();
 
-  // Helper
+  // ----------------------------
+  // 🔹 Create / Update Users
+  // ----------------------------
   const createOrUpdateUserWithRole = async (contact, role) => {
     if (!contact?.email) return null;
 
@@ -151,7 +278,6 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
         isActive: true,
       });
     } else {
-      // user.role = "travel-admin";
       user.role = role;
       user.passwordResetToken = hashedToken;
       user.passwordResetExpires = Date.now() + 24 * 60 * 60 * 1000;
@@ -161,13 +287,6 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
 
     return { user, token };
   };
-
-  // const primaryAdmin = await createOrUpdateTravelAdmin(
-  //   corporate.primaryContact,
-  // );
-  // const secondaryAdmin = await createOrUpdateTravelAdmin(
-  //   corporate.secondaryContact,
-  // );
 
   const primaryAdmin = await createOrUpdateUserWithRole(
     corporate.primaryContact,
@@ -199,9 +318,9 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
     console.error("Email sending failed:", err);
   }
 
-  res
-    .status(200)
-    .json(new ApiResponse(200, corporate, "Corporate approved successfully."));
+  res.status(200).json(
+    new ApiResponse(200, corporate, "Corporate approved & activated"),
+  );
 });
 
 // -----------------------------------------------------

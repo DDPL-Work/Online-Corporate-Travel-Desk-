@@ -1,9 +1,16 @@
 // components/HotelDetails/PriceCard.jsx
-import React from 'react';
-import { FaStar } from 'react-icons/fa';
-import { MdCheckCircle } from 'react-icons/md';
+import React from "react";
+import { FaStar } from "react-icons/fa";
+import { MdCheckCircle } from "react-icons/md";
 
-const PriceCard = ({ selectedRoom }) => {
+const PriceCard = ({
+  selectedRoom,
+  travellerDetails,
+  onOpenTravellerModal,
+  onSendForApproval,
+}) => {
+  const nights = selectedRoom?.DayRates?.[0]?.length || 1;
+  const perNight = selectedRoom?.DayRates?.[0]?.[0]?.BasePrice || null;
   return (
     <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
       {/* Room Type Header */}
@@ -20,58 +27,48 @@ const PriceCard = ({ selectedRoom }) => {
       </div>
 
       {/* Price Section */}
-      <div className="p-4 border-b">
+      <div className="p-4">
         <div className="flex items-baseline justify-between mb-2">
           <span className="text-sm text-gray-600">Starting From</span>
           <div className="text-right">
             <div className="text-3xl font-bold text-gray-900">
-              {selectedRoom?.discountedPrice || '₹46,322'}
+              ₹{selectedRoom?.TotalFare?.toLocaleString("en-IN")}
             </div>
-            <div className="text-sm text-gray-500 line-through">
-              {selectedRoom?.originalPrice || '₹83,523'}
+
+            <div className="text-sm text-gray-600 text-right">
+              Incl. ₹{selectedRoom?.TotalTax?.toLocaleString("en-IN")} taxes
             </div>
+
+            {perNight && (
+              <div className="text-sm text-gray-500">
+                ₹{perNight.toLocaleString("en-IN")} per night
+              </div>
+            )}
           </div>
-        </div>
-        <div className="text-sm text-gray-600 text-right">
-          {selectedRoom?.taxes || '+ ₹8,337 taxes'}
         </div>
       </div>
 
-      {/* Book Now Button */}
-      <div className="p-4">
-        <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors shadow-md hover:shadow-lg">
-          Send For approval
-        </button>
-      </div>
-
-      {/* Rating */}
-      <div className="px-4 pb-4 border-b">
-        <div className="flex items-center justify-between bg-orange-50 rounded-lg p-3">
-          <div>
-            <div className="text-2xl font-bold text-gray-900">4.3</div>
-            <div className="text-sm text-gray-600">Good</div>
-          </div>
-          <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            View Reviews
+      {/* CTA Section */}
+      <div className="p-4 ">
+        {!travellerDetails ? (
+          <button
+            onClick={onOpenTravellerModal}
+            className="w-full bg-[#0d7fe8] hover:bg-[#0b6cd0] text-white font-semibold py-3 rounded-lg transition"
+          >
+            Add Traveller Details
           </button>
-        </div>
+        ) : (
+          <button
+            onClick={onSendForApproval}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition"
+          >
+            Send for Approval
+          </button>
+        )}
       </div>
 
       {/* Check In/Out Timings */}
       <div className="p-4 space-y-3">
-        <h4 className="font-semibold text-gray-900">Check In-Check Out Timings</h4>
-        
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Check In</span>
-            <span className="font-medium text-gray-900">2 PM</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Check Out</span>
-            <span className="font-medium text-gray-900">12 PM</span>
-          </div>
-        </div>
-
         {/* Features */}
         <div className="pt-3 border-t space-y-2">
           <div className="flex items-start gap-2">

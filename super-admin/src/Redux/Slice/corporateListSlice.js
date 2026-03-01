@@ -57,11 +57,11 @@ export const fetchCorporateById = createAsyncThunk(
 // --------------------------------------------------
 export const approveCorporate = createAsyncThunk(
   "corporate/approve",
-  async (id, { rejectWithValue }) => {
+  async ({ id, payload }, { rejectWithValue }) => {
     try {
       const res = await axios.put(
         `${API_URL}/corporate/${id}/approve`,
-        {},
+        payload, // ✅ send financial config
         authHeader()
       );
       return res.data.data;

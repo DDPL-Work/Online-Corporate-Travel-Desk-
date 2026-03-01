@@ -11,7 +11,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, lowercase: true, trim: true, index: true },
   name: { type: nameSchema, default: {} },
   password: { type: String, select: false },
-  role: { type: String, enum: ['super-admin', 'travel-admin', 'employee'], default: 'employee' },
+  role: { type: String, enum: ['super-admin','corporate-super-admin', 'travel-admin', 'employee'], default: 'employee' },
   ssoProvider: { type: String }, // 'google' | 'microsoft' | ...
   ssoId: { type: String, index: true },
   profilePicture: { type: String },

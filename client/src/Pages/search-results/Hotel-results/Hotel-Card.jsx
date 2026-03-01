@@ -1,116 +1,236 @@
-import React from 'react';
-import { BsStarFill, BsStar } from 'react-icons/bs';
-import { FaHeart, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import { BsStarFill, BsStar } from "react-icons/bs";
+import {
+  FaHeart,
+  FaChevronLeft,
+  FaChevronRight,
+  FaWifi,
+  FaCheck,
+  FaTimes,
+  FaTag,
+} from "react-icons/fa";
+import { MdLocationOn, MdBreakfastDining } from "react-icons/md";
+import { useNavigate } from "react-router-dom";
 
+/* ⭐ Star Renderer */
+const Stars = ({ rating = 0 }) =>
+  Array.from({ length: 5 }, (_, i) =>
+    i < Math.round(rating) ? (
+      <BsStarFill key={i} className="text-amber-400 text-xs" />
+    ) : (
+      <BsStar key={i} className="text-amber-300 text-xs" />
+    ),
+  );
+
+/* 🏷 Score Badge */
+const ScoreBadge = ({ score = 0 }) => {
+  const label =
+    score >= 4.5
+      ? "Excellent"
+      : score >= 4
+        ? "Very Good"
+        : score >= 3.5
+          ? "Good"
+          : "Average";
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="bg-[#0a2540] text-white text-lg font-black w-10 h-10 rounded-lg flex items-center justify-center">
+        {score?.toFixed(1)}
+      </div>
+      <span className="text-[10px] text-[#0a2540] font-bold mt-0.5">
+        {label}
+      </span>
+    </div>
+  );
+};
+
+/* 🏨 Main Card */
 const HotelCard = ({ hotel }) => {
-
   const navigate = useNavigate();
-  const renderStars = (rating) => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      stars.push(
-        i <= rating ? (
-          <BsStarFill key={i} className="text-orange-500 text-sm" />
-        ) : (
-          <BsStar key={i} className="text-orange-500 text-sm" />
-        )
-      );
-    }
-    return stars;
+  const [imgIndex, setImgIndex] = useState(0);
+  const [wishlisted, setWishlisted] = useState(false);
+
+  const images = hotel.images?.length
+    ? hotel.images
+    : ["https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800"];
+
+  const totalImages = images.length;
+
+  const prev = (e) => {
+    e.stopPropagation();
+    setImgIndex((i) => (i === 0 ? totalImages - 1 : i - 1));
+  };
+
+  const next = (e) => {
+    e.stopPropagation();
+    setImgIndex((i) => (i === totalImages - 1 ? 0 : i + 1));
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow mb-4">
-      <div className="flex">
-        {/* Hotel Image */}
-        <div className="w-80 h-64 shrink-0 relative">
+    <div className="bg-white rounded-xl border border-slate-200 hover:border-[#0d7fe8] hover:shadow-lg transition-all duration-200 overflow-hidden mb-4">
+      <div className="flex flex-col md:flex-row">
+        {/* 🖼 Image Section */}
+        <div className="relative w-full md:w-72 h-52 md:h-auto shrink-0">
           <img
-            src={hotel.image}
+            src={images[imgIndex]}
             alt={hotel.name}
             className="w-full h-full object-cover"
           />
-          {/* Image Navigation */}
-          <button className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-2 shadow-md">
-            <FaChevronLeft className="text-gray-700" />
-          </button>
-          <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-2 shadow-md">
-            <FaChevronRight className="text-gray-700" />
-          </button>
-          {/* Image Counter */}
-          <div className="absolute bottom-3 right-3 bg-black/70 text-white px-3 py-1 rounded text-sm">
-            5 / 10
+
+          {totalImages > 1 && (
+            <>
+              <button
+                onClick={prev}
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-7 h-7 flex items-center justify-center"
+              >
+                <FaChevronLeft className="text-xs" />
+              </button>
+              <button
+                onClick={next}
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-7 h-7 flex items-center justify-center"
+              >
+                <FaChevronRight className="text-xs" />
+              </button>
+            </>
+          )}
+
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full">
+            {imgIndex + 1} / {totalImages}
           </div>
-          {/* Favorite Heart */}
-          <button className="absolute top-3 right-3 bg-white/90 hover:bg-white rounded-full p-2 shadow-md">
-            <FaHeart className="text-gray-400 hover:text-red-500" />
+
+          <button
+            onClick={() => setWishlisted((v) => !v)}
+            className="absolute top-2 right-2 bg-white rounded-full w-8 h-8 flex items-center justify-center shadow"
+          >
+            <FaHeart
+              className={wishlisted ? "text-red-500" : "text-gray-300"}
+            />
           </button>
+
+          {hotel.promotion && (
+            <div className="absolute top-2 left-2 bg-[#0d7fe8] text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+              <FaTag className="text-[8px]" />
+              {hotel.promotion}
+            </div>
+          )}
         </div>
 
-        {/* Hotel Details */}
-        <div className="flex-1 p-6 flex flex-col justify-between">
+        {/* 📄 Middle Section */}
+        <div className="flex-1 p-4 flex flex-col justify-between">
           <div>
-            <div className="flex items-start justify-between mb-2">
+            {/* Title + Rating */}
+            <div className="flex justify-between items-start mb-2">
               <div>
-                <h3 className="text-2xl font-bold text-gray-800 mb-1">
+                <h3 className="text-base font-bold text-[#0a2540]">
                   {hotel.name}
                 </h3>
-                <div className="flex gap-1 mb-2">
-                  {renderStars(hotel.rating)}
+
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex gap-0.5">
+                    <Stars rating={hotel.rating} />
+                  </div>
+                  <span className="text-xs text-slate-400">
+                    {hotel.propertyType}
+                  </span>
                 </div>
-                <p className="text-sm text-gray-600 mb-3">
-                  {hotel.address}
-                </p>
               </div>
-              
-              {/* Rating Badge */}
-              <div className="text-right">
-                <div className="text-4xl font-bold text-orange-500">4.3</div>
-                <div className="text-sm text-gray-600">Good</div>
-                <div className="text-xs text-gray-500">(5069 Ratings)</div>
-              </div>
+
+              {/* <ScoreBadge score={hotel.rating} /> */}
             </div>
 
-            {/* Hotel Features */}
-            <div className="mb-3">
-              <div className="inline-block bg-gray-100 px-3 py-1 rounded text-sm text-gray-700 mb-2">
-                • Room Only
-              </div>
-              <div className="inline-block bg-green-50 px-3 py-1 rounded text-sm text-green-600 ml-2">
-                • Free Cancellation before 09-02-2026
-              </div>
+            {/* Location */}
+            <div className="flex items-center gap-1 text-xs text-slate-500 mb-2">
+              <MdLocationOn className="text-[#0d7fe8]" />
+              {hotel.address}
+            </div>
+
+            {/* Meal + Cancellation */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              {hotel.meal && (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-0.5">
+                  <MdBreakfastDining className="text-sm" />
+                  {hotel.meal}
+                </span>
+              )}
+
+              {hotel.refundable ? (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold bg-green-50 text-green-700 border border-green-200 rounded px-2 py-0.5">
+                  <FaCheck className="text-[10px]" />
+                  Free Cancellation
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold bg-red-50 text-red-500 border border-red-200 rounded px-2 py-0.5">
+                  <FaTimes className="text-[10px]" />
+                  Non-Refundable
+                </span>
+              )}
             </div>
 
             {/* Amenities */}
-            <div className="flex gap-4 text-sm text-gray-600">
-              <span>Bar/Lounges</span>
-              <span>•</span>
-              <span>Coffee Shop/Cafe</span>
-              <span>•</span>
-              <span>Health Club</span>
+            <div className="flex flex-wrap gap-2">
+              {hotel.inclusions?.slice(0, 5).map((item, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded px-2 py-0.5 text-xs text-slate-600"
+                >
+                  <FaWifi className="text-[#0d7fe8] text-[10px]" />
+                  {item}
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Price Section */}
-          <div className="flex items-end justify-between mt-4 pt-4 border-t border-gray-200">
-            <div>
-              {/* Empty space for alignment */}
+          {/* Bottom Info */}
+          <div className="mt-3 pt-2 border-t border-dashed border-slate-200 text-xs text-slate-500">
+            {hotel.nights} Night(s)
+          </div>
+        </div>
+
+        {/* 💰 Right Pricing Section */}
+        <div className="w-full md:w-56 bg-[#f4f8fd] border-t md:border-t-0 md:border-l border-slate-200 flex flex-col items-center justify-between p-4">
+          <div className="w-full text-center">
+            <div className="text-[10px] text-slate-400 uppercase">
+              Per Night
             </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-500 mb-1">
-                ₹23,177 <span className="text-xs">/night</span>
+
+            <div className="text-xl font-black text-[#0a2540]">
+              ₹{Math.round(hotel.perNight)?.toLocaleString()}
+            </div>
+
+            <div className="text-[10px] text-slate-500">
+              {hotel.nights} night(s)
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-lg p-2 mt-3">
+              <div className="text-[10px] text-slate-400 uppercase">
+                Total Amount
               </div>
-              <div className="text-3xl font-bold text-gray-800 mb-1">
-                ₹{hotel.price.toLocaleString()} 
-                <span className="text-sm font-normal text-gray-600"> Total</span>
+              <div className="text-lg font-black text-[#0d7fe8]">
+                ₹{hotel.price?.toLocaleString()}
               </div>
-              <div className="text-xs text-gray-500 mb-3">(Incl. of all taxes)</div>
-              
-              <button onClick={() => navigate("/one-hotel-details")} className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2 rounded font-semibold transition-colors">
-                SELECT ROOM
-              </button>
+              <div className="text-[9px] text-slate-400">
+                Incl. ₹{hotel.totalTax?.toLocaleString()} tax
+              </div>
             </div>
           </div>
+
+          <button
+            onClick={() => {
+              navigate("/one-hotel-details", {
+                state: { hotelCode: hotel.id },
+              });
+            }}
+            className="w-full py-2 bg-linear-to-b from-[#0d7fe8] to-[#0a65c2] hover:from-[#0a65c2] hover:to-[#0850a0] text-white font-bold text-xs uppercase tracking-widest rounded-lg shadow mt-3"
+          >
+            Select Room
+          </button>
+
+          {hotel.roomsLeft <= 3 && (
+            <div className="text-[10px] text-red-500 font-semibold text-center mt-2">
+              ⚡ Only {hotel.roomsLeft} rooms left!
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -3,10 +3,76 @@ import { FaSearch, FaMapMarkerAlt } from "react-icons/fa";
 import { BsStarFill } from "react-icons/bs";
 import { useState } from "react";
 import MapModal from "./Map/MapModal";
-import MapPreview from "./Map/MapPreview";
+import { FaMapLocation } from "react-icons/fa6";
 
-const FilterSidebar = ({ filters, setFilters }) => {
+const FilterSidebar = ({
+  hotels = [],
+  filters,
+  setFilters,
+  searchText,
+  setSearchText,
+}) => {
   const [showMap, setShowMap] = useState(false);
+
+  // Extract cheapest room per hotel
+
+  const hotelData = hotels?.map((hotel) => {
+    const cheapestRoom = hotel.Rooms?.reduce((prev, curr) =>
+      curr.TotalFare < prev.TotalFare ? curr : prev,
+    );
+
+    return {
+      price: cheapestRoom?.TotalFare || 0,
+      rating: hotel.StarRating || 0,
+      meal: cheapestRoom?.MealType || "ROOM ONLY",
+      amenities: hotel.Amenities || [],
+    };
+  });
+
+  // Dynamic price range
+  const prices = hotels.map((h) => h.price).filter(Boolean);
+  const dynamicMinPrice = prices.length ? Math.min(...prices) : 0;
+  const dynamicMaxPrice = prices.length ? Math.max(...prices) : 0;
+
+  // Dynamic star ratings with count
+  const starCounts = hotelData.reduce((acc, hotel) => {
+    const star = hotel.rating;
+    if (!star) return acc;
+    acc[star] = (acc[star] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Dynamic meal types
+  const mealCounts = hotels.reduce((acc, hotel) => {
+    if (!hotel.meal) return acc;
+    acc[hotel.meal] = (acc[hotel.meal] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Dynamic property types
+  const propertyCounts = hotels.reduce((acc, hotel) => {
+    const type = hotel.PropertyType || "Hotel";
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {});
+
+  const refundableCounts = hotels.reduce(
+    (acc, hotel) => {
+      if (hotel.refundable) acc.refundable++;
+      else acc.nonRefundable++;
+      return acc;
+    },
+    { refundable: 0, nonRefundable: 0 },
+  );
+
+  // Dynamic amenities
+  const amenityCounts = hotels.reduce((acc, hotel) => {
+    hotel.inclusions?.forEach((item) => {
+      const clean = item.trim();
+      acc[clean] = (acc[clean] || 0) + 1;
+    });
+    return acc;
+  }, {});
 
   const handlePriceChange = (type, value) => {
     setFilters({
@@ -44,38 +110,22 @@ const FilterSidebar = ({ filters, setFilters }) => {
       {/* Map Search */}
       <div className="mb-6">
         <div className="relative">
-          <MapPreview onOpen={() => setShowMap(true)} />
+          <div className=" mb-6 rounded-lg overflow-hidden">
+            {/* Overlay */}
+            <button
+              onClick={() => setShowMap(true)}
+              className="bg-blue-500 hover:bg-blue-600 flex items-center gap-2 cursor-pointer text-white px-3 py-1 text-sm rounded font-normal transition"
+            >
+              SEARCH ON MAP <FaMapLocation />
+            </button>
+          </div>
 
-          <MapModal open={showMap} onClose={() => setShowMap(false)} />
-        </div>
-      </div>
-
-      {/* Search by Hotel Name */}
-      <div className="mb-6">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search by Hotel name"
-            className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <MapModal
+            open={showMap}
+            onClose={() => setShowMap(false)}
+            hotels={hotels}
           />
-          <FaSearch className="absolute right-3 top-3 text-gray-400" />
         </div>
-      </div>
-
-      {/* Free Cancellation */}
-      <div className="mb-6">
-        <button className="w-full px-4 py-2 border border-gray-300 rounded flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
-          <span>📋</span>
-          <span>Free Cancellation Available</span>
-        </button>
-      </div>
-
-      {/* Search by Location */}
-      <div className="mb-6">
-        <button className="w-full px-4 py-2 border border-gray-300 rounded flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
-          <FaMapMarkerAlt />
-          <span>Search by Location</span>
-        </button>
       </div>
 
       {/* Price Filter */}
@@ -88,8 +138,8 @@ const FilterSidebar = ({ filters, setFilters }) => {
         <div className="mb-4">
           <input
             type="range"
-            min="1460"
-            max="242360"
+            min={dynamicMinPrice}
+            max={dynamicMaxPrice}
             value={filters.maxPrice}
             onChange={(e) => handlePriceChange("maxPrice", e.target.value)}
             className="w-full h-2 bg-blue-500 rounded-lg appearance-none cursor-pointer"
@@ -97,8 +147,16 @@ const FilterSidebar = ({ filters, setFilters }) => {
               background: `linear-gradient(
     to right,
     #2563eb 0%,
-    #2563eb ${((filters.maxPrice - 1460) / (242360 - 1460)) * 100}%,
-    #e5e7eb ${((filters.maxPrice - 1460) / (242360 - 1460)) * 100}%,
+    #2563eb ${
+      ((filters.maxPrice - dynamicMinPrice) /
+        (dynamicMaxPrice - dynamicMinPrice)) *
+      100
+    }%,
+    #e5e7eb ${
+      ((filters.maxPrice - dynamicMinPrice) /
+        (dynamicMaxPrice - dynamicMinPrice)) *
+      100
+    }%,
     #e5e7eb 100%
   )`,
             }}
@@ -144,20 +202,25 @@ const FilterSidebar = ({ filters, setFilters }) => {
         </div>
 
         <div className="space-y-3">
-          {[5, 4, 3, 2, 1].map((stars) => (
-            <label
-              key={stars}
-              className="flex items-center gap-3 cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                checked={filters.starRating.includes(stars)}
-                onChange={() => toggleStarRating(stars)}
-                className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <div className="flex gap-1">{renderStars(stars)}</div>
-            </label>
-          ))}
+          {Object.keys(starCounts)
+            .sort((a, b) => b - a)
+            .map((stars) => (
+              <label
+                key={stars}
+                className="flex items-center gap-3 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={filters.starRating.includes(stars)}
+                  onChange={() => toggleStarRating(stars)}
+                  className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <div className="flex gap-1">{renderStars(Number(stars))}</div>
+                <span className="text-gray-500 text-xs">
+                  ({starCounts[stars]})
+                </span>
+              </label>
+            ))}
         </div>
       </div>
 
@@ -169,15 +232,28 @@ const FilterSidebar = ({ filters, setFilters }) => {
         </div>
 
         <div className="space-y-3">
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              ROOM ONLY <span className="text-gray-500">(424)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-            />
-          </label>
+          {Object.keys(mealCounts).map((meal) => (
+            <label
+              key={meal}
+              className="flex items-center justify-between cursor-pointer"
+            >
+              <span className="text-gray-700">
+                {meal}{" "}
+                <span className="text-gray-500">({mealCounts[meal]})</span>
+              </span>
+              <input
+                type="checkbox"
+                onChange={() =>
+                  setFilters({
+                    ...filters,
+                    mealType: filters.mealType === meal ? null : meal,
+                  })
+                }
+                checked={filters.mealType === meal}
+                className="w-4 h-4 text-blue-500 border-gray-300 rounded"
+              />
+            </label>
+          ))}
         </div>
       </div>
 
@@ -189,56 +265,63 @@ const FilterSidebar = ({ filters, setFilters }) => {
         </div>
 
         <div className="space-y-3">
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Hotel <span className="text-gray-500">(390)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-600"
-            />
-          </label>
+          {Object.keys(propertyCounts).map((type) => (
+            <label
+              key={type}
+              className="flex items-center justify-between cursor-pointer"
+            >
+              <span className="text-gray-700">
+                {type}{" "}
+                <span className="text-gray-500">({propertyCounts[type]})</span>
+              </span>
 
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Bed & Breakfast <span className="text-gray-500">(8)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-600"
-            />
-          </label>
+              <input
+                type="checkbox"
+                checked={filters.propertyType.includes(type)}
+                onChange={() => {
+                  const updated = filters.propertyType.includes(type)
+                    ? filters.propertyType.filter((t) => t !== type)
+                    : [...filters.propertyType, type];
 
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Aparthotel <span className="text-gray-500">(5)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-600"
-            />
-          </label>
-
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Guesthouse <span className="text-gray-500">(13)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-600"
-            />
-          </label>
-
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Inn <span className="text-gray-500">(1)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-600"
-            />
-          </label>
+                  setFilters({ ...filters, propertyType: updated });
+                }}
+                className="w-4 h-4 text-blue-500 border-gray-300 rounded"
+              />
+            </label>
+          ))}
         </div>
+      </div>
+
+      <div className="mb-6 pb-6 border-b">
+        <h3 className="font-semibold mb-3">Cancellation</h3>
+
+        <label className="flex justify-between cursor-pointer">
+          <span>Free Cancellation ({refundableCounts.refundable})</span>
+          <input
+            type="checkbox"
+            checked={filters.refundable === true}
+            onChange={() =>
+              setFilters({
+                ...filters,
+                refundable: filters.refundable === true ? null : true,
+              })
+            }
+          />
+        </label>
+
+        <label className="flex justify-between cursor-pointer">
+          <span>Non-Refundable ({refundableCounts.nonRefundable})</span>
+          <input
+            type="checkbox"
+            checked={filters.refundable === false}
+            onChange={() =>
+              setFilters({
+                ...filters,
+                refundable: filters.refundable === false ? null : false,
+              })
+            }
+          />
+        </label>
       </div>
 
       {/* User Rating Filter */}
@@ -298,66 +381,33 @@ const FilterSidebar = ({ filters, setFilters }) => {
           <button className="text-gray-600">−</button>
         </div>
 
-        <div className="space-y-3">
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Wi-Fi <span className="text-gray-500">(350)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-            />
-          </label>
+        <div className="space-y-3 max-h-48 overflow-y-auto">
+          {Object.keys(amenityCounts).map((amenity) => (
+            <label
+              key={amenity}
+              className="flex items-center justify-between cursor-pointer"
+            >
+              <span className="text-gray-700 text-sm">
+                {amenity}{" "}
+                <span className="text-gray-500">
+                  ({amenityCounts[amenity]})
+                </span>
+              </span>
 
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Swimming Pool <span className="text-gray-500">(85)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-            />
-          </label>
+              <input
+                type="checkbox"
+                checked={filters.amenities.includes(amenity)}
+                onChange={() => {
+                  const updated = filters.amenities.includes(amenity)
+                    ? filters.amenities.filter((a) => a !== amenity)
+                    : [...filters.amenities, amenity];
 
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Parking <span className="text-gray-500">(280)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-            />
-          </label>
-
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Restaurant <span className="text-gray-500">(220)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-            />
-          </label>
-
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Gym/Fitness Center <span className="text-gray-500">(95)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-            />
-          </label>
-
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Room Service <span className="text-gray-500">(310)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-            />
-          </label>
+                  setFilters({ ...filters, amenities: updated });
+                }}
+                className="w-4 h-4 text-blue-500 border-gray-300 rounded"
+              />
+            </label>
+          ))}
         </div>
       </div>
     </div>

@@ -17,65 +17,13 @@ import {
 import { useNavigate } from "react-router-dom";
 import EmployeeHeader from "./Employee-Header";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchCities, fetchCountries } from "../../Redux/Actions/hotelThunks";
+import {
+  fetchCities,
+  fetchCountries,
+  searchHotels,
+} from "../../Redux/Actions/hotelThunks";
 
 /* ─── Data ─── */
-const COUNTRIES = [
-  { code: "IN", name: "India", flag: "🇮🇳" },
-  { code: "AE", name: "UAE", flag: "🇦🇪" },
-  { code: "US", name: "United States", flag: "🇺🇸" },
-  { code: "GB", name: "United Kingdom", flag: "🇬🇧" },
-  { code: "SG", name: "Singapore", flag: "🇸🇬" },
-  { code: "TH", name: "Thailand", flag: "🇹🇭" },
-  { code: "FR", name: "France", flag: "🇫🇷" },
-  { code: "IT", name: "Italy", flag: "🇮🇹" },
-  { code: "JP", name: "Japan", flag: "🇯🇵" },
-  { code: "AU", name: "Australia", flag: "🇦🇺" },
-  { code: "CA", name: "Canada", flag: "🇨🇦" },
-  { code: "DE", name: "Germany", flag: "🇩🇪" },
-  { code: "MV", name: "Maldives", flag: "🇲🇻" },
-  { code: "ID", name: "Indonesia", flag: "🇮🇩" },
-  { code: "NL", name: "Netherlands", flag: "🇳🇱" },
-];
-
-const CITIES_BY_COUNTRY = {
-  IN: [
-    "Mumbai",
-    "Delhi",
-    "Bengaluru",
-    "Hyderabad",
-    "Chennai",
-    "Kolkata",
-    "Pune",
-    "Jaipur",
-    "Goa",
-    "Ahmedabad",
-  ],
-  AE: ["Dubai", "Abu Dhabi", "Sharjah", "Ajman"],
-  US: [
-    "New York",
-    "Los Angeles",
-    "Chicago",
-    "Miami",
-    "Las Vegas",
-    "San Francisco",
-  ],
-  GB: ["London", "Manchester", "Edinburgh", "Birmingham", "Liverpool"],
-  SG: ["Singapore"],
-  TH: ["Bangkok", "Phuket", "Chiang Mai", "Pattaya"],
-  FR: ["Paris", "Nice", "Lyon", "Marseille"],
-  IT: ["Rome", "Milan", "Venice", "Florence"],
-  JP: ["Tokyo", "Osaka", "Kyoto", "Hiroshima"],
-  AU: ["Sydney", "Melbourne", "Brisbane", "Perth"],
-  CA: ["Toronto", "Vancouver", "Montreal", "Calgary"],
-  DE: ["Berlin", "Munich", "Hamburg", "Frankfurt"],
-  MV: ["Malé", "Maafushi", "Hulhumalé"],
-  ID: ["Bali", "Jakarta", "Lombok", "Yogyakarta"],
-  NL: ["Amsterdam", "Rotterdam", "The Hague"],
-};
-
-const ALL_CITIES = [...new Set(Object.values(CITIES_BY_COUNTRY).flat())];
-
 const POPULAR_BY_COUNTRY = {
   IN: ["Goa", "Delhi", "Mumbai", "Jaipur", "Bengaluru"],
   AE: ["Dubai", "Abu Dhabi"],
@@ -130,9 +78,9 @@ const CountrySelector = ({ value, onChange, countries }) => {
                 <p className="text-sm font-semibold text-gray-800 truncate">
                   {selected.name}
                 </p>
-                <p className="text-xs text-blue-600 font-bold">
+                {/* <p className="text-xs text-blue-600 font-bold">
                   {selected.code}
-                </p>
+                </p> */}
               </div>
             </>
           ) : (
@@ -190,7 +138,7 @@ const CountrySelector = ({ value, onChange, countries }) => {
                   ${value === country.code ? "bg-blue-50" : ""}`}
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-xl">{country.flag}</span>
+                  {/* <span className="text-xl">{country.flag}</span> */}
                   <p
                     className={`text-sm font-semibold group-hover:text-blue-700 ${value === country.code ? "text-blue-700" : "text-gray-800"}`}
                   >
@@ -230,6 +178,9 @@ export default function HotelSearchPage() {
   const [showGuestDropdown, setShowGuestDropdown] = useState(false);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [filteredCities, setFilteredCities] = useState([]);
+  const [selectedCityCode, setSelectedCityCode] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [noResults, setNoResults] = useState(false);
   const guestRef = useRef(null);
   const cityRef = useRef(null);
 
@@ -240,16 +191,37 @@ export default function HotelSearchPage() {
 
   const currentCities = citiesByCountry?.[country] || [];
 
-  const normalizedCountries = Array.isArray(countries)
-    ? countries.map((c) => ({
-        code: c.Code || c.code,
-        name: c.Name || c.name,
-      }))
+  const getFlagEmoji = (countryCode) => {
+    if (!countryCode) return "";
+    return countryCode
+      .toUpperCase()
+      .replace(/./g, (char) =>
+        String.fromCodePoint(127397 + char.charCodeAt()),
+      );
+  };
+
+  useEffect(() => {
+    console.log("Redux countries:", countries);
+  }, [countries]);
+
+  const countryArray =
+    countries?.data?.CountryList || countries?.data || countries || [];
+
+  const normalizedCountries = Array.isArray(countryArray)
+    ? countryArray.map((c) => {
+        const code = c.Code || c.code;
+        return {
+          code,
+          name: c.Name || c.name,
+          flag: getFlagEmoji(code),
+        };
+      })
     : [];
 
   const handleCountryChange = (code) => {
     setCountry(code);
     setCity("");
+    setSelectedCityCode(null); // 🔥 IMPORTANT
     setFilteredCities([]);
   };
 
@@ -285,9 +257,52 @@ export default function HotelSearchPage() {
     setShowCitySuggestions(true);
   };
 
-  const handleCitySelect = (c) => {
-    setCity(c);
+  const handleCitySelect = (cityObj) => {
+    setCity(cityObj.Name); // for UI
+    setSelectedCityCode(cityObj.Code); // ✅ CORRECT PROPERTY
     setShowCitySuggestions(false);
+  };
+
+  const handleSearch = async () => {
+    if (!selectedCityCode || !checkIn || !checkOut) {
+      alert("Please select a valid city and fill all required fields");
+      return;
+    }
+
+    setIsSearching(true);
+    setNoResults(true);
+
+    const payload = {
+      CheckIn: checkIn,
+      CheckOut: checkOut,
+      CityCode: selectedCityCode, // string is fine
+      GuestNationality: country, // 🔥 IMPORTANT
+      NoOfRooms: rooms,
+      PaxRooms: [
+        {
+          Adults: adults,
+          Children: children,
+          ChildrenAges: children > 0 ? Array(children).fill(5) : [],
+        },
+      ],
+      IsDetailedResponse: true,
+      Filters: {
+        Refundable: false,
+        MealType: "All",
+      },
+    };
+
+    try {
+      const result = await dispatch(searchHotels(payload)).unwrap();
+
+      if (result) {
+        navigate("/search-hotel-results");
+      }
+    } catch (error) {
+      console.error("Search failed:", error);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const guestSummary = `${adults + children} Guest${adults + children > 1 ? "s" : ""}, ${rooms} Room${rooms > 1 ? "s" : ""}`;
@@ -454,7 +469,7 @@ export default function HotelSearchPage() {
                     ).map((c) => (
                       <div
                         key={c.Name}
-                        onMouseDown={() => handleCitySelect(c.Name)}
+                        onMouseDown={() => handleCitySelect(c)}
                         className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 cursor-pointer transition group"
                       >
                         <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
@@ -493,7 +508,7 @@ export default function HotelSearchPage() {
                     }}
                     className="w-full text-sm font-medium text-gray-800 outline-none bg-transparent cursor-pointer"
                   />
-                  {checkIn && (
+                  {/* {checkIn && (
                     <p className="text-xs text-blue-600 font-semibold mt-1">
                       {new Date(checkIn).toLocaleDateString("en-US", {
                         weekday: "short",
@@ -501,7 +516,7 @@ export default function HotelSearchPage() {
                         month: "short",
                       })}
                     </p>
-                  )}
+                  )} */}
                 </div>
               </div>
 
@@ -520,7 +535,7 @@ export default function HotelSearchPage() {
                     onChange={(e) => setCheckOut(e.target.value)}
                     className="w-full text-sm font-medium text-gray-800 outline-none bg-transparent cursor-pointer"
                   />
-                  {checkOut && (
+                  {/* {checkOut && (
                     <p className="text-xs text-blue-600 font-semibold mt-1">
                       {new Date(checkOut).toLocaleDateString("en-US", {
                         weekday: "short",
@@ -528,7 +543,7 @@ export default function HotelSearchPage() {
                         month: "short",
                       })}
                     </p>
-                  )}
+                  )} */}
                 </div>
                 {nightCount && (
                   <div className="mt-1.5 text-center">
@@ -642,8 +657,10 @@ export default function HotelSearchPage() {
             {/* Search Button */}
             <div className="mt-5">
               <button
-                onClick={() => navigate("/search-hotel-results")}
-                className="w-full flex items-center justify-center gap-3 text-white font-extrabold text-lg py-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95 tracking-wide uppercase"
+                onClick={handleSearch}
+                disabled={isSearching}
+                className={`w-full flex items-center justify-center gap-3 text-white font-extrabold text-lg py-4 rounded-xl shadow-lg transition-all duration-200 active:scale-95 tracking-wide uppercase
+    ${isSearching ? "opacity-70 cursor-not-allowed" : ""}`}
                 style={{
                   background:
                     "linear-gradient(180deg, #2F80B7 0%, #1F8DB7 100%)",
@@ -657,8 +674,35 @@ export default function HotelSearchPage() {
                     "linear-gradient(180deg, #2F80B7 0%, #1F8DB7 100%)")
                 }
               >
-                <FaSearch className="text-base" />
-                Search Hotels
+                {isSearching ? (
+                  <>
+                    <svg
+                      className="animate-spin h-5 w-5 text-white"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8z"
+                      />
+                    </svg>
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <FaSearch className="text-base" />
+                    Search Hotels
+                  </>
+                )}
               </button>
             </div>
           </div>

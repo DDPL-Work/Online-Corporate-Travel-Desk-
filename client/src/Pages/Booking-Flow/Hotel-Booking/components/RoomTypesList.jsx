@@ -21,7 +21,7 @@ const RoomTypesList = ({ rooms, onSelectRoom }) => {
       <div className="space-y-4">
         {rooms.map((room) => (
           <RoomCard 
-            key={room.id} 
+            key={room.BookingCode} 
             room={room}
             onSelect={() => onSelectRoom(room)}
           />
