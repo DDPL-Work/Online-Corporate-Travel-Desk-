@@ -21,7 +21,7 @@ const SSOCallback = () => {
     }
 
     if (!token) {
-      navigate("/landing", { replace: true });
+      navigate("/iapindia", { replace: true });
       return;
     }
 
@@ -51,7 +51,7 @@ const SSOCallback = () => {
         navigate("/corporate-dashboard", { replace: true });
       }
     } catch (err) {
-      navigate("/landing", { replace: true });
+      navigate("/iapindia", { replace: true });
     }
   }, [dispatch, navigate, params]);
 

@@ -53,7 +53,7 @@ export const appRouter = createBrowserRouter([
   //   path: "/sso-login",
   //   element: <SSOLogin />,
   // },
-  { path: "/landing", element: <LandingPage /> },
+  { path: "/iapindia", element: <LandingPage /> },
   {
     path: "/sso/callback",
     element: <SSOCallback />, // ✅ REQUIRED
@@ -150,7 +150,7 @@ export const appRouter = createBrowserRouter([
 
   //SHARED ROUTES
 
-  { path: "/landing", element: <LandingPage /> },
+  { path: "/iapindia", element: <LandingPage /> },
   { path: "/search-flight", element: <FlightSearch /> },
   { path: "/search-flight-results", element: <FlightSearchResults /> },
   { path: "/one-way-flight/booking", element: <OneFlightBooking /> },
