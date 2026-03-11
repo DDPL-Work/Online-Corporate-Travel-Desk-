@@ -22,6 +22,7 @@ const validatePrice = require("./checkApprovedRequestPrice.routes");
 const travelAdmin = require("./travelAdmin.routes");
 const postPaidCorporate = require("./postPaid.corporate.routes");
 const flightAmendment = require("./flightAmendment.routes");
+const gestRoutes = require("./gst.routes");
 // const tboRoutes = require('./tbo.routes')
 
 // ------------------ ✅ IMPORTANT FIX ------------------
@@ -47,6 +48,7 @@ router.use("/validate-price", validatePrice);
 router.use("/my-travel-admin", travelAdmin);
 router.use("/postpaid", postPaidCorporate);
 router.use("/flights/amendments", flightAmendment);
+router.use("/onboarding/gst", gestRoutes);
 
 // ------------------ API Info ------------------
 router.get("/", (req, res) => {
@@ -74,6 +76,8 @@ router.get("/", (req, res) => {
       corporateSuperAdmin: "api/v1/corporate-super-admin",
       postPaidCorporate: "api/v1/postpaid",
       flightAmendment: "api/v1/flights/amendments",
+
+      gestRoutes: "api/v1/onboarding/gst",
     },
   });
 });

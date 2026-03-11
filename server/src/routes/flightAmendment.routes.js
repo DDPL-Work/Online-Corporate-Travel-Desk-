@@ -32,7 +32,7 @@ router.post("/amend", controller.amendBooking);
 /**
  * 5️⃣ Get Change Request Status
  */
-router.post("/status", controller.getChangeStatus);
+router.post("/cancellation/status", controller.getChangeStatus);
 
 /**
  * 6️⃣ Release PNR (Unticketed only)

@@ -13,6 +13,8 @@ const hotelSlice = createSlice({
     citiesByCountry: {},
     hotels: [],
     selectedHotel: null,
+    searchPayload: null,
+    hotelDetailsById: {},
 
     loading: {
       countries: false,
@@ -79,7 +81,8 @@ const hotelSlice = createSlice({
       })
       .addCase(searchHotels.fulfilled, (state, action) => {
         state.loading.search = false;
-        state.hotels = action.payload?.Hotels || [];
+        state.hotels = action.payload || [];
+        state.searchPayload = action.meta.arg;
       })
       .addCase(searchHotels.rejected, (state, action) => {
         state.loading.search = false;
@@ -93,6 +96,10 @@ const hotelSlice = createSlice({
       })
       .addCase(fetchHotelDetails.fulfilled, (state, action) => {
         state.loading.details = false;
+
+        const hotelCode = action.meta.arg;
+        state.hotelDetailsById[hotelCode] = action.payload;
+
         state.selectedHotel = action.payload;
       })
       .addCase(fetchHotelDetails.rejected, (state, action) => {
