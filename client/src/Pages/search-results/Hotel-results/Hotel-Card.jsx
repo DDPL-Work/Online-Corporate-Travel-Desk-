@@ -218,7 +218,11 @@ const HotelCard = ({ hotel }) => {
           <button
             onClick={() => {
               navigate("/one-hotel-details", {
-                state: { hotelCode: hotel.id },
+// <<<<<<< HEAD
+//                 state: { hotelCode: hotel.id },
+// =======
+                state: { hotelCode: hotel.id, traceId: hotel.traceId },
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
               });
             }}
             className="w-full py-2 bg-linear-to-b from-[#0d7fe8] to-[#0a65c2] hover:from-[#0a65c2] hover:to-[#0850a0] text-white font-bold text-xs uppercase tracking-widest rounded-lg shadow mt-3"

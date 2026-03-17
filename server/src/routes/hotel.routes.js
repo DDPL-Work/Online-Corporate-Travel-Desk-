@@ -2,6 +2,10 @@ const express = require("express");
 const router = express.Router();
 
 const hotelController = require("../controllers/hotel.controller");
+// <<<<<<< HEAD
+// =======
+const hotelSearchController = require("../controllers/hotelSearch.controller");
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
 
 const bookingValidation = require("../validations/booking.validation");
 const {
@@ -32,7 +36,7 @@ router.get(
 );
 
 /* ======================================================
-HOTEL SEARCH
+  HOTEL SEARCH & DETAILS
 ====================================================== */
 
 router.post(
@@ -40,16 +44,38 @@ router.post(
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
   searchLimiter,
   validate(bookingValidation.searchHotel),
-  hotelController.searchHotels,
+// <<<<<<< HEAD
+//   hotelController.searchHotels,
+// );
+
+// /* ======================================================
+// HOTEL DETAILS
+// ====================================================== */
+// router.post(
+//   "/details",
+//   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+//   hotelController.getStaticHotelDetails,
+// =======
+  hotelSearchController.searchHotels,
 );
 
-/* ======================================================
-HOTEL DETAILS
-====================================================== */
 router.post(
   "/details",
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  hotelController.getStaticHotelDetails,
+  hotelSearchController.getHotelDetails,
+);
+
+router.post(
+  "/room-info",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  hotelSearchController.getRoomInfo,
+);
+
+router.post(
+  "/booking-details",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  hotelSearchController.getBookingDetails,
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
 );
 
 module.exports = router;

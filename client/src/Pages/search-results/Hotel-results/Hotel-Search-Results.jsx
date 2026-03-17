@@ -6,7 +6,7 @@ import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
 import { useSelector } from "react-redux";
 
 function HotelSearchResults() {
-  const { hotels, loading } = useSelector((state) => state.hotel);
+  const { hotels, loading, traceId } = useSelector((state) => state.hotel);
 
   const [filters, setFilters] = useState({
     minPrice: 0,
@@ -51,6 +51,7 @@ function HotelSearchResults() {
       address: hotel.Address || "Location not available",
       roomType: cheapestRoom?.Name?.[0] || "Standard",
       roomsLeft: hotel.Rooms?.length || 1,
+      traceId: traceId,
       images: hotel.Images || [
         "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800",
       ],
@@ -129,21 +130,7 @@ function HotelSearchResults() {
                   Found {filteredHotels?.length || 0} hotels
                 </h2>
 
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 my-3">
-                  <span className="text-gray-600 text-sm">Sort By</span>
 
-                  <div className="flex flex-wrap gap-2">
-                    <button className="px-4 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100">
-                      Rating
-                    </button>
-                    <button className="px-4 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100">
-                      Preferred
-                    </button>
-                    <button className="px-4 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100">
-                      Price
-                    </button>
-                  </div>
-                </div>
               </div>
 
               {/* Hotel Cards */}

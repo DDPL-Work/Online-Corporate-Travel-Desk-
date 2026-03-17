@@ -185,7 +185,7 @@ export default function HotelSearchPage() {
   const cityRef = useRef(null);
 
   const dispatch = useDispatch();
-  const { countries, citiesByCountry, loading } = useSelector(
+  const { countries, citiesByCountry, loading, error } = useSelector(
     (state) => state.hotel,
   );
 
@@ -259,7 +259,7 @@ export default function HotelSearchPage() {
 
   const handleCitySelect = (cityObj) => {
     setCity(cityObj.Name); // for UI
-    setSelectedCityCode(cityObj.Code); // ✅ CORRECT PROPERTY
+    setSelectedCityCode(cityObj.Code || cityObj.CityCode || cityObj.CityId); // tolerate variations
     setShowCitySuggestions(false);
   };
 
@@ -278,13 +278,11 @@ export default function HotelSearchPage() {
       CityCode: selectedCityCode, // string is fine
       GuestNationality: country, // 🔥 IMPORTANT
       NoOfRooms: rooms,
-      PaxRooms: [
-        {
-          Adults: adults,
-          Children: children,
-          ChildrenAges: children > 0 ? Array(children).fill(5) : [],
-        },
-      ],
+      PaxRooms: Array.from({ length: rooms }, () => ({
+        Adults: adults,
+        Children: children,
+        ChildrenAges: children > 0 ? Array(children).fill(5) : [],
+      })),
       IsDetailedResponse: true,
       Filters: {
         Refundable: false,
@@ -463,28 +461,72 @@ export default function HotelSearchPage() {
                           : "Popular Destinations"}
                       </p>
                     </div>
-                    {(filteredCities.length > 0
-                      ? filteredCities
-                      : currentCities
-                    ).map((c) => (
-                      <div
-                        key={c.Name}
-                        onMouseDown={() => handleCitySelect(c)}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 cursor-pointer transition group"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                          <FaMapMarkerAlt className="text-blue-600 text-xs" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-800 group-hover:text-blue-700">
-                            {c.Name}
+
+                    {/* LOADING STATE */}
+                    {loading.cities && (
+                      <div className="p-8 flex flex-col items-center justify-center gap-3">
+                        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-xs font-bold text-blue-600 animate-pulse uppercase tracking-widest">
+                          Fetching Cities...
+                        </p>
+                      </div>
+                    )}
+
+                    {/* ERROR STATE */}
+                    {!loading.cities && error?.cities && (
+                      <div className="p-6 text-center">
+                        <div className="bg-red-50 text-red-500 rounded-xl p-4 border border-red-100">
+                          <p className="text-xs font-bold uppercase mb-1">
+                            Load Failed
                           </p>
-                          <p className="text-xs text-gray-400">
-                            {selectedCountry?.name || "Hotels & Resorts"}
+                          <p className="text-xs font-medium opacity-80">
+                            {typeof error.cities === "string"
+                              ? error.cities
+                              : "Something went wrong"}
                           </p>
+                          <button
+                            onMouseDown={() => dispatch(fetchCities(country))}
+                            className="mt-3 text-[10px] font-extrabold text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-all uppercase"
+                          >
+                            Retry
+                          </button>
                         </div>
                       </div>
-                    ))}
+                    )}
+
+                    {/* EMPTY STATE */}
+                    {!loading.cities &&
+                      !error?.cities &&
+                      (filteredCities.length > 0 || currentCities.length > 0
+                        ? (filteredCities.length > 0
+                            ? filteredCities
+                            : currentCities
+                          ).map((c) => (
+                            <div
+                              key={c.Name}
+                              onMouseDown={() => handleCitySelect(c)}
+                              className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 cursor-pointer transition group"
+                            >
+                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                <FaMapMarkerAlt className="text-blue-600 text-xs" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-gray-800 group-hover:text-blue-700">
+                                  {c.Name}
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  {selectedCountry?.name || "Hotels & Resorts"}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        : city && (
+                            <div className="p-8 text-center">
+                              <p className="text-sm font-semibold text-gray-400">
+                                No cities found for "{city}"
+                              </p>
+                            </div>
+                          ))}
                   </div>
                 )}
               </div>

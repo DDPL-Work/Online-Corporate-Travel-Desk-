@@ -48,6 +48,45 @@ export default function PendingTravelRequests() {
 
   const requests = useMemo(() => {
     return list.map((b) => {
+      const type = b.bookingType || "flight";
+      const isHotel = type === "hotel";
+
+      if (isHotel) {
+        const snapshot = b.bookingSnapshot || {};
+        return {
+          id: b._id,
+          bookingRef: b.bookingReference,
+          type: "hotel",
+          status: b.requestStatus || "pending_approval",
+          employee: b.userId?.name?.firstName || b.userId?.email || "Employee",
+          travellers: (b.travellers || []).map((t) => ({
+            name: `${t.firstName || ""} ${t.lastName || ""}`.trim() || "Traveller",
+            email: t.email || "N/A",
+            isLead: t.isLeadGuest,
+          })),
+          reason: b.purposeOfTravel,
+          priority: "Medium",
+          destination: snapshot.hotelName || snapshot.city || "Hotel",
+          cityFrom: snapshot.city || "N/A",
+          cityTo: snapshot.city || "N/A",
+          departureDate: snapshot.checkInDate
+            ? new Date(snapshot.checkInDate).toLocaleDateString()
+            : "N/A",
+          returnDate: snapshot.checkOutDate
+            ? new Date(snapshot.checkOutDate).toLocaleDateString()
+            : "N/A",
+          estimatedCost: b.pricingSnapshot?.totalAmount || 0,
+          hotelName: snapshot.hotelName,
+          checkIn: snapshot.checkInDate,
+          checkOut: snapshot.checkOutDate,
+          roomCount: snapshot.roomCount,
+          nights: snapshot.nights,
+          roomType: b.hotelRequest?.roomTypeName || "N/A",
+          ratePlan: b.hotelRequest?.ratePlanCode || "N/A",
+          pricing: b.pricingSnapshot || {},
+        };
+      }
+
       const segments = b.flightRequest?.segments || [];
       const ssr = b.flightRequest?.ssrSnapshot || {};
       const lastSegment = segments[segments.length - 1];
@@ -62,7 +101,7 @@ export default function PendingTravelRequests() {
           name:
             `${t.firstName || ""} ${t.lastName || ""}`.trim() || "Traveller",
           email: t.email || "N/A",
-          isLead: t.isLeadPassenger,
+          isLead: t.isLeadGuest,
         })),
 
         reason: b.purposeOfTravel,
@@ -355,9 +394,15 @@ export default function PendingTravelRequests() {
                         <FaHotel className="text-[#0A4D68] text-xl" />
                       )}
                       <h3 className="text-base sm:text-lg font-semibold wrap-break-word text-[#0A4D68] flex items-center gap-2">
-                        <span>{r.cityFrom}</span>
-                        <span className="text-gray-500">→</span>
-                        <span>{r.cityTo}</span>
+                        {r.type === "flight" ? (
+                          <>
+                            <span>{r.cityFrom}</span>
+                            <span className="text-gray-500">→</span>
+                            <span>{r.cityTo}</span>
+                          </>
+                        ) : (
+                          <span>{r.destination}</span>
+                        )}
                       </h3>
                     </div>
                     {/* TRAVELLERS */}
@@ -479,11 +524,27 @@ export default function PendingTravelRequests() {
                     label="Purpose"
                     value={r.reason}
                   />
-                  <Detail
-                    icon={<FiAlertCircle />}
-                    label="Cabin"
-                    value={r.cabin}
-                  />
+                  {r.cabin && (
+                    <Detail
+                      icon={<FiAlertCircle />}
+                      label="Cabin"
+                      value={r.cabin}
+                    />
+                  )}
+                  {r.type === "hotel" && (
+                     <Detail
+                        icon={<FaHotel />}
+                        label="Hotel"
+                        value={r.hotelName}
+                     />
+                  )}
+                  {r.nights && (
+                     <Detail
+                        icon={<FiCalendar />}
+                        label="Nights"
+                        value={r.nights}
+                     />
+                  )}
 
                   {/* ==== Fare Expiry Info ==== */}
                   {r.fareExpiry &&
@@ -754,8 +815,22 @@ export default function PendingTravelRequests() {
                           </>
                         )}
                       </>
+                    ) : r.type === "hotel" ? (
+                      /* HOTEL EXPANDED VIEW */
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        <Detail label="Hotel Name" value={r.hotelName || "N/A"} />
+                        <Detail label="Room Type" value={r.roomType || "N/A"} />
+                        <Detail label="Check-In" value={r.checkIn ? new Date(r.checkIn).toLocaleDateString() : "N/A"} />
+                        <Detail label="Check-Out" value={r.checkOut ? new Date(r.checkOut).toLocaleDateString() : "N/A"} />
+                        <Detail label="Nights" value={r.nights || "N/A"} />
+                        <Detail label="Rooms" value={r.roomCount || "1"} />
+                        <Detail
+                          label="Pricing"
+                          value={`Total ₹${r.pricing?.totalAmount || "N/A"}`}
+                        />
+                      </div>
                     ) : (
-                      /* CARD VIEW if no segments */
+                      /* FLIGHT CARD VIEW if no segments (fallback) */
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         <Detail label="Airline" value={r.airline || "N/A"} />
                         <Detail label="Aircraft" value={r.aircraft || "N/A"} />

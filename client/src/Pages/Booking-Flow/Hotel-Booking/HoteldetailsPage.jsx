@@ -1,30 +1,29 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchHotelDetails } from "../../../Redux/Actions/hotelThunks";
+import { fetchHotelDetails, fetchRoomInfo } from "../../../Redux/Actions/hotelThunks";
 import HotelHeader from "./components/HotelHeader";
 import HotelImageGallery from "./components/HotelImageGallery";
 import HotelInfo from "./components/HotelInfo";
 import Amenities from "./components/Amenities";
 import RoomTypesList from "./components/RoomTypesList";
-import PriceCard from "./components/PriceCard";
 import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
 import Attractions from "./components/Attractions";
+import HotelDetailsSkeleton from "./components/HotelDetailsSkeleton";
 import { MdArrowBack } from "react-icons/md";
-import TravellersModal from "./components/TravellersModal";
 
 const HotelDetailsPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
   const hotelCode = location.state?.hotelCode;
-  const [selectedRoom, setSelectedRoom] = useState(null);
-  const [travellerDetails, setTravellerDetails] = useState(null);
-  const [showTravellerModal, setShowTravellerModal] = useState(false);
 
-  const { hotels, hotelDetailsById, loading } = useSelector(
+  const { hotels, hotelDetailsById, searchPayload, loading, traceId: reduxTraceId } = useSelector(
     (state) => state.hotel,
   );
+
+  // Prefer location.state traceId (from navigation), fall back to Redux state
+  const traceId = location.state?.traceId || reduxTraceId;
 
   /* ----------------------------
      1️⃣ Get hotel from search
@@ -34,15 +33,26 @@ const HotelDetailsPage = () => {
   }, [hotels, hotelCode]);
 
   /* ----------------------------
-     2️⃣ Call details API
+     2️⃣ Call dynamic details & rooms API
   ----------------------------- */
   useEffect(() => {
-    if (hotelCode && !hotelDetailsById?.[hotelCode]) {
-      dispatch(fetchHotelDetails(hotelCode));
+    if (hotelCode && traceId && hotelFromSearch?.ResultIndex) {
+      const payload = {
+        hotelCode,
+        traceId,
+        resultIndex: hotelFromSearch.ResultIndex,
+      };
+
+      // Fetch dynamic details
+      dispatch(fetchHotelDetails(payload));
+
+      // Fetch latest rooms (locks the price & refreshes the TBO session)
+      dispatch(fetchRoomInfo(payload));
     }
-  }, [hotelCode, hotelDetailsById, dispatch]);
+  }, [hotelCode, traceId, hotelFromSearch?.ResultIndex, dispatch]);
 
   const hotelFromDetails = hotelDetailsById?.[hotelCode]?.HotelDetails?.[0];
+  const roomsFromRedux = hotelDetailsById?.[hotelCode]?.Rooms || [];
 
   /* ----------------------------
      3️⃣ Merge Search + Details
@@ -89,6 +99,7 @@ const HotelDetailsPage = () => {
 
     return {
       // Basic
+      hotelCode: hotelCode,
       name:
         hotelFromDetails?.HotelName || hotelFromSearch?.HotelName || "Hotel",
 
@@ -96,6 +107,11 @@ const HotelDetailsPage = () => {
         hotelFromDetails?.Address ||
         hotelFromSearch?.Address ||
         "Address not available",
+      
+      pinCode: hotelFromDetails?.PinCode || "",
+      cityName: hotelFromDetails?.CityName || hotelFromSearch?.CityName || "",
+      countryName: hotelFromDetails?.CountryName || "",
+      map: hotelFromDetails?.Map || "", // Lat/Lng string or URL
 
       rating: hotelFromDetails?.HotelRating || hotelFromSearch?.StarRating || 0,
 
@@ -119,9 +135,9 @@ const HotelDetailsPage = () => {
         fax: hotelFromDetails?.FaxNumber || "",
       },
 
-      rooms: (hotelFromSearch?.Rooms || []).map((room, index) => {
+      rooms: (roomsFromRedux.length > 0 ? roomsFromRedux : hotelFromSearch?.Rooms || []).map((room, index) => {
         const allImages = hotelFromDetails?.Images || [];
-        const roomCount = hotelFromSearch?.Rooms?.length || 1;
+        const roomCount = roomsFromRedux?.length || 1;
 
         const imagesPerRoom = Math.ceil(allImages.length / roomCount);
 
@@ -129,28 +145,42 @@ const HotelDetailsPage = () => {
         const end = start + imagesPerRoom;
 
         return {
-          ...room, // ✅ KEEP FULL ORIGINAL ROOM DATA
+          ...room, // ✅ KEEP FULL ORIGINAL ROOM DATA (now from Room Info API)
           images: allImages.slice(start, end),
         };
       }),
+      resultIndex: hotelFromSearch?.ResultIndex,
+      traceId: traceId,
     };
-  }, [hotelFromSearch, hotelFromDetails]);
+  }, [hotelFromSearch, hotelFromDetails, traceId, roomsFromRedux]);
 
-  const handleSendForApproval = () => {
-    if (!travellerDetails) {
-      setShowTravellerModal(true);
-      return;
-    }
-
-    // call approval API here
-    dispatch(
-      sendApproval({
-        hotelCode,
-        room: selectedRoom || priceCardRoom,
-        travellerDetails,
-      }),
-    );
+  const handleSelectRoom = (room) => {
+    navigate("/hotel-review-booking", {
+      state: {
+        hotel: mergedHotel,
+        room: room,
+        searchParams: {
+          checkIn: searchPayload?.CheckIn,
+          checkOut: searchPayload?.CheckOut,
+          rooms: searchPayload?.PaxRooms,
+          city: hotelFromSearch?.CityName,
+        },
+      },
+    });
   };
+
+  // --- SHOW SKELETON WHILE LOADING DYNAMIC DATA ---
+  const isInitialLoading = loading.details || loading.rooms;
+  const hasDynamicData = !!hotelFromDetails && roomsFromRedux.length > 0;
+
+  if (isInitialLoading && !hasDynamicData) {
+    return (
+      <>
+        <EmployeeHeader />
+        <HotelDetailsSkeleton />
+      </>
+    );
+  }
 
   if (!hotelFromSearch) {
     return (
@@ -164,12 +194,9 @@ const HotelDetailsPage = () => {
      4️⃣ Prepare Cheapest Room
   ----------------------------- */
   const cheapestRoom = mergedHotel.rooms?.reduce((prev, curr) =>
-    curr.TotalFare < prev.TotalFare ? curr : prev,
+    (curr.Price?.TotalFare || curr.TotalFare) < (prev.Price?.TotalFare || prev.TotalFare) ? curr : prev,
+    mergedHotel.rooms[0]
   );
-
-  const nights = cheapestRoom?.DayRates?.[0]?.length || 1;
-
-  const priceCardRoom = cheapestRoom;
 
   /* ========================= */
   return (
@@ -177,24 +204,17 @@ const HotelDetailsPage = () => {
       <EmployeeHeader />
       <HotelHeader
         name={mergedHotel.name}
-        address={mergedHotel.address}
+        address={`${mergedHotel.address}${mergedHotel.pinCode ? `, ${mergedHotel.pinCode}` : ""}`}
+        cityName={mergedHotel.cityName}
+        countryName={mergedHotel.countryName}
         rating={mergedHotel.rating}
         reviewCount={0}
       />
 
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             <HotelImageGallery images={mergedHotel.images} />
-          </div>
-
-          <div>
-            <PriceCard
-              selectedRoom={selectedRoom || priceCardRoom}
-              travellerDetails={travellerDetails}
-              onOpenTravellerModal={() => setShowTravellerModal(true)}
-              onSendForApproval={handleSendForApproval}
-            />
           </div>
         </div>
 
@@ -203,36 +223,22 @@ const HotelDetailsPage = () => {
           checkIn={mergedHotel.checkIn}
           checkOut={mergedHotel.checkOut}
           contact={mergedHotel.contact}
+          map={mergedHotel.map}
         />
 
         <Amenities
-          // ✅ CORRECT
           amenities={mergedHotel.facilities}
         />
 
-        {/* Nearby Attractions — object passed directly */}
         {mergedHotel.attractions?.length > 0 && (
           <Attractions attractions={mergedHotel.attractions} />
         )}
 
         <RoomTypesList
           rooms={mergedHotel.rooms}
-          onSelectRoom={setSelectedRoom}
+          onSelectRoom={handleSelectRoom}
         />
       </div>
-      {showTravellerModal && (
-        <TravellersModal
-          isOpen={showTravellerModal}
-          onClose={() => setShowTravellerModal(false)}
-          onSubmit={(HotelPassengerArray) => {
-            setTravellerDetails(HotelPassengerArray);
-            setShowTravellerModal(false);
-          }}
-          rooms={[{ adults: 1, children: 0 }]}
-          countryCode="IN"
-          hotelCountryCode="AE"
-        />
-      )}
     </div>
   );
 };

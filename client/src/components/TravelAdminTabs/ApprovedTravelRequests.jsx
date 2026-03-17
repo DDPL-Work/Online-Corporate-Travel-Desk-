@@ -124,15 +124,23 @@ export default function ApprovedTravelRequests() {
 
         // 🛫 FIXED: show only start → final destination
         destination:
-          segments.length > 0
+          a.bookingType === "hotel"
+            ? a.bookingSnapshot?.hotelName || a.bookingSnapshot?.city || "Hotel"
+            : segments.length > 0
             ? `${getCity(segments[0], "origin")} → ${getCity(
                 segments[segments.length - 1],
                 "destination",
               )}`
             : "N/A",
 
-        departureDate: firstSeg?.departureDateTime,
-        returnDate: lastSeg?.arrivalDateTime,
+        departureDate:
+          a.bookingType === "hotel"
+            ? a.bookingSnapshot?.checkInDate
+            : firstSeg?.departureDateTime,
+        returnDate:
+          a.bookingType === "hotel"
+            ? a.bookingSnapshot?.checkOutDate
+            : lastSeg?.arrivalDateTime,
         estimatedCost: a.pricingSnapshot?.totalAmount || 0,
         bookingStatus:
           a.executionStatus === "not_started" ? "Pending Booking" : "Booked",
@@ -370,7 +378,7 @@ export default function ApprovedTravelRequests() {
 
                     <div className="flex justify-between items-center mt-3">
                       <span className="text-[#0A4D68] font-semibold flex items-center gap-1">
-                        <FiDollarSign />
+                        ₹
                         {r.estimatedCost.toLocaleString()}
                       </span>
                       <button

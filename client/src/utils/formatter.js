@@ -17,20 +17,43 @@ export const getCabinClassLabel = (cabinClassCode) => {
   }
 };
 
-export const formatTime = (d) =>
-  new Date(d).toLocaleTimeString("en-IN", {
+// <<<<<<< HEAD
+// export const formatTime = (d) =>
+//   new Date(d).toLocaleTimeString("en-IN", {
+// =======
+export const formatTime = (d) => {
+  if (!d) return "N/A";
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "N/A";
+  return date.toLocaleTimeString("en-IN", {
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
   });
+// <<<<<<< HEAD
+
+// // with weekday and month in English
+// export const formatDate = (d) =>
+//   new Date(d).toLocaleDateString("en-IN", {
+// =======
+};
 
 // with weekday and month in English
-export const formatDate = (d) =>
-  new Date(d).toLocaleDateString("en-IN", {
+export const formatDate = (d) => {
+  if (!d) return "N/A";
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "N/A";
+  return date.toLocaleDateString("en-IN", {
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
     weekday: "short",
     day: "2-digit",
     month: "short",
   });
+// <<<<<<< HEAD
+// =======
+};
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
 
 export const formatDateTime = (date) => {
   if (!date) return "N/A";

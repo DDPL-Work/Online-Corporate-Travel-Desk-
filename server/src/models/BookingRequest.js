@@ -83,7 +83,14 @@ const bookingRequestSchema = new mongoose.Schema(
     /* ================= FLIGHT REQUEST (FULL DATA) ================= */
 
     flightRequest: {
-      type: mongoose.Schema.Types.Mixed, // 🔥 FULL PROVIDER PAYLOAD
+// <<<<<<< HEAD
+//       type: mongoose.Schema.Types.Mixed, // 🔥 FULL PROVIDER PAYLOAD
+// =======
+      type: mongoose.Schema.Types.Mixed, // 🔥 FULL FLIGHT PAYLOAD
+    },
+    hotelRequest: {
+      type: mongoose.Schema.Types.Mixed, // 🔥 FULL HOTEL PAYLOAD
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
     },
 
     /* ================= PRICING ================= */
@@ -110,6 +117,22 @@ const bookingRequestSchema = new mongoose.Schema(
       index: true,
     },
 
+// <<<<<<< HEAD
+// =======
+    // Who executed the booking (explicitly recorded when execution completes)
+    executedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    executedByRole: {
+      type: String,
+    },
+
+    executedAt: Date,
+
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
     // bookingResult: {
     //   pnr: String,
     //   ticketNumbers: [String],
@@ -152,21 +175,39 @@ const bookingRequestSchema = new mongoose.Schema(
     /* ================= BOOKING SUMMARY ================= */
 
     bookingSnapshot: {
+// <<<<<<< HEAD
+//       sectors: [String],
+//       airline: String,
+//       travelDate: {
+//         type: Date,
+//         required: true,
+//       },
+
+//       returnDate: {
+//         type: Date,
+//       },
+//       cabinClass: {
+//         type: String,
+//         enum: ["Economy", "Premium Economy", "Business", "First"],
+//         index: true,
+//       },
+// =======
+      // Common / Flight
       sectors: [String],
       airline: String,
-      travelDate: {
-        type: Date,
-        required: true,
-      },
+      travelDate: Date,
+      returnDate: Date,
+      cabinClass: String,
 
-      returnDate: {
-        type: Date,
-      },
-      cabinClass: {
-        type: String,
-        enum: ["Economy", "Premium Economy", "Business", "First"],
-        index: true,
-      },
+      // Hotel Specific
+      hotelName: String,
+      checkInDate: Date,
+      checkOutDate: Date,
+      roomCount: Number,
+      nights: Number,
+
+      // Common
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
       amount: Number,
       purposeOfTravel: String,
       city: String,

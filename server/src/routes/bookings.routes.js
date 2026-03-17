@@ -24,6 +24,15 @@ router.post(
   bookingsController.executeApprovedFlightBooking
 );
 
+// <<<<<<< HEAD
+// =======
+// execute approved hotel
+router.post(
+  "/:bookingId/execute-hotel",
+  bookingsController.executeApprovedHotelBooking
+);
+
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
 router.get(
   "/:id/ticket-pdf",
   bookingsController.downloadTicketPdf

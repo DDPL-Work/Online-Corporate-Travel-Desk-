@@ -46,7 +46,14 @@ module.exports = {
       hotelDetails: "/TBOHolidays_HotelAPI/Hoteldetails",
 
       /* Hotel Search */
+// <<<<<<< HEAD
+//       hotelSearch: "/HotelAPI/Search",
+// =======
+      /* Hotel Search & Rooms */
       hotelSearch: "/HotelAPI/Search",
+      hotelRoom: "/HotelAPI/GetHotelRoom",
+      hotelDetailsDynamic: "/HotelAPI/GetHotelDetails",
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
 
       /* Booking Flow */
       hotelPreBook: "/HotelAPI/PreBook",
@@ -97,7 +104,14 @@ module.exports = {
       hotelDetails: "/TBOHolidays_HotelAPI/Hoteldetails",
 
       /* Hotel Search */
+// <<<<<<< HEAD
+//       hotelSearch: "/HotelAPI/Search",
+// =======
+      /* Hotel Search & Rooms */
       hotelSearch: "/HotelAPI/Search",
+      hotelRoom: "/HotelAPI/GetHotelRoom",
+      hotelDetailsDynamic: "/HotelAPI/GetHotelDetails",
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
 
       /* Booking Flow */
       hotelPreBook: "/HotelAPI/PreBook",

@@ -6,6 +6,7 @@ const Corporate = require("../models/Corporate");
 const WalletTransaction = require("../models/Wallet");
 const Ledger = require("../models/Ledger");
 const tboService = require("../services/tektravels/flight.service");
+const hotelTboService = require("../services/tektravels/hotel.service");
 const pdfService = require("../services/pdf.service");
 const notificationService = require("../services/notification.service");
 const { generateBookingReference } = require("../utils/helpers");
@@ -120,7 +121,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   }
 
   const leadPassenger =
-    travellers.find((t) => t.isLeadPassenger) || travellers[0];
+    travellers.find((t) => t.isLeadPassenger || t.isLeadGuest) || travellers[0];
 
   if (!leadPassenger?.phoneWithCode) {
     throw new ApiError(400, "Lead passenger phone number is required");
@@ -130,12 +131,14 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Lead passenger email is required");
   }
 
-  const fareResult = Array.isArray(flightRequest.fareQuote?.Results)
-    ? flightRequest.fareQuote.Results[0]
-    : flightRequest.fareQuote?.Results;
+  if (bookingType === "flight") {
+    const fareResult = Array.isArray(flightRequest.fareQuote?.Results)
+      ? flightRequest.fareQuote.Results[0]
+      : flightRequest.fareQuote?.Results;
 
-  if (!fareResult?.FareBreakdown || !fareResult.FareBreakdown.length) {
-    throw new ApiError(400, "Valid FareQuote is required");
+    if (!fareResult?.FareBreakdown || !fareResult.FareBreakdown.length) {
+      throw new ApiError(400, "Valid FareQuote is required");
+    }
   }
 
   /* ================= BALANCE CHECK ================= */
@@ -268,6 +271,16 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     //       city: segment.destination.city,
     //     };
     // >>>>>>> d5de6b9290f0417c8d6b38e9aa73e68f776f4f0f
+  } else if (bookingType === "hotel") {
+    // Hotel Snapshot is already well-defined in the request body from frontend
+    bookingSnapshot = req.body.bookingSnapshot || {
+      hotelName: hotelRequest?.hotelName,
+      city: hotelRequest?.city,
+      checkInDate: hotelRequest?.checkInDate,
+      checkOutDate: hotelRequest?.checkOutDate,
+      roomCount: hotelRequest?.rooms?.length || 1,
+      amount: pricingSnapshot.totalAmount,
+    };
   }
 
   /* ================= CREATE BOOKING REQUEST ================= */
@@ -288,49 +301,50 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
   let freshFareQuote;
 
-  if (typeof flightRequest.resultIndex === "object") {
-    const onwardFare = await tboService.getFareQuote(
-      flightRequest.traceId,
-      flightRequest.resultIndex.onward,
-    );
+  if (bookingType === "flight") {
+    if (typeof flightRequest.resultIndex === "object") {
+      const onwardFare = await tboService.getFareQuote(
+        flightRequest.traceId,
+        flightRequest.resultIndex.onward,
+      );
 
-    const returnFare = await tboService.getFareQuote(
-      flightRequest.traceId,
-      flightRequest.resultIndex.return,
-    );
+      const returnFare = await tboService.getFareQuote(
+        flightRequest.traceId,
+        flightRequest.resultIndex.return,
+      );
 
-    freshFareQuote = {
-      Results: [onwardFare.Response.Results, returnFare.Response.Results],
-    };
-  } else {
-    freshFareQuote = await tboService.getFareQuote(
-      flightRequest.traceId,
-      flightRequest.resultIndex,
-    );
+      freshFareQuote = {
+        Results: [onwardFare.Response.Results, returnFare.Response.Results],
+      };
+    } else {
+      freshFareQuote = await tboService.getFareQuote(
+        flightRequest.traceId,
+        flightRequest.resultIndex,
+      );
+    }
   }
 
-  const bookingRequest = await BookingRequest.create({
+  const bookingRequest = new BookingRequest({
     bookingReference: generateBookingReference(),
-    bookingType,
     corporateId: corporate._id,
     userId: user._id,
-
-    requestStatus: "pending_approval",
-    executionStatus: "not_started",
-
-    fareQuote: freshFareQuote,
-
-    purposeOfTravel,
-    travellers,
+    bookingType,
     flightRequest:
       bookingType === "flight"
         ? {
             ...sanitizeFlightRequest(flightRequest),
             segments: flightRequest.segments, // ✅ FULL SEGMENTS
+            fareQuote: freshFareQuote, // Store the fresh quote
           }
         : undefined,
 
     hotelRequest: bookingType === "hotel" ? hotelRequest : undefined,
+
+    travellers: travellers.map((t) => ({
+      ...t,
+      isLeadPassenger: t.isLeadGuest ?? t.isLeadPassenger,
+    })),
+    purposeOfTravel,
 
     pricingSnapshot: {
       totalAmount: pricingSnapshot.totalAmount,
@@ -338,8 +352,10 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
       capturedAt: new Date(),
     },
     bookingSnapshot,
-    // bookingSnapshot: req.body.bookingSnapshot,
+    requestStatus: "pending_approval",
   });
+
+  await bookingRequest.save();
 
   /* ================= NOTIFICATION ================= */
 
@@ -370,7 +386,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 exports.getMyRequests = asyncHandler(async (req, res) => {
   const bookings = await BookingRequest.find({
     userId: req.user._id, // 🔐 ownership enforced
-    bookingType: "flight",
+    bookingType: { $in: ["flight", "hotel"] },
 
     // ✅ approved OR pending_approval
     requestStatus: { $in: ["approved", "pending_approval"] },
@@ -1031,6 +1047,498 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
   }
 });
 
+exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+
+  const booking = await BookingRequest.findById(bookingId);
+  if (!booking) throw new ApiError(404, "Booking not found");
+
+  if (booking.bookingType !== "hotel") {
+    throw new ApiError(400, "This is not a hotel booking request");
+  }
+
+  if (booking.requestStatus !== "approved")
+    throw new ApiError(400, "Booking not approved");
+
+  const corporate = await Corporate.findById(booking.corporateId);
+  if (!corporate) throw new ApiError(404, "Corporate not found");
+
+  const hotelReq = booking.hotelRequest;
+  if (!hotelReq) throw new ApiError(400, "Hotel request details missing");
+
+  // Keep logs production-safe and consistent with the logger (avoid console noise).
+  logger.info("HOTEL BOOKING REQUEST (DB)", {
+    bookingId: booking._id,
+    hotelCode: hotelReq?.hotelCode,
+    hasTraceId: !!hotelReq?.traceId,
+    hasBookingCode: !!(hotelReq?.bookingCode || hotelReq?.BookingCode),
+  });
+
+  const normalizeTitleWithDot = (title) => {
+    const raw = String(title || "").trim();
+    const base = raw.replace(/\./g, "").trim();
+    if (!base) return "Mr.";
+    const cased = base.charAt(0).toUpperCase() + base.slice(1).toLowerCase();
+    return `${cased}.`;
+  };
+
+  // Supplier contract includes these fields; passport fields can be null for domestic travel.
+  const passengers = (booking.travellers || []).map((t, idx) => ({
+    Title: normalizeTitleWithDot(t?.title),
+    FirstName: t?.firstName || "Guest",
+    MiddleName: "",
+    LastName: t?.lastName || "User",
+    Email: t?.email || null,
+    PaxType: 1,
+    LeadPassenger: idx === 0,
+    Age: 0,
+    PassportNo: t?.passportNumber || null,
+    PassportIssueDate: null,
+    PassportExpDate: null,
+    Phoneno: String(t?.phoneWithCode || "").replace(/\D/g, "").trim() || null,
+    PaxId: 0,
+    GSTCompanyAddress: null,
+    GSTCompanyContactNumber: null,
+    GSTCompanyName: null,
+    GSTNumber: null,
+    GSTCompanyEmail: null,
+    PAN: null,
+  }));
+
+  if (!passengers.length) {
+    throw new ApiError(400, "At least one traveller is required");
+  }
+
+  const hotelCode = hotelReq?.hotelCode;
+  if (!hotelCode) throw new ApiError(400, "hotelCode missing in hotelRequest");
+
+  const traceId = hotelReq?.traceId || null;
+  const resultIndex = hotelReq?.resultIndex || hotelReq?.roomIndex || null;
+
+  // Prefer already stored BookingCode from room info (best for long approval windows).
+  const looksLikeBookingCode = (v) =>
+    typeof v === "string" && v.includes("!TB!") && /!AFF!$/i.test(v);
+
+  let bookingCode =
+    hotelReq?.bookingCode ||
+    hotelReq?.BookingCode ||
+    (looksLikeBookingCode(hotelReq?.roomTypeCode) ? hotelReq.roomTypeCode : null) ||
+    (looksLikeBookingCode(hotelReq?.ratePlanCode) ? hotelReq.ratePlanCode : null) ||
+    null;
+
+  const extractTraceId = (resp) =>
+    resp?.TraceId ||
+    resp?.TraceID ||
+    resp?.HotelSearchResult?.TraceId ||
+    resp?.HotelSearchResult?.TraceID ||
+    resp?.SearchResult?.TraceId ||
+    resp?.SearchResult?.TraceID ||
+    resp?.GetHotelRoomResult?.TraceId ||
+    resp?.GetHotelRoomResult?.TraceID ||
+    resp?.BookResult?.TraceId ||
+    resp?.BookResult?.TraceID ||
+    // Some supplier variants include TraceId on the hotel result item(s)
+    (Array.isArray(resp?.HotelResult) ? resp.HotelResult?.[0]?.TraceId : null) ||
+    (Array.isArray(resp?.HotelResult) ? resp.HotelResult?.[0]?.TraceID : null) ||
+    (resp?.HotelResult && !Array.isArray(resp.HotelResult)
+      ? resp.HotelResult?.TraceId || resp.HotelResult?.TraceID
+      : null) ||
+    null;
+
+  const extractHotelResults = (resp) =>
+    (() => {
+      const v =
+        resp?.HotelResult ||
+        resp?.HotelSearchResult?.HotelResult ||
+        resp?.SearchResult?.HotelResult ||
+        [];
+      if (Array.isArray(v)) return v;
+      if (v && typeof v === "object") return [v];
+      return [];
+    })();
+
+  const extractRoomDetails = (resp) =>
+    resp?.GetHotelRoomResult?.HotelRoomsDetails ||
+    resp?.HotelRoomsDetails ||
+    resp?.Rooms ||
+    [];
+
+  const pickRoom = (rooms, desiredRoomIndex, desiredRoomTypeName) => {
+    if (!Array.isArray(rooms) || rooms.length === 0) return null;
+
+    const idxMatch = rooms.find(
+      (r) => String(r?.RoomIndex) === String(desiredRoomIndex),
+    );
+    if (idxMatch) return idxMatch;
+
+    if (desiredRoomTypeName) {
+      const name = String(desiredRoomTypeName).toLowerCase();
+      const nameMatch = rooms.find((r) =>
+        String(r?.RoomTypeName || r?.Name || "")
+          .toLowerCase()
+          .includes(name),
+      );
+      if (nameMatch) return nameMatch;
+    }
+
+    return rooms[0];
+  };
+
+  const getFreshBookingCode = async () => {
+    const CheckIn = hotelReq?.checkIn || hotelReq?.CheckIn;
+    const CheckOut = hotelReq?.checkOut || hotelReq?.CheckOut;
+    const PaxRooms = hotelReq?.rooms || hotelReq?.PaxRooms;
+    const NoOfRooms = hotelReq?.noOfRooms || hotelReq?.NoOfRooms || PaxRooms?.length;
+    const GuestNationality = hotelReq?.guestNationality || hotelReq?.GuestNationality || "IN";
+
+    if (!CheckIn || !CheckOut) {
+      throw new ApiError(409, "Missing checkIn/checkOut. Please search again.");
+    }
+    if (!Array.isArray(PaxRooms) || PaxRooms.length === 0 || !NoOfRooms) {
+      throw new ApiError(
+        409,
+        "Missing room configuration. Please search again and re-create the request.",
+      );
+    }
+
+    const runSearch = async (HotelCodes) =>
+      hotelTboService.searchHotels({
+        CheckIn,
+        CheckOut,
+        HotelCodes,
+        GuestNationality,
+        NoOfRooms: Number(NoOfRooms),
+        PaxRooms,
+        IsDetailedResponse: true,
+        Filters: { Refundable: false, MealType: "All" },
+      });
+
+    // First attempt: search with just the selected HotelCode.
+    let searchResp = await runSearch(String(hotelCode));
+
+    let freshTraceId = extractTraceId(searchResp);
+    let results = extractHotelResults(searchResp);
+    let matched =
+      Array.isArray(results) &&
+      results.find((h) => String(h?.HotelCode) === String(hotelCode));
+
+    let freshResultIndex =
+      matched?.ResultIndex ||
+      matched?.resultIndex ||
+      results?.[0]?.ResultIndex ||
+      results?.[0]?.resultIndex;
+
+    // Fallback: if TraceId/ResultIndex is missing, re-search using the city hotel-code list (static API).
+    if (!freshTraceId || !freshResultIndex) {
+      logger.warn("HOTEL BOOKING REFRESH SEARCH MISSING TRACE/INDEX -> FALLBACK", {
+        bookingId: booking._id,
+        hotelCode,
+        hasTraceId: !!freshTraceId,
+        hasResultIndex: !!freshResultIndex,
+        searchKeys: searchResp && typeof searchResp === "object" ? Object.keys(searchResp) : typeof searchResp,
+        hotelSearchKeys:
+          searchResp?.HotelSearchResult && typeof searchResp.HotelSearchResult === "object"
+            ? Object.keys(searchResp.HotelSearchResult)
+            : null,
+        status: searchResp?.Status || searchResp?.HotelSearchResult?.Status || null,
+        error: searchResp?.Error || searchResp?.HotelSearchResult?.Error || null,
+        hotelResultType: Array.isArray(searchResp?.HotelResult)
+          ? "array"
+          : typeof searchResp?.HotelResult,
+        hotelResultCount: Array.isArray(searchResp?.HotelResult)
+          ? searchResp.HotelResult.length
+          : null,
+        firstHotelSample: Array.isArray(searchResp?.HotelResult)
+          ? {
+              HotelCode: searchResp.HotelResult?.[0]?.HotelCode,
+              ResultIndex: searchResp.HotelResult?.[0]?.ResultIndex,
+              TraceId: searchResp.HotelResult?.[0]?.TraceId,
+            }
+          : null,
+      });
+
+      const staticDetails = await hotelTboService.getStaticHotelDetails(String(hotelCode));
+
+      const cityCode =
+        staticDetails?.Hotels?.[0]?.CityCode ||
+        staticDetails?.Hotels?.[0]?.CityId ||
+        staticDetails?.HotelDetails?.[0]?.CityCode ||
+        staticDetails?.HotelDetails?.[0]?.CityId ||
+        staticDetails?.CityCode ||
+        staticDetails?.CityId ||
+        null;
+
+      if (!cityCode) {
+        throw new ApiError(
+          409,
+          "Could not refresh hotel session (CityCode missing from static hotel details). Please search again.",
+        );
+      }
+
+      const codeResp = await hotelTboService.getTBOHotelCodeList(cityCode);
+      const codesRaw = Array.isArray(codeResp?.Hotels)
+        ? codeResp.Hotels.map((h) => String(h?.HotelCode || "")).filter(Boolean)
+        : [];
+
+      const target = String(hotelCode);
+      const codes = [target, ...codesRaw.filter((c) => c !== target)];
+      const hotelCodes = codes.slice(0, 300).join(",");
+
+      searchResp = await runSearch(hotelCodes);
+
+      freshTraceId = extractTraceId(searchResp);
+      results = extractHotelResults(searchResp);
+      matched =
+        Array.isArray(results) &&
+        results.find((h) => String(h?.HotelCode) === String(hotelCode));
+      freshResultIndex =
+        matched?.ResultIndex ||
+        matched?.resultIndex ||
+        results?.[0]?.ResultIndex ||
+        results?.[0]?.resultIndex;
+    }
+
+    if (!freshTraceId || !freshResultIndex) {
+      logger.warn("HOTEL BOOKING REFRESH SEARCH STILL MISSING TRACE/INDEX", {
+        bookingId: booking._id,
+        hotelCode,
+        hasTraceId: !!freshTraceId,
+        hasResultIndex: !!freshResultIndex,
+        status: searchResp?.Status || searchResp?.HotelSearchResult?.Status || null,
+        hotelResultCount: Array.isArray(results) ? results.length : null,
+      });
+      throw new ApiError(
+        409,
+        "Could not refresh hotel session (TraceId/ResultIndex missing). Please search again.",
+      );
+    }
+
+    const roomInfoResp = await hotelTboService.getRoomInfo(
+      String(hotelCode),
+      freshTraceId,
+      String(freshResultIndex),
+    );
+
+    const rooms = extractRoomDetails(roomInfoResp);
+    const selected = pickRoom(rooms, hotelReq?.roomIndex, hotelReq?.roomTypeName);
+
+    const freshBookingCode =
+      selected?.BookingCode || selected?.RoomTypeCode || selected?.RatePlanCode || null;
+
+    if (!freshBookingCode) {
+      throw new ApiError(
+        409,
+        "Could not refresh BookingCode for the selected room. Please select the room again.",
+      );
+    }
+
+    // Persist refreshed BookingCode so the booking can proceed even if approval took time.
+    // Do NOT persist TraceId (project requirement).
+    booking.hotelRequest = booking.hotelRequest || {};
+    booking.hotelRequest.resultIndex = String(freshResultIndex);
+    booking.hotelRequest.bookingCode = freshBookingCode;
+    if (selected?.RoomTypeCode) booking.hotelRequest.roomTypeCode = selected.RoomTypeCode;
+    if (selected?.RatePlanCode) booking.hotelRequest.ratePlanCode = selected.RatePlanCode;
+    if (selected?.RoomTypeName) booking.hotelRequest.roomTypeName = selected.RoomTypeName;
+    booking.markModified("hotelRequest");
+
+    await booking.save();
+
+    return freshBookingCode;
+  };
+
+  try {
+    booking.executionStatus = "booking_initiated";
+    await booking.save();
+
+    let didPrebook = false;
+
+    // Only refresh BookingCode if it's missing. If it's stale, we will attempt booking first and
+    // refresh only if the supplier explicitly responds with "Session Expired". This avoids blocking
+    // bookings when supplier search doesn't return session refs (or when hotel availability changes).
+    if (!bookingCode) {
+      logger.info("HOTEL BOOKING -> REFRESH BOOKINGCODE", {
+        bookingId: booking._id,
+        hotelCode,
+        reason: "missing_bookingCode",
+      });
+      bookingCode = await getFreshBookingCode();
+    }
+
+    if (!bookingCode) {
+      if (!resultIndex) {
+        throw new ApiError(
+          409,
+          "Missing session data (resultIndex/roomIndex). Please search and select the room again.",
+        );
+      }
+
+      // PreBook generates BookingCode. Requirement: do not send TraceId in PreBook request.
+      // Service strips TraceId and retries once with TraceId if supplier requires it.
+      const prebookResp = await hotelTboService.preBookHotel({
+        traceId,
+        hotelCode,
+        roomIndex: resultIndex,
+      });
+
+      bookingCode =
+        prebookResp?.PreBookResult?.BookingCode || prebookResp?.BookingCode || null;
+
+      if (!bookingCode) {
+        throw new ApiError(502, "PreBook failed: BookingCode missing");
+      }
+      didPrebook = true;
+    }
+
+    const bookPayload = {
+      BookingCode: bookingCode,
+      IsVoucherBooking: true,
+      GuestNationality: hotelReq?.guestNationality || "IN",
+      ...(process.env.TBO_END_USER_IP
+        ? { EndUserIp: process.env.TBO_END_USER_IP }
+        : {}),
+      RequestedBookingMode: 5,
+      NetAmount: booking.pricingSnapshot?.totalAmount || 0,
+      ClientReferenceId: booking.bookingReference || String(booking._id),
+      HotelRoomsDetails: [
+        {
+          HotelPassenger: passengers,
+        },
+      ],
+    };
+
+    logger.info("HOTEL BOOKING (BOOKINGCODE FLOW)", {
+      bookingId: booking._id,
+      hotelCode,
+      hasTraceId: !!traceId,
+      hasBookingCode: !!bookingCode,
+    });
+
+    let bookResp;
+    try {
+      bookResp = await hotelTboService.bookHotel(bookPayload);
+    } catch (err) {
+      const msg = String(err?.message || "");
+      const isSessionExpired =
+        /session\\s*expired/i.test(msg) ||
+        /session\\s*expired/i.test(String(err?.response?.data || ""));
+      const isTraceExpired =
+        (/trace\\s*id/i.test(msg) && /expired|session/i.test(msg)) ||
+        isSessionExpired;
+
+      // Session expired -> refresh BookingCode and retry once.
+      if (isSessionExpired) {
+        logger.warn("HOTEL BOOK SESSION EXPIRED -> REFRESH BOOKINGCODE", {
+          bookingId: booking._id,
+          hotelCode,
+        });
+
+        // Prefer PreBook refresh first (doesn't require TraceId) to avoid being blocked when search
+        // doesn't return TraceId/ResultIndex for some suppliers.
+        let refreshedCode = null;
+        if (resultIndex) {
+          try {
+            const prebookResp = await hotelTboService.preBookHotel({
+              traceId,
+              hotelCode,
+              roomIndex: resultIndex,
+            });
+            refreshedCode =
+              prebookResp?.PreBookResult?.BookingCode ||
+              prebookResp?.BookingCode ||
+              null;
+          } catch (prebookErr) {
+            logger.warn("HOTEL BOOK SESSION EXPIRED -> PREBOOK REFRESH FAILED", {
+              bookingId: booking._id,
+              hotelCode,
+              message: String(prebookErr?.message || ""),
+            });
+          }
+        }
+
+        if (!refreshedCode) {
+          // Full revalidation (re-search + room-info) to get a fresh BookingCode.
+          refreshedCode = await getFreshBookingCode();
+        }
+
+        try {
+          bookResp = await hotelTboService.bookHotel({
+            ...bookPayload,
+            BookingCode: refreshedCode,
+          });
+        } catch (retryErr) {
+          const retryMsg = String(retryErr?.message || "");
+          if (/session\\s*expired/i.test(retryMsg)) {
+            throw new ApiError(
+              409,
+              "Hotel session expired. Please search again and re-create the booking request.",
+            );
+          }
+          throw retryErr;
+        }
+      }
+      // If BookingCode was derived from cached room fields (or old PreBook), refresh it once via PreBook and retry.
+      else if (!didPrebook && isTraceExpired && resultIndex) {
+        logger.warn("HOTEL BOOK TRACE EXPIRED -> REPREBOOK", {
+          bookingId: booking._id,
+          hotelCode,
+        });
+
+        const prebookResp = await hotelTboService.preBookHotel({
+          traceId,
+          hotelCode,
+          roomIndex: resultIndex,
+        });
+
+        const newCode =
+          prebookResp?.PreBookResult?.BookingCode || prebookResp?.BookingCode || null;
+
+        if (!newCode) throw err;
+
+        bookResp = await hotelTboService.bookHotel({
+          ...bookPayload,
+          BookingCode: newCode,
+        });
+      } else {
+        throw err;
+      }
+    }
+
+    if (bookResp?.BookResult?.ResponseStatus !== 1) {
+      const tboError =
+        bookResp?.BookResult?.Error?.ErrorMessage ||
+        bookResp?.BookResult?.Status?.Description ||
+        "Unknown TBO error";
+      throw new ApiError(502, `TBO Hotel booking failed: ${tboError}`);
+    }
+
+    booking.bookingResult = {
+      providerResponse: bookResp,
+      providerBookingId: bookResp?.BookResult?.BookingId,
+      pnr: bookResp?.BookResult?.ConfirmationNo,
+      bookingRefNo: bookResp?.BookResult?.BookingRefNo,
+    };
+    booking.executionStatus = "ticketed";
+    booking.executedBy = req.user?._id;
+    booking.executedByRole = req.user?.role;
+    booking.executedAt = new Date();
+    await booking.save();
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, booking, "Hotel booked successfully"));
+  } catch (err) {
+    logger.error("HOTEL BOOKING FAILED", {
+      bookingId: booking._id,
+      message: err.message,
+    });
+    booking.executionStatus = "failed";
+    await booking.save();
+    throw err instanceof ApiError ? err : new ApiError(500, err.message);
+  }
+});
+
+
 // @desc    Download ticket PDF
 // @route   GET /api/v1/bookings/:id/ticket-pdf
 // @access  Private (Employee)
@@ -1363,6 +1871,7 @@ module.exports = {
   getMyRequestById: exports.getMyRequestById,
   getMyRejectedRequests: exports.getMyRejectedRequests,
   executeApprovedFlightBooking: exports.executeApprovedFlightBooking,
+  executeApprovedHotelBooking: exports.executeApprovedHotelBooking,
   downloadTicketPdf: exports.downloadTicketPdf,
   getMyBookings: exports.getMyBookings,
   getMyBookingById: exports.getMyBookingById,

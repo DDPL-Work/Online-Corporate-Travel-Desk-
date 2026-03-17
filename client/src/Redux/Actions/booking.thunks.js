@@ -81,6 +81,24 @@ export const executeApprovedFlightBooking = createAsyncThunk(
   },
 );
 
+// <<<<<<< HEAD
+// =======
+// CONFIRM hotel booking after approval
+export const executeApprovedHotelBooking = createAsyncThunk(
+  "bookings/executeHotel",
+  async (bookingId, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`/bookings/${bookingId}/execute-hotel`);
+      return data.data; // Updated BookingRequest
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Hotel booking failed",
+      );
+    }
+  },
+);
+
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
 // GET my bookings (Employee – BookingRequest)
 export const fetchMyBookings = createAsyncThunk(
   "bookings/fetchMyBookings",

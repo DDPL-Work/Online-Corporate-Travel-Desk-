@@ -1,8 +1,56 @@
-const hotelBookingRequest = require("../models/hotelBookingRequest.model");
+// <<<<<<< HEAD
+// const hotelBookingRequest = require("../models/hotelBookingRequest.model");
+// const paymentService = require("../services/payment.service");
+// const hotelService = require("../services/tektravels/hotel.service");
+// const ApiError = require("../utils/ApiError");
+// const asyncHandler = require("../utils/asyncHandler");
+// =======
+const HotelBookingRequest = require("../models/hotelBookingRequest.model");
 const paymentService = require("../services/payment.service");
 const hotelService = require("../services/tektravels/hotel.service");
+const notificationService = require("../services/notification.service");
 const ApiError = require("../utils/ApiError");
+const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
+const Corporate = require("../models/Corporate");
+const { generateBookingReference } = require("../utils/helpers");
+
+function normalizeTitleWithDot(title) {
+  const raw = String(title || "").trim();
+  const base = raw.replace(/\./g, "").trim();
+  if (!base) return "Mr.";
+  const cased = base.charAt(0).toUpperCase() + base.slice(1).toLowerCase();
+  return `${cased}.`;
+}
+
+function buildHotelPassengers(guests = []) {
+  if (!Array.isArray(guests) || guests.length === 0) return [];
+
+  return guests.map((g, idx) => ({
+    Title: normalizeTitleWithDot(g?.title),
+    FirstName: g?.firstName || "Guest",
+    MiddleName: "",
+    LastName: g?.lastName || "User",
+    Email: g?.email || null,
+    PaxType: 1,
+    LeadPassenger: idx === 0,
+    Age: 0,
+    PassportNo: null,
+    PassportIssueDate: null,
+    PassportExpDate: null,
+    Phoneno: String(g?.phoneWithCode || "")
+      .replace(/\D/g, "")
+      .trim() || null,
+    PaxId: 0,
+    GSTCompanyAddress: null,
+    GSTCompanyContactNumber: null,
+    GSTCompanyName: null,
+    GSTNumber: null,
+    GSTCompanyEmail: null,
+    PAN: g?.pan || null,
+  }));
+}
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
 
 /* ======================================================
    CREATE HOTEL BOOKING REQUEST (Approval First)
@@ -29,7 +77,11 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     currency: pricingSnapshot.currency || "INR",
   };
 
-  const bookingRequest = await hotelBookingRequest.create({
+// <<<<<<< HEAD
+//   const bookingRequest = await hotelBookingRequest.create({
+// =======
+  const bookingRequest = await HotelBookingRequest.create({
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
     bookingReference: generateBookingReference(),
     corporateId: corporate._id,
     userId: user._id,
@@ -65,21 +117,76 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 ====================================================== */
 exports.bookHotel = async (req, res, next) => {
   try {
-    const { traceId, hotelCode, roomIndex, guests } = req.body;
+// <<<<<<< HEAD
+//     const { traceId, hotelCode, roomIndex, guests } = req.body;
 
-    if (!traceId || !hotelCode || !roomIndex || !guests?.length) {
-      throw new ApiError(
-        400,
-        "traceId, hotelCode, roomIndex and guests are required",
-      );
+//     if (!traceId || !hotelCode || !roomIndex || !guests?.length) {
+//       throw new ApiError(
+//         400,
+//         "traceId, hotelCode, roomIndex and guests are required",
+//       );
+//     }
+
+//     const result = await hotelService.bookHotel({
+//       traceId,
+//       hotelCode,
+//       roomIndex,
+//       guests,
+//     });
+// =======
+    const {
+      BookingCode,
+      IsVoucherBooking,
+      GuestNationality,
+      EndUserIp,
+      RequestedBookingMode,
+      NetAmount,
+      ClientReferenceId,
+      HotelRoomsDetails,
+      guests, // backwards compat
+    } = req.body;
+
+    let payload = {
+      BookingCode,
+      IsVoucherBooking,
+      GuestNationality,
+      EndUserIp,
+      RequestedBookingMode,
+      NetAmount,
+      ClientReferenceId,
+      HotelRoomsDetails,
+    };
+
+    // If old clients send `guests`, build the required structure.
+    if (!payload.HotelRoomsDetails && Array.isArray(guests) && guests.length) {
+      payload.HotelRoomsDetails = [
+        {
+          HotelPassenger: buildHotelPassengers(guests),
+        },
+      ];
     }
 
-    const result = await hotelService.bookHotel({
-      traceId,
-      hotelCode,
-      roomIndex,
-      guests,
-    });
+    if (!payload.BookingCode) {
+      throw new ApiError(400, "BookingCode is required");
+    }
+    if (
+      !Array.isArray(payload.HotelRoomsDetails) ||
+      payload.HotelRoomsDetails.length === 0 ||
+      !Array.isArray(payload.HotelRoomsDetails[0]?.HotelPassenger) ||
+      payload.HotelRoomsDetails[0].HotelPassenger.length === 0
+    ) {
+      throw new ApiError(400, "HotelRoomsDetails.HotelPassenger is required");
+    }
+
+    // Defaults per supplier contract.
+    if (payload.IsVoucherBooking === undefined) payload.IsVoucherBooking = true;
+    if (!payload.GuestNationality) payload.GuestNationality = "IN";
+    if (!payload.RequestedBookingMode) payload.RequestedBookingMode = 5;
+    if (!payload.ClientReferenceId)
+      payload.ClientReferenceId = `hotel-${Date.now()}`;
+
+    const result = await hotelService.bookHotel(payload);
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
 
     return res.status(200).json({
       success: true,
@@ -112,25 +219,76 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
   try {
     /* ================= HOTEL PREBOOK ================= */
     const prebookResp = await hotelService.preBookHotel({
-      traceId: booking.hotelRequest.providerTraceId,
+// <<<<<<< HEAD
+//       traceId: booking.hotelRequest.providerTraceId,
+//       hotelCode: booking.hotelRequest.selectedHotel.hotelCode,
+//       roomIndex: booking.hotelRequest.selectedRoom.roomIndex,
+//     });
+
+//     /* ================= HOTEL BOOK ================= */
+//     const bookResp = await hotelService.bookHotel({
+//       traceId: booking.hotelRequest.providerTraceId,
+//       hotelCode: booking.hotelRequest.selectedHotel.hotelCode,
+//       roomIndex: booking.hotelRequest.selectedRoom.roomIndex,
+//       guests: booking.travellers,
+//     });
+
+//     const confirmationNumber = bookResp?.BookingId || bookResp?.ConfirmationNo;
+// =======
       hotelCode: booking.hotelRequest.selectedHotel.hotelCode,
       roomIndex: booking.hotelRequest.selectedRoom.roomIndex,
+      // If the supplier requires TraceId, the service will retry automatically when provided.
+      traceId: booking.hotelRequest.providerTraceId,
     });
+
+    const bookingCode =
+      prebookResp?.PreBookResult?.BookingCode ||
+      prebookResp?.BookingCode ||
+      prebookResp?.bookingCode;
+
+    if (!bookingCode) {
+      throw new ApiError(502, "PreBook failed: BookingCode missing");
+    }
 
     /* ================= HOTEL BOOK ================= */
-    const bookResp = await hotelService.bookHotel({
-      traceId: booking.hotelRequest.providerTraceId,
-      hotelCode: booking.hotelRequest.selectedHotel.hotelCode,
-      roomIndex: booking.hotelRequest.selectedRoom.roomIndex,
-      guests: booking.travellers,
-    });
+    // Match supplier contract provided in the request: BookingCode based booking.
+    const bookPayload = {
+      BookingCode: bookingCode,
+      IsVoucherBooking: true,
+      GuestNationality: booking.hotelRequest.guestNationality || "IN",
+      ...(process.env.TBO_END_USER_IP
+        ? { EndUserIp: process.env.TBO_END_USER_IP }
+        : {}),
+      RequestedBookingMode: 5,
+      NetAmount:
+        prebookResp?.PreBookResult?.NetAmount ??
+        booking.pricingSnapshot?.totalAmount ??
+        0,
+      ClientReferenceId: booking.bookingReference || String(booking._id),
+      HotelRoomsDetails: [
+        {
+          HotelPassenger: buildHotelPassengers(booking.travellers),
+        },
+      ],
+    };
 
-    const confirmationNumber = bookResp?.BookingId || bookResp?.ConfirmationNo;
+    const bookResp = await hotelService.bookHotel(bookPayload);
+
+    const bookResult = bookResp?.BookResult || bookResp;
+    const confirmationNumber =
+      bookResult?.ConfirmationNo || bookResult?.BookingId || bookResult?.BookingRefNo;
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
 
     if (!confirmationNumber) throw new ApiError(500, "Hotel booking failed");
 
     booking.bookingResult = {
-      hotelBookingId: confirmationNumber,
+// <<<<<<< HEAD
+//       hotelBookingId: confirmationNumber,
+// =======
+      hotelBookingId: String(confirmationNumber),
+      confirmationNumber: String(bookResult?.ConfirmationNo || ""),
+      providerBookingId: String(bookResult?.BookingId || ""),
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
       providerResponse: bookResp,
     };
 

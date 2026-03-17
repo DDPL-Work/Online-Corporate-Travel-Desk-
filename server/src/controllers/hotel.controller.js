@@ -75,6 +75,13 @@ exports.getCityList = asyncHandler(async (req, res) => {
 
   const data = await tboService.getCityList(countryCode);
 
+// <<<<<<< HEAD
+// =======
+  if (!data?.CityList) {
+    throw new ApiError(404, "No cities found for this country");
+  }
+
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
   res
     .status(200)
     .json(new ApiResponse(200, data, "City list fetched successfully"));

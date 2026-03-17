@@ -46,38 +46,28 @@ export default function MyRejectedRequests() {
   // Normalize + Filter
   const filtered = useMemo(() => {
     const normalized = rejectedRequests.map((r) => {
+      const snapshot = r.bookingSnapshot || {};
       const segments = r.flightRequest?.segments || [];
       const first = segments[0];
       const last = segments[segments.length - 1];
+
       return {
         id: r._id,
         raw: r,
         type: r.bookingType === "flight" ? "Flight" : "Hotel",
         status: "Rejected",
         destination:
-          r.bookingType === "hotel"
-            ? r.hotelRequest?.city || "N/A"
+          snapshot.hotelName ||
+          snapshot.city ||
+          (r.bookingType === "hotel"
+            ? r.hotelRequest?.hotelName || "N/A"
             : segments.length
             ? `${first?.origin?.city || "N/A"} → ${
                 last?.destination?.city || "N/A"
               }`
-            : "N/A",
-        startDate:
-          r.bookingType === "hotel"
-            ? r.hotelRequest?.checkInDate
-            : first?.departureDateTime,
-        startTime:
-          r.bookingType === "hotel"
-            ? r.hotelRequest?.checkInDate
-            : first?.departureDateTime,
-        endDate:
-          r.bookingType === "hotel"
-            ? r.hotelRequest?.checkOutDate
-            : last?.arrivalDateTime,
-        endTime:
-          r.bookingType === "hotel"
-            ? r.hotelRequest?.checkOutDate
-            : last?.arrivalDateTime,
+            : "N/A"),
+        startDate: snapshot.travelDate || snapshot.checkInDate || (r.bookingType === "hotel" ? r.hotelRequest?.checkInDate : first?.departureDateTime),
+        endDate: snapshot.returnDate || snapshot.checkOutDate || (r.bookingType === "hotel" ? r.hotelRequest?.checkOutDate : last?.arrivalDateTime),
         rejectedBy: r.rejectedBy?.name
           ? `${r.rejectedBy.name.firstName} ${r.rejectedBy.name.lastName}`
           : "Admin",
@@ -347,6 +337,41 @@ export default function MyRejectedRequests() {
                   ))}
                 </div>
               </div>
+
+              {/* Hotel Details (Only if Hotel) */}
+              {selectedRequest.type === "Hotel" && selectedRequest.raw.hotelRequest && (
+                <div>
+                  <h3 className="text-lg font-semibold text-[#0A4D68] mb-2">
+                    Hotel Details
+                  </h3>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs uppercase text-gray-500 font-semibold tracking-wide">Hotel Name</p>
+                      <p className="text-sm text-gray-800 font-medium">
+                        {selectedRequest.raw.hotelRequest.hotelName || selectedRequest.raw.bookingSnapshot?.hotelName || "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-500 font-semibold tracking-wide">Room Type</p>
+                      <p className="text-sm text-gray-800 font-medium">
+                        {selectedRequest.raw.hotelRequest.roomTypeName || "Standard Room"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-500 font-semibold tracking-wide">Check-In</p>
+                      <p className="text-sm text-gray-800 font-medium">
+                        {formatDate(getDateInIST(selectedRequest.raw.hotelRequest.checkInDate || selectedRequest.raw.bookingSnapshot?.checkInDate))}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-500 font-semibold tracking-wide">Check-Out</p>
+                      <p className="text-sm text-gray-800 font-medium">
+                        {formatDate(getDateInIST(selectedRequest.raw.hotelRequest.checkOutDate || selectedRequest.raw.bookingSnapshot?.checkOutDate))}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Flight Details */}
               {selectedRequest.raw.flightRequest?.segments?.length > 0 && (

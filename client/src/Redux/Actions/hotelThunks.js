@@ -56,7 +56,15 @@ export const searchHotels = createAsyncThunk(
   async (payload, { rejectWithValue }) => {
     try {
       const { data } = await api.post("/hotels/search", payload);
-      return data.data.HotelResult;
+// <<<<<<< HEAD
+//       return data.data.HotelResult;
+// =======
+      console.log("🏨 HOTEL SEARCH RESPONSE:", data.data);
+      return {
+        hotels: data.data.HotelResult || [],
+        traceId: data.data.TraceId,
+      };
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
@@ -66,16 +74,30 @@ export const searchHotels = createAsyncThunk(
 /* ---------- HOTEL DETAILS ---------- */
 export const fetchHotelDetails = createAsyncThunk(
   "hotel/fetchHotelDetails",
-  async (hotelCode, { rejectWithValue }) => {
+// <<<<<<< HEAD
+//   async (hotelCode, { rejectWithValue }) => {
+//     try {
+//       const { data } = await api.post("/hotels/details", { hotelCode });
+// =======
+  async ({ hotelCode, traceId, resultIndex }, { rejectWithValue }) => {
     try {
-      const { data } = await api.post("/hotels/details", { hotelCode });
+      const { data } = await api.post("/hotels/details", {
+        hotelCode,
+        traceId,
+        resultIndex,
+      });
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
       return data.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
   },
   {
-    condition: (hotelCode, { getState }) => {
+// <<<<<<< HEAD
+//     condition: (hotelCode, { getState }) => {
+// =======
+    condition: ({ hotelCode }, { getState }) => {
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
       const { hotel } = getState();
       if (hotel.hotelDetailsById?.[hotelCode]) {
         return false; // already cached
@@ -83,3 +105,35 @@ export const fetchHotelDetails = createAsyncThunk(
     },
   },
 );
+// <<<<<<< HEAD
+// =======
+
+/* ---------- ROOM INFO ---------- */
+export const fetchRoomInfo = createAsyncThunk(
+  "hotel/fetchRoomInfo",
+  async ({ hotelCode, traceId, resultIndex }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post("/hotels/room-info", {
+        hotelCode,
+        traceId,
+        resultIndex,
+      });
+      return { hotelCode, rooms: data.data?.GetHotelRoomResult?.HotelRoomsDetails || [] };
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  },
+);
+/* ---------- BOOKING DETAILS (Post-Booking) ---------- */
+export const fetchBookingDetails = createAsyncThunk(
+  "hotel/fetchBookingDetails",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post("/hotels/booking-details", payload);
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  },
+);
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90

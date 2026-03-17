@@ -39,6 +39,28 @@ export default function MyPendingApprovals() {
     return (myRequests || [])
       .filter((b) => b.requestStatus !== "rejected")
       .map((b) => {
+// <<<<<<< HEAD
+// =======
+        const type = b.bookingType === "hotel" ? "Hotel" : "Flight";
+        const isHotel = type === "Hotel";
+
+        if (isHotel) {
+          const snapshot = b.bookingSnapshot || {};
+          const hotelReq = b.hotelRequest || {};
+          return {
+            id: b._id,
+            type: "Hotel",
+            status: b.requestStatus,
+            destination: snapshot.hotelName || snapshot.city || hotelReq.hotelName || hotelReq.city || "Hotel",
+            city: snapshot.city || hotelReq.city,
+            startDate: snapshot.checkInDate || hotelReq.checkInDate,
+            returnDate: snapshot.checkOutDate || hotelReq.checkOutDate,
+            createdAt: b.createdAt,
+            fareExpired: false, 
+          };
+        }
+
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
         const segments = b.flightRequest?.segments || [];
         const first = segments[0];
         const last = segments[segments.length - 1];
@@ -51,7 +73,11 @@ export default function MyPendingApprovals() {
 
         return {
           id: b._id,
-          type: b.bookingType === "hotel" ? "Hotel" : "Flight",
+// <<<<<<< HEAD
+//           type: b.bookingType === "hotel" ? "Hotel" : "Flight",
+// =======
+          type: "Flight",
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
           status: b.requestStatus,
           destination: (() => {
             if (!segments.length) return "N/A";
@@ -340,7 +366,16 @@ export default function MyPendingApprovals() {
                     </span>
                   )}
                   <button
-                    onClick={() => navigate(`/bookings/${trip.id}/book`)}
+// <<<<<<< HEAD
+//                     onClick={() => navigate(`/bookings/${trip.id}/book`)}
+// =======
+                    onClick={() => {
+                      if (trip.type === "Hotel") {
+                        navigate(`/hotel-review-booking?id=${trip.id}`);
+                      } else {
+                        navigate(`/bookings/${trip.id}/book`);
+                      }
+                    }}
                     className="flex items-center gap-2 px-4 py-2 rounded bg-[#0A4D68] text-white text-sm hover:bg-[#083a50] transition"
                   >
                     View Details <FiArrowRightCircle />
