@@ -1,5 +1,4 @@
-// hotelBooking.controller.js
-
+//server\src\controllers\hotelBooking.controller.js
 const Corporate = require("../models/Corporate");
 const HotelBookingRequest = require("../models/hotelBookingRequest.model");
 const paymentService = require("../services/payment.service");
@@ -295,8 +294,7 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     const preBookResult =
       preBookResp?.PreBookResult || preBookResp?.BookResult || preBookResp;
 
-      const netAmount =
-  preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount;
+    const netAmount = preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount;
 
     // 🔥 TBO PREBOOK SUCCESS CHECK (CORRECT)
     if (preBookResp?.Status?.Code !== 200 && preBookResp?.Status !== 1) {
@@ -445,7 +443,7 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
   const [rawBookings, total] = await Promise.all([
     HotelBookingRequest.find(query)
       .select(
-        "bookingReference bookingType requestStatus executionStatus bookingSnapshot pricingSnapshot createdAt bookingResult",
+        "bookingReference bookingType requestStatus executionStatus bookingSnapshot pricingSnapshot createdAt bookingResult hotelRequest.selectedRoom.rawRoomData.images",
       )
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -459,16 +457,26 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
       booking?.bookingResult?.providerResponse?.BookResult ||
       booking?.bookingResult?.providerResponse;
 
+    // 🔥 Extract images safely (cover all cases)
+    const images =
+      booking?.hotelRequest?.selectedRoom?.rawRoomData?.images || [];
+
     return {
       ...booking,
 
-      // 🔥 derived hotel fields
+      // existing fields
       hotelName: result?.HotelName,
       city: result?.City,
       checkIn: result?.CheckInDate,
       checkOut: result?.CheckOutDate,
       status: result?.HotelBookingStatus,
       confirmationNo: result?.ConfirmationNo,
+
+      // ✅ NEW: images
+      images,
+
+      // ✅ NEW: hero image (first image)
+      heroImage: images?.[0] || null,
     };
   });
 
@@ -522,6 +530,14 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
     travellers = [],
     bookingResult = {},
   } = booking;
+
+  // 🔥 Extract images from DB (IMPORTANT)
+  const hotelReq = booking.hotelRequest || {};
+  const selectedRoom = hotelReq.selectedRoom || {};
+  const rawRoom = selectedRoom.rawRoomData || {};
+
+  const images = rawRoom.images || [];
+  const heroImage = images[0] || null;
 
   /* ================= EXTRACT IDENTIFIERS ================= */
 
@@ -595,6 +611,9 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
       bookingSnapshot,
       pricingSnapshot,
       travellers,
+
+      images,
+      heroImage,
 
       // ✅ TBO (live)
       confirmationNo: result?.ConfirmationNo || confirmationNo,

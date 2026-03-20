@@ -173,6 +173,7 @@ function Stars({ count = 0 }) {
 /*  HotelHeroCard — mirrors FlightCard dark gradient style         */
 /* ─────────────────────────────────────────────────────────────── */
 function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
+  const [activeIndex, setActiveIndex] = useState(0);
   const hotelReq = booking?.hotelRequest || {};
   const snapshot = booking?.bookingSnapshot || {};
   const result = booking?.bookingResult || {};
@@ -199,8 +200,7 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
       : 1;
   const roomType =
     room?.RoomTypeName || selectedRoom?.roomTypeName || "Standard Room";
-  const images = selectedRoom?.rawRoomData?.images || [];
-  const heroImage = images[0] || null;
+  const images = booking?.images || selectedRoom?.rawRoomData?.images || [];
 
   const confirmationNo = detail?.ConfirmationNo || result?.hotelBookingId || "";
   const invoiceNo =
@@ -214,6 +214,16 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
   const tboRef = detail?.TBOReferenceNo || "";
 
   const executionStatus = booking?.executionStatus || "";
+
+  useEffect(() => {
+    if (!images.length) return;
+
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % images.length);
+    }, 2000); // 🔥 2 sec
+
+    return () => clearInterval(interval);
+  }, [images]);
 
   return (
     <div
@@ -233,16 +243,23 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
       />
 
       {/* Hero image strip */}
-      {heroImage && (
+      {/* {images.length > 0 && (
         <div className="relative h-44 overflow-hidden">
-          <img
-            src={heroImage}
-            alt={hotelName}
-            className="w-full h-full object-cover opacity-40"
-          />
-          <div className="absolute inset-0 bg-linear-to-b from-transparent to-[#0d1b2a]" />
+          {images.map((img, index) => (
+            <img
+              key={index}
+              src={img}
+              alt={hotelName}
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out ${
+                index === activeIndex ? "opacity-40 z-10" : "opacity-0"
+              }`}
+            />
+          ))}
+
+          {/* Gradient overlay *
+          <div className="absolute inset-0 bg-linear-to-b from-transparent to-[#0d1b2a] z-20" />
         </div>
-      )}
+      )} */}
 
       <div className="relative p-6 grid gap-0">
         {/* ── ROW 1: Hotel name + status ── */}
@@ -299,9 +316,9 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
               <span className="w-2 h-2 rounded-full border-2 border-white/30 shrink-0" />
               <div className="flex-1 relative flex items-center">
                 <div className="w-full border-t border-dashed border-white/20" />
-                <span className="absolute left-1/2 -translate-x-1/2 -translate-y-[45%] text-sm select-none">
+                {/* <span className="absolute left-1/2 -translate-x-1/2 -translate-y-[45%] text-sm select-none">
                   🏨
-                </span>
+                </span> */}
               </div>
               <span className="w-2 h-2 rounded-full bg-white/30 shrink-0" />
             </div>
@@ -405,44 +422,6 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
         )}
       </div>
     </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Image Gallery                                                  */
-/* ─────────────────────────────────────────────────────────────── */
-function ImageGallery({ images }) {
-  const [active, setActive] = useState(0);
-  if (!images?.length) return null;
-
-  return (
-    <BentoCard className="col-span-2">
-      <CardLabel icon={MdHotel} label="Hotel Gallery" />
-      <div className="space-y-3">
-        <div className="relative w-full h-64 rounded-xl overflow-hidden">
-          <img
-            src={images[active]}
-            alt="Hotel"
-            className="w-full h-full object-cover"
-          />
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {images.slice(0, 10).map((img, i) => (
-            <button
-              key={i}
-              onClick={() => setActive(i)}
-              className={`shrink-0 w-16 h-14 rounded-lg overflow-hidden border-2 transition-all ${
-                active === i
-                  ? "border-teal-500 scale-105"
-                  : "border-transparent opacity-60 hover:opacity-90"
-              }`}
-            >
-              <img src={img} alt="" className="w-full h-full object-cover" />
-            </button>
-          ))}
-        </div>
-      </div>
-    </BentoCard>
   );
 }
 
@@ -631,7 +610,10 @@ export default function HotelBookingDetails() {
   const isConfirmed =
     executionStatus === "voucher_generated" || executionStatus === "confirmed";
 
-  const images = booking?.hotelRequest?.selectedRoom?.rawRoomData?.images || [];
+  const images =
+    booking?.images ||
+    booking?.hotelRequest?.selectedRoom?.rawRoomData?.images ||
+    [];
 
   // Cancellation policies — prefer GetBookingDetailResult detail
   const cancelPolicies = detailRoom?.CancelPolicies?.length
@@ -866,7 +848,7 @@ export default function HotelBookingDetails() {
         </div>
 
         {/* Image gallery — full width */}
-        {images.length > 0 && <ImageGallery images={images} />}
+        {/* {images.length > 0 && <ImageGallery images={images} />} */}
 
         {/* ── Traveller card ── */}
         <BentoCard>

@@ -140,6 +140,9 @@ const hotelBookingSlice = createSlice({
   },
 });
 
+export const selectMyRejectedHotelRequests = (state) =>
+  state.hotelBookings.rejected;
+
 export const {
   clearSelectedRequest,
   resetHotelBookingState,

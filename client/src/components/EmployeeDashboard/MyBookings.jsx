@@ -1,3 +1,4 @@
+//client\src\components\EmployeeDashboard\MyBookings.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import {
   FiSearch,
@@ -18,7 +19,14 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchMyBookings } from "../../Redux/Actions/booking.thunks";
 import { fetchMyHotelBookings } from "../../Redux/Actions/hotelBooking.thunks";
-import { formatDateWithYear, airlineLogo, getTotalDuration, getStopsLabel, getCabinClassLabel, airlineThemes } from "../../utils/formatter";
+import {
+  formatDateWithYear,
+  airlineLogo,
+  getTotalDuration,
+  getStopsLabel,
+  getCabinClassLabel,
+  airlineThemes,
+} from "../../utils/formatter";
 
 /* ─── helpers ─── */
 function fmtDate(
@@ -95,7 +103,16 @@ function FlightBookingCard({ b, navigate }) {
   const firstSeg = segments[0];
   const lastSeg = segments[segments.length - 1];
 
-  const airlineCode = firstSeg?.airline?.airlineCode || snapshot.airlineCode;
+  const airlineCode = (
+    b.flightRequest?.segments?.[0]?.airlineCode ||
+    // case 1 (with raw)
+    b.bookingResult?.providerResponse?.raw?.Response?.Response?.FlightItinerary
+      ?.AirlineCode ||
+    // case 2 (without raw)
+    b.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary
+      ?.AirlineCode ||
+    ""
+  ).toUpperCase();
   const departure = firstSeg?.origin;
   const arrival = lastSeg?.destination;
 
@@ -106,7 +123,7 @@ function FlightBookingCard({ b, navigate }) {
   const stopsLabel = getStopsLabel(segments);
   const cabinClass = getCabinClassLabel(b.flightRequest?.cabinClass);
 
-  const logo = airlineLogo(airlineCode);
+  const logo = airlineLogo(airlineCode) || "/default-airline.png";
 
   const formattedRoute =
     sectors.length === 1
@@ -122,6 +139,15 @@ function FlightBookingCard({ b, navigate }) {
     secondary: "#088395",
     accent: "#fff",
   };
+
+  const airlineName =
+    b.flightRequest?.segments?.[0]?.airlineName ||
+    b.bookingResult?.providerResponse?.raw?.Response?.Response?.FlightItinerary
+      ?.Segments?.[0]?.Airline?.AirlineName ||
+    b.bookingSnapshot?.airline ||
+    airlineCode;
+
+  console.log("AIRLINE CODE:", airlineCode);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border border-slate-200 overflow-hidden group">
@@ -147,9 +173,7 @@ function FlightBookingCard({ b, navigate }) {
 
             {/* Airline info */}
             <div>
-              <p className="text-sm font-bold text-slate-800">
-                {snapshot.airline || airlineCode}
-              </p>
+              <p className="text-sm font-bold text-slate-800">{airlineName}</p>
               <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                 {cabinClass}
               </p>
@@ -210,10 +234,33 @@ function HotelBookingCard({ b, navigate }) {
   const city = selectedHotel.city || snapshot.city || "";
   const checkIn = snapshot.checkInDate || hotelReq.checkInDate;
   const checkOut = snapshot.checkOutDate || hotelReq.checkOutDate;
-  const nights = snapshot.nights || hotelReq.noOfNights || 1;
+  const nights =
+  checkIn && checkOut
+    ? Math.max(
+        1,
+        Math.ceil(
+          (new Date(checkOut) - new Date(checkIn)) /
+            (1000 * 60 * 60 * 24)
+        )
+      )
+    : 1;
   const roomType =
     rawRoom.Name?.[0] || selectedRoom.roomTypeName || "Standard Room";
-  const heroImage = rawRoom.images?.[0] || null;
+  const images = rawRoom.images || [];
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // auto change every 500ms
+  useEffect(() => {
+    if (!images.length) return;
+
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % images.length);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [images]);
+
+  const heroImage = images[currentIndex] || null;
   const mealType = selectedRoom.mealType || "—";
   const refundable = selectedRoom.isRefundable;
 
@@ -222,11 +269,18 @@ function HotelBookingCard({ b, navigate }) {
       {/* Hotel image / gradient fallback */}
       <div className="relative h-36 overflow-hidden bg-linear-to-br from-[#0A4D68] to-[#088395]">
         {heroImage ? (
-          <img
-            src={heroImage}
-            alt={hotelName}
-            className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500"
-          />
+          <div className="relative w-full h-full">
+            {images.map((img, i) => (
+              <img
+                key={i}
+                src={img}
+                alt={hotelName}
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${
+                  i === currentIndex ? "opacity-100" : "opacity-0"
+                }`}
+              />
+            ))}
+          </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <MdHotel size={40} className="text-white/25" />
