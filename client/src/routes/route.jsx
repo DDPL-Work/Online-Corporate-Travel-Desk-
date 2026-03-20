@@ -44,6 +44,9 @@ import CorporateSuperAdminDashboard from "../components/CorporateSuperAdmin/Corp
 import TravelAdminManagement from "../components/CorporateSuperAdmin/TravelAdminManagement";
 import CorporateTotalBookings from "../components/CorporateSuperAdmin/TotalBookings";
 import EmployeeManagement from "../components/CorporateSuperAdmin/EmployeeManagement";
+import HotelReviewBooking from "../Pages/Booking-Flow/Hotel-Booking/HotelReviewBooking";
+import HotelBookNow from "../Pages/Booking-Flow/Hotel-Booking/HotelBooking";
+import HotelBookingDetails from "../components/EmployeeDashboard/Hotelbookingdetails";
 
 export const appRouter = createBrowserRouter([
   // -------------------------------
@@ -111,6 +114,7 @@ export const appRouter = createBrowserRouter([
           { path: "/my-profile", element: <MyProfile /> },
           { path: "/travel-documents", element: <TravelDocuments /> },
           { path: "/bookings/:id/book", element: <BookApprovedFlight /> },
+          { path: "/my-hotel-booking/:id", element: <HotelBookingDetails /> },
         ],
       },
     ],
@@ -164,6 +168,9 @@ export const appRouter = createBrowserRouter([
   { path: "/search-hotel", element: <HotelSearchPage /> },
   { path: "/search-hotel-results", element: <HotelSearchResults /> },
   { path: "/one-hotel-details", element: <HotelDetailsPage /> },
+  { path: "/hotel-review-booking", element: <HotelReviewBooking /> },
+  { path: "/hotel-review-booking/:id", element: <HotelReviewBooking /> },
+  { path: "/hotel-booking/:id", element: <HotelBookNow /> },
 
   // DEFAULT REDIRECT
   {

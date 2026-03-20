@@ -1,3 +1,6 @@
+// client\src\Redux\Actions\hotelThunks.js
+
+
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../API/axios";
 
@@ -11,18 +14,14 @@ export const fetchCountries = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await api.get("/hotels/country-list");
-     return response.data.data.CountryList;
+
+      console.log("COUNTRY API RESPONSE:", response.data);
+
+      return response.data.data;
     } catch (err) {
+      console.log("COUNTRY API ERROR:", err);
       return rejectWithValue(err.response?.data?.message || err.message);
     }
-  },
-  {
-    condition: (_, { getState }) => {
-      const { hotel } = getState();
-      if (hotel.countries.length > 0) {
-        return false; // prevent duplicate fetch
-      }
-    },
   },
 );
 
@@ -32,16 +31,14 @@ export const fetchCities = createAsyncThunk(
   async (countryCode, { rejectWithValue }) => {
     try {
       const { data } = await api.get(
-        `/hotels/cities?countryCode=${countryCode}`
+        `/hotels/cities?countryCode=${countryCode}`,
       );
       return {
-  countryCode,
-  cities: data.data?.CityList || [],
-};
+        countryCode,
+        cities: data.data?.CityList || [],
+      };
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data?.message || err.message
-      );
+      return rejectWithValue(err.response?.data?.message || err.message);
     }
   },
   {
@@ -53,7 +50,7 @@ export const fetchCities = createAsyncThunk(
         return false;
       }
     },
-  }
+  },
 );
 
 /* ---------- HOTEL SEARCH ---------- */
@@ -62,7 +59,10 @@ export const searchHotels = createAsyncThunk(
   async (payload, { rejectWithValue }) => {
     try {
       const { data } = await api.post("/hotels/search", payload);
-      return data.data;
+      console.log("🏨 HOTEL SEARCH RESPONSE:", data.data);
+      return {
+        hotels: data.data.HotelResult || [],
+      };
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
@@ -72,9 +72,49 @@ export const searchHotels = createAsyncThunk(
 /* ---------- HOTEL DETAILS ---------- */
 export const fetchHotelDetails = createAsyncThunk(
   "hotel/fetchHotelDetails",
-  async (hotelCode, { rejectWithValue }) => {
+  async ({ hotelCode }, { rejectWithValue }) => {
     try {
-      const { data } = await api.post("/hotels/details", { hotelCode });
+      const { data } = await api.post("/hotels/details", {
+        hotelCode,
+      });
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  },
+  {
+    condition: ({ hotelCode }, { getState }) => {
+      const { hotel } = getState();
+      if (hotel.hotelDetailsById?.[hotelCode]) {
+        return false; // already cached
+      }
+    },
+  },
+);
+
+/* ---------- ROOM INFO ---------- */
+export const fetchRoomInfo = createAsyncThunk(
+  "hotel/fetchRoomInfo",
+  async ({ hotelCode }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post("/hotels/room-info", {
+        hotelCode,
+      });
+      return {
+        hotelCode,
+        rooms: data.data?.GetHotelRoomResult?.HotelRoomsDetails || [],
+      };
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  },
+);
+/* ---------- BOOKING DETAILS (Post-Booking) ---------- */
+export const fetchBookingDetails = createAsyncThunk(
+  "hotel/fetchBookingDetails",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post("/hotels/booking-details", payload);
       return data.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);

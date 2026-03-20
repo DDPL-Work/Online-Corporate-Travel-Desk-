@@ -1,3 +1,5 @@
+//hotel.service.js
+
 const axios = require("axios");
 const config = require("../../config/tbo.hotel.config");
 const logger = require("../../utils/logger");
@@ -128,6 +130,10 @@ class HotelService {
     const token = await this.getToken(env);
 
     try {
+      const base64Auth = Buffer.from(
+        `${cfg.credentials.username}:${cfg.credentials.password}`,
+      ).toString("base64");
+
       const { data } = await axios.post(
         `${cfg[baseType]}${endpoint}`,
         {
@@ -135,7 +141,18 @@ class HotelService {
           TokenId: token,
           ...payload,
         },
-        { timeout: config.timeout },
+        {
+          timeout: config.timeout,
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+
+            // 🔥 REQUIRED BY TBO
+            Authorization: `Basic ${base64Auth}`,
+            TokenId: token,
+            ClientId: cfg.credentials.clientId,
+          },
+        },
       );
 
       return data;
@@ -313,15 +330,32 @@ class HotelService {
   }
 
   /* =====================================================
-     DYNAMIC HOTEL DETAILS (base2)
+     DYNAMIC BOOKED HOTEL DETAILS (base2)
   ====================================================== */
-  async getHotelDetails(payload) {
-    return this.tokenPost(
-      config[this.getEnv()].endpoints.hotelDetails,
-      payload,
-      "base2",
-    );
+  async getBookingDetails({ bookingId, confirmationNo, traceId, firstName, lastName }) {
+  const payload = {};
+
+  if (bookingId) {
+    payload.BookingId = Number(bookingId);   // ✅ FIXED
+  } 
+  else if (confirmationNo) {
+    payload.ConfirmationNo = confirmationNo; // ✅ FIXED
+    payload.FirstName = firstName;
+    payload.LastName = lastName;
+  } 
+  else if (traceId) {
+    payload.TraceId = traceId;               // ✅ FIXED
+  } 
+  else {
+    throw new ApiError(400, "No valid identifier provided");
   }
+
+  return this.tokenPost(
+    config[this.getEnv()].endpoints.getBookingDetails,
+    payload,
+    "base2"
+  );
+}
 }
 
 module.exports = new HotelService();

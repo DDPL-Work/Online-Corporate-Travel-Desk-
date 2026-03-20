@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   FiFilter,
   FiEdit2,
@@ -23,6 +23,7 @@ import {
 
 import ViewCorporateModal from "../../Modal/ViewCorporateModal";
 import { ToastConfirm } from "../../utils/ToastConfirm";
+import FinancialApprovalModal from "../../Modal/FinancialApprovalModal";
 
 const colors = {
   primary: "#0A4D68",
@@ -39,14 +40,16 @@ export default function CorporateAccessControl() {
     error,
   } = useSelector((state) => state.corporateList);
 
-  const [isViewOpen, setIsViewOpen] = React.useState(false);
-  const [viewCorporate, setViewCorporate] = React.useState(null);
-  const [openEdit, setOpenEdit] = React.useState(false);
-  const [selectedRow, setSelectedRow] = React.useState(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [viewCorporate, setViewCorporate] = useState(null);
+  const [openEdit, setOpenEdit] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
 
-  const [corporate, setCorporate] = React.useState("All");
-  const [role, setRole] = React.useState("All");
-  const [status, setStatus] = React.useState("All");
+  const [corporate, setCorporate] = useState("All");
+  const [role, setRole] = useState("All");
+  const [status, setStatus] = useState("All");
+
+  const [openFinancialApprove, setOpenFinancialApprove] = useState(false);
 
   /* ---------------- FETCH ---------------- */
 
@@ -84,19 +87,24 @@ export default function CorporateAccessControl() {
     }
   };
 
-  const handleApprove = (id) => {
-    ToastConfirm({
-      message: "Approve this corporate?",
-      confirmText: "Approve",
-      onConfirm: async () => {
-        try {
-          await dispatch(approveCorporate(id)).unwrap();
-          toast.success("Corporate approved successfully");
-        } catch (err) {
-          toast.error(err);
-        }
-      },
-    });
+  // const handleApprove = (id) => {
+  //   ToastConfirm({
+  //     message: "Approve this corporate?",
+  //     confirmText: "Approve",
+  //     onConfirm: async () => {
+  //       try {
+  //         await dispatch(approveCorporate(id)).unwrap();
+  //         toast.success("Corporate approved successfully");
+  //       } catch (err) {
+  //         toast.error(err);
+  //       }
+  //     },
+  //   });
+  // };
+
+  const handleApprove = (corporate) => {
+    setSelectedRow(corporate);
+    setOpenFinancialApprove(true);
   };
 
   const handleToggleStatus = (id) => {
@@ -180,8 +188,8 @@ export default function CorporateAccessControl() {
                           c.status === "active"
                             ? "bg-green-100 text-green-700"
                             : c.status === "pending"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-red-100 text-red-700"
                         }`}
                       >
                         {c.status}
@@ -212,7 +220,7 @@ export default function CorporateAccessControl() {
                         <IconBtn
                           title="Approve"
                           color="text-green-600"
-                          onClick={() => handleApprove(c._id)}
+                          onClick={() => handleApprove(c)}
                         >
                           <FiCheckCircle />
                         </IconBtn>
@@ -257,6 +265,16 @@ export default function CorporateAccessControl() {
           <EditCorporateModal
             corporate={selectedRow}
             onClose={() => setOpenEdit(false)}
+          />
+        )}
+
+        {openFinancialApprove && selectedRow && (
+          <FinancialApprovalModal
+            corporate={selectedRow}
+            onClose={() => {
+              setOpenFinancialApprove(false);
+              setSelectedRow(null);
+            }}
           />
         )}
       </div>

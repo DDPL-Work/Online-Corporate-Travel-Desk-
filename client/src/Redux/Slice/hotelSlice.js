@@ -1,8 +1,13 @@
+// client\src\Redux\Slice\hotelSlice.js
+
+
 import { createSlice } from "@reduxjs/toolkit";
 import {
   fetchCities,
   fetchCountries,
   fetchHotelDetails,
+  fetchRoomInfo,
+  fetchBookingDetails,
   searchHotels,
 } from "../Actions/hotelThunks";
 
@@ -13,12 +18,17 @@ const hotelSlice = createSlice({
     citiesByCountry: {},
     hotels: [],
     selectedHotel: null,
+    searchPayload: null,
+    hotelDetailsById: {},
+    tboBookingDetails: null, // ✅ STORE TBO BOOKING INFO
 
     loading: {
       countries: false,
       cities: false,
       search: false,
       details: false,
+      rooms: false,
+      bookingDetails: false,
     },
 
     error: {
@@ -26,6 +36,8 @@ const hotelSlice = createSlice({
       cities: null,
       search: null,
       details: null,
+      rooms: null,
+      bookingDetails: null,
     },
   },
 
@@ -79,7 +91,8 @@ const hotelSlice = createSlice({
       })
       .addCase(searchHotels.fulfilled, (state, action) => {
         state.loading.search = false;
-        state.hotels = action.payload?.Hotels || [];
+        state.hotels = action.payload.hotels || [];
+        state.searchPayload = action.meta.arg;
       })
       .addCase(searchHotels.rejected, (state, action) => {
         state.loading.search = false;
@@ -93,11 +106,43 @@ const hotelSlice = createSlice({
       })
       .addCase(fetchHotelDetails.fulfilled, (state, action) => {
         state.loading.details = false;
+        const { hotelCode } = action.meta.arg;
+        state.hotelDetailsById[hotelCode] = action.payload;
         state.selectedHotel = action.payload;
       })
       .addCase(fetchHotelDetails.rejected, (state, action) => {
         state.loading.details = false;
         state.error.details = action.payload;
+      })
+      /* ---------------- ROOM INFO ---------------- */
+      .addCase(fetchRoomInfo.pending, (state) => {
+        state.loading.rooms = true;
+        state.error.rooms = null;
+      })
+      .addCase(fetchRoomInfo.fulfilled, (state, action) => {
+        state.loading.rooms = false;
+        const { hotelCode, rooms } = action.payload;
+        // Update the hotel details with the latest rooms if already present
+        if (state.hotelDetailsById[hotelCode]) {
+          state.hotelDetailsById[hotelCode].Rooms = rooms;
+        }
+      })
+      .addCase(fetchRoomInfo.rejected, (state, action) => {
+        state.loading.rooms = false;
+        state.error.rooms = action.payload;
+      })
+      /* ---------------- BOOKING DETAILS ---------------- */
+      .addCase(fetchBookingDetails.pending, (state) => {
+        state.loading.bookingDetails = true;
+        state.error.bookingDetails = null;
+      })
+      .addCase(fetchBookingDetails.fulfilled, (state, action) => {
+        state.loading.bookingDetails = false;
+        state.tboBookingDetails = action.payload;
+      })
+      .addCase(fetchBookingDetails.rejected, (state, action) => {
+        state.loading.bookingDetails = false;
+        state.error.bookingDetails = action.payload;
       });
   },
 });

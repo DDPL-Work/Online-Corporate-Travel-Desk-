@@ -1,242 +1,534 @@
-// components/HotelDetails/HotelDetailsPage.jsx
-import React, { useState } from "react";
+// HotelDetailsPage.jsx
+
+import React, { useState, useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  fetchHotelDetails,
+  fetchRoomInfo,
+} from "../../../Redux/Actions/hotelThunks";
 import HotelHeader from "./components/HotelHeader";
 import HotelImageGallery from "./components/HotelImageGallery";
 import HotelInfo from "./components/HotelInfo";
 import Amenities from "./components/Amenities";
 import RoomTypesList from "./components/RoomTypesList";
-import PriceCard from "./components/PriceCard";
 import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import Attractions from "./components/Attractions";
+import HotelDetailsSkeleton from "./components/HotelDetailsSkeleton";
+import { MdArrowBack } from "react-icons/md";
+import { FiClock, FiPhone, FiMail, FiGlobe } from "react-icons/fi";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 
 const HotelDetailsPage = () => {
-  const [selectedRoom, setSelectedRoom] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const dispatch = useDispatch();
+  const [mapModalOpen, setMapModalOpen] = useState(false);
+  const hotelCode = location.state?.hotelCode;
 
-  const hotelData = {
-    name: "Pride Plaza Hotel Aerocity New Delhi",
-    address:
-      "Asset Area 1, Hospitality District, Aerocity New Delhi, Indira Gandhi International Airport, New Delhi 110037 India",
-    rating: 4.3,
-    reviewCount: 8532,
-    images: [
-      "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=400&h=300&fit=crop",
-      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=400&h=300&fit=crop",
-    ],
-    description:
-      "Located in New Delhi, Aerocity, Pride Plaza Hotel Aerocity New Delhi is within a 5-minute drive of Indira Gandhi International Airport. This luxurious hotel is 13.7 km (8.5 mi) from India Gate and 9.8 km (6.1 mi) from Qutub Minar.",
-    amenities: [
-      { icon: "wifi", label: "Free WiFi" },
-      { icon: "parking", label: "Free Parking" },
-      { icon: "pool", label: "Swimming Pool" },
-      { icon: "gym", label: "Fitness Center" },
-      { icon: "restaurant", label: "Restaurant" },
-      { icon: "spa", label: "Spa" },
-      { icon: "ac", label: "Air Conditioning" },
-      { icon: "bar", label: "Bar/Lounge" },
-    ],
-    checkIn: "Check In 2 PM",
-    checkOut: "Check Out 12 PM",
-    roomTypes: [
-      {
-        id: 1,
-        name: "Superior, Double",
-        type: "Room Only",
-        refundable: "Non-refundable",
-        paxRequired: "PAN not Required",
-        image:
-          "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=400&h=300&fit=crop",
-        features: [
-          "1 Double bed",
-          "air conditioning",
-          "bathtub",
-          "coffee/tea maker",
-          "television",
-        ],
-        originalPrice: "₹83,523",
-        discountedPrice: "₹46,322",
-        taxes: "+ ₹8,337 taxes",
-        discount: "45% off",
-        amenities: [
-          "Breakfast not included",
-          "Superior Double room-King beds (total beds in subject to availability)",
-          "Free Cancellation till 16th January 2025",
-        ],
-      },
-      {
-        id: 2,
-        name: "Superior, 2 Twin",
-        type: "Room Only",
-        refundable: "Non-refundable",
-        paxRequired: "PAN not Required",
-        image:
-          "https://images.unsplash.com/photo-1590490360182-c33d57733427?w=400&h=300&fit=crop",
-        features: ["2 Twin", "desk", "bathtub", "free toiletries"],
-        originalPrice: "₹83,523",
-        discountedPrice: "₹48,376",
-        taxes: "+ ₹8,707 taxes",
-        discount: "42% off",
-        amenities: [
-          "Breakfast",
-          "Non-refundable",
-          "PAN not Required",
-          "Superior Double room-2twin beds (total beds in subject to availability)",
-          "Free Cancellation",
-        ],
-      },
-      {
-        id: 3,
-        name: "Premium Double, Room",
-        type: "Room Only",
-        refundable: "Non-refundable",
-        paxRequired: "PAN not Required",
-        image:
-          "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=400&h=300&fit=crop",
-        features: ["1 Double", "free mini bar"],
-        originalPrice: "₹1,12,185",
-        discountedPrice: "₹48,181",
-        taxes: "+ ₹8,672 taxes",
-        discount: "57% off",
-        amenities: [
-          "Breakfast",
-          "Non-refundable",
-          "PAN not Required",
-          "Premium Double -King bed (total beds in subject to availability)",
-        ],
-      },
-      {
-        id: 4,
-        name: "Superior, King",
-        type: "Room Only",
-        refundable: "Refundable",
-        paxRequired: "PAN not Required",
-        image:
-          "https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=400&h=300&fit=crop",
-        features: [
-          "1 King",
-          "Wardrobe access",
-          "Minibar",
-          "Direct-dial phone",
-          "Pillow",
-        ],
-        originalPrice: "₹2,67,626",
-        discountedPrice: "₹1,57,802",
-        taxes: "+ ₹28,404 taxes",
-        discount: "41% off",
-        amenities: [
-          "Free Cancellation",
-          "Free Cancellation till 16th January 2025",
-        ],
-      },
-      {
-        id: 5,
-        name: "Superior",
-        type: "Room Only",
-        refundable: "Non-refundable",
-        paxRequired: "PAN not Required",
-        image:
-          "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=400&h=300&fit=crop",
-        features: [
-          "1 Double",
-          "air conditioning",
-          "bathtub",
-          "bed",
-          "television",
-        ],
-        originalPrice: "₹2,67,626",
-        discountedPrice: "₹2,20,658",
-        taxes: "+ ₹39,718 taxes",
-        discount: "18% off",
-        amenities: [
-          "Breakfast",
-          "Non-refundable",
-          "PAN not Required",
-          "SUPERIOR",
-        ],
-      },
-      {
-        id: 6,
-        name: "Superior Double Room",
-        type: "Room Only",
-        refundable: "Non-refundable",
-        paxRequired: "PAN not Required",
-        image:
-          "https://images.unsplash.com/photo-1596436889106-be35e843f974?w=400&h=300&fit=crop",
-        features: [
-          "1 Double",
-          "air conditioning",
-          "bathtub",
-          "bed",
-          "television",
-        ],
-        originalPrice: "₹2,67,626",
-        discountedPrice: "₹2,39,874",
-        taxes: "+ ₹43,177 taxes",
-        discount: "10% off",
-        amenities: [
-          "Breakfast",
-          "Non-refundable",
-          "PAN not Required",
-          "Double room Superior",
-          "Free Cancellation till 16th January 2025",
-        ],
-      },
-    ],
-    policies: {
-      checkIn: "2:00 PM",
-      checkOut: "12:00 PM",
-    },
+  const { hotels, hotelDetailsById, searchPayload, loading } = useSelector(
+    (state) => state.hotel,
+  );
+
+  const hotelFromSearch = useMemo(
+    () => hotels?.find((h) => h.HotelCode === hotelCode),
+    [hotels, hotelCode],
+  );
+
+  useEffect(() => {
+    if (!hotelCode || !hotelFromSearch) return;
+    dispatch(fetchHotelDetails({ hotelCode }));
+    dispatch(fetchRoomInfo({ hotelCode }));
+  }, [hotelCode, hotelFromSearch, dispatch]);
+
+  const hotelFromDetails = hotelDetailsById?.[hotelCode]?.HotelDetails?.[0];
+  const roomsFromRedux = hotelDetailsById?.[hotelCode]?.Rooms || [];
+
+  const extractAttractions = (html) => {
+    if (!html) return [];
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    let attractions = [];
+    Array.from(doc.querySelectorAll("p")).forEach((p) => {
+      const strong = p.querySelector("strong");
+      if (strong?.textContent.toLowerCase().includes("nearby attractions")) {
+        const next = p.nextElementSibling;
+        if (next?.tagName === "UL")
+          attractions = Array.from(next.querySelectorAll("li")).map((li) =>
+            li.textContent.trim(),
+          );
+      }
+    });
+    return attractions;
   };
 
-  return (
-    <div className="min-h-screen bg-blue-50">
-      <EmployeeHeader />
-      {/* Header */}
-      <HotelHeader
-        name={hotelData.name}
-        address={hotelData.address}
-        rating={hotelData.rating}
-        reviewCount={hotelData.reviewCount}
-      />
+  const mergedHotel = useMemo(() => {
+    if (!hotelFromSearch) return null;
+    const mapCoords = hotelFromDetails?.Map || hotelFromSearch?.Map || "";
 
-      {/* Main Content */}
+    const [lat, lng] = mapCoords.split("|");
+    return {
+      HotelCode: hotelCode,
+      hotelCode,
+      // ✅ KEEP ORIGINAL FIELD (IMPORTANT)
+      HotelName: hotelFromDetails?.HotelName || hotelFromSearch?.HotelName,
+
+      // ✅ UI FIELD (optional)
+      name:
+        hotelFromDetails?.HotelName || hotelFromSearch?.HotelName || "Hotel",
+      address:
+        hotelFromDetails?.Address ||
+        hotelFromSearch?.Address ||
+        "Address not available",
+      pinCode: hotelFromDetails?.PinCode || "",
+      cityName: hotelFromDetails?.CityName || hotelFromSearch?.CityName || "",
+      latitude: lat ? Number(lat) : null,
+      longitude: lng ? Number(lng) : null,
+      countryName: hotelFromDetails?.CountryName || "",
+      map: hotelFromDetails?.Map || "",
+      rating: hotelFromDetails?.HotelRating || hotelFromSearch?.StarRating || 0,
+      description: hotelFromDetails?.Description || "No description available",
+      checkIn: hotelFromDetails?.CheckInTime || "2:00 PM",
+      checkOut: hotelFromDetails?.CheckOutTime || "12:00 PM",
+      images: hotelFromDetails?.Images?.length
+        ? hotelFromDetails.Images
+        : hotelFromSearch?.Images || [],
+      facilities:
+        hotelFromDetails?.HotelFacilities || hotelFromSearch?.Amenities || [],
+      attractions: extractAttractions(hotelFromDetails?.Description || ""),
+      contact: {
+        phone: hotelFromDetails?.PhoneNumber || "",
+        email: hotelFromDetails?.Email || "",
+        website: hotelFromDetails?.HotelWebsiteUrl || "",
+        fax: hotelFromDetails?.FaxNumber || "",
+      },
+
+      rooms: (roomsFromRedux.length > 0
+        ? roomsFromRedux
+        : hotelFromSearch?.Rooms || []
+      ).map((room, index, arr) => {
+        const allImages = hotelFromDetails?.Images || [];
+
+        const totalImages = allImages.length;
+        const totalRooms = arr.length;
+
+        if (!totalImages) {
+          return { ...room, images: [] };
+        }
+
+        // 🔥 calculate chunk size
+        const chunkSize = Math.ceil(totalImages / totalRooms);
+
+        const start = index * chunkSize;
+        const end = start + chunkSize;
+
+        let roomImages = allImages.slice(start, end);
+
+        // ⚠️ fallback: if slice empty (rare edge case)
+        if (!roomImages.length) {
+          roomImages = allImages.slice(0, chunkSize);
+        }
+
+        return {
+          ...room,
+          images: roomImages,
+        };
+      }),
+    };
+  }, [hotelFromSearch, hotelFromDetails, roomsFromRedux]);
+
+  console.log("LAT LNG:", mergedHotel?.latitude, mergedHotel?.longitude);
+
+  const handleSelectRoom = (room) => {
+    const normalizedRoom = {
+      ...room,
+      BookingCode: room.BookingCode || room.RoomTypeCode || room.RatePlanCode,
+      Price: room.Price || {
+        TotalFare: room.TotalFare,
+        Tax: room.TotalTax,
+        BaseFare: room.BaseFare,
+      },
+    };
+
+    navigate("/hotel-review-booking", {
+      state: {
+        hotel: mergedHotel,
+        room: normalizedRoom,
+        searchParams: {
+          checkIn: searchPayload?.CheckIn,
+          checkOut: searchPayload?.CheckOut,
+          rooms: searchPayload?.PaxRooms?.map((r) => ({
+            adults: r.Adults,
+            children: r.Children,
+            childAges: r.ChildAge,
+          })),
+          city: hotelFromSearch?.CityName,
+        },
+      },
+    });
+  };
+
+  const isInitialLoading = loading.details || loading.rooms;
+  const hasDynamicData = !!hotelFromDetails && roomsFromRedux.length > 0;
+
+  if (isInitialLoading && !hasDynamicData) {
+    return (
+      <>
+        <EmployeeHeader />
+        <HotelDetailsSkeleton />
+      </>
+    );
+  }
+
+  if (!hotelFromSearch) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <p className="text-slate-500 mb-4">Hotel not found</p>
+          <button
+            onClick={() => navigate(-1)}
+            className="px-4 py-2 bg-[#0A4D68] text-white text-sm rounded-lg hover:bg-[#083d52] transition"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const cheapestRoom = mergedHotel.rooms?.reduce(
+    (prev, curr) =>
+      (curr.Price?.TotalFare || curr.TotalFare) <
+      (prev.Price?.TotalFare || prev.TotalFare)
+        ? curr
+        : prev,
+    mergedHotel.rooms[0],
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <EmployeeHeader />
+
+      {/* ── Hotel Header ── */}
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <HotelHeader
+            name={mergedHotel.name}
+            address={`${mergedHotel.address}${mergedHotel.pinCode ? `, ${mergedHotel.pinCode}` : ""}`}
+            cityName={mergedHotel.cityName}
+            countryName={mergedHotel.countryName}
+            rating={mergedHotel.rating}
+            reviewCount={0}
+          />
+        </div>
+      </div>
+
+      {/* ── Main Content ── */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex flex-col gap-5"> 
+        {/* Gallery — full width */}
+        <div className="mb-6">
+          <HotelImageGallery images={mergedHotel.images} />
+        </div>
+
+        {/* Two-column layout: main (left) + sticky sidebar (right) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Image Gallery */}
-              <HotelImageGallery images={hotelData.images} />
-            </div>
-            {/* Right Column - Price Card */}
-            <div className="lg:col-span-1">
-              <div className=" top-6">
-                <PriceCard
-                  selectedRoom={selectedRoom || hotelData.roomTypes[0]}
-                />
+          {/* ── Left: main detail column ── */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* About / Description */}
+            <HotelInfo
+              description={mergedHotel.description}
+              checkIn={mergedHotel.checkIn}
+              checkOut={mergedHotel.checkOut}
+              contact={mergedHotel.contact}
+              map={mergedHotel.map}
+            />
+
+            {/* Amenities */}
+            <Amenities amenities={mergedHotel.facilities} />
+
+            {/* Nearby attractions */}
+            {mergedHotel.attractions?.length > 0 && (
+              <Attractions attractions={mergedHotel.attractions} />
+            )}
+          </div>
+
+          {/* ── Right: sticky summary sidebar ── */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-6 space-y-4">
+              {/* Quick-info card */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="h-1.5 bg-linear-to-r from-[#0A4D68] to-[#088395]" />
+                <div className="p-5 space-y-4">
+                  <h3 className="text-sm font-semibold text-slate-700">
+                    Hotel Summary
+                  </h3>
+
+                  {/* Check-in / Check-out */}
+                  {/* <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-slate-50 rounded-xl p-3">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">
+                        Check-in
+                      </p>
+                      <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                        <FiClock size={13} className="text-[#0A4D68]" />
+                        {mergedHotel.checkIn}
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 rounded-xl p-3">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">
+                        Check-out
+                      </p>
+                      <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                        <FiClock size={13} className="text-[#088395]" />
+                        {mergedHotel.checkOut}
+                      </div>
+                    </div>
+                  </div> */}
+
+                  {/* Cheapest room price */}
+                  {cheapestRoom && (
+                    <div className="bg-[#0A4D68]/5 border border-[#0A4D68]/15 rounded-xl p-3">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">
+                        Starting from
+                      </p>
+                      <p className="text-xl font-bold text-[#0A4D68]">
+                        ₹
+                        {(
+                          cheapestRoom.Price?.TotalFare ||
+                          cheapestRoom.TotalFare ||
+                          0
+                        ).toLocaleString("en-IN")}
+                        <span className="text-xs font-normal text-slate-400 ml-1">
+                          / night
+                        </span>
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Contact */}
+                  <div className="space-y-2 pt-1 border-t border-slate-100">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                      Contact
+                    </p>
+                    {mergedHotel.contact.phone && (
+                      <ContactRow
+                        icon={FiPhone}
+                        value={mergedHotel.contact.phone}
+                        href={`tel:${mergedHotel.contact.phone}`}
+                      />
+                    )}
+                    {mergedHotel.contact.email && (
+                      <ContactRow
+                        icon={FiMail}
+                        value={mergedHotel.contact.email}
+                        href={`mailto:${mergedHotel.contact.email}`}
+                      />
+                    )}
+                    {mergedHotel.contact.website && (
+                      <ContactRow
+                        icon={FiGlobe}
+                        value="Visit Website"
+                        href={mergedHotel.contact.website}
+                        external
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
+
+              {/* Map card */}
+              {/* {mergedHotel.map && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <iframe
+                    title="Hotel Map"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(mergedHotel.map)}&output=embed`}
+                    className="w-full h-48 border-0"
+                    loading="lazy"
+                    allowFullScreen
+                  />
+                  <div className="px-4 py-2.5 text-xs text-slate-400 flex items-center gap-1.5">
+                    <FiGlobe size={11} />
+                    {mergedHotel.address}
+                  </div>
+                </div>
+              )} */}
+
+              {/* Map card */}
+              {mergedHotel?.latitude != null &&
+                mergedHotel?.longitude != null && (
+                  <div
+                    className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden cursor-pointer group"
+                    onClick={() => setMapModalOpen(true)}
+                  >
+                    {/* Thumbnail map — non-interactive overlay to capture click */}
+                    <div className="relative h-48">
+                      <MapContainer
+                        center={[mergedHotel.latitude, mergedHotel.longitude]}
+                        zoom={15}
+                        className="w-full h-full"
+                        scrollWheelZoom={false}
+                        zoomControl={false}
+                        dragging={false}
+                        doubleClickZoom={false}
+                        attributionControl={false}
+                      >
+                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                        <Marker
+                          position={[
+                            mergedHotel.latitude,
+                            mergedHotel.longitude,
+                          ]}
+                        >
+                          <Popup>{mergedHotel.name}</Popup>
+                        </Marker>
+                      </MapContainer>
+
+                      {/* Click overlay with expand hint */}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 backdrop-blur-sm text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-full shadow flex items-center gap-1.5">
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                          >
+                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                          </svg>
+                          Click to expand
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="px-4 py-2.5 text-xs text-slate-400 flex items-center gap-1.5">
+                      <FiGlobe size={11} />
+                      {mergedHotel.address}
+                    </div>
+                  </div>
+                )}
             </div>
           </div>
-         <div className="flex flex-col gap-5">
-           {/* Hotel Info */}
-          <HotelInfo
-            description={hotelData.description}
-            checkIn={hotelData.checkIn}
-            checkOut={hotelData.checkOut}
-          />
+        </div>
 
-          {/* Amenities */}
-          <Amenities amenities={hotelData.amenities} />
-
-          {/* Room Types */}
+        <div className="mt-10">
+          {/* Rooms — full span under left column */}
           <RoomTypesList
-            rooms={hotelData.roomTypes}
-            onSelectRoom={setSelectedRoom}
+            rooms={mergedHotel.rooms}
+            onSelectRoom={handleSelectRoom}
           />
-         </div>
+        </div>
+      </div>
+      {/* Map Modal */}
+      <MapModal
+        open={mapModalOpen}
+        onClose={() => setMapModalOpen(false)}
+        lat={mergedHotel?.latitude}
+        lng={mergedHotel?.longitude}
+        name={mergedHotel?.name}
+        address={mergedHotel?.address}
+      />
+    </div>
+  );
+};
+
+// ── Sidebar contact row ───────────────────────────────────
+function ContactRow({ icon: Icon, value, href, external }) {
+  return (
+    <a
+      href={href}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noreferrer" : undefined}
+      className="flex items-center gap-2 text-xs text-slate-600 hover:text-[#0A4D68] transition truncate"
+    >
+      <Icon size={12} className="text-slate-400 shrink-0" />
+      <span className="truncate">{value}</span>
+    </a>
+  );
+}
+
+function MapModal({ open, onClose, lat, lng, name, address }) {
+  useEffect(() => {
+    if (open) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-9999 flex items-center justify-center"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+      {/* Modal */}
+      <div
+        className="relative z-10 w-[95vw] max-w-4xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 bg-white"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 bg-white border-b border-slate-100">
+          <div>
+            <p className="text-sm font-bold text-slate-800">{name}</p>
+            <p className="text-xs text-slate-400 mt-0.5 truncate max-w-sm">
+              {address}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition cursor-pointer border-none"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path
+                d="M1 1l12 12M13 1L1 13"
+                stroke="#64748b"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* Full map */}
+        <div className="h-[70vh]">
+          <MapContainer
+            center={[lat, lng]}
+            zoom={15}
+            className="w-full h-full"
+            scrollWheelZoom={true}
+          >
+            <TileLayer
+              attribution="&copy; OpenStreetMap contributors"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <Marker position={[lat, lng]}>
+              <Popup>{name}</Popup>
+            </Marker>
+          </MapContainer>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+          <p className="text-xs text-slate-400 flex items-center gap-1.5">
+            <FiGlobe size={11} /> {address}
+          </p>
+          <a
+            href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}&zoom=15`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs font-semibold text-[#0A4D68] hover:underline"
+          >
+            Open in OpenStreetMap →
+          </a>
         </div>
       </div>
     </div>
   );
-};
+}
 
 export default HotelDetailsPage;

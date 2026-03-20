@@ -13,6 +13,12 @@ router.use(verifyToken);
  * ================================
  */
 
+/**
+ * ================================
+ * FLIGHT APPROVAL FLOW
+ * ================================
+ */
+
 // ✅ Get all approval requests (ALL employees under same corporate/domain)
 router.get(
   '/',
@@ -38,6 +44,33 @@ router.post(
   '/:id/reject',
   authorizeRoles('travel-admin'),
   approvalController.rejectRequest
+);
+
+
+/**
+ * ================================
+ * HOTEL APPROVAL FLOW
+ * ================================
+ */
+
+// ✅ Get single HOTEL request
+router.get(
+  "/hotel/:id",
+  approvalController.getHotelApproval
+);
+
+// ✅ Approve HOTEL request
+router.post(
+  "/hotel/:id/approve",
+  authorizeRoles("travel-admin"),
+  approvalController.approveHotelRequest
+);
+
+// ✅ Reject HOTEL request
+router.post(
+  "/hotel/:id/reject",
+  authorizeRoles("travel-admin"),
+  approvalController.rejectHotelRequest
 );
 
 module.exports = router;

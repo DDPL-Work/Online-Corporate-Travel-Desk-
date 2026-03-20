@@ -833,8 +833,35 @@ export default function FlightSearchPage() {
                         "linear-gradient(180deg, #2F80B7 0%, #1F8DB7 100%)")
                     }
                   >
-                    <FaSearch className="text-base" />
-                    {loading ? "Searching Flights..." : "Search Flights"}
+                    {loading ? (
+                      <>
+                        <svg
+                          className="animate-spin h-5 w-5 text-white"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8v8z"
+                          />
+                        </svg>
+                        Searching...
+                      </>
+                    ) : (
+                      <>
+                        <FaSearch className="text-base" />
+                        Search Flights
+                      </>
+                    )}
                   </button>
                 </form>
               </>
