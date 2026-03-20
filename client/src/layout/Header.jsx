@@ -60,7 +60,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
 
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate("/landing", { replace: true });
+    navigate("/iapindia", { replace: true });
   };
 
   const handleProfileNavigation = () => {
@@ -74,7 +74,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
         break;
 
       default:
-        navigate("/landing");
+        navigate("/iapindia");
     }
   };
 

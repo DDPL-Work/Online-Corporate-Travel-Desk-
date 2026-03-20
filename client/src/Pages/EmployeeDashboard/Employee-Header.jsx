@@ -51,7 +51,7 @@ export default function EmployeeHeader() {
   /* ================= ACTIONS ================= */
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate("/landing", { replace: true });
+    navigate("/iapindia", { replace: true });
   };
 
   const goToProfile = () => {
@@ -63,14 +63,15 @@ export default function EmployeeHeader() {
       <div className="max-w-full mx-10  py-1  flex items-center justify-between">
         {/* LEFT: LOGO */}
         <div
-          onClick={() => navigate("/search-flight")}
-          className="flex items-center gap-2 cursor-pointer"
-        >
-          <div className="w-9 h-9 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-lg">
-            ED
-          </div>
-          <span className="text-xl font-bold text-slate-900">COTD</span>
-        </div>
+  onClick={() => navigate("/search-flight")}
+  className="flex items-center cursor-pointer"
+>
+  <img
+    src="/logo-primary.png"   // change to your actual logo path
+    alt="COTD Logo"
+    className="h-10 w-auto object-contain"
+  />
+</div>
 
         {/* RIGHT */}
         <div className="flex items-center gap-4">
