@@ -1,27 +1,24 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
-const corporateController = require('../controllers/corporate.controller');
+const corporateController = require("../controllers/corporate.controller");
 
 // Middleware
-const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
-const validate = require('../middleware/validate.middleware');
-const sanitizeBody = require('../middleware/sanitize.middleware');
-const { uploadMultiple } = require('../middleware/upload.middleware');
+const {
+  verifyToken,
+  authorizeRoles,
+} = require("../middleware/auth.middleware");
+const validate = require("../middleware/validate.middleware");
+const sanitizeBody = require("../middleware/sanitize.middleware");
+const { uploadMultiple } = require("../middleware/upload.middleware");
 
 // Validations (express-validator)
-const corporateValidation = require('../validations/corporate.validation');
+const corporateValidation = require("../validations/corporate.validation");
 
 // --------------------------------------------------
 // PUBLIC : ONBOARD CORPORATE
 // --------------------------------------------------
-router.post(
-  "/onboard",
-  uploadMultiple,
-  sanitizeBody(["corporateName", "primaryContact.email", "ssoConfig.domain"]),
-  validate(corporateValidation.corporateOnboarding),
-  corporateController.onboardCorporate
-);
+router.post("/onboard", uploadMultiple, corporateController.onboardCorporate);
 
 // --------------------------------------------------
 // PROTECTED ROUTES
@@ -32,7 +29,7 @@ router.use(verifyToken);
 router.get(
   "/",
   authorizeRoles("super-admin"),
-  corporateController.getAllCorporates
+  corporateController.getAllCorporates,
 );
 
 // Get Single Corporate
@@ -45,21 +42,21 @@ router.put(
   corporateValidation.updateCorporate,
   sanitizeBody(["corporateName", "primaryContact.email"]),
   validate,
-  corporateController.updateCorporate
+  corporateController.updateCorporate,
 );
 
 // Approve Corporate
 router.put(
   "/:id/approve",
   authorizeRoles("super-admin"),
-  corporateController.approveCorporate
+  corporateController.approveCorporate,
 );
 
 // Toggle Status
 router.patch(
   "/:id/toggle-status",
   authorizeRoles("super-admin"),
-  corporateController.toggleCorporateStatus
+  corporateController.toggleCorporateStatus,
 );
 
 module.exports = router;

@@ -22,7 +22,7 @@ export default function UserManagement() {
 
   // ✅ CORRECT SELECTOR
   const { employees, loading, error } = useSelector(
-    (state) => state.employeeAction
+    (state) => state.employeeAction,
   );
 
   const [search, setSearch] = useState("");

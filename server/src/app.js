@@ -36,6 +36,7 @@ app.use(
 // ------------------------------
 const allowedOrigins = [
   config.frontend.url,
+  config.frontend.superAdminUrl,
   config.frontend.adminUrl,
   config.frontend.prodUrl,
 ].filter(Boolean); // removes undefined
@@ -58,9 +59,6 @@ app.use(
   })
 );
 
-
-
-
 // ------------------------------
 // BODY PARSERS
 // ------------------------------
@@ -69,8 +67,6 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.use(cookieParser());
 app.use(compression());
-
-
 
 // ------------------------------
 // PASSPORT AUTH MIDDLEWARE

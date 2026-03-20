@@ -1,9 +1,6 @@
 // src/components/Flights/OneFlightBooking.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import PhoneInput from "react-phone-input-2";
-import "react-phone-input-2/lib/style.css";
-
 import { MdArrowBack, MdFlightTakeoff, MdFlightLand } from "react-icons/md";
 import { BsCalendar4 } from "react-icons/bs";
 import { AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
@@ -12,14 +9,11 @@ import {
   formatDate,
   parseFlightData,
   FlightTimeline,
-  FareOptions,
   PriceSummary,
-  ImportantInformation,
-  BaggageTable,
   Amenities,
   HotelHomeButton,
   CTABox,
-  FareRulesAccordion,
+  TravelerForm,
 } from "./CommonComponents";
 import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
 import { useDispatch, useSelector } from "react-redux";
@@ -28,50 +22,12 @@ import {
   getFareRule,
   getSSR,
 } from "../../../Redux/Actions/flight.thunks";
-import SeatSelectionModal from "./SeatSelectionModal";
-
-const normalizeFareOptions = ({ fareQuote, fareRule }) => {
-  const results = fareQuote?.Response?.Results;
-  if (!results || !results.length) return [];
-
-  const fare = results[0].Fare;
-
-  const rules = fareRule?.Response?.FareRules || [];
-
-  const hasCancellation = rules.some((r) =>
-    /cancel/i.test(r.FareRuleDetail || "")
-  );
-
-  const hasDateChange = rules.some((r) =>
-    /reissue|date change/i.test(r.FareRuleDetail || "")
-  );
-
-  return [
-    {
-      type: fare.FareClassification?.Type || "Standard",
-      price: fare.PublishedFare,
-      popular: true,
-
-      features: [
-        { text: "Cabin baggage included", included: true },
-        {
-          text: "Check-in baggage included",
-          included: !!fare.Baggage,
-        },
-        {
-          text: "Cancellation allowed",
-          included: fare.IsRefundable || hasCancellation,
-        },
-        {
-          text: "Date change allowed",
-          included: hasDateChange,
-        },
-      ],
-
-      conditions: rules.map((r) => r.FareRuleDetail).filter(Boolean),
-    },
-  ];
-};
+import SeatSelectionModal from "./SSR/SeatSelectionModal";
+import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import { ToastWithTimer } from "../../../utils/ToastConfirm";
+import { CABIN_MAP } from "../../../utils/formatter";
+import { FareDetailsModal } from "./FareDetailsModal";
+import { getMyTravelAdmin } from "../../../Redux/Actions/travelAdmin.thunks";
 
 const normalizeFareRules = (fareRule) => {
   const rules = fareRule?.Response?.FareRules;
@@ -85,59 +41,30 @@ const normalizeFareRules = (fareRule) => {
   };
 };
 
-const normalizeFareRulesFromQuote = (fareQuote) => {
-  const mini = fareQuote?.Response?.Results?.MiniFareRules?.[0];
-  if (!mini || !mini.length) return null;
-
-  return {
-    cancellation: mini
-      .filter((r) => r.Type === "Cancellation")
-      .map((r) => {
-        const range = r.To
-          ? `${r.From}-${r.To} ${r.Unit.toLowerCase()}`
-          : `After ${r.From} ${r.Unit.toLowerCase()}`;
-
-        return `${range}: ${r.Details}`;
-      }),
-
-    dateChange: mini
-      .filter((r) => r.Type === "Reissue")
-      .map((r) => {
-        const range = r.To
-          ? `${r.From}-${r.To} ${r.Unit.toLowerCase()}`
-          : `After ${r.From} ${r.Unit.toLowerCase()}`;
-
-        return `${range}: ${r.Details}`;
-      }),
-
-    baggage: [
-      `Cabin baggage: ${fareQuote.Response.Results.Segments[0][0].CabinBaggage}`,
-      `Check-in baggage: ${fareQuote.Response.Results.Segments[0][0].Baggage}`,
-    ],
-
-    important: [
-      fareQuote.Response.Results.AirlineRemark,
-      fareQuote.Response.Results.IsRefundable
-        ? "Ticket is refundable"
-        : "Ticket is non-refundable",
-    ].filter(Boolean),
-  };
-};
-
 export default function OneFlightBooking() {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const { traceId, fareQuote, fareRule, ssr } = useSelector(
-    (state) => state.flights
+    (state) => state.flights,
   );
+
+  const { actionLoading } = useSelector((state) => state.bookings);
+  const { user } = useSelector((state) => state.auth);
+
+  const {
+    approver,
+    loading: approverLoading,
+    error: approverError,
+  } = useSelector((state) => state.travelAdmin);
 
   const {
     selectedFlight,
     searchParams,
     rawFlightData,
     tripType = "one-way",
+    isInternational = false,
   } = location.state || {};
 
   const [parsedFlightData, setParsedFlightData] = useState(null);
@@ -145,6 +72,9 @@ export default function OneFlightBooking() {
   const [seatModalOpen, setSeatModalOpen] = useState(false);
   const [activeSegmentIndex, setActiveSegmentIndex] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState({});
+  const [selectedMeals, setSelectedMeals] = useState({});
+
+  const [selectedBaggage, setSelectedBaggage] = useState({});
 
   const [expandedSections, setExpandedSections] = useState({
     flightDetails: true,
@@ -155,8 +85,75 @@ export default function OneFlightBooking() {
     terms: false,
   });
 
-  const [expandedFare, setExpandedFare] = useState(null);
-  const [selectedFare, setSelectedFare] = useState("Standard");
+  const [travelerErrors, setTravelerErrors] = useState({});
+  const [purposeOfTravel, setPurposeOfTravel] = useState("");
+  // ===== Traveler State =====
+  const initialTraveler = (id) => ({
+    id,
+    title: "MR",
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    gender: "",
+    age: "",
+    email: "",
+    phoneWithCode: "",
+    passportNumber: "",
+    passportExpiry: "",
+    nationality: "",
+    dob: "",
+  });
+
+  const [travelers, setTravelers] = useState([]);
+
+  // ✅ AUTO-FILL LEAD TRAVELER
+  useEffect(() => {
+    const adultCount =
+      searchParams?.passengers?.adults || searchParams?.adults || 1;
+    const childCount =
+      searchParams?.passengers?.children || searchParams?.children || 0;
+    const infantCount =
+      searchParams?.passengers?.infants || searchParams?.infants || 0;
+    const totalCount = adultCount + childCount + infantCount;
+
+    const initial = Array.from({ length: totalCount || 1 }, (_, i) => ({
+      id: i + 1,
+      title: "MR",
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      gender: "",
+      age: "",
+      email: "",
+      mobile: "",
+      phoneWithCode: "",
+      passportNumber: "",
+      passportExpiry: "",
+      nationality: "India",
+      dob: "",
+    }));
+
+    // Pre-fill first traveler if user is logged in
+    if (user && initial[0]) {
+      if (user.name && typeof user.name === "object") {
+        initial[0].firstName = (user.name.firstName || "").toUpperCase();
+        initial[0].lastName = (user.name.lastName || "").toUpperCase();
+      } else {
+        const rawName = user.name || user.displayName || "";
+        const fullName = typeof rawName === "string" ? rawName : "";
+        const names = fullName.trim().split(/\s+/);
+
+        initial[0].firstName = (names[0] || "").toUpperCase();
+        initial[0].lastName = (names.slice(1).join(" ") || "").toUpperCase();
+      }
+
+      initial[0].email = user.email || "";
+      initial[0].phoneWithCode =
+        user.phone || user.mobile || user.phoneWithCode || "";
+    }
+
+    setTravelers(initial);
+  }, [user, searchParams]);
 
   const formatDateTime = (dateString) => {
     if (!dateString) return "N/A";
@@ -186,78 +183,26 @@ export default function OneFlightBooking() {
     }));
   };
 
-  const baggageInfo = React.useMemo(() => {
-    if (!ssr?.Results?.Baggage?.length) return {};
-
-    const bag = ssr.Results.Baggage[0];
-
-    return {
-      cB: "7 Kg",
-      iB: bag.Weight,
-    };
-  }, [ssr]);
-
-  // OneFlightBooking.jsx
-  const buildSeatSSR = () => {
-    const seatSSR = [];
-
-    Object.entries(selectedSeats).forEach(([key, value]) => {
-      const [, segmentIndex] = key.split("|");
-
-      value.list.forEach((seatCode, paxIndex) => {
-        seatSSR.push({
-          segmentIndex: Number(segmentIndex),
-          paxIndex: paxIndex, // 🔑 better than hard-coded 0
-          seatCode,
-          price: value.priceMap[seatCode] || 0,
-          currency: "INR",
-          isChargeable: (value.priceMap[seatCode] || 0) > 0,
-        });
-      });
-    });
-
-    return seatSSR;
-  };
-
-  // useEffect(() => {
-  //   if (!searchParams?.traceId || !selectedFlight?.ResultIndex) return;
-
-  //   dispatch(
-  //     getFareRule({
-  //       traceId: searchParams.traceId,
-  //       resultIndex: selectedFlight.ResultIndex,
-  //     })
-  //   );
-  // }, [dispatch, searchParams, selectedFlight]);
+  useEffect(() => {
+    if (user?.role === "employee") {
+      dispatch(getMyTravelAdmin());
+    }
+  }, [dispatch, user]);
 
   useEffect(() => {
-    if (!searchParams?.traceId || !selectedFlight?.ResultIndex) return;
+    if (!traceId || !selectedFlight?.ResultIndex) return;
 
     dispatch(
       getFareQuote({
-        traceId: searchParams.traceId,
+        traceId: searchParams.traceId, // ✅ REDUX traceId
         resultIndex: selectedFlight.ResultIndex,
-      })
+      }),
     );
-  }, [dispatch, searchParams?.traceId, selectedFlight?.ResultIndex]);
-
-  // useEffect(() => {
-  //   if (!fareQuote?.Results?.length) return;
-
-  //   dispatch(
-  //     getFareQuote({
-  //       traceId: searchParams.traceId,
-  //       resultIndex: selectedFlight.ResultIndex,
-  //     })
-  //   );
-
-  //   dispatch(
-  //     getSSR({
-  //       traceId: searchParams.traceId,
-  //       resultIndex: selectedFlight.ResultIndex,
-  //     })
-  //   );
-  // }, [fareQuote, dispatch, searchParams, selectedFlight]);
+  }, [
+    dispatch,
+    traceId, // ✅ CRITICAL
+    selectedFlight?.ResultIndex,
+  ]);
 
   useEffect(() => {
     const quoteResult = fareQuote?.Response?.Results;
@@ -268,14 +213,14 @@ export default function OneFlightBooking() {
       getFareRule({
         traceId: searchParams.traceId,
         resultIndex: quoteResult.ResultIndex, // 🔑 USE THIS
-      })
+      }),
     );
 
     dispatch(
       getSSR({
         traceId: searchParams.traceId,
         resultIndex: quoteResult.ResultIndex,
-      })
+      }),
     );
   }, [
     fareQuote?.Response?.Results?.ResultIndex,
@@ -310,17 +255,23 @@ export default function OneFlightBooking() {
     }
   }, [loading, selectedFlight, rawFlightData, navigate]);
 
-  const isSeatReady = Boolean(
-    ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[0]?.RowSeats?.length
-  );
+  const isSeatReady = useMemo(() => {
+    const segments = ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat;
+    return Array.isArray(segments) && segments.length > 0;
+  }, [ssr]);
 
   const openSeatModal = (segmentIndex) => {
     if (!isSeatReady) return;
-    const seatRows =
-      ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[0]?.RowSeats;
+
+    const segmentSeat =
+      ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[segmentIndex];
+    const seatRows = segmentSeat?.RowSeats;
 
     if (!Array.isArray(seatRows) || seatRows.length === 0) {
-      alert("Seat data is still loading. Please wait...");
+      ToastWithTimer({
+        type: "info",
+        message: "Seat data is still loading. Please wait...",
+      });
       return;
     }
 
@@ -360,6 +311,347 @@ export default function OneFlightBooking() {
         },
       };
     });
+  };
+
+  const toggleMealSelection = (
+    journeyType,
+    segmentIndex,
+    meal,
+    travelersCount,
+  ) => {
+    const key = `${journeyType}|${segmentIndex}`;
+
+    setSelectedMeals((prev) => {
+      const list = prev[key] || [];
+      const exists = list.find((m) => m.Code === meal.Code);
+
+      if (exists) {
+        return { ...prev, [key]: list.filter((m) => m.Code !== meal.Code) };
+      }
+
+      if (list.length >= travelersCount) {
+        ToastWithTimer({
+          type: "info",
+          message: `You can add meals for only ${travelersCount} traveler(s)`,
+        });
+        return prev;
+      }
+
+      return { ...prev, [key]: [...list, meal] };
+    });
+  };
+
+  const handleSelectBaggage = (journeyType, segmentIndex, bag) => {
+    const key = `${journeyType}|${segmentIndex}`;
+    setSelectedBaggage((prev) => ({
+      ...prev,
+      [key]: bag,
+    }));
+  };
+
+  const updateTraveler = (id, field, value) => {
+    setTravelers((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, [field]: value } : t)),
+    );
+  };
+
+  const perAdultFare = useMemo(() => {
+    const fare = fareQuote?.Response?.Results?.Fare;
+    if (!fare) return { base: 0, tax: 0 };
+
+    return {
+      base: Number(Math.ceil(fare.BaseFare) || fare.PublishedFare || 0),
+      tax: Number(Math.ceil(fare.Tax) || 0),
+      otherCharges: Number(Math.ceil(fare.OtherCharges) || 0),
+    };
+  }, [fareQuote]);
+
+  const buildSeatSSR = () => {
+    const seats = [];
+
+    Object.entries(selectedSeats).forEach(([key, value]) => {
+      const [, segmentIndex] = key.split("|");
+
+      value.list.forEach((seatCode, travelerIndex) => {
+        seats.push({
+          segmentIndex: Number(segmentIndex),
+          travelerIndex,
+          seatNo: seatCode,
+          price: value.priceMap[seatCode] || 0,
+        });
+      });
+    });
+
+    return seats;
+  };
+
+  const calculateSSRTotal = () => {
+    let total = 0;
+
+    Object.values(selectedSeats).forEach((v) => {
+      v?.list?.forEach((seat) => (total += Number(v.priceMap?.[seat] || 0)));
+    });
+
+    Object.values(selectedMeals).forEach((meals) => {
+      meals?.forEach((m) => (total += Number(m.Price || 0)));
+    });
+
+    Object.values(selectedBaggage).forEach((bag) => {
+      if (bag?.Price) total += Number(bag.Price) * travelers.length;
+    });
+
+    return total;
+  };
+
+  const fullSegments =
+    rawFlightData?.Segments?.flat()?.map((s, index) => ({
+      segmentIndex: index,
+
+      airlineCode: s.Airline.AirlineCode,
+      airlineName: s.Airline.AirlineName,
+      flightNumber: s.Airline.FlightNumber,
+      fareClass: s.Airline.FareClass,
+      cabinClass: s.CabinClass,
+
+      origin: {
+        airportCode: s.Origin.Airport.AirportCode,
+        airportName: s.Origin.Airport.AirportName,
+        terminal: s.Origin.Airport.Terminal,
+        city: s.Origin.Airport.CityName,
+        country: s.Origin.Airport.CountryCode,
+      },
+
+      destination: {
+        airportCode: s.Destination.Airport.AirportCode,
+        airportName: s.Destination.Airport.AirportName,
+        terminal: s.Destination.Airport.Terminal,
+        city: s.Destination.Airport.CityName,
+        country: s.Destination.Airport.CountryCode,
+      },
+
+      departureDateTime: s.Origin.DepTime,
+      arrivalDateTime: s.Destination.ArrTime,
+
+      durationMinutes: s.Duration,
+      stopOver: s.StopOver,
+      aircraft: s.Craft,
+
+      baggage: {
+        checkIn: s.Baggage,
+        cabin: s.CabinBaggage,
+      },
+    })) || [];
+
+  const fareSnapshot = {
+    currency: fareQuote?.Response?.Results?.Fare?.Currency || "INR",
+
+    baseFare: fareQuote?.Response?.Results?.Fare?.BaseFare || 0,
+    tax: fareQuote?.Response?.Results?.Fare?.Tax || 0,
+
+    publishedFare: fareQuote?.Response?.Results?.Fare?.PublishedFare || 0,
+    offeredFare: fareQuote?.Response?.Results?.Fare?.OfferedFare || 0,
+
+    refundable: selectedFlight?.IsRefundable,
+    fareType: selectedFlight?.ResultFareType,
+
+    miniFareRules: selectedFlight?.MiniFareRules || [],
+    lastTicketDate: fareQuote?.Response?.Results?.LastTicketDate,
+  };
+
+  const buildMealSSR = () => {
+    const meals = [];
+
+    Object.entries(selectedMeals).forEach(([key, mealList]) => {
+      const [, segmentIndex] = key.split("|");
+
+      mealList.forEach((meal, travelerIndex) => {
+        meals.push({
+          segmentIndex: Number(segmentIndex),
+          travelerIndex,
+          code: meal.Code,
+          description: meal.Description,
+          price: meal.Price,
+        });
+      });
+    });
+
+    return meals;
+  };
+
+  const buildBaggageSSR = () => {
+    const baggage = [];
+
+    Object.entries(selectedBaggage).forEach(([key, bag]) => {
+      if (!bag) return;
+
+      const [, segmentIndex] = key.split("|");
+
+      baggage.push({
+        segmentIndex: Number(segmentIndex),
+        code: bag.Code,
+        weight: bag.Weight,
+        price: bag.Price,
+      });
+    });
+
+    return baggage;
+  };
+
+  const buildBookingRequestPayload = () => {
+    const segments = parsedFlightData?.segments || [];
+    const firstSegment = segments[0];
+    const lastSegment = segments[segments.length - 1];
+    const cabinClass = CABIN_MAP[firstSegment?.cabinClass] || "Economy";
+
+    const bookingSnapshot = {
+      bookingType: "flight",
+      sectors: segments.map((s) => `${s.from}-${s.to}`),
+      airline: segments.map((s) => s.airline).join(", ") || "N/A",
+      travelDate: firstSegment?.dt || "N/A",
+      returnDate: lastSegment?.at || "N/A",
+      cabinClass,
+      amount:
+        perAdultFare.base * travelers.length +
+        perAdultFare.tax * travelers.length +
+        perAdultFare.otherCharges * travelers.length +
+        calculateSSRTotal(),
+      purposeOfTravel: purposeOfTravel || "N/A",
+      city: lastSegment?.to || "N/A",
+    };
+
+    const TRACE_VALIDITY_MINUTES = 15;
+
+    const fareExpiry = new Date(
+      Date.now() + TRACE_VALIDITY_MINUTES * 60 * 1000,
+    );
+
+    return {
+      bookingType: "flight",
+      flightRequest: {
+        traceId: searchParams.traceId,
+        resultIndex: selectedFlight.ResultIndex,
+
+        fareQuote: {
+          Results: Array.isArray(fareQuote.Response.Results)
+            ? fareQuote.Response.Results
+            : [fareQuote.Response.Results],
+        },
+        segments: fullSegments,
+
+        fareSnapshot,
+
+        ssrSnapshot: {
+          seats: buildSeatSSR(),
+          meals: buildMealSSR(),
+          baggage: buildBaggageSSR(),
+        },
+
+        fareExpiry,
+      },
+
+      travellers: travelers.map((t, idx) => ({
+        title: t.title,
+        firstName: t.firstName,
+        lastName: t.lastName,
+
+        email: t.email,
+        phoneWithCode: t.phoneWithCode, // ✅ THIS WAS MISSING
+
+        gender: t.gender,
+        dateOfBirth: t.dob,
+
+        passportNumber: t.passportNumber,
+        passportExpiry: t.passportExpiry,
+        nationality: t.nationality,
+
+        isLeadPassenger: idx === 0,
+      })),
+
+      purposeOfTravel,
+      bookingSnapshot, // ✅ include summary for backend to save
+      pricingSnapshot: {
+        totalAmount:
+          perAdultFare.base * travelers.length +
+          perAdultFare.tax * travelers.length +
+          perAdultFare.otherCharges * travelers.length +
+          calculateSSRTotal(),
+        currency: "INR",
+      },
+    };
+  };
+
+  const validateTravelers = () => {
+    const errors = {};
+    let isValid = true;
+
+    travelers.forEach((t, idx) => {
+      const e = {};
+
+      if (!t.firstName?.trim()) e.firstName = "First name is required";
+      if (!t.lastName?.trim()) e.lastName = "Last name is required";
+      if (!t.gender?.trim()) e.gender = "Gender is required";
+      if (!t.email?.trim()) e.email = "Email is required";
+      if (!t.dob?.trim()) e.dob = "Date of birth is required";
+      if (!t.phoneWithCode?.trim())
+        e.phoneWithCode = "Phone number is required";
+      if (!t.nationality?.trim()) e.nationality = "Nationality is required";
+
+      // passportNumber validation: only if flight is international
+      const isInternational = Boolean(
+        parsedFlightData?.segments?.some(
+          (s) =>
+            s?.origin?.country &&
+            s?.destination?.country &&
+            s.origin.country !== s.destination.country,
+        ),
+      );
+
+      if (isInternational && !t.passportNumber?.trim()) {
+        e.passportNumber =
+          "Passport number is required for international flights";
+      }
+
+      if (Object.keys(e).length > 0) {
+        errors[idx] = e;
+        isValid = false;
+      }
+    });
+
+    setTravelerErrors(errors);
+    return isValid;
+  };
+
+  const handleSendForApproval = async () => {
+    if (!purposeOfTravel) {
+      ToastWithTimer({
+        type: "error",
+        message: "Please enter purpose of travel",
+      });
+      return;
+    }
+
+    // Validate traveler details before submission
+    if (!validateTravelers()) {
+      ToastWithTimer({
+        type: "error",
+        message: "Please fill all required traveler details correctly.",
+      });
+      return;
+    }
+
+    try {
+      const payload = buildBookingRequestPayload();
+      await dispatch(createBookingRequest(payload)).unwrap();
+
+      navigate("/my-bookings", {
+        state: { success: true },
+      });
+    } catch (err) {
+      ToastWithTimer({
+        type: "error",
+        message: "Failed to submit booking request",
+      });
+    }
   };
 
   if (loading) {
@@ -521,54 +813,31 @@ export default function OneFlightBooking() {
               )}
             </div>
 
-            {/* Fare Selection */}
-            <div className="bg-white rounded-2xl  shadow-sm p-6">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">
-                Fare Options
-              </h3>
-              <FareOptions
-                fareRules={normalizeFareRulesFromQuote(fareQuote)}
-                fareRulesStatus={
-                  fareQuote?.Response?.Results ? "succeeded" : "loading"
-                }
+            {/* Traveller Details */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <TravelerForm
+                travelers={travelers}
+                updateTraveler={updateTraveler}
+                errors={travelerErrors}
+                parsedFlightData={parsedFlightData}
+                purposeOfTravel={purposeOfTravel}
+                setPurposeOfTravel={setPurposeOfTravel}
+                isInternational={isInternational}
               />
-              {ssr?.Results?.Meal?.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h3 className="text-lg font-bold mb-4">Meals</h3>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    {ssr.Results.Meal.map((meal, idx) => (
-                      <div
-                        key={idx}
-                        className="border rounded-lg p-4 flex justify-between items-center"
-                      >
-                        <div>
-                          <p className="font-semibold">{meal.Description}</p>
-                          <p className="text-sm text-gray-500">{meal.Code}</p>
-                        </div>
-                        <p className="font-bold text-blue-600">₹{meal.Price}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Info & Baggage */}
-            <div className="space-y-6">
-              <div className="bg-white rounded-2xl  shadow-sm p-6">
-                <h3 className="text-lg font-bold mb-4">
-                  Important Information
-                </h3>
-                <FareRulesAccordion
-                  fareRules={normalizeFareRules(fareRule)}
-                  fareRulesStatus={!fareRule ? "loading" : "succeeded"}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              {/* Section Header */}
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg md:text-xl font-bold text-slate-900">
+                  Fare Rules & Policies
+                </h2>
+                {/* Button + Modal */}
+                <FareDetailsModal
+                  fareQuote={fareQuote}
+                  fareRule={fareRule}
+                  normalizeFareRules={normalizeFareRules}
                 />
-              </div>
-
-              <div className="bg-white rounded-2xl  shadow-sm p-6">
-                <h3 className="text-lg font-bold mb-4">Baggage & Inclusions</h3>
-                <BaggageTable baggageInfo={baggageInfo} />
               </div>
             </div>
           </div>
@@ -579,12 +848,19 @@ export default function OneFlightBooking() {
               <PriceSummary
                 parsedFlightData={{
                   ...parsedFlightData,
-                  basePrice:
-                    fareQuote?.Response?.Results?.Fare?.PublishedFare ||
-                    parsedFlightData.basePrice,
+                  baseFare: perAdultFare.base * travelers.length,
+                  taxFare: perAdultFare.tax * travelers.length,
+                  otherCharges: perAdultFare.otherCharges * travelers.length,
                 }}
-                selectedSeats={selectedSeats} // ✅ PASS THIS
-                travelers={parsedFlightData?.travelers || []} // ✅ PASS THIS
+                travelers={travelers}
+                selectedSeats={selectedSeats}
+                selectedMeals={selectedMeals}
+                selectedBaggage={selectedBaggage}
+                approver={approver}
+                approverLoading={approverLoading}
+                approverError={approverError}
+                onSendForApproval={handleSendForApproval}
+                loading={actionLoading}
               />
 
               <Amenities />
@@ -598,7 +874,7 @@ export default function OneFlightBooking() {
         <SeatSelectionModal
           isOpen={seatModalOpen}
           onClose={() => setSeatModalOpen(false)}
-          flightIndex={activeSegmentIndex}
+          segmentIndex={activeSegmentIndex}
           journeyType="onward"
           travelers={travelersForSeat}
           selectedSeats={selectedSeats}
@@ -606,6 +882,10 @@ export default function OneFlightBooking() {
           segment={parsedFlightData.segments[activeSegmentIndex]}
           traceId={searchParams.traceId}
           resultIndex={selectedFlight.ResultIndex}
+          selectedMeals={selectedMeals}
+          selectedBaggage={selectedBaggage}
+          onToggleMeal={toggleMealSelection}
+          onSelectBaggage={handleSelectBaggage}
         />
       )}
     </div>

@@ -77,7 +77,7 @@ exports.bookFlight = asyncHandler(async (req, res) => {
   if (!traceId || !resultIndex || !Fare || !passengers?.length) {
     throw new ApiError(
       400,
-      "traceId, resultIndex, Fare and passengers are required"
+      "traceId, resultIndex, Fare and passengers are required",
     );
   }
 

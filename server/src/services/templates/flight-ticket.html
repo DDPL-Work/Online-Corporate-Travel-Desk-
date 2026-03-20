@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Flight Ticket - Air India Express</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Rajdhani:wght@500;600;700&display=swap');
+
+    :root {
+      --primary: #1a3a5c;
+      --accent: #e85d04;
+      --accent2: #f48c06;
+      --bg: #f0f4f8;
+      --card: #ffffff;
+      --border: #cdd8e3;
+      --text: #1e293b;
+      --muted: #64748b;
+      --badge-bg: #1a3a5c;
+      --badge-text: #ffffff;
+      --barcode-bg: #1e293b;
+      --highlight: #e85d04;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 30px 16px;
+    }
+
+    .page-wrapper {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .date-line {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 18px;
+      font-weight: 600;
+    }
+
+    /* ── TOP HEADER ── */
+    .top-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 22px;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-icon {
+      background: var(--accent);
+      color: white;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      padding: 5px 9px;
+      border-radius: 6px;
+      letter-spacing: 1px;
+    }
+
+    .logo-text {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--primary);
+    }
+    .logo-sub {
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .ticket-info {
+      text-align: right;
+    }
+    .ticket-info .label {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .ticket-info .label span {
+      font-weight: 400;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .ticket-info .booking-id {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+    .ticket-info .booking-id strong {
+      color: var(--accent);
+    }
+
+    /* ── BARCODE CARD ── */
+    .barcode-card {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 22px;
+      box-shadow: 0 2px 10px rgba(26,58,92,0.06);
+    }
+
+    .barcode-card .journey-label {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .barcode-card .journey-label strong {
+      color: var(--primary);
+      font-weight: 700;
+    }
+    .barcode-card .journey-label .airline {
+      color: var(--accent);
+      font-weight: 800;
+    }
+
+    .barcode-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .passenger-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .barcode-img {
+      background: var(--barcode-bg);
+      padding: 6px 10px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+    }
+
+    .barcode-bars {
+      display: flex;
+      gap: 2px;
+      height: 36px;
+      align-items: center;
+    }
+
+    .barcode-bars span {
+      display: inline-block;
+      background: white;
+      height: 100%;
+      border-radius: 1px;
+    }
+
+    /* ── SECTION HEADING ── */
+    .section-heading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .section-heading .bar {
+      width: 4px;
+      height: 20px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+    .section-heading h2 {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--primary);
+      text-transform: uppercase;
+    }
+
+    /* ── ROUTE HEADER ── */
+    .route-header {
+      margin-bottom: 4px;
+    }
+    .route-header h1 {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .route-sub {
+      font-size: 12.5px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .route-sub span {
+      color: var(--accent2);
+      font-weight: 700;
+    }
+
+    /* ── MAIN TICKET CARD ── */
+    .ticket-card {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 10px rgba(26,58,92,0.06);
+      overflow: hidden;
+    }
+
+    /* airline strip */
+    .airline-strip {
+      background: linear-gradient(90deg, #1a3a5c 0%, #1e4976 100%);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .airline-logo-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .airline-logo-x {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .airline-name {
+      font-size: 9.5px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .airline-num {
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      margin-top: 2px;
+    }
+
+    .pnr-badge {
+      background: var(--accent);
+      color: white;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 5px;
+      letter-spacing: 1px;
+    }
+
+    .pnr-value {
+      background: white;
+      color: var(--primary);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      padding: 5px 14px;
+      border-radius: 5px;
+      letter-spacing: 2px;
+    }
+
+    /* flight times */
+    .flight-times {
+      padding: 20px 20px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .city-block { min-width: 110px; }
+
+    .city-name {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 2px;
+    }
+
+    .iata {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .time {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--primary);
+      line-height: 1.1;
+    }
+
+    .time span {
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .time-date {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .terminal-info {
+      font-size: 11.5px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* route line */
+    .route-line {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+      gap: 4px;
+    }
+
+    .duration-label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .line-with-dots {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      gap: 0;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      background: white;
+      flex-shrink: 0;
+    }
+
+    .line {
+      flex: 1;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+
+    .plane-icon {
+      width: 22px;
+      height: 22px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    .nonstop {
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    /* fare info */
+    .fare-row {
+      display: flex;
+      gap: 12px;
+      padding: 12px 20px;
+      border-top: 1.5px dashed var(--border);
+    }
+
+    .fare-chip {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .fare-chip svg {
+      color: var(--accent);
+    }
+
+    /* baggage */
+    .baggage-row {
+      display: flex;
+      gap: 20px;
+      padding: 10px 20px 14px;
+    }
+
+    .baggage-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12.5px;
+      color: var(--text);
+    }
+
+    .baggage-item .icon {
+      font-size: 16px;
+    }
+
+    .baggage-item strong {
+      color: var(--primary);
+    }
+
+    /* traveller table */
+    .traveller-table {
+      padding: 0 20px 14px;
+    }
+
+    .traveller-header {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 2fr;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+    }
+
+    .traveller-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 2fr;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .traveller-row .name {
+      font-weight: 800;
+      color: var(--primary);
+    }
+    .traveller-row .seat { font-weight: 700; }
+    .traveller-row .eticket {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 14px;
+      letter-spacing: 1px;
+    }
+
+    .traveller-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* wheelchair notice */
+    .wheelchair-notice {
+      margin: 10px 20px 16px;
+      background: linear-gradient(90deg, rgba(232,93,4,0.08), rgba(244,140,6,0.08));
+      border: 1px solid rgba(232,93,4,0.25);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 9px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12.5px;
+      color: var(--text);
+    }
+
+    .wc-icon {
+      font-size: 18px;
+    }
+
+    .wheelchair-notice .notice-text {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* price */
+    .price-bar {
+      background: var(--bg);
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      border: 1.5px solid var(--border);
+    }
+
+    .price-bar .label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .price-bar .amount {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--primary);
+    }
+    .price-bar .amount span {
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    /* ── PROHIBITED ITEMS ── */
+    .items-section {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px rgba(26,58,92,0.06);
+    }
+
+    .items-grid-wrapper {
+      display: grid;
+      grid-template-columns: 1fr auto;
+    }
+
+    .prohibited-side {
+      padding: 14px 16px;
+    }
+
+    .prohibited-header {
+      background: linear-gradient(90deg, #c0392b, #e74c3c);
+      color: white;
+      text-align: center;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      letter-spacing: 0.5px;
+    }
+
+    .items-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .item-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      width: 68px;
+    }
+
+    .item-icon {
+      width: 44px;
+      height: 44px;
+      border: 2px solid #e74c3c;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      position: relative;
+      background: rgba(231,76,60,0.07);
+    }
+
+    .item-icon::after {
+      content: '';
+      position: absolute;
+      width: 45px;
+      height: 2px;
+      background: #e74c3c;
+      transform: rotate(-45deg);
+      border-radius: 2px;
+    }
+
+    .item-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-align: center;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      line-height: 1.3;
+    }
+
+    /* allowed side */
+    .allowed-side {
+      width: 120px;
+      background: linear-gradient(180deg, #f48c06 0%, #e85d04 100%);
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .allowed-header {
+      color: white;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      line-height: 1.3;
+    }
+
+    .allowed-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .allowed-icon {
+      width: 44px;
+      height: 44px;
+      background: rgba(255,255,255,0.2);
+      border: 2px solid rgba(255,255,255,0.5);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .allowed-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-align: center;
+      color: white;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      line-height: 1.3;
+    }
+
+    /* ── IMPORTANT INFO ── */
+    .info-section {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px rgba(26,58,92,0.06);
+    }
+
+    .info-section h3 {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 16px;
+    }
+
+    .info-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .info-list li {
+      font-size: 12.5px;
+      color: var(--text);
+      padding-left: 14px;
+      position: relative;
+      line-height: 1.5;
+    }
+
+    .info-list li::before {
+      content: '•';
+      color: var(--accent);
+      font-weight: 800;
+      position: absolute;
+      left: 0;
+    }
+
+    .info-list li strong {
+      color: var(--primary);
+      font-weight: 800;
+    }
+
+    .info-list a {
+      color: var(--accent);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    /* ── FOOTER ── */
+    .ticket-footer {
+      text-align: center;
+      font-size: 12.5px;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    .ticket-footer a {
+      color: var(--accent);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .contact-strip {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+
+    .contact-strip strong {
+      color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- Date -->
+  <div class="date-line">26 January 2026</div>
+
+  <!-- Top Header -->
+  <div class="top-header">
+    <div class="brand-logo">
+      <div class="logo-icon">my</div>
+      <div>
+        <div class="logo-text">Partner</div>
+        <div class="logo-sub">by MakeMyTrip</div>
+      </div>
+    </div>
+    <div class="ticket-info">
+      <div class="label">Flight Ticket <span>(One way)</span></div>
+      <div class="booking-id">Booking ID: <strong>MF27GRJNBKK0C3K91551,</strong> (Booked on )</div>
+    </div>
+  </div>
+
+  <!-- Barcode Card -->
+  <div class="barcode-card">
+    <div class="journey-label">
+      Barcode(s) for your journey <strong>Bangalore-Jaipur</strong> on <span class="airline">AIR INDIA EXPRESS</span>
+    </div>
+    <div class="barcode-row">
+      <div class="passenger-name">aashay sahay</div>
+      <div class="barcode-img">
+        <div class="barcode-bars">
+          <!-- simulated barcode bars -->
+          <span style="width:1px"></span><span style="width:3px"></span><span style="width:1px"></span><span style="width:2px"></span>
+          <span style="width:1px"></span><span style="width:1px"></span><span style="width:3px"></span><span style="width:1px"></span>
+          <span style="width:2px"></span><span style="width:1px"></span><span style="width:1px"></span><span style="width:3px"></span>
+          <span style="width:1px"></span><span style="width:2px"></span><span style="width:1px"></span><span style="width:3px"></span>
+          <span style="width:1px"></span><span style="width:1px"></span><span style="width:2px"></span><span style="width:1px"></span>
+          <span style="width:3px"></span><span style="width:1px"></span><span style="width:2px"></span><span style="width:1px"></span>
+          <span style="width:1px"></span><span style="width:3px"></span><span style="width:1px"></span><span style="width:2px"></span>
+          <span style="width:1px"></span><span style="width:1px"></span><span style="width:3px"></span><span style="width:1px"></span>
+          <span style="width:2px"></span><span style="width:1px"></span><span style="width:3px"></span><span style="width:1px"></span>
+          <span style="width:1px"></span><span style="width:2px"></span><span style="width:1px"></span><span style="width:3px"></span>
+          <span style="width:1px"></span><span style="width:2px"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Booking Details Heading -->
+  <div class="section-heading">
+    <div class="bar"></div>
+    <h2>Booking Details</h2>
+  </div>
+
+  <!-- Route -->
+  <div class="route-header">
+    <h1>Bangalore - Jaipur</h1>
+  </div>
+  <div class="route-sub">Tue, 27 Jan 2026 • <span>Non stop</span> • 2h 45m duration</div>
+
+  <!-- Main Ticket Card -->
+  <div class="ticket-card">
+
+    <!-- Airline Strip -->
+    <div class="airline-strip">
+      <div class="airline-logo-box">
+        <div class="airline-logo-x">✕</div>
+        <div class="airline-name">AIR INDIA<br>EXPRESS</div>
+        <div class="airline-num">IX-2068</div>
+      </div>
+      <div style="margin-left:6px; display:flex; align-items:center; gap:8px;">
+        <div class="pnr-badge">PNR</div>
+        <div class="pnr-value">JD9USE</div>
+      </div>
+    </div>
+
+    <!-- Flight Times -->
+    <div class="flight-times">
+      <div class="city-block">
+        <div class="city-name">Bangalore</div>
+        <div class="iata">BLR</div>
+        <div class="time">19:30 <span>hrs</span></div>
+        <div class="time-date">Tue, 27 Jan</div>
+        <div class="terminal-info">Bengaluru International<br>Airport Terminal T2</div>
+      </div>
+
+      <div class="route-line">
+        <div class="duration-label">2h 45m</div>
+        <div class="line-with-dots">
+          <div class="dot"></div>
+          <div class="line"></div>
+          <div class="plane-icon">✈</div>
+          <div class="line"></div>
+          <div class="dot"></div>
+        </div>
+        <div class="nonstop">● NON STOP ●</div>
+      </div>
+
+      <div class="city-block" style="text-align:right;">
+        <div class="city-name">Jaipur</div>
+        <div class="iata">JAI</div>
+        <div class="time">22:15 <span>hrs</span></div>
+        <div class="time-date">Tue, 27 Jan</div>
+        <div class="terminal-info">Jaipur Airport Terminal T2</div>
+      </div>
+    </div>
+
+    <!-- Fare Row -->
+    <div class="fare-row">
+      <div class="fare-chip">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+        Defence Fare
+      </div>
+      <div class="fare-chip">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg>
+        Economy
+      </div>
+      <div class="fare-chip">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/></svg>
+        Armed forces Fare
+      </div>
+    </div>
+
+    <!-- Baggage Row -->
+    <div class="baggage-row">
+      <div class="baggage-item">
+        <span class="icon">🧳</span>
+        <span><strong>Check-in:</strong> 15 Kgs (1 piece only) per Adult</span>
+      </div>
+      <div class="baggage-item">
+        <span class="icon">👜</span>
+        <span><strong>Cabin:</strong> 7 Kgs per Adult</span>
+      </div>
+    </div>
+
+    <!-- Traveller Table -->
+    <div class="traveller-table">
+      <div class="traveller-header">
+        <span>TRAVELLER</span>
+        <span>SEAT</span>
+        <span>MEAL</span>
+        <span>E-TICKET NO</span>
+      </div>
+      <div class="traveller-row">
+        <div>
+          <div class="name">MR. AASHAY SAHAY <span style="font-weight:400;font-size:12px;color:var(--muted)">Adult</span></div>
+          <div class="traveller-sub">JD9USE</div>
+        </div>
+        <div class="seat">11D</div>
+        <div></div>
+        <div class="eticket">JD9USE</div>
+      </div>
+    </div>
+
+    <!-- Wheelchair Notice -->
+    <div class="wheelchair-notice">
+      <span class="wc-icon">♿</span>
+      <div>
+        <div>Wheelchair request has been accepted* by the airline.</div>
+        <div class="notice-text">*Please note, there is a chance that airline may refuse to acknowledge this request at the airport even after acceptance (due to unavailability at the airport). For further information in all such cases, please get in touch with the airline directly.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Price Bar -->
+  <div class="price-bar">
+    <span class="label">You have paid</span>
+    <span class="amount"><span>INR </span>6736</span>
+  </div>
+
+  <!-- Prohibited Items -->
+  <div class="items-section">
+    <div class="items-grid-wrapper">
+      <div class="prohibited-side">
+        <div class="prohibited-header">Items not allowed in the aircraft</div>
+        <div class="items-row">
+          <div class="item-box">
+            <div class="item-icon">🔥</div>
+            <div class="item-label">Lighters, Matchsticks</div>
+          </div>
+          <div class="item-box">
+            <div class="item-icon">🧴</div>
+            <div class="item-label">Flammable Liquids</div>
+          </div>
+          <div class="item-box">
+            <div class="item-icon">☠️</div>
+            <div class="item-label">Toxic</div>
+          </div>
+          <div class="item-box">
+            <div class="item-icon">🧪</div>
+            <div class="item-label">Corrosives</div>
+          </div>
+          <div class="item-box">
+            <div class="item-icon">💨</div>
+            <div class="item-label">Pepper Spray</div>
+          </div>
+        </div>
+        <div class="items-row">
+          <div class="item-box">
+            <div class="item-icon">💨</div>
+            <div class="item-label">Flammable Gas</div>
+          </div>
+          <div class="item-box">
+            <div class="item-icon">🚬</div>
+            <div class="item-label">E-Cigarette</div>
+          </div>
+          <div class="item-box">
+            <div class="item-icon">🦠</div>
+            <div class="item-label">Infectious Substances</div>
+          </div>
+          <div class="item-box">
+            <div class="item-icon">☢️</div>
+            <div class="item-label">Radioactive Materials</div>
+          </div>
+          <div class="item-box">
+            <div class="item-icon">💣</div>
+            <div class="item-label">Explosives Ammunition</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="allowed-side">
+        <div class="allowed-header">Items allowed only in Hand Baggage</div>
+        <div class="allowed-item">
+          <div class="allowed-icon">🔋</div>
+          <div class="allowed-label">Lithium Batteries</div>
+        </div>
+        <div class="allowed-item">
+          <div class="allowed-icon">🔌</div>
+          <div class="allowed-label">Power Banks</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Important Information -->
+  <div class="info-section">
+    <h3>Important Information</h3>
+    <ul class="info-list">
+      <li><strong>Check-In Time :</strong> We advise you to reach the airport atleast 3 hours before departure. Check-in counter generally closes 60 minutes before scheduled departure. It may vary from airline to airline and so it is advisable to check with the airline once.</li>
+      <li><strong>DGCA passenger charter :</strong> Please refer to passenger charter by clicking <a href="#">Here</a></li>
+      <li>Only serving/retired Indian Armed Forces personnel \u0026 their dependents can avail this special fare. It is mandatory to show a valid Armed Forces ID or dependent card at the airport, without which boarding will be denied.</li>
+      <li><strong>Check travel guidelines and baggage information below: :</strong> Carry no more than 1 check-in baggage and 1 hand baggage per passenger. If violated, airline may levy extra charges.</li>
+      <li><strong>Availability of Boarding Pass: :</strong> Once web check-in is completed, your boarding pass will be available within 6 hours of your flight departure.</li>
+      <li><strong>Unaccompanied Minors Travelling: :</strong> An unaccompanied minor usually refers to a child travelling without an adult aged 18 or older. Please check with the airline for their rules and regulations regarding unaccompanied minors, as these can differ between airlines.</li>
+      <li><strong>Valid ID proof needed :</strong> Carry a valid photo identification proof (Driver Licence, Aadhar Card, Pan Card or any other Government recognised photo identification)</li>
+    </ul>
+  </div>
+
+  <!-- Footer -->
+  <div class="ticket-footer">
+    You can view all cancellation, date change and baggage related information <a href="#">here</a> , If you want to manage your booking, you visit MyTrips section using this <a href="#">link</a>
+  </div>
+
+  <!-- Contact -->
+  <div class="contact-strip">
+    <strong>Contact myPartner :</strong> 0124 6280411
+  </div>
+
+</div>
+</body>
+</html>

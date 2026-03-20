@@ -1,29 +1,55 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
-const hotelController = require('../controllers/hotel.controller');
-const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
-const validate = require('../middleware/validate.middleware'); // ✅ FIX
-const { bookingValidation } = require('../validations');
-const { searchLimiter } = require('../middleware/rateLimit.middleware');
+const hotelController = require("../controllers/hotel.controller");
 
-// Protect all routes
+const bookingValidation = require("../validations/booking.validation");
+const {
+  authorizeRoles,
+  verifyToken,
+} = require("../middleware/auth.middleware");
+const { searchLimiter } = require("../middleware/rateLimit.middleware");
+const validate = require("../middleware/validate.middleware");
+
 router.use(verifyToken);
 
-// Hotel search (POST)
-router.post(
-  '/search',
-  authorizeRoles('manager', 'travel-admin', 'corporateAdmin'),
-  searchLimiter,
-  validate(bookingValidation.searchHotel),
-  hotelController.searchHotels
+/* ======================================================
+   STATIC SERVICES
+====================================================== */
+
+router.get(
+  "/countries",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  hotelController.getCountryList,
 );
 
-// Hotel details (GET)
+router.get("/country-list", hotelController.getCountriesFromDB);
+
 router.get(
-  '/:hotelCode',
-  authorizeRoles('manager', 'travel-admin', 'corporateAdmin'),
-  hotelController.getHotelDetails
+  "/cities",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  hotelController.getCityList,
+);
+
+/* ======================================================
+HOTEL SEARCH
+====================================================== */
+
+router.post(
+  "/search",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  searchLimiter,
+  validate(bookingValidation.searchHotel),
+  hotelController.searchHotels,
+);
+
+/* ======================================================
+HOTEL DETAILS
+====================================================== */
+router.post(
+  "/details",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  hotelController.getStaticHotelDetails,
 );
 
 module.exports = router;

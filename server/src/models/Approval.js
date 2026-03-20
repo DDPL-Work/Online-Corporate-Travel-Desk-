@@ -1,45 +1,119 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const approvalSchema = new mongoose.Schema({
-  bookingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', required: true },
-  requesterId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  approverId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  corporateId: { type: mongoose.Schema.Types.ObjectId, ref: 'Corporate', required: true },
-  status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
-  bookingDetails: {
-    bookingType: String,
-    destination: String,
-    travelDate: Date,
-    amount: Number,
-    purposeOfTravel: String
+const approvalSchema = new mongoose.Schema(
+  {
+    /* ================= REFERENCES ================= */
+
+    // bookingRequestId: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "BookingRequest",
+    //   index: true,
+    //   required: true,
+    // },
+
+    bookingRequestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      refPath: "bookingRequestModel",
+      index: true,
+    },
+
+    bookingRequestModel: {
+      type: String,
+      required: true,
+      enum: ["BookingRequest", "HotelBookingRequest"],
+    },
+
+    approvalReference: {
+      type: String,
+      unique: true,
+      required: true,
+      index: true,
+    },
+
+    corporateId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Corporate",
+      required: true,
+      index: true,
+    },
+
+    requesterId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+
+    approverId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+
+    /* ================= APPROVAL STATE ================= */
+
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected", "expired", "cancelled"],
+      default: "pending",
+      index: true,
+    },
+
+    requesterComments: String,
+    approverComments: String,
+
+    approvedAt: Date,
+    rejectedAt: Date,
+    expiredAt: Date,
+
+    /* ================= FULL SNAPSHOT ================= */
+
+    bookingRequestSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      required: true,
+    },
+
+    /* ================= POLICY SNAPSHOT ================= */
+
+    policySnapshot: {
+      policyType: String,
+      maxAllowedAmount: Number,
+      violationFlags: [String],
+    },
+
+    /* ================= NOTIFICATION ================= */
+
+    notification: {
+      initialSent: { type: Boolean, default: false },
+      remindersSent: { type: Number, default: 0 },
+      lastReminderAt: Date,
+    },
   },
-  comments: { type: String, trim: true },
-  approverComments: { type: String, trim: true },
-  approvedAt: Date,
-  rejectedAt: Date,
-  notificationSent: { type: Boolean, default: false },
-  remindersSent: { type: Number, default: 0 },
-  lastReminderAt: Date
-}, { timestamps: true });
+  { timestamps: true },
+);
 
-// Indexes
-approvalSchema.index({ approverId: 1, status: 1, createdAt: -1 });
-approvalSchema.index({ corporateId: 1, status: 1 });
-approvalSchema.index({ requesterId: 1, status: 1 });
+/* ================= METHODS ================= */
 
-// Methods
-approvalSchema.methods.approve = async function(comments = '') {
-  this.status = 'approved';
+approvalSchema.methods.approve = function (comments = "") {
+  this.status = "approved";
+  this.approverComments = comments;
   this.approvedAt = new Date();
-  this.approverComments = comments;
-  return await this.save();
+  return this.save();
 };
 
-approvalSchema.methods.reject = async function(comments = '') {
-  this.status = 'rejected';
+approvalSchema.methods.reject = function (comments = "") {
+  this.status = "rejected";
+  this.approverComments = comments;
   this.rejectedAt = new Date();
-  this.approverComments = comments;
-  return await this.save();
+  return this.save();
 };
 
-module.exports = mongoose.model('Approval', approvalSchema);
+approvalSchema.pre("save", function () {
+  if (!this.isNew && this.isModified("bookingRequestSnapshot")) {
+    throw new Error("Approval snapshot is immutable");
+  }
+});
+
+module.exports = mongoose.model("Approval", approvalSchema);

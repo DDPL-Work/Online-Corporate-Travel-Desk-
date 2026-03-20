@@ -30,6 +30,7 @@ module.exports = {
 
   frontend: {
     url: process.env.FRONTEND_URL,
+    superAdminUrl: process.env.SUPER_ADMIN_URL,
     adminUrl: process.env.ADMIN_FRONTEND_URL,
     prodUrl: process.env.PRODUCTION_FRONTEND_URL
   },

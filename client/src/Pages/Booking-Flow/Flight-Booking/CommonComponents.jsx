@@ -1,11 +1,31 @@
 // Common Components
 import React, { useMemo, useState } from "react";
-import { MdEventSeat, MdInfo } from "react-icons/md";
-import { FaWifi, FaUser, FaPlaneArrival } from "react-icons/fa";
+import {
+  MdCancel,
+  MdDateRange,
+  MdEventSeat,
+  MdInfo,
+  MdLuggage,
+} from "react-icons/md";
+import {
+  FaWifi,
+  FaUser,
+  FaPlaneArrival,
+  FaConciergeBell,
+} from "react-icons/fa";
 import { BsLuggage, BsTag, BsInfoCircleFill } from "react-icons/bs";
-import { AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
+import {
+  AiOutlineInfoCircle,
+  AiOutlineMinus,
+  AiOutlinePlus,
+} from "react-icons/ai";
 import { FaPlaneDeparture } from "react-icons/fa6";
-import { IoPersonAdd, IoPersonRemove } from "react-icons/io5";
+import {
+  IoChevronDown,
+  IoChevronUp,
+  IoPersonAdd,
+  IoPersonRemove,
+} from "react-icons/io5";
 import { PiForkKnifeBold } from "react-icons/pi";
 import { RiHotelLine } from "react-icons/ri";
 import { HiOutlineLocationMarker } from "react-icons/hi";
@@ -13,6 +33,8 @@ import { LuInfo } from "react-icons/lu";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { useNavigate } from "react-router-dom";
+import { airlineLogo, airlineThemes } from "../../../utils/formatter";
+import "./Fares.css"; // custom animation + minor overrides
 
 // Updated color scheme - clean and minimal
 export const orangeText = "text-blue-600";
@@ -22,15 +44,6 @@ export const blueText = "text-gray-800";
 export const grayText = "text-gray-500";
 export const greenText = "text-green-600";
 export const lightGreenBg = "bg-green-50";
-
-const normalizeTripInfos = (tripInfos) => {
-  if (!tripInfos) return [];
-  if (Array.isArray(tripInfos)) return tripInfos;
-  if (typeof tripInfos === "object") {
-    return Object.values(tripInfos).filter(Array.isArray);
-  }
-  return [];
-};
 
 // Helper functions
 export const formatTime = (dateTimeString) => {
@@ -85,23 +98,47 @@ export const formatDuration = (totalMinutes) => {
 // Flight Data Parsing Functions
 export const parseFlightData = (rawFlightData) => {
   if (!rawFlightData?.Segments?.length) return null;
+
+  // ✅ MULTI-CITY ONLY
+  if (rawFlightData.Segments.length > 1) {
+    return {
+      type: "multi-city",
+
+      allSegmentsData: rawFlightData.Segments.map((leg, idx) => {
+        const parsed = parseOneWayData({ ...rawFlightData, Segments: [leg] });
+
+        return {
+          legIndex: idx,
+          from: parsed.flightData.from,
+          to: parsed.flightData.to,
+          date: parsed.flightData.date,
+          segments: parsed.segments,
+        };
+      }),
+
+      // Header helpers (used ONLY in booking page)
+      flightData: {
+        from: rawFlightData.Segments[0][0].Origin.Airport.CityName,
+        to: rawFlightData.Segments[rawFlightData.Segments.length - 1].slice(
+          -1,
+        )[0].Destination.Airport.CityName,
+        date: rawFlightData.Segments[0][0].Origin.DepTime,
+      },
+    };
+  }
+
+  // 🔒 ONE-WAY & ROUND-TRIP UNCHANGED
   return parseOneWayData(rawFlightData);
 };
 
-const _norm = (v = "") => (v || "").toString().trim().toUpperCase();
-
-const formatPassengers = (passengers = {}) => {
-  const adults = passengers.adults || 1;
-  const children = passengers.children || 0;
-  const infants = passengers.infants || 0;
-  let result = `${adults} Adult${adults > 1 ? "s" : ""}`;
-  if (children > 0) result += `, ${children} Child${children > 1 ? "ren" : ""}`;
-  if (infants > 0) result += `, ${infants} Infant${infants > 1 ? "s" : ""}`;
-  return result;
-};
-
 export const parseOneWayData = (result) => {
-  const segmentGroup = result.Segments?.[0] || [];
+  // const segmentGroup = result.Segments?.[0] || [];
+  const segmentGroup =
+    result?.Segments?.[0] ||
+    result?.FareQuote?.Results?.[0]?.Segments?.[0] ||
+    result?.Results?.[0]?.Segments?.[0] ||
+    [];
+
   if (!segmentGroup.length) return null;
 
   const segments = segmentGroup.map((seg, idx) => {
@@ -116,6 +153,7 @@ export const parseOneWayData = (result) => {
         code: seg.Origin.Airport.AirportCode,
         name: seg.Origin.Airport.AirportName,
         terminal: seg.Origin.Airport.Terminal,
+        countryCode: seg.Origin.Airport.CountryCode,
       },
 
       aa: {
@@ -123,6 +161,7 @@ export const parseOneWayData = (result) => {
         code: seg.Destination.Airport.AirportCode,
         name: seg.Destination.Airport.AirportName,
         terminal: seg.Destination.Airport.Terminal,
+        countryCode: seg.Destination.Airport.CountryCode,
       },
 
       fD: {
@@ -141,7 +180,7 @@ export const parseOneWayData = (result) => {
             0,
             (new Date(next.Origin.DepTime) -
               new Date(seg.Destination.ArrTime)) /
-              60000
+              60000,
           )
         : 0,
     };
@@ -172,9 +211,48 @@ export const parseOneWayData = (result) => {
   };
 };
 
+const calculateDurationInMinutes = (segments = []) => {
+  if (!segments.length) return 0;
+
+  const start = new Date(segments[0].dt);
+  const end = new Date(segments[segments.length - 1].at);
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+
+  return Math.round((end - start) / 60000);
+};
+
+export const parseRoundTripBooking = ({ onward, return: ret }) => {
+  if (!onward || !ret) return null;
+
+  const onwardParsed = parseOneWayData(onward);
+  const returnParsed = parseOneWayData(ret);
+
+  return {
+    type: "round-trip",
+
+    onwardSegments: onwardParsed.segments,
+    returnSegments: returnParsed.segments,
+
+    onwardData: onwardParsed.flightData,
+    returnData: returnParsed.flightData,
+
+    basePrice:
+      (onward.Fare?.PublishedFare || 0) + (ret.Fare?.PublishedFare || 0),
+
+    baggageInfo: onwardParsed.baggageInfo,
+    isRefundable: onwardParsed.isRefundable && returnParsed.isRefundable,
+
+    // ✅ SEPARATE DURATIONS (THIS FIXES THE UI)
+    totalDuration: calculateDurationInMinutes(onwardParsed.segments),
+    returnTotalDuration: calculateDurationInMinutes(returnParsed.segments),
+  };
+};
+
 export const FlightTimeline = ({
   segments = [],
   selectedSeats = {},
+  baseSegmentIndex = 0,
   openSeatModal,
   journeyType = "onward",
   isSeatReady = false,
@@ -199,7 +277,9 @@ export const FlightTimeline = ({
     return <p className="text-gray-500">No flight segments available.</p>;
   }
 
-  const seatDisabled = !isSeatReady;
+  // const seatDisabled = !isSeatReady;
+  const seatDisabled = isSeatReady !== true;
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-12">
       {segments.map((segment, idx) => {
@@ -259,7 +339,8 @@ export const FlightTimeline = ({
                               <div>
                                 {/* Selected seats */}
                                 {(() => {
-                                  const seatKey = `${journeyType}|${idx}`;
+                                  const actualIndex = baseSegmentIndex + idx;
+                                  const seatKey = `${journeyType}|${actualIndex}`;
                                   const seats =
                                     selectedSeats?.[seatKey]?.list || [];
                                   if (!seats.length) return null;
@@ -279,20 +360,39 @@ export const FlightTimeline = ({
                           Duration: {formatDurationCompact(segment.duration)} •{" "}
                           {segment.fD?.eT || "Aircraft"}
                         </p>
-                        <button
-                          onClick={() => !seatDisabled && openSeatModal(idx)}
-                          disabled={seatDisabled}
-                          className={`mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-lg py-2 transition
-    ${
-      seatDisabled
-        ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
-        : "text-blue-600 border border-blue-600 hover:bg-blue-600 hover:text-white"
-    }
-  `}
-                        >
-                          <MdEventSeat />
-                          {seatDisabled ? "Seats loading…" : "Select Seats"}
-                        </button>
+                        {(() => {
+                          const getSeatButtonText = () => {
+                            if (isSeatReady === "loading")
+                              return "SSR loading…";
+                            if (isSeatReady === "error")
+                              return "Unable to load ssr";
+                            if (isSeatReady === "none")
+                              return "No ssr available";
+                            if (isSeatReady === true) return "Select SSR";
+                            return "SSR loading…";
+                          };
+
+                          const seatDisabled = isSeatReady !== true;
+
+                          return (
+                            <button
+                              onClick={() =>
+                                !seatDisabled && openSeatModal(idx)
+                              }
+                              disabled={seatDisabled}
+                              className={`mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-lg py-2 transition
+        ${
+          seatDisabled
+            ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
+            : "text-blue-600 border border-blue-600 hover:border-[#0A4D68] hover:bg-[#0A4D68] hover:text-white"
+        }
+      `}
+                            >
+                              <FaConciergeBell />
+                              {getSeatButtonText()}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -340,100 +440,631 @@ export const FlightTimeline = ({
   );
 };
 
-// Fare Options Component
+/* ======================================================
+   ROUND TRIP FLIGHT TIMELINE
+   (Wrapper over FlightTimeline)
+   ====================================================== */
+
+export const RoundTripFlightTimeline = ({
+  segments = [],
+  isReturnJourney = false,
+  selectedSeats = {},
+  openSeatModal,
+  isSeatReady,
+  isInternational = false,
+  onwardCount = 0,
+}) => {
+  const journeyType = isReturnJourney ? "return" : "onward";
+  const seatReady = Boolean(isSeatReady);
+
+  if (!segments.length) return null;
+
+  return (
+    <FlightTimeline
+      segments={segments}
+      journeyType={journeyType}
+      selectedSeats={selectedSeats}
+      baseSegmentIndex={isReturnJourney && isInternational ? onwardCount : 0}
+      openSeatModal={(segmentIndex) =>
+        openSeatModal(segments[segmentIndex], segmentIndex, journeyType)
+      }
+      isSeatReady={seatReady}
+    />
+  );
+};
+
+/* ======================================================
+   MULTI CITY FLIGHT TIMELINE
+   ====================================================== */
+
+export const MultiCityFlightTimeline = ({
+  allSegmentsData = [],
+  selectedSeats = {},
+  openSeatModal,
+  isSeatReady = false,
+}) => {
+  if (!Array.isArray(allSegmentsData) || allSegmentsData.length === 0) {
+    return (
+      <p className="text-sm text-gray-500 text-center py-6">
+        No flight details available.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-12">
+      {allSegmentsData.map((leg, legIndex) => (
+        <div
+          key={legIndex}
+          className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
+        >
+          {/* ===== LEG HEADER ===== */}
+          <div className="px-6 py-4 bg-linear-to-r from-blue-50 to-blue-100 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  {leg.from} → {leg.to}
+                </h3>
+              </div>
+            </div>
+          </div>
+
+          {/* ===== LEG BODY ===== */}
+          <div className="p-6 bg-slate-50">
+            <FlightTimeline
+              segments={leg.segments}
+              selectedSeats={selectedSeats}
+              openSeatModal={(segmentIndex) =>
+                openSeatModal?.("multi-city", legIndex, segmentIndex)
+              }
+              journeyType={`multi-${legIndex}`}
+              isSeatReady={isSeatReady}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export const normalizeSSRList = (list = []) => {
+  if (!Array.isArray(list)) return [];
+
+  // Flatten one level if needed
+  const flat = Array.isArray(list[0]) ? list.flat() : list;
+
+  const map = new Map();
+
+  flat.forEach((meal) => {
+    if (!meal || meal.Code === "NoMeal") return;
+
+    // Deduplicate by Meal Code (correct key)
+    if (!map.has(meal.Code)) {
+      map.set(meal.Code, meal);
+    }
+  });
+
+  return Array.from(map.values());
+};
+
 export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
   const [open, setOpen] = useState({
-    cancellation: false,
-    dateChange: false,
-    baggage: false,
+    cancellation: true,
+    dateChange: true,
     important: false,
   });
 
   const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  // 🔒 LOGIC UNCHANGED
   if (fareRulesStatus === "loading") {
     return (
-      <div className="text-center py-4 text-gray-600 font-medium">
-        Fetching fare rules...
+      <div className="flex flex-col items-center justify-center bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <div className="loader mb-3"></div>
+        <p className="text-gray-600 text-sm">Loading fare rules...</p>
       </div>
     );
   }
 
   if (!fareRules) {
     return (
-      <div className="text-center py-4 text-gray-600 font-medium">
+      <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-500 text-sm">
         Fare rules not available for this fare.
       </div>
     );
   }
 
+  const results = fareRules?.Response?.Results || fareRules;
+  const miniFareRules = Array.isArray(results?.MiniFareRules)
+    ? results.MiniFareRules.flat()
+    : [];
+
+  const cancellationRules = miniFareRules.filter(
+    (rule) => rule.Type === "Cancellation",
+  );
+  const reissueRules = miniFareRules.filter((rule) => rule.Type === "Reissue");
+
+  const fareBasisCode = results?.FareRules?.[0]?.FareBasisCode || "";
+  const airlineRemark = results?.AirlineRemark || "";
+  const isRefundable = results?.IsRefundable;
+
+  const formatTimeRange = (from, to, unit) => {
+    if (!from && !to) return "Anytime";
+    if (from && !to)
+      return `More than ${from} ${unit.toLowerCase()} before departure`;
+    if (!from && to) return `Within ${to} ${unit.toLowerCase()} of departure`;
+    return `${from}-${to} ${unit.toLowerCase()} before departure`;
+  };
+
   const sections = [
     {
+      key: "cancellation",
+      title: "Cancellation Charges",
+      icon: <MdCancel size={20} />,
+      color: "text-red-600",
+      data: cancellationRules,
+      hasData: cancellationRules.length > 0,
+    },
+    {
+      key: "dateChange",
+      title: "Date Change Charges",
+      icon: <MdDateRange size={20} />,
+      color: "text-orange-600",
+      data: reissueRules,
+      hasData: reissueRules.length > 0,
+    },
+    {
       key: "important",
-      title: "Important Notes",
-      icon: <MdInfo className="text-teal-600 text-xl" />,
-      data: fareRules.important,
-      bg: "from-teal-50 to-purple-100 border-gray-300",
+      title: "Important Information",
+      icon: <AiOutlineInfoCircle size={20} />,
+      color: "text-blue-600",
+      data: { fareBasisCode, airlineRemark, isRefundable },
+      hasData: !!(fareBasisCode || airlineRemark || isRefundable !== undefined),
     },
   ];
 
+  // 🔒 RENDER LOGIC UNCHANGED — only classes & structure polished
   return (
-    <div className="space-y-4">
-      {sections.map((sec) => (
-        <div
-          key={sec.key}
-          className={`rounded-xl overflow-hidden border shadow-sm bg-linear-to-r ${sec.bg}`}
-        >
-          {/* Header */}
-          <button
-            onClick={() => toggle(sec.key)}
-            className="w-full flex items-center justify-between p-4"
-          >
-            <div className="flex items-center gap-3">
-              {sec.icon}
-              <span className="font-semibold text-gray-900">{sec.title}</span>
-            </div>
+    <div className="space-y-5">
+      {sections.map(
+        (sec) =>
+          sec.hasData && (
+            <div
+              key={sec.key}
+              className="border border-gray-200 bg-white rounded-xl shadow-sm overflow-hidden transition-all hover:shadow-md"
+            >
+              {/* Header */}
+              <button
+                onClick={() => toggle(sec.key)}
+                className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 hover:bg-gray-100 transition"
+              >
+                <div className="flex items-center gap-3">
+                  <span className={sec.color}>{sec.icon}</span>
+                  <span className="font-semibold text-gray-800 text-sm md:text-base">
+                    {sec.title}
+                  </span>
+                </div>
+                {open[sec.key] ? (
+                  <IoChevronUp className="text-gray-500" size={18} />
+                ) : (
+                  <IoChevronDown className="text-gray-500" size={18} />
+                )}
+              </button>
 
-            <span className="text-gray-700 text-lg">
-              {open[sec.key] ? "−" : "+"}
-            </span>
-          </button>
+              {/* Body */}
+              {open[sec.key] && (
+                <div className="px-6 py-4 bg-white border-t border-gray-100 animate-fadeIn space-y-3">
+                  {/* Cancellation */}
+                  {sec.key === "cancellation" &&
+                    sec.data.map((rule, i) => (
+                      <div
+                        key={i}
+                        className="flex justify-between items-start py-2 border-b last:border-0 border-gray-100"
+                      >
+                        <div className="flex-1 pr-4">
+                          <p className="font-medium text-gray-800 text-sm">
+                            {formatTimeRange(rule.From, rule.To, rule.Unit)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {rule.JourneyPoints}
+                          </p>
+                        </div>
+                        <p className="text-right font-semibold text-gray-900 text-sm">
+                          {rule.Details}
+                        </p>
+                      </div>
+                    ))}
 
-          {/* Content */}
-          {open[sec.key] && (
-            <div className="bg-white p-5 border-t border-gray-200 animate-fadeIn">
-              {sec.data.length > 0 ? (
-                sec.data.map((html, i) => (
-                  <div
-                    key={i}
-                    className="
-            prose prose-sm max-w-none
-            prose-ul:pl-5
-            prose-li:marker:text-purple-500
-            prose-strong:text-gray-900
-            prose-p:my-2
-            text-gray-700
-          "
-                    dangerouslySetInnerHTML={{
-                      __html: html
-                        // optional cleanup for better spacing
-                        .replace(/<br\s*\/?>/gi, "<br/>")
-                        .replace(
-                          /FareBasisCode is:\s*(\w+)/i,
-                          '<div class="mb-3 inline-flex items-center gap-2 bg-purple-50 border border-purple-200 text-purple-800 px-3 py-1 rounded-lg text-xs font-semibold">Fare Basis Code: $1</div>'
-                        ),
-                    }}
-                  />
-                ))
-              ) : (
-                <p className="text-sm text-gray-600">
-                  No information available.
-                </p>
+                  {/* Date Change */}
+                  {sec.key === "dateChange" &&
+                    sec.data.map((rule, i) => (
+                      <div
+                        key={i}
+                        className="flex justify-between items-start py-2 border-b last:border-0 border-gray-100"
+                      >
+                        <div className="flex-1 pr-4">
+                          <p className="font-medium text-gray-800 text-sm">
+                            {formatTimeRange(rule.From, rule.To, rule.Unit)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {rule.JourneyPoints}
+                          </p>
+                        </div>
+                        <p className="text-right font-semibold text-gray-900 text-sm">
+                          {rule.Details}
+                        </p>
+                      </div>
+                    ))}
+
+                  {/* Important */}
+                  {sec.key === "important" && (
+                    <div className="space-y-3">
+                      {sec.data.fareBasisCode && (
+                        <div className="p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
+                          <p className="text-xs text-gray-600 font-medium uppercase">
+                            Fare Basis Code
+                          </p>
+                          <p className="font-semibold text-blue-900 text-sm">
+                            {sec.data.fareBasisCode}
+                          </p>
+                        </div>
+                      )}
+                      {sec.data.isRefundable !== undefined && (
+                        <div
+                          className={`p-3 border-l-4 rounded ${
+                            sec.data.isRefundable
+                              ? "bg-green-50 border-green-500"
+                              : "bg-red-50 border-red-500"
+                          }`}
+                        >
+                          <p className="text-xs text-gray-600 font-medium uppercase">
+                            Refund Policy
+                          </p>
+                          <p
+                            className={`font-semibold text-sm ${
+                              sec.data.isRefundable
+                                ? "text-green-800"
+                                : "text-red-800"
+                            }`}
+                          >
+                            {sec.data.isRefundable
+                              ? "Refundable"
+                              : "Non-Refundable"}
+                          </p>
+                        </div>
+                      )}
+                      {sec.data.airlineRemark && (
+                        <div className="p-3 bg-gray-50 border-l-4 border-gray-400 rounded">
+                          <p className="text-xs text-gray-600 font-medium uppercase">
+                            Airline Remark
+                          </p>
+                          <p className="text-xs text-gray-700 mt-1 leading-relaxed">
+                            {sec.data.airlineRemark.split(".")[0]}.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-          )}
+          ),
+      )}
+    </div>
+  );
+};
+
+export const FareRulesAccordion = ({
+  fareRules = null,
+  fareRulesStatus = "idle",
+}) => {
+  const [open, setOpen] = useState(true);
+
+  // ✅ Extract airline data dynamically from API
+  // ✅ Extract airline + routing details dynamically and safely
+  const airlineInfo =
+    fareRules?.data?.Response?.FareRules?.[0] ||
+    fareRules?.Response?.FareRules?.[0] ||
+    fareRules?.FareRules?.[0] ||
+    null;
+
+  // ✅ Normalize airline code (handles SG / 6E / AI / uk etc.)
+  const normalizeAirlineCode = (code = "") =>
+    code
+      .toString()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+
+  const airlineCode = normalizeAirlineCode(
+    airlineInfo?.AirlineCode || airlineInfo?.Airline || "",
+  );
+
+  // ✅ Dynamic airline name fallback
+  const airlineName =
+    airlineInfo?.AirlineName ||
+    airlineInfo?.Airline ||
+    airlineCode ||
+    "Unknown Airline";
+
+  const origin = airlineInfo?.Origin || "";
+  const destination = airlineInfo?.Destination || "";
+
+  // ✅ Theme gradient (dynamic from airlineThemes map)
+  const gradient =
+    airlineThemes[airlineCode]?.gradient || airlineThemes.DEFAULT.gradient;
+
+  // 🔒 Original Logic (Unchanged)
+  const rules =
+    fareRules?.FareRules ||
+    fareRules?.Response?.FareRules ||
+    fareRules?.data?.Response?.FareRules ||
+    [];
+
+  const parseFareRuleDetail = (detail) => {
+    if (!detail) return null;
+    const fareBasisMatch = detail.match(/The FareBasisCode is:\s*(\w+)/i);
+    const fareBasisCode = fareBasisMatch ? fareBasisMatch[1] : null;
+    const domesticMatch = detail.match(
+      /Domestic([\s\S]*?)(?=International|$)/i,
+    );
+    const internationalMatch = detail.match(/International([\s\S]*?)(?=\*|$)/i);
+    const importantNotes = detail.match(/\*[^\r\n]+/g) || [];
+    return {
+      fareBasisCode,
+      domestic: domesticMatch ? domesticMatch[1].trim() : null,
+      international: internationalMatch ? internationalMatch[1].trim() : null,
+      importantNotes: importantNotes.map((note) =>
+        note.replace(/^\*\s*/, "").trim(),
+      ),
+    };
+  };
+
+  const parseBaggageTable = (text) => {
+    if (!text) return [];
+    const lines = text.split(/\r\n/).filter((l) => l.trim());
+    const baggageLines = lines.filter(
+      (l) => l.includes("Ex ") && l.includes("Kgs"),
+    );
+    return baggageLines
+      .map((line) => {
+        const parts = line.split(/\s+(\d+\s*Kgs?)/i);
+        if (parts.length >= 2) {
+          return { sector: parts[0].trim(), allowance: parts[1].trim() };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  };
+
+  // 🔒 Data formatting preserved, UI enhanced
+  const formatFareRuleContent = (detail) => {
+    const parsed = parseFareRuleDetail(detail);
+    if (!parsed) return null;
+
+    const domesticBaggage = parsed.domestic
+      ? parseBaggageTable(parsed.domestic)
+      : [];
+    const internationalBaggage = parsed.international
+      ? parseBaggageTable(parsed.international)
+      : [];
+
+    return (
+      <div className="space-y-8">
+        {/* Fare Basis Highlight */}
+        {parsed.fareBasisCode && (
+          <div
+            className={`flex items-center justify-between bg-linear-to-r ${gradient} text-white rounded-xl shadow p-4`}
+          >
+            <div>
+              <p className="text-xs opacity-90 uppercase tracking-wide">
+                Fare Basis Code
+              </p>
+              <h3 className="text-lg font-bold tracking-wider">
+                {parsed.fareBasisCode}
+              </h3>
+            </div>
+            <div className="bg-white/20 text-white px-3 py-1 rounded-md text-sm font-medium">
+              Airline Rule Info
+            </div>
+          </div>
+        )}
+
+        {/* Domestic Fare Section */}
+        {parsed.domestic && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 bg-blue-50 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">✈️</span>
+                <h3 className="text-sm font-semibold text-gray-800">
+                  Domestic Fare Rules
+                </h3>
+              </div>
+              {domesticBaggage.length > 0 && (
+                <div className="bg-green-100 text-green-800 px-3 py-1 rounded-md text-xs font-semibold">
+                  Free Baggage: {domesticBaggage[0]?.allowance}
+                </div>
+              )}
+            </div>
+            <div className="p-5 text-sm text-gray-700 leading-relaxed">
+              <p>{parsed.domestic.split(/(?=Free baggage)/i)[0].trim()}</p>
+            </div>
+          </div>
+        )}
+
+        {/* International Fare Section */}
+        {parsed.international && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 bg-indigo-50 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🌍</span>
+                <h3 className="text-sm font-semibold text-gray-800">
+                  International Fare Rules
+                </h3>
+              </div>
+            </div>
+
+            <div className="p-5 text-sm text-gray-700 leading-relaxed">
+              <p>{parsed.international.split(/(?=Free baggage)/i)[0].trim()}</p>
+
+              {internationalBaggage.length > 0 && (
+                <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
+                    🧳 Free Baggage Allowance by Sector
+                  </h4>
+                  <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {internationalBaggage.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex justify-between items-center px-3 py-2 bg-white rounded-md border border-gray-200 hover:border-blue-400 shadow-sm"
+                      >
+                        <span className="text-xs text-gray-700 font-medium">
+                          {item.sector}
+                        </span>
+                        <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
+                          {item.allowance}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Important Notes */}
+        {parsed.importantNotes.length > 0 && (
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-gray-800">
+              Important Notes
+            </h4>
+            {parsed.importantNotes.map((note, idx) => {
+              const isGst =
+                note.toUpperCase().includes("GST") ||
+                note.toUpperCase().includes("EXTRA");
+              const isTime = note.toUpperCase().includes("HOURS BEFORE");
+              return (
+                <div
+                  key={idx}
+                  className={`flex items-start gap-3 p-4 rounded-lg border text-sm shadow-sm ${
+                    isGst
+                      ? "bg-amber-50 border-amber-300 text-amber-800"
+                      : isTime
+                        ? "bg-yellow-50 border-yellow-300 text-yellow-800"
+                        : "bg-blue-50 border-blue-200 text-blue-800"
+                  }`}
+                >
+                  <span className="text-lg leading-none">
+                    {isGst ? "⚠️" : isTime ? "🕐" : "ℹ️"}
+                  </span>
+                  <p className="flex-1 leading-relaxed">{note}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // 🔒 Core logic preserved
+  if (fareRulesStatus === "loading") {
+    return (
+      <div className="border border-gray-200 bg-white rounded-xl p-8 text-center">
+        <div className="loader mx-auto mb-3"></div>
+        <p className="text-gray-600 text-sm">Loading fare rules...</p>
+      </div>
+    );
+  }
+
+  let fareRuleDetails = null;
+  if (fareRules?.important?.length) fareRuleDetails = fareRules.important;
+  else if (fareRules?.data?.Response?.FareRules?.length)
+    fareRuleDetails = fareRules.data.Response.FareRules.map(
+      (r) => r.FareRuleDetail,
+    ).filter(Boolean);
+  else if (fareRules?.Response?.FareRules?.length)
+    fareRuleDetails = fareRules.Response.FareRules.map(
+      (r) => r.FareRuleDetail,
+    ).filter(Boolean);
+  else if (fareRules?.FareRules?.length)
+    fareRuleDetails = fareRules.FareRules.map((r) => r.FareRuleDetail).filter(
+      Boolean,
+    );
+  else if (Array.isArray(fareRules))
+    fareRuleDetails = fareRules
+      .map((r) =>
+        typeof r === "string" ? r : r.FareRuleDetail || r.important?.[0],
+      )
+      .filter(Boolean);
+  else if (fareRules?.FareRuleDetail)
+    fareRuleDetails = [fareRules.FareRuleDetail];
+
+  if (!fareRuleDetails || fareRuleDetails.length === 0) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500 text-sm">
+        Fare rules not available for this fare.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
+      {/* Accordion Header */}
+      <button
+        onClick={() => setOpen(!open)}
+        className={`w-full flex items-center justify-between px-6 py-4 bg-linear-to-r ${gradient} text-white font-semibold tracking-wide hover:brightness-110 transition`}
+      >
+        <div className="flex items-center gap-3">
+          <img
+            src={airlineLogo(airlineCode)}
+            alt={airlineName}
+            className="w-8 h-8 rounded-full bg-white p-1"
+          />
+          <div className="flex flex-col text-left">
+            <span className="text-sm font-medium">{airlineName}</span>
+            {origin && destination && (
+              <span className="text-xs opacity-80">
+                {origin} → {destination}
+              </span>
+            )}
+          </div>
         </div>
-      ))}
+        {open ? (
+          <IoChevronUp className="text-white" size={20} />
+        ) : (
+          <IoChevronDown className="text-white" size={20} />
+        )}
+      </button>
+
+      {/* Accordion Content */}
+      {open && (
+        <div className="bg-gray-50 px-6 py-6 animate-fadeIn space-y-10">
+          {fareRuleDetails.map((detail, i) => (
+            <div key={i}>{formatFareRuleContent(detail)}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Animations */}
+      <style>{`
+        .loader {
+          width: 24px;
+          height: 24px;
+          border: 3px solid #3b82f6;
+          border-top-color: transparent;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-in-out; }
+      `}</style>
     </div>
   );
 };
@@ -443,53 +1074,66 @@ export const PriceSummary = ({
   parsedFlightData,
   discountAmount = 0,
   selectedSeats = {},
+  selectedMeals = {},
+  selectedBaggage = {},
   travelers = [],
+  approver,
+  approverLoading,
+  approverError,
+  onSendForApproval,
+  loading = false,
 }) => {
   if (!parsedFlightData) return null;
 
   const travelerCount = Math.max(travelers.length || 1);
-  const totalBaseFare = parsedFlightData.basePrice || 0;
-  const perPassengerBaseFare = Math.round(totalBaseFare / travelerCount);
+
+  const baseFare = Math.ceil(parsedFlightData.baseFare) || 0;
+  const taxFare =
+    Math.ceil(parsedFlightData.taxFare) +
+    Math.ceil(parsedFlightData.otherCharges);
 
   const totalSeatPrice = useMemo(() => {
     let sum = 0;
     Object.values(selectedSeats || {}).forEach((v) => {
       if (!v?.priceMap || !v?.list) return;
       v.list.forEach((seat) => {
-        sum += v.priceMap[seat] || 0;
+        sum += Number(v.priceMap[seat] || 0);
       });
     });
     return sum;
   }, [selectedSeats]);
 
-  const taxRate = 0.08;
-  const taxAmount = Math.round(totalBaseFare * taxRate);
-  const convenienceFee = 99;
+  const totalMealPrice = useMemo(() => {
+    let sum = 0;
 
-  const subtotal = totalBaseFare + taxAmount + convenienceFee + totalSeatPrice;
-  const totalAmount = Math.max(0, subtotal - (discountAmount || 0));
-
-  const seatBreakdown = useMemo(() => {
-    const rows = [];
-
-    Object.entries(selectedSeats || {}).forEach(([key, value]) => {
-      if (!value?.list?.length) return;
-
-      value.list.forEach((seat, index) => {
-        rows.push({
-          seat,
-          price: value.priceMap?.[seat] || 0,
-          passenger: `Passenger ${index + 1}`,
-          segment: key,
-        });
+    Object.values(selectedMeals || {}).forEach((meals) => {
+      if (!Array.isArray(meals)) return;
+      meals.forEach((meal) => {
+        sum += Number(meal.Price || 0);
       });
     });
 
-    return rows;
-  }, [selectedSeats]);
+    return sum;
+  }, [selectedMeals]);
+
+  const totalBaggagePrice = useMemo(() => {
+    let sum = 0;
+
+    Object.values(selectedBaggage || {}).forEach((bag) => {
+      if (!bag) return;
+      sum += Number(bag.Price || 0) * travelers.length;
+    });
+
+    return sum;
+  }, [selectedBaggage, travelers.length]);
+
+  const subtotal =
+    baseFare + taxFare + totalSeatPrice + totalMealPrice + totalBaggagePrice;
+
+  const totalAmount = Math.max(0, subtotal - discountAmount);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden ">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       {/* Header */}
       <div className="bg-linear-to-r from-gray-700 to-gray-800 text-white p-5">
         <h3 className="text-xl font-bold">Fare Summary</h3>
@@ -498,66 +1142,54 @@ export const PriceSummary = ({
 
       <div className="p-5 space-y-3">
         {/* Base Fare */}
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between">
           <span className="text-sm text-gray-600">
             Base Fare ({travelerCount} Adult)
           </span>
-          <span className="font-semibold text-gray-900">
-            ₹{totalBaseFare.toLocaleString()}
-          </span>
+          <span className="font-semibold">₹{baseFare.toLocaleString()}</span>
         </div>
 
         {/* Taxes */}
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">Taxes & Fees</span>
-          <span className="font-semibold text-gray-900">
-            ₹{taxAmount.toLocaleString()}
-          </span>
-        </div>
-
-        {/* Seat Charges */}
-        {/* Seat Charges */}
-        {totalSeatPrice > 0 && (
-          <>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Seat Charges</span>
-              <span className="font-semibold text-gray-900">
-                ₹{totalSeatPrice.toLocaleString()}
-              </span>
-            </div>
-
-            {/* Seat breakdown */}
-            <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
-              {seatBreakdown.map((s, i) => (
-                <div
-                  key={`${s.seat}-${i}`}
-                  className="flex justify-between items-center text-sm"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium text-gray-800">
-                      Seat {s.seat}
-                    </span>
-                    <span className="text-xs text-gray-500">{s.passenger}</span>
-                  </div>
-
-                  <span className="font-semibold text-gray-900">
-                    ₹{s.price.toLocaleString()}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
+        {taxFare > 0 && (
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Taxes & Fees</span>
+            <span className="font-semibold">₹{taxFare.toLocaleString()}</span>
+          </div>
         )}
 
-        {/* Convenience Fee */}
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">Convenience Fee</span>
-          <span className="font-semibold text-gray-900">₹{convenienceFee}</span>
-        </div>
+        {/* Seat Charges */}
+        {totalSeatPrice > 0 && (
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Seat Charges</span>
+            <span className="font-semibold">
+              ₹{totalSeatPrice.toLocaleString()}
+            </span>
+          </div>
+        )}
+
+        {/* Baggage Charges */}
+        {totalBaggagePrice > 0 && (
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Extra Baggage</span>
+            <span className="font-semibold">
+              ₹{totalBaggagePrice.toLocaleString()}
+            </span>
+          </div>
+        )}
+
+        {/* Meal Charges */}
+        {totalMealPrice > 0 && (
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Meals</span>
+            <span className="font-semibold">
+              ₹{totalMealPrice.toLocaleString()}
+            </span>
+          </div>
+        )}
 
         {/* Discount */}
         {discountAmount > 0 && (
-          <div className="flex justify-between items-center text-green-600">
+          <div className="flex justify-between text-green-600">
             <span className="text-sm font-semibold">Discount</span>
             <span className="font-semibold">
               -₹{discountAmount.toLocaleString()}
@@ -565,29 +1197,47 @@ export const PriceSummary = ({
           </div>
         )}
 
-        <div className="border-t border-gray-200 pt-3 mt-3 flex justify-between items-center">
-          <span className="text-lg font-bold text-gray-900">Total Payable</span>
+        <div className="border-t border-gray-200 pt-3 mt-3 flex justify-between">
+          <span className="text-lg font-bold">Total Payable</span>
           <span className="text-xl font-bold text-blue-600">
             ₹{totalAmount.toLocaleString()}
           </span>
         </div>
 
-        {/* Coupon */}
-        {/* <div className="pt-3 border-t border-gray-200">
-          <input
-            type="text"
-            value={couponCode}
-            onChange={onCouponChange}
-            placeholder="Enter coupon code"
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          <button
-            onClick={onApplyCoupon}
-            className="mt-2 w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition"
-          >
-            Apply Coupon
-          </button>
-        </div> */}
+        <div
+          onClick={!loading ? onSendForApproval : undefined}
+          className={`text-white font-bold px-3 py-1.5 flex items-center justify-center rounded-xl
+    ${
+      loading
+        ? "bg-gray-400 cursor-not-allowed"
+        : "bg-blue-600 hover:bg-[#0A4D68] cursor-pointer"
+    }
+  `}
+        >
+          {loading ? "Submitting..." : "Send For Approval"}
+        </div>
+        {/* Approver Message */}
+        <div className="mt-3 text-sm text-center">
+          {approverLoading && (
+            <p className="text-gray-500">Fetching approver details...</p>
+          )}
+
+          {approverError && <p className="text-red-500">{approverError}</p>}
+
+          {!approverLoading && approver && (
+            <p className="text-gray-700">
+              Your request will be sent to{" "}
+              <span className="font-semibold">{approver.name}</span> (
+              {approver.email})
+            </p>
+          )}
+
+          {!approverLoading && !approver && !approverError && (
+            <p className="text-red-500">
+              No approver assigned to your account.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -675,223 +1325,66 @@ export const ImportantInformation = ({
   );
 };
 
-// Normalize the API response to extract fare rules
-const normalizeFareRules = (fareRule) => {
-  if (!fareRule?.Response?.FareRules?.length) {
-    return null;
+const isInternationalTrip = (parsedFlightData) => {
+  if (!parsedFlightData) return false;
+
+  const checkSegments = (segments = []) =>
+    segments.some(
+      (s) =>
+        s?.da?.countryCode &&
+        s?.aa?.countryCode &&
+        s.da.countryCode !== s.aa.countryCode,
+    );
+
+  if (parsedFlightData.type === "one-way") {
+    return checkSegments(parsedFlightData.segments);
   }
 
-  const rules = fareRule.Response.FareRules.map(
-    (rule) => rule.FareRuleDetail
-  ).filter(Boolean);
-
-  return {
-    important: rules,
-  };
-};
-
-export const FareRulesAccordion = ({
-  fareRules = null,
-  fareRulesStatus = "idle",
-}) => {
-  const [open, setOpen] = useState(true);
-
-  if (fareRulesStatus === "loading") {
+  if (parsedFlightData.type === "round-trip") {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-6 py-8 text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mb-3"></div>
-          <p className="text-gray-500 text-sm">Fetching fare rules…</p>
-        </div>
-      </div>
+      checkSegments(parsedFlightData.onwardSegments) ||
+      checkSegments(parsedFlightData.returnSegments)
     );
   }
 
-  if (!fareRules || !fareRules.important?.length) {
-    return (
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-6 py-8 text-center text-gray-500 text-sm">
-          Fare rules not available for this fare.
-        </div>
-      </div>
+  if (parsedFlightData.type === "multi-city") {
+    return (parsedFlightData.allSegmentsData || []).some((seg) =>
+      checkSegments(seg.segments),
     );
   }
 
-  return (
-    <div className="rounded-xl border border-purple-100 bg-linear-to-br from-purple-50/50 to-white shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
-      {/* Header */}
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-6 py-4 bg-linear-to-r from-purple-50 to-purple-50/30 hover:from-purple-100 hover:to-purple-50 transition-all duration-200 group"
-      >
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 flex items-center justify-center rounded-full bg-purple-600 text-white shadow-md group-hover:scale-110 transition-transform duration-200">
-            <LuInfo size={20} strokeWidth={2.5} />
-          </div>
-          <div className="text-left">
-            <p className="font-bold text-gray-900 text-base">Fare Rules</p>
-            <p className="text-xs text-gray-600 mt-0.5">
-              Cancellation, reissue & airline conditions
-            </p>
-          </div>
-        </div>
-
-        <div
-          className="text-purple-600 transition-transform duration-200"
-          style={{ transform: open ? "rotate(0deg)" : "rotate(0deg)" }}
-        >
-          {open ? <AiOutlineMinus  /> : <AiOutlinePlus />}
-        </div>
-      </button>
-
-      {/* Content */}
-      {open && (
-        <div className="bg-white px-6 py-6 border-t border-purple-100 animate-fadeIn">
-          {fareRules.important.map((html, i) => (
-            <div
-              key={i}
-              className="fare-rules-content text-gray-700 text-sm leading-relaxed"
-              dangerouslySetInnerHTML={{
-                __html: html
-                  // Extract and style Fare Basis Code
-                  .replace(
-                    /The FareBasisCode is:\s*(\w+)/i,
-                    `<div style="margin-bottom: 1.5rem;">
-                      <span style="display: inline-flex; align-items: center; gap: 0.5rem; background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); color: #7c3aed; border: 1px solid #e9d5ff; padding: 0.5rem 1rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(124, 58, 237, 0.1);">
-                        <span style="font-size: 0.7rem; opacity: 0.8;">Fare Basis Code:</span> $1
-                      </span>
-                    </div>`
-                  )
-
-                  // Style GST/RAF notice with improved design
-                  .replace(
-                    /(GST,.*?EXTRA\.)/gi,
-                    `<div style="margin-top: 1.5rem; padding: 1rem 1.25rem; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-left: 4px solid #f59e0b; border-radius: 0.5rem; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);">
-                      <p style="margin: 0; color: #92400e; font-weight: 600; font-size: 0.875rem;">$1</p>
-                    </div>`
-                  ),
-              }}
-            />
-          ))}
-        </div>
-      )}
-
-      <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-        
-        .fare-rules-content ul {
-          list-style: none;
-          padding-left: 0;
-          margin: 1rem 0;
-        }
-        
-        .fare-rules-content li {
-          padding: 0.5rem 0;
-          padding-left: 1.5rem;
-          position: relative;
-          line-height: 1.6;
-        }
-        
-        .fare-rules-content li:before {
-          content: "•";
-          position: absolute;
-          left: 0.5rem;
-          color: #7c3aed;
-          font-weight: bold;
-          font-size: 1.2rem;
-        }
-        
-        .fare-rules-content table {
-          width: 100%;
-          border-collapse: collapse;
-          margin: 1.5rem 0;
-          border-radius: 0.5rem;
-          overflow: hidden;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        }
-        
-        .fare-rules-content table td {
-          padding: 0.875rem 1rem;
-          border: 1px solid #e5e7eb;
-          background: white;
-        }
-        
-        .fare-rules-content table tr:first-child td {
-          background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
-          font-weight: 600;
-          color: #374151;
-        }
-        
-        .fare-rules-content table tr:hover td {
-          background: #faf5ff;
-        }
-        
-        .fare-rules-content b {
-          color: #1f2937;
-          font-weight: 700;
-        }
-        
-        .fare-rules-content p {
-          margin: 0.75rem 0;
-          line-height: 1.7;
-        }
-        
-        .fare-rules-content strong {
-          color: #1f2937;
-          font-weight: 600;
-        }
-      `}</style>
-    </div>
-  );
+  return false;
 };
 
-// Baggage Table Component
-export const BaggageTable = ({ baggageInfo = {}, fareClass = "" }) => {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div className="border border-gray-300 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <BsLuggage className="text-orange-600" />
-          <h4 className="font-bold">Cabin Baggage</h4>
-        </div>
-        <p className="text-sm text-gray-600">
-          {baggageInfo?.cB || "7 Kg per passenger"}
-        </p>
-      </div>
+const calculateAgeFromDOB = (dob) => {
+  if (!dob) return "";
 
-      <div className="border border-gray-300 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <BsLuggage className="text-orange-600 text-xl" />
-          <h4 className="font-bold">Check-In Baggage</h4>
-        </div>
-        <p className="text-sm text-gray-600">
-          {baggageInfo?.iB || "15 Kg per passenger"}
-        </p>
-      </div>
-    </div>
-  );
+  const birthDate = new Date(dob);
+  const today = new Date();
+
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+
+  return age;
 };
 
 export const TravelerForm = ({
   travelers = [],
-  addTraveler,
-  removeTraveler,
   updateTraveler,
+  errors = {},
+  parsedFlightData,
+  purposeOfTravel,
+  setPurposeOfTravel,
+  isInternational: isIntlFromProp,
 }) => {
   if (!Array.isArray(travelers)) travelers = [];
+
+  const isInternational =
+    isIntlFromProp ?? isInternationalTrip(parsedFlightData);
 
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
@@ -899,7 +1392,7 @@ export const TravelerForm = ({
       <div className="bg-linear-to-r from-[#1a2957] to-[#24a7c] text-white p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 bg-blue-900 rounded-full flex items-center justify-center shadow-lg">
               <FaUser className="text-white text-xl" />
             </div>
             <div>
@@ -909,48 +1402,45 @@ export const TravelerForm = ({
               </p>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={addTraveler}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-semibold transition shadow-md"
-          >
-            <IoPersonAdd size={20} />
-            <span>Add Adult</span>
-          </button>
         </div>
       </div>
 
       {/* ================= BODY ================= */}
       <div className="p-6 space-y-6 bg-linear-to-b from-gray-50 to-white">
+        {/* ================= PURPOSE OF TRAVEL ================= */}
+        <div className="bg-white border-2 border-blue-200 rounded-xl p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-blue-900 mb-2">
+            Purpose of Travel <span className="text-red-500">*</span>
+          </h3>
+
+          <textarea
+            rows={3}
+            value={purposeOfTravel || ""}
+            onChange={(e) => setPurposeOfTravel(e.target.value)}
+            placeholder="E.g. Client meeting, Project deployment, Training, Conference"
+            className={`w-full px-4 py-3 border-2 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              errors.purposeOfTravel ? "border-red-400" : "border-gray-300"
+            }`}
+            required
+          />
+
+          {errors.purposeOfTravel && (
+            <p className="text-sm text-red-600 mt-1 font-medium">
+              {errors.purposeOfTravel}
+            </p>
+          )}
+
+          <p className="text-xs text-gray-500 mt-2">
+            This information is mandatory for approval by the travel
+            administrator.
+          </p>
+        </div>
+
         {travelers.map((traveler, index) => (
           <div
             key={traveler.id ?? index}
             className="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition"
           >
-            {/* ===== Traveler Header ===== */}
-            <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center">
-                  <FaUser className="text-white" />
-                </div>
-                <h3 className="font-bold text-blue-900 text-lg">
-                  {`${index + 1} Adult (12yrs+) `}
-                </h3>
-              </div>
-
-              {travelers.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeTraveler(traveler.id)}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-semibold transition border border-red-200"
-                >
-                  <IoPersonRemove size={18} />
-                  Remove
-                </button>
-              )}
-            </div>
-
             {/* ===== Name Section ===== */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
               <div>
@@ -958,16 +1448,17 @@ export const TravelerForm = ({
                   Title <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={traveler.title || "Mr."}
+                  value={traveler.title || "MR"}
                   onChange={(e) =>
                     updateTraveler(traveler.id, "title", e.target.value)
                   }
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
                   required
                 >
-                  <option>Mr.</option>
-                  <option>Ms.</option>
-                  <option>Mrs.</option>
+                  <option value="MR">Mr</option>
+                  <option value="MRS">Mrs</option>
+                  <option value="MS">Ms</option>
+                  <option value="MISS">Miss</option>
                 </select>
               </div>
 
@@ -979,7 +1470,11 @@ export const TravelerForm = ({
                   type="text"
                   value={traveler.firstName || ""}
                   onChange={(e) =>
-                    updateTraveler(traveler.id, "firstName", e.target.value)
+                    updateTraveler(
+                      traveler.id,
+                      "firstName",
+                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
+                    )
                   }
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
                   required
@@ -994,7 +1489,11 @@ export const TravelerForm = ({
                   type="text"
                   value={traveler.middleName || ""}
                   onChange={(e) =>
-                    updateTraveler(traveler.id, "middleName", e.target.value)
+                    updateTraveler(
+                      traveler.id,
+                      "middleName",
+                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
+                    )
                   }
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
                 />
@@ -1008,7 +1507,11 @@ export const TravelerForm = ({
                   type="text"
                   value={traveler.lastName || ""}
                   onChange={(e) =>
-                    updateTraveler(traveler.id, "lastName", e.target.value)
+                    updateTraveler(
+                      traveler.id,
+                      "lastName",
+                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
+                    )
                   }
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
                   required
@@ -1017,50 +1520,82 @@ export const TravelerForm = ({
             </div>
 
             {/* ===== Primary Adult Extra Fields ===== */}
-            {/* {index === 0 && ( */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={traveler.email || ""}
-                  onChange={(e) =>
-                    updateTraveler(traveler.id, "email", e.target.value)
-                  }
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
-                  required
-                />
-              </div>
+            {index === 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={traveler.email || ""}
+                    onChange={(e) =>
+                      updateTraveler(traveler.id, "email", e.target.value)
+                    }
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Mobile Number <span className="text-red-500">*</span>
-                </label>
-                <PhoneInput
-                  country={"in"}
-                  value={traveler.phoneWithCode || ""}
-                  onChange={(phone) =>
-                    updateTraveler(traveler.id, "phoneWithCode", phone)
-                  }
-                  enableSearch
-                  containerStyle={{ width: "100%" }}
-                  inputStyle={{
-                    width: "100%",
-                    height: "48px",
-                    border: "2px solid #d1d5db",
-                    borderRadius: "0.5rem",
-                    paddingLeft: "48px",
-                  }}
-                  required
-                />
-              </div>
-            </div>
-            {/*)} */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Mobile Number <span className="text-red-500">*</span>
+                  </label>
+                  <PhoneInput
+                    country={"in"}
+                    value={traveler.phoneWithCode || ""}
+                    onChange={(phone, countryData) => {
+                      updateTraveler(traveler.id, "phoneWithCode", phone);
 
-            {/* ===== Gender + Age ===== */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                      // ✅ Get ISO country code (e.g. "in", "us", "gb")
+                      const isoCode = countryData?.countryCode?.toUpperCase();
+                      if (isoCode) {
+                        try {
+                          const regionNames = new Intl.DisplayNames(["en"], {
+                            type: "region",
+                          });
+                          const nationality = regionNames.of(isoCode); // e.g. "India", "United States"
+                          updateTraveler(
+                            traveler.id,
+                            "nationality",
+                            nationality,
+                          );
+                        } catch (err) {
+                          console.warn("Failed to resolve country name:", err);
+                        }
+                      }
+                    }}
+                    enableSearch
+                    containerStyle={{ width: "100%" }}
+                    inputStyle={{
+                      width: "100%",
+                      height: "48px",
+                      border: errors?.[index]?.phoneWithCode
+                        ? "2px solid #ef4444"
+                        : "2px solid #d1d5db",
+                      borderRadius: "0.5rem",
+                      paddingLeft: "48px",
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Nationality<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={traveler.nationality || "India"}
+                    readOnly
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ===== Gender + DOB + Calculated Age ===== */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+              {/* Gender */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
                   Gender <span className="text-red-500">*</span>
@@ -1080,26 +1615,81 @@ export const TravelerForm = ({
                 </select>
               </div>
 
+              {/* DOB */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Age <span className="text-red-500">*</span>
+                  Date of Birth <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="number"
-                  min={12}
-                  value={traveler.age ?? ""}
-                  onChange={(e) =>
-                    updateTraveler(
-                      traveler.id,
-                      "age",
-                      parseInt(e.target.value || "0")
-                    )
-                  }
+                  type="date"
+                  value={traveler.dob || ""}
+                  onChange={(e) => {
+                    const dob = e.target.value;
+                    const age = calculateAgeFromDOB(dob);
+
+                    updateTraveler(traveler.id, "dob", dob);
+                    updateTraveler(traveler.id, "age", age); // derived
+                  }}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
                   required
                 />
               </div>
+
+              {/* Calculated Age (Read-only) */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Age (Auto-calculated)
+                </label>
+                <input
+                  type="text"
+                  value={traveler.age || ""}
+                  readOnly
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                />
+              </div>
             </div>
+
+            {isInternational && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Passport Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={traveler.passportNumber || ""}
+                    onChange={(e) =>
+                      updateTraveler(
+                        traveler.id,
+                        "passportNumber",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Passport Expiry <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={traveler.passportExpiry || ""}
+                    onChange={(e) =>
+                      updateTraveler(
+                        traveler.id,
+                        "passportExpiry",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    required
+                  />
+                </div>
+              </div>
+            )}
 
             {/* ===== Note ===== */}
             <div className="mt-6 bg-blue-50 border-l-4 border-blue-900 p-4 rounded-lg">
@@ -1110,17 +1700,6 @@ export const TravelerForm = ({
             </div>
           </div>
         ))}
-
-        {/* ===== ADD NEW ADULT ===== */}
-        <div className="flex justify-center pt-4">
-          <button
-            type="button"
-            onClick={addTraveler}
-            className="flex items-center gap-2 px-6 py-3 border-2 border-dashed border-orange-500 text-orange-600 hover:bg-orange-50 rounded-xl font-bold transition"
-          >
-            <IoPersonAdd size={20} />+ ADD NEW ADULT
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -1205,10 +1784,10 @@ export default {
   formatDurationCompact,
   parseFlightData,
   FlightTimeline,
+  RoundTripFlightTimeline,
   FareOptions,
   PriceSummary,
   ImportantInformation,
-  BaggageTable,
   TravelerForm,
   FareRulesAccordion,
   CTABox,

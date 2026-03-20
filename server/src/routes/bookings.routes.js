@@ -2,24 +2,36 @@
 
 const router = require("express").Router();
 const { verifyToken } = require("../middleware/auth.middleware");
+const corporateContext = require("../middleware/corporate.middleware");
 const bookingsController = require("../controllers/booking.controller");
 
-// All booking routes are private
+// 🔐 all routes protected
 router.use(verifyToken);
 
-// Create booking
-router.post("/", bookingsController.createBooking);
+// create booking request
+router.post("/", corporateContext, bookingsController.createBookingRequest);
 
-// Confirm booking after approval
-router.post("/:id/confirm", bookingsController.confirmBooking);
+// employee routes
+router.get("/my/rejected", bookingsController.getMyRejectedRequests);
+router.get("/my-bookings", bookingsController.getMyBookings);
+router.get("/my-requests", bookingsController.getMyRequests);
+router.get("/my-booking/:id", bookingsController.getMyBookingById);
+router.get("/my-request/:id", bookingsController.getMyRequestById);
 
-// Get all bookings
-router.get("/", bookingsController.getAllBookings);
+// execute approved flight
+router.post(
+  "/:bookingId/execute-flight",
+  bookingsController.executeApprovedFlightBooking
+);
 
-// Get single booking
-router.get("/:id", bookingsController.getBooking);
+router.get(
+  "/:id/ticket-pdf",
+  bookingsController.downloadTicketPdf
+)
 
-// Cancel booking
+// common / admin
+// router.get("/", bookingsController.getAllBookings);
+// router.get("/:id", bookingsController.getBooking);
 router.post("/:id/cancel", bookingsController.cancelBooking);
 
 module.exports = router;

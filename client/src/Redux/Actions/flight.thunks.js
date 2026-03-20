@@ -1,3 +1,5 @@
+//flight.thunks.js
+
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import flightApi from "../../API/flightAPI";
 
@@ -10,11 +12,13 @@ export const searchFlights = createAsyncThunk(
 
       const response = data?.data?.Response;
 
-      if (!response || response.ResponseStatus !== 1) {
-        return rejectWithValue("Flight search failed");
-      }
-
       // 🔥 FLATTEN TBO RESULTS
+      if (!response || response.ResponseStatus !== 1) {
+        console.error("❌ FLIGHT SEARCH FAILED (API Response):", response);
+        return rejectWithValue(
+          response?.Error?.ErrorMessage || "Flight search failed",
+        );
+      }
       const flatResults = (response.Results || []).flat();
 
       return {
@@ -78,6 +82,25 @@ export const getSSR = createAsyncThunk(
   }
 );
 
+/* ---------------- FARE UPSELL ---------------- */
+export const getFareUpsell = createAsyncThunk(
+  "flights/fareUpsell",
+  async ({ traceId, resultIndex }, { rejectWithValue }) => {
+    try {
+      const { data } = await flightApi.post("/fare-upsell", {
+        traceId,
+        resultIndex,
+      });
+
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Fare upsell failed"
+      );
+    }
+  }
+);
+
 /* ---------------- BOOK ---------------- */
 export const bookFlight = createAsyncThunk(
   "flights/book",
@@ -91,18 +114,6 @@ export const bookFlight = createAsyncThunk(
   }
 );
 
-/* ---------------- TICKET ---------------- */
-export const ticketFlight = createAsyncThunk(
-  "flights/ticket",
-  async ({ bookingId, pnr }, { rejectWithValue }) => {
-    try {
-      const { data } = await flightApi.post("/ticket", { bookingId, pnr });
-      return data.data;
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message);
-    }
-  }
-);
 
 /* ---------------- BOOKING DETAILS ---------------- */
 export const getBookingDetails = createAsyncThunk(
