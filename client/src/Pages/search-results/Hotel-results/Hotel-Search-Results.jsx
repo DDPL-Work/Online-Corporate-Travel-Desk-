@@ -1,3 +1,6 @@
+// client\src\Pages\search-results\Hotel-results\Hotel-Search-Results.jsx
+
+
 import React, { useState } from "react";
 import Header from "./Hotel-Header";
 import FilterSidebar from "./Filter-Sidebar";
@@ -6,7 +9,7 @@ import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
 import { useSelector } from "react-redux";
 
 function HotelSearchResults() {
-  const { hotels, loading } = useSelector((state) => state.hotel);
+  const { hotels, loading, traceId } = useSelector((state) => state.hotel);
 
   const [filters, setFilters] = useState({
     minPrice: 0,
@@ -33,9 +36,12 @@ function HotelSearchResults() {
       cheapestRoom?.Inclusion?.split(",")?.map((i) => i.replaceAll("_", " ")) ||
       [];
 
+      const mapCoords = hotel.Map || "";
+const [lat, lng] = mapCoords.split("|");
+
     return {
       id: hotel.HotelCode,
-      name: cheapestRoom?.Name?.[0] || "Hotel",
+      name: hotel.HotelName || "Hotel",
       currency: hotel.Currency,
       price: cheapestRoom?.TotalFare || 0,
       totalTax: cheapestRoom?.TotalTax || 0,
@@ -51,9 +57,17 @@ function HotelSearchResults() {
       address: hotel.Address || "Location not available",
       roomType: cheapestRoom?.Name?.[0] || "Standard",
       roomsLeft: hotel.Rooms?.length || 1,
-      images: hotel.Images || [
+      traceId: traceId,
+     images:
+  hotel.Images?.length > 0
+    ? hotel.Images
+    : hotel.Image
+    ? [hotel.Image]
+    : [
         "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800",
       ],
+      latitude: lat ? Number(lat) : null,
+longitude: lng ? Number(lng) : null,
     };
   });
 
@@ -111,7 +125,7 @@ function HotelSearchResults() {
                           lg:overflow-y-auto"
             >
               <FilterSidebar
-                  hotels={transformedHotels}
+                hotels={transformedHotels}
                 filters={filters}
                 setFilters={setFilters}
                 searchText={searchText}
@@ -128,22 +142,6 @@ function HotelSearchResults() {
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
                   Found {filteredHotels?.length || 0} hotels
                 </h2>
-
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 my-3">
-                  <span className="text-gray-600 text-sm">Sort By</span>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button className="px-4 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100">
-                      Rating
-                    </button>
-                    <button className="px-4 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100">
-                      Preferred
-                    </button>
-                    <button className="px-4 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100">
-                      Price
-                    </button>
-                  </div>
-                </div>
               </div>
 
               {/* Hotel Cards */}

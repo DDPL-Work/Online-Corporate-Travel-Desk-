@@ -48,6 +48,63 @@ export default function PendingTravelRequests() {
 
   const requests = useMemo(() => {
     return list.map((b) => {
+      const isHotel = b.bookingType === "hotel";
+
+      if (isHotel) {
+        const hotelReq = b.hotelRequest || {};
+        const selectedRoom = hotelReq.selectedRoom || {};
+        const selectedHotel = hotelReq.selectedHotel || {};
+        const rawRoom = selectedRoom.rawRoomData || {};
+
+        const checkIn = hotelReq.checkInDate;
+        const checkOut = hotelReq.checkOutDate;
+
+        const calculateNights = (inDate, outDate) => {
+          if (!inDate || !outDate) return 1;
+          const diff = new Date(outDate).getTime() - new Date(inDate).getTime();
+          return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+        };
+
+        return {
+          id: b._id,
+          bookingRef: b.bookingReference,
+          type: "hotel",
+          status: b.requestStatus,
+          employee: b.userId?.name?.firstName || b.userId?.email,
+          travellers: (b.travellers || []).map((t) => ({
+            name: `${t.title} ${t.firstName} ${t.lastName}`,
+            email: t.email,
+            age: t.age,
+            gender: t.gender,
+            isLead: t.isLeadPassenger,
+          })),
+          reason: b.purposeOfTravel,
+          hotelName: selectedHotel.hotelName,
+          address: selectedHotel.address,
+          city: selectedHotel.city,
+          starRating: selectedHotel.starRating,
+          checkIn,
+          checkOut,
+          nights: calculateNights(checkIn, checkOut),
+          rooms: hotelReq.noOfRooms,
+          guests:
+            hotelReq.roomGuests?.reduce(
+              (sum, r) => sum + (r.noOfAdults || 0),
+              0,
+            ) || b.travellers.length,
+          roomName: rawRoom.Name?.[0],
+          mealType: selectedRoom.mealType,
+          inclusion: selectedRoom.inclusion,
+          refundable: selectedRoom.isRefundable,
+          totalFare: selectedRoom.totalFare,
+          totalTax: selectedRoom.totalTax,
+          currency: selectedRoom.currency,
+          estimatedCost: b.pricingSnapshot?.totalAmount || 0,
+          cancelPolicies: selectedRoom.cancelPolicies || [],
+          images: rawRoom.images || [],
+        };
+      }
+
       const segments = b.flightRequest?.segments || [];
       const ssr = b.flightRequest?.ssrSnapshot || {};
       const lastSegment = segments[segments.length - 1];
@@ -64,16 +121,13 @@ export default function PendingTravelRequests() {
           email: t.email || "N/A",
           isLead: t.isLeadPassenger,
         })),
-
         reason: b.purposeOfTravel,
         priority: "Medium",
         destination: segments.length
           ? segments
               .map(
                 (s) =>
-                  `${s?.origin?.city || "Unknown"} → ${
-                    s?.destination?.city || "Unknown"
-                  }`,
+                  `${s?.origin?.city || "Unknown"} → ${s?.destination?.city || "Unknown"}`,
               )
               .join(", ")
           : "N/A",
@@ -97,9 +151,7 @@ export default function PendingTravelRequests() {
           route: `${s.origin?.city} (${s.origin?.airportCode}) → ${s.destination?.city} (${s.destination?.airportCode})`,
           airline: s.airlineName || "N/A",
           airlineCode: s.airlineCode || "N/A",
-          airlineDisplay: `${s.airlineName || "N/A"} (${s.airlineCode || ""}-${
-            s.flightNumber || ""
-          })`,
+          airlineDisplay: `${s.airlineName || "N/A"} (${s.airlineCode || ""}-${s.flightNumber || ""})`,
           flightNumber: s.flightNumber || "N/A",
           aircraft: s.aircraft || "N/A",
           departure: s.departureDateTime,
@@ -110,9 +162,7 @@ export default function PendingTravelRequests() {
         country:
           (firstSegment?.origin?.country || "N/A") !==
           (lastSegment?.destination?.country || "N/A")
-            ? `${firstSegment?.origin?.country || "N/A"} → ${
-                lastSegment?.destination?.country || "N/A"
-              }`
+            ? `${firstSegment?.origin?.country || "N/A"} → ${lastSegment?.destination?.country || "N/A"}`
             : firstSegment?.origin?.country || "N/A",
         airline: [
           ...new Set(segments.map((s) => s?.airlineName).filter(Boolean)),
@@ -145,7 +195,7 @@ export default function PendingTravelRequests() {
     (r) => filters.type === "All" || r.type === filters.type,
   );
 
-  const handleApprove = async (id) => {
+  const handleApprove = async (id, type) => {
     const result = await Swal.fire({
       title: "Approve Travel Request",
       text: "Are you sure you want to approve this request?",
@@ -156,25 +206,17 @@ export default function PendingTravelRequests() {
       confirmButtonColor: "#16a34a",
       cancelButtonColor: "#6b7280",
     });
-
     if (result.isConfirmed) {
-      dispatch(
-        approveApproval({
-          id,
-          comments: "", // intentionally empty
-        }),
-      )
+      dispatch(approveApproval({ id, comments: "", type }))
         .unwrap()
-        .then(() => {
-          Swal.fire("Approved", "Request approved successfully", "success");
-        })
-        .catch((err) => {
-          Swal.fire("Error", err || "Approval failed", "error");
-        });
+        .then(() =>
+          Swal.fire("Approved", "Request approved successfully", "success"),
+        )
+        .catch((err) => Swal.fire("Error", err || "Approval failed", "error"));
     }
   };
 
-  const handleReject = async (id) => {
+  const handleReject = async (id, type) => {
     const result = await Swal.fire({
       title: "Reject Travel Request",
       text: "Please provide a reason for rejection",
@@ -187,55 +229,410 @@ export default function PendingTravelRequests() {
       confirmButtonColor: "#dc2626",
       cancelButtonColor: "#6b7280",
       inputValidator: (value) => {
-        if (!value || value.trim().length < 5) {
+        if (!value || value.trim().length < 5)
           return "Rejection reason must be at least 5 characters";
-        }
       },
     });
-
     if (result.isConfirmed) {
-      dispatch(
-        rejectApproval({
-          id,
-          comments: result.value.trim(), // always string here
-        }),
-      )
+      dispatch(rejectApproval({ id, comments: result.value.trim(), type }))
         .unwrap()
-        .then(() => {
-          Swal.fire("Rejected", "Request rejected successfully", "success");
-        })
-        .catch((err) => {
-          Swal.fire("Error", err || "Rejection failed", "error");
-        });
+        .then(() =>
+          Swal.fire("Rejected", "Request rejected successfully", "success"),
+        )
+        .catch((err) => Swal.fire("Error", err || "Rejection failed", "error"));
     }
   };
 
   const totalPending = filteredRequests.length;
-
   const totalPendingFlights = filteredRequests.filter(
     (r) =>
       r.status === "pending_approval" &&
       (r.bookingType === "flight" || r.type === "flight"),
   ).length;
-
   const totalPendingHotels = filteredRequests.filter(
     (r) =>
       r.status === "pending_approval" &&
       (r.bookingType === "hotel" || r.type === "hotel"),
   ).length;
-
   const totalFlight = filteredRequests.filter(
     (r) => r.type === "flight",
   ).length;
-
   const totalHotels = filteredRequests.filter(
     (r) => r.bookingType === "hotel" || r.type === "hotel",
   ).length;
-
   const totalEstimatedCost = filteredRequests.reduce(
     (sum, r) => sum + r.estimatedCost,
     0,
   );
+
+  /* ─────────────────────────────────────────────────────────────
+     HOTEL CARD  — mirrors flight card structure exactly
+  ───────────────────────────────────────────────────────────── */
+  const renderHotelCard = (r, isExpanded) => {
+    const perNight =
+      r.nights && r.totalFare ? Math.round(r.totalFare / r.nights) : 0;
+
+    return (
+      <div
+        key={r.id}
+        className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-200 overflow-hidden"
+      >
+        {/* ── HEADER ── same structure as flight */}
+        <div
+          className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-4 px-4 sm:px-6 py-4 cursor-pointer bg-linear-to-r from-orange-100 to-white text-gray-900"
+          onClick={() => setExpanded((prev) => (prev === r.id ? null : r.id))}
+        >
+          {/* LEFT — icon + hotel name + city + travellers (mirrors flight left block) */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-2">
+              <FaHotel className="text-[#0A4D68] text-xl" />
+              <h3 className="text-base sm:text-lg font-semibold text-[#0A4D68] flex items-center gap-2">
+                <span>{r.hotelName || "Hotel"}</span>
+                {r.city && (
+                  <>
+                    <span className="text-gray-400">·</span>
+                    <span className="text-gray-500 font-normal text-sm">
+                      {r.city}
+                    </span>
+                  </>
+                )}
+              </h3>
+            </div>
+
+            {/* Travellers — same inline layout as flight */}
+            <div className="md:col-span-2">
+              <div className="space-y-2">
+                {r.travellers.length ? (
+                  r.travellers.map((t, idx) => (
+                    <div
+                      key={idx}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white border rounded-md p-3 gap-2"
+                    >
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <FiUser className="text-[#0A4D68]" />
+                        <span className="font-medium">
+                          {t.name}
+                          {t.isLead && (
+                            <span className="ml-2 text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+                              Lead
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600 mt-1 sm:mt-0">
+                        <FiMail />
+                        {t.email}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    No traveller details available
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* STATUS BADGE */}
+          <div>
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-medium ${
+                r.status === "pending_approval"
+                  ? "bg-yellow-100 text-yellow-700"
+                  : r.status === "approved"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-red-100 text-red-700"
+              }`}
+            >
+              {(r.status || "unknown").replace(/_/g, " ").toUpperCase()}
+            </span>
+          </div>
+
+          {/* RIGHT — cost + action buttons + chevron */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="font-semibold text-[#0A4D68]">
+              ₹{r.estimatedCost.toLocaleString()}
+            </span>
+
+            {/* ACTION BUTTONS — same as flight */}
+            <div className="flex justify-end gap-2">
+              <button
+                disabled={actionLoading}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleApprove(r.id, r.type);
+                }}
+                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md flex items-center gap-1 text-sm transition"
+              >
+                <FiCheck /> Approve
+              </button>
+              <button
+                disabled={actionLoading}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReject(r.id, r.type);
+                }}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md flex items-center gap-1 text-sm transition"
+              >
+                <FiX /> Reject
+              </button>
+            </div>
+
+            {isExpanded ? (
+              <FiChevronUp className="text-[#0A4D68] text-xl" />
+            ) : (
+              <FiChevronDown className="text-[#0A4D68] text-xl" />
+            )}
+          </div>
+        </div>
+
+        {/* ── SUMMARY GRID — mirrors flight's 6-col detail grid ── */}
+        <div className="px-6 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <Detail
+            icon={<FiCalendar />}
+            label="Check-in"
+            value={r.checkIn ? new Date(r.checkIn).toLocaleDateString() : "N/A"}
+          />
+          <Detail
+            icon={<FiCalendar />}
+            label="Check-out"
+            value={
+              r.checkOut ? new Date(r.checkOut).toLocaleDateString() : "N/A"
+            }
+          />
+          <Detail icon={<FiMapPin />} label="City" value={r.city} />
+          <Detail icon={<FiHome />} label="Room Type" value={r.roomName} />
+          <Detail
+            icon={<FiDollarSign />}
+            label="Estimated Cost"
+            value={`₹${r.estimatedCost}`}
+          />
+          <Detail icon={<FiAlertCircle />} label="Purpose" value={r.reason} />
+        </div>
+
+        {/* ── EXPANDED SECTION — same bg/border/structure as flight ── */}
+        {isExpanded && (
+          <div className="bg-gray-50 border-t border-gray-200 px-6 py-5 animate-fade-in space-y-5">
+            <h4 className="text-md font-semibold text-gray-700 mb-3">
+              Full Request Details
+            </h4>
+
+            {/* Hotel image */}
+            {r.images?.[0] && (
+              <img
+                src={r.images[0]}
+                className="w-full h-56 object-cover rounded-lg"
+                alt={r.hotelName}
+              />
+            )}
+
+            {/* Hotel details table — styled like flight segments table */}
+            <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
+              Hotel & Room Details
+            </h5>
+            <div className="overflow-x-auto -mx-3 sm:mx-0">
+              <table className="min-w-[600px] border border-gray-300 bg-white rounded-md shadow-sm">
+                <thead className="bg-[#05BFDB]/20 text-[#0A4D68]">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Hotel
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Room Type
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Meal Plan
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Nights
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Refundable
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="odd:bg-white even:bg-gray-50 border-b border-gray-300">
+                    <td className="px-4 py-2 text-sm text-gray-700">
+                      {r.hotelName || "N/A"}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-700">
+                      {r.roomName || "N/A"}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-700">
+                      {r.mealType || "N/A"}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-700">
+                      {r.nights}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-700">
+                      {r.refundable ? "Yes" : "No"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pricing table — like baggage table */}
+            <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
+              Pricing
+            </h5>
+            <div className="overflow-x-auto -mx-3 sm:mx-0">
+              <table className="min-w-[400px] border border-gray-300 bg-white rounded-md shadow-sm">
+                <thead className="bg-[#05BFDB]/20 text-[#0A4D68]">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Total Fare
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Tax
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Per Night
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Currency
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="odd:bg-white even:bg-gray-50 border-b border-gray-300">
+                    <td className="px-4 py-2 text-sm text-gray-700">
+                      ₹{r.totalFare || 0}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-700">
+                      ₹{r.totalTax || 0}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-700">
+                      ₹{perNight}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-700">
+                      {r.currency || "INR"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Room benefits */}
+            {r.inclusion && (
+              <>
+                <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
+                  Room & Benefits
+                </h5>
+                <div className="bg-white p-4 rounded-lg border border-gray-300 text-sm text-gray-700">
+                  {r.inclusion}
+                </div>
+              </>
+            )}
+
+            {/* Cancellation policies — like seats/meals table */}
+            {r.cancelPolicies?.length > 0 && (
+              <>
+                <h5 className="text-md font-semibold text-red-600 mb-2">
+                  Cancellation Policy
+                </h5>
+                <div className="overflow-x-auto -mx-3 sm:mx-0">
+                  <table className="min-w-[600px] border border-gray-300 bg-white rounded-md shadow-sm">
+                    <thead className="bg-red-50 text-red-700">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                          From Date
+                        </th>
+                        <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                          Charge Type
+                        </th>
+                        <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                          Cancellation Charge
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.cancelPolicies.map((c, i) => (
+                        <tr
+                          key={i}
+                          className="odd:bg-white even:bg-gray-50 border-b border-gray-300"
+                        >
+                          <td className="px-4 py-2 text-sm text-gray-700">
+                            {c.FromDate}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-700">
+                            {c.ChargeType}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-700">
+                            {c.CancellationCharge}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {/* Travellers — same layout as flight expanded section */}
+            <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
+              Travellers
+            </h5>
+            <div className="overflow-x-auto -mx-3 sm:mx-0">
+              <table className="min-w-[500px] border border-gray-300 bg-white rounded-md shadow-sm">
+                <thead className="bg-[#05BFDB]/20 text-[#0A4D68]">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Name
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Email
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Age
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold border-b border-gray-300">
+                      Gender
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {r.travellers.map((t, i) => (
+                    <tr
+                      key={i}
+                      className="odd:bg-white even:bg-gray-50 border-b border-gray-300"
+                    >
+                      <td className="px-4 py-2 text-sm text-gray-700">
+                        {t.name}
+                        {t.isLead && (
+                          <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                            Lead
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700">
+                        {t.email}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700">
+                        {t.age || "N/A"}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700">
+                        {t.gender || "N/A"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer — same as flight */}
+            <div className="mt-5 flex justify-between items-center border-t border-gray-200 pt-3">
+              <div className="text-xs text-gray-500">
+                Booking Ref: <span className="font-medium">{r.bookingRef}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -327,6 +724,7 @@ export default function PendingTravelRequests() {
             <option value="hotel">Hotel</option>
           </select>
         </div>
+
         {/* LIST */}
         {filteredRequests.length === 0 ? (
           <div className="bg-white p-8 text-center rounded-lg shadow">
@@ -335,6 +733,12 @@ export default function PendingTravelRequests() {
         ) : (
           filteredRequests.map((r) => {
             const isExpanded = expanded === r.id;
+
+            if (r.type === "hotel") {
+              return renderHotelCard(r, isExpanded);
+            }
+
+            /* ── FLIGHT CARD (unchanged) ── */
             return (
               <div
                 key={r.id}
@@ -349,18 +753,13 @@ export default function PendingTravelRequests() {
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <div className="flex items-center gap-2">
-                      {r.type === "flight" ? (
-                        <FaPlane className="text-[#0A4D68] text-xl" />
-                      ) : (
-                        <FaHotel className="text-[#0A4D68] text-xl" />
-                      )}
+                      <FaPlane className="text-[#0A4D68] text-xl" />
                       <h3 className="text-base sm:text-lg font-semibold wrap-break-word text-[#0A4D68] flex items-center gap-2">
                         <span>{r.cityFrom}</span>
                         <span className="text-gray-500">→</span>
                         <span>{r.cityTo}</span>
                       </h3>
                     </div>
-                    {/* TRAVELLERS */}
                     <div className="md:col-span-2">
                       <div className="space-y-2">
                         {r.travellers.length ? (
@@ -380,7 +779,6 @@ export default function PendingTravelRequests() {
                                   )}
                                 </span>
                               </div>
-
                               <div className="flex items-center gap-2 text-sm text-gray-600 mt-1 sm:mt-0">
                                 <FiMail />
                                 {t.email}
@@ -397,7 +795,6 @@ export default function PendingTravelRequests() {
                   </div>
 
                   <div>
-                    {" "}
                     <span
                       className={`px-3 py-1 rounded-full text-sm font-medium ${
                         r.status === "pending_approval"
@@ -415,7 +812,6 @@ export default function PendingTravelRequests() {
                     <span className="font-semibold text-[#0A4D68]">
                       ₹{r.estimatedCost.toLocaleString()}
                     </span>
-                    {/* ACTION BUTTONS */}
                     <div className="flex justify-end gap-2">
                       <button
                         disabled={actionLoading}
@@ -438,7 +834,6 @@ export default function PendingTravelRequests() {
                         <FiX /> Reject
                       </button>
                     </div>
-
                     {isExpanded ? (
                       <FiChevronUp className="text-[#0A4D68] text-xl" />
                     ) : (
@@ -485,12 +880,10 @@ export default function PendingTravelRequests() {
                     value={r.cabin}
                   />
 
-                  {/* ==== Fare Expiry Info ==== */}
                   {r.fareExpiry &&
                     (() => {
                       const expiryIST = getDateInIST(r.fareExpiry);
                       const nowIST = getDateInIST(new Date());
-
                       if (!expiryIST || !nowIST) {
                         return (
                           <div className="flex items-center gap-2 text-gray-500">
@@ -499,23 +892,16 @@ export default function PendingTravelRequests() {
                           </div>
                         );
                       }
-
                       const diffMs = expiryIST - nowIST;
-
                       let expiryText = "Fare expired";
                       let expiryColor = "text-red-600";
-
                       if (diffMs > 0) {
                         const mins = Math.floor(diffMs / 60000);
                         const h = Math.floor(mins / 60);
                         const m = mins % 60;
-
-                        expiryText = `Fare expires in ${
-                          h ? h + "h " : ""
-                        }${m}m (IST)`;
+                        expiryText = `Fare expires in ${h ? h + "h " : ""}${m}m (IST)`;
                         expiryColor = "text-green-600";
                       }
-
                       return (
                         <div className="mb-4 flex items-center gap-2">
                           <FiClock className={`text-lg ${expiryColor}`} />
@@ -533,10 +919,8 @@ export default function PendingTravelRequests() {
                       Full Request Details
                     </h4>
 
-                    {/* If there are route segments → show tables */}
                     {r.route?.length > 0 ? (
                       <>
-                        {/* FLIGHT DETAILS TABLE */}
                         <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
                           Flight Segments
                         </h5>
@@ -570,21 +954,17 @@ export default function PendingTravelRequests() {
                                   <td className="px-4 py-2 text-sm text-gray-700">
                                     {seg.route}
                                   </td>
-
                                   <td className="px-4 py-2 text-sm text-gray-700">
                                     {seg.airlineDisplay}
                                   </td>
-
                                   <td className="px-4 py-2 text-sm text-gray-700">
                                     {seg.aircraft}
                                   </td>
-
                                   <td className="px-4 py-2 text-sm text-gray-700">
                                     {seg.departure
                                       ? new Date(seg.departure).toLocaleString()
                                       : "N/A"}
                                   </td>
-
                                   <td className="px-4 py-2 text-sm text-gray-700">
                                     {seg.arrival
                                       ? new Date(seg.arrival).toLocaleString()
@@ -596,7 +976,6 @@ export default function PendingTravelRequests() {
                           </table>
                         </div>
 
-                        {/* BAGGAGE TABLE */}
                         {r.baggage?.length > 0 && (
                           <>
                             <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
@@ -640,7 +1019,6 @@ export default function PendingTravelRequests() {
                           </>
                         )}
 
-                        {/* SEATS TABLE */}
                         {r.seats?.length > 0 && (
                           <>
                             <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
@@ -678,7 +1056,6 @@ export default function PendingTravelRequests() {
                           </>
                         )}
 
-                        {/* MEALS TABLE */}
                         {r.meals?.length > 0 && (
                           <>
                             <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
@@ -716,7 +1093,6 @@ export default function PendingTravelRequests() {
                           </>
                         )}
 
-                        {/* EXTRA BAGGAGE TABLE */}
                         {r.extraBaggage?.length > 0 && (
                           <>
                             <h5 className="text-md font-semibold text-[#0A4D68] mb-2">
@@ -755,7 +1131,6 @@ export default function PendingTravelRequests() {
                         )}
                       </>
                     ) : (
-                      /* CARD VIEW if no segments */
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         <Detail label="Airline" value={r.airline || "N/A"} />
                         <Detail label="Aircraft" value={r.aircraft || "N/A"} />
@@ -796,7 +1171,6 @@ export default function PendingTravelRequests() {
                       </div>
                     )}
 
-                    {/* FOOTER */}
                     <div className="mt-5 flex justify-between items-center border-t border-gray-200 pt-3">
                       <div className="text-xs text-gray-500">
                         Booking Ref:{" "}
@@ -814,7 +1188,7 @@ export default function PendingTravelRequests() {
   );
 }
 
-/* ========== SMALL COMPONENTS ========== */
+/* ── Detail chip ── */
 const Detail = ({ icon, label, value }) => (
   <div className="flex items-start gap-3 bg-white rounded-lg p-3 border border-gray-100 shadow-sm hover:shadow-md transition">
     {icon && <div className="text-blue-500 mt-0.5 text-lg">{icon}</div>}

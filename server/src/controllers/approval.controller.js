@@ -1,5 +1,6 @@
 const Approval = require("../models/Approval");
 const Booking = require("../models/Booking");
+const HotelBookingRequest = require("../models/hotelBookingRequest.model");
 const BookingIntent = require("../models/BookingIntent");
 const BookingRequest = require("../models/BookingRequest");
 const User = require("../models/User");
@@ -25,21 +26,54 @@ exports.getAllApprovals = asyncHandler(async (req, res) => {
     requestStatus: status, // pending_approval | approved | rejected
   };
 
-  const requests = await BookingRequest.find(query)
+  // const requests = await BookingRequest.find(query)
+  //   .populate("userId", "name email")
+  //   .populate("approvedBy", "name email")
+  //   .populate("rejectedBy", "name email")
+  //   .sort({ createdAt: -1 })
+  //   .skip(skip)
+  //   .limit(Number(limit));
+
+  // const total = await BookingRequest.countDocuments(query);
+
+  // 🔹 Fetch flight requests
+  const flightRequests = await BookingRequest.find(query)
     .populate("userId", "name email")
     .populate("approvedBy", "name email")
-    .populate("rejectedBy", "name email")
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(Number(limit));
+    .populate("rejectedBy", "name email");
 
-  const total = await BookingRequest.countDocuments(query);
+  // 🔹 Fetch hotel requests
+  const hotelRequests = await HotelBookingRequest.find(query)
+    .populate("userId", "name email")
+    .populate("approvedBy", "name email")
+    .populate("rejectedBy", "name email");
+
+  // 🔥 Add type (VERY IMPORTANT)
+  const taggedFlights = flightRequests.map((r) => ({
+    ...r.toObject(),
+    bookingType: "flight",
+  }));
+
+  const taggedHotels = hotelRequests.map((r) => ({
+    ...r.toObject(),
+    bookingType: "hotel",
+  }));
+
+  // 🔹 Merge + sort
+  const allRequests = [...taggedFlights, ...taggedHotels].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  );
+
+  // 🔹 Apply pagination AFTER merge
+  const paginated = allRequests.slice(skip, skip + Number(limit));
+
+  const total = allRequests.length;
 
   res.status(200).json(
     new ApiResponse(
       200,
       {
-        approvals: requests,
+        approvals: paginated,
         pagination: {
           total,
           page: Number(page),
@@ -151,7 +185,6 @@ exports.approveRequest = asyncHandler(async (req, res) => {
 
   // const maxApprovedPrice = fareResult.Fare.PublishedFare;
 
-
   await BookingIntent.create({
     bookingRequestId: bookingRequest._id,
     corporateId: bookingRequest.corporateId,
@@ -227,6 +260,123 @@ exports.rejectRequest = asyncHandler(async (req, res) => {
         200,
         bookingRequest,
         "Booking request rejected successfully",
+      ),
+    );
+});
+
+// ======================================
+
+// HOTEL REQUESTS
+
+// ======================================
+
+// @desc    Get single HOTEL booking request
+// @route   GET /api/v1/approvals/hotel/:id
+// @access  Private
+exports.getHotelApproval = asyncHandler(async (req, res) => {
+  const bookingRequest = await HotelBookingRequest.findById(req.params.id)
+    .populate("userId", "name email")
+    .populate("approvedBy", "name email")
+    .populate("rejectedBy", "name email");
+
+  if (!bookingRequest) {
+    throw new ApiError(404, "Hotel booking request not found");
+  }
+
+  const isAdmin = req.user.role === "travel-admin";
+  const isOwner = bookingRequest.userId._id.toString() === req.user.id;
+
+  if (!isAdmin && !isOwner) {
+    throw new ApiError(403, "Not authorized");
+  }
+
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        bookingRequest,
+        "Hotel booking request fetched successfully",
+      ),
+    );
+});
+
+// @desc    Approve HOTEL booking request
+// @route   POST /api/v1/approvals/hotel/:id/approve
+// @access  Private (Travel Admin)
+exports.approveHotelRequest = asyncHandler(async (req, res) => {
+  const { comments = "" } = req.body;
+
+  if (req.user.role !== "travel-admin") {
+    throw new ApiError(403, "Only admin can approve requests");
+  }
+
+  const bookingRequest = await HotelBookingRequest.findOne({
+    _id: req.params.id,
+    corporateId: req.user.corporateId,
+    requestStatus: "pending_approval",
+  });
+
+  if (!bookingRequest) {
+    throw new ApiError(404, "Hotel request not found or already processed");
+  }
+
+  bookingRequest.requestStatus = "approved";
+  bookingRequest.approvedAt = new Date();
+  bookingRequest.approvedBy = req.user._id;
+  bookingRequest.approverComments = comments;
+
+  await bookingRequest.save();
+
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        bookingRequest,
+        "Hotel booking request approved successfully",
+      ),
+    );
+});
+
+// @desc    Approve HOTEL booking request
+// @route   POST /api/v1/approvals/hotel/:id/reject
+// @access  Private (Travel Admin)
+exports.rejectHotelRequest = asyncHandler(async (req, res) => {
+  const { comments } = req.body;
+
+  if (!comments) {
+    throw new ApiError(400, "Rejection comments are required");
+  }
+
+  if (req.user.role !== "travel-admin") {
+    throw new ApiError(403, "Only admin can reject requests");
+  }
+
+  const bookingRequest = await HotelBookingRequest.findOne({
+    _id: req.params.id,
+    corporateId: req.user.corporateId,
+    requestStatus: "pending_approval",
+  });
+
+  if (!bookingRequest) {
+    throw new ApiError(404, "Hotel request not found or already processed");
+  }
+
+  bookingRequest.requestStatus = "rejected";
+  bookingRequest.rejectedAt = new Date();
+  bookingRequest.rejectedBy = req.user._id;
+  bookingRequest.approverComments = comments;
+
+  await bookingRequest.save();
+
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        bookingRequest,
+        "Hotel booking request rejected successfully",
       ),
     );
 });

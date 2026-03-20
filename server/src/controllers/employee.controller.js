@@ -1,19 +1,41 @@
+// employee.controller.js
+
+
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const Employee = require("../models/Employee");
 const User = require("../models/User"); // TravelAdmin
 const Corporate = require("../models/Corporate");
-const { ApiError } = require("../utils/ApiError");
+const ApiError = require("../utils/ApiError");
+const TravelDocument = require("../models/TravelDocument");
+const { extractTextFromImage } = require("../utils/ocr");
+const { parseDocumentData } = require("../utils/documentParser");
+const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
 
 // ===============================
 // GET OWN PROFILE
 // ===============================
 exports.getProfile = async (req, res, next) => {
   try {
-    const employee = await Employee.findOne({ userId: req.user.id }).select("-__v");
+    const employee = await Employee.findOne({ userId: req.user.id }).select(
+      "-__v",
+    );
     if (!employee) return next(new ApiError(404, "Employee profile not found"));
 
-    res.json({ success: true, employee });
+    const user = await User.findById(req.user.id);
+
+    res.json({
+      success: true,
+      employee: {
+        name: employee.name,
+        email: user?.email,
+        phone: employee.mobile,
+        employeeId: employee.employeeCode,
+        department: employee.department,
+        designation: employee.designation,
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -24,24 +46,48 @@ exports.getProfile = async (req, res, next) => {
 // ===============================
 exports.updateProfile = async (req, res, next) => {
   try {
-    const allowed = ["name", "mobile", "department", "designation", "employeeCode"];
     const updates = {};
-    allowed.forEach((f) => {
-      if (req.body[f] !== undefined) updates[f] = req.body[f];
-    });
+
+    if (req.body.name !== undefined) updates.name = req.body.name;
+    if (req.body.phone !== undefined) updates.mobile = req.body.phone; // 🔥 mapping
+    if (req.body.department !== undefined)
+      updates.department = req.body.department;
+    if (req.body.designation !== undefined)
+      updates.designation = req.body.designation;
+    if (req.body.employeeId !== undefined)
+      updates.employeeCode = req.body.employeeId;
 
     if (!Object.keys(updates).length)
       return next(new ApiError(400, "No valid fields to update"));
 
+    if (req.body.email !== undefined) {
+      await User.findByIdAndUpdate(req.user.id, {
+        email: req.body.email,
+      });
+    }
+
     const emp = await Employee.findOneAndUpdate(
       { userId: req.user.id },
       { $set: updates },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     ).select("-__v");
 
     if (!emp) return next(new ApiError(404, "Employee profile not found"));
 
-    res.json({ success: true, message: "Profile updated successfully", employee: emp });
+    const user = await User.findById(req.user.id);
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      employee: {
+        name: emp.name,
+        email: user?.email,
+        phone: emp.mobile,
+        employeeId: emp.employeeCode,
+        department: emp.department,
+        designation: emp.designation,
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -74,7 +120,9 @@ exports.getEmployee = async (req, res, next) => {
     }
 
     if (!emp)
-      return next(new ApiError(404, "Employee not found or not in your domain"));
+      return next(
+        new ApiError(404, "Employee not found or not in your domain"),
+      );
 
     res.json({ success: true, employee: emp });
   } catch (err) {
@@ -104,7 +152,14 @@ exports.getAllEmployees = async (req, res, next) => {
 // ===============================
 exports.updateEmployee = async (req, res, next) => {
   try {
-    const allowed = ["name", "mobile", "department", "designation", "employeeCode", "status"];
+    const allowed = [
+      "name",
+      "mobile",
+      "department",
+      "designation",
+      "employeeCode",
+      "status",
+    ];
     const updates = {};
     allowed.forEach((f) => {
       if (req.body[f] !== undefined) updates[f] = req.body[f];
@@ -123,7 +178,11 @@ exports.updateEmployee = async (req, res, next) => {
     Object.assign(emp, updates);
     await emp.save();
 
-    res.json({ success: true, message: "Employee updated successfully", employee: emp });
+    res.json({
+      success: true,
+      message: "Employee updated successfully",
+      employee: emp,
+    });
   } catch (err) {
     next(err);
   }
@@ -170,6 +229,113 @@ exports.removeEmployee = async (req, res, next) => {
     await User.findByIdAndDelete(emp.userId); // optionally delete user as well
 
     res.json({ success: true, message: "Employee removed successfully" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.uploadTravelDocument = async (req, res, next) => {
+  try {
+    const file = req.files?.travelDocument?.[0];
+
+    if (!file) {
+      return next(new ApiError(400, "File is required"));
+    }
+
+    const { type, name } = req.body;
+
+    // Restriction
+    if (["passport", "pan"].includes(type)) {
+      const existing = await TravelDocument.findOne({
+        userId: req.user.id,
+        type,
+      });
+
+      if (existing) {
+        return next(
+          new ApiError(400, `${type} already exists. Only one allowed.`),
+        );
+      }
+    }
+
+    // ✅ 1. Upload to Cloudinary
+    const uploaded = await cloudinary.uploader.upload(file.path, {
+      folder: "travel-documents",
+    });
+
+    // ✅ 2. Delete local file (VERY IMPORTANT)
+    fs.unlinkSync(file.path);
+
+    // ✅ 3. OCR from cloudinary URL (better)
+    const extractedText = await extractTextFromImage(uploaded.secure_url);
+
+    // ✅ 4. Parse
+    const parsed = parseDocumentData(extractedText, type);
+
+    const doc = await TravelDocument.create({
+      userId: req.user.id,
+      type,
+      name,
+      number: parsed.number,
+      expiry: type === "pan" ? null : parsed.expiry, // ✅ FIX
+      issueDate: parsed.issueDate,
+      fileUrl: uploaded.secure_url,
+      fileName: file.originalname,
+    });
+
+    res.json({
+      success: true,
+      message: "Uploaded + parsed successfully",
+      document: doc,
+      extracted: parsed,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteTravelDocument = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const doc = await TravelDocument.findOne({
+      _id: id,
+      userId: req.user.id, // 🔒 security
+    });
+
+    if (!doc) {
+      return next(new ApiError(404, "Document not found"));
+    }
+
+    // ✅ Delete from Cloudinary
+    if (doc.fileUrl) {
+      const publicId = doc.fileUrl.split("/").slice(-2).join("/").split(".")[0]; // extract public_id
+
+      await cloudinary.uploader.destroy(publicId);
+    }
+
+    // ✅ Delete from DB
+    await TravelDocument.findByIdAndDelete(id);
+
+    res.json({
+      success: true,
+      message: "Document deleted successfully",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getMyDocuments = async (req, res, next) => {
+  try {
+    const docs = await TravelDocument.find({
+      userId: req.user.id,
+    }).sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      documents: docs,
+    });
   } catch (err) {
     next(err);
   }

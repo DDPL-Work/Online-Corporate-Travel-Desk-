@@ -1,3 +1,6 @@
+// client\src\Redux\Actions\hotelThunks.js
+
+
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../API/axios";
 
@@ -56,7 +59,10 @@ export const searchHotels = createAsyncThunk(
   async (payload, { rejectWithValue }) => {
     try {
       const { data } = await api.post("/hotels/search", payload);
-      return data.data.HotelResult;
+      console.log("🏨 HOTEL SEARCH RESPONSE:", data.data);
+      return {
+        hotels: data.data.HotelResult || [],
+      };
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
@@ -66,20 +72,52 @@ export const searchHotels = createAsyncThunk(
 /* ---------- HOTEL DETAILS ---------- */
 export const fetchHotelDetails = createAsyncThunk(
   "hotel/fetchHotelDetails",
-  async (hotelCode, { rejectWithValue }) => {
+  async ({ hotelCode }, { rejectWithValue }) => {
     try {
-      const { data } = await api.post("/hotels/details", { hotelCode });
+      const { data } = await api.post("/hotels/details", {
+        hotelCode,
+      });
       return data.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
   },
   {
-    condition: (hotelCode, { getState }) => {
+    condition: ({ hotelCode }, { getState }) => {
       const { hotel } = getState();
       if (hotel.hotelDetailsById?.[hotelCode]) {
         return false; // already cached
       }
     },
+  },
+);
+
+/* ---------- ROOM INFO ---------- */
+export const fetchRoomInfo = createAsyncThunk(
+  "hotel/fetchRoomInfo",
+  async ({ hotelCode }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post("/hotels/room-info", {
+        hotelCode,
+      });
+      return {
+        hotelCode,
+        rooms: data.data?.GetHotelRoomResult?.HotelRoomsDetails || [],
+      };
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  },
+);
+/* ---------- BOOKING DETAILS (Post-Booking) ---------- */
+export const fetchBookingDetails = createAsyncThunk(
+  "hotel/fetchBookingDetails",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post("/hotels/booking-details", payload);
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
   },
 );

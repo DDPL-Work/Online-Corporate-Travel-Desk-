@@ -377,9 +377,50 @@ const ContactCard = ({ contact }) => {
 };
 
 /* ─────────────────────────────────────────
+   Map Section
+───────────────────────────────────────── */
+const MapSection = ({ mapString }) => {
+  if (!mapString) return null;
+
+  // TBO map string is usually "lat,lng"
+  const [lat, lng] = mapString.split(",").map((s) => s.trim());
+  const isValid = lat && lng && !isNaN(lat) && !isNaN(lng);
+
+  return (
+    <div className="rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+          <MdLocationOn className="text-emerald-600 text-base" />
+        </div>
+        <span className="font-black text-[#0a2540] text-sm">Location Map</span>
+      </div>
+      <div className="aspect-video w-full bg-slate-100 relative group">
+        {isValid ? (
+          <iframe
+            title="Hotel Location"
+            width="100%"
+            height="100%"
+            frameBorder="0"
+            style={{ border: 0 }}
+            src={`https://www.google.com/maps?q=${lat},${lng}&z=15&output=embed`}
+            allowFullScreen
+          />
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-2">
+            <MdLocationOn className="text-3xl" />
+            <span className="text-xs font-bold uppercase tracking-widest">Map data unavailable</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
    Main HotelInfo
 ───────────────────────────────────────── */
-const HotelInfo = ({ description = "", checkIn, checkOut, contact = {} }) => {
+const HotelInfo = ({ description = "", checkIn, checkOut, contact = {}, map }) => {
+// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
   const [showAll, setShowAll] = useState(false);
 
   const sections = useMemo(() => parseDescription(description), [description]);
@@ -404,23 +445,27 @@ const HotelInfo = ({ description = "", checkIn, checkOut, contact = {} }) => {
           </p>
         </div>
       </div>
+      <div className="p-4 flex flex-col gap-4">
+        <div>
+          {/* ── Check times ── */}
+          {(checkIn || checkOut) && (
+            <CheckTimesCard checkIn={checkIn} checkOut={checkOut} />
+          )}
+        </div>
 
-      <div className="p-4 flex flex-col gap-3">
-        {/* ── Check times ── */}
-        {(checkIn || checkOut) && (
-          <CheckTimesCard checkIn={checkIn} checkOut={checkOut} />
-        )}
-
-        <ContactCard contact={contact} />
+        {/* {map && <MapSection mapString={map} />} */}
 
         {/* ── Section Cards ── */}
-        {visibleSections.map((section, i) => (
-          <SectionCard
-            key={section.title + i}
-            section={section}
-            defaultOpen={i === 0}
-          />
-        ))}
+        <div className="space-y-3">
+          {visibleSections.map((section, i) => (
+            <SectionCard
+              key={section.title + i}
+              section={section}
+              defaultOpen={i === 0}
+            />
+          ))}
+        </div>
+{/* >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90 */}
 
         {/* ── Show more / less ── */}
         {sections.length > 3 && (

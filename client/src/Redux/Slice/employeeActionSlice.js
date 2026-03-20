@@ -1,3 +1,6 @@
+// client\src\Redux\Slice\employeeActionSlice.js
+
+
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../API/axios";
 
@@ -13,9 +16,11 @@ export const fetchMyProfile = createAsyncThunk(
       const res = await api.get("/employees/profile");
       return res.data.employee;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || "Failed to load profile");
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to load profile",
+      );
     }
-  }
+  },
 );
 
 // 🔹 Update own profile
@@ -26,9 +31,11 @@ export const updateMyProfile = createAsyncThunk(
       const res = await api.patch("/employees/profile", payload);
       return res.data.employee;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || "Profile update failed");
+      return rejectWithValue(
+        err.response?.data?.message || "Profile update failed",
+      );
     }
-  }
+  },
 );
 
 // 🔹 Admin: Get all employees
@@ -39,9 +46,11 @@ export const fetchEmployees = createAsyncThunk(
       const res = await api.get("/employees");
       return res.data.employees;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || "Failed to fetch employees");
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch employees",
+      );
     }
-  }
+  },
 );
 
 // 🔹 Admin: Get single employee
@@ -52,9 +61,11 @@ export const fetchEmployeeById = createAsyncThunk(
       const res = await api.get(`/employees/${id}`);
       return res.data.employee;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || "Failed to fetch employee");
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch employee",
+      );
     }
-  }
+  },
 );
 
 // 🔹 Admin: Update employee
@@ -65,9 +76,11 @@ export const updateEmployee = createAsyncThunk(
       const res = await api.put(`/employees/${id}`, data);
       return res.data.employee;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || "Employee update failed");
+      return rejectWithValue(
+        err.response?.data?.message || "Employee update failed",
+      );
     }
-  }
+  },
 );
 
 // 🔹 Admin: Toggle active/inactive
@@ -78,9 +91,11 @@ export const toggleEmployeeStatus = createAsyncThunk(
       const res = await api.patch(`/employees/${id}/toggle-status`);
       return { id, status: res.data.status };
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || "Failed to toggle status");
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to toggle status",
+      );
     }
-  }
+  },
 );
 
 // 🔹 Admin: Delete employee
@@ -91,9 +106,11 @@ export const deleteEmployee = createAsyncThunk(
       await api.delete(`/employees/${id}`);
       return id;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || "Failed to delete employee");
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to delete employee",
+      );
     }
-  }
+  },
 );
 
 // ===============================
@@ -107,6 +124,7 @@ const employeeActionSlice = createSlice({
     selectedEmployee: null,
     loading: false,
     error: null,
+    updating: false,
   },
 
   reducers: {
@@ -136,8 +154,20 @@ const employeeActionSlice = createSlice({
         state.error = action.payload;
       })
 
+      // -------------------------
+      // MY PROFILE UPDATING
+      // -------------------------
+
+      .addCase(updateMyProfile.pending, (state) => {
+        state.updating = true;
+      })
       .addCase(updateMyProfile.fulfilled, (state, action) => {
+        state.updating = false;
         state.myProfile = action.payload;
+      })
+      .addCase(updateMyProfile.rejected, (state, action) => {
+        state.updating = false;
+        state.error = action.payload;
       })
 
       // -------------------------
@@ -161,7 +191,7 @@ const employeeActionSlice = createSlice({
 
       .addCase(updateEmployee.fulfilled, (state, action) => {
         state.employees = state.employees.map((emp) =>
-          emp._id === action.payload._id ? action.payload : emp
+          emp._id === action.payload._id ? action.payload : emp,
         );
       })
 
@@ -172,15 +202,13 @@ const employeeActionSlice = createSlice({
 
       .addCase(deleteEmployee.fulfilled, (state, action) => {
         state.employees = state.employees.filter(
-          (emp) => emp._id !== action.payload
+          (emp) => emp._id !== action.payload,
         );
       });
   },
 });
 
-export const {
-  clearEmployeeError,
-  clearSelectedEmployee,
-} = employeeActionSlice.actions;
+export const { clearEmployeeError, clearSelectedEmployee } =
+  employeeActionSlice.actions;
 
 export default employeeActionSlice.reducer;

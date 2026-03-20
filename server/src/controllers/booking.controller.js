@@ -1,6 +1,7 @@
 // server/src/controllers/booking.controller.js
 const Booking = require("../models/Booking");
 const BookingRequest = require("../models/BookingRequest");
+const HotelBookingRequest = require("../models/hotelBookingRequest.model");
 const Approval = require("../models/Approval");
 const Corporate = require("../models/Corporate");
 const WalletTransaction = require("../models/Wallet");

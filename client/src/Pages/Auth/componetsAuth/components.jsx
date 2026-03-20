@@ -414,13 +414,17 @@ export const LeftPanel = ({ step }) => {
           <div className="w-9 h-9 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center backdrop-blur-sm">
             <MdFlightTakeoff className="text-white text-lg" />
           </div>
-         <div className="flex items-center">
-  <img
-    src="/logo-primary.png"   // change to your logo path
-    alt="COTD Logo"
-    className="h-8 w-auto object-contain"
-  />
-</div>
+          <div>
+            <div
+              className="font-black text-white text-base leading-none"
+              style={{ fontFamily: "'Outfit',sans-serif" }}
+            >
+              COTD
+            </div>
+            <div className="text-cyan-300 text-[8px] font-bold tracking-[0.2em] mt-0.5">
+              CORPORATE TRAVEL DESK
+            </div>
+          </div>
         </div>
 
         {/* Middle content */}

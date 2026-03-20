@@ -1,3 +1,6 @@
+// client\src\Pages\search-results\Hotel-results\Map\MapModal.jsx
+
+
 // components/MapModal.jsx
 import React, { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -89,7 +92,7 @@ const HotelListCard = ({ hotel, isActive, onEnter, onLeave, onPin }) => (
       {/* Image */}
       <div className="relative w-36 h-28 shrink-0">
         <img
-          src={hotel.image}
+          src={hotel.images?.[0]}
           alt={hotel.name}
           className="w-full h-full object-cover"
           style={{ borderRadius: "12px 0 0 12px" }}
@@ -180,27 +183,31 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
 
   const debouncedSearch = useRef(debounce(searchLocation, 700)).current;
 
-  const transformedHotels = hotels
-    ?.map((hotel) => {
-      if (!hotel?.Latitude || !hotel?.Longitude) return null;
-      const cheapestRoom = hotel.Rooms?.reduce((prev, curr) =>
-        curr.TotalFare < prev.TotalFare ? curr : prev
-      );
-      if (!cheapestRoom) return null;
-      return {
-        id: hotel.HotelCode,
-        name: hotel.HotelName || "Hotel",
-        address: hotel.Address || "",
-        price: cheapestRoom.TotalFare,
-        rating: hotel.StarRating || 0,
-        nights: cheapestRoom.DayRates?.[0]?.length || 1,
-        image: hotel.image,
-        meal: hotel.meal,
-        refundable: hotel.refundable,
-        position: [parseFloat(hotel.Latitude), parseFloat(hotel.Longitude)],
-      };
-    })
-    .filter(Boolean);
+const transformedHotels = hotels
+  ?.map((hotel) => {
+    if (hotel?.latitude == null || hotel?.longitude == null) return null;
+
+    return {
+      id: hotel.id,
+      name: hotel.name,
+      address: hotel.address,
+      price: hotel.price,
+      rating: hotel.rating,
+      nights: hotel.nights,
+images:
+  hotel.images?.length > 0
+    ? hotel.images
+    : [
+        "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800",
+      ],
+      refundable: hotel.refundable,
+      position: [
+        parseFloat(hotel.latitude),
+        parseFloat(hotel.longitude),
+      ],
+    };
+  })
+  .filter(Boolean);
 
   const resetMap = () => {
     if (!mapRef.current) return;
@@ -284,7 +291,7 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
             </div>
 
             <div className="p-3 flex flex-col gap-2.5">
-              {hotels.map((hotel) => (
+              {transformedHotels.map((hotel) => (
                 <HotelListCard
                   key={hotel.id}
                   hotel={hotel}
@@ -391,7 +398,7 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
               if (!h) return null;
               return (
                 <div className="absolute bottom-16 left-4 z-1000 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 flex items-center gap-3 max-w-xs">
-                  <img src={h.image} alt={h.name} className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                  <img src={h.images?.[0]} />
                   <div className="min-w-0">
                     <p className="text-sm font-black text-[#0a2540] truncate">{h.name}</p>
                     <div className="flex gap-0.5 my-0.5"><Stars rating={h.rating} /></div>

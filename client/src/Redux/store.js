@@ -1,3 +1,6 @@
+// store.js
+
+
 import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "./Slice/authSlice.js";
 // import ssoAuthReducer from "./Slice/ssoAuthSlice.js";
@@ -6,6 +9,7 @@ import profileReducer from "./Slice/profileSlice";
 import corporateOnboardingReducer from "./Slice/registrationSlice.js";
 import corporateListReducer from "./Slice/corporateListSlice.js";
 import employeeActionReducer from "./Slice/employeeActionSlice.js";
+import documentReducer from "./Slice/documentSlice.js";
 import corporateAdminReducer from "./Slice/corporateAdminSlice.js";
 import walletReducer from "./Slice/walletSlice.js";
 import flightReducer from "./Slice/flightSearchSlice.js";
@@ -21,6 +25,7 @@ import postpaidReducer from "./Slice/postpaidSlice.js";
 import amendmentReducer from "./Slice/amendmentSlice.js";
 //hotel
 import hotelReducer from "./Slice/hotelSlice.js";
+import hotelBookingReducer from "./Slice/hotelBooking.slice";
 
 export const store = configureStore({
   reducer: {
@@ -30,7 +35,10 @@ export const store = configureStore({
     profile: profileReducer,
     corporateList: corporateListReducer,
     corporateOnboarding: corporateOnboardingReducer,
+
     employeeAction: employeeActionReducer,
+    documents: documentReducer,
+
     corporateAdmin: corporateAdminReducer,
     wallet: walletReducer,
     walletRechargeLogs: walletRechargeLogsReducer,
@@ -50,5 +58,6 @@ export const store = configureStore({
 
     //Hotel
     hotel: hotelReducer,
+    hotelBookings: hotelBookingReducer,
   },
 });
