@@ -1,3 +1,5 @@
+//hotelBookingRequest.model.js
+
 const mongoose = require("mongoose");
 
 const hotelBookingRequestSchema = new mongoose.Schema(
@@ -52,10 +54,22 @@ const hotelBookingRequestSchema = new mongoose.Schema(
         title: String,
         firstName: String,
         lastName: String,
+
+        gender: String,
+        dob: Date,
+        age: Number,
+
         email: String,
         phoneWithCode: String,
+
         nationality: String,
-        isLeadGuest: Boolean,
+        countryCode: String,
+
+        isLeadPassenger: Boolean,
+        paxType: String, // lead | adult | child
+
+        // 🔥 backup (important)
+        raw: mongoose.Schema.Types.Mixed,
       },
     ],
 
@@ -98,15 +112,37 @@ const hotelBookingRequestSchema = new mongoose.Schema(
         country: String,
       },
 
+      rawHotelData: mongoose.Schema.Types.Mixed,
+      allRooms: mongoose.Schema.Types.Mixed,
+
       selectedRoom: {
         roomIndex: String,
+
         roomTypeName: String,
         ratePlanName: String,
-        cancellationPolicy: String,
-        mealPlan: String,
-        price: Number,
+
+        // 🔥 pricing
+        totalFare: Number,
+        totalTax: Number,
         currency: String,
+
+        // 🔥 details
+        inclusion: String,
+        mealType: String,
+        isRefundable: Boolean,
+        withTransfers: Boolean,
+
+        // 🔥 policies
+        cancelPolicies: mongoose.Schema.Types.Mixed,
+
+        // 🔥 IMPORTANT
+        bookingCode: String,
+
+        // 🔥 FULL RAW ROOM
+        rawRoomData: mongoose.Schema.Types.Mixed,
       },
+
+      providerBookingId: String,
 
       providerTraceId: String,
       providerSearchResponse: mongoose.Schema.Types.Mixed,
@@ -188,7 +224,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       refundStatus: String,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 /* ================= INDEXES ================= */
@@ -199,5 +235,5 @@ hotelBookingRequestSchema.index({ executionStatus: 1 });
 
 module.exports = mongoose.model(
   "HotelBookingRequest",
-  hotelBookingRequestSchema
+  hotelBookingRequestSchema,
 );

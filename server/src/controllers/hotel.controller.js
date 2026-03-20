@@ -1,3 +1,5 @@
+// hotel.controller.js
+
 const tboService = require("../services/tektravels/hotel.service");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
@@ -132,7 +134,7 @@ exports.searchHotels = asyncHandler(async (req, res) => {
   }
 
   /* =====================================================
-     STEP 1: GET HOTEL CODE LIST BY CITY
+     STEP 1: GET HOTEL CODE LIST
   ===================================================== */
 
   const hotelCodeResponse = await tboService.getTBOHotelCodeList(CityCode);
@@ -141,12 +143,11 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     throw new ApiError(404, "No hotels found for this city");
   }
 
-  const hotelCodes = hotelCodeResponse.Hotels.slice(0, 300) // LIMIT TO 300 HOTELS
-    .map((h) => h.HotelCode)
-    .join(",");
+  const hotelCodesArray = hotelCodeResponse.Hotels.slice(0, 200); // 🔥 reduce for performance
+  const hotelCodes = hotelCodesArray.map((h) => h.HotelCode).join(",");
 
   /* =====================================================
-     STEP 2: SEARCH HOTELS USING HOTEL CODES
+     STEP 2: SEARCH (PRICE + ROOMS)
   ===================================================== */
 
   const searchResults = await tboService.searchHotels({
@@ -160,13 +161,61 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     Filters,
   });
 
-  res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        searchResults,
-        "Hotel search completed successfully",
-      ),
-    );
+  /* =====================================================
+     STEP 3: DETAILS (BATCH)
+  ===================================================== */
+
+  const detailsResponse = await tboService.getStaticHotelDetails(hotelCodes);
+
+  // 🔥 SAFE EXTRACTION
+  const detailsList =
+    detailsResponse?.HotelDetails ||
+    detailsResponse?.HotelDetails?.HotelDetails ||
+    [];
+
+  /* =====================================================
+     STEP 4: CREATE MAP (FAST LOOKUP)
+  ===================================================== */
+
+  const detailsMap = {};
+  detailsList.forEach((hotel) => {
+    detailsMap[hotel.HotelCode] = hotel;
+  });
+
+  /* =====================================================
+     STEP 5: MERGE DATA
+  ===================================================== */
+
+  const mergedHotels = (searchResults?.HotelResult || []).map((hotel) => {
+    const details = detailsMap[hotel.HotelCode];
+
+    return {
+      ...hotel,
+
+      // 🔥 ENRICH DATA
+      HotelName: details?.HotelName || "Hotel",
+      Address: details?.Address || "",
+      CityName: details?.CityName || "",
+      CountryName: details?.CountryName || "",
+      StarRating: details?.HotelRating || 0,
+      Description: details?.Description || "",
+      Images: details?.Images || [],
+      Amenities: details?.HotelFacilities || [],
+      Map: details?.Map,
+    };
+  });
+
+  /* =====================================================
+     FINAL RESPONSE
+  ===================================================== */
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        HotelResult: mergedHotels,
+      },
+      "Hotel search completed with details",
+    ),
+  );
 });

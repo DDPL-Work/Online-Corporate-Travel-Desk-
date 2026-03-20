@@ -1,3 +1,5 @@
+//client\src\Pages\search-results\Hotel-results\Hotel-Card.jsx
+
 import React, { useState } from "react";
 import { BsStarFill, BsStar } from "react-icons/bs";
 import {
@@ -218,19 +220,13 @@ const HotelCard = ({ hotel }) => {
           <button
             onClick={() => {
               navigate("/one-hotel-details", {
-                state: { hotelCode: hotel.id },
+                state: { hotelCode: hotel.id, traceId: hotel.traceId },
               });
             }}
             className="w-full py-2 bg-linear-to-b from-[#0d7fe8] to-[#0a65c2] hover:from-[#0a65c2] hover:to-[#0850a0] text-white font-bold text-xs uppercase tracking-widest rounded-lg shadow mt-3"
           >
             Select Room
           </button>
-
-          {hotel.roomsLeft <= 3 && (
-            <div className="text-[10px] text-red-500 font-semibold text-center mt-2">
-              ⚡ Only {hotel.roomsLeft} rooms left!
-            </div>
-          )}
         </div>
       </div>
     </div>

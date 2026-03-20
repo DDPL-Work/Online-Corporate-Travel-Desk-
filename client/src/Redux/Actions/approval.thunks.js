@@ -33,16 +33,21 @@ export const fetchApprovals = createAsyncThunk(
  */
 export const fetchApprovalById = createAsyncThunk(
   "approvals/fetchById",
-  async (id, { rejectWithValue }) => {
+  async ({ id, type = "flight" }, { rejectWithValue }) => {
     try {
-      const { data } = await api.get(`/approvals/${id}`);
+      const url =
+        type === "hotel"
+          ? `/approvals/hotel/${id}`
+          : `/approvals/${id}`;
+
+      const { data } = await api.get(url);
       return data.data;
     } catch (err) {
       return rejectWithValue(
-        err.response?.data?.error || "Failed to fetch approval",
+        err.response?.data?.error || "Failed to fetch approval"
       );
     }
-  },
+  }
 );
 
 /**
@@ -53,16 +58,21 @@ export const fetchApprovalById = createAsyncThunk(
  */
 export const approveApproval = createAsyncThunk(
   "approvals/approve",
-  async ({ id, comments }, { rejectWithValue }) => {
+  async ({ id, comments, type = "flight" }, { rejectWithValue }) => {
     try {
-      const { data } = await api.post(`/approvals/${id}/approve`, {
-        comments,
-      });
-      return data.data; // Approval document
+      const url =
+        type === "hotel"
+          ? `/approvals/hotel/${id}/approve`
+          : `/approvals/${id}/approve`;
+
+      const { data } = await api.post(url, { comments });
+      return data.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.error || "Approval failed");
+      return rejectWithValue(
+        err.response?.data?.error || "Approval failed"
+      );
     }
-  },
+  }
 );
 
 /**
@@ -73,16 +83,21 @@ export const approveApproval = createAsyncThunk(
  */
 export const rejectApproval = createAsyncThunk(
   "approvals/reject",
-  async ({ id, comments }, { rejectWithValue }) => {
+  async ({ id, comments, type = "flight" }, { rejectWithValue }) => {
     try {
-      const { data } = await api.post(`/approvals/${id}/reject`, {
-        comments,
-      });
-      return data.data; // Approval document
+      const url =
+        type === "hotel"
+          ? `/approvals/hotel/${id}/reject`
+          : `/approvals/${id}/reject`;
+
+      const { data } = await api.post(url, { comments });
+      return data.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.error || "Rejection failed");
+      return rejectWithValue(
+        err.response?.data?.error || "Rejection failed"
+      );
     }
-  },
+  }
 );
 
 export const selectApprovals = (state) => state.approvals.list;

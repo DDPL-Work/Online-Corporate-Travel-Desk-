@@ -23,7 +23,7 @@ const travelAdmin = require("./travelAdmin.routes");
 const postPaidCorporate = require("./postPaid.corporate.routes");
 const flightAmendment = require("./flightAmendment.routes");
 const gestRoutes = require("./gst.routes");
-// const tboRoutes = require('./tbo.routes')
+const hotelBooking = require('./hotelBooking.routes');
 
 // ------------------ ✅ IMPORTANT FIX ------------------
 // ✅ SSO MUST BE MOUNTED BEFORE /auth (to avoid JWT blocking)
@@ -49,6 +49,7 @@ router.use("/my-travel-admin", travelAdmin);
 router.use("/postpaid", postPaidCorporate);
 router.use("/flights/amendments", flightAmendment);
 router.use("/onboarding/gst", gestRoutes);
+router.use("/hotel-booking", hotelBooking)
 
 // ------------------ API Info ------------------
 router.get("/", (req, res) => {
@@ -62,6 +63,7 @@ router.get("/", (req, res) => {
       approvals: "/api/v1/approvals",
       flights: "/api/v1/flights",
       hotels: "/api/v1/hotels",
+      hotels: "/api/v1/hotel-booking",
       dashboard: "/api/v1/dashboard",
       wallet: "/api/v1/wallet",
       vouchers: "/api/v1/vouchers",
