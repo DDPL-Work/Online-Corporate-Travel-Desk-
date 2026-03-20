@@ -127,7 +127,7 @@ function Navbar({ onAuthOpen }) {
   <img
     src="/logo-primary.png"   // change to your logo path
     alt="COTD Logo"
-    className="h-12 w-auto object-contain"
+    className="h-14 w-auto object-contain"
   />
 </div>
         <ul className="hidden lg:flex items-center gap-8">
@@ -185,6 +185,7 @@ function Navbar({ onAuthOpen }) {
     </nav>
   );
 }
+
 
 // ── Hero ──────────────────────────────────────────────────────────────────────
 function Hero() {
