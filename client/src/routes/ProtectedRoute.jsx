@@ -9,7 +9,7 @@ export default function ProtectedRoute({ allowedRoles }) {
   const role = auth.role;
 
   // if (!token) return <Navigate to="/sso-login" replace />;
-  if (!token) return <Navigate to="/landing" replace />;
+  if (!token) return <Navigate to="/iapindia" replace />;
 
   if (allowedRoles && !allowedRoles.includes(role)) {
     return <Navigate to="/unauthorized" replace />;
