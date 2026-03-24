@@ -1,6 +1,5 @@
 // client\src\Pages\search-results\Hotel-results\Map\MapModal.jsx
 
-
 // components/MapModal.jsx
 import React, { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -16,6 +15,7 @@ import {
 } from "react-icons/md";
 import { FaCheck } from "react-icons/fa";
 import L from "leaflet";
+import { useNavigate } from "react-router-dom";
 
 /* ── Price Marker Icon ── */
 const createPriceIcon = (price, isActive = false) =>
@@ -69,12 +69,20 @@ const Stars = ({ rating }) =>
       <BsStarFill key={i} className="text-amber-400 text-[10px]" />
     ) : (
       <BsStar key={i} className="text-gray-300 text-[10px]" />
-    )
+    ),
   );
 
 /* ── Hotel Card (left panel) ── */
-const HotelListCard = ({ hotel, isActive, onEnter, onLeave, onPin }) => (
+const HotelListCard = ({
+  hotel,
+  isActive,
+  onEnter,
+  onLeave,
+  onPin,
+  onClick,
+}) => (
   <div
+    onClick={onClick}
     onMouseEnter={onEnter}
     onMouseLeave={onLeave}
     className={`group relative bg-white rounded-xl border transition-all duration-200 cursor-pointer overflow-hidden ${
@@ -126,19 +134,26 @@ const HotelListCard = ({ hotel, isActive, onEnter, onLeave, onPin }) => (
         </div>
 
         <div className="flex items-end justify-between mt-1">
-          <button
-            onClick={(e) => { e.stopPropagation(); onPin?.(); }}
+          {/* <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPin?.();
+            }}
             className="flex items-center gap-1 text-[10px] font-bold text-[#0d7fe8] bg-blue-50 border border-blue-200 rounded px-2 py-0.5 hover:bg-blue-100 transition"
           >
             <FiMapPin className="text-[10px]" />
             PIN
-          </button>
+          </button> */}
           <div className="text-right">
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider">Starts from</div>
+            <div className="text-[9px] text-slate-400 uppercase tracking-wider">
+              Starts from
+            </div>
             <div className="text-base font-black text-[#0a2540] leading-none">
               ₹{hotel.price?.toLocaleString("en-IN")}
             </div>
-            <div className="text-[9px] text-slate-400">{hotel.nights || 1} Night(s)</div>
+            <div className="text-[9px] text-slate-400">
+              {hotel.nights || 1} Night(s)
+            </div>
           </div>
         </div>
       </div>
@@ -148,6 +163,7 @@ const HotelListCard = ({ hotel, isActive, onEnter, onLeave, onPin }) => (
 
 /* ── Main Modal ── */
 const MapModal = ({ open, onClose, hotels = [] }) => {
+  const navigate = useNavigate();
   const [hoveredHotel, setHoveredHotel] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMarker, setSearchMarker] = useState(null);
@@ -157,7 +173,9 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "auto";
-    return () => { document.body.style.overflow = "auto"; };
+    return () => {
+      document.body.style.overflow = "auto";
+    };
   }, [open]);
 
   const searchLocation = async (query) => {
@@ -166,7 +184,12 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`,
-        { headers: { Accept: "application/json", "User-Agent": "hotel-map/1.0" } }
+        {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "hotel-map/1.0",
+          },
+        },
       );
       const data = await res.json();
       if (!data.length) return;
@@ -183,31 +206,35 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
 
   const debouncedSearch = useRef(debounce(searchLocation, 700)).current;
 
-const transformedHotels = hotels
-  ?.map((hotel) => {
-    if (hotel?.latitude == null || hotel?.longitude == null) return null;
+  const transformedHotels = hotels
+    ?.map((hotel) => {
+      if (hotel?.latitude == null || hotel?.longitude == null) return null;
 
-    return {
-      id: hotel.id,
-      name: hotel.name,
-      address: hotel.address,
-      price: hotel.price,
-      rating: hotel.rating,
-      nights: hotel.nights,
-images:
-  hotel.images?.length > 0
-    ? hotel.images
-    : [
-        "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800",
-      ],
-      refundable: hotel.refundable,
-      position: [
-        parseFloat(hotel.latitude),
-        parseFloat(hotel.longitude),
-      ],
-    };
-  })
-  .filter(Boolean);
+      return {
+        id: hotel.id,
+        name: hotel.name,
+        address: hotel.address,
+        price: hotel.price,
+        rating: hotel.rating,
+        nights: hotel.nights,
+        images:
+          hotel.images?.length > 0
+            ? hotel.images
+            : [
+                "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800",
+              ],
+        refundable: hotel.refundable,
+        position: [parseFloat(hotel.latitude), parseFloat(hotel.longitude)],
+      };
+    })
+    .filter(Boolean)
+    .filter((hotel) => {
+      if (!searchQuery) return true;
+
+      const text = `${hotel.name} ${hotel.address}`.toLowerCase();
+
+      return text.includes(searchQuery.toLowerCase());
+    });
 
   const resetMap = () => {
     if (!mapRef.current) return;
@@ -242,8 +269,12 @@ images:
               <FiMapPin className="text-white text-base" />
             </div>
             <div>
-              <h3 className="text-base font-black text-[#0a2540] leading-none">Hotel Locations</h3>
-              <p className="text-xs text-slate-400 mt-0.5">{hotels.length} properties on map</p>
+              <h3 className="text-base font-black text-[#0a2540] leading-none">
+                Hotel Locations
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {hotels.length} properties on map
+              </p>
             </div>
           </div>
 
@@ -260,7 +291,7 @@ images:
                 setSearchQuery(e.target.value);
                 debouncedSearch(e.target.value);
               }}
-              placeholder="Search city, area or landmark..."
+              placeholder="Search Hotel name, city, area or landmark..."
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
             />
           </div>
@@ -275,7 +306,6 @@ images:
 
         {/* ── Body ── */}
         <div className="flex flex-1 overflow-hidden">
-
           {/* ── Left: Hotel List ── */}
           <div
             ref={listRef}
@@ -287,22 +317,34 @@ images:
               <span className="text-xs font-bold text-[#0a2540] uppercase tracking-wider">
                 {hotels.length} Hotels Found
               </span>
-              <span className="text-[10px] text-slate-400">Hover to highlight</span>
+              <span className="text-[10px] text-slate-400">
+                Hover to highlight
+              </span>
             </div>
 
             <div className="p-3 flex flex-col gap-2.5">
               {transformedHotels.map((hotel) => (
+                <div id={`hotel-${hotel.id}`}>
                 <HotelListCard
                   key={hotel.id}
                   hotel={hotel}
+                  onClick={() => {
+                    navigate("/one-hotel-details", {
+                      state: {
+                        hotelCode: hotel.id,
+                      },
+                    });
+                  }}
                   isActive={hoveredHotel === hotel.id}
                   onEnter={() => setHoveredHotel(hotel.id)}
                   onLeave={() => setHoveredHotel(null)}
                   onPin={() => {
                     const t = transformedHotels.find((h) => h.id === hotel.id);
-                    if (t && mapRef.current) mapRef.current.flyTo(t.position, 15, { duration: 1 });
+                    if (t && mapRef.current)
+                      mapRef.current.flyTo(t.position, 15, { duration: 1 });
                   }}
                 />
+                </div>
               ))}
             </div>
           </div>
@@ -310,11 +352,17 @@ images:
           {/* ── Right: Map ── */}
           <div className="flex-1 relative">
             <MapContainer
-              center={transformedHotels.length ? transformedHotels[0].position : [20.5937, 78.9629]}
+              center={
+                transformedHotels.length
+                  ? transformedHotels[0].position
+                  : [20.5937, 78.9629]
+              }
               zoom={12}
               className="w-full h-full"
               zoomControl={false}
-              whenCreated={(map) => { mapRef.current = map; }}
+              whenCreated={(map) => {
+                mapRef.current = map;
+              }}
             >
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org">OpenStreetMap</a>'
@@ -329,18 +377,37 @@ images:
                   eventHandlers={{
                     mouseover: () => setHoveredHotel(hotel.id),
                     mouseout: () => setHoveredHotel(null),
+
+                    click: () => {
+                      setHoveredHotel(hotel.id);
+
+                      // scroll to card
+                      const el = document.getElementById(`hotel-${hotel.id}`);
+                      if (el) {
+                        el.scrollIntoView({
+                          behavior: "smooth",
+                          block: "center",
+                        });
+                      }
+                    },
                   }}
                 >
                   <Popup>
                     <div className="text-sm min-w-40">
-                      <p className="font-black text-[#0a2540] mb-0.5">{hotel.name}</p>
+                      <p className="font-black text-[#0a2540] mb-0.5">
+                        {hotel.name}
+                      </p>
                       <div className="flex gap-0.5 mb-1">
                         <Stars rating={hotel.rating} />
                       </div>
-                      <p className="text-[11px] text-slate-500 mb-1">{hotel.address}</p>
+                      <p className="text-[11px] text-slate-500 mb-1">
+                        {hotel.address}
+                      </p>
                       <p className="text-[#0d7fe8] font-black text-base">
                         ₹{hotel.price?.toLocaleString("en-IN")}
-                        <span className="text-[10px] font-normal text-slate-400 ml-1">/ night</span>
+                        <span className="text-[10px] font-normal text-slate-400 ml-1">
+                          / night
+                        </span>
                       </p>
                     </div>
                   </Popup>
@@ -350,7 +417,9 @@ images:
               {searchMarker && (
                 <Marker position={searchMarker.position}>
                   <Popup>
-                    <p className="text-sm font-semibold text-[#0a2540]">{searchMarker.name}</p>
+                    <p className="text-sm font-semibold text-[#0a2540]">
+                      {searchMarker.name}
+                    </p>
                   </Popup>
                 </Marker>
               )}
@@ -393,25 +462,32 @@ images:
             </div>
 
             {/* ── Hovered hotel tooltip ── */}
-            {hoveredHotel && (() => {
-              const h = hotels.find((x) => x.id === hoveredHotel);
-              if (!h) return null;
-              return (
-                <div className="absolute bottom-16 left-4 z-1000 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 flex items-center gap-3 max-w-xs">
-                  <img src={h.images?.[0]} />
-                  <div className="min-w-0">
-                    <p className="text-sm font-black text-[#0a2540] truncate">{h.name}</p>
-                    <div className="flex gap-0.5 my-0.5"><Stars rating={h.rating} /></div>
-                    <p className="text-[#0d7fe8] font-black text-sm">₹{h.price?.toLocaleString("en-IN")}</p>
+            {hoveredHotel &&
+              (() => {
+                const h = hotels.find((x) => x.id === hoveredHotel);
+                if (!h) return null;
+                return (
+                  <div className="absolute bottom-16 left-4 z-1000 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 flex items-center gap-3 max-w-xs">
+                    <img src={h.images?.[0]} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-[#0a2540] truncate">
+                        {h.name}
+                      </p>
+                      <div className="flex gap-0.5 my-0.5">
+                        <Stars rating={h.rating} />
+                      </div>
+                      <p className="text-[#0d7fe8] font-black text-sm">
+                        ₹{h.price?.toLocaleString("en-IN")}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
           </div>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 

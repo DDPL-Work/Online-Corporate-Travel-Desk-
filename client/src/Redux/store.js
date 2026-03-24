@@ -26,6 +26,7 @@ import amendmentReducer from "./Slice/amendmentSlice.js";
 //hotel
 import hotelReducer from "./Slice/hotelSlice.js";
 import hotelBookingReducer from "./Slice/hotelBooking.slice";
+import hotelAmendmentReducer from "./Slice/hotelAmendment.slice.js";
 
 export const store = configureStore({
   reducer: {
@@ -59,5 +60,6 @@ export const store = configureStore({
     //Hotel
     hotel: hotelReducer,
     hotelBookings: hotelBookingReducer,
+    hotelAmendment: hotelAmendmentReducer,
   },
 });

@@ -1,8 +1,8 @@
-// hotelBooking.controller.js
-
+//server\src\controllers\hotelBooking.controller.js
 const Corporate = require("../models/Corporate");
 const HotelBookingRequest = require("../models/hotelBookingRequest.model");
 const paymentService = require("../services/payment.service");
+const pdfService = require("../services/pdf.service");
 const hotelService = require("../services/tektravels/hotel.service");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
@@ -295,8 +295,7 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     const preBookResult =
       preBookResp?.PreBookResult || preBookResp?.BookResult || preBookResp;
 
-      const netAmount =
-  preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount;
+    const netAmount = preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount;
 
     // 🔥 TBO PREBOOK SUCCESS CHECK (CORRECT)
     if (preBookResp?.Status?.Code !== 200 && preBookResp?.Status !== 1) {
@@ -445,7 +444,19 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
   const [rawBookings, total] = await Promise.all([
     HotelBookingRequest.find(query)
       .select(
-        "bookingReference bookingType requestStatus executionStatus bookingSnapshot pricingSnapshot createdAt bookingResult",
+        `
+  bookingReference
+  bookingType
+  requestStatus
+  executionStatus
+  bookingSnapshot
+  pricingSnapshot
+  createdAt
+  bookingResult
+  hotelRequest.selectedRoom
+  hotelRequest.selectedHotel
+  amendment
+  `,
       )
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -459,16 +470,41 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
       booking?.bookingResult?.providerResponse?.BookResult ||
       booking?.bookingResult?.providerResponse;
 
+    const selectedRoom = booking?.hotelRequest?.selectedRoom || {};
+    const rawRoom = selectedRoom?.rawRoomData || {};
+
+    // 🔥 Extract images safely (cover all cases)
+    const images =
+      booking?.hotelRequest?.selectedRoom?.rawRoomData?.images || [];
+
     return {
       ...booking,
 
-      // 🔥 derived hotel fields
+      // existing fields
       hotelName: result?.HotelName,
       city: result?.City,
       checkIn: result?.CheckInDate,
       checkOut: result?.CheckOutDate,
       status: result?.HotelBookingStatus,
       confirmationNo: result?.ConfirmationNo,
+
+      // ✅ ROOM DETAILS (IMPORTANT)
+      roomType: rawRoom?.Name?.[0] || selectedRoom?.roomTypeName || null,
+
+      mealType: selectedRoom?.mealType || rawRoom?.MealType || null,
+
+      isRefundable: selectedRoom?.isRefundable ?? rawRoom?.IsRefundable ?? null,
+
+      cancelPolicies:
+        rawRoom?.CancelPolicies || selectedRoom?.cancelPolicies || [],
+
+      // ✅ NEW: images
+      images,
+
+      // ✅ NEW: hero image (first image)
+      heroImage: images?.[0] || null,
+
+      amendment: booking.amendment || null,
     };
   });
 
@@ -522,6 +558,15 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
     travellers = [],
     bookingResult = {},
   } = booking;
+  const amendment = booking.amendment || null;
+
+  // 🔥 Extract images from DB (IMPORTANT)
+  const hotelReq = booking.hotelRequest || {};
+  const selectedRoom = hotelReq.selectedRoom || {};
+  const rawRoom = selectedRoom.rawRoomData || {};
+
+  const images = rawRoom.images || [];
+  const heroImage = images[0] || null;
 
   /* ================= EXTRACT IDENTIFIERS ================= */
 
@@ -596,6 +641,9 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
       pricingSnapshot,
       travellers,
 
+      images,
+      heroImage,
+
       // ✅ TBO (live)
       confirmationNo: result?.ConfirmationNo || confirmationNo,
       hotelName,
@@ -612,6 +660,8 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
       // ✅ raw (optional)
       raw: result || null,
 
+      amendment,
+
       // ✅ audit fields (ADD THESE)
       createdAt: booking.createdAt,
       approvedAt: booking.approvedAt,
@@ -620,4 +670,96 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
       rejectedBy: booking.rejectedBy,
     },
   });
+});
+
+// @desc    Generate Voucher for booked hotel
+// @route   POST /api/v1/hotel-bookings/:id/voucher
+// @access  Private
+
+exports.generateHotelVoucher = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const booking = await HotelBookingRequest.findById(id);
+
+  if (!booking) throw new ApiError(404, "Booking not found");
+
+  if (booking.userId.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "Not authorized");
+  }
+
+  /* =====================================================
+     ✅ STEP 1: IF PDF ALREADY EXISTS → DIRECT DOWNLOAD
+  ====================================================== */
+
+  if (booking.voucher?.filePath) {
+    return res.download(booking.voucher.filePath);
+  }
+
+  /* =====================================================
+     ✅ STEP 2: ALLOW BOTH STATES
+  ====================================================== */
+
+  if (!["booked", "voucher_generated"].includes(booking.executionStatus)) {
+    throw new ApiError(400, "Booking not ready for voucher");
+  }
+
+  /* =====================================================
+     ✅ STEP 3: CALL TBO ONLY IF NOT VOUCHERED
+  ====================================================== */
+
+  let voucherResp = booking.voucher?.raw || null;
+
+  if (!voucherResp) {
+    const rawResponse = booking.bookingResult?.providerResponse || {};
+    // const bookResult = rawResponse.BookResult || rawResponse;
+    const bookResult =
+      booking.bookingResult?.providerResponse?.BookResult || {};
+
+    const bookingIdTBO = bookResult?.BookingId;
+
+    if (!bookingIdTBO) {
+      throw new ApiError(400, "TBO BookingId not found");
+    }
+
+    voucherResp = await hotelService.generateVoucher({
+      BookingId: bookingIdTBO,
+      EndUserIp: process.env.TBO_END_USER_IP,
+    });
+
+    const result = voucherResp?.GenerateVoucherResult || voucherResp;
+
+    if (!result?.VoucherStatus) {
+      throw new ApiError(500, result?.Error?.ErrorMessage || "Voucher failed");
+    }
+
+    // ✅ HANDLE ALREADY GENERATED CASE
+    if (result?.ResponseStatus !== 1) {
+      console.warn("⚠️ Voucher already generated, continuing...");
+    }
+    /* ================= SAVE TBO RESPONSE ================= */
+
+    booking.voucher = {
+      bookingRefNo: result.BookingRefNo || bookResult.BookingRefNo,
+      confirmationNo: result.ConfirmationNo || bookResult.ConfirmationNo,
+      invoiceNumber: result.InvoiceNumber || null,
+      raw: result,
+    };
+  }
+
+  /* =====================================================
+     ✅ STEP 4: GENERATE PDF (ONLY IF NOT EXISTS)
+  ====================================================== */
+
+  const filePath = await pdfService.generateHotelVoucher(booking);
+
+  booking.voucher.filePath = filePath;
+  booking.executionStatus = "voucher_generated";
+
+  await booking.save();
+
+  /* =====================================================
+     ✅ STEP 5: DIRECT DOWNLOAD (BEST UX)
+  ====================================================== */
+
+  return res.download(filePath);
 });

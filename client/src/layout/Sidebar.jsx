@@ -20,6 +20,7 @@ import {
   FaUser,
   FaBars,
 } from "react-icons/fa";
+import { MdCancel } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCorporateAdmin } from "../Redux/Slice/corporateAdminSlice";
 
@@ -149,6 +150,11 @@ export default function Sidebar({ isOpen, onClose }) {
       label: "Rejected Requests",
       icon: <FaTimes />,
     },
+    {
+      to: "/my-cancelled-bookings",
+      label: "Cancelled Bookings",
+      icon: <MdCancel />
+    },
     { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
     { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },
   ];
@@ -196,7 +202,7 @@ export default function Sidebar({ isOpen, onClose }) {
     <>
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/40 z-50 lg:hidden"
           onClick={onClose}
         />
       )}

@@ -123,13 +123,13 @@ function Navbar({ onAuthOpen }) {
       className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? "bg-white/96 backdrop-blur-lg shadow-xl shadow-slate-200/50" : "bg-transparent"}`}
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between py-4">
-      <div className="flex items-center">
-  <img
-    src="/logo-primary.png"   // change to your logo path
-    alt="COTD Logo"
-    className="h-14 w-auto object-contain"
-  />
-</div>
+        <div className="flex items-center">
+          <img
+            src="/logo-primary.png" // change to your logo path
+            alt="COTD Logo"
+            className="h-14 w-auto object-contain"
+          />
+        </div>
         <ul className="hidden lg:flex items-center gap-8">
           {links.map((l) => (
             <li key={l}>
@@ -185,7 +185,6 @@ function Navbar({ onAuthOpen }) {
     </nav>
   );
 }
-
 
 // ── Hero ──────────────────────────────────────────────────────────────────────
 function Hero() {

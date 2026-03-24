@@ -88,7 +88,7 @@ module.exports = {
 
       // Release PNR (If PNR held but not ticketed)
       flightReleasePNR:
-        "/BookingEngineService_Air/AirService.svc/rest/ReleasePNR",
+        "/BookingEngineService_Air/AirService.svc/rest/ReleasePNRRequest",
 
       // Send Change Request (Amendment / Cancellation)
       flightSendChangeRequest:

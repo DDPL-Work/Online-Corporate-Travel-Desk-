@@ -3,10 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  fetchHotelDetails,
-  fetchRoomInfo,
-} from "../../../Redux/Actions/hotelThunks";
+import { fetchHotelDetails } from "../../../Redux/Actions/hotelThunks";
 import HotelHeader from "./components/HotelHeader";
 import HotelImageGallery from "./components/HotelImageGallery";
 import HotelInfo from "./components/HotelInfo";
@@ -15,8 +12,7 @@ import RoomTypesList from "./components/RoomTypesList";
 import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
 import Attractions from "./components/Attractions";
 import HotelDetailsSkeleton from "./components/HotelDetailsSkeleton";
-import { MdArrowBack } from "react-icons/md";
-import { FiClock, FiPhone, FiMail, FiGlobe } from "react-icons/fi";
+import { FiPhone, FiMail, FiGlobe } from "react-icons/fi";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 
 const HotelDetailsPage = () => {
@@ -38,7 +34,6 @@ const HotelDetailsPage = () => {
   useEffect(() => {
     if (!hotelCode || !hotelFromSearch) return;
     dispatch(fetchHotelDetails({ hotelCode }));
-    dispatch(fetchRoomInfo({ hotelCode }));
   }, [hotelCode, hotelFromSearch, dispatch]);
 
   const hotelFromDetails = hotelDetailsById?.[hotelCode]?.HotelDetails?.[0];
@@ -140,13 +135,28 @@ const HotelDetailsPage = () => {
   console.log("LAT LNG:", mergedHotel?.latitude, mergedHotel?.longitude);
 
   const handleSelectRoom = (room) => {
+    const totalFare = room.TotalFare || room.Price?.TotalFare || 0;
+    const tax = room.TotalTax || room.Price?.Tax || 0;
+
+    const nights = room?.DayRates?.[0]?.length || 1;
+
+    const baseFare = totalFare - tax;
+    const perNight = totalFare / nights;
+
     const normalizedRoom = {
       ...room,
+
+      rawRoomData: room,
+
       BookingCode: room.BookingCode || room.RoomTypeCode || room.RatePlanCode,
-      Price: room.Price || {
-        TotalFare: room.TotalFare,
-        Tax: room.TotalTax,
-        BaseFare: room.BaseFare,
+
+      Price: {
+        totalFare, // ✅ FINAL PRICE (send to backend)
+        tax,
+        baseFare,
+        perNight,
+        nights,
+        currency: room.Currency || "INR",
       },
     };
 
@@ -299,7 +309,7 @@ const HotelDetailsPage = () => {
                           0
                         ).toLocaleString("en-IN")}
                         <span className="text-xs font-normal text-slate-400 ml-1">
-                          / night
+                          ( incl. all taxes )
                         </span>
                       </p>
                     </div>
