@@ -464,6 +464,7 @@ export default function CancelledFlightsPage() {
     const segment =
       b?.flightRequest?.segments?.[0] ||
       b?.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary
+        ?.Segments?.[0] ||  b?.bookingResult?.providerResponse?.raw?.Response?.Response?.FlightItinerary
         ?.Segments?.[0];
 
     return {
