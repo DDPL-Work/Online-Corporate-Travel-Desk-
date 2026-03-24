@@ -1,3 +1,4 @@
+//server\src\config\tbo.hotel.config.js
 module.exports = {
   timeout: 500000,
 
@@ -56,8 +57,8 @@ module.exports = {
       /* Post Booking */
       getBookingDetails: "/hotelservice.svc/rest/Getbookingdetail",
       getChangeRequestStatus:
-        "/internalhotelservice.svc/rest/GetChangeRequestStatus",
-      sendChangeRequest: "/internalhotelservice.svc/rest/SendChangeRequest",
+        "/hotelservice.svc/rest/GetChangeRequestStatus",
+      sendChangeRequest: "/hotelservice.svc/rest/SendChangeRequest",
     },
   },
 
@@ -107,8 +108,8 @@ module.exports = {
       /* Post Booking */
       getBookingDetails: "/hotelservice.svc/rest/Getbookingdetail",
       getChangeRequestStatus:
-        "/internalhotelservice.svc/rest/GetChangeRequestStatus",
-      sendChangeRequest: "/internalhotelservice.svc/rest/SendChangeRequest",
+        "/hotelservice.svc/rest/GetChangeRequestStatus",
+      sendChangeRequest: "/hotelservice.svc/rest/SendChangeRequest",
     },
   },
 };

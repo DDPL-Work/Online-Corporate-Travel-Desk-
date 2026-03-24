@@ -105,6 +105,8 @@ const bookingRequestSchema = new mongoose.Schema(
         "ticket_pending",
         "ticketed",
         "failed",
+        "cancel_requested", // ✅ ADD
+        "cancelled",
       ],
       default: "not_started",
       index: true,
@@ -189,6 +191,33 @@ const bookingRequestSchema = new mongoose.Schema(
       refundAmount: Number,
       refundStatus: String,
     },
+
+    amendment: {
+      type: {
+        type: String, // FULL_CANCEL / PARTIAL_CANCEL / AMENDMENT / RELEASE_PNR
+      },
+      changeRequestId: String,
+      status: {
+        type: String, // requested / in_progress / completed / failed
+        default: null,
+      },
+      response: mongoose.Schema.Types.Mixed,
+    },
+
+    amendmentHistory: [
+      {
+        type: {
+          type: String,
+        },
+        changeRequestId: String,
+        status: String,
+        response: mongoose.Schema.Types.Mixed,
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   { timestamps: true },
 );

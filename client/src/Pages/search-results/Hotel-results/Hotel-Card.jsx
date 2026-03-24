@@ -191,18 +191,18 @@ const HotelCard = ({ hotel }) => {
 
         {/* 💰 Right Pricing Section */}
         <div className="w-full md:w-56 bg-[#f4f8fd] border-t md:border-t-0 md:border-l border-slate-200 flex flex-col items-center justify-between p-4">
-          <div className="w-full text-center">
-            <div className="text-[10px] text-slate-400 uppercase">
-              Per Night
+            <div className="text-[15px] text-slate-500 font-bold ">
+              Starts From
             </div>
+          <div className="w-full text-center">
 
             <div className="text-xl font-black text-[#0a2540]">
-              ₹{Math.round(hotel.perNight)?.toLocaleString()}
+              ₹{Math.round(hotel.perNight)?.toLocaleString()} / night
             </div>
 
-            <div className="text-[10px] text-slate-500">
+            {/* <div className="text-[10px] text-slate-500">
               {hotel.nights} night(s)
-            </div>
+            </div> */}
 
             <div className="bg-white border border-slate-200 rounded-lg p-2 mt-3">
               <div className="text-[10px] text-slate-400 uppercase">

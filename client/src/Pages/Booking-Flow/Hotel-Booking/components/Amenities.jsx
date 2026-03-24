@@ -66,7 +66,6 @@ import { BsStars, BsBuildingCheck } from "react-icons/bs";
 
 /* ─────────────────────────────────────────
    Keyword → { icon, category } map
-   Accepts raw string from HotelFacilities[]
 ───────────────────────────────────────── */
 const KEYWORD_MAP = [
   // Internet
@@ -418,52 +417,53 @@ const CAT_STYLE = {
 
 const getCatStyle = (cat) => CAT_STYLE[cat] || CAT_STYLE.Other;
 
-/* ─── Single chip ─── */
+/* ─── Single chip - Responsive ─── */
 const AmenityChip = ({ label, style }) => {
   const { icon: Icon } = resolveAmenity(label);
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${style.bg} ${style.border} hover:shadow-sm hover:-translate-y-0.5 transition-all duration-150`}
+      className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl border ${style.bg} ${style.border} hover:shadow-sm hover:-translate-y-0.5 transition-all duration-150`}
     >
       <span className={`shrink-0 ${style.icon}`}>
-        <Icon style={{ fontSize: 14 }} />
+        <Icon style={{ fontSize: 12 }} className="sm:text-base" />
       </span>
-      <span className="text-xs font-medium text-slate-700 leading-tight capitalize">
+      <span className="text-xs sm:text-xs font-medium text-slate-700 leading-tight capitalize line-clamp-2 sm:line-clamp-1">
         {label}
       </span>
     </div>
   );
 };
 
-/* ─── Category group ─── */
+/* ─── Category group - Responsive ─── */
 const CategoryGroup = ({ category, items, style, defaultOpen }) => {
   const [open, setOpen] = useState(defaultOpen);
+  
   return (
-    <div className="rounded-xl border border-slate-200 overflow-hidden">
+    <div className="rounded-lg sm:rounded-xl border border-slate-200 overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-slate-50 transition"
+        className="w-full flex items-center justify-between px-2.5 sm:px-4 py-2.5 sm:py-3 bg-white hover:bg-slate-50 transition"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
           <span
-            className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${style.badge}`}
+            className={`text-[8px] sm:text-[10px] font-black uppercase tracking-widest px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap ${style.badge}`}
           >
             {category}
           </span>
-          <span className="text-[11px] text-slate-400 font-medium">
-            {items.length} item{items.length !== 1 ? "s" : ""}
+          <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium whitespace-nowrap">
+            {items.length}
           </span>
         </div>
         {open ? (
-          <MdExpandLess className="text-slate-400 text-lg shrink-0" />
+          <MdExpandLess className="text-slate-400 text-base sm:text-lg shrink-0 ml-2" />
         ) : (
-          <MdExpandMore className="text-slate-400 text-lg shrink-0" />
+          <MdExpandMore className="text-slate-400 text-base sm:text-lg shrink-0 ml-2" />
         )}
       </button>
 
       {open && (
-        <div className="px-4 pb-4 pt-1 bg-white">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+        <div className="px-2.5 sm:px-4 pb-3 sm:pb-4 pt-1 bg-white">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-2">
             {items.map((label, i) => (
               <AmenityChip key={i} label={label} style={style} />
             ))}
@@ -475,7 +475,7 @@ const CategoryGroup = ({ category, items, style, defaultOpen }) => {
 };
 
 /* ─────────────────────────────────────────
-   Main Amenities
+   Main Amenities - Fully Responsive
    Props: amenities — string[] from HotelFacilities
 ───────────────────────────────────────── */
 const Amenities = ({ amenities = [] }) => {
@@ -507,74 +507,80 @@ const Amenities = ({ amenities = [] }) => {
     });
   }, [amenities]);
 
-  const visibleGroups = showAll ? grouped : grouped.slice(0, 4);
-  const hiddenCount = grouped.length - 4;
+  // Responsive visibility: Mobile shows 2, Tablet 3, Desktop 4
+  const visibleGroups = showAll ? grouped : grouped.slice(0, 3);
+  const hiddenCount = grouped.length - 3;
 
   if (!grouped.length) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#0a2540] flex items-center justify-center shrink-0">
-            <BsStars className="text-white text-base" />
+    <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 overflow-hidden">
+      {/* Header - Responsive */}
+      <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-[#0a2540] flex items-center justify-center shrink-0">
+            <BsStars className="text-white text-sm sm:text-base" />
           </div>
-          <div>
-            <h2 className="font-black text-[#0a2540] text-base leading-none">
+          <div className="min-w-0">
+            <h2 className="font-black text-[#0a2540] text-sm sm:text-base leading-none">
               Amenities
             </h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              {amenities.filter(Boolean).length} facilities · {grouped.length}{" "}
-              categories
+            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 whitespace-nowrap">
+              {amenities.filter(Boolean).length} facilities
             </p>
           </div>
         </div>
-        <div className="hidden md:flex items-center gap-1.5 flex-wrap justify-end max-w-xs">
-          {grouped.slice(0, 5).map(([cat]) => {
+
+        {/* Category badges - Hidden on mobile, visible on tablet+ */}
+        <div className="hidden sm:flex items-center gap-1 flex-wrap justify-end max-w-xs">
+          {grouped.slice(0, 3).map(([cat]) => {
             const style = getCatStyle(cat);
             return (
               <span
                 key={cat}
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${style.badge}`}
+                className={`text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded-full ${style.badge}`}
               >
                 {cat}
               </span>
             );
           })}
-          {grouped.length > 5 && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-              +{grouped.length - 5} more
+          {grouped.length > 3 && (
+            <span className="text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+              +{grouped.length - 3}
             </span>
           )}
         </div>
       </div>
 
-      {/* Groups */}
-      <div className="p-4 flex flex-col gap-3">
+      {/* Groups - Responsive spacing */}
+      <div className="p-2.5 sm:p-4 flex flex-col gap-2 sm:gap-3">
         {visibleGroups.map(([category, items], i) => (
           <CategoryGroup
             key={category}
             category={category}
             items={items}
             style={getCatStyle(category)}
-            defaultOpen={i < 2}
+            defaultOpen={i === 0}
           />
         ))}
 
-        {grouped.length > 4 && (
+        {grouped.length > 3 && (
           <button
             onClick={() => setShowAll((v) => !v)}
-            className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-slate-200 text-[#0d7fe8] font-bold text-xs hover:border-[#0d7fe8] hover:bg-blue-50 transition w-full"
+            className="flex items-center justify-center gap-2 py-2 sm:py-2.5 rounded-lg sm:rounded-xl border-2 border-dashed border-slate-200 text-[#0d7fe8] font-bold text-xs sm:text-sm hover:border-[#0d7fe8] hover:bg-blue-50 transition w-full"
           >
             {showAll ? (
               <>
-                <MdExpandLess className="text-base" /> Show Less
+                <MdExpandLess className="text-base sm:text-lg" />
+                <span>Show Less</span>
               </>
             ) : (
               <>
-                <MdExpandMore className="text-base" /> Show {hiddenCount} More
-                Categories
+                <MdExpandMore className="text-base sm:text-lg" />
+                <span className="hidden sm:inline">
+                  Show {hiddenCount} More Categories
+                </span>
+                <span className="sm:hidden">+{hiddenCount}</span>
               </>
             )}
           </button>

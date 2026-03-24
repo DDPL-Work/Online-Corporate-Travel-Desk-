@@ -15,10 +15,10 @@ const {
   getMyHotelRequests,
   getMyHotelRequestById,
   getMyRejectedHotelRequests,
-  getMyCompletedHotelBookings, // (optional if you want separate controller)
   executeApprovedHotelBooking,
   getBookedHotelDetails,
   getMyHotelBookings,
+  generateHotelVoucher,
 } = require("../controllers/hotelBooking.controller");
 
 router.use(verifyToken);
@@ -80,6 +80,12 @@ router.get(
   "/:id/details",
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
   getBookedHotelDetails
+);
+
+router.post(
+  "/:id/voucher",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  generateHotelVoucher
 );
 
 module.exports = router;

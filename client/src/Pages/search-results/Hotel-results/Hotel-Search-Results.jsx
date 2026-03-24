@@ -1,6 +1,5 @@
 // client\src\Pages\search-results\Hotel-results\Hotel-Search-Results.jsx
 
-
 import React, { useState } from "react";
 import Header from "./Hotel-Header";
 import FilterSidebar from "./Filter-Sidebar";
@@ -16,11 +15,13 @@ function HotelSearchResults() {
     maxPrice: 100000,
     starRating: [],
     mealType: null,
-    propertyType: [],
+    location: "",
     amenities: [],
+    refundable: null,
   });
   const [searchText, setSearchText] = useState("");
   const [visibleCount, setVisibleCount] = useState(10);
+  const [sortOrder, setSortOrder] = useState("");
 
   const transformedHotels = hotels?.map((hotel) => {
     const cheapestRoom = hotel.Rooms?.reduce((prev, curr) =>
@@ -36,8 +37,8 @@ function HotelSearchResults() {
       cheapestRoom?.Inclusion?.split(",")?.map((i) => i.replaceAll("_", " ")) ||
       [];
 
-      const mapCoords = hotel.Map || "";
-const [lat, lng] = mapCoords.split("|");
+    const mapCoords = hotel.Map || "";
+    const [lat, lng] = mapCoords.split("|");
 
     return {
       id: hotel.HotelCode,
@@ -58,20 +59,23 @@ const [lat, lng] = mapCoords.split("|");
       roomType: cheapestRoom?.Name?.[0] || "Standard",
       roomsLeft: hotel.Rooms?.length || 1,
       traceId: traceId,
-     images:
-  hotel.Images?.length > 0
-    ? hotel.Images
-    : hotel.Image
-    ? [hotel.Image]
-    : [
-        "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800",
-      ],
+      images:
+        hotel.Images?.length > 0
+          ? hotel.Images
+          : hotel.Image
+            ? [hotel.Image]
+            : [
+                "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800",
+              ],
       latitude: lat ? Number(lat) : null,
-longitude: lng ? Number(lng) : null,
+      longitude: lng ? Number(lng) : null,
     };
   });
 
   const filteredHotels = transformedHotels?.filter((hotel) => {
+    const locationMatch =
+      !filters.location ||
+      hotel.address?.toLowerCase().includes(filters.location.toLowerCase());
     const priceMatch =
       hotel.price >= filters.minPrice && hotel.price <= filters.maxPrice;
 
@@ -85,25 +89,36 @@ longitude: lng ? Number(lng) : null,
 
     const mealMatch = !filters.mealType || hotel.meal === filters.mealType;
 
-    const propertyMatch =
-      filters.propertyType.length === 0 ||
-      filters.propertyType.includes(hotel.propertyType);
+    // const propertyMatch =
+    //   filters.propertyType.length === 0 ||
+    //   filters.propertyType.includes(hotel.propertyType);
 
     const amenityMatch =
       filters.amenities.length === 0 ||
       filters.amenities.every((amenity) => hotel.amenities?.includes(amenity));
 
+    const refundableMatch =
+      filters.refundable === null || hotel.refundable === filters.refundable;
+
     return (
+      locationMatch &&
       priceMatch &&
       starMatch &&
       nameMatch &&
       mealMatch &&
-      propertyMatch &&
-      amenityMatch
+      // propertyMatch &&
+      amenityMatch &&
+      refundableMatch
     );
   });
 
-  const visibleHotels = filteredHotels?.slice(0, visibleCount);
+  const sortedHotels = [...filteredHotels].sort((a, b) => {
+    if (sortOrder === "low") return a.price - b.price;
+    if (sortOrder === "high") return b.price - a.price;
+    return 0;
+  });
+
+  const visibleHotels = sortedHotels?.slice(0, visibleCount);
 
   const handleLoadMore = () => {
     setVisibleCount((prev) => prev + 10);
@@ -138,10 +153,25 @@ longitude: lng ? Number(lng) : null,
           <div className="flex-1">
             <div className="  flex flex-col">
               {/* Header */}
-              <div className="border-b border-gray-300">
+              <div className="border-b border-gray-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3">
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
                   Found {filteredHotels?.length || 0} hotels
                 </h2>
+
+                {/* Sort Dropdown */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Sort by:</span>
+
+                  <select
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Recommended</option>
+                    <option value="low">Price: Low → High</option>
+                    <option value="high">Price: High → Low</option>
+                  </select>
+                </div>
               </div>
 
               {/* Hotel Cards */}

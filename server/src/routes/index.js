@@ -22,6 +22,7 @@ const validatePrice = require("./checkApprovedRequestPrice.routes");
 const travelAdmin = require("./travelAdmin.routes");
 const postPaidCorporate = require("./postPaid.corporate.routes");
 const flightAmendment = require("./flightAmendment.routes");
+const hotelAmendment = require("./hotelAmendment.routes");
 const gestRoutes = require("./gst.routes");
 const hotelBooking = require('./hotelBooking.routes');
 
@@ -48,6 +49,7 @@ router.use("/validate-price", validatePrice);
 router.use("/my-travel-admin", travelAdmin);
 router.use("/postpaid", postPaidCorporate);
 router.use("/flights/amendments", flightAmendment);
+router.use("/hotels/amendments", hotelAmendment);
 router.use("/onboarding/gst", gestRoutes);
 router.use("/hotel-booking", hotelBooking)
 
@@ -78,6 +80,7 @@ router.get("/", (req, res) => {
       corporateSuperAdmin: "api/v1/corporate-super-admin",
       postPaidCorporate: "api/v1/postpaid",
       flightAmendment: "api/v1/flights/amendments",
+      hotelAmendment: "api/v1/hotels/amendments",
 
       gestRoutes: "api/v1/onboarding/gst",
     },

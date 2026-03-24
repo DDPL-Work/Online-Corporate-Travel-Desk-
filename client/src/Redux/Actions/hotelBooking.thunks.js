@@ -113,3 +113,38 @@ export const fetchBookedHotelDetails = createAsyncThunk(
     }
   }
 );
+
+/* ================================
+   GENERATE HOTEL VOUCHER
+================================ */
+export const generateHotelVoucher = createAsyncThunk(
+  "hotelBookings/generateHotelVoucher",
+  async (bookingId, { rejectWithValue }) => {
+    try {
+      const res = await api.post(
+        `/hotel-booking/${bookingId}/voucher`,
+        {},
+        {
+          responseType: "blob", // 🔥 VERY IMPORTANT
+        }
+      );
+
+      // 🔥 Create download
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.setAttribute("download", `hotel-voucher-${bookingId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+
+      return true;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || err.message
+      );
+    }
+  }
+);

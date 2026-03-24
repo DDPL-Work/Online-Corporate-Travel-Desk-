@@ -2,33 +2,26 @@
 import React, { useState, useMemo } from "react";
 import {
   MdHotel,
-  MdRestaurant,
-  MdSpa,
   MdLocationOn,
   MdPolicy,
   MdInfo,
-  MdCheckCircle,
-  MdWarningAmber,
   MdPool,
   MdExpandMore,
   MdExpandLess,
   MdLogin,
   MdLogout,
   MdAccessTime,
-  MdAttractions,
-  MdSummarize,
 } from "react-icons/md";
 import {
   FaBed,
   FaUtensils,
-  FaLeaf,
   FaShuttleVan,
   FaLandmark,
   FaCheckCircle,
   FaExclamationTriangle,
   FaStar,
 } from "react-icons/fa";
-import { BsBuilding, BsInfoCircleFill } from "react-icons/bs";
+import { BsBuilding } from "react-icons/bs";
 import { GiMeditation } from "react-icons/gi";
 
 /* ─────────────────────────────────────────
