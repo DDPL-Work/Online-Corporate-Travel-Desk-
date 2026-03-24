@@ -1073,57 +1073,101 @@ exports.downloadTicketPdf = asyncHandler(async (req, res) => {
 // @desc    Employee - Get my bookings (all statuses)
 // @route   GET /api/v1/bookings/my
 // @access  Private (Employee)
-exports.getMyBookings = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, bookingType = "flight" } = req.query;
 
+exports.getMyBookings = asyncHandler(async (req, res) => {
+  const {
+    page = 1,
+    limit = 10,
+    bookingType = "flight",
+    executionStatus,
+    requestStatus,
+  } = req.query;
+
+  /* ================= BUILD QUERY ================= */
   const query = {
     userId: req.user._id,
     bookingType,
-    executionStatus: ["ticketed", "ticket_pending"],
   };
+
+  // ✅ executionStatus filter (supports multiple)
+  if (executionStatus) {
+    query.executionStatus = {
+      $in: executionStatus.split(","),
+    };
+  }
+
+  // ✅ optional requestStatus filter
+  if (requestStatus) {
+    query.requestStatus = requestStatus;
+  }
 
   const skip = (Number(page) - 1) * Number(limit);
 
+  /* ================= FETCH DATA ================= */
   const [rawBookings, total] = await Promise.all([
     BookingRequest.find(query)
       .select(
-        "bookingReference bookingType requestStatus executionStatus bookingSnapshot pricingSnapshot createdAt bookingResult",
+        `
+        bookingReference
+        bookingType
+        requestStatus
+        executionStatus
+        bookingSnapshot
+        pricingSnapshot
+        createdAt
+        updatedAt
+        bookingResult
+        amendment
+        amendmentHistory
+      `,
       )
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit))
-      .lean(), // IMPORTANT for safe mutation
+      .lean(),
+
     BookingRequest.countDocuments(query),
   ]);
 
+  /* ================= TRANSFORM ================= */
   const bookings = rawBookings.map((booking) => {
     const providerResponse =
       booking?.bookingResult?.providerResponse?.Response?.Response;
 
     const flightItinerary = providerResponse?.FlightItinerary;
 
-    // PNR resolution priority
-    // const pnr =
-    //   providerResponse?.PNR ||
-    //   flightItinerary?.PNR ||
-    //   flightItinerary?.Segments?.[0]?.AirlinePNR ||
-    //   null;
-
+    /* ---------- PNR RESOLUTION ---------- */
     let pnr = null;
 
     if (booking.bookingResult?.pnr) {
       pnr = booking.bookingResult.pnr;
     } else if (booking.bookingResult?.onwardPNR) {
       pnr = `${booking.bookingResult.onwardPNR} / ${booking.bookingResult.returnPNR}`;
+    } else if (providerResponse?.PNR) {
+      pnr = providerResponse.PNR;
+    } else if (flightItinerary?.PNR) {
+      pnr = flightItinerary.PNR;
     }
+
+    /* ---------- AMENDMENT NORMALIZATION ---------- */
+    const amendment = booking.amendment
+      ? {
+          type: booking.amendment.type,
+          status: booking.amendment.status,
+          changeRequestId: booking.amendment.changeRequestId,
+          requestedAt: booking.updatedAt,
+        }
+      : null;
 
     return {
       ...booking,
       pnr,
+      amendment,
     };
   });
 
-  res.status(200).json(
+  /* ================= RESPONSE ================= */
+  return res.status(200).json(
     new ApiResponse(
       200,
       {
@@ -1134,7 +1178,7 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
           pages: Math.ceil(total / limit),
         },
       },
-      "Ticketed flight bookings fetched successfully",
+      "Flight bookings fetched successfully",
     ),
   );
 });
@@ -1142,6 +1186,7 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
 // @desc    Employee - Get my booking by ID
 // @route   GET /api/v1/bookings/my/:id
 // @access  Private (Employee)
+
 exports.getMyBookingById = asyncHandler(async (req, res) => {
   const booking = await BookingRequest.findById(req.params.id).lean();
 
@@ -1154,33 +1199,52 @@ exports.getMyBookingById = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Not authorized to view this booking");
   }
 
-  // ✅ DERIVE PAYMENT STATUS FROM WALLET
-  // const paymentTxn = await WalletTransaction.findOne({
-  //   bookingId: booking._id,
-  //   type: "debit",
-  //   status: "completed",
-  // })
-  //   .sort({ createdAt: -1 })
-  //   .select("_id amount createdAt");
+  /* ================= PNR RESOLUTION ================= */
+  const providerResponse =
+    booking?.bookingResult?.providerResponse?.Response?.Response;
 
-  // booking.payment = paymentTxn
-  //   ? {
-  //       status: "completed",
-  //       method: "wallet",
-  //       amount: paymentTxn.amount,
-  //       paidAt: paymentTxn.createdAt,
-  //       transactionId: paymentTxn._id,
-  //     }
-  //   : {
-  //       status: "pending",
-  //     };
+  const flightItinerary = providerResponse?.FlightItinerary;
 
-  // 🔎 Determine corporate type
+  let pnr = null;
+
+  if (booking.bookingResult?.pnr) {
+    pnr = booking.bookingResult.pnr;
+  } else if (booking.bookingResult?.onwardPNR) {
+    pnr = `${booking.bookingResult.onwardPNR} / ${booking.bookingResult.returnPNR}`;
+  } else if (providerResponse?.PNR) {
+    pnr = providerResponse.PNR;
+  } else if (flightItinerary?.PNR) {
+    pnr = flightItinerary.PNR;
+  }
+
+  booking.pnr = pnr;
+
+  /* ================= AMENDMENT NORMALIZATION ================= */
+  booking.amendment = booking.amendment
+    ? {
+        type: booking.amendment.type,
+        status: booking.amendment.status,
+        changeRequestId: booking.amendment.changeRequestId,
+        requestedAt: booking.updatedAt,
+        raw: booking.amendment.response, // full TBO response (optional)
+      }
+    : null;
+
+  booking.amendmentHistory =
+    booking.amendmentHistory?.map((item) => ({
+      type: item.type,
+      status: item.status,
+      changeRequestId: item.changeRequestId,
+      createdAt: item.createdAt,
+    })) || [];
+
+  /* ================= PAYMENT LOGIC ================= */
+
   const corporate = await Corporate.findById(booking.corporateId).select(
     "classification",
   );
 
-  // ================= PREPAID =================
+  // PREPAID
   if (corporate?.classification === "prepaid") {
     const walletTxn = await WalletTransaction.findOne({
       bookingId: booking._id,
@@ -1201,7 +1265,7 @@ exports.getMyBookingById = asyncHandler(async (req, res) => {
       : { status: "pending" };
   }
 
-  // ================= POSTPAID =================
+  // POSTPAID
   else if (corporate?.classification === "postpaid") {
     const ledgerEntry = await Ledger.findOne({
       bookingId: booking._id,
@@ -1222,10 +1286,12 @@ exports.getMyBookingById = asyncHandler(async (req, res) => {
       : { status: "pending" };
   }
 
-  // ================= FALLBACK (safety) =================
+  // FALLBACK
   else {
     booking.payment = { status: "pending" };
   }
+
+  /* ================= RESPONSE ================= */
 
   return res
     .status(200)

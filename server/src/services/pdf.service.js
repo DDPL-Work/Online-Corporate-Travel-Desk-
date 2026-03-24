@@ -8,6 +8,7 @@ const logger = require("../utils/logger");
 const {
   generateFlightTicketPdfKit,
 } = require("./templates/flight_ticket_pdfkit");
+const { generateHotelVoucherPdfKit } = require("./templates/hotel_voucher_pdfkit");
 // const puppeteer = require("puppeteer-core");
 
 class PDFService {
@@ -314,90 +315,22 @@ class PDFService {
     });
   }
 
-  async generateHotelVoucher(booking, user, corporate) {
-    return new Promise((resolve, reject) => {
-      try {
-        const filename = `hotel-${booking.bookingReference}-${randomUUID()}.pdf`;
-        const filepath = path.join(this.voucherDir, filename);
+  async generateHotelVoucher(booking) {
+  try {
+    const filename = `hotel-${booking.bookingReference}-${randomUUID()}.pdf`;
+    const filepath = path.join(this.voucherDir, filename);
 
-        const doc = new PDFDocument({ margin: 50 });
-        const stream = fs.createWriteStream(filepath);
-
-        doc.pipe(stream);
-
-        // Header
-        doc.fontSize(20).text("HOTEL BOOKING VOUCHER", { align: "center" });
-        doc.moveDown();
-
-        doc.fontSize(12).text(`Corporate: ${corporate.corporateName}`);
-        doc.fontSize(10).text(`Booking Reference: ${booking.bookingReference}`);
-        doc.text(`Confirmation No: ${booking.hotelDetails.confirmationNumber}`);
-        doc.moveDown();
-
-        // Guest Details
-        doc.fontSize(14).text("Guest Details", { underline: true });
-        doc.moveDown(0.5);
-        booking.travellers.forEach((traveller, index) => {
-          doc
-            .fontSize(10)
-            .text(
-              `${index + 1}. ${traveller.title} ${traveller.firstName} ${traveller.lastName}`,
-            );
-        });
-        doc.moveDown();
-
-        // Hotel Details
-        doc.fontSize(14).text("Hotel Details", { underline: true });
-        doc.moveDown(0.5);
-        doc.fontSize(10);
-        doc.text(`Hotel: ${booking.hotelDetails.hotelName}`);
-        doc.text(
-          `Address: ${booking.hotelDetails.address.street}, ${booking.hotelDetails.address.city}`,
-        );
-        doc.text(
-          `Check-in: ${new Date(booking.hotelDetails.checkInDate).toLocaleDateString()}`,
-        );
-        doc.text(
-          `Check-out: ${new Date(booking.hotelDetails.checkOutDate).toLocaleDateString()}`,
-        );
-        doc.text(`Nights: ${booking.hotelDetails.numberOfNights}`);
-        doc.text(`Room Type: ${booking.hotelDetails.roomType}`);
-        doc.text(`Meal Plan: ${booking.hotelDetails.mealPlan}`);
-        doc.moveDown();
-
-        // Fare Details
-        doc.fontSize(14).text("Fare Details", { underline: true });
-        doc.moveDown(0.5);
-        doc.fontSize(10);
-        doc.text(`Base Fare: ₹${booking.pricing.baseFare.toLocaleString()}`);
-        doc.text(`Taxes: ₹${booking.pricing.taxes.toLocaleString()}`);
-        doc
-          .fontSize(12)
-          .text(
-            `Total Amount: ₹${booking.pricing.totalAmount.toLocaleString()}`,
-            { bold: true },
-          );
-
-        doc.moveDown(2);
-        doc
-          .fontSize(8)
-          .text(
-            "This is a computer-generated voucher and does not require a signature.",
-            { align: "center" },
-          );
-
-        doc.end();
-
-        stream.on("finish", () => {
-          resolve(`/uploads/vouchers/${filename}`);
-        });
-
-        stream.on("error", reject);
-      } catch (error) {
-        reject(error);
-      }
+    await generateHotelVoucherPdfKit({
+      booking,
+      outputPath: filepath,
     });
+
+    return filepath;
+  } catch (error) {
+    logger.error("Hotel voucher PDF generation failed", error);
+    throw error;
   }
+}
 }
 
 module.exports = new PDFService();

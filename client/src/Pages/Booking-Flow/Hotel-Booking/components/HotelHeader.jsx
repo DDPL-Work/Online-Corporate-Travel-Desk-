@@ -26,10 +26,10 @@ const HotelHeader = ({ name, address, rating, cityName, countryName }) => {
             <FaShareAlt className="text-sm" />
             SHARE
           </button>
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors text-xs font-bold">
+          {/* <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors text-xs font-bold">
             <FaHeart className="text-sm" />
             SAVE
-          </button>
+          </button> */}
         </div>
       </div>
 

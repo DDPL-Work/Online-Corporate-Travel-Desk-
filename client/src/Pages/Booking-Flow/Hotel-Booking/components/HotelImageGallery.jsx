@@ -30,32 +30,33 @@ const Lightbox = ({ images, startIndex, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-9999 flex flex-col"
+      className="fixed inset-0 z-50 flex flex-col"
       style={{
         background: "rgba(5,10,20,0.97)",
         backdropFilter: "blur(20px)",
         outline: "none",
-        background: "rgba(5,10,20,0.97)",
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
       onKeyDown={handleKey}
       tabIndex={0}
       ref={(el) => el?.focus()}
     >
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-8 py-5 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-            <MdPhotoLibrary className="text-white text-base" />
+      {/* Top bar - Responsive */}
+      <div className="flex items-center justify-between px-3 sm:px-6 md:px-8 py-3 sm:py-4 md:py-5 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/10 flex items-center justify-center">
+            <MdPhotoLibrary className="text-white text-xs sm:text-sm md:text-base" />
           </div>
           <div>
-            <span className="text-white font-black text-sm">{current + 1}</span>
-            <span className="text-white/30 text-sm"> / {total}</span>
+            <span className="text-white font-black text-xs sm:text-sm">
+              {current + 1}
+            </span>
+            <span className="text-white/30 text-xs sm:text-sm"> / {total}</span>
           </div>
         </div>
 
-        {/* Dot progress */}
-        <div className="hidden md:flex items-center gap-1">
+        {/* Dot progress - Hidden on mobile */}
+        <div className="hidden sm:flex items-center gap-1">
           {images.slice(0, Math.min(total, 12)).map((_, i) => (
             <button
               key={i}
@@ -77,19 +78,20 @@ const Lightbox = ({ images, startIndex, onClose }) => {
 
         <button
           onClick={onClose}
-          className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition"
+          className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition"
         >
-          <MdClose className="text-xl" />
+          <MdClose className="text-lg sm:text-xl" />
         </button>
       </div>
 
-      {/* Main image */}
-      <div className="flex-1 flex items-center justify-center relative px-20 min-h-0">
+      {/* Main image - Responsive */}
+      <div className="flex-1 flex items-center justify-center relative px-3 sm:px-6 md:px-20 min-h-0">
+        {/* Left Arrow */}
         <button
           onClick={prev}
-          className="absolute left-6 w-14 h-14 rounded-2xl bg-white/8 hover:bg-white/20 border border-white/10 flex items-center justify-center text-white transition-all hover:scale-105 z-10"
+          className="absolute left-2 sm:left-3 md:left-6 w-8 h-8 sm:w-10 sm:h-10 md:w-14 md:h-14 rounded-lg sm:rounded-xl md:rounded-2xl bg-white/8 hover:bg-white/20 border border-white/10 flex items-center justify-center text-white transition-all hover:scale-105 z-10"
         >
-          <MdChevronLeft className="text-3xl" />
+          <MdChevronLeft className="text-xl sm:text-2xl md:text-3xl" />
         </button>
 
         <div className="relative max-h-full max-w-full flex items-center justify-center">
@@ -97,32 +99,36 @@ const Lightbox = ({ images, startIndex, onClose }) => {
             key={current}
             src={images[current]}
             alt={`Photo ${current + 1}`}
-            className="rounded-2xl shadow-2xl object-contain"
-            style={{ maxHeight: "calc(100vh - 220px)", maxWidth: "100%" }}
+            className="rounded-lg sm:rounded-xl md:rounded-2xl shadow-2xl object-contain"
+            style={{
+              maxHeight: "calc(100vh - 140px)",
+              maxWidth: "100%",
+            }}
           />
         </div>
 
+        {/* Right Arrow */}
         <button
           onClick={next}
-          className="absolute right-6 w-14 h-14 rounded-2xl bg-white/8 hover:bg-white/20 border border-white/10 flex items-center justify-center text-white transition-all hover:scale-105 z-10"
+          className="absolute right-2 sm:right-3 md:right-6 w-8 h-8 sm:w-10 sm:h-10 md:w-14 md:h-14 rounded-lg sm:rounded-xl md:rounded-2xl bg-white/8 hover:bg-white/20 border border-white/10 flex items-center justify-center text-white transition-all hover:scale-105 z-10"
         >
-          <MdChevronRight className="text-3xl" />
+          <MdChevronRight className="text-xl sm:text-2xl md:text-3xl" />
         </button>
       </div>
 
-      {/* Thumbnail strip */}
+      {/* Thumbnail strip - Responsive */}
       <div
-        className="shrink-0 px-8 py-5 flex gap-2 overflow-x-auto"
+        className="shrink-0 px-2 sm:px-4 md:px-8 py-3 sm:py-4 md:py-5 flex gap-1 sm:gap-2 overflow-x-auto"
         style={{ scrollbarWidth: "none" }}
       >
         {images.map((img, i) => (
           <button
             key={i}
             onClick={() => setCurrent(i)}
-            className="shrink-0 rounded-xl overflow-hidden transition-all duration-200"
+            className="shrink-0 rounded-lg sm:rounded-xl overflow-hidden transition-all duration-200"
             style={{
-              width: i === current ? 80 : 56,
-              height: 48,
+              width: i === current ? 60 : 48,
+              height: 40,
               border:
                 i === current ? "2px solid #0d7fe8" : "2px solid transparent",
               opacity: i === current ? 1 : 0.45,
@@ -179,8 +185,8 @@ const Tile = ({ src, alt, onClick, children, style, className = "" }) => {
         }}
       />
       {/* Zoom icon */}
-      <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-100 scale-75">
-        <MdZoomIn className="text-white text-base" />
+      <div className="absolute top-2 sm:top-3 right-2 sm:right-3 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-100 scale-75">
+        <MdZoomIn className="text-white text-sm sm:text-base" />
       </div>
       {children}
     </div>
@@ -188,11 +194,10 @@ const Tile = ({ src, alt, onClick, children, style, className = "" }) => {
 };
 
 /* ─────────────────────────────────────────
-   Main Gallery — Unique Asymmetric Bento
+   Main Gallery — Fully Responsive
 ───────────────────────────────────────── */
 const HotelImageGallery = ({ images = [] }) => {
   const [lightboxIndex, setLightboxIndex] = useState(null);
-  const [showAll, setShowAll] = useState(false);
 
   const total = images.length;
   if (!total) return null;
@@ -209,24 +214,109 @@ const HotelImageGallery = ({ images = [] }) => {
           0% { background-position: 200% 0; }
           100% { background-position: -200% 0; }
         }
-        .gallery-grid {
-          display: grid;
-          gap: 6px;
-          height: 500px;
-          grid-template-columns: 2.2fr 1fr 1fr;
-          grid-template-rows: 1fr 1fr;
+        
+        /* Mobile: Single column layout */
+        @media (max-width: 640px) {
+          .gallery-grid {
+            display: grid;
+            gap: 4px;
+            height: auto;
+            grid-template-columns: 1fr;
+            grid-template-rows: auto;
+            grid-auto-rows: 180px;
+          }
+          .gallery-grid > div:nth-child(1) {
+            grid-row: 1;
+            grid-column: 1;
+            height: 220px !important;
+          }
+          .gallery-grid > div:nth-child(2) {
+            grid-row: 2;
+            grid-column: 1;
+          }
+          .gallery-grid > div:nth-child(3) {
+            grid-row: 3;
+            grid-column: 1;
+          }
+          .gallery-grid > div:nth-child(4) {
+            grid-row: 4;
+            grid-column: 1;
+          }
+          .gallery-grid > div:nth-child(5) {
+            grid-row: 5;
+            grid-column: 1;
+          }
+        }
+        
+        /* Tablet: 2x3 grid */
+        @media (min-width: 641px) and (max-width: 1024px) {
+          .gallery-grid {
+            display: grid;
+            gap: 6px;
+            height: 400px;
+            grid-template-columns: 1.5fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            grid-auto-flow: dense;
+          }
+          .gallery-grid > div:nth-child(1) {
+            grid-row: 1 / 3;
+            grid-column: 1;
+          }
+          .gallery-grid > div:nth-child(2) {
+            grid-row: 1;
+            grid-column: 2;
+          }
+          .gallery-grid > div:nth-child(3) {
+            grid-row: 2;
+            grid-column: 2;
+          }
+          .gallery-grid > div:nth-child(4) {
+            display: none;
+          }
+          .gallery-grid > div:nth-child(5) {
+            display: none;
+          }
+        }
+        
+        /* Desktop: Full bento layout */
+        @media (min-width: 1025px) {
+          .gallery-grid {
+            display: grid;
+            gap: 6px;
+            height: 500px;
+            grid-template-columns: 2.2fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+          }
+          .gallery-grid > div:nth-child(1) {
+            grid-row: 1 / 3;
+            grid-column: 1;
+          }
+          .gallery-grid > div:nth-child(2) {
+            grid-row: 1;
+            grid-column: 2;
+          }
+          .gallery-grid > div:nth-child(3) {
+            grid-row: 1;
+            grid-column: 3;
+          }
+          .gallery-grid > div:nth-child(4) {
+            grid-row: 2;
+            grid-column: 2;
+          }
+          .gallery-grid > div:nth-child(5) {
+            grid-row: 2;
+            grid-column: 3;
+          }
         }
       `}</style>
 
-      {/* ── Main Bento ── */}
-      <div className="relative">
+      {/* ── Main Gallery ── */}
+      <div className="relative w-full">
         <div className="gallery-grid">
-          {/* ① HERO — tall left, spans both rows */}
+          {/* ① HERO */}
           <div
             style={{
-              gridRow: "1 / 3",
-              gridColumn: "1 / 2",
-              borderRadius: 16,
+              borderRadius: 12,
               overflow: "hidden",
               position: "relative",
             }}
@@ -237,9 +327,9 @@ const HotelImageGallery = ({ images = [] }) => {
               onClick={() => open(0)}
               style={{ borderRadius: 0, width: "100%", height: "100%" }}
             >
-              {/* Hotel name overlay on hero */}
+              {/* Hero overlay label - Hidden on mobile */}
               <div
-                className="absolute bottom-0 left-0 right-0 p-5"
+                className="hidden sm:block absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-5"
                 style={{
                   background:
                     "linear-gradient(to top, rgba(10,37,64,0.8) 0%, transparent 100%)",
@@ -255,11 +345,9 @@ const HotelImageGallery = ({ images = [] }) => {
             </Tile>
           </div>
 
-          {/* ② Top center */}
+          {/* ② Second image */}
           <div
             style={{
-              gridRow: "1 / 2",
-              gridColumn: "2 / 3",
               borderRadius: 12,
               overflow: "hidden",
               position: "relative",
@@ -277,11 +365,9 @@ const HotelImageGallery = ({ images = [] }) => {
             )}
           </div>
 
-          {/* ③ Top right — taller with label */}
+          {/* ③ Third image */}
           <div
             style={{
-              gridRow: "1 / 2",
-              gridColumn: "3 / 4",
               borderRadius: 12,
               overflow: "hidden",
               position: "relative",
@@ -299,11 +385,9 @@ const HotelImageGallery = ({ images = [] }) => {
             )}
           </div>
 
-          {/* ④ Bottom center */}
+          {/* ④ Fourth image */}
           <div
             style={{
-              gridRow: "2 / 3",
-              gridColumn: "2 / 3",
               borderRadius: 12,
               overflow: "hidden",
               position: "relative",
@@ -321,11 +405,9 @@ const HotelImageGallery = ({ images = [] }) => {
             )}
           </div>
 
-          {/* ⑤ Bottom right — +N overlay */}
+          {/* ⑤ Fifth image with +N overlay */}
           <div
             style={{
-              gridRow: "2 / 3",
-              gridColumn: "3 / 4",
               borderRadius: 12,
               overflow: "hidden",
               position: "relative",
@@ -335,7 +417,7 @@ const HotelImageGallery = ({ images = [] }) => {
               <Tile
                 src={images[4]}
                 alt="5"
-                onClick={() => open(0)}
+                onClick={() => open(4)}
                 style={{ borderRadius: 0, width: "100%", height: "100%" }}
               >
                 {remaining > 0 && (
@@ -348,16 +430,10 @@ const HotelImageGallery = ({ images = [] }) => {
                   >
                     <div
                       className="text-white font-black leading-none"
-                      style={{ fontSize: 36 }}
+                      style={{ fontSize: 28 }}
                     >
                       +{remaining}
                     </div>
-                    {/* <div className="flex items-center gap-1.5 bg-white/15 border border-white/20 rounded-full px-3 py-1">
-                      <MdGridView className="text-white text-xs" />
-                      <span className="text-white text-[11px] font-bold">
-                        View All
-                      </span>
-                    </div> */}
                   </div>
                 )}
               </Tile>
@@ -367,24 +443,24 @@ const HotelImageGallery = ({ images = [] }) => {
           </div>
         </div>
 
-        {/* ── Floating badge — total count ── */}
+        {/* ── Photo count badge - Responsive ── */}
         <div
-          className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full z-10"
+          className="absolute top-2 sm:top-3 md:top-4 left-2 sm:left-3 md:left-4 flex items-center gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full z-10"
           style={{
             background: "rgba(10,37,64,0.75)",
             backdropFilter: "blur(8px)",
             border: "1px solid rgba(255,255,255,0.12)",
           }}
         >
-          <MdPhotoLibrary className="text-white text-sm" />
+          <MdPhotoLibrary className="text-white text-xs sm:text-sm" />
           <span className="text-white text-xs font-bold">{total} Photos</span>
         </div>
 
-        {/* ── Action buttons bottom-right ── */}
-        <div className="absolute bottom-4 right-4 flex items-center gap-2 z-10">
+        {/* ── Action button - Responsive ── */}
+        <div className="absolute bottom-2 sm:bottom-3 md:bottom-4 right-2 sm:right-3 md:right-4 z-10">
           <button
             onClick={() => open(0)}
-            className="flex items-center gap-2 font-bold text-xs px-4 py-2.5 rounded-xl transition-all hover:scale-105"
+            className="flex items-center gap-1.5 sm:gap-2 font-bold text-xs px-2.5 sm:px-4 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl transition-all hover:scale-105 active:scale-95"
             style={{
               background: "rgba(255,255,255,0.95)",
               color: "#0a2540",
@@ -392,27 +468,18 @@ const HotelImageGallery = ({ images = [] }) => {
               border: "1px solid rgba(255,255,255,0.5)",
             }}
           >
-            <MdGridView className="text-[#0d7fe8] text-base" />
-            View All {total} Photos
+            <MdGridView className="text-[#0d7fe8] text-sm sm:text-base" />
+            <span className="hidden sm:inline">View All {total}</span>
+            <span className="sm:hidden">{total}</span>
           </button>
-          {/* <button
-            onClick={() => open(0)}
-            className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:scale-105"
-            style={{
-              background: "rgba(255,255,255,0.95)",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-            }}
-          >
-            <BsArrowsFullscreen className="text-[#0a2540] text-sm" />
-          </button> */}
         </div>
       </div>
 
-      {/* ── Thumbnail filmstrip ── */}
+      {/* ── Thumbnail filmstrip - Responsive ── */}
       {total > 5 && (
-        <div className="mt-3 relative">
+        <div className="mt-2 sm:mt-3 md:mt-4 relative">
           <div
-            className="flex gap-2 overflow-x-auto py-1 px-0.5"
+            className="flex gap-1.5 sm:gap-2 overflow-x-auto py-1 px-0.5"
             style={{ scrollbarWidth: "none" }}
           >
             {images.map((img, i) => (
@@ -421,9 +488,9 @@ const HotelImageGallery = ({ images = [] }) => {
                 onClick={() => open(i)}
                 className="group relative shrink-0 overflow-hidden transition-all duration-200 hover:-translate-y-1"
                 style={{
-                  width: 72,
-                  height: 52,
-                  borderRadius: 10,
+                  width: 60,
+                  height: 44,
+                  borderRadius: 8,
                   border: "2px solid transparent",
                   outline: "none",
                 }}
@@ -442,9 +509,9 @@ const HotelImageGallery = ({ images = [] }) => {
               </button>
             ))}
           </div>
-          {/* Fade edges */}
+          {/* Fade edge */}
           <div
-            className="absolute top-0 right-0 bottom-0 w-12 pointer-events-none"
+            className="absolute top-0 right-0 bottom-0 w-8 sm:w-12 pointer-events-none"
             style={{
               background: "linear-gradient(to left, white, transparent)",
             }}

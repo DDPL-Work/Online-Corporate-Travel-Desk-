@@ -138,44 +138,27 @@ export const cancelBooking = createAsyncThunk(
   },
 );
 
+
+export const ticketTBO = createAsyncThunk(
+  "bookings/ticketTBO",
+  async ({bookingId, journeyType}, {rejectWithValue}) =>{
+    try{
+      const response = await api.get(`/bookings/${bookingId}/ticket-tbo`,{
+        params: {journeyType},
+        responseType: "application/json",
+      });
+      return response;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Ticket Data fetching failed",
+      );
+    }
+  }
+)
+
 /* =====================================================
  * ✅ Ticket Flight (issue ticket & optionally download)
  * ===================================================== */
-// export const ticketFlight = createAsyncThunk(
-//   "bookings/ticketFlight",
-//   async ({ bookingId, pnr, isLCC = false }, { rejectWithValue }) => {
-//     try {
-//       const response = await axios.post(
-//         "/api/v1/flights/ticket",
-//         {
-//           bookingId,
-//           pnr,
-//           IsLCC: isLCC,
-//         },
-//         { responseType: "blob" }, // so we can download PDF
-//       );
-
-//       // If backend sends PDF blob
-//       const blob = new Blob([response.data], { type: "application/pdf" });
-//       const url = window.URL.createObjectURL(blob);
-//       const a = document.createElement("a");
-//       a.href = url;
-//       a.download = `ticket_${pnr || bookingId}.pdf`;
-//       document.body.appendChild(a);
-//       a.click();
-//       window.URL.revokeObjectURL(url);
-//       a.remove();
-
-//       return { bookingId, pnr, success: true };
-//     } catch (err) {
-//       console.error("Ticket download failed:", err);
-//       const message =
-//         err.response?.data?.message || "Failed to download ticket.";
-//       return rejectWithValue(message);
-//     }
-//   },
-// );
-
 export const downloadTicketPdf = createAsyncThunk(
   "bookings/downloadTicketPdf",
   async ({bookingId, journeyType}, { rejectWithValue }) => {

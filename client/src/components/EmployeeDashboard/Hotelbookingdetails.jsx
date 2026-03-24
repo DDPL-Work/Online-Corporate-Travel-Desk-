@@ -1,6 +1,8 @@
 // HotelBookingDetails.jsx
 // Hotel booking details page — mirrors BookingDetails.jsx structure.
 // Uses DB booking object + bookingResult.providerResponse (GetBookingDetailResult).
+// ✅ REMOVED: Fare Summary Block
+// ✅ KEPT: Download Invoice Button (Header + Payment Status Card)
 
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -27,6 +29,10 @@ import {
   FiWifi,
   FiCoffee,
   FiHome,
+  FiMessageCircle,
+  FiSend,
+  FiClock,
+  FiXCircle,
 } from "react-icons/fi";
 import {
   MdHotel,
@@ -38,7 +44,14 @@ import {
   MdCancel,
   MdKingBed,
 } from "react-icons/md";
-import { fetchBookedHotelDetails } from "../../Redux/Actions/hotelBooking.thunks";
+import {
+  fetchBookedHotelDetails,
+  generateHotelVoucher,
+} from "../../Redux/Actions/hotelBooking.thunks";
+import {
+  sendHotelAmendment,
+  getHotelAmendmentStatus,
+} from "../../Redux/Actions/hotelAmendment.thunks";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Primitives (same pattern as BookingDetails)                    */
@@ -89,7 +102,7 @@ function InfoRow({ label, value, accent }) {
 function BentoCard({ children, className = "" }) {
   return (
     <div
-      className={`bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm ${className}`}
+      className={`bg-white rounded-xl sm:rounded-2xl border border-slate-200/80 p-4 sm:p-6 shadow-sm ${className}`}
     >
       {children}
     </div>
@@ -98,8 +111,8 @@ function BentoCard({ children, className = "" }) {
 
 function CardLabel({ icon: Icon, label }) {
   return (
-    <div className="flex items-center gap-2 mb-5">
-      <span className="bg-cyan-50 rounded-lg p-1.5 flex items-center justify-center">
+    <div className="flex items-center gap-2 mb-3 sm:mb-5">
+      <span className="bg-cyan-50 rounded-lg p-1.5 flex items-center justify-center shrink-0">
         <Icon size={13} className="text-teal-600" />
       </span>
       <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
@@ -111,13 +124,13 @@ function CardLabel({ icon: Icon, label }) {
 
 function MetaChip({ icon: Icon, label, value }) {
   return (
-    <div className="flex items-center gap-2 bg-white/[0.07] rounded-xl px-3 py-2.5 border border-white/10">
+    <div className="flex items-center gap-2 bg-white/[0.07] rounded-lg sm:rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 border border-white/10">
       <Icon size={13} className="text-white/50 shrink-0" />
       <div>
-        <p className="text-[9px] uppercase tracking-widest text-white/40 font-bold leading-none mb-0.5">
+        <p className="text-[8px] sm:text-[9px] uppercase tracking-widest text-white/40 font-bold leading-none mb-0.5">
           {label}
         </p>
-        <p className="text-[13px] font-semibold text-white leading-none">
+        <p className="text-xs sm:text-[13px] font-semibold text-white leading-none">
           {value || "—"}
         </p>
       </div>
@@ -135,6 +148,7 @@ function fmtDate(
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-GB", opts);
 }
+
 function fmtTime(d) {
   if (!d) return "—";
   return new Date(d).toLocaleTimeString("en-IN", {
@@ -143,6 +157,7 @@ function fmtTime(d) {
     hour12: true,
   });
 }
+
 function fmtDay(d) {
   if (!d) return "";
   return new Date(d).toLocaleDateString("en-GB", { weekday: "long" });
@@ -158,7 +173,7 @@ function Stars({ count = 0 }) {
       {Array.from({ length: Math.min(count, 5) }).map((_, i) => (
         <svg
           key={i}
-          className="w-3.5 h-3.5 text-amber-400"
+          className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400"
           fill="currentColor"
           viewBox="0 0 20 20"
         >
@@ -173,10 +188,11 @@ function Stars({ count = 0 }) {
 /*  HotelHeroCard — mirrors FlightCard dark gradient style         */
 /* ─────────────────────────────────────────────────────────────── */
 function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
+  const [activeIndex, setActiveIndex] = useState(0);
   const hotelReq = booking?.hotelRequest || {};
   const snapshot = booking?.bookingSnapshot || {};
   const result = booking?.bookingResult || {};
-  const detail = bookingDetail || booking?.raw || {}; // GetBookingDetailResult
+  const detail = bookingDetail || booking?.raw || {};
   const room = detail?.Rooms?.[0] || {};
   const selectedRoom = hotelReq?.selectedRoom || {};
   const selectedHotel = hotelReq?.selectedHotel || {};
@@ -199,8 +215,7 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
       : 1;
   const roomType =
     room?.RoomTypeName || selectedRoom?.roomTypeName || "Standard Room";
-  const images = selectedRoom?.rawRoomData?.images || [];
-  const heroImage = images[0] || null;
+  const images = booking?.images || selectedRoom?.rawRoomData?.images || [];
 
   const confirmationNo = detail?.ConfirmationNo || result?.hotelBookingId || "";
   const invoiceNo =
@@ -215,15 +230,22 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
 
   const executionStatus = booking?.executionStatus || "";
 
+  useEffect(() => {
+    if (!images.length) return;
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % images.length);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [images]);
+
   return (
     <div
-      className="rounded-2xl overflow-hidden shadow-2xl text-white relative"
+      className="rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl text-white relative w-full"
       style={{
         background:
           "linear-gradient(140deg, #0d1b2a 0%, #0A4D68 60%, #088395 100%)",
       }}
     >
-      {/* Grid texture */}
       <div
         className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
@@ -232,39 +254,27 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
         }}
       />
 
-      {/* Hero image strip */}
-      {heroImage && (
-        <div className="relative h-44 overflow-hidden">
-          <img
-            src={heroImage}
-            alt={hotelName}
-            className="w-full h-full object-cover opacity-40"
-          />
-          <div className="absolute inset-0 bg-linear-to-b from-transparent to-[#0d1b2a]" />
-        </div>
-      )}
-
-      <div className="relative p-6 grid gap-0">
+      <div className="relative p-4 sm:p-6 grid gap-0">
         {/* ── ROW 1: Hotel name + status ── */}
-        <div className="flex items-start gap-4 pb-5 border-b border-white/10">
-          <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
-            <MdHotel size={22} className="text-white/80" />
+        <div className="flex items-start gap-3 sm:gap-4 pb-4 sm:pb-5 border-b border-white/10">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
+            <MdHotel size={18} className="sm:size-[22px] text-white/80" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xl font-black leading-tight truncate">
+            <p className="text-base sm:text-xl font-black leading-tight truncate">
               {hotelName}
             </p>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               {starRating > 0 && <Stars count={starRating} />}
               {city && (
-                <span className="flex items-center gap-1 text-[11px] text-white/55">
-                  <MdLocationOn size={12} className="text-teal-400" />
+                <span className="flex items-center gap-1 text-[10px] sm:text-[11px] text-white/55">
+                  <MdLocationOn size={11} className="text-teal-400 shrink-0" />
                   {city}
                 </span>
               )}
             </div>
             {address && (
-              <p className="text-[11px] text-white/35 mt-1 leading-snug line-clamp-1">
+              <p className="text-[10px] sm:text-[11px] text-white/35 mt-1 leading-snug line-clamp-1">
                 {address}
               </p>
             )}
@@ -272,63 +282,61 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
           <StatusPill status={executionStatus || "Confirmed"} />
         </div>
 
-        {/* ── ROW 2: Check-in / nights / Check-out — 3-col grid ── */}
-        <div className="grid grid-cols-[1fr_140px_1fr] items-center py-6 border-b border-white/10">
-          {/* Check-in */}
-          <div className="space-y-1">
-            <p className="text-[11px] text-white/40 font-bold uppercase tracking-widest">
+        {/* ── ROW 2: Check-in / nights / Check-out ── */}
+        <div className="grid grid-cols-[1fr_100px_1fr] sm:grid-cols-[1fr_140px_1fr] items-center py-4 sm:py-6 border-b border-white/10 gap-2 sm:gap-0">
+          <div className="space-y-0.5 sm:space-y-1">
+            <p className="text-[9px] sm:text-[11px] text-white/40 font-bold uppercase tracking-widest">
               Check-in
             </p>
-            <p className="text-[40px] font-black tracking-tighter leading-none">
+            <p className="text-2xl sm:text-[40px] font-black tracking-tighter leading-none">
               {checkIn
                 ? new Date(checkIn).getDate().toString().padStart(2, "0")
                 : "—"}
             </p>
-            <p className="text-base text-white/70 font-semibold">
+            <p className="text-xs sm:text-base text-white/70 font-semibold">
               {fmtDate(checkIn, { month: "short", year: "numeric" })}
             </p>
-            <p className="text-xs text-white/40">{fmtDay(checkIn)}</p>
+            <p className="text-[9px] sm:text-xs text-white/40">
+              {fmtDay(checkIn)}
+            </p>
           </div>
 
-          {/* Connector */}
-          <div className="flex flex-col items-center gap-1.5 px-2">
-            <span className="text-[10px] font-bold tracking-widest text-white/40 uppercase">
+          <div className="flex flex-col items-center gap-1 sm:gap-1.5 px-1 sm:px-2">
+            <span className="text-[8px] sm:text-[10px] font-bold tracking-widest text-white/40 uppercase whitespace-nowrap">
               {nights} Night{nights !== 1 ? "s" : ""}
             </span>
             <div className="flex items-center gap-0 w-full">
-              <span className="w-2 h-2 rounded-full border-2 border-white/30 shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full border-2 border-white/30 shrink-0" />
               <div className="flex-1 relative flex items-center">
                 <div className="w-full border-t border-dashed border-white/20" />
-                <span className="absolute left-1/2 -translate-x-1/2 -translate-y-[45%] text-sm select-none">
-                  🏨
-                </span>
               </div>
-              <span className="w-2 h-2 rounded-full bg-white/30 shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-white/30 shrink-0" />
             </div>
-            <span className="text-[9px] font-bold tracking-widest text-white/30 uppercase">
+            <span className="text-[7px] sm:text-[9px] font-bold tracking-widest text-white/30 uppercase text-center px-1 line-clamp-2">
               {roomType}
             </span>
           </div>
 
-          {/* Check-out */}
-          <div className="text-right space-y-1">
-            <p className="text-[11px] text-white/40 font-bold uppercase tracking-widest">
+          <div className="text-right space-y-0.5 sm:space-y-1">
+            <p className="text-[9px] sm:text-[11px] text-white/40 font-bold uppercase tracking-widest">
               Check-out
             </p>
-            <p className="text-[40px] font-black tracking-tighter leading-none">
+            <p className="text-2xl sm:text-[40px] font-black tracking-tighter leading-none">
               {checkOut
                 ? new Date(checkOut).getDate().toString().padStart(2, "0")
                 : "—"}
             </p>
-            <p className="text-base text-white/70 font-semibold">
+            <p className="text-xs sm:text-base text-white/70 font-semibold">
               {fmtDate(checkOut, { month: "short", year: "numeric" })}
             </p>
-            <p className="text-xs text-white/40">{fmtDay(checkOut)}</p>
+            <p className="text-[9px] sm:text-xs text-white/40">
+              {fmtDay(checkOut)}
+            </p>
           </div>
         </div>
 
         {/* ── ROW 3: Meta chips ── */}
-        <div className="grid grid-cols-3 gap-2.5 py-4 border-b border-white/10">
+        <div className="grid grid-cols-3 gap-2 py-3 sm:py-4 border-b border-white/10">
           <MetaChip
             icon={MdKingBed}
             label="Room Type"
@@ -350,13 +358,13 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
 
         {/* ── ROW 4: Confirmation details ── */}
         {paymentSuccessful && (
-          <div className="pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="pt-3 sm:pt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <p className="text-[9px] uppercase tracking-widest text-white/35 font-bold mb-1">
+              <p className="text-[8px] sm:text-[9px] uppercase tracking-widest text-white/35 font-bold mb-1">
                 Confirmation No.
               </p>
               {confirmationNo ? (
-                <p className="text-xl font-black tracking-[0.12em] font-mono text-white">
+                <p className="text-base sm:text-xl font-black tracking-[0.12em] font-mono text-white break-all">
                   {confirmationNo}
                 </p>
               ) : (
@@ -365,27 +373,27 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
                     size={13}
                     className="text-white/40 animate-spin"
                   />
-                  <span className="text-sm text-white/40 font-semibold">
+                  <span className="text-xs sm:text-sm text-white/40 font-semibold">
                     Awaiting confirmation…
                   </span>
                 </div>
               )}
               {invoiceNo && (
-                <p className="text-[11px] text-white/35 mt-1">
+                <p className="text-[10px] sm:text-[11px] text-white/35 mt-1">
                   Invoice: {invoiceNo}
                 </p>
               )}
             </div>
             {tboRef && (
               <div className="sm:text-right">
-                <p className="text-[9px] uppercase tracking-widest text-white/35 font-bold mb-1">
+                <p className="text-[8px] sm:text-[9px] uppercase tracking-widest text-white/35 font-bold mb-1">
                   TBO Reference
                 </p>
-                <p className="text-base font-black tracking-wider font-mono text-white/80">
+                <p className="text-sm sm:text-base font-black tracking-wider font-mono text-white/80 break-all">
                   {tboRef}
                 </p>
                 {bookingRefNo && (
-                  <p className="text-[11px] text-white/35 mt-1 truncate">
+                  <p className="text-[10px] sm:text-[11px] text-white/35 mt-1 truncate">
                     Ref: {bookingRefNo}
                   </p>
                 )}
@@ -394,11 +402,10 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
           </div>
         )}
 
-        {/* Payment not done */}
         {!paymentSuccessful && (
-          <div className="pt-4 flex items-center gap-2 text-white/30">
+          <div className="pt-3 sm:pt-4 flex items-center gap-2 text-white/30">
             <FiAlertCircle size={14} />
-            <p className="text-xs font-medium">
+            <p className="text-[11px] sm:text-xs font-medium">
               Complete payment to view confirmation details
             </p>
           </div>
@@ -409,39 +416,428 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Image Gallery                                                  */
+/*  Cancellation Request + Status Card (NEW)                       */
 /* ─────────────────────────────────────────────────────────────── */
-function ImageGallery({ images }) {
-  const [active, setActive] = useState(0);
-  if (!images?.length) return null;
+
+const CANCEL_REASONS = [
+  "Change of travel plans",
+  "Medical emergency",
+  "Flight cancellation",
+  "Visa issues",
+  "Personal reasons",
+  "Duplicate booking",
+  "Other",
+];
+
+const CANCEL_STATUS_CONFIG = {
+  pending: {
+    label: "Request Submitted",
+    bg: "bg-amber-50",
+    border: "border-amber-100",
+    text: "text-amber-700",
+    dot: "bg-amber-400",
+    icon: FiClock,
+    iconColor: "text-amber-500",
+    barColor: "bg-amber-400",
+  },
+  approved: {
+    label: "Cancellation Approved",
+    bg: "bg-emerald-50",
+    border: "border-emerald-100",
+    text: "text-emerald-700",
+    dot: "bg-emerald-500",
+    icon: FiCheckCircle,
+    iconColor: "text-emerald-500",
+    barColor: "bg-emerald-500",
+  },
+  rejected: {
+    label: "Request Rejected",
+    bg: "bg-red-50",
+    border: "border-red-100",
+    text: "text-red-700",
+    dot: "bg-red-500",
+    icon: FiXCircle,
+    iconColor: "text-red-400",
+    barColor: "bg-red-500",
+  },
+  processing: {
+    label: "Processing Cancellation",
+    bg: "bg-blue-50",
+    border: "border-blue-100",
+    text: "text-blue-700",
+    dot: "bg-blue-400",
+    icon: FiRefreshCw,
+    iconColor: "text-blue-500",
+    barColor: "bg-blue-400",
+  },
+};
+
+function CancellationSection({ booking, isConfirmed }) {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  // Local UI state — replace with Redux state wired to your thunks
+  const [showForm, setShowForm] = useState(false);
+  const [reason, setReason] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const submitted =
+    (booking?.amendment &&
+      booking.amendment.status &&
+      booking.amendment.status !== "not_requested") ||
+    isSubmitted;
+
+  // Replace with real cancellation request from Redux
+  // const cancelRequest = useSelector((s) => s.hotelBookings.cancellationRequest);
+  const cancelRequest =
+    booking?.amendment &&
+    booking.amendment.status &&
+    booking.amendment.status !== "not_requested"
+      ? booking.amendment
+      : null;
+
+  const isCancelled =
+    booking?.executionStatus === "cancelled" ||
+    booking?.executionStatus === "Cancelled";
+
+  const canRequest = isConfirmed && !isCancelled && !cancelRequest;
+
+  const { amendmentStatus } = useSelector((state) => state.hotelAmendment);
+
+  const providerStatusRaw =
+    booking?.amendment?.providerResponse?.HotelChangeRequestStatusResult;
+
+  const providerStatus =
+    providerStatusRaw?.ChangeRequestStatus !== undefined
+      ? providerStatusRaw
+      : null;
+
+  const mappedStatus = (() => {
+    const s = providerStatus?.ChangeRequestStatus;
+
+    if (s !== undefined && s !== null) {
+      if (s === 1) return "pending";
+      if (s === 2) return "processing";
+      if (s === 3) return "approved"; // ✅ IMPORTANT
+      if (s === 4) return "rejected";
+      return null; // fallback
+    }
+
+    // fallback from DB
+    const status = cancelRequest?.status || booking?.requestStatus;
+
+    if (!status || status === "not_requested") return null;
+
+    if (status === "requested") return "pending";
+    if (status === "in_progress") return "processing";
+    if (status === "approved") return "approved";
+    if (status === "rejected") return "rejected";
+
+    return null;
+  })();
+  console.log("PROVIDER STATUS:", providerStatus);
+  console.log("MAPPED STATUS:", mappedStatus);
+
+  const handleSubmit = async () => {
+    if (!reason) return;
+    setSubmitting(true);
+    try {
+      console.log("BOOKING FULL:", booking);
+      console.log("BOOKING ID:", booking?.bookingId);
+      const res = await dispatch(
+        sendHotelAmendment({
+          bookingId: booking?._id || booking?.bookingId,
+          remarks: `${reason} - ${remarks}`,
+        }),
+      );
+
+      if (res.meta.requestStatus === "fulfilled") {
+        setShowForm(false);
+        setIsSubmitted(true);
+
+        navigate("/my-cancelled-bookings");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Already cancelled ──
+  if (isCancelled) {
+    return (
+      <BentoCard className="col-span-full">
+        <CardLabel icon={MdCancel} label="Cancellation" />
+        <div className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-lg sm:rounded-xl px-3 sm:px-4 py-3">
+          <FiXCircle size={18} className="text-red-500 shrink-0" />
+          <div>
+            <p className="text-xs sm:text-[13px] font-bold text-red-700">
+              This booking has been cancelled
+            </p>
+            {booking?.cancelledAt && (
+              <p className="text-[10px] sm:text-[11px] text-red-500 mt-0.5">
+                Cancelled on {fmtDate(booking.cancelledAt)}
+              </p>
+            )}
+          </div>
+        </div>
+      </BentoCard>
+    );
+  }
 
   return (
-    <BentoCard className="col-span-2">
-      <CardLabel icon={MdHotel} label="Hotel Gallery" />
-      <div className="space-y-3">
-        <div className="relative w-full h-64 rounded-xl overflow-hidden">
-          <img
-            src={images[active]}
-            alt="Hotel"
-            className="w-full h-full object-cover"
-          />
+    <BentoCard className="col-span-full">
+      <CardLabel icon={MdCancel} label="Cancellation Request" />
+
+      {/* ── Existing cancellation request status ── */}
+      {cancelRequest && mappedStatus && (
+        <div className="mb-5">
+          {(() => {
+            const status = mappedStatus;
+            const cfg =
+              CANCEL_STATUS_CONFIG[status] || CANCEL_STATUS_CONFIG.pending;
+            const StatusIcon = cfg.icon;
+            return (
+              <div
+                className={`${cfg.bg} ${cfg.border} border rounded-lg sm:rounded-2xl overflow-hidden`}
+              >
+                {/* color bar */}
+                <div className={`h-1 ${cfg.barColor}`} />
+                <div className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <StatusIcon
+                        size={16}
+                        className={`${cfg.iconColor} ${status === "processing" ? "animate-spin" : ""}`}
+                      />
+                      <span
+                        className={`text-xs sm:text-[13px] font-bold ${cfg.text}`}
+                      >
+                        {cfg.label}
+                      </span>
+                    </div>
+                    <div
+                      className={`flex items-center gap-1.5 ${cfg.bg} ${cfg.text} border ${cfg.border} rounded-full px-2 sm:px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                      {status
+                        ? status.charAt(0).toUpperCase() + status.slice(1)
+                        : ""}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-[11px] sm:text-[12px]">
+                    <div className="bg-white/60 rounded-lg sm:rounded-xl px-2.5 sm:px-3 py-2">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-0.5">
+                        Reason
+                      </p>
+                      <p className={`font-semibold ${cfg.text}`}>
+                        {submitted ? reason : cancelRequest?.reason || "—"}
+                      </p>
+                    </div>
+                    {(submitted ? remarks : cancelRequest?.remarks) && (
+                      <div className="bg-white/60 rounded-lg sm:rounded-xl px-2.5 sm:px-3 py-2 sm:col-span-2">
+                        <p className="text-[9px] sm:text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-0.5">
+                          Remarks
+                        </p>
+                        <p className="text-slate-600 font-medium">
+                          {submitted ? remarks : cancelRequest?.remarks}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Rejection reason from approver */}
+                  {status === "rejected" && cancelRequest?.approverComments && (
+                    <div className="mt-3 flex items-start gap-2 bg-red-100 border border-red-200 rounded-lg sm:rounded-xl px-2.5 sm:px-3 py-2">
+                      <FiMessageCircle
+                        size={13}
+                        className="text-red-500 mt-0.5 shrink-0"
+                      />
+                      <p className="text-[11px] sm:text-[12px] text-red-700 font-medium">
+                        {cancelRequest.approverComments}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Refund info if approved */}
+                  {status === "approved" && (
+                    <div className="mt-3 flex items-center gap-2 bg-emerald-100 border border-emerald-200 rounded-lg sm:rounded-xl px-2.5 sm:px-3 py-2">
+                      <FiCheckCircle
+                        size={13}
+                        className="text-emerald-600 shrink-0"
+                      />
+                      <p className="text-[11px] sm:text-[12px] text-emerald-700 font-semibold">
+                        Refund will be processed within 5–7 business days
+                      </p>
+                    </div>
+                  )}
+
+                  {cancelRequest?.requestedAt && (
+                    <p className="mt-3 text-[10px] sm:text-[11px] text-slate-400">
+                      Submitted on {fmtDate(cancelRequest.requestedAt)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          <button
+            onClick={() =>
+              dispatch(
+                getHotelAmendmentStatus({ bookingId: booking.bookingId }),
+              )
+            }
+            className="mt-3 text-xs text-blue-600 underline"
+          >
+            Check Status
+          </button>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {images.slice(0, 10).map((img, i) => (
-            <button
-              key={i}
-              onClick={() => setActive(i)}
-              className={`shrink-0 w-16 h-14 rounded-lg overflow-hidden border-2 transition-all ${
-                active === i
-                  ? "border-teal-500 scale-105"
-                  : "border-transparent opacity-60 hover:opacity-90"
-              }`}
-            >
-              <img src={img} alt="" className="w-full h-full object-cover" />
-            </button>
-          ))}
+      )}
+
+      {/* ── Request form ── */}
+      {canRequest && !submitted && (
+        <>
+          {!showForm ? (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-lg sm:rounded-2xl px-3 sm:px-5 py-3 sm:py-4">
+              <div>
+                <p className="text-xs sm:text-[13px] font-semibold text-slate-700">
+                  Need to cancel this booking?
+                </p>
+                <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">
+                  Submit a cancellation request to cancel your booking
+                </p>
+              </div>
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 active:scale-[0.97] text-white text-[11px] sm:text-[12px] font-semibold px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl transition-all duration-150 cursor-pointer border-none shrink-0 w-full sm:w-auto justify-center sm:justify-start"
+              >
+                <MdCancel size={14} />
+                Request Cancellation
+              </button>
+            </div>
+          ) : (
+            <div className="bg-red-50 border border-red-100 rounded-lg sm:rounded-2xl p-3 sm:p-5 space-y-3 sm:space-y-4">
+              {/* Form header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="bg-red-100 rounded-lg p-1.5">
+                    <MdCancel size={13} className="text-red-600" />
+                  </span>
+                  <span className="text-[11px] sm:text-[12px] font-bold text-red-700 uppercase tracking-widest">
+                    Cancellation Request
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowForm(false);
+                    setReason("");
+                    setRemarks("");
+                  }}
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center border-none cursor-pointer transition-colors"
+                >
+                  <FiX size={14} className="text-red-600" />
+                </button>
+              </div>
+
+              {/* Reason select */}
+              <div>
+                <label className="block text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-red-600 mb-1.5">
+                  Reason for Cancellation{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="w-full px-2.5 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-[13px] border border-red-200 rounded-lg sm:rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-red-400/30 focus:border-red-400 transition text-slate-700"
+                >
+                  <option value="">Select a reason…</option>
+                  {CANCEL_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Remarks textarea */}
+              <div>
+                <label className="block text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-red-600 mb-1.5">
+                  Additional Remarks{" "}
+                  <span className="text-slate-400 font-normal normal-case">
+                    (optional)
+                  </span>
+                </label>
+                <textarea
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Add any additional context for your request…"
+                  rows={3}
+                  className="w-full px-2.5 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-[13px] border border-red-200 rounded-lg sm:rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-red-400/30 focus:border-red-400 transition text-slate-700 resize-none"
+                />
+              </div>
+
+              {/* Info note */}
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg sm:rounded-xl px-2.5 sm:px-3 py-2">
+                <FiInfo size={13} className="text-amber-500 mt-0.5 shrink-0" />
+                <p className="text-[10px] sm:text-[11px] text-amber-700 leading-snug">
+                  Your request will be reviewed by a travel admin. Cancellation
+                  charges may apply as per the hotel's policy. Refunds (if
+                  applicable) will be processed after approval.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 sm:gap-3 pt-1 flex-wrap">
+                <button
+                  onClick={handleSubmit}
+                  disabled={!reason || submitting}
+                  className={`flex items-center gap-2 text-white text-[11px] sm:text-[12px] font-semibold px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl transition-all duration-150 cursor-pointer border-none ${
+                    !reason || submitting
+                      ? "bg-red-300 cursor-not-allowed"
+                      : "bg-red-600 hover:bg-red-700 active:scale-[0.97]"
+                  }`}
+                >
+                  {submitting ? (
+                    <>
+                      <FiRefreshCw size={13} className="animate-spin" />
+                      Submitting…
+                    </>
+                  ) : (
+                    <>
+                      <FiSend size={13} />
+                      Submit Request
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowForm(false);
+                    setReason("");
+                    setRemarks("");
+                  }}
+                  className="text-[11px] sm:text-[12px] text-slate-500 hover:text-slate-700 font-medium bg-transparent border-none cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Not eligible ── */}
+      {!canRequest && !isCancelled && !cancelRequest && !submitted && (
+        <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg sm:rounded-xl px-3 sm:px-4 py-3">
+          <FiInfo size={15} className="text-slate-400 shrink-0" />
+          <p className="text-[11px] sm:text-[12px] text-slate-500">
+            Cancellation requests can only be submitted for confirmed bookings.
+          </p>
         </div>
-      </div>
+      )}
     </BentoCard>
   );
 }
@@ -458,7 +854,7 @@ function AmenitiesCard({ amenities = [] }) {
         {amenities.map((a, i) => (
           <span
             key={i}
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-teal-700 bg-teal-50 border border-teal-100 px-2.5 py-1 rounded-full"
+            className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium text-teal-700 bg-teal-50 border border-teal-100 px-2 sm:px-2.5 py-1 rounded-full"
           >
             <MdCheckCircle size={11} /> {a}
           </span>
@@ -481,29 +877,29 @@ function CancellationCard({ policies = [], lastCancellationDate }) {
   };
 
   return (
-    <BentoCard>
+    <BentoCard className="col-span-full">
       <CardLabel icon={FiShield} label="Cancellation Policy" />
       {lastCancellationDate && (
-        <div className="flex items-center gap-2 mb-4 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-800">
+        <div className="flex items-center gap-2 mb-4 p-2.5 sm:p-3 bg-amber-50 border border-amber-100 rounded-lg sm:rounded-xl text-[10px] sm:text-xs text-amber-800">
           <MdInfo className="text-amber-500 shrink-0" size={14} />
           Free cancellation until{" "}
           <strong>{fmtDate(lastCancellationDate)}</strong>
         </div>
       )}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <table className="w-full text-xs sm:text-sm border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left px-3 py-2 text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+              <th className="text-left px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold">
                 From Date
               </th>
-              <th className="text-left px-3 py-2 text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+              <th className="text-left px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold">
                 To Date
               </th>
-              <th className="text-left px-3 py-2 text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+              <th className="text-left px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold">
                 Charge Type
               </th>
-              <th className="text-right px-3 py-2 text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+              <th className="text-right px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold">
                 Charge
               </th>
             </tr>
@@ -514,15 +910,15 @@ function CancellationCard({ policies = [], lastCancellationDate }) {
                 key={i}
                 className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition"
               >
-                <td className="px-3 py-2.5 text-xs text-slate-700 font-medium">
+                <td className="px-2 sm:px-3 py-2 text-[10px] sm:text-xs text-slate-700 font-medium">
                   {p.FromDate || fmtDate(p.FromDate)}
                 </td>
-                <td className="px-3 py-2.5 text-xs text-slate-500">
+                <td className="px-2 sm:px-3 py-2 text-[10px] sm:text-xs text-slate-500">
                   {p.ToDate || "—"}
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-2 sm:px-3 py-2">
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    className={`text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full ${
                       p.CancellationCharge === 0
                         ? "bg-green-50 text-green-700"
                         : "bg-red-50 text-red-700"
@@ -531,11 +927,11 @@ function CancellationCard({ policies = [], lastCancellationDate }) {
                     {typeLabel(p.ChargeType)}
                   </span>
                 </td>
-                <td className="px-3 py-2.5 text-right font-bold text-sm">
+                <td className="px-2 sm:px-3 py-2 text-right font-bold text-xs sm:text-sm">
                   {p.CancellationCharge === 0 ? (
                     <span className="text-green-600">Free</span>
                   ) : (
-                    <span className="text-red-600">
+                    <span className="text-red-600 whitespace-nowrap">
                       {p.ChargeType === 2 || p.ChargeType === "Percentage"
                         ? `${p.CancellationCharge}%`
                         : `₹${Number(p.CancellationCharge).toLocaleString("en-IN")}`}
@@ -561,19 +957,189 @@ function HotelPoliciesCard({ conditions = [] }) {
   if (!filtered.length) return null;
 
   return (
-    <BentoCard className="col-span-2">
+    <BentoCard className="col-span-full">
       <CardLabel icon={FiInfo} label="Hotel Policies & Conditions" />
-      <ul className="space-y-2.5">
+      <ul className="space-y-2 sm:space-y-2.5">
         {filtered.map((c, i) => (
           <li
             key={i}
-            className="flex items-start gap-2.5 text-xs text-slate-600 leading-relaxed"
+            className="flex items-start gap-2 sm:gap-2.5 text-[11px] sm:text-xs text-slate-600 leading-relaxed"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0 mt-1.5" />
+            <span className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0 mt-1 sm:mt-1.5" />
             {c}
           </li>
         ))}
       </ul>
+    </BentoCard>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Booking References Card — extracted for reuse                  */
+/* ─────────────────────────────────────────────────────────────── */
+function BookingReferencesCard({ booking, bookingDetail, result }) {
+  return (
+    <BentoCard className="col-span-full">
+      <CardLabel icon={MdReceipt} label="Booking References" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div>
+          <p className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
+            Booking Ref
+          </p>
+          <p className="text-xs sm:text-sm font-black text-slate-800 font-mono break-all">
+            {booking.bookingReference || "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
+            Confirmation No.
+          </p>
+          <p className="text-xs sm:text-sm font-black text-slate-800 font-mono break-all">
+            {bookingDetail?.ConfirmationNo || result?.hotelBookingId || "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
+            Invoice No.
+          </p>
+          <p className="text-xs sm:text-sm font-black text-slate-800 font-mono break-all">
+            {bookingDetail?.InvoiceNo ||
+              result?.providerResponse?.BookResult?.InvoiceNumber ||
+              "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
+            TBO Reference
+          </p>
+          <p className="text-xs sm:text-sm font-black text-slate-800 font-mono break-all">
+            {bookingDetail?.TBOReferenceNo || "—"}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 text-[10px] sm:text-xs text-slate-500">
+        <div>
+          <span className="font-semibold text-slate-600">Created: </span>
+          <div className="break-all">
+            {booking.createdAt
+              ? fmtDate(booking.createdAt, {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "—"}
+          </div>
+        </div>
+        <div>
+          <span className="font-semibold text-slate-600">Approved: </span>
+          {booking.approvedAt ? fmtDate(booking.approvedAt) : "—"}
+        </div>
+        <div>
+          <span className="font-semibold text-slate-600">Booking Date: </span>
+          {bookingDetail?.BookingDate
+            ? fmtDate(bookingDetail.BookingDate)
+            : "—"}
+        </div>
+      </div>
+    </BentoCard>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Payment & Booking Status Card — extracted for reuse            */
+/* ─────────────────────────────────────────────────────────────── */
+function PaymentStatusCard({
+  booking,
+  paymentSuccessful,
+  isConfirmed,
+  hotelReq,
+}) {
+  return (
+    <BentoCard className="col-span-full">
+      <CardLabel icon={FiCreditCard} label="Payment & Booking Status" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <div
+          className={`rounded-lg sm:rounded-xl p-3 sm:p-4 flex flex-col gap-1 sm:gap-1.5 border ${paymentSuccessful ? "bg-emerald-50 border-emerald-100" : "bg-amber-50 border-amber-100"}`}
+        >
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+            {paymentSuccessful ? (
+              <FiCheckCircle
+                size={14}
+                className="sm:size-[16px] text-emerald-500"
+              />
+            ) : (
+              <FiAlertCircle
+                size={14}
+                className="sm:size-[16px] text-amber-500"
+              />
+            )}
+            <span
+              className={`text-[8px] sm:text-[10px] font-black uppercase tracking-widest ${paymentSuccessful ? "text-emerald-600" : "text-amber-600"}`}
+            >
+              Payment
+            </span>
+          </div>
+          <p
+            className={`text-sm sm:text-lg font-black ${paymentSuccessful ? "text-emerald-800" : "text-amber-800"}`}
+          >
+            {paymentSuccessful ? "Completed" : "Pending"}
+          </p>
+        </div>
+
+        <div
+          className={`rounded-lg sm:rounded-xl p-3 sm:p-4 flex flex-col gap-1 sm:gap-1.5 border ${isConfirmed ? "bg-emerald-50 border-emerald-100" : "bg-amber-50 border-amber-100"}`}
+        >
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+            {isConfirmed ? (
+              <MdVerifiedUser
+                size={14}
+                className="sm:size-[16px] text-emerald-500"
+              />
+            ) : (
+              <FiRefreshCw
+                size={14}
+                className="sm:size-[16px] text-amber-500 animate-spin"
+              />
+            )}
+            <span
+              className={`text-[8px] sm:text-[10px] font-black uppercase tracking-widest ${isConfirmed ? "text-emerald-600" : "text-amber-600"}`}
+            >
+              Invoice
+            </span>
+          </div>
+          <p
+            className={`text-sm sm:text-lg font-black ${isConfirmed ? "text-emerald-800" : "text-amber-800"}`}
+          >
+            {isConfirmed ? "Issued" : "Processing…"}
+          </p>
+        </div>
+
+        <div className="bg-slate-50 border border-slate-100 rounded-lg sm:rounded-xl p-3 sm:p-4 flex flex-col gap-1 sm:gap-1.5">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+            <MdHotel size={14} className="sm:size-[16px] text-slate-400" />
+            <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400">
+              Rooms
+            </span>
+          </div>
+          <p className="text-sm sm:text-lg font-black text-slate-800">
+            {hotelReq.noOfRooms || 1}
+          </p>
+        </div>
+
+        <div className="bg-slate-50 border border-slate-100 rounded-lg sm:rounded-xl p-3 sm:p-4 flex flex-col gap-1 sm:gap-1.5">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+            <FiBriefcase size={14} className="sm:size-[16px] text-slate-400" />
+            <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400">
+              Purpose
+            </span>
+          </div>
+          <p className="text-[11px] sm:text-sm font-bold text-slate-800 line-clamp-2">
+            {booking.purposeOfTravel || "—"}
+          </p>
+        </div>
+      </div>
     </BentoCard>
   );
 }
@@ -585,22 +1151,34 @@ export default function HotelBookingDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
+  const [showAmendForm, setShowAmendForm] = useState(false);
+  const [remarks, setRemarks] = useState("");
+
   const { selectedBookingDetails: booking, loading } = useSelector(
     (s) => s.hotelBookings,
   );
 
+  const {
+    sendLoading,
+    sendError,
+    sendSuccess,
+    statusLoading,
+    amendmentStatus,
+  } = useSelector((state) => state.hotelAmendment);
+
   useEffect(() => {
-    if (id && !booking) {
+    if (id) {
       dispatch(fetchBookedHotelDetails(id));
     }
-  }, [id, booking, dispatch]);
+  }, [id, dispatch]);
 
   /* ── Loading ── */
   if (loading || !booking) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
         <div className="w-11 h-11 rounded-full border-[3px] border-slate-200 border-t-teal-500 animate-spin" />
-        <p className="text-sm text-slate-400 font-medium">
+        <p className="text-xs sm:text-sm text-slate-400 font-medium">
           Loading booking details…
         </p>
       </div>
@@ -609,7 +1187,6 @@ export default function HotelBookingDetails() {
 
   /* ── Data ── */
   const detail = booking?.raw || {};
-
   const hotelReq = booking?.hotelRequest || {};
   const snapshot = booking?.bookingSnapshot || {};
   const pricing = booking?.pricingSnapshot || {};
@@ -620,7 +1197,6 @@ export default function HotelBookingDetails() {
   const traveller =
     booking?.travellers?.[0] || booking?.raw?.Rooms?.[0]?.HotelPassenger?.[0];
 
-  // GetBookingDetailResult from providerResponse
   const bookingDetail = booking?.raw || null;
   const detailRoom = booking?.raw?.Rooms?.[0] || {};
   const priceBreakUp = detailRoom?.PriceBreakUp || {};
@@ -631,9 +1207,11 @@ export default function HotelBookingDetails() {
   const isConfirmed =
     executionStatus === "voucher_generated" || executionStatus === "confirmed";
 
-  const images = booking?.hotelRequest?.selectedRoom?.rawRoomData?.images || [];
+  const images =
+    booking?.images ||
+    booking?.hotelRequest?.selectedRoom?.rawRoomData?.images ||
+    [];
 
-  // Cancellation policies — prefer GetBookingDetailResult detail
   const cancelPolicies = detailRoom?.CancelPolicies?.length
     ? detailRoom.CancelPolicies
     : selectedRoom.cancelPolicies || [];
@@ -647,7 +1225,6 @@ export default function HotelBookingDetails() {
 
   const checkInDate =
     detail?.CheckInDate || snapshot?.checkInDate || hotelReq?.checkInDate;
-
   const checkOutDate =
     detail?.CheckOutDate || snapshot?.checkOutDate || hotelReq?.checkOutDate;
 
@@ -658,184 +1235,34 @@ export default function HotelBookingDetails() {
             (1000 * 60 * 60 * 24),
         )
       : 1;
-  const perNight = nights ? Math.round(totalFare / nights) : 0;
 
-  // Rate conditions
   const rateConditions = bookingDetail?.RateConditions || [];
-
-  const downloadInvoice = () => {
-    const printWindow = window.open("", "_blank");
-    const hotelName =
-      detail?.HotelName ||
-      snapshot?.hotelName ||
-      selectedHotel?.hotelName ||
-      "Hotel";
-    const checkIn =
-      detail?.CheckInDate || snapshot?.checkInDate || hotelReq?.checkInDate;
-    const checkOut =
-      detail?.CheckOutDate || snapshot?.checkOutDate || hotelReq?.checkOutDate;
-    const guestName =
-      `${traveller?.title || ""} ${traveller?.firstName || ""} ${traveller?.lastName || ""}`.trim();
-    const confirmationNo =
-      detail?.ConfirmationNo || result?.hotelBookingId || "—";
-    const invoiceNo =
-      detail?.InvoiceNo ||
-      result?.providerResponse?.BookResult?.InvoiceNumber ||
-      "—";
-
-    printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8" />
-      <title>Invoice – ${booking.bookingReference || "Hotel Booking"}</title>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; color: #1e293b; background: #fff; padding: 40px; font-size: 13px; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0A4D68; padding-bottom: 20px; margin-bottom: 28px; }
-        .brand { font-size: 22px; font-weight: 900; color: #0A4D68; letter-spacing: -0.5px; }
-        .brand span { color: #088395; }
-        .invoice-meta { text-align: right; }
-        .invoice-meta .invoice-title { font-size: 26px; font-weight: 900; color: #0A4D68; letter-spacing: 2px; text-transform: uppercase; }
-        .invoice-meta p { color: #64748b; font-size: 11px; margin-top: 4px; }
-        .invoice-meta strong { color: #1e293b; }
-        .section { margin-bottom: 24px; }
-        .section-title { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #94a3b8; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .info-block p { font-size: 12px; color: #475569; margin-bottom: 4px; }
-        .info-block strong { color: #0f172a; font-weight: 700; }
-        .info-block .name { font-size: 16px; font-weight: 900; color: #0f172a; margin-bottom: 6px; }
-        .info-block .hotel-name { font-size: 18px; font-weight: 900; color: #0A4D68; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        th { background: #f1f5f9; text-align: left; padding: 8px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #64748b; }
-        td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
-        tr:last-child td { border-bottom: none; }
-        .total-row { background: #f8fafc; font-weight: 900; font-size: 14px; }
-        .total-row td { padding: 14px 12px; color: #0A4D68; border-top: 2px solid #0A4D68; }
-        .highlight-box { background: linear-gradient(135deg, #f0fdfc, #e6f7f8); border: 1px solid #99e6f0; border-radius: 10px; padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
-        .highlight-box .label { font-size: 11px; font-weight: 700; color: #0A4D68; text-transform: uppercase; letter-spacing: 1px; }
-        .highlight-box .amount { font-size: 28px; font-weight: 900; color: #0A4D68; }
-        .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; color: #94a3b8; font-size: 11px; }
-        .status-badge { display: inline-block; background: #d1fae5; color: #065f46; border-radius: 20px; padding: 3px 10px; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-        @media print { body { padding: 20px; } }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div>
-          <div class="brand">travel<span>desk</span></div>
-          <p style="color:#64748b;font-size:11px;margin-top:4px;">Hotel Booking Invoice</p>
-        </div>
-        <div class="invoice-meta">
-          <div class="invoice-title">Invoice</div>
-          <p>Invoice No: <strong>${invoiceNo}</strong></p>
-          <p>Booking Ref: <strong>${booking.bookingReference || "—"}</strong></p>
-          <p>Date: <strong>${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</strong></p>
-          <div style="margin-top:8px"><span class="status-badge">Confirmed</span></div>
-        </div>
-      </div>
-
-      <div class="grid-2">
-        <div class="section">
-          <div class="section-title">Hotel Details</div>
-          <div class="info-block">
-            <div class="hotel-name">${hotelName}</div>
-            <p style="margin-top:6px">${detail?.AddressLine1 || selectedHotel?.address || "—"}</p>
-            <p>${detail?.City || selectedHotel?.city || ""}</p>
-            <p style="margin-top:8px">⭐ ${detail?.StarRating || selectedHotel?.starRating || "—"} Star Hotel</p>
-          </div>
-        </div>
-        <div class="section">
-          <div class="section-title">Guest Details</div>
-          <div class="info-block">
-            <div class="name">${guestName || "—"}</div>
-            <p>${traveller?.email || "—"}</p>
-            <p>${traveller?.phoneWithCode || "—"}</p>
-            <p style="margin-top:8px">Nationality: <strong>${traveller?.nationality || "—"}</strong></p>
-          </div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">Stay Details</div>
-        <div class="grid-2">
-          <div class="info-block">
-            <p>Check-in: <strong>${checkIn ? new Date(checkIn).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }) : "—"}</strong></p>
-            <p>Check-out: <strong>${checkOut ? new Date(checkOut).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }) : "—"}</strong></p>
-            <p>Duration: <strong>${nights} Night${nights !== 1 ? "s" : ""}</strong></p>
-          </div>
-          <div class="info-block">
-            <p>Room Type: <strong>${detailRoom?.RoomTypeName || selectedRoom?.roomTypeName || "Standard Room"}</strong></p>
-            <p>No. of Rooms: <strong>${hotelReq.noOfRooms || 1}</strong></p>
-            <p>Confirmation No: <strong>${confirmationNo}</strong></p>
-          </div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">Fare Breakdown</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th style="text-align:right">Amount (INR)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>Room Rate (Base Fare)</td><td style="text-align:right">₹${Number(baseFare).toLocaleString("en-IN")}</td></tr>
-            <tr><td>Taxes & Fees</td><td style="text-align:right">₹${Number(totalTax).toLocaleString("en-IN")}</td></tr>
-            ${agentComm > 0 ? `<tr><td>Agent Commission</td><td style="text-align:right">₹${Number(agentComm).toLocaleString("en-IN")}</td></tr>` : ""}
-            <tr class="total-row"><td>Total Amount Paid</td><td style="text-align:right">₹${Number(totalFare).toLocaleString("en-IN")}</td></tr>
-          </tbody>
-        </table>
-        <div class="highlight-box">
-          <div>
-            <div class="label">Total Amount Paid</div>
-            <div style="font-size:11px;color:#475569;margin-top:3px">${nights} Night${nights !== 1 ? "s" : ""} · ${pricing.currency || "INR"}</div>
-          </div>
-          <div class="amount">₹${Number(totalFare).toLocaleString("en-IN")}</div>
-        </div>
-      </div>
-
-      <div class="footer">
-        <div>TBO Ref: ${detail?.TBOReferenceNo || "—"} · Booking Ref: ${booking.bookingReference || "—"}</div>
-        <div>Generated on ${new Date().toLocaleString("en-IN")}</div>
-      </div>
-    </body>
-    </html>
-  `);
-
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 500);
-  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
-      {/* ── Sticky nav bar ── */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 h-[60px] px-6 flex items-center gap-4 shadow-sm">
+      {/* ── Sticky nav bar — Fully Responsive ── */}
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 h-14 sm:h-[60px] px-3 sm:px-6 flex items-center gap-2 sm:gap-4 shadow-sm overflow-x-auto">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-teal-600 hover:text-teal-700 text-sm font-semibold transition-colors bg-transparent border-none p-0 cursor-pointer"
+          className="flex items-center gap-1 sm:gap-1.5 text-teal-600 hover:text-teal-700 text-xs sm:text-sm font-semibold transition-colors bg-transparent border-none p-0 cursor-pointer shrink-0"
         >
-          <FiArrowLeft size={15} /> Back
+          <FiArrowLeft size={14} className="sm:size-[15px]" />
+          <span className="hidden sm:inline">Back</span>
         </button>
-        <span className="w-px h-5 bg-slate-200" />
-        <h1 className="text-[15px] font-bold text-slate-900">
+        <span className="w-px h-4 sm:h-5 bg-slate-200 shrink-0" />
+        <h1 className="text-xs sm:text-[15px] font-bold text-slate-900 truncate">
           Hotel Booking Details
         </h1>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2 sm:gap-3 shrink-0">
           {isConfirmed && (
-            <span className="flex items-center gap-1.5 bg-emerald-100 text-emerald-800 rounded-full px-3 py-1 text-xs font-bold">
-              <MdVerifiedUser size={12} /> Voucher Issued
+            <span className="flex items-center gap-1 bg-emerald-100 text-emerald-800 rounded-full px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold whitespace-nowrap">
+              <MdVerifiedUser size={11} className="sm:size-[12px]" /> Voucher
+              Issued
             </span>
           )}
           {booking.bookingReference && (
-            <span className="text-xs text-slate-400 font-medium">
+            <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden md:inline">
               Ref:{" "}
               <strong className="text-slate-900">
                 {booking.bookingReference}
@@ -844,20 +1271,21 @@ export default function HotelBookingDetails() {
           )}
           {paymentSuccessful && (
             <button
-              onClick={downloadInvoice}
-              className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition-all duration-150 cursor-pointer border-none"
+              onClick={() => dispatch(generateHotelVoucher(booking.bookingId))}
+              className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white text-[10px] sm:text-xs font-bold px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl shadow-sm transition-all duration-150 cursor-pointer border-none whitespace-nowrap"
             >
-              <FiDownload size={13} />
-              Download Invoice
+              <FiDownload size={12} className="sm:size-[13px]" />
+              <span className="hidden sm:inline">Download Invoice</span>
+              <span className="sm:hidden">Invoice</span>
             </button>
           )}
         </div>
       </header>
 
-      {/* ── Bento grid ── */}
-      <main className="max-w-7xl mx-auto px-5 py-8 pb-24 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Hotel hero card — full width */}
-        <div className="md:col-span-2">
+      {/* ── Main content: sidebar layout on large screens ── */}
+      <main className="w-full max-w-7xl mx-auto px-3 sm:px-5 py-4 sm:py-8 pb-20 sm:pb-24">
+        {/* ── TOP: Hero card always full width ── */}
+        <div className="mb-3 sm:mb-4">
           <HotelHeroCard
             booking={booking}
             bookingDetail={bookingDetail}
@@ -865,305 +1293,120 @@ export default function HotelBookingDetails() {
           />
         </div>
 
-        {/* Image gallery — full width */}
-        {images.length > 0 && <ImageGallery images={images} />}
-
-        {/* ── Traveller card ── */}
-        <BentoCard>
-          <CardLabel icon={FiUser} label="Guest Details" />
-          <div className="mb-4">
-            <p className="text-lg font-extrabold text-slate-900 leading-snug">
-              {traveller?.title} {traveller?.firstName} {traveller?.lastName}
-            </p>
-            <p className="text-xs text-slate-400 mt-1">{traveller?.email}</p>
-          </div>
-          <InfoRow label="Phone" value={traveller?.phoneWithCode} />
-          <InfoRow label="Gender" value={traveller?.gender} />
-          <InfoRow
-            label="Age"
-            value={traveller?.age ? `${traveller.age} yrs` : "—"}
-          />
-          <InfoRow label="Nationality" value={traveller?.nationality} />
-          <InfoRow
-            label="Lead Passenger"
-            value={traveller?.isLeadPassenger ? "Yes" : "No"}
-            accent
-          />
-        </BentoCard>
-
-        {/* ── Fare summary ── */}
-        <BentoCard>
-          <CardLabel icon={FiCreditCard} label="Fare Summary" />
-          <InfoRow
-            label="Room Rate"
-            value={`₹${Number(baseFare).toLocaleString("en-IN")}`}
-          />
-          <InfoRow
-            label="Taxes & Fees"
-            value={`₹${Number(totalTax).toLocaleString("en-IN")}`}
-          />
-          {agentComm > 0 && (
-            <InfoRow
-              label="Agent Commission"
-              value={`₹${Number(agentComm).toLocaleString("en-IN")}`}
-              accent
+        {/* ── BODY: Two-column asymmetric layout on lg+ ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-3 sm:gap-4 items-start">
+          {/* ════ LEFT COLUMN — primary details ════ */}
+          <div className="flex flex-col gap-3 sm:gap-4">
+            {/* Payment & Booking Status — high priority, appears first in left col */}
+            <PaymentStatusCard
+              booking={booking}
+              paymentSuccessful={paymentSuccessful}
+              isConfirmed={isConfirmed}
+              hotelReq={hotelReq}
             />
-          )}
-          <InfoRow
-            label="Per Night"
-            value={`₹${Number(perNight).toLocaleString("en-IN")}`}
-          />
-          <InfoRow label="Nights" value={nights} />
-          <InfoRow label="Currency" value={pricing.currency || "INR"} />
-          <InfoRow
-            label="Refundable"
-            value={selectedRoom.isRefundable ? "Yes" : "No"}
-            accent={selectedRoom.isRefundable}
-          />
-          <div className="mt-4 bg-linear-to-r from-cyan-50 to-teal-50 rounded-xl px-4 py-4 flex justify-between items-center border border-teal-100">
-            <span className="text-sm text-teal-700 font-semibold">
-              Total Paid
-            </span>
-            <span className="text-2xl font-black text-slate-900">
-              ₹{Number(totalFare).toLocaleString("en-IN")}
-            </span>
-          </div>
-          {paymentSuccessful && (
-            <button
-              onClick={downloadInvoice}
-              className="mt-3 w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-700 active:scale-[0.98] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all duration-150 cursor-pointer border-none"
-            >
-              <FiDownload size={13} />
-              Download Invoice (PDF)
-            </button>
-          )}
-        </BentoCard>
 
-        {/* ── Tax breakdown (if available from provider) ── */}
-        {/* {priceBreakUp.TaxBreakup?.length > 0 && (
-          <BentoCard>
-            <CardLabel icon={MdReceipt} label="Tax Breakdown" />
-            {priceBreakUp.TaxBreakup.filter((t) => t.TaxAmount > 0).length ===
-            0 ? (
-              <p className="text-xs text-slate-400">
-                No individual tax components available.
-              </p>
-            ) : (
-              priceBreakUp.TaxBreakup.filter((t) => t.TaxAmount > 0).map(
-                (t, i) => (
-                  <InfoRow
-                    key={i}
-                    label={t.TaxType?.replace("Tax_", "") || "Tax"}
-                    value={`₹${t.TaxAmount}`}
-                  />
-                ),
-              )
+            {/* Room description + Inclusions — side by side on md, stacked on sm */}
+            {(detailRoom?.RoomDescription ||
+              selectedRoom.inclusion ||
+              detailRoom?.Inclusion) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                {detailRoom?.RoomDescription && (
+                  <BentoCard>
+                    <CardLabel icon={MdKingBed} label="Room Description" />
+                    <div
+                      className="text-[11px] sm:text-xs text-slate-600 leading-relaxed prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{
+                        __html: detailRoom.RoomDescription.replace(
+                          /<p><\/p>/g,
+                          "",
+                        ),
+                      }}
+                    />
+                  </BentoCard>
+                )}
+
+                {(selectedRoom.inclusion || detailRoom?.Inclusion) && (
+                  <BentoCard>
+                    <CardLabel icon={FiCoffee} label="Inclusions" />
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                      {(selectedRoom.inclusion || detailRoom?.Inclusion || "")
+                        .split(" ")
+                        .filter(Boolean)
+                        .filter((v, i, a) => a.indexOf(v) === i)
+                        .map((item, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 sm:px-2.5 py-1 rounded-full font-medium"
+                          >
+                            <MdCheckCircle size={11} /> {item}
+                          </span>
+                        ))}
+                    </div>
+                  </BentoCard>
+                )}
+              </div>
             )}
-          </BentoCard>
-        )} */}
 
-        {/* ── Payment & Booking status — full width ── */}
-        <BentoCard className="col-span-2">
-          <CardLabel icon={FiCreditCard} label="Payment & Booking Status" />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* Payment */}
-            <div
-              className={`rounded-xl p-4 flex flex-col gap-1.5 border ${paymentSuccessful ? "bg-emerald-50 border-emerald-100" : "bg-amber-50 border-amber-100"}`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                {paymentSuccessful ? (
-                  <FiCheckCircle size={16} className="text-emerald-500" />
-                ) : (
-                  <FiAlertCircle size={16} className="text-amber-500" />
-                )}
-                <span
-                  className={`text-[10px] font-black uppercase tracking-widest ${paymentSuccessful ? "text-emerald-600" : "text-amber-600"}`}
-                >
-                  Payment
-                </span>
-              </div>
-              <p
-                className={`text-lg font-black ${paymentSuccessful ? "text-emerald-800" : "text-amber-800"}`}
-              >
-                {paymentSuccessful ? "Completed" : "Pending"}
-              </p>
-            </div>
+            {/* Amenities — full width in left col */}
+            {amenities.length > 0 && <AmenitiesCard amenities={amenities} />}
 
-            {/* Execution */}
-            <div
-              className={`rounded-xl p-4 flex flex-col gap-1.5 border ${isConfirmed ? "bg-emerald-50 border-emerald-100" : "bg-amber-50 border-amber-100"}`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                {isConfirmed ? (
-                  <MdVerifiedUser size={16} className="text-emerald-500" />
-                ) : (
-                  <FiRefreshCw
-                    size={16}
-                    className="text-amber-500 animate-spin"
-                  />
-                )}
-                <span
-                  className={`text-[10px] font-black uppercase tracking-widest ${isConfirmed ? "text-emerald-600" : "text-amber-600"}`}
-                >
-                  InVoice
-                </span>
-              </div>
-              <p
-                className={`text-lg font-black ${isConfirmed ? "text-emerald-800" : "text-amber-800"}`}
-              >
-                {isConfirmed ? "Issued" : "Processing…"}
-              </p>
-            </div>
+            {/* Hotel Policies — full width in left col */}
+            {rateConditions.length > 0 && (
+              <HotelPoliciesCard conditions={rateConditions} />
+            )}
 
-            {/* Room count */}
-            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 mb-1">
-                <MdHotel size={16} className="text-slate-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  Rooms
-                </span>
-              </div>
-              <p className="text-lg font-black text-slate-800">
-                {hotelReq.noOfRooms || 1}
-              </p>
-            </div>
+            {/* Cancellation Policy — full width in left col */}
+            {cancelPolicies.length > 0 && (
+              <CancellationCard
+                policies={cancelPolicies}
+                lastCancellationDate={
+                  detailRoom?.LastCancellationDate ||
+                  bookingDetail?.LastCancellationDate
+                }
+              />
+            )}
 
-            {/* Purpose */}
-            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 mb-1">
-                <FiBriefcase size={16} className="text-slate-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  Purpose
-                </span>
-              </div>
-              <p className="text-sm font-bold text-slate-800 line-clamp-2">
-                {booking.purposeOfTravel || "—"}
-              </p>
-            </div>
-          </div>
-        </BentoCard>
-
-        {/* Room description */}
-        {detailRoom?.RoomDescription && (
-          <BentoCard>
-            <CardLabel icon={MdKingBed} label="Room Description" />
-            <div
-              className="text-xs text-slate-600 leading-relaxed prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{
-                __html: detailRoom.RoomDescription.replace(/<p><\/p>/g, ""),
-              }}
-            />
-          </BentoCard>
-        )}
-
-        {/* Inclusions */}
-        {(selectedRoom.inclusion || detailRoom?.Inclusion) && (
-          <BentoCard>
-            <CardLabel icon={FiCoffee} label="Inclusions" />
-            <div className="flex flex-wrap gap-2">
-              {(selectedRoom.inclusion || detailRoom?.Inclusion || "")
-                .split(" ")
-                .filter(Boolean)
-                .filter((v, i, a) => a.indexOf(v) === i)
-                .map((item, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full font-medium"
-                  >
-                    <MdCheckCircle size={11} /> {item}
-                  </span>
-                ))}
-            </div>
-          </BentoCard>
-        )}
-
-        {/* Amenities */}
-        {amenities.length > 0 && <AmenitiesCard amenities={amenities} />}
-
-        {/* Cancellation policy */}
-        {cancelPolicies.length > 0 && (
-          <div className="md:col-span-2">
-            <CancellationCard
-              policies={cancelPolicies}
-              lastCancellationDate={
-                detailRoom?.LastCancellationDate ||
-                bookingDetail?.LastCancellationDate
-              }
+            {/* Booking References — full width in left col */}
+            <BookingReferencesCard
+              booking={booking}
+              bookingDetail={bookingDetail}
+              result={result}
             />
           </div>
-        )}
 
-        {/* Hotel policies */}
-        {rateConditions.length > 0 && (
-          <HotelPoliciesCard conditions={rateConditions} />
-        )}
-
-        {/* Booking reference footer */}
-        <BentoCard className="col-span-2">
-          <CardLabel icon={MdReceipt} label="Booking References" />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
-                Booking Ref
-              </p>
-              <p className="text-sm font-black text-slate-800 font-mono">
-                {booking.bookingReference || "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
-                Confirmation No.
-              </p>
-              <p className="text-sm font-black text-slate-800 font-mono">
-                {bookingDetail?.ConfirmationNo || result?.hotelBookingId || "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
-                Invoice No.
-              </p>
-              <p className="text-sm font-black text-slate-800 font-mono">
-                {bookingDetail?.InvoiceNo ||
-                  result?.providerResponse?.BookResult?.InvoiceNumber ||
-                  "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">
-                TBO Reference
-              </p>
-              <p className="text-sm font-black text-slate-800 font-mono">
-                {bookingDetail?.TBOReferenceNo || "—"}
-              </p>
-            </div>
+          {/* ════ RIGHT COLUMN — sidebar: guest details, sticky on lg ════ */}
+          <div className="flex flex-col gap-3 sm:gap-4 lg:sticky lg:top-[76px]">
+            {/* Guest Details */}
+            <BentoCard>
+              <CardLabel icon={FiUser} label="Guest Details" />
+              <div className="mb-3 sm:mb-4">
+                <p className="text-base sm:text-lg font-extrabold text-slate-900 leading-snug">
+                  {traveller?.title} {traveller?.firstName}{" "}
+                  {traveller?.lastName}
+                </p>
+                <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 break-all">
+                  {traveller?.email}
+                </p>
+              </div>
+              <InfoRow label="Phone" value={traveller?.phoneWithCode} />
+              <InfoRow label="Gender" value={traveller?.gender} />
+              <InfoRow
+                label="Age"
+                value={traveller?.age ? `${traveller.age} yrs` : "—"}
+              />
+              <InfoRow label="Nationality" value={traveller?.nationality} />
+              <InfoRow
+                label="Lead Passenger"
+                value={traveller?.isLeadPassenger ? "Yes" : "No"}
+                accent
+              />
+            </BentoCard>
           </div>
-          <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs text-slate-500">
-            <div>
-              <span className="font-semibold text-slate-600">Created: </span>
-              {booking.createdAt
-                ? fmtDate(booking.createdAt, {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : "—"}
-            </div>
-            <div>
-              <span className="font-semibold text-slate-600">Approved: </span>
-              {booking.approvedAt ? fmtDate(booking.approvedAt) : "—"}
-            </div>
-            <div>
-              <span className="font-semibold text-slate-600">
-                Booking Date:{" "}
-              </span>
-              {bookingDetail?.BookingDate
-                ? fmtDate(bookingDetail.BookingDate)
-                : "—"}
-            </div>
-          </div>
-        </BentoCard>
+        </div>
+        <div className="mt-5">
+          {/* ── Cancellation Request Section — always last in left col ── */}
+        <CancellationSection booking={booking} isConfirmed={isConfirmed} />
+        </div>
       </main>
     </div>
   );
