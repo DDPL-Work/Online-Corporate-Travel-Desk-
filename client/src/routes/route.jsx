@@ -47,6 +47,8 @@ import EmployeeManagement from "../components/CorporateSuperAdmin/EmployeeManage
 import HotelReviewBooking from "../Pages/Booking-Flow/Hotel-Booking/HotelReviewBooking";
 import HotelBookNow from "../Pages/Booking-Flow/Hotel-Booking/HotelBooking";
 import HotelBookingDetails from "../components/EmployeeDashboard/Hotelbookingdetails";
+import CancelledFlightsPage from "../components/EmployeeDashboard/MyCancelledBookings";
+import CancelledBookings from "../components/TravelAdminTabs/CancelledBookings";
 
 export const appRouter = createBrowserRouter([
   // -------------------------------
@@ -78,6 +80,7 @@ export const appRouter = createBrowserRouter([
         children: [
           { path: "/update-profile", element: <ProfileSettings /> },
           { path: "total-bookings", element: <BookingsDashboard /> },
+          { path: "/total-cancelled-bookings", element: <CancelledBookings /> },
           { path: "/pending-requests", element: <PendingTravelRequests /> },
           { path: "/approved-requests", element: <ApprovedTravelRequests /> },
           { path: "/rejected-requests", element: <RejectedTravelRequests /> },
@@ -106,6 +109,7 @@ export const appRouter = createBrowserRouter([
         element: <Layout />,
         children: [
           { path: "/my-bookings", element: <MyBookings /> },
+          { path: "/my-cancelled-bookings", element: <CancelledFlightsPage /> },
           { path: "/my-bookings/:id", element: <BookingDetails /> },
           { path: "/my-upcoming-trips", element: <MyUpcomingTrips /> },
           { path: "/my-past-trips", element: <MyPastTrips /> },

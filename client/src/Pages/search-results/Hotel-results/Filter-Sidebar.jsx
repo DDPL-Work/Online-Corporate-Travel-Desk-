@@ -1,9 +1,11 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { FaSearch, FaMapMarkerAlt } from "react-icons/fa";
 import { BsStarFill } from "react-icons/bs";
 import { useState } from "react";
 import MapModal from "./Map/MapModal";
 import { FaMapLocation } from "react-icons/fa6";
+import { MdExpandMore, MdExpandLess } from "react-icons/md";
+import { IoClose } from "react-icons/io5";
 
 const FilterSidebar = ({
   hotels = [],
@@ -13,9 +15,25 @@ const FilterSidebar = ({
   setSearchText,
 }) => {
   const [showMap, setShowMap] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    search: true,
+    price: true,
+    rating: true,
+    meal: true,
+    cancellation: true,
+    amenities: false,
+  });
+
+  const [openLocation, setOpenLocation] = useState(false);
+  const [locationSearch, setLocationSearch] = useState("");
+
+  const locations = [...new Set(hotels.map((h) => h.address))];
+
+  const filteredLocations = locations.filter((loc) =>
+    loc.toLowerCase().includes(locationSearch.toLowerCase()),
+  );
 
   // Extract cheapest room per hotel
-
   const hotelData = hotels?.map((hotel) => {
     const cheapestRoom = hotel.Rooms?.reduce((prev, curr) =>
       curr.TotalFare < prev.TotalFare ? curr : prev,
@@ -23,7 +41,7 @@ const FilterSidebar = ({
 
     return {
       price: cheapestRoom?.TotalFare || 0,
-      rating: hotel.StarRating || 0,
+      rating: hotel.StarRating ? Math.round(hotel.StarRating) : null,
       meal: cheapestRoom?.MealType || "ROOM ONLY",
       amenities: hotel.Amenities || [],
     };
@@ -34,11 +52,17 @@ const FilterSidebar = ({
   const dynamicMinPrice = prices.length ? Math.min(...prices) : 0;
   const dynamicMaxPrice = prices.length ? Math.max(...prices) : 0;
 
+  useEffect(() => {
+    setFilters((prev) => ({
+      ...prev,
+      minPrice: dynamicMinPrice,
+      maxPrice: dynamicMaxPrice,
+    }));
+  }, [dynamicMinPrice, dynamicMaxPrice]);
+
   // Dynamic star ratings with count
-  const starCounts = hotelData.reduce((acc, hotel) => {
-    const star = hotel.rating;
-    if (!star) return acc;
-    acc[star] = (acc[star] || 0) + 1;
+  const starCounts = [1, 2, 3, 4, 5].reduce((acc, star) => {
+    acc[star] = hotelData.filter((h) => h.rating === star).length;
     return acc;
   }, {});
 
@@ -74,342 +98,453 @@ const FilterSidebar = ({
     return acc;
   }, {});
 
-  const handlePriceChange = (type, value) => {
-    setFilters({
-      ...filters,
-      [type]: parseInt(value),
-    });
-  };
-
-  const toggleStarRating = (stars) => {
-    const currentRatings = [...filters.starRating];
-    const index = currentRatings.indexOf(stars);
-
-    if (index > -1) {
-      currentRatings.splice(index, 1);
-    } else {
-      currentRatings.push(stars);
-    }
-
-    setFilters({
-      ...filters,
-      starRating: currentRatings,
-    });
+  const toggleSection = (section) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
   };
 
   const renderStars = (count) => {
     const stars = [];
     for (let i = 0; i < count; i++) {
-      stars.push(<BsStarFill key={i} className="text-orange-500" />);
+      stars.push(<BsStarFill key={i} className="text-amber-400" size={12} />);
     }
     return stars;
   };
 
+  // Count active filters
+  const activeFilterCount =
+    filters.starRating.length +
+    (filters.mealType ? 1 : 0) +
+    (filters.refundable !== null ? 1 : 0) +
+    filters.amenities.length;
+
+  const clearAllFilters = () => {
+    setSearchText("");
+    setFilters({
+      minPrice: dynamicMinPrice,
+      maxPrice: dynamicMaxPrice,
+      starRating: [],
+      mealType: null,
+      refundable: null,
+      amenities: [],
+      location: "",
+    });
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 sticky top-4">
-      {/* Map Search */}
-      <div className="mb-6">
-        <div className="relative">
-          <div className=" mb-6 rounded-lg overflow-hidden">
-            {/* Overlay */}
-            <button
-              onClick={() => setShowMap(true)}
-              className="bg-blue-500 hover:bg-blue-600 flex items-center gap-2 cursor-pointer text-white px-3 py-1 text-sm rounded font-normal transition"
+    <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-4 space-y-2 max-h-[calc(100vh-2rem)] overflow-y-auto">
+      {/* Header with Clear Button */}
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Filters</h2>
+          {activeFilterCount > 0 && (
+            <p className="text-xs text-blue-600 font-medium mt-1">
+              {activeFilterCount} active
+            </p>
+          )}
+        </div>
+        {activeFilterCount > 0 && (
+          <button
+            onClick={clearAllFilters}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            Clear All
+          </button>
+        )}
+      </div>
+
+      {/* Search Section */}
+      <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-100">
+        <div className="mb-3">
+          <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-2">
+            Search
+          </label>
+
+          {/* Name Search */}
+          <div className="relative mb-3">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 text-xs" />
+            <input
+              type="text"
+              placeholder="Hotel name..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full pl-9 pr-3 py-2.5 border border-blue-200 rounded-lg text-sm bg-white/60 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
+            />
+          </div>
+
+          {/* Location Dropdown */}
+          <div className="relative">
+            {/* Selected Box */}
+            <div
+              onClick={() => setOpenLocation(!openLocation)}
+              className="w-full border border-blue-200 rounded-lg px-3 py-2.5 text-sm bg-white/60 backdrop-blur-sm flex items-center justify-between cursor-pointer hover:border-blue-400 transition"
             >
-              SEARCH ON MAP <FaMapLocation />
-            </button>
-          </div>
+              <span className="truncate text-gray-700">
+                {filters.location || "Select Location"}
+              </span>
+              <MdExpandMore
+                className={`transition ${openLocation ? "rotate-180" : ""}`}
+              />
+            </div>
 
-          <MapModal
-            open={showMap}
-            onClose={() => setShowMap(false)}
-            hotels={hotels}
-          />
+            {/* Dropdown */}
+            {openLocation && (
+              <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                {/* Search */}
+                <div className="p-2 border-b">
+                  <input
+                    type="text"
+                    placeholder="Search location..."
+                    value={locationSearch}
+                    onChange={(e) => setLocationSearch(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+
+                {/* List */}
+                <div className="max-h-48 overflow-y-auto">
+                  <div
+                    onClick={() => {
+                      setFilters({ ...filters, location: "" });
+                      setOpenLocation(false);
+                    }}
+                    className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer"
+                  >
+                    All Locations
+                  </div>
+
+                  {filteredLocations.map((loc) => (
+                    <div
+                      key={loc}
+                      onClick={() => {
+                        setFilters({ ...filters, location: loc });
+                        setOpenLocation(false);
+                      }}
+                      className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                        filters.location === loc
+                          ? "bg-blue-100 font-medium"
+                          : ""
+                      }`}
+                    >
+                      {loc}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Map Button */}
+        <button
+          onClick={() => setShowMap(true)}
+          className="w-full bg-gradient-to-r from-blue-700 to-blue-500 hover:from-blue-800 hover:to-blue-600 active:scale-95 flex items-center justify-center gap-2 text-white px-4 py-2.5 text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg"
+        >
+          <FaMapLocation size={14} />
+          Search on Map
+        </button>
+
+        <MapModal
+          open={showMap}
+          onClose={() => setShowMap(false)}
+          hotels={hotels}
+        />
       </div>
 
-      {/* Price Filter */}
-      <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800">Price</h3>
-          <button className="text-gray-600">−</button>
-        </div>
+      {/* Price Filter Section */}
+      <FilterSection
+        title="Price Range"
+        expanded={expandedSections.price}
+        onToggle={() => toggleSection("price")}
+      >
+        <div className="space-y-4">
+          {/* Slider */}
+          <div className="relative py-4">
+            {/* Track */}
+            <div className="absolute top-1/2 -translate-y-1/2 w-full h-2 bg-gray-200 rounded-full" />
 
-        <div className="mb-4">
-          <input
-            type="range"
-            min={dynamicMinPrice}
-            max={dynamicMaxPrice}
-            value={filters.maxPrice}
-            onChange={(e) => handlePriceChange("maxPrice", e.target.value)}
-            className="w-full h-2 bg-blue-500 rounded-lg appearance-none cursor-pointer"
-            style={{
-              background: `linear-gradient(
-    to right,
-    #2563eb 0%,
-    #2563eb ${
-      ((filters.maxPrice - dynamicMinPrice) /
-        (dynamicMaxPrice - dynamicMinPrice)) *
-      100
-    }%,
-    #e5e7eb ${
-      ((filters.maxPrice - dynamicMinPrice) /
-        (dynamicMaxPrice - dynamicMinPrice)) *
-      100
-    }%,
-    #e5e7eb 100%
-  )`,
-            }}
-          />
-        </div>
+            {/* Active Range */}
+            <div
+              className="absolute top-1/2 -translate-y-1/2 h-2 rounded-full bg-gradient-to-r from-[#0d47a1] to-[#1565c0] transition-all duration-200"
+              style={{
+                left: `${
+                  ((filters.minPrice - dynamicMinPrice) /
+                    (dynamicMaxPrice - dynamicMinPrice)) *
+                  100
+                }%`,
+                right: `${
+                  100 -
+                  ((filters.maxPrice - dynamicMinPrice) /
+                    (dynamicMaxPrice - dynamicMinPrice)) *
+                    100
+                }%`,
+              }}
+            />
 
-        <div className="flex justify-between text-sm text-blue-700 mb-4">
-          <span>₹ {filters.minPrice.toLocaleString()}</span>
-          <span>₹ {filters.maxPrice.toLocaleString()}</span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs text-gray-600 mb-1 block">
-              Minimum Price
-            </label>
+            {/* Min */}
             <input
-              type="text"
-              value={`₹ ${filters.minPrice}`}
-              readOnly
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+              type="range"
+              min={dynamicMinPrice}
+              max={dynamicMaxPrice}
+              value={filters.minPrice}
+              onChange={(e) => {
+                const value = Math.min(
+                  Number(e.target.value),
+                  filters.maxPrice - 500,
+                );
+                setFilters({ ...filters, minPrice: value });
+              }}
+              className="absolute w-full appearance-none bg-transparent z-30 range-thumb"
+            />
+
+            {/* Max */}
+            <input
+              type="range"
+              min={dynamicMinPrice}
+              max={dynamicMaxPrice}
+              value={filters.maxPrice}
+              onChange={(e) => {
+                const value = Math.max(
+                  Number(e.target.value),
+                  filters.minPrice + 500,
+                );
+                setFilters({ ...filters, maxPrice: value });
+              }}
+              className="absolute w-full appearance-none bg-transparent z-20 range-thumb"
             />
           </div>
-          <div>
-            <label className="text-xs text-gray-600 mb-1 block">
-              Maximum Price
-            </label>
-            <input
-              type="text"
-              value={`₹ ${filters.maxPrice}`}
-              readOnly
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-            />
+
+          {/* Price Display */}
+          <div className="bg-white rounded-lg p-3 border border-gray-200">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">From</p>
+                <p className="text-sm font-bold text-blue-600">
+                  ₹ {filters.minPrice.toLocaleString()}
+                </p>
+              </div>
+              <div className="text-gray-300">→</div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 mb-1">To</p>
+                <p className="text-sm font-bold text-cyan-600">
+                  ₹ {filters.maxPrice.toLocaleString()}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </FilterSection>
 
       {/* Star Rating Filter */}
-      <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800">Star Rating</h3>
-          <button className="text-gray-600">−</button>
-        </div>
+      <FilterSection
+        title="Star Rating"
+        count={Object.values(starCounts).reduce((a, b) => a + b, 0)}
+        expanded={expandedSections.rating}
+        onToggle={() => toggleSection("rating")}
+      >
+        <div className="space-y-2.5">
+          {[5, 4, 3, 2, 1].map((stars) => (
+            <label
+              key={stars}
+              className="flex items-center gap-3 p-2.5 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={filters.starRating.includes(stars)}
+                onChange={() => {
+                  const updated = filters.starRating.includes(stars)
+                    ? filters.starRating.filter((r) => r !== stars)
+                    : [...filters.starRating, stars];
 
-        <div className="space-y-3">
-          {Object.keys(starCounts)
-            .sort((a, b) => b - a)
-            .map((stars) => (
-              <label
-                key={stars}
-                className="flex items-center gap-3 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={filters.starRating.includes(stars)}
-                  onChange={() => toggleStarRating(stars)}
-                  className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <div className="flex gap-1">{renderStars(Number(stars))}</div>
-                <span className="text-gray-500 text-xs">
-                  ({starCounts[stars]})
-                </span>
-              </label>
-            ))}
+                  setFilters({ ...filters, starRating: updated });
+                }}
+              />
+
+              {/* Stars */}
+              <div className="flex gap-1">
+                {Array.from({ length: stars }).map((_, i) => (
+                  <BsStarFill key={i} className="text-amber-400 text-xs" />
+                ))}
+              </div>
+
+              {/* Label */}
+              <span className="text-sm text-gray-700">{stars} Star</span>
+
+              {/* Count */}
+              {/* <span className="ml-auto text-xs bg-gray-100 px-2 rounded">
+      {starCounts[stars]}
+    </span> */}
+            </label>
+          ))}
         </div>
-      </div>
+      </FilterSection>
 
       {/* Meal Basis Filter */}
-      <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800">Meal Basis</h3>
-          <button className="text-gray-600">−</button>
-        </div>
-
-        <div className="space-y-3">
+      <FilterSection
+        title="Meal Basis"
+        count={Object.values(mealCounts).reduce((a, b) => a + b, 0)}
+        expanded={expandedSections.meal}
+        onToggle={() => toggleSection("meal")}
+      >
+        <div className="space-y-2.5">
           {Object.keys(mealCounts).map((meal) => (
             <label
               key={meal}
-              className="flex items-center justify-between cursor-pointer"
+              className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
             >
-              <span className="text-gray-700">
-                {meal}{" "}
-                <span className="text-gray-500">({mealCounts[meal]})</span>
-              </span>
-              <input
-                type="checkbox"
-                onChange={() =>
-                  setFilters({
-                    ...filters,
-                    mealType: filters.mealType === meal ? null : meal,
-                  })
-                }
-                checked={filters.mealType === meal}
-                className="w-4 h-4 text-blue-500 border-gray-300 rounded"
-              />
+              <span className="text-sm text-gray-700 font-medium">{meal}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                  {mealCounts[meal]}
+                </span>
+                <input
+                  type="checkbox"
+                  onChange={() =>
+                    setFilters({
+                      ...filters,
+                      mealType: filters.mealType === meal ? null : meal,
+                    })
+                  }
+                  checked={filters.mealType === meal}
+                  className="w-4 h-4 text-blue-500 accent-blue-500 cursor-pointer rounded"
+                />
+              </div>
             </label>
           ))}
         </div>
-      </div>
+      </FilterSection>
 
-      {/* Property Type Filter */}
-      <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800">Property Type</h3>
-          <button className="text-gray-600">−</button>
-        </div>
-
-        <div className="space-y-3">
-          {Object.keys(propertyCounts).map((type) => (
-            <label
-              key={type}
-              className="flex items-center justify-between cursor-pointer"
-            >
-              <span className="text-gray-700">
-                {type}{" "}
-                <span className="text-gray-500">({propertyCounts[type]})</span>
-              </span>
-
-              <input
-                type="checkbox"
-                checked={filters.propertyType.includes(type)}
-                onChange={() => {
-                  const updated = filters.propertyType.includes(type)
-                    ? filters.propertyType.filter((t) => t !== type)
-                    : [...filters.propertyType, type];
-
-                  setFilters({ ...filters, propertyType: updated });
-                }}
-                className="w-4 h-4 text-blue-500 border-gray-300 rounded"
-              />
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="mb-6 pb-6 border-b">
-        <h3 className="font-semibold mb-3">Cancellation</h3>
-
-        <label className="flex justify-between cursor-pointer">
-          <span>Free Cancellation ({refundableCounts.refundable})</span>
-          <input
-            type="checkbox"
-            checked={filters.refundable === true}
-            onChange={() =>
-              setFilters({
-                ...filters,
-                refundable: filters.refundable === true ? null : true,
-              })
-            }
-          />
-        </label>
-
-        <label className="flex justify-between cursor-pointer">
-          <span>Non-Refundable ({refundableCounts.nonRefundable})</span>
-          <input
-            type="checkbox"
-            checked={filters.refundable === false}
-            onChange={() =>
-              setFilters({
-                ...filters,
-                refundable: filters.refundable === false ? null : false,
-              })
-            }
-          />
-        </label>
-      </div>
-
-      {/* User Rating Filter */}
-      <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800">User Rating</h3>
-          <button className="text-gray-600">−</button>
-        </div>
-
-        <div className="space-y-3">
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Excellent 4.5+ <span className="text-gray-500">(45)</span>
-            </span>
+      {/* Cancellation Filter */}
+      <FilterSection
+        title="Cancellation"
+        expanded={expandedSections.cancellation}
+        onToggle={() => toggleSection("cancellation")}
+      >
+        <div className="space-y-2.5">
+          <label className="flex items-center justify-between p-2.5 rounded-lg hover:bg-emerald-50 cursor-pointer transition-colors border border-transparent hover:border-emerald-100">
+            <div>
+              <p className="text-sm font-medium text-gray-700">
+                Free Cancellation
+              </p>
+              <p className="text-xs text-gray-500">
+                {refundableCounts.refundable} hotels
+              </p>
+            </div>
             <input
               type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
+              checked={filters.refundable === true}
+              onChange={() =>
+                setFilters({
+                  ...filters,
+                  refundable: filters.refundable === true ? null : true,
+                })
+              }
+              className="w-4 h-4 text-emerald-500 accent-emerald-500 cursor-pointer rounded"
             />
           </label>
 
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Very Good 4+ <span className="text-gray-500">(120)</span>
-            </span>
+          <label className="flex items-center justify-between p-2.5 rounded-lg hover:bg-red-50 cursor-pointer transition-colors border border-transparent hover:border-red-100">
+            <div>
+              <p className="text-sm font-medium text-gray-700">
+                Non-Refundable
+              </p>
+              <p className="text-xs text-gray-500">
+                {refundableCounts.nonRefundable} hotels
+              </p>
+            </div>
             <input
               type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-            />
-          </label>
-
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Good 3.5+ <span className="text-gray-500">(180)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
-            />
-          </label>
-
-          <label className="flex items-center justify-between cursor-pointer">
-            <span className="text-gray-700">
-              Pleasant 3+ <span className="text-gray-500">(95)</span>
-            </span>
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
+              checked={filters.refundable === false}
+              onChange={() =>
+                setFilters({
+                  ...filters,
+                  refundable: filters.refundable === false ? null : false,
+                })
+              }
+              className="w-4 h-4 text-red-500 accent-red-500 cursor-pointer rounded"
             />
           </label>
         </div>
-      </div>
+      </FilterSection>
 
       {/* Amenities Filter */}
-      <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800">Amenities</h3>
-          <button className="text-gray-600">−</button>
-        </div>
-
-        <div className="space-y-3 max-h-48 overflow-y-auto">
-          {Object.keys(amenityCounts).map((amenity) => (
-            <label
-              key={amenity}
-              className="flex items-center justify-between cursor-pointer"
-            >
-              <span className="text-gray-700 text-sm">
-                {amenity}{" "}
-                <span className="text-gray-500">
-                  ({amenityCounts[amenity]})
+      <FilterSection
+        title="Amenities"
+        count={Object.keys(amenityCounts).length}
+        expanded={expandedSections.amenities}
+        onToggle={() => toggleSection("amenities")}
+      >
+        <div className="space-y-2 max-h-56 overflow-y-auto pr-2">
+          {Object.keys(amenityCounts)
+            .sort((a, b) => amenityCounts[b] - amenityCounts[a])
+            .map((amenity) => (
+              <label
+                key={amenity}
+                className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group"
+              >
+                <span className="text-sm text-gray-700 group-hover:text-gray-900 truncate">
+                  {amenity}
                 </span>
-              </span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {amenityCounts[amenity]}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={filters.amenities.includes(amenity)}
+                    onChange={() => {
+                      const updated = filters.amenities.includes(amenity)
+                        ? filters.amenities.filter((a) => a !== amenity)
+                        : [...filters.amenities, amenity];
 
-              <input
-                type="checkbox"
-                checked={filters.amenities.includes(amenity)}
-                onChange={() => {
-                  const updated = filters.amenities.includes(amenity)
-                    ? filters.amenities.filter((a) => a !== amenity)
-                    : [...filters.amenities, amenity];
-
-                  setFilters({ ...filters, amenities: updated });
-                }}
-                className="w-4 h-4 text-blue-500 border-gray-300 rounded"
-              />
-            </label>
-          ))}
+                      setFilters({ ...filters, amenities: updated });
+                    }}
+                    className="w-4 h-4 text-blue-500 accent-blue-500 cursor-pointer rounded flex-shrink-0"
+                  />
+                </div>
+              </label>
+            ))}
         </div>
+      </FilterSection>
+
+      {/* Footer Info */}
+      <div className="pt-4 border-t border-gray-100 mt-6">
+        <p className="text-xs text-gray-500 text-center">
+          Showing {hotels.length} hotels matching your filters
+        </p>
       </div>
+    </div>
+  );
+};
+
+// Reusable Filter Section Component
+const FilterSection = ({ title, children, expanded, onToggle, count }) => {
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden hover:border-gray-300 transition-colors">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-4 py-3.5 bg-gradient-to-r from-gray-50 to-gray-25 hover:from-gray-100 hover:to-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-bold text-gray-900">{title}</h3>
+          {count && (
+            <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+              {count}
+            </span>
+          )}
+        </div>
+        <span className="text-gray-500 transition-transform duration-200">
+          {expanded ? <MdExpandLess size={20} /> : <MdExpandMore size={20} />}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="px-4 py-4 bg-white border-t border-gray-100 animate-in fade-in duration-200">
+          {children}
+        </div>
+      )}
     </div>
   );
 };

@@ -235,17 +235,19 @@ function HotelBookingCard({ b, navigate }) {
   const checkIn = snapshot.checkInDate || hotelReq.checkInDate;
   const checkOut = snapshot.checkOutDate || hotelReq.checkOutDate;
   const nights =
-  checkIn && checkOut
-    ? Math.max(
-        1,
-        Math.ceil(
-          (new Date(checkOut) - new Date(checkIn)) /
-            (1000 * 60 * 60 * 24)
+    checkIn && checkOut
+      ? Math.max(
+          1,
+          Math.ceil(
+            (new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60 * 24),
+          ),
         )
-      )
-    : 1;
+      : 1;
   const roomType =
-    rawRoom.Name?.[0] || selectedRoom.roomTypeName || "Standard Room";
+    rawRoom?.Name?.[0] ||
+    selectedRoom?.roomTypeName ||
+    b?.bookingSnapshot?.roomType ||
+    "Room details unavailable";
   const images = rawRoom.images || [];
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -262,7 +264,15 @@ function HotelBookingCard({ b, navigate }) {
 
   const heroImage = images[currentIndex] || null;
   const mealType = selectedRoom.mealType || "—";
-  const refundable = selectedRoom.isRefundable;
+  const cancelPolicies =
+    rawRoom?.CancelPolicies ||
+    selectedRoom?.cancelPolicies ||
+    b?.raw?.Rooms?.[0]?.CancelPolicies ||
+    [];
+
+  const refundable = cancelPolicies.some(
+    (p) => Number(p.CancellationCharge) === 0,
+  );
 
   return (
     <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border border-slate-200 overflow-hidden group">
@@ -414,9 +424,30 @@ export default function MyBookings() {
   /* ── Filter logic ── */
   const filteredBookings = useMemo(() => {
     return bookings.filter((b) => {
+      // ✅ ONLY SHOW VALID FLIGHT BOOKINGS
+      if (activeTab === "flight") {
+        const status = b.executionStatus?.toLowerCase();
+
+        if (
+          status === "failed" ||
+          status === "cancelled" ||
+          status === "cancel_requested"
+        ) {
+          return false; // ❌ skip these completely
+        }
+      }
       const matchesStatus =
         statusFilter === "All" ||
         b.executionStatus?.toLowerCase() === statusFilter.toLowerCase();
+
+      if (activeTab === "hotel") {
+        const amendmentStatus = b?.amendment?.status;
+
+        // hide if amendment is initiated
+        if (amendmentStatus && amendmentStatus !== "not_requested") {
+          return false;
+        }
+      }
 
       if (activeTab === "flight") {
         const seg = b.flightRequest?.segments?.[0];
@@ -455,6 +486,34 @@ export default function MyBookings() {
       }
     });
   }, [bookings, statusFilter, searchTerm, startDate, endDate, activeTab]);
+
+  const filteredFlightCount = useMemo(() => {
+  return flightBookings.filter((b) => {
+    const status = b.executionStatus?.toLowerCase();
+
+    if (
+      status === "failed" ||
+      status === "cancelled" ||
+      status === "cancel_requested"
+    ) {
+      return false;
+    }
+
+    return true;
+  }).length;
+}, [flightBookings]);
+
+const filteredHotelCount = useMemo(() => {
+  return hotelBookings.filter((b) => {
+    const amendmentStatus = b?.amendment?.status;
+
+    if (amendmentStatus && amendmentStatus !== "not_requested") {
+      return false;
+    }
+
+    return true;
+  }).length;
+}, [hotelBookings]);
 
   const statusOptions =
     activeTab === "flight"
@@ -512,13 +571,13 @@ export default function MyBookings() {
                 key: "flight",
                 label: "Flights",
                 Icon: FaPlane,
-                count: flightBookings.length,
+                count: filteredFlightCount,
               },
               {
                 key: "hotel",
                 label: "Hotels",
                 Icon: FaHotel,
-                count: hotelBookings.length,
+                count: filteredHotelCount,
               },
             ].map(({ key, label, Icon, count }) => (
               <button

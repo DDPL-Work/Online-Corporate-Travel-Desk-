@@ -9,6 +9,7 @@ import {
   fetchMyHotelBookings,
   executeHotelBooking,
   fetchBookedHotelDetails,
+  generateHotelVoucher,
 } from "../Actions/hotelBooking.thunks";
 
 const initialState = {
@@ -22,6 +23,10 @@ const initialState = {
   loading: false,
   error: null,
   success: false,
+
+  voucherLoading: false,
+  voucherError: null,
+  voucherSuccess: false,
 };
 
 const hotelBookingSlice = createSlice({
@@ -136,7 +141,25 @@ const hotelBookingSlice = createSlice({
       .addCase(fetchBookedHotelDetails.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-      });
+      })
+
+      .addCase(generateHotelVoucher.pending, (state) => {
+        state.voucherLoading = true;
+        state.voucherError = null;
+      })
+      .addCase(generateHotelVoucher.fulfilled, (state, action) => {
+        state.voucherLoading = false;
+        state.voucherSuccess = true;
+
+        // update selected booking
+        if (state.selectedBookingDetails) {
+          state.selectedBookingDetails.executionStatus = "voucher_generated";
+        }
+      })
+      .addCase(generateHotelVoucher.rejected, (state, action) => {
+        state.voucherLoading = false;
+        state.voucherError = action.payload;
+      })
   },
 });
 

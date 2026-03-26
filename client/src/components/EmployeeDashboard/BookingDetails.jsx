@@ -18,6 +18,13 @@ import {
   fetchMyBookingById,
 } from "../../Redux/Actions/booking.thunks";
 import {
+  fetchCancellationCharges,
+  fullCancellation,
+  partialCancellation,
+  amendBooking,
+  fetchChangeStatus,
+} from "../../Redux/Actions/amendmentThunks";
+import {
   formatDate,
   formatTime,
   formatDuration,
@@ -27,6 +34,7 @@ import {
   airlineThemes,
   FLIGHT_STATUS_MAP,
 } from "../../utils/formatter";
+import Swal from "sweetalert2";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Shared primitives                                              */
@@ -402,29 +410,69 @@ function AmendmentModal({ type, booking, onClose }) {
 }
 function CancelScreen({ booking, onClose }) {
   const dispatch = useDispatch();
+
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [charges, setCharges] = useState(null);
 
-  const refundable =
-    booking.flightRequest?.fareSnapshot?.onwardFare?.IsRefundable ||
-    booking.flightRequest?.fareSnapshot?.refundable;
+  /* 🔥 STEP 1: Fetch cancellation charges */
+  useEffect(() => {
+    const fetchCharges = async () => {
+      const res = await dispatch(fetchCancellationCharges(booking._id));
 
-  const totalPaid = booking.pricingSnapshot?.totalAmount || 0;
+      if (res.payload) {
+        setCharges(res.payload);
+      }
+    };
 
-  // 🔹 Example cancellation logic (replace with backend API response later)
-  const airlinePenalty = refundable ? 1500 : totalPaid;
-  const serviceFee = refundable ? 300 : 0;
-  const refundAmount = refundable
-    ? Math.max(totalPaid - airlinePenalty - serviceFee, 0)
-    : 0;
+    fetchCharges();
+  }, [booking._id, dispatch]);
 
+  /* 🔥 STEP 2: Cancel + Poll status */
   const handleCancel = async () => {
     if (!confirm) return;
+
     try {
       setLoading(true);
-      await dispatch(cancelBookingThunk(booking._id));
+
+      // 1️⃣ Send cancel request
+      const res = await dispatch(fullCancellation({ bookingId: booking._id }));
+
+      const changeRequestId =
+        res.payload?.Response?.ChangeRequestId || res.payload?.ChangeRequestId;
+
+      if (!changeRequestId) throw new Error("No ChangeRequestId");
+
+      // 2️⃣ POLLING (CRITICAL)
+      let status = "requested";
+
+      while (status === "requested" || status === "in_progress") {
+        await new Promise((r) => setTimeout(r, 4000));
+
+        const statusRes = await dispatch(
+          fetchChangeStatus({
+            changeRequestId,
+            bookingId: booking._id,
+          }),
+        );
+
+        const apiStatus = statusRes.payload?.Response?.Status;
+
+        if (apiStatus === 1) status = "completed";
+        else if (apiStatus === 2) status = "in_progress";
+        else status = "failed";
+      }
+
+      if (status !== "completed") {
+        throw new Error("Cancellation failed");
+      }
+
+      // 3️⃣ Refresh booking
       await dispatch(fetchMyBookingById(booking._id));
+
       onClose();
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -432,64 +480,44 @@ function CancelScreen({ booking, onClose }) {
 
   return (
     <div className="space-y-5">
-      {!refundable && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
-          This ticket is non-refundable. Cancelling will result in zero refund.
-        </div>
-      )}
-
-      {refundable && (
+      {/* Charges UI */}
+      {charges && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm space-y-2">
-          <p className="font-semibold text-amber-800">Refund Breakdown</p>
+          <p className="font-semibold text-amber-800">Cancellation Charges</p>
 
           <div className="flex justify-between">
-            <span>Total Paid</span>
-            <span>₹{totalPaid}</span>
+            <span>Airline Charges</span>
+            <span>₹{charges?.AirlineCharge || 0}</span>
           </div>
 
-          <div className="flex justify-between text-red-600">
-            <span>Airline Cancellation Penalty</span>
-            <span>- ₹{airlinePenalty}</span>
-          </div>
-
-          <div className="flex justify-between text-red-600">
+          <div className="flex justify-between">
             <span>Service Fee</span>
-            <span>- ₹{serviceFee}</span>
-          </div>
-
-          <div className="border-t pt-2 flex justify-between font-bold text-emerald-700">
-            <span>Estimated Refund</span>
-            <span>₹{refundAmount}</span>
+            <span>₹{charges?.ServiceCharge || 0}</span>
           </div>
         </div>
       )}
 
-      {/* Confirmation checkbox */}
+      {/* Confirmation */}
       <label className="flex items-start gap-2 text-sm text-slate-600">
         <input
           type="checkbox"
           checked={confirm}
           onChange={(e) => setConfirm(e.target.checked)}
-          className="mt-1"
         />
-        I understand the cancellation policy and agree to proceed.
+        I confirm cancellation
       </label>
 
       <div className="flex justify-end gap-3">
-        <button
-          onClick={onClose}
-          disabled={loading}
-          className="px-4 py-2 text-sm font-semibold bg-slate-100 rounded-lg"
-        >
+        <button onClick={onClose} className="px-4 py-2 bg-slate-100 rounded-lg">
           Close
         </button>
 
         <button
           onClick={handleCancel}
           disabled={!confirm || loading}
-          className="px-4 py-2 text-sm font-bold bg-red-600 text-white rounded-lg disabled:opacity-50"
+          className="px-4 py-2 bg-red-600 text-white rounded-lg"
         >
-          {loading ? "Cancelling..." : "Confirm Cancellation"}
+          {loading ? "Processing..." : "Cancel Ticket"}
         </button>
       </div>
     </div>
@@ -612,6 +640,83 @@ export default function BookingDetails() {
     return () => clearInterval(iv);
   }, [booking?._id, booking?.executionStatus, dispatch]);
 
+  const handleCancelBooking = async () => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "This will cancel your ticket permanently.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "Yes, cancel it!",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      Swal.fire({
+        title: "Cancelling...",
+        text: "Please wait while we process your request",
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
+      // 🔥 CALL YOUR EXISTING THUNK
+      const res = await dispatch(fullCancellation({ bookingId: booking._id }));
+
+      const changeRequestId =
+        res.payload?.Response?.ChangeRequestId || res.payload?.ChangeRequestId;
+
+      // 🔁 POLLING (same logic from modal)
+      let status = "requested";
+
+      while (status === "requested" || status === "in_progress") {
+        await new Promise((r) => setTimeout(r, 4000));
+
+        const statusRes = await dispatch(
+          fetchChangeStatus({
+            changeRequestId,
+            bookingId: booking._id,
+          }),
+        );
+
+        const apiStatus = statusRes.payload?.Response?.ChangeRequestStatus;
+
+        if (apiStatus === 4) status = "completed";
+        else if ([1, 2, 3, 7].includes(apiStatus)) status = "in_progress";
+        else status = "failed";
+      }
+
+      // 🔥 3️⃣ VERIFY FINAL DB STATE
+      const updated = await dispatch(fetchMyBookingById(booking._id));
+
+      const finalStatus = updated.payload?.executionStatus;
+
+      // ❌ NOT COMPLETED
+      if (finalStatus !== "cancelled") {
+        throw new Error("Cancellation not completed yet");
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Cancelled!",
+        text: "Your booking has been cancelled successfully.",
+        confirmButtonText: "Go to Cancelled Bookings",
+      });
+      navigate("/my-cancelled-bookings");
+    } catch (err) {
+      console.error(err);
+
+      Swal.fire({
+        icon: "error",
+        title: "Failed!",
+        text: "Cancellation failed. Please try again.",
+      });
+    }
+  };
+
   /* ── Loading ── */
   if (loading || !booking) {
     return (
@@ -652,6 +757,50 @@ export default function BookingDetails() {
   };
 
   const fareSnapshot = booking.flightRequest?.fareSnapshot;
+
+  const departureTime =
+    booking?.flightRequest?.segments?.[0]?.departureDateTime;
+
+  const isTravelPassed = departureTime && new Date() > new Date(departureTime);
+
+  const allRules = fareSnapshot?.miniFareRules?.flat() || [];
+
+  const cancellationPolicies = allRules.filter(
+    (r) => r.Type === "Cancellation",
+  );
+
+  const reissuePolicies = allRules.filter((r) => r.Type === "Reissue");
+  const getAmount = (str) => Number(str?.replace(/\D/g, "") || 0);
+
+  const minCancelFee = Math.min(
+    ...cancellationPolicies.map((r) => getAmount(r.Details)),
+  );
+
+  const minReissueFee = Math.min(
+    ...reissuePolicies.map((r) => getAmount(r.Details)),
+  );
+
+  const getPolicyDisplay = (rule) => {
+    const dep = new Date(departureTime);
+
+    const fromHours = Number(rule.From || 0);
+    const toHours = rule.To ? Number(rule.To) : null;
+
+    const fromDate = new Date(dep - fromHours * 3600000);
+    const toDate = toHours ? new Date(dep - toHours * 3600000) : null;
+
+    if (!toDate) {
+      return {
+        label: `More than ${fromHours} hrs before departure`,
+        range: `Before ${formatDate(fromDate)} ${formatTime(fromDate)}`,
+      };
+    }
+
+    return {
+      label: `Within ${toHours} hrs of departure`,
+      range: `${formatDate(toDate)} → ${formatDate(fromDate)}`,
+    };
+  };
 
   const seatSelections = booking.flightRequest?.ssrSnapshot?.seats || [];
 
@@ -793,7 +942,7 @@ export default function BookingDetails() {
         </BentoCard>
 
         {/* ── Fare ── */}
-        <BentoCard>
+        {/* <BentoCard>
           <CardLabel icon={FiCreditCard} label="Fare Summary" />
 
           <InfoRow label="Base Fare" value={`₹${baseFare}`} />
@@ -832,7 +981,7 @@ export default function BookingDetails() {
               ₹{fare?.totalAmount}
             </span>
           </div>
-        </BentoCard>
+        </BentoCard> */}
 
         {/* ── Payment & Status — full width ── */}
         <BentoCard className="col-span-2">
@@ -915,35 +1064,149 @@ export default function BookingDetails() {
           </div>
         </BentoCard>
 
-        {/* ── Amendment Actions ── */}
-        {paymentSuccessful && executionStatus === "ticketed" && (
+        {/* ── Cancellation Policy ── */}
+        {cancellationPolicies.length > 0 && (
           <BentoCard className="col-span-2">
-            <CardLabel icon={FiRefreshCw} label="Amendment Actions" />
+            <CardLabel icon={FiAlertCircle} label="Cancellation Policy" />
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => setAmendmentType("reschedule")}
-                className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition"
-              >
-                Reschedule Flight
-              </button>
+            <p className="text-xs text-slate-400 mb-3">
+              Charges vary depending on how close you are to departure.
+            </p>
 
-              <button
-                onClick={() => setAmendmentType("modify")}
-                className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition"
-              >
-                Modify Traveller
-              </button>
+            <div className="space-y-3">
+              {cancellationPolicies.map((rule, index) => {
+                const policy = getPolicyDisplay(rule);
+                const amount = getAmount(rule.Details);
+                const isUrgent = Number(rule.From) <= 24;
+                const isCheapest = amount === minCancelFee;
 
-              <button
-                onClick={() => setAmendmentType("cancel")}
-                className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition"
-              >
-                Cancel Ticket
-              </button>
+                return (
+                  <div
+                    key={index}
+                    className={`flex justify-between items-center rounded-xl px-4 py-3 border
+              ${
+                isUrgent
+                  ? "bg-red-50 border-red-200"
+                  : "bg-slate-50 border-slate-200"
+              }`}
+                  >
+                    {/* Time window */}
+                    <div>
+                      <p className="text-xs text-slate-400 font-medium">
+                        {policy.range}
+                      </p>
+                      <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                        {policy.label}
+
+                        {isCheapest && (
+                          <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
+                            Cheapest
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Charge */}
+                    <div className="text-right">
+                      <p className="text-xs text-slate-400">Cancellation Fee</p>
+                      <p className="text-sm font-bold text-red-600">
+                        {rule.Details}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </BentoCard>
         )}
+
+        {/* ── Reissue Policy ── */}
+        {reissuePolicies.length > 0 && (
+          <BentoCard className="col-span-2">
+            <CardLabel icon={FiRefreshCw} label="Reschedule / Reissue Policy" />
+
+            <p className="text-xs text-slate-400 mb-3">
+              Charges depend on how early you reschedule.
+            </p>
+
+            <div className="space-y-3">
+              {reissuePolicies.map((rule, index) => {
+                const policy = getPolicyDisplay(rule);
+                const amount = getAmount(rule.Details);
+                const isUrgent = Number(rule.From) <= 24;
+                const isCheapest = amount === minReissueFee;
+
+                return (
+                  <div
+                    key={index}
+                    className={`flex justify-between items-center rounded-xl px-4 py-3 border
+              ${
+                isUrgent
+                  ? "bg-amber-50 border-amber-200"
+                  : "bg-slate-50 border-slate-200"
+              }`}
+                  >
+                    {/* Time window */}
+                    <div>
+                      <p className="text-xs text-slate-400 font-medium">
+                        {policy.range}
+                      </p>
+                      <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                        {policy.label}
+
+                        {isCheapest && (
+                          <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
+                            Cheapest
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Charge */}
+                    <div className="text-right">
+                      <p className="text-xs text-slate-400">Reissue Fee</p>
+                      <p className="text-sm font-bold text-blue-600">
+                        {rule.Details}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </BentoCard>
+        )}
+
+        {/* ── Amendment Actions ── */}
+        {paymentSuccessful &&
+          executionStatus === "ticketed" &&
+          !isTravelPassed && (
+            <BentoCard className="col-span-2">
+              <CardLabel icon={FiRefreshCw} label="Amendment Actions" />
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => setAmendmentType("reschedule")}
+                  className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition"
+                >
+                  Reschedule Flight
+                </button>
+
+                <button
+                  onClick={() => setAmendmentType("modify")}
+                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition"
+                >
+                  Modify Traveller
+                </button>
+
+                <button
+                  onClick={handleCancelBooking}
+                  className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition"
+                >
+                  Cancel Ticket
+                </button>
+              </div>
+            </BentoCard>
+          )}
       </main>
       {amendmentType && (
         <AmendmentModal

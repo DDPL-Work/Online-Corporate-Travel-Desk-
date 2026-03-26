@@ -83,10 +83,11 @@ export const amendBooking = createAsyncThunk(
 ================================= */
 export const fetchChangeStatus = createAsyncThunk(
   "amendment/fetchChangeStatus",
-  async (changeRequestId, { rejectWithValue }) => {
+  async ({ changeRequestId, bookingId }, { rejectWithValue }) => {
     try {
-      const res = await flightApi.post("/amendments/status", {
+      const res = await flightApi.post("/amendments/cancellation/status", {
         changeRequestId,
+        bookingId, // ✅ IMPORTANT
       });
       return res.data;
     } catch (err) {

@@ -13,6 +13,12 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       index: true,
     },
 
+    bookingType: {
+      type: String,
+      enum: ["flight", "hotel"],
+      required: true,
+    },
+
     corporateId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Corporate",
@@ -222,6 +228,37 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       reason: String,
       refundAmount: Number,
       refundStatus: String,
+    },
+
+    /* ================= AMENDMENT ================= */
+
+    amendment: {
+      changeRequestId: String, // from TBO
+      amendmentType: {
+        type: String,
+        enum: ["amendment", "cancellation"],
+        default: "amendment",
+      },
+
+      status: {
+        type: String,
+        enum: [
+          "not_requested",
+          "requested",
+          "in_progress",
+          "approved",
+          "rejected",
+          "failed",
+        ],
+        default: "not_requested",
+      },
+
+      remarks: String,
+
+      requestedAt: Date,
+      lastCheckedAt: Date,
+
+      providerResponse: mongoose.Schema.Types.Mixed,
     },
   },
   { timestamps: true },
