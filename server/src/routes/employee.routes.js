@@ -44,6 +44,13 @@ router.get(
   employeeCtrl.getMyDocuments,
 );
 
+router.get(
+  "/me",
+  verifyToken,
+  authorizeRoles("employee"),
+  employeeCtrl.getMyTravelAdmin,
+);
+
 // -------------------------
 // Admin routes (Corporate Admin / Travel Admin)
 // -------------------------

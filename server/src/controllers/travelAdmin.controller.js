@@ -1,56 +1,140 @@
-const User = require("../models/User");
+const { default: mongoose } = require("mongoose");
+const BookingRequest = require("../models/BookingRequest");
+const HotelBooking = require("../models/hotelBookingRequest.model"); // if separate model exists
 
 /**
- * GET /api/travel-admin/me
- * Fetch approver based on same email domain
+ * ============================================================
+ * 🛡️ COMMON ADMIN VALIDATION
+ * ============================================================
  */
+const validateTravelAdmin = (req) => {
+  if (!req.user || req.user.role !== "travel-admin") {
+    const error = new Error("Access denied. Travel Admin only.");
+    error.statusCode = 403;
+    throw error;
+  }
 
-exports.getMyTravelAdmin = async (req, res) => {
+  if (!req.user.corporateId) {
+    const error = new Error("Corporate context missing (SSO failure)");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return req.user.corporateId;
+};
+
+/**
+ * ============================================================
+ * ✈️ FETCH ALL FLIGHT BOOKINGS (ADMIN - SSO SCOPED)
+ * ============================================================
+ */
+exports.getAllFlightBookingsAdmin = async (req, res) => {
   try {
-    const { id, email, role } = req.user;
+    const corporateId = validateTravelAdmin(req);
 
-    // Only employee should call this
-    if (role !== "employee") {
-      return res.status(403).json({
-        success: false,
-        message: "Only employees can fetch approver",
-      });
-    }
-
-    if (!email || !email.includes("@")) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid employee email",
-      });
-    }
-
-    // 1️⃣ Extract domain
-    const domain = email.split("@")[1].toLowerCase();
-
-    // 2️⃣ Find approver in same domain
-    const approver = await User.findOne({
-      role: { $in: ["travel-admin", "admin"] },
-      email: { $regex: `@${domain}$`, $options: "i" },
-      isActive: true,
-    }).select("_id name email phone designation role");
-
-    if (!approver) {
-      return res.status(404).json({
-        success: false,
-        message: "No approver found for your domain",
-      });
-    }
+    const bookings = await BookingRequest.find({
+      corporateId,
+      bookingType: "flight",
+    })
+      .populate("userId", "name email")
+      .sort({ createdAt: -1 })
+      .lean();
 
     return res.status(200).json({
       success: true,
-      data: approver,
+      count: bookings.length,
+      data: bookings,
     });
   } catch (error) {
-    console.error("GET APPROVER ERROR:", error);
+    console.error("Flight Admin Fetch Error:", error);
 
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: "Failed to fetch approver",
+      message: error.message || "Failed to fetch flight bookings",
     });
   }
 };
+
+/**
+ * ============================================================
+ * 🏨 FETCH ALL HOTEL BOOKINGS (ADMIN - SSO SCOPED)
+ * ============================================================
+ */
+exports.getAllHotelBookingsAdmin = async (req, res) => {
+  try {
+    const corporateId = new mongoose.Types.ObjectId(validateTravelAdmin(req));
+
+    const bookings = await HotelBooking.find({
+      corporateId,
+      // bookingType: "hotel",
+      requestStatus: "approved",
+    })
+      .populate("userId", "name email")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: bookings.length,
+      data: bookings,
+    });
+  } catch (error) {
+    console.error("Hotel Admin Fetch Error:", error);
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to fetch hotel bookings",
+    });
+  }
+};
+
+/**
+ * ============================================================
+ * ❌ FETCH CANCELLED / CANCELLING HOTEL BOOKINGS (ADMIN)
+ * ============================================================
+ */
+exports.getCancelledHotelBookingsAdmin = async (req, res) => {
+  try {
+    const corporateId = new mongoose.Types.ObjectId(
+      validateTravelAdmin(req)
+    );
+
+    const bookings = await HotelBooking.find({
+      corporateId,
+      requestStatus: "approved",
+
+      // ✅ CORRECT LOGIC (BASED ON YOUR DB)
+      $or: [
+        {
+          executionStatus: {
+            $in: ["failed", "cancelled"],
+          },
+        },
+        {
+          "amendment.status": "requested",
+        },
+      ],
+    })
+      .populate("userId", "name email")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: bookings.length,
+      data: bookings,
+    });
+  } catch (error) {
+    console.error("Cancelled Hotel Fetch Error:", error);
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message:
+        error.message || "Failed to fetch cancelled hotel bookings",
+    });
+  }
+};
+
+
+// Manager Onboarding process
+

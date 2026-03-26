@@ -1,15 +1,63 @@
+//client\src\Redux\Actions\travelAdmin.thunks.js
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import api from "../../API/axios"; 
+import api from "../../API/axios";
 
-export const getMyTravelAdmin = createAsyncThunk(
-  "travelAdmin/getMyTravelAdmin",
+/**
+ * ============================================================
+ * ✈️ FETCH FLIGHT BOOKINGS (ADMIN)
+ * ============================================================
+ */
+export const getAllFlightBookingsAdmin = createAsyncThunk(
+  "adminBooking/getAllFlightBookingsAdmin",
   async (_, { rejectWithValue }) => {
     try {
-      const res = await api.get("/my-travel-admin/me");
+      const res = await api.get("/travel-admin/flights");
+
       return res.data.data;
-    } catch (error) {
+    } catch (err) {
       return rejectWithValue(
-        error.response?.data?.message || "Failed to fetch approver",
+        err.response?.data?.message || "Failed to fetch flight bookings",
+      );
+    }
+  },
+);
+
+/**
+ * ============================================================
+ * 🏨 FETCH HOTEL BOOKINGS (ADMIN)
+ * ============================================================
+ */
+export const getAllHotelBookingsAdmin = createAsyncThunk(
+  "adminBooking/getAllHotelBookingsAdmin",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.get("/travel-admin/hotels");
+
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch hotel bookings",
+      );
+    }
+  },
+);
+
+/**
+ * ============================================================
+ * ❌ FETCH CANCELLED HOTEL BOOKINGS (ADMIN)
+ * ============================================================
+ */
+export const getCancelledHotelBookingsAdmin = createAsyncThunk(
+  "adminBooking/getCancelledHotelBookingsAdmin",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.get("/travel-admin/hotels/cancelled");
+
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message ||
+          "Failed to fetch cancelled hotel bookings",
       );
     }
   },

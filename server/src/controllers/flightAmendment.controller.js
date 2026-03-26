@@ -295,7 +295,7 @@ exports.amendBooking = async (req, res) => {
 };
 
 /* ======================================================
-   5️⃣ CHECK CHANGE STATUS
+   5️⃣ CHECK CHANGE STATUS (OPTIMIZED - NO DB SPAM)
 ====================================================== */
 exports.getChangeStatus = async (req, res) => {
   try {
@@ -305,6 +305,22 @@ exports.getChangeStatus = async (req, res) => {
       return res.status(400).json({ message: "changeRequestId required" });
     }
 
+    /* 🔹 FETCH BOOKING FIRST */
+    const booking = await BookingRequest.findById(bookingId);
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    /* 🔹 OPTIONAL: STOP IF ALREADY COMPLETED */
+    if (booking?.amendment?.status === "completed") {
+      return res.json({
+        message: "Already completed",
+        status: "completed",
+      });
+    }
+
+    /* 🔹 CALL TBO STATUS API */
     const result = await amendmentService.getChangeRequestStatus({
       ChangeRequestId: changeRequestId,
     });
@@ -317,6 +333,14 @@ exports.getChangeStatus = async (req, res) => {
     else if (crStatus === 4) status = "completed";
     else if (crStatus === 5) status = "failed";
 
+    /* 🔥 PREVENT DB SPAM */
+    const prevStatus = booking?.amendment?.status;
+
+    if (prevStatus === status) {
+      return res.json(result); // 🚫 NO DB UPDATE
+    }
+
+    /* ✅ ONLY UPDATE WHEN STATUS CHANGES */
     await BookingRequest.findByIdAndUpdate(
       bookingId,
       {

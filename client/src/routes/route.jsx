@@ -48,6 +48,7 @@ import HotelReviewBooking from "../Pages/Booking-Flow/Hotel-Booking/HotelReviewB
 import HotelBookNow from "../Pages/Booking-Flow/Hotel-Booking/HotelBooking";
 import HotelBookingDetails from "../components/EmployeeDashboard/Hotelbookingdetails";
 import CancelledFlightsPage from "../components/EmployeeDashboard/MyCancelledBookings";
+import CancelledBookings from "../components/TravelAdminTabs/CancelledBookings";
 
 export const appRouter = createBrowserRouter([
   // -------------------------------
@@ -79,6 +80,7 @@ export const appRouter = createBrowserRouter([
         children: [
           { path: "/update-profile", element: <ProfileSettings /> },
           { path: "total-bookings", element: <BookingsDashboard /> },
+          { path: "/total-cancelled-bookings", element: <CancelledBookings /> },
           { path: "/pending-requests", element: <PendingTravelRequests /> },
           { path: "/approved-requests", element: <ApprovedTravelRequests /> },
           { path: "/rejected-requests", element: <RejectedTravelRequests /> },

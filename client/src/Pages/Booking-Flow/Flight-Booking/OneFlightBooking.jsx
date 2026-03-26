@@ -27,7 +27,7 @@ import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { FareDetailsModal } from "./FareDetailsModal";
-import { getMyTravelAdmin } from "../../../Redux/Actions/travelAdmin.thunks";
+import { getMyTravelAdmin } from "../../../Redux/Actions/employee.thunks";
 
 const normalizeFareRules = (fareRule) => {
   const rules = fareRule?.Response?.FareRules;
@@ -57,7 +57,7 @@ export default function OneFlightBooking() {
     approver,
     loading: approverLoading,
     error: approverError,
-  } = useSelector((state) => state.travelAdmin);
+  } = useSelector((state) => state.employee);
 
   const {
     selectedFlight,

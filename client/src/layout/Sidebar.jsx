@@ -55,6 +55,11 @@ export default function Sidebar({ isOpen, onClose }) {
         label: "Total Bookings",
         icon: <FaClipboardList />,
       },
+      {
+        to: "/total-cancelled-bookings",
+        label: "Cancelled Bookings",
+        icon: <FaClipboardList />,
+      },
       { to: "/pending-requests", label: "Pending Requests", icon: <FaClock /> },
       {
         to: "/approved-requests",

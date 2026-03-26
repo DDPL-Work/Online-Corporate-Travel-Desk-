@@ -435,7 +435,7 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
 
   const query = {
     userId: req.user._id,
-    bookingType: "hotel",
+    // bookingType: "hotel",
     executionStatus: { $in: ["voucher_generated"] }, // ✅ FIXED
   };
 
