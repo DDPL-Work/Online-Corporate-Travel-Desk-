@@ -47,7 +47,7 @@ const SSOCallback = () => {
         navigate("/onboarded-corporates", { replace: true });
       } else if (role === "employee") {
         navigate("/my-bookings", { replace: true });
-      } else if (role === "corporate-super-admin") {
+      } else if (role === "manager") {
         navigate("/corporate-dashboard", { replace: true });
       }
     } catch (err) {

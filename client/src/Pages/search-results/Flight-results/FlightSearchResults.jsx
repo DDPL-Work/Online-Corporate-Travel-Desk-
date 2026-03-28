@@ -403,7 +403,7 @@ export default function FlightSearchResults() {
     returnSearchDate,
   ]);
 
-  console.log("Header Route", routeHeader);
+  // console.log("Header Route", routeHeader);
 
   const getSegments = (flight) => {
     if (!flight?.Segments) return [];

@@ -44,15 +44,13 @@ router.get(
   employeeCtrl.getMyDocuments,
 );
 
-// -------------------------
-// Admin routes (Corporate Admin / Travel Admin)
-// -------------------------
-router.use(authorizeRoles("corporate-admin", "travel-admin"));
+router.get(
+  "/me",
+  verifyToken,
+  authorizeRoles("employee"),
+  employeeCtrl.getMyTravelAdmin,
+);
 
-router.get("/", employeeCtrl.getAllEmployees); // list all employees
-router.get("/:id", employeeCtrl.getEmployee); // single employee
-router.put("/:id", employeeCtrl.updateEmployee); // update employee
-router.patch("/:id/toggle-status", employeeCtrl.toggleEmployeeStatus); // toggle status
-router.delete("/:id", employeeCtrl.removeEmployee); // delete employee
+
 
 module.exports = router;

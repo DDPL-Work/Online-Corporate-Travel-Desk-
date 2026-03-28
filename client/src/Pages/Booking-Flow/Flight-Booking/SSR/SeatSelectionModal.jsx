@@ -33,6 +33,8 @@ export default function SeatSelectionModal({
   onToggleMeal,
   selectedBaggage,
   onSelectBaggage,
+  ssrError,
+  ssrErrorMessage,
 }) {
   const dispatch = useDispatch();
   const { seatMap, loading } = useSelector((state) => state.flights);
@@ -438,6 +440,35 @@ export default function SeatSelectionModal({
   }, [seatsFlat]);
 
   if (!isOpen) return null;
+
+  if (ssrError) {
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white p-6 rounded-xl text-center max-w-sm w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-semibold mb-2">
+          No SSR Available
+        </h2>
+
+        <p className="text-gray-600 mb-4">
+          {ssrErrorMessage}
+        </p>
+
+        <button
+          onClick={onClose}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
 
   return (
     <div

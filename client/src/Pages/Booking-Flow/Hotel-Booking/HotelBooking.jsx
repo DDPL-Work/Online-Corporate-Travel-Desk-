@@ -138,36 +138,50 @@ const HotelBookNow = () => {
   const pricing = bookingRequest?.pricingSnapshot || {};
 
   const selectedHotel = hotelReq.selectedHotel || {};
-  const selectedRoom = hotelReq.selectedRoom || {};
-  const rawRoom = selectedRoom.rawRoomData || {};
+ const selectedRooms = Array.isArray(hotelReq.allRooms)
+  ? hotelReq.allRooms
+  : [];
+  // const rawRoom = selectedRooms.rawRoomData || {};
 
   const hotel = {
     name: selectedHotel.hotelName || "Hotel",
     rating: selectedHotel.starRating || 0,
     address: selectedHotel.address || "",
     city: selectedHotel.city || "",
-    image: rawRoom.images?.[0] || "/placeholder-hotel.jpg",
+    image:
+      selectedRooms[0]?.images?.[0] ||
+      selectedRooms[0]?.rawRoomData?.images?.[0] ||
+      "/placeholder-hotel.jpg",
   };
 
   const checkIn = hotelReq.checkInDate || snapshot.checkInDate;
   const checkOut = hotelReq.checkOutDate || snapshot.checkOutDate;
+  const roomNames = selectedRooms.map((r) => r.name?.[0] || "Room");
+
   const room = {
-    typeName: rawRoom.Name?.[0] || "Room",
-    currency: selectedRoom.currency || "INR",
-    nights: calculateNights(checkIn, checkOut),
-    cancellationPolicies: selectedRoom.cancelPolicies || [],
-    inclusions: selectedRoom.inclusion ? selectedRoom.inclusion.split(",") : [],
-    mealType: selectedRoom.mealType,
-    refundable: selectedRoom.isRefundable,
+    typeName: roomNames.join(", "),
+    currency: selectedRooms[0]?.price?.currency || "INR",
+    cancellationPolicies: selectedRooms[0]?.cancelPolicies || [],
+    inclusions: [],
+    mealType: selectedRooms.map((r) => r.mealType).join(", "),
+    refundable: selectedRooms[0]?.isRefundable,
   };
-  const roomCount = hotelReq.noOfRooms || snapshot.roomCount || 1;
+
+  const roomCount = selectedRooms.length;
   const totalAdults =
     hotelReq.roomGuests?.reduce((sum, r) => sum + (r.noOfAdults || 0), 0) ||
     travelers.length;
+  const totalFare = selectedRooms.reduce(
+    (sum, r) => sum + (r.totalFare || r.price?.totalFare || 0),
+    0,
+  );
 
-  const totalFare = selectedRoom.totalFare || pricing.totalAmount || 0;
-  const tax = selectedRoom.totalTax || 0;
-  const baseFare = totalFare - tax;
+  const tax = selectedRooms.reduce(
+    (sum, r) => sum + (r.totalTax || r.price?.tax || 0),
+    0,
+  );
+
+  let baseFare = totalFare - tax;
   if (!baseFare && !tax && totalFare) {
     baseFare = Math.round(totalFare * 0.85);
     tax = totalFare - baseFare;
@@ -515,9 +529,13 @@ const HotelBookNow = () => {
                   <div className="w-7 h-7 rounded-lg bg-[#0A4D68]/8 flex items-center justify-center">
                     <MdHotel size={14} className="text-[#0A4D68]" />
                   </div>
-                  <span className="text-sm font-bold text-slate-800">
-                    {room.typeName}
-                  </span>
+                  <div>
+                    {selectedRooms.map((r, i) => (
+                      <div key={i} className="text-sm font-bold text-slate-800">
+                        {r.name?.[0]}
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-500">
                   <span className="flex items-center gap-1">

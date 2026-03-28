@@ -14,6 +14,9 @@ export const fetchDashboardDataAPI = async (role) => {
     case "travel-admin":
       endpoint = "/dashboard/travel-admin";
       break;
+    case "manager":
+      endpoint = "/dashboard/manager";
+      break;
 
     case "super-admin":
       endpoint = "/dashboard/super-admin";

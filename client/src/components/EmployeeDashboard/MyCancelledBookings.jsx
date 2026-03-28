@@ -11,12 +11,6 @@ import {
   FiXCircle,
   FiEye,
   FiRefreshCw,
-  FiX,
-  FiLoader,
-  FiMapPin,
-  FiPhone,
-  FiMail,
-  FiDownload,
 } from "react-icons/fi";
 import {
   MdFlightTakeoff,
@@ -100,6 +94,48 @@ function CancelledFlightCard({ flight, onViewDetails }) {
   const refund = REFUND_CONFIG[flight.refundStatus];
   const RefundIcon = refund.icon;
 
+  const STATUS_MAP = {
+    0: "not_set",
+    1: "unassigned",
+    2: "assigned",
+    3: "acknowledged",
+    4: "completed",
+    5: "rejected",
+    6: "closed",
+    7: "pending",
+    8: "other",
+  };
+
+  const liveStatus = STATUS_MAP[flight.liveStatus] || null;
+
+  const getBadge = () => {
+    // Final cancelled
+    if (flight.executionStatus === "cancelled" || liveStatus === "completed") {
+      return {
+        text: "Cancelled",
+        className: "bg-red-50 text-red-700 border-red-100",
+        dot: "bg-red-500",
+      };
+    }
+
+    // Cancellation in progress
+    if (liveStatus && liveStatus !== "completed") {
+      return {
+        text: "Cancelling...",
+        className: "bg-orange-50 text-orange-700 border-orange-100",
+        dot: "bg-orange-500",
+      };
+    }
+
+    return {
+      text: "Cancelled",
+      className: "bg-red-50 text-red-700 border-red-100",
+      dot: "bg-red-500",
+    };
+  };
+
+  const badge = getBadge();
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
       <div className="h-[5px] bg-red-500" />
@@ -121,9 +157,11 @@ function CancelledFlightCard({ flight, onViewDetails }) {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-100 rounded-full px-2.5 py-1 text-[11px] font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-            Cancelled
+          <div
+            className={`flex items-center gap-1.5 border rounded-full px-2.5 py-1 text-[11px] font-semibold ${badge.className}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+            {badge.text}
           </div>
         </div>
 
@@ -464,12 +502,15 @@ export default function CancelledFlightsPage() {
     const segment =
       b?.flightRequest?.segments?.[0] ||
       b?.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary
-        ?.Segments?.[0] ||  b?.bookingResult?.providerResponse?.raw?.Response?.Response?.FlightItinerary
-        ?.Segments?.[0];
+        ?.Segments?.[0] ||
+      b?.bookingResult?.providerResponse?.raw?.Response?.Response
+        ?.FlightItinerary?.Segments?.[0];
 
     return {
       id: b._id,
 
+      liveStatus: b?.amendment?.changeRequestStatus, // numeric from API
+      executionStatus: b.executionStatus,
       airline:
         segment?.airlineName || segment?.Airline?.AirlineName || "Airline",
 

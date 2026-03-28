@@ -3,11 +3,14 @@ const hotelAmendmentService = require("../services/tektravels/hotelAmendment.ser
 const HotelBookingRequest = require("../models/hotelBookingRequest.model");
 
 exports.amendHotelBooking = async (req, res) => {
+  let booking;
+  let remarks;
   try {
-    const { bookingId, remarks } = req.body;
-
+    const body = req.body;
+    const bookingId = body.bookingId;
+    remarks = body.remarks;
     /* 1. FETCH BOOKING FROM DB */
-    const booking = await HotelBookingRequest.findById(bookingId);
+    booking = await HotelBookingRequest.findById(bookingId);
 
     if (!booking) {
       return res.status(404).json({
@@ -75,6 +78,12 @@ exports.amendHotelBooking = async (req, res) => {
     }
 
     /* 5. SAVE IN DB */
+
+    // ✅ ensure required field BEFORE save
+    if (!booking.bookingType) {
+      booking.bookingType = "hotel";
+    }
+
     booking.amendment = {
       changeRequestId,
       status: "requested",
@@ -97,14 +106,22 @@ exports.amendHotelBooking = async (req, res) => {
     console.error("AMEND ERROR:", err);
 
     if (booking) {
-      booking.amendment = {
-        status: "failed",
-        remarks,
-        requestedAt: new Date(),
-        providerResponse: err?.response?.data || err.message,
-      };
+      try {
+        if (!booking.bookingType) {
+          booking.bookingType = "hotel";
+        }
 
-      await booking.save();
+        booking.amendment = {
+          status: "failed",
+          remarks,
+          requestedAt: new Date(),
+          providerResponse: err?.response?.data || err.message,
+        };
+
+        await booking.save();
+      } catch (saveErr) {
+        console.error("FAILED TO SAVE ERROR STATE:", saveErr.message);
+      }
     }
 
     res.status(500).json({
@@ -139,16 +156,14 @@ exports.getAmendmentStatus = async (req, res) => {
 
     const tboStatus = response?.HotelChangeRequestResult?.ChangeRequestStatus;
 
-    if (tboStatus !== undefined && tboStatus !== null) {
-      if (tboStatus === 0 || tboStatus === "Requested") status = "requested";
-      else if (tboStatus === 1 || tboStatus === "InProgress")
-        status = "in_progress";
-      else if (tboStatus === 2 || tboStatus === "Processed")
-        status = "approved";
-      else if (tboStatus === 3 || tboStatus === "Rejected") status = "rejected";
-    } else {
-      console.warn("TBO status not available yet");
-    }
+    if (tboStatus === 0) status = "requested";
+    else if ([1, 2, 3].includes(tboStatus)) status = "in_progress";
+    else if (tboStatus === 4) status = "approved";
+    else if (tboStatus === 5) status = "rejected";
+    else if (tboStatus === 6) status = "closed";
+    // } else {
+    //   console.warn("TBO status not available yet");
+    // }
 
     /* 4. UPDATE DB */
     booking.amendment.status = status;

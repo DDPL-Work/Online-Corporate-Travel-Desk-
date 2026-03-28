@@ -193,7 +193,7 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
   const snapshot = booking?.bookingSnapshot || {};
   const result = booking?.bookingResult || {};
   const detail = bookingDetail || booking?.raw || {};
-  const room = detail?.Rooms?.[0] || {};
+  const rooms = Array.isArray(booking?.rooms) ? booking.rooms : [];
   const selectedRoom = hotelReq?.selectedRoom || {};
   const selectedHotel = hotelReq?.selectedHotel || {};
 
@@ -214,7 +214,9 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
         )
       : 1;
   const roomType =
-    room?.RoomTypeName || selectedRoom?.roomTypeName || "Standard Room";
+    rooms.length > 1
+      ? rooms.map((r) => r.RoomTypeName).join(", ")
+      : rooms[0]?.RoomTypeName || "Standard Room";
   const images = booking?.images || selectedRoom?.rawRoomData?.images || [];
 
   const confirmationNo = detail?.ConfirmationNo || result?.hotelBookingId || "";
@@ -340,14 +342,12 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
           <MetaChip
             icon={MdKingBed}
             label="Room Type"
-            value={roomType?.split(",")[0] || "Room"}
+            value={roomType}
           />
           <MetaChip
             icon={FiCoffee}
             label="Meal Plan"
-            value={
-              selectedRoom?.mealType || room?.Inclusion?.split(" ")?.[0] || "—"
-            }
+            value={selectedRoom?.mealType || rooms[0]?.Inclusion || "—" || "—"}
           />
           <MetaChip
             icon={FiShield}
@@ -536,8 +536,8 @@ function CancellationSection({ booking, isConfirmed }) {
 
     return null;
   })();
-  console.log("PROVIDER STATUS:", providerStatus);
-  console.log("MAPPED STATUS:", mappedStatus);
+  // console.log("PROVIDER STATUS:", providerStatus);
+  // console.log("MAPPED STATUS:", mappedStatus);
 
   const handleSubmit = async () => {
     if (!reason) return;
@@ -1065,15 +1065,9 @@ function PaymentStatusCard({
         >
           <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
             {paymentSuccessful ? (
-              <FiCheckCircle
-                size={14}
-                className="sm:size-[16px] text-emerald-500"
-              />
+              <FiCheckCircle size={14} className="sm:size-4 text-emerald-500" />
             ) : (
-              <FiAlertCircle
-                size={14}
-                className="sm:size-[16px] text-amber-500"
-              />
+              <FiAlertCircle size={14} className="sm:size-4 text-amber-500" />
             )}
             <span
               className={`text-[8px] sm:text-[10px] font-black uppercase tracking-widest ${paymentSuccessful ? "text-emerald-600" : "text-amber-600"}`}
@@ -1095,12 +1089,12 @@ function PaymentStatusCard({
             {isConfirmed ? (
               <MdVerifiedUser
                 size={14}
-                className="sm:size-[16px] text-emerald-500"
+                className="sm:size-4 text-emerald-500"
               />
             ) : (
               <FiRefreshCw
                 size={14}
-                className="sm:size-[16px] text-amber-500 animate-spin"
+                className="sm:size-4 text-amber-500 animate-spin"
               />
             )}
             <span
@@ -1118,7 +1112,7 @@ function PaymentStatusCard({
 
         <div className="bg-slate-50 border border-slate-100 rounded-lg sm:rounded-xl p-3 sm:p-4 flex flex-col gap-1 sm:gap-1.5">
           <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-            <MdHotel size={14} className="sm:size-[16px] text-slate-400" />
+            <MdHotel size={14} className="sm:size-4 text-slate-400" />
             <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400">
               Rooms
             </span>
@@ -1130,7 +1124,7 @@ function PaymentStatusCard({
 
         <div className="bg-slate-50 border border-slate-100 rounded-lg sm:rounded-xl p-3 sm:p-4 flex flex-col gap-1 sm:gap-1.5">
           <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-            <FiBriefcase size={14} className="sm:size-[16px] text-slate-400" />
+            <FiBriefcase size={14} className="sm:size-4 text-slate-400" />
             <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400">
               Purpose
             </span>
@@ -1158,6 +1152,8 @@ export default function HotelBookingDetails() {
   const { selectedBookingDetails: booking, loading } = useSelector(
     (s) => s.hotelBookings,
   );
+
+  const rooms = Array.isArray(booking?.rooms) ? booking.rooms : [];
 
   const {
     sendLoading,
@@ -1194,9 +1190,11 @@ export default function HotelBookingDetails() {
   const selectedRoom = hotelReq.selectedRoom || {};
   const selectedHotel = hotelReq.selectedHotel || {};
   const rawRoom = selectedRoom.rawRoomData || {};
-  const traveller =
-    booking?.travellers?.[0] || booking?.raw?.Rooms?.[0]?.HotelPassenger?.[0];
-
+  const travellers = booking?.travellers?.length
+    ? booking.travellers
+    : booking?.guests?.length
+      ? booking.guests
+      : booking?.raw?.Rooms?.flatMap((r) => r?.HotelPassenger || []) || [];
   const bookingDetail = booking?.raw || null;
   const detailRoom = booking?.raw?.Rooms?.[0] || {};
   const priceBreakUp = detailRoom?.PriceBreakUp || {};
@@ -1212,11 +1210,9 @@ export default function HotelBookingDetails() {
     booking?.hotelRequest?.selectedRoom?.rawRoomData?.images ||
     [];
 
-  const cancelPolicies = detailRoom?.CancelPolicies?.length
-    ? detailRoom.CancelPolicies
-    : selectedRoom.cancelPolicies || [];
+  const cancelPolicies = rooms.flatMap((r) => r.CancelPolicies || []);
 
-  const amenities = detailRoom?.Amenities || [];
+  const amenities = rooms.flatMap((r) => r.Amenities || []);
 
   const totalFare = booking?.totalFare || booking?.raw?.InvoiceAmount || 0;
   const totalTax = priceBreakUp.RoomTax || selectedRoom.totalTax || 0;
@@ -1238,6 +1234,8 @@ export default function HotelBookingDetails() {
 
   const rateConditions = bookingDetail?.RateConditions || [];
 
+  console.log("ROOMS DATA:", rooms);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
       {/* ── Sticky nav bar — Fully Responsive ── */}
@@ -1257,8 +1255,7 @@ export default function HotelBookingDetails() {
         <div className="ml-auto flex items-center gap-2 sm:gap-3 shrink-0">
           {isConfirmed && (
             <span className="flex items-center gap-1 bg-emerald-100 text-emerald-800 rounded-full px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold whitespace-nowrap">
-              <MdVerifiedUser size={11} className="sm:size-[12px]" /> Voucher
-              Issued
+              <MdVerifiedUser size={11} className="sm:size-3" /> Voucher Issued
             </span>
           )}
           {booking.bookingReference && (
@@ -1306,44 +1303,66 @@ export default function HotelBookingDetails() {
             />
 
             {/* Room description + Inclusions — side by side on md, stacked on sm */}
-            {(detailRoom?.RoomDescription ||
-              selectedRoom.inclusion ||
-              detailRoom?.Inclusion) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                {detailRoom?.RoomDescription && (
-                  <BentoCard>
-                    <CardLabel icon={MdKingBed} label="Room Description" />
-                    <div
-                      className="text-[11px] sm:text-xs text-slate-600 leading-relaxed prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{
-                        __html: detailRoom.RoomDescription.replace(
-                          /<p><\/p>/g,
-                          "",
-                        ),
-                      }}
-                    />
-                  </BentoCard>
-                )}
-
-                {(selectedRoom.inclusion || detailRoom?.Inclusion) && (
-                  <BentoCard>
-                    <CardLabel icon={FiCoffee} label="Inclusions" />
-                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                      {(selectedRoom.inclusion || detailRoom?.Inclusion || "")
-                        .split(" ")
-                        .filter(Boolean)
-                        .filter((v, i, a) => a.indexOf(v) === i)
-                        .map((item, i) => (
-                          <span
-                            key={i}
-                            className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 sm:px-2.5 py-1 rounded-full font-medium"
-                          >
-                            <MdCheckCircle size={11} /> {item}
-                          </span>
-                        ))}
+            {/* ── Room Description + Inclusions (MULTI ROOM) ── */}
+            {rooms?.length > 0 && (
+              <div className="space-y-4 sm:space-y-5">
+                {rooms.map((room, index) => (
+                  <div key={index} className="space-y-3">
+                    {/* 🔥 Room Header */}
+                    <div className="flex justify-between items-center">
+                      <p className="font-bold text-slate-800 text-sm sm:text-base">
+                        Room {index + 1}
+                      </p>
+                      <span className="text-xs sm:text-sm text-teal-600 font-semibold">
+                        {room.RoomTypeName}
+                      </span>
                     </div>
-                  </BentoCard>
-                )}
+
+                    {/* Grid */}
+                    {(room?.RoomDescription || room?.Inclusion) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                        {/* Description */}
+                        {room?.RoomDescription && (
+                          <BentoCard>
+                            <CardLabel
+                              icon={MdKingBed}
+                              label="Room Description"
+                            />
+                            <div
+                              className="text-[11px] sm:text-xs text-slate-600 leading-relaxed prose prose-sm max-w-none"
+                              dangerouslySetInnerHTML={{
+                                __html: room.RoomDescription.replace(
+                                  /<p><\/p>/g,
+                                  "",
+                                ),
+                              }}
+                            />
+                          </BentoCard>
+                        )}
+
+                        {/* Inclusions */}
+                        {room?.Inclusion && (
+                          <BentoCard>
+                            <CardLabel icon={FiCoffee} label="Inclusions" />
+                            <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                              {room.Inclusion.split(/,|\s+/)
+                                .filter(Boolean)
+                                .filter((v, i, a) => a.indexOf(v) === i)
+                                .map((item, i) => (
+                                  <span
+                                    key={i}
+                                    className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 sm:px-2.5 py-1 rounded-full font-medium"
+                                  >
+                                    <MdCheckCircle size={11} /> {item}
+                                  </span>
+                                ))}
+                            </div>
+                          </BentoCard>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
 
@@ -1379,33 +1398,66 @@ export default function HotelBookingDetails() {
             {/* Guest Details */}
             <BentoCard>
               <CardLabel icon={FiUser} label="Guest Details" />
-              <div className="mb-3 sm:mb-4">
-                <p className="text-base sm:text-lg font-extrabold text-slate-900 leading-snug">
-                  {traveller?.title} {traveller?.firstName}{" "}
-                  {traveller?.lastName}
-                </p>
-                <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 break-all">
-                  {traveller?.email}
-                </p>
+
+              <div className="space-y-3">
+                {travellers.map((t, index) => {
+                  const name =
+                    `${t.Title || t.title || ""} ${t.FirstName || t.firstName || ""} ${t.LastName || t.lastName || ""}`.trim();
+
+                  const email = t.Email || t.email || "—";
+                  const phone = t.Phoneno || t.phoneWithCode || "—";
+                  const gender = t.Gender || t.gender || "—";
+                  const age = t.Age || t.age || "—";
+                  const nationality = t.Nationality || t.nationality || "—";
+
+                  const isLead =
+                    t.LeadPassenger === true || t.isLeadPassenger === true;
+
+                  return (
+                    <div
+                      key={index}
+                      className="border border-slate-100 rounded-xl p-3 bg-slate-50"
+                    >
+                      {/* Header */}
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">
+                            {name || "Guest"}
+                          </p>
+                          <p className="text-xs text-slate-400">{email}</p>
+                        </div>
+
+                        <span
+                          className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                            isLead
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-200 text-slate-600"
+                          }`}
+                        >
+                          {isLead ? "Lead" : "Guest"}
+                        </span>
+                      </div>
+
+                      {/* Details */}
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                        <InfoRow label="Phone" value={phone} />
+                        <InfoRow label="Gender" value={gender} />
+                        <InfoRow
+                          label="Age"
+                          value={age !== "—" ? `${age} yrs` : "—"}
+                        />
+                        <InfoRow label="Nationality" value={nationality} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <InfoRow label="Phone" value={traveller?.phoneWithCode} />
-              <InfoRow label="Gender" value={traveller?.gender} />
-              <InfoRow
-                label="Age"
-                value={traveller?.age ? `${traveller.age} yrs` : "—"}
-              />
-              <InfoRow label="Nationality" value={traveller?.nationality} />
-              <InfoRow
-                label="Lead Passenger"
-                value={traveller?.isLeadPassenger ? "Yes" : "No"}
-                accent
-              />
             </BentoCard>
           </div>
         </div>
         <div className="mt-5">
           {/* ── Cancellation Request Section — always last in left col ── */}
-        <CancellationSection booking={booking} isConfirmed={isConfirmed} />
+          <CancellationSection booking={booking} isConfirmed={isConfirmed} />
         </div>
       </main>
     </div>

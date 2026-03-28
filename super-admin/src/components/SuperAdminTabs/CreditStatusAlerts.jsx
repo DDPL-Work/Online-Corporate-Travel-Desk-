@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { FiFilter, FiAlertTriangle, FiBell, FiMail } from "react-icons/fi";
+import {
+  FiFilter,
+  FiAlertTriangle,
+  FiBell,
+  FiMail,
+  FiSearch,
+  FiCalendar,
+} from "react-icons/fi";
 import { creditAlertsData } from "../../data/dummyData";
 
 const colors = {
@@ -9,21 +16,46 @@ const colors = {
   light: "#F8FAFC",
   dark: "#1E293B",
   danger: "#EF4444",
-  warning: "#F59E0B"
+  warning: "#F59E0B",
 };
 
 export default function CreditStatusAlerts() {
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [corporate, setCorporate] = useState("All");
   const [priority, setPriority] = useState("All");
 
-  const corporates = ["All", ...new Set(creditAlertsData.map((c) => c.company))];
+  const corporates = ["All", ...new Set(creditAlertsData.map((a) => a.company))];
   const priorities = ["All", "High", "Medium", "Low"];
 
-  // Filter alerts
-  const filtered = creditAlertsData.filter((c) => {
-    const corpMatch = corporate === "All" || c.company === corporate;
-    const priorityMatch = priority === "All" || c.priority === priority;
-    return corpMatch && priorityMatch;
+  // Filter logic
+  const filtered = creditAlertsData.filter((alert) => {
+    // Corporate filter
+    const corpMatch = corporate === "All" || alert.company === corporate;
+    // Priority filter
+    const priorityMatch = priority === "All" || alert.priority === priority;
+    // Search filter (company or message)
+    const searchMatch =
+      !searchTerm ||
+      alert.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      alert.message.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Date range filter
+    let dateMatch = true;
+    if (dateFrom) {
+      const alertDate = new Date(alert.date);
+      const from = new Date(dateFrom);
+      if (isNaN(alertDate.getTime()) || alertDate < from) dateMatch = false;
+    }
+    if (dateTo && dateMatch) {
+      const alertDate = new Date(alert.date);
+      const to = new Date(dateTo);
+      if (isNaN(alertDate.getTime()) || alertDate > to) dateMatch = false;
+    }
+
+    return corpMatch && priorityMatch && searchMatch && dateMatch;
   });
 
   // Summary values
@@ -32,168 +64,294 @@ export default function CreditStatusAlerts() {
   const mediumAlerts = filtered.filter((a) => a.priority === "Medium").length;
   const lowAlerts = filtered.filter((a) => a.priority === "Low").length;
 
+  // Handle notify action (placeholder)
+  const handleNotify = (alert) => {
+    alert("Notify " + alert.company + " about: " + alert.message);
+  };
+
   return (
-    <div className="p-6" style={{ backgroundColor: colors.light }}>
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen p-6 font-sans" style={{ backgroundColor: colors.light }}>
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* PAGE HEADER */}
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-12 h-12 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white">
+            <FiBell size={24} />
+          </div>
+          <div className="text-left">
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase leading-none">
+              Credit Status Alerts
+            </h1>
+            <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-widest">
+              Monitor corporate credit thresholds
+            </p>
+          </div>
+        </div>
 
-        {/* HEADER */}
-        <h1 className="text-3xl font-bold mb-6" style={{ color: colors.dark }}>
-          Credit Status Alerts
-        </h1>
-
-        {/* SUMMARY CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <SummaryCard
-            title="Total Alerts"
-            count={totalAlerts}
-            color={colors.primary}
-            icon={<FiBell size={26} />}
+        {/* STATS CARDS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            label="Total Alerts"
+            value={totalAlerts}
+            Icon={FiBell}
+            borderCls="border-[#0A4D68]"
+            iconBgCls="bg-[#0A4D68]/10"
+            iconColorCls="text-[#0A4D68]"
           />
-          <SummaryCard
-            title="High Priority"
-            count={highAlerts}
-            color={colors.danger}
-            icon={<FiAlertTriangle size={26} />}
+          <StatCard
+            label="High Priority"
+            value={highAlerts}
+            Icon={FiAlertTriangle}
+            borderCls="border-red-500"
+            iconBgCls="bg-red-50"
+            iconColorCls="text-red-600"
           />
-          <SummaryCard
-            title="Medium Priority"
-            count={mediumAlerts}
-            color={colors.warning}
-            icon={<FiAlertTriangle size={26} />}
+          <StatCard
+            label="Medium Priority"
+            value={mediumAlerts}
+            Icon={FiAlertTriangle}
+            borderCls="border-amber-500"
+            iconBgCls="bg-amber-50"
+            iconColorCls="text-amber-600"
           />
-          <SummaryCard
-            title="Low Priority"
-            count={lowAlerts}
-            color={colors.secondary}
-            icon={<FiAlertTriangle size={26} />}
+          <StatCard
+            label="Low Priority"
+            value={lowAlerts}
+            Icon={FiAlertTriangle}
+            borderCls="border-[#088395]"
+            iconBgCls="bg-[#088395]/10"
+            iconColorCls="text-[#088395]"
           />
         </div>
 
-        {/* FILTERS */}
-        <div className="bg-white shadow rounded-lg p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <FiFilter className="text-[#0A4D68]" size={22} />
-            <h2 className="text-lg font-semibold">Filters</h2>
-          </div>
+        {/* FILTERS SECTION */}
+        <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <LabeledInput label="Search">
+              <div className="relative">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Company / Message..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+                />
+              </div>
+            </LabeledInput>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <LabeledInput label="From Date">
+              <div className="relative">
+                <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+                />
+              </div>
+            </LabeledInput>
 
-            {/* Corporate Filter */}
-            <div>
-              <label className="text-sm font-medium">Corporate</label>
+            <LabeledInput label="To Date">
+              <div className="relative">
+                <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+                />
+              </div>
+            </LabeledInput>
+
+            <LabeledInput label="Corporate">
               <select
-                className="border w-full p-2 rounded mt-1"
                 value={corporate}
                 onChange={(e) => setCorporate(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
               >
                 {corporates.map((c) => (
-                  <option key={c}>{c}</option>
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
               </select>
-            </div>
+            </LabeledInput>
 
-            {/* Priority Filter */}
-            <div>
-              <label className="text-sm font-medium">Priority</label>
+            <LabeledInput label="Priority">
               <select
-                className="border w-full p-2 rounded mt-1"
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
               >
                 {priorities.map((p) => (
-                  <option key={p}>{p}</option>
+                  <option key={p} value={p}>
+                    {p === "All" ? "All Priorities" : p}
+                  </option>
                 ))}
               </select>
-            </div>
-
+            </LabeledInput>
           </div>
         </div>
 
-        {/* ALERT TABLE */}
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="p-6 border-b">
-            <h2 className="text-xl font-semibold">Alert Details</h2>
+        {/* TABLE SECTION */}
+        <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
+              Alert Details
+            </h2>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-bold transition-all shadow-md uppercase bg-[#0A4D68] hover:bg-[#088395]"
+              onClick={() => {}} // optional export
+            >
+              <FiFilter /> Export
+            </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead style={{ backgroundColor: colors.primary }}>
-                <tr>
-                  {["Date", "Company", "Priority", "Message", "Action"].map((h) => (
-                    <th key={h} className="px-6 py-3 text-sm text-white font-medium">{h}</th>
-                  ))}
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr style={{ backgroundColor: colors.primary }} className="text-white">
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Date
+                  </th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Corporate
+                  </th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Priority
+                  </th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Message
+                  </th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Action
+                  </th>
                 </tr>
               </thead>
-
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-slate-100 text-sm">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="text-center py-8 text-gray-500">
-                      No alerts available
+                    <td colSpan="5" className="py-8 text-center text-slate-500">
+                      No alerts match the filters.
                     </td>
                   </tr>
                 ) : (
                   filtered.map((alert) => (
-                    <tr key={alert.id} className="hover:bg-gray-50 transition">
-
-                      <td className="px-6 py-4 text-sm">{alert.date}</td>
-                      <td className="px-6 py-4 text-sm font-medium">{alert.company}</td>
-
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`px-3 py-1 text-xs rounded-full font-medium
-                            ${
-                              alert.priority === "High"
-                                ? "bg-red-100 text-red-700"
-                                : alert.priority === "Medium"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-green-100 text-green-700"
-                            }
-                          `}
-                        >
-                          {alert.priority}
+                    <tr key={alert.id} className="hover:bg-slate-50 transition-all">
+                      <td className="px-6 py-4 text-slate-600 font-medium">
+                        {alert.date}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-bold text-slate-800 text-[13px]">
+                          {alert.company}
                         </span>
                       </td>
-
-                      <td className="px-6 py-4 text-sm">{alert.message}</td>
-
-                      <td className="px-6 py-4 text-sm">
-                        <button className="flex items-center gap-1 px-3 py-1 rounded bg-gray-100 hover:bg-gray-200">
-                          <FiMail /> Notify
-                        </button>
+                      <td className="px-6 py-4">
+                        <PriorityBadge priority={alert.priority} />
                       </td>
-
+                      <td className="px-6 py-4 text-slate-600">
+                        {alert.message}
+                      </td>
+                      <td className="px-6 py-4">
+                        <ActionButton
+                          icon={<FiMail size={14} />}
+                          onClick={() => handleNotify(alert)}
+                          tooltip="Notify"
+                          color="text-slate-600"
+                          hoverBg="bg-slate-100"
+                          label="Notify"
+                        />
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
-
             </table>
           </div>
-        </div>
 
+          <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            <span>Showing {filtered.length} alert(s)</span>
+            <span>
+              High: {highAlerts} | Medium: {mediumAlerts} | Low: {lowAlerts}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-
-// Summary Card Component
-function SummaryCard({ title, count, color, icon }) {
+/* ------------------- HELPER COMPONENTS ------------------- */
+function StatCard({ label, value, borderCls, iconBgCls, iconColorCls, Icon }) {
   return (
-    <div className="bg-white shadow rounded-lg p-6 flex items-center justify-between border-l-4"
-      style={{ borderColor: color }}>
-      
-      <div>
-        <p className="text-gray-600 text-sm">{title}</p>
-        <h3 className="text-3xl font-bold mt-1" style={{ color }}>
-          {count}
-        </h3>
+    <div
+      className={`bg-white rounded-xl p-4 flex items-center gap-3 shadow-sm border-l-4 ${borderCls}`}
+    >
+      <div
+        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBgCls}`}
+      >
+        <Icon size={18} className={iconColorCls} />
       </div>
-
-      <div className="p-3 rounded-full bg-[#F8FAFC]">
-        {icon}
+      <div className="text-left">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
+          {label}
+        </p>
+        <p className="text-xl font-black text-slate-900 leading-none">
+          {value}
+        </p>
       </div>
     </div>
+  );
+}
+
+function LabeledInput({ label, children }) {
+  return (
+    <div className="flex flex-col gap-1 text-left">
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function PriorityBadge({ priority }) {
+  const config = {
+    High: {
+      bg: "bg-red-50",
+      text: "text-red-700",
+      border: "border-red-100",
+    },
+    Medium: {
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      border: "border-amber-100",
+    },
+    Low: {
+      bg: "bg-emerald-50",
+      text: "text-emerald-700",
+      border: "border-emerald-100",
+    },
+  };
+  const style = config[priority] || config.Low;
+  return (
+    <span
+      className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border ${style.bg} ${style.text} ${style.border}`}
+    >
+      {priority}
+    </span>
+  );
+}
+
+function ActionButton({ icon, onClick, tooltip, color, hoverBg, label }) {
+  return (
+    <button
+      title={tooltip}
+      onClick={onClick}
+      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all ${color} ${hoverBg} hover:scale-105 focus:outline-none text-xs font-medium`}
+    >
+      {icon}
+      {label && <span>{label}</span>}
+    </button>
   );
 }

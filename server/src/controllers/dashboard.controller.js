@@ -192,6 +192,142 @@ exports.getCorporateDashboard = asyncHandler(async (req, res) => {
 });
 
 /* =========================================================
+   MANAGER DASHBOARD (TEAM LEVEL)
+========================================================= */
+exports.getManagerDashboard = asyncHandler(async (req, res) => {
+  const managerId = req.user._id;
+  const corporateId = req.user.corporateId;
+
+  if (!corporateId) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, null, "Corporate ID missing"));
+  }
+
+  /* =============================
+     GET TEAM MEMBERS
+  ============================== */
+  const teamUsers = await User.find({
+    corporateId,
+    managerId: managerId, // 🔥 KEY RELATION
+  }).select("_id");
+
+  const teamUserIds = teamUsers.map((u) => u._id);
+
+  if (teamUserIds.length === 0) {
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          stats: {},
+          recentBookings: [],
+          upcomingTrips: [],
+        },
+        "No team members assigned to this manager",
+      ),
+    );
+  }
+
+  const monthlyStart = moment().startOf("month").toDate();
+
+  /* =============================
+     Monthly Spend (TEAM ONLY)
+  ============================== */
+  const monthlySpendAgg = await Booking.aggregate([
+    {
+      $match: {
+        corporateId,
+        userId: { $in: teamUserIds },
+        createdAt: { $gte: monthlyStart },
+        status: "confirmed",
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: "$pricing.totalAmount" },
+      },
+    },
+  ]);
+
+  const monthlySpend = monthlySpendAgg[0]?.total || 0;
+
+  /* =============================
+     Core Counts (TEAM ONLY)
+  ============================== */
+
+  const totalBookings = await Booking.countDocuments({
+    corporateId,
+    userId: { $in: teamUserIds },
+  });
+
+  const pendingApprovals = await Approval.countDocuments({
+    corporateId,
+    userId: { $in: teamUserIds },
+    status: "pending",
+  });
+
+  const teamSize = teamUserIds.length;
+
+  const activeUsers = await User.countDocuments({
+    _id: { $in: teamUserIds },
+    isActive: true,
+  });
+
+  /* =============================
+     Recent Bookings (TEAM)
+  ============================== */
+
+  const recentBookings = await Booking.find({
+    corporateId,
+    userId: { $in: teamUserIds },
+  })
+    .populate("userId", "name email role")
+    .sort({ createdAt: -1 })
+    .limit(10);
+
+  /* =============================
+     Upcoming Trips (TEAM)
+  ============================== */
+
+  const upcomingTrips = await Booking.find({
+    corporateId,
+    userId: { $in: teamUserIds },
+    status: "confirmed",
+    $or: [
+      { "flightDetails.departureDate": { $gte: new Date() } },
+      { "hotelDetails.checkInDate": { $gte: new Date() } },
+    ],
+  })
+    .populate("userId", "name email role")
+    .limit(10);
+
+  /* =============================
+     RESPONSE
+  ============================== */
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        stats: {
+          totalBookings,
+          pendingApprovals,
+          teamSize,
+          activeUsers,
+          monthlySpend,
+        },
+        recentBookings,
+        upcomingTrips,
+      },
+      "Manager dashboard fetched successfully",
+    ),
+  );
+});
+
+
+
+/* =========================================================
    PLATFORM SUPER ADMIN DASHBOARD
 ========================================================= */
 exports.getSuperAdminDashboard = asyncHandler(async (req, res) => {
