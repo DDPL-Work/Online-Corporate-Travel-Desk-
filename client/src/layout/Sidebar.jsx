@@ -73,7 +73,7 @@ export default function Sidebar({ isOpen, onClose }) {
       },
       { to: "/upcoming-trips", label: "Upcoming Trips", icon: <FaClock /> },
       { to: "/past-trips", label: "Past Trips", icon: <FaClipboardList /> },
-      { to: "/user-management", label: "User Management", icon: <FaUsers /> },
+      { to: "/user-management", label: "Employee Management", icon: <FaUsers /> },
     ];
     if (classification === "prepaid") {
       menu.push({
@@ -164,7 +164,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },
   ];
 
-  const corporateSuperAdminMenu = [
+  const manager = [
     {
       to: "/corporate-dashboard",
       label: "Dashboard",
@@ -191,7 +191,7 @@ export default function Sidebar({ isOpen, onClose }) {
     "super-admin": travelCompanyMenu,
     "travel-admin": travelAdminMenu,
     employee: employeeMenu,
-    "corporate-super-admin": corporateSuperAdminMenu,
+    manager: manager,
   };
   const activeMenu = menus[role] || [];
 

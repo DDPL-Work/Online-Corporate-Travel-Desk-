@@ -71,10 +71,10 @@ function CancelledFlightSection() {
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [travelDate, setTravelDate] = useState("");
   const [cancelStatusFilter, setCancelStatus] = useState("All");
   const [corpFilter, setCorp] = useState("All");
   const [selectedBooking, setSelectedBooking] = useState(null);
-  const [travelDate, setTravelDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
@@ -271,19 +271,16 @@ function CancelledFlightSection() {
           <LabeledField
             label={
               <>
-                <BsBuilding size={10} /> Corporate
+                <FiCalendar size={10} /> Travel Date
               </>
             }
           >
-            <select
-              value={corpFilter}
-              onChange={(e) => setCorp(e.target.value)}
-              className={selectCls}
-            >
-              {["All"].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
+            <input
+              type="date"
+              value={travelDate}
+              onChange={(e) => setTravelDate(e.target.value)}
+              className={dateCls}
+            />
           </LabeledField>
           <LabeledField
             label={
@@ -453,6 +450,8 @@ function CancelledHotelSection() {
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [checkInDate, setCheckInDate] = useState("");
+  const [checkOutDate, setCheckOutDate] = useState("");
   const [cancelStatusFilter, setCancelStatus] = useState("All");
   const [corpFilter, setCorp] = useState("All");
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -609,7 +608,7 @@ function CancelledHotelSection() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <LabeledField
             label={
               <>
@@ -651,22 +650,33 @@ function CancelledHotelSection() {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField
+           <LabeledField
             label={
               <>
-                <BsBuilding size={10} /> Corporate
+                <FiCalendar size={10} /> CheckIn Date
               </>
             }
           >
-            <select
-              value={corpFilter}
-              onChange={(e) => setCorp(e.target.value)}
-              className={selectCls}
-            >
-              {["All"].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
+            <input
+              type="date"
+              value={checkInDate}
+              onChange={(e) => setCheckInDate(e.target.value)}
+              className={dateCls}
+            />
+          </LabeledField>
+           <LabeledField
+            label={
+              <>
+                <FiCalendar size={10} /> CheckOut Date
+              </>
+            }
+          >
+            <input
+              type="date"
+              value={checkOutDate}
+              onChange={(e) => setCheckOutDate(e.target.value)}
+              className={dateCls}
+            />
           </LabeledField>
           <LabeledField
             label={

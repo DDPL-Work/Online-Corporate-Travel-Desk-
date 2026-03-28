@@ -17,6 +17,7 @@ import {
   FaUser,
   FaBars,
 } from "react-icons/fa";
+import { MdOutlineCancel } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCorporateAdmin } from "../Redux/Slice/corporateAdminSlice";
 
@@ -46,15 +47,25 @@ export default function Sidebar({ isOpen, onClose }) {
   // ========================= MENUS =========================
 
   const travelCompanyMenu = [
+    // {
+    //   to: "/onboarded-corporates",
+    //   label: "Onboarded Corporates",
+    //   icon: <FaBuilding />,
+    // },
     {
-      to: "/onboarded-corporates",
-      label: "Onboarded Corporates",
-      icon: <FaBuilding />,
+      to: "/corporate-access",
+      label: "Corporate Access Control",
+      icon: <FaShieldAlt />,
     },
     {
       to: "/bookings-summary",
       label: "Bookings Summary",
       icon: <FaClipboardList />,
+    },
+    {
+      to: "/cancellation-summary",
+      label: "Cancellation Summary",
+      icon: <MdOutlineCancel />,
     },
     {
       to: "/corporate-revenue",
@@ -71,27 +82,23 @@ export default function Sidebar({ isOpen, onClose }) {
       label: "Wallet Recharge Logs",
       icon: <FaWallet />,
     },
-    {
-      to: "/corporate-access",
-      label: "Corporate Access Control",
-      icon: <FaShieldAlt />,
-    },
-    {
-      to: "/pending-amendments",
-      label: "Pending Amendments",
-      icon: <FaExchangeAlt />,
-    },
-    {
-      to: "/commission-settings",
-      label: "Commission Settings",
-      icon: <FaCog />,
-    },
+    
+    // {
+    //   to: "/pending-amendments",
+    //   label: "Pending Amendments",
+    //   icon: <FaExchangeAlt />,
+    // },
+    // {
+    //   to: "/commission-settings",
+    //   label: "Commission Settings",
+    //   icon: <FaCog />,
+    // },
     {
       to: "/api-configurations",
       label: "API Configurations",
       icon: <FaListAlt />,
     },
-    { to: "/system-logs", label: "System Logs", icon: <FaFileAlt /> },
+    // { to: "/system-logs", label: "System Logs", icon: <FaFileAlt /> },
   ];
 
   const menus = {

@@ -290,8 +290,8 @@ function RejectedHotelCard({ req, onViewDetails }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-          <div>
+        <div className="flex items-end justify-end pt-3 border-t border-slate-100">
+          {/* <div>
             {req.price && (
               <>
                 <p className="text-[11px] text-slate-400 mb-0.5">Est. fare</p>
@@ -300,7 +300,7 @@ function RejectedHotelCard({ req, onViewDetails }) {
                 </p>
               </>
             )}
-          </div>
+          </div> */}
           <button
             onClick={() => onViewDetails(req)}
             className="flex items-center gap-2 bg-[#0A4D68] hover:bg-[#083d52] active:scale-[0.98] text-white text-[12px] font-semibold px-4 py-2 rounded-2xl transition-all duration-150 cursor-pointer border-none"

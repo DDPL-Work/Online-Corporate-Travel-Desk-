@@ -14,17 +14,20 @@ import Attractions from "./components/Attractions";
 import HotelDetailsSkeleton from "./components/HotelDetailsSkeleton";
 import { FiPhone, FiMail, FiGlobe } from "react-icons/fi";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { ToastWithTimer } from "../../../utils/ToastConfirm";
 
 const HotelDetailsPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
   const [mapModalOpen, setMapModalOpen] = useState(false);
+  const [selectedRooms, setSelectedRooms] = useState({});
   const hotelCode = location.state?.hotelCode;
 
   const { hotels, hotelDetailsById, searchPayload, loading } = useSelector(
     (state) => state.hotel,
   );
+  const requiredRooms = searchPayload?.PaxRooms?.length || 1;
 
   const hotelFromSearch = useMemo(
     () => hotels?.find((h) => h.HotelCode === hotelCode),
@@ -134,47 +137,121 @@ const HotelDetailsPage = () => {
 
   console.log("LAT LNG:", mergedHotel?.latitude, mergedHotel?.longitude);
 
-  const handleSelectRoom = (room) => {
-    const totalFare = room.TotalFare || room.Price?.TotalFare || 0;
-    const tax = room.TotalTax || room.Price?.Tax || 0;
+  const handleContinue = () => {
+    const totalSelected = Object.values(selectedRooms).reduce(
+      (sum, r) => sum + r.count,
+      0,
+    );
 
-    const nights = room?.DayRates?.[0]?.length || 1;
+    if (totalSelected !== requiredRooms) {
+      ToastWithTimer({
+        type: "warning",
+        message: `Please select ${requiredRooms} rooms`,
+      });
+      return;
+    }
 
-    const baseFare = totalFare - tax;
-    const perNight = totalFare / nights;
+    const normalizedRooms = Object.values(selectedRooms)
+      .flatMap((r) =>
+        Array.from({ length: r.count }, () => ({
+          ...r.room, // ✅ create new object
+        })),
+      )
+      .map((room) => {
+        const totalFare = room.TotalFare || room.Price?.TotalFare || 0;
+        const tax = room.TotalTax || room.Price?.Tax || 0;
+        const nights = Array.isArray(room?.DayRates?.[0])
+          ? room.DayRates[0].length
+          : 1;
 
-    const normalizedRoom = {
-      ...room,
+        return {
+          ...room,
+          rawRoomData: room,
+          BookingCode:
+            room.BookingCode || room.RoomTypeCode || room.RatePlanCode,
+          Price: {
+            totalFare,
+            tax,
+            baseFare: totalFare - tax,
+            perNight: totalFare / nights,
+            nights,
+            currency: room.Currency || "INR",
+          },
+        };
+      });
 
-      rawRoomData: room,
-
-      BookingCode: room.BookingCode || room.RoomTypeCode || room.RatePlanCode,
-
-      Price: {
-        totalFare, // ✅ FINAL PRICE (send to backend)
-        tax,
-        baseFare,
-        perNight,
-        nights,
-        currency: room.Currency || "INR",
+    const bookingData = {
+      hotel: mergedHotel,
+      rooms: normalizedRooms,
+      searchParams: {
+        checkIn: searchPayload?.CheckIn,
+        checkOut: searchPayload?.CheckOut,
+        rooms: searchPayload?.PaxRooms?.map((r) => ({
+          adults: r.Adults,
+          children: r.Children,
+          childAges: r.ChildAge,
+        })),
+        city: hotelFromSearch?.CityName,
       },
     };
 
+    sessionStorage.setItem("hotelBookingData", JSON.stringify(bookingData));
+
     navigate("/hotel-review-booking", {
-      state: {
-        hotel: mergedHotel,
-        room: normalizedRoom,
-        searchParams: {
-          checkIn: searchPayload?.CheckIn,
-          checkOut: searchPayload?.CheckOut,
-          rooms: searchPayload?.PaxRooms?.map((r) => ({
-            adults: r.Adults,
-            children: r.Children,
-            childAges: r.ChildAge,
-          })),
-          city: hotelFromSearch?.CityName,
-        },
-      },
+      state: bookingData,
+    });
+  };
+
+  const handleSelectRoom = (room, type) => {
+    const bookingCode =
+      room.BookingCode || room.RoomTypeCode || room.RatePlanCode;
+
+    setSelectedRooms((prev) => {
+      const current = prev[bookingCode]?.count || 0;
+
+      // total selected count
+      const totalSelected = Object.values(prev).reduce(
+        (sum, r) => sum + r.count,
+        0,
+      );
+
+      // ➕ INCREMENT
+      if (type === "add") {
+        if (totalSelected >= requiredRooms) {
+          ToastWithTimer({
+            type: "warning",
+            message: `You can select only ${requiredRooms} rooms`,
+          });
+          return prev;
+        }
+
+        return {
+          ...prev,
+          [bookingCode]: {
+            room,
+            count: current + 1,
+          },
+        };
+      }
+
+      // ➖ DECREMENT
+      if (type === "remove") {
+        if (current <= 1) {
+          const updated = { ...prev };
+          delete updated[bookingCode];
+          return updated;
+        }
+
+        return {
+          ...prev,
+          [bookingCode]: {
+            room,
+            count: current - 1,
+          },
+        };
+      }
+
+      return prev;
     });
   };
 
@@ -238,6 +315,23 @@ const HotelDetailsPage = () => {
         {/* Gallery — full width */}
         <div className="mb-6">
           <HotelImageGallery images={mergedHotel.images} />
+        </div>
+
+        <div className="mt-10">
+          {/* Rooms — full span under left column */}
+          <RoomTypesList
+            rooms={mergedHotel.rooms}
+            onSelectRoom={handleSelectRoom}
+            selectedRooms={selectedRooms}
+            requiredRooms={requiredRooms}
+          />
+
+          <div className="mb-4 text-sm font-semibold text-[#0A4D68]">
+            Select {requiredRooms} Room{requiredRooms > 1 ? "s" : ""}
+            <span className="ml-2 text-slate-500 font-normal">
+              ({selectedRooms.length} selected)
+            </span>
+          </div>
         </div>
 
         {/* Two-column layout: main (left) + sticky sidebar (right) */}
@@ -312,6 +406,44 @@ const HotelDetailsPage = () => {
                           ( incl. all taxes )
                         </span>
                       </p>
+                    </div>
+                  )}
+
+                  {Object.keys(selectedRooms).length > 0 && (
+                    <div className="max-w-7xl mx-auto flex items-center justify-between">
+                      {/* LEFT */}
+                      <div>
+                        <p className="text-sm font-semibold text-[#0A4D68]">
+                          {Object.values(selectedRooms).reduce(
+                            (sum, r) => sum + r.count,
+                            0,
+                          )}{" "}
+                          / {requiredRooms} Rooms
+                        </p>
+
+                        <p className="text-xs text-gray-500">
+                          ₹
+                          {Object.values(selectedRooms)
+                            .reduce(
+                              (sum, r) =>
+                                sum +
+                                r.count *
+                                  (r.room.TotalFare ||
+                                    r.room.Price?.TotalFare ||
+                                    0),
+                              0,
+                            )
+                            .toLocaleString()}
+                        </p>
+                      </div>
+
+                      {/* RIGHT */}
+                      <button
+                        onClick={handleContinue}
+                        className="bg-[#0A4D68] text-white px-6 py-2 rounded-lg font-semibold"
+                      >
+                        Continue
+                      </button>
                     </div>
                   )}
 
@@ -419,14 +551,6 @@ const HotelDetailsPage = () => {
                 )}
             </div>
           </div>
-        </div>
-
-        <div className="mt-10">
-          {/* Rooms — full span under left column */}
-          <RoomTypesList
-            rooms={mergedHotel.rooms}
-            onSelectRoom={handleSelectRoom}
-          />
         </div>
       </div>
       {/* Map Modal */}

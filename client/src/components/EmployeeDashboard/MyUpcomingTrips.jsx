@@ -169,8 +169,8 @@ function FlightTripCard({ trip, onView }) {
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-          <div>
+        <div className="flex items-end justify-end pt-3 border-t border-slate-100">
+          {/* <div>
             {trip.pricingSnapshot?.totalAmount && (
               <>
                 <p className="text-[11px] text-slate-400 mb-0.5">Total fare</p>
@@ -182,7 +182,7 @@ function FlightTripCard({ trip, onView }) {
                 </p>
               </>
             )}
-          </div>
+          </div> */}
           <button
             onClick={() => onView(trip)}
             className="flex items-center gap-2 bg-[#0A4D68] hover:bg-[#083d52] active:scale-[0.98] text-white text-[12px] font-semibold px-4 py-2 rounded-2xl transition-all duration-150 cursor-pointer border-none"
@@ -304,8 +304,8 @@ function HotelTripCard({ trip, onView }) {
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-          <div>
+        <div className="flex items-end justify-end pt-3 border-t border-slate-100">
+          {/* <div>
             {trip.pricingSnapshot?.totalAmount && (
               <>
                 <p className="text-[11px] text-slate-400 mb-0.5">Total fare</p>
@@ -317,7 +317,7 @@ function HotelTripCard({ trip, onView }) {
                 </p>
               </>
             )}
-          </div>
+          </div> */}
           <button
             onClick={() => onView(trip)}
             className="flex items-center gap-2 bg-[#0A4D68] hover:bg-[#083d52] active:scale-[0.98] text-white text-[12px] font-semibold px-4 py-2 rounded-2xl transition-all duration-150 cursor-pointer border-none"

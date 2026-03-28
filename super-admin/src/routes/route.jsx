@@ -18,6 +18,7 @@ import PendingAmendments from "../components/SuperAdminTabs/PendingAmendments";
 import CommissionSettings from "../components/SuperAdminTabs/CommissionSettings";
 import ApiConfigurations from "../components/SuperAdminTabs/ApiConfigurations";
 import SystemLogs from "../components/SuperAdminTabs/SystemLogs";
+import CancellationDashboard from "../components/SuperAdminTabs/CancelledBookingsSummary";
 
 export const appRouter = createBrowserRouter([
   // -------------------------------
@@ -44,6 +45,7 @@ export const appRouter = createBrowserRouter([
         children: [
           { path: "/onboarded-corporates", element: <OnboardedCorporates /> },
           { path: "/bookings-summary", element: <BookingsSummary /> },
+          { path: "/cancellation-summary", element: <CancellationDashboard /> },
           { path: "/corporate-revenue", element: <CorporateRevenue /> },
           { path: "/credit-status", element: <CreditStatusAlerts /> },
           { path: "/wallet-recharge-logs", element: <WalletRechargeLogs /> },

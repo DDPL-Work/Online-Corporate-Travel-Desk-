@@ -17,6 +17,7 @@ const { default: mongoose } = require("mongoose");
 const USER_TYPES = [
   { model: SuperAdmin, role: "super-admin" },
   { model: User, role: "travel-admin" },
+  { model: User, role: "manager" },
   { model: Employee, role: "employee" },
 ];
 
@@ -160,6 +161,7 @@ exports.updateProfile = asyncHandler(async (req, res) => {
   let model;
   if (req.user.role === "super-admin") model = SuperAdmin;
   else if (req.user.role === "travel-admin") model = User;
+  else if (req.user.role === "manager") model = User;
   else if (req.user.role === "employee") model = Employee;
   else throw new ApiError(400, "Invalid user role");
 

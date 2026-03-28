@@ -228,9 +228,9 @@ export default function MultiCityFlightBooking() {
     searchParams?.traceId,
   ]);
 
-  useEffect(() => {
-    console.log("SSR DATA:", ssr);
-  }, [ssr]);
+  // useEffect(() => {
+  //   console.log("SSR DATA:", ssr);
+  // }, [ssr]);
 
   useEffect(() => {
     if (!rawFlightData) {

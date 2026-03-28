@@ -148,7 +148,7 @@ function FlightRequestCard({ trip, onView }) {
                 Flight Request
               </p>
               <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
-                #{trip.id?.slice(-8).toUpperCase()}
+                #{trip.id}
               </p>
             </div>
           </div>
@@ -217,13 +217,11 @@ function FlightRequestCard({ trip, onView }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-          <div>
+        <div className="flex items-end justify-end pt-3 border-t border-slate-100">
+          {/* <div>
             {trip.amount && (
               <>
-                <p className="text-[11px] text-slate-400 mb-0.5">
-                  Est. Amount
-                </p>
+                <p className="text-[11px] text-slate-400 mb-0.5">Est. Amount</p>
                 <p className="text-[17px] font-bold text-slate-800">
                   ₹{Number(trip.amount).toLocaleString("en-IN")}
                   {trip.currency && (
@@ -234,7 +232,7 @@ function FlightRequestCard({ trip, onView }) {
                 </p>
               </>
             )}
-          </div>
+          </div> */}
           <button
             onClick={() => onView(trip)}
             className="flex items-center gap-2 bg-[#0A4D68] hover:bg-[#083d52] active:scale-[0.98] text-white text-[12px] font-semibold px-4 py-2 rounded-2xl transition-all duration-150 cursor-pointer border-none"
@@ -361,13 +359,11 @@ function HotelRequestCard({ trip, onView }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-          <div>
+        <div className="flex items-end justify-end pt-3 border-t border-slate-100">
+          {/* <div>
             {trip.amount && (
               <>
-                <p className="text-[11px] text-slate-400 mb-0.5">
-                  Est. Amount
-                </p>
+                <p className="text-[11px] text-slate-400 mb-0.5">Est. Amount</p>
                 <p className="text-[17px] font-bold text-slate-800">
                   ₹{Number(trip.amount).toLocaleString("en-IN")}
                   {trip.currency && (
@@ -378,7 +374,7 @@ function HotelRequestCard({ trip, onView }) {
                 </p>
               </>
             )}
-          </div>
+          </div> */}
           <button
             onClick={() => onView(trip)}
             className="flex items-center gap-2 bg-[#0A4D68] hover:bg-[#083d52] active:scale-[0.98] text-white text-[12px] font-semibold px-4 py-2 rounded-2xl transition-all duration-150 cursor-pointer border-none"
@@ -421,7 +417,18 @@ export default function MyPendingApprovals() {
 
   const myTrips = useMemo(() => {
     return (sourceData || [])
-      .filter((b) => b.requestStatus !== "rejected")
+      .filter((b) => {
+        const invalidRequestStatus = b.requestStatus === "rejected";
+
+        const invalidExecutionStatus = [
+          "ticketed",
+          "cancelled",
+          "cancel_requested",
+          "failed"
+        ].includes((b.executionStatus || "").toLowerCase());
+
+        return !invalidRequestStatus && !invalidExecutionStatus;
+      })
       .map((b) => {
         const segments = b.flightRequest?.segments || [];
         const fareExpiry = b.flightRequest?.fareExpiry;
@@ -433,8 +440,7 @@ export default function MyPendingApprovals() {
         const firstOrigin = segments[0]?.origin?.airportCode;
         const lastDest =
           segments[segments.length - 1]?.destination?.airportCode;
-        const isRoundTrip =
-          segments.length > 1 && firstOrigin === lastDest;
+        const isRoundTrip = segments.length > 1 && firstOrigin === lastDest;
 
         let destination = "N/A";
         if (activeTab === "hotel") {
@@ -497,8 +503,7 @@ export default function MyPendingApprovals() {
       const tripDate = new Date(t.startDate);
       const matchStart =
         !startDate || tripDate >= new Date(startDate + "T00:00:00");
-      const matchEnd =
-        !endDate || tripDate <= new Date(endDate + "T23:59:59");
+      const matchEnd = !endDate || tripDate <= new Date(endDate + "T23:59:59");
       return matchStatus && matchSearch && matchStart && matchEnd;
     });
   }, [statusFilter, searchTerm, startDate, endDate, myTrips]);
@@ -719,8 +724,8 @@ export default function MyPendingApprovals() {
                   )}
                 </div>
                 <p className="text-slate-500 font-semibold mb-1">
-                  No{" "}
-                  {activeTab === "flight" ? "flight" : "hotel"} requests found
+                  No {activeTab === "flight" ? "flight" : "hotel"} requests
+                  found
                 </p>
                 <p className="text-sm text-slate-400">
                   Try adjusting your filters

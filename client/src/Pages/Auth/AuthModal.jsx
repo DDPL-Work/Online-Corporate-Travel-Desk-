@@ -33,9 +33,9 @@ export default function AuthModal({ onClose }) {
     primaryName: "",
     primaryEmail: "",
     primaryMobile: "",
-    secondaryName: "",
-    secondaryEmail: "",
-    secondaryMobile: "",
+    // secondaryName: "",
+    // secondaryEmail: "",
+    // secondaryMobile: "",
     billingName: "",
     billingEmail: "",
     billingMobile: "",
@@ -280,9 +280,9 @@ export default function AuthModal({ onClose }) {
     // fd.append("creditLimit", form.creditLimit);
 
     // SECONDARY CONTACT
-    fd.append("secondaryContact[name]", form.secondaryName);
-    fd.append("secondaryContact[email]", form.secondaryEmail);
-    fd.append("secondaryContact[mobile]", form.secondaryMobile);
+    // fd.append("secondaryContact[name]", form.secondaryName);
+    // fd.append("secondaryContact[email]", form.secondaryEmail);
+    // fd.append("secondaryContact[mobile]", form.secondaryMobile);
 
     // BILLING DEPARTMENT
     fd.append("billingDepartment[name]", form.billingName);

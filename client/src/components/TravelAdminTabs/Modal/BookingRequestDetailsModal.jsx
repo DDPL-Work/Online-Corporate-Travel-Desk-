@@ -1,5 +1,5 @@
 import React from "react";
-import { FaPlane, FaHotel } from "react-icons/fa";
+import { FaHotel, FaPlane } from "react-icons/fa";
 import {
   FiHome,
   FiCheckCircle,
@@ -16,6 +16,8 @@ import {
   FiMail,
   FiGlobe,
   FiKey,
+  FiStar,
+  FiLayers,
 } from "react-icons/fi";
 import { formatDate, formatDateTime } from "../../../utils/formatter";
 import {
@@ -29,27 +31,48 @@ import {
 } from "../Shared/CommonComponents";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOTEL BOOKING MODAL — full details
+// HOTEL BOOKING MODAL — full details (multi-room fixed)
 // ─────────────────────────────────────────────────────────────────────────────
 export const HotelBookingModal = ({ booking: raw, onClose }) => {
   if (!raw) return null;
+
   const hotel = raw.hotelRequest?.selectedHotel || {};
-  const room = raw.hotelRequest?.selectedRoom || {};
-  const rawRoom = room.rawRoomData || {};
+  const selectedRoom = raw.hotelRequest?.selectedRoom || {};
+
+  // ✅ FIX: rawRoomData is always an array — normalise it
+  const rawRooms = Array.isArray(selectedRoom.rawRoomData)
+    ? selectedRoom.rawRoomData
+    : [selectedRoom.rawRoomData].filter(Boolean);
+
   const pricing = raw.pricingSnapshot || {};
   const snap = raw.bookingSnapshot || {};
-  const policies = room.cancelPolicies || [];
   const travelers = raw.travellers || [];
   const roomGuests = raw.hotelRequest?.roomGuests || [];
-  const dayRates = rawRoom?.DayRates?.[0] || [];
-  const images = rawRoom?.images || [];
-  const promos = rawRoom?.RoomPromotion || [];
-  const price = rawRoom?.Price || {};
-  const baseFare = (room.totalFare || 0) - (room.totalTax || 0);
   const approver = raw.approvedBy || {};
   const user = raw.userId || {};
   const amendment = raw.amendment || {};
   const bookRes = raw.bookingResult || {};
+
+  // Aggregate all cancellation policies from all rooms (deduplicated by FromDate)
+  const allPoliciesMap = new Map();
+  rawRooms.forEach((r) => {
+    (r.CancelPolicies || []).forEach((p) => {
+      if (!allPoliciesMap.has(p.FromDate)) allPoliciesMap.set(p.FromDate, p);
+    });
+  });
+  const policies = [...allPoliciesMap.values()];
+
+  // Total base fare across all rooms
+  // const totalFare = rawRooms.reduce((s, r) => s + (r.TotalFare || 0), 0);
+  // const totalTax = rawRooms.reduce((s, r) => s + (r.TotalTax || 0), 0);
+  // const baseFare = totalFare - totalTax;
+
+  const allRooms = raw.hotelRequest?.allRooms || [];
+
+const totalFare = allRooms.reduce((sum, r) => sum + (r.totalFare || 0), 0);
+const totalTax = allRooms.reduce((sum, r) => sum + (r.totalTax || 0), 0);
+const baseFare = totalFare - totalTax;
+const currency = allRooms[0]?.price?.currency || "INR";
 
   return (
     <div
@@ -60,6 +83,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
         onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-4 overflow-hidden"
       >
+        {/* ── Header ── */}
         <div className="bg-[#088395] px-6 py-5 text-white flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
@@ -80,6 +104,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
           </button>
         </div>
 
+        {/* ── Status bar ── */}
         <div className="bg-blue-50 border-b border-blue-100 px-6 py-2.5 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <ExecStatusBadge status={raw.executionStatus} />
@@ -98,292 +123,333 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Hotel Info */}
+
+          {/* ── Hotel Info ── */}
           <div>
-            <SectionLabel
-              icon={<FiHome size={11} />}
-              title="Hotel Information"
-            />
-            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-3">
+            <SectionLabel icon={<FiHome size={11} />} title="Hotel Information" />
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
               <div className="flex justify-between items-start flex-wrap gap-3">
                 <div>
-                  <p className="text-xl font-black text-slate-900">
-                    {hotel.hotelName}
-                  </p>
+                  <p className="text-xl font-black text-slate-900">{hotel.hotelName}</p>
                   <p className="text-xs text-slate-500 mt-1 flex items-start gap-1.5">
                     <FiMapPin className="mt-0.5 shrink-0" size={11} />
                     {hotel.address}
                   </p>
-                  <div className="flex flex-wrap gap-1.5 mt-3 pt-2 border-t border-slate-200">
-                    <InfoBadge color="teal">
-                      {rawRoom?.Name?.[0] || "Room"}
-                    </InfoBadge>
-                    <InfoBadge color="blue">
-                      <FiCoffee size={9} className="mr-1" />
-                      {room.mealType}
-                    </InfoBadge>
-                    {room.isRefundable ? (
-                      <InfoBadge color="green">
-                        <FiCheckCircle size={9} className="mr-1" />
-                        Refundable
-                      </InfoBadge>
-                    ) : (
-                      <InfoBadge color="red">Non-Refundable</InfoBadge>
-                    )}
-                    {promos.map((p, i) => (
-                      <InfoBadge key={i} color="amber">
-                        <FiTag size={9} className="mr-1" />
-                        {p}
-                      </InfoBadge>
-                    ))}
-                    {!room.withTransfers && (
-                      <InfoBadge color="gray">No Transfers</InfoBadge>
-                    )}
-                  </div>
                 </div>
                 <div className="text-right text-xs text-slate-500">
                   <p className="font-mono">{hotel.hotelCode}</p>
                   {hotel.starRating > 0 && (
-                    <p className="text-amber-500 mt-1">
-                      {"★".repeat(hotel.starRating)}
-                    </p>
+                    <p className="text-amber-500 mt-1">{"★".repeat(hotel.starRating)}</p>
                   )}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Stay Details */}
+          {/* ── Stay Details ── */}
           <div>
-            <SectionLabel
-              icon={<FiCalendar size={11} />}
-              title="Stay Details"
-            />
+            <SectionLabel icon={<FiCalendar size={11} />} title="Stay Details" />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <MiniStatCard
                 label="Check-In"
                 value={formatDate(raw.hotelRequest?.checkInDate)}
-                sub={new Date(raw.hotelRequest?.checkInDate).toLocaleDateString(
-                  "en-GB",
-                  { weekday: "long" },
-                )}
+                sub={new Date(raw.hotelRequest?.checkInDate).toLocaleDateString("en-GB", { weekday: "long" })}
               />
               <MiniStatCard
                 label="Check-Out"
                 value={formatDate(raw.hotelRequest?.checkOutDate)}
-                sub={new Date(
-                  raw.hotelRequest?.checkOutDate,
-                ).toLocaleDateString("en-GB", { weekday: "long" })}
+                sub={new Date(raw.hotelRequest?.checkOutDate).toLocaleDateString("en-GB", { weekday: "long" })}
               />
               <MiniStatCard
                 label="Nights"
-                value={price.nights || snap.nights || "—"}
+                value={rawRooms[0]?.Price?.nights || snap.nights || "—"}
               />
               <MiniStatCard label="Rooms" value={raw.hotelRequest?.noOfRooms} />
             </div>
+
             {roomGuests.map((rg, i) => (
               <div
                 key={i}
                 className="mt-3 bg-slate-50 border border-slate-100 rounded-xl p-3 flex flex-wrap gap-6 text-sm"
               >
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">
-                    Room {i + 1} Guests
-                  </p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Room {i + 1} Guests</p>
                   <p className="font-semibold">
                     {rg.noOfAdults} Adult{rg.noOfAdults !== 1 ? "s" : ""}
                     {rg.noOfChild > 0 ? `, ${rg.noOfChild} Child` : ""}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">
-                    Nationality
-                  </p>
-                  <p className="font-semibold">
-                    {raw.hotelRequest?.guestNationality}
-                  </p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Nationality</p>
+                  <p className="font-semibold">{raw.hotelRequest?.guestNationality}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">
-                    Currency
-                  </p>
-                  <p className="font-semibold">
-                    {raw.hotelRequest?.preferredCurrency}
-                  </p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Currency</p>
+                  <p className="font-semibold">{raw.hotelRequest?.preferredCurrency}</p>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Room + Pricing */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <SectionLabel icon={<FiKey size={11} />} title="Room Details" />
-              <div className="bg-white border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
-                <InfoRow label="Room Name" value={rawRoom?.Name?.[0]} padded />
-                <InfoRow label="Meal Type" value={rawRoom?.MealType} padded />
-                <InfoRow
-                  label="Refundable"
-                  value={room.isRefundable ? "Yes" : "No"}
-                  padded
-                />
-                <InfoRow
-                  label="Transfers"
-                  value={room.withTransfers ? "Yes" : "No"}
-                  padded
-                />
-                <InfoRow
-                  label="Total Fare"
-                  value={`${room.currency} ${room.totalFare?.toLocaleString()}`}
-                  padded
-                />
-                <InfoRow
-                  label="Tax"
-                  value={`${room.currency} ${room.totalTax?.toLocaleString()}`}
-                  padded
-                />
-                <InfoRow
-                  label="Base Fare"
-                  value={`${room.currency} ${baseFare?.toFixed(2)}`}
-                  padded
-                />
-              </div>
-            </div>
-            <div>
-              <SectionLabel
-                icon={<FiDollarSign size={11} />}
-                title="Pricing Summary"
-              />
-              <div className="bg-slate-900 text-white p-5 rounded-2xl">
-                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                  Total (Incl. Tax)
-                </p>
-                <p className="text-3xl font-black mt-1">
-                  {pricing.currency} {pricing.totalAmount?.toLocaleString()}
-                </p>
-                <p className="text-slate-500 text-[10px] mt-1">
-                  Captured: {formatDateTime(pricing.capturedAt)}
-                </p>
-                <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/10">
-                  <div>
-                    <p className="text-slate-400 text-[10px] uppercase">Base</p>
-                    <p className="text-white font-bold text-sm">
-                      {pricing.currency} {baseFare?.toFixed(2)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-slate-400 text-[10px] uppercase">Tax</p>
-                    <p className="text-white font-bold text-sm">
-                      {pricing.currency} {room.totalTax}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-slate-400 text-[10px] uppercase">
-                      Per Night
-                    </p>
-                    <p className="text-white font-bold text-sm">
-                      {pricing.currency} {price.perNight?.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 space-y-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  Day Rates
-                </p>
-                {dayRates.map((d, i) => (
-                  <div
-                    key={i}
-                    className="flex justify-between items-center bg-slate-50 border border-slate-100 rounded-lg px-4 py-2.5"
-                  >
-                    <span className="text-sm text-slate-500">
-                      Night {i + 1}
-                    </span>
-                    <span className="text-sm font-bold text-slate-800">
-                      {room.currency} {d.BasePrice?.toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Inclusions */}
-          {room.inclusion && (
-            <div>
-              <SectionLabel
-                icon={<FiCheckCircle size={11} />}
-                title="Inclusions"
-              />
-              <div className="flex flex-wrap gap-2">
-                {room.inclusion.split(",").map((item, i) => (
-                  <span
-                    key={i}
-                    className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5"
-                  >
-                    <FiCheckCircle size={10} className="text-green-500" />
-                    {item.trim()}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Cancellation Policy */}
+          {/* ── Selected Rooms (one card per room) ── */}
           <div>
             <SectionLabel
-              icon={<FiShield size={11} />}
-              title="Cancellation Policy"
+              icon={<FiLayers size={11} />}
+              title={`Selected Rooms (${rawRooms.length})`}
             />
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-                  <tr>
-                    <th className="px-4 py-2.5 text-left">From Date</th>
-                    <th className="px-4 py-2.5 text-left">Charge Type</th>
-                    <th className="px-4 py-2.5 text-right">Penalty</th>
-                    <th className="px-4 py-2.5 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {policies.map((p, i) => (
-                    <tr key={i} className="hover:bg-slate-50/50">
-                      <td className="px-4 py-3 font-mono text-xs text-slate-600">
-                        {p.FromDate}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {p.ChargeType}
-                      </td>
-                      <td className="px-4 py-3 text-right font-black">
-                        {p.CancellationCharge === 0 ? (
-                          <span className="text-green-600">FREE</span>
+            <div className="space-y-4">
+              {rawRooms.map((room, idx) => {
+                const roomName = Array.isArray(room.Name) ? room.Name[0] : room.Name;
+                const roomPrice = room.Price || {};
+                const dayRates = room.DayRates?.[0] || [];
+                const inclusions = room.Inclusion
+                  ? room.Inclusion.split(",").map((s) => s.trim()).filter(Boolean)
+                  : [];
+                const roomImages = room.images || room.rawRoomData?.images || [];
+                const roomBaseFare = (room.TotalFare || 0) - (room.TotalTax || 0);
+
+                return (
+                  <div
+                    key={idx}
+                    className="border border-slate-200 rounded-2xl overflow-hidden"
+                  >
+                    {/* Room header */}
+                    <div className="bg-gradient-to-r from-[#088395]/10 to-slate-50 px-5 py-3 flex items-center justify-between border-b border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-[#088395] text-white text-[11px] font-black flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <p className="font-black text-slate-800 text-sm">{roomName}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <InfoBadge color="blue">
+                          <FiCoffee size={9} className="mr-1" />
+                          {room.MealType?.replace(/_/g, " ")}
+                        </InfoBadge>
+                        {room.IsRefundable ? (
+                          <InfoBadge color="green">
+                            <FiCheckCircle size={9} className="mr-1" />
+                            Refundable
+                          </InfoBadge>
                         ) : (
-                          <span className="text-red-600">
-                            {p.ChargeType === "Percentage"
-                              ? `${p.CancellationCharge}%`
-                              : `₹${Number(p.CancellationCharge).toFixed(2)}`}
-                          </span>
+                          <InfoBadge color="red">Non-Refundable</InfoBadge>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {p.CancellationCharge === 0 ? (
-                          <span className="px-2 py-0.5 bg-green-50 text-green-700 text-[10px] font-bold rounded border border-green-100">
-                            No Charge
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-red-50 text-red-700 text-[10px] font-bold rounded border border-red-100">
-                            Charged
-                          </span>
+                        {!room.WithTransfers && (
+                          <InfoBadge color="gray">No Transfers</InfoBadge>
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+
+                    <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+                      {/* Left: room details */}
+                      <div className="space-y-4">
+                        {/* Pricing */}
+                        <div className="bg-slate-900 text-white rounded-xl p-4">
+                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                            Total Fare (Incl. Tax)
+                          </p>
+                          <p className="text-2xl font-black mt-1">
+                            {selectedRoom.currency || "INR"}{" "}
+                            {room.TotalFare?.toLocaleString()}
+                          </p>
+                          <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/10">
+                            <div>
+                              <p className="text-slate-400 text-[10px] uppercase">Base</p>
+                              <p className="text-white font-bold text-sm">
+                                {selectedRoom.currency || "INR"} {roomBaseFare?.toFixed(2)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-slate-400 text-[10px] uppercase">Tax</p>
+                              <p className="text-white font-bold text-sm">
+                                {selectedRoom.currency || "INR"} {room.TotalTax?.toLocaleString()}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-slate-400 text-[10px] uppercase">Per Night</p>
+                              <p className="text-white font-bold text-sm">
+                                {selectedRoom.currency || "INR"}{" "}
+                                {roomPrice.perNight?.toFixed(2) || "—"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Booking Code */}
+                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                            Booking Code
+                          </p>
+                          <p className="text-[10px] font-mono text-slate-600 break-all leading-relaxed">
+                            {room.BookingCode}
+                          </p>
+                        </div>
+
+                        {/* Inclusions */}
+                        {inclusions.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">
+                              Inclusions
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {inclusions.map((item, i) => (
+                                <span
+                                  key={i}
+                                  className="px-2.5 py-1 bg-green-50 border border-green-100 text-green-700 text-xs font-semibold rounded-lg flex items-center gap-1"
+                                >
+                                  <FiCheckCircle size={9} className="text-green-500" />
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right: day rates + images */}
+                      <div className="space-y-4">
+                        {/* Day Rates */}
+                        {dayRates.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">
+                              Day Rates
+                            </p>
+                            <div className="space-y-1.5">
+                              {dayRates.map((d, i) => (
+                                <div
+                                  key={i}
+                                  className="flex justify-between items-center bg-slate-50 border border-slate-100 rounded-lg px-3 py-2"
+                                >
+                                  <span className="text-xs text-slate-500">Night {i + 1}</span>
+                                  <span className="text-sm font-bold text-slate-800">
+                                    {selectedRoom.currency || "INR"}{" "}
+                                    {d.BasePrice?.toFixed(2)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Room Images */}
+                        {roomImages.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">
+                              Room Images
+                            </p>
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                              {roomImages.slice(0, 5).map((url, i) => (
+                                <img
+                                  key={i}
+                                  src={url}
+                                  alt={`Room ${idx + 1} image ${i + 1}`}
+                                  className="h-20 w-28 object-cover rounded-lg border border-slate-200 shrink-0"
+                                  onError={(e) => {
+                                    e.target.style.display = "none";
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Cancellation Policy per room */}
+                    {(room.CancelPolicies || []).length > 0 && (
+                      <div className="border-t border-slate-100 px-5 py-4">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                          <FiShield size={10} /> Cancellation Policy
+                        </p>
+                        <div className="border border-slate-200 rounded-xl overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
+                              <tr>
+                                <th className="px-4 py-2 text-left">From Date</th>
+                                <th className="px-4 py-2 text-left">Charge Type</th>
+                                <th className="px-4 py-2 text-right">Penalty</th>
+                                <th className="px-4 py-2 text-right">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {room.CancelPolicies.map((p, i) => (
+                                <tr key={i} className="hover:bg-slate-50/50">
+                                  <td className="px-4 py-2.5 font-mono text-xs text-slate-600">
+                                    {p.FromDate}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-slate-600 text-xs">
+                                    {p.ChargeType}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-right font-black">
+                                    {p.CancellationCharge === 0 ? (
+                                      <span className="text-green-600">FREE</span>
+                                    ) : (
+                                      <span className="text-red-600">
+                                        {p.ChargeType === "Percentage"
+                                          ? `${p.CancellationCharge}%`
+                                          : `₹${Number(p.CancellationCharge).toFixed(2)}`}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-right">
+                                    {p.CancellationCharge === 0 ? (
+                                      <span className="px-2 py-0.5 bg-green-50 text-green-700 text-[10px] font-bold rounded border border-green-100">
+                                        No Charge
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 bg-red-50 text-red-700 text-[10px] font-bold rounded border border-red-100">
+                                        Charged
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Travellers */}
+          {/* ── Overall Pricing Summary ── */}
+          <div>
+            <SectionLabel icon={<FiDollarSign size={11} />} title="Total Pricing Summary" />
+            <div className="bg-slate-900 text-white p-5 rounded-2xl">
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                Grand Total (Incl. Tax)
+              </p>
+              <p className="text-3xl font-black mt-1">
+                 {currency} {totalFare.toLocaleString()}
+              </p>
+              <p className="text-slate-500 text-[10px] mt-1">
+                Captured: {formatDateTime(pricing.capturedAt)}
+              </p>
+              <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/10">
+                <div>
+                  <p className="text-slate-400 text-[10px] uppercase">Total Base</p>
+                  <p className="text-white font-bold text-sm">
+                    {pricing.currency} {baseFare?.toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-slate-400 text-[10px] uppercase">Total Tax</p>
+                  <p className="text-white font-bold text-sm">
+                    {pricing.currency} {totalTax?.toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-slate-400 text-[10px] uppercase">Rooms</p>
+                  <p className="text-white font-bold text-sm">{rawRooms.length}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Travellers ── */}
           <div>
             <SectionLabel
               icon={<FiUser size={11} />}
@@ -398,8 +464,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[#088395]/10 text-[#088395] flex items-center justify-center font-black text-sm shrink-0">
-                        {pax.firstName?.[0]}
-                        {pax.lastName?.[0]}
+                        {pax.firstName?.[0]}{pax.lastName?.[0]}
                       </div>
                       <div>
                         <p className="font-black text-slate-900">
@@ -418,44 +483,18 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-2 border-t border-slate-200">
                     {[
-                      {
-                        icon: <FiUser size={10} />,
-                        label: "Gender",
-                        value: pax.gender,
-                      },
-                      {
-                        icon: <FiCalendar size={10} />,
-                        label: "Date of Birth",
-                        value: formatDate(pax.dob),
-                      },
-                      {
-                        icon: <FiInfo size={10} />,
-                        label: "Age",
-                        value: `${pax.age} years`,
-                      },
-                      {
-                        icon: <FiGlobe size={10} />,
-                        label: "Nationality",
-                        value: pax.nationality,
-                      },
-                      {
-                        icon: <FiMail size={10} />,
-                        label: "Email",
-                        value: pax.email,
-                      },
-                      {
-                        icon: <FiPhone size={10} />,
-                        label: "Phone",
-                        value: `+${pax.phoneWithCode}`,
-                      },
+                      { icon: <FiUser size={10} />, label: "Gender", value: pax.gender },
+                      { icon: <FiCalendar size={10} />, label: "Date of Birth", value: formatDate(pax.dob) },
+                      { icon: <FiInfo size={10} />, label: "Age", value: `${pax.age} years` },
+                      { icon: <FiGlobe size={10} />, label: "Nationality", value: pax.nationality },
+                      { icon: <FiMail size={10} />, label: "Email", value: pax.email },
+                      { icon: <FiPhone size={10} />, label: "Phone", value: `+${pax.phoneWithCode}` },
                     ].map(({ icon, label, value }, j) => (
                       <div key={j}>
                         <p className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-0.5">
                           {icon} {label}
                         </p>
-                        <p className="text-xs font-semibold text-slate-700">
-                          {value || "—"}
-                        </p>
+                        <p className="text-xs font-semibold text-slate-700">{value || "—"}</p>
                       </div>
                     ))}
                   </div>
@@ -464,7 +503,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
             </div>
           </div>
 
-          {/* Booking Confirmation */}
+          {/* ── Booking Confirmation ── */}
           {bookRes.hotelBookingId && (
             <div>
               <SectionLabel
@@ -473,29 +512,30 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
               />
               <div className="bg-green-50 border border-green-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-3 gap-3">
                 <div>
-                  <p className="text-[10px] font-bold text-green-600 uppercase">
-                    Confirmation No
-                  </p>
+                  <p className="text-[10px] font-bold text-green-600 uppercase">Confirmation No</p>
                   <p className="text-sm font-mono font-bold text-green-800">
-                    {bookRes.providerResponse?.BookResult?.ConfirmationNo ||
-                      bookRes.hotelBookingId}
+                    {bookRes.providerResponse?.BookResult?.ConfirmationNo || bookRes.hotelBookingId}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-green-600 uppercase">
-                    Booking ID
-                  </p>
+                  <p className="text-[10px] font-bold text-green-600 uppercase">Booking ID</p>
                   <p className="text-sm font-mono font-bold text-green-800">
                     {bookRes.hotelBookingId}
                   </p>
                 </div>
                 {bookRes.providerResponse?.BookResult?.InvoiceNumber && (
                   <div>
-                    <p className="text-[10px] font-bold text-green-600 uppercase">
-                      Invoice No
-                    </p>
+                    <p className="text-[10px] font-bold text-green-600 uppercase">Invoice No</p>
                     <p className="text-sm font-mono font-bold text-green-800">
                       {bookRes.providerResponse.BookResult.InvoiceNumber}
+                    </p>
+                  </div>
+                )}
+                {bookRes.providerResponse?.BookResult?.BookingRefNo && (
+                  <div className="col-span-full">
+                    <p className="text-[10px] font-bold text-green-600 uppercase">Booking Ref Nos</p>
+                    <p className="text-xs font-mono font-semibold text-green-700">
+                      {bookRes.providerResponse.BookResult.BookingRefNo}
                     </p>
                   </div>
                 )}
@@ -503,58 +543,28 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
             </div>
           )}
 
-          {/* Amendment */}
+          {/* ── Amendment ── */}
           {amendment.status && amendment.status !== "not_requested" && (
             <div>
-              <SectionLabel
-                icon={<FiInfo size={11} />}
-                title="Amendment Details"
-              />
+              <SectionLabel icon={<FiInfo size={11} />} title="Amendment Details" />
               <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 space-y-1">
-                <InfoRow
-                  label="Amendment Type"
-                  value={amendment.amendmentType}
-                />
-                <InfoRow
-                  label="Status"
-                  value={amendment.status?.replace(/_/g, " ")}
-                  capitalize
-                />
-                {amendment.remarks && (
-                  <InfoRow label="Remarks" value={amendment.remarks} />
-                )}
+                <InfoRow label="Amendment Type" value={amendment.amendmentType} />
+                <InfoRow label="Status" value={amendment.status?.replace(/_/g, " ")} capitalize />
+                {amendment.remarks && <InfoRow label="Remarks" value={amendment.remarks} />}
                 {amendment.requestedAt && (
-                  <InfoRow
-                    label="Requested At"
-                    value={formatDateTime(amendment.requestedAt)}
-                  />
-                )}
-                {amendment.changeRequestId && (
-                  <InfoRow
-                    label="Change Request ID"
-                    value={amendment.changeRequestId}
-                    mono
-                  />
-                )}
-                {amendment.providerResponse?.HotelChangeRequestStatusResult
-                  ?.RefundedAmount && (
-                  <InfoRow
-                    label="Refunded Amount"
-                    value={`₹${amendment.providerResponse.HotelChangeRequestStatusResult.RefundedAmount?.toLocaleString()}`}
-                  />
+                  <InfoRow label="Requested At" value={formatDateTime(amendment.requestedAt)} />
                 )}
               </div>
             </div>
           )}
 
-          {/* Requester + Meta */}
+          {/* ── Requester + Meta ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <SectionLabel icon={<FiUser size={11} />} title="Requested By" />
               <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-black text-sm shrink-0">
-                  {user.name?.firstName?.[0]}
-                  {user.name?.lastName?.[0]}
+                  {user.name?.firstName?.[0]}{user.name?.lastName?.[0]}
                 </div>
                 <div className="flex-1">
                   <p className="font-bold text-slate-900">
@@ -565,13 +575,11 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                     {user.email}
                   </p>
                 </div>
-                {approver._id && (
+                {approver && (
                   <div className="text-right">
-                    <p className="text-[10px] text-slate-400 uppercase font-bold">
-                      Approved By
-                    </p>
+                    <p className="text-[10px] text-slate-400 uppercase font-bold">Approved By</p>
                     <p className="text-xs font-semibold text-slate-700">
-                      {approver.name?.firstName} {approver.name?.lastName}
+                      {raw.approverComments || "—"}
                     </p>
                     <p className="text-[10px] text-slate-400">
                       {formatDateTime(raw.approvedAt)}
@@ -584,12 +592,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
               <SectionLabel icon={<FiTag size={11} />} title="Booking Meta" />
               <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
                 <InfoRow label="Booking ID" value={raw._id} mono padded />
-                <InfoRow
-                  label="Corporate ID"
-                  value={raw.corporateId}
-                  mono
-                  padded
-                />
+                <InfoRow label="Corporate ID" value={raw.corporateId} mono padded />
                 <InfoRow
                   label="Execution Status"
                   value={raw.executionStatus?.replace(/_/g, " ")}
@@ -602,47 +605,21 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                   capitalize
                   padded
                 />
-                <InfoRow
-                  label="Updated At"
-                  value={formatDateTime(raw.updatedAt)}
-                  padded
-                />
+                <InfoRow label="Updated At" value={formatDateTime(raw.updatedAt)} padded />
               </div>
             </div>
           </div>
 
+          {/* ── Purpose of Travel ── */}
           <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
             <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1">
               Purpose of Travel
             </p>
-            <p className="text-sm text-amber-900 italic">
-              "{raw.purposeOfTravel}"
-            </p>
+            <p className="text-sm text-amber-900 italic">"{raw.purposeOfTravel}"</p>
           </div>
-
-          {images.length > 0 && (
-            <div>
-              <SectionLabel
-                icon={<FiHome size={11} />}
-                title={`Hotel Images (${images.length})`}
-              />
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {images.slice(0, 8).map((url, i) => (
-                  <img
-                    key={i}
-                    src={url}
-                    alt={`Hotel ${i + 1}`}
-                    className="h-24 w-36 object-cover rounded-lg border border-slate-200 shrink-0"
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
+        {/* ── Footer ── */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
           <p className="text-xs text-slate-400">
             Ref:{" "}
@@ -661,6 +638,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
     </div>
   );
 };
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FLIGHT BOOKING MODAL — full details

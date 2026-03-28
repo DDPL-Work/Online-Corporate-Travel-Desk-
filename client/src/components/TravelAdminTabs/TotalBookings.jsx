@@ -218,7 +218,7 @@ function FlightSection() {
           <LabeledField
             label={
               <>
-                <FiSearch size={10} /> Search Traveller / PNR
+                <FiSearch size={10} /> Search Traveller
               </>
             }
           >
@@ -313,7 +313,7 @@ function FlightSection() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse min-w-[860px]">
             <thead>
-              <tr className="bg-[#0A4D68] text-[#bfdbfe]">
+              <tr className="bg-[#0f9041] text-[#ffffff]">
                 <Th>Booking ID</Th>
                 <Th>Traveller Name</Th>
                 <Th>Booked Date</Th>
@@ -482,7 +482,11 @@ function HotelSection() {
     const invoiceNo = bookResult.InvoiceNumber || "-";
     const providerBookingId = bookResult.BookingId || "-";
 
-    const amount = b.pricingSnapshot?.totalAmount || 0;
+    const allRooms = b.hotelRequest?.allRooms || [];
+
+    const amount = allRooms.length
+      ? allRooms.reduce((sum, room) => sum + (room.totalFare || 0), 0)
+      : 0;
 
     return {
       ...b,
@@ -602,7 +606,7 @@ function HotelSection() {
           <LabeledField
             label={
               <>
-                <FiSearch size={10} /> Search Guest / Invoice
+                <FiSearch size={10} /> Search Guest
               </>
             }
           >
@@ -712,7 +716,7 @@ function HotelSection() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse min-w-[860px]">
             <thead>
-              <tr className="bg-[#088395] text-[#ccfbf1]">
+              <tr className="bg-[#0f9041] text-[#ccfbf1]">
                 <Th>Booking ID</Th>
                 <Th>Guest Name</Th>
                 <Th>Booked Date</Th>

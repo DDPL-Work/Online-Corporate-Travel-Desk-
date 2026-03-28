@@ -59,6 +59,11 @@ export default function OneFlightBooking() {
     error: approverError,
   } = useSelector((state) => state.employee);
 
+  const isSSRError = ssr?.Response?.ResponseStatus === 2;
+
+  const ssrErrorMessage =
+    ssr?.Response?.Error?.ErrorMessage || "No SSR available";
+
   const {
     selectedFlight,
     searchParams,
@@ -155,6 +160,15 @@ export default function OneFlightBooking() {
     setTravelers(initial);
   }, [user, searchParams]);
 
+  useEffect(() => {
+    if (isSSRError) {
+      ToastWithTimer({
+        type: "info",
+        message: ssrErrorMessage,
+      });
+    }
+  }, [isSSRError]);
+
   const formatDateTime = (dateString) => {
     if (!dateString) return "N/A";
 
@@ -228,9 +242,9 @@ export default function OneFlightBooking() {
     searchParams?.traceId,
   ]);
 
-  useEffect(() => {
-    console.log("SSR DATA:", ssr);
-  }, [ssr]);
+  // useEffect(() => {
+  //   console.log("SSR DATA:", ssr);
+  // }, [ssr]);
 
   useEffect(() => {
     if (!rawFlightData) {
@@ -256,12 +270,21 @@ export default function OneFlightBooking() {
   }, [loading, selectedFlight, rawFlightData, navigate]);
 
   const isSeatReady = useMemo(() => {
+    if (isSSRError) return false;
+
     const segments = ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat;
+
     return Array.isArray(segments) && segments.length > 0;
-  }, [ssr]);
+  }, [ssr, isSSRError]);
 
   const openSeatModal = (segmentIndex) => {
-    if (!isSeatReady) return;
+    if (!isSeatReady) {
+      ToastWithTimer({
+        type: "info",
+        message: isSSRError ? ssrErrorMessage : "Seat data is not available",
+      });
+      return;
+    }
 
     const segmentSeat =
       ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[segmentIndex];
@@ -886,6 +909,8 @@ export default function OneFlightBooking() {
           selectedBaggage={selectedBaggage}
           onToggleMeal={toggleMealSelection}
           onSelectBaggage={handleSelectBaggage}
+          ssrError={isSSRError}
+          ssrErrorMessage={ssrErrorMessage}
         />
       )}
     </div>

@@ -30,20 +30,40 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
   /* ================= TRANSFORM DATA ================= */
 
+  // ✅ STRICT STRING BASED (MATCHES YOUR DB)
+
+  const totalAdults = travellers.filter(
+    (t) => t.paxType === "adult" || t.paxType === "lead",
+  ).length;
+
+  const totalChildren = travellers.filter((t) => t.paxType === "child").length;
+
+  const roomsCount =
+  hotelRequest?.allRooms?.length ||
+  hotelRequest.noOfRooms ||
+  1;
+
+  console.log("Travellers:", travellers);
+  console.log("Rooms:", hotelRequest.rooms);
+
+  const roomGuests = Array.from({ length: roomsCount }).map((_, index) => ({
+  noOfAdults:
+    Math.floor(totalAdults / roomsCount) +
+    (index < totalAdults % roomsCount ? 1 : 0),
+  noOfChild: 0,
+  childAge: [],
+}));
+
   const transformedHotelRequest = {
     checkInDate: hotelRequest.checkIn,
     checkOutDate: hotelRequest.checkOut,
 
-    noOfRooms: hotelRequest.rooms?.length || 1,
+    noOfRooms: hotelRequest.noOfRooms || 1,
     noOfNights: hotelRequest?.nights || 1,
 
     guestNationality: hotelRequest.guestNationality || "IN",
 
-    roomGuests: (hotelRequest.rooms || []).map((r) => ({
-      noOfAdults: r.Adults || r.adults || 0,
-      noOfChild: r.Children || r.children || 0,
-      childAge: r.ChildAge || [],
-    })),
+   roomGuests: roomGuests,
 
     selectedHotel: {
       hotelCode: hotelRequest.hotelCode,
@@ -273,27 +293,54 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
   try {
     /* ================= STEP 1: GET BOOKING CODE ================= */
 
-    const bookingCode =
-      booking.hotelRequest?.selectedRoom?.bookingCode ||
-      booking.hotelRequest?.providerBookingId;
+    const selectedRooms = booking.hotelRequest?.allRooms || [];
 
-    if (!bookingCode) {
+    const bookingCodes = selectedRooms
+      .map((r) => r.bookingCode)
+      .filter(Boolean);
+
+    if (!bookingCodes.length) {
       throw new ApiError(400, "BookingCode missing");
     }
 
-    console.log("INITIAL BOOKING CODE:", bookingCode);
+    if (!bookingCodes) {
+      throw new ApiError(400, "BookingCode missing");
+    }
+
+    console.log("INITIAL BOOKING CODE:", bookingCodes);
 
     /* ================= STEP 2: PREBOOK ================= */
 
     const preBookResp = await hotelService.preBookHotel({
-      BookingCode: bookingCode,
+      BookingCode: bookingCodes.join(","), // 🔥 MULTI ROOM FIX
       EndUserIp: process.env.TBO_END_USER_IP,
     });
 
     console.log("PREBOOK RESPONSE:", JSON.stringify(preBookResp, null, 2));
 
-    const preBookResult =
-      preBookResp?.PreBookResult || preBookResp?.BookResult || preBookResp;
+    const preBookRooms = preBookResp?.HotelResult?.[0]?.Rooms || [];
+
+    const isPriceChanged =
+      preBookResp?.HotelResult?.[0]?.IsPriceChanged || false;
+
+    const isPolicyChanged =
+      preBookResp?.HotelResult?.[0]?.IsCancellationPolicyChanged || false;
+
+    if (isPriceChanged) {
+      throw new ApiError(400, "Price changed. Please refresh booking.");
+    }
+
+    if (isPolicyChanged) {
+      throw new ApiError(400, "Cancellation policy changed. Please review.");
+    }
+
+    const freshBookingCode = preBookRooms
+      .map((r) => r.BookingCode)
+      .filter(Boolean);
+
+    if (!freshBookingCode.length) {
+      throw new ApiError(500, "PreBook failed - BookingCode missing");
+    }
 
     const netAmount = preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount;
 
@@ -311,24 +358,86 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
 
     /* ================= STEP 3: HANDLE PRICE / POLICY CHANGE ================= */
 
-    if (preBookResult?.IsPriceChanged) {
-      throw new ApiError(400, "Price changed. Please refresh booking.");
-    }
+    // if (preBookResult?.IsPriceChanged) {
+    //   throw new ApiError(400, "Price changed. Please refresh booking.");
+    // }
 
-    if (preBookResult?.IsCancellationPolicyChanged) {
-      throw new ApiError(400, "Cancellation policy changed. Please review.");
-    }
+    // if (preBookResult?.IsCancellationPolicyChanged) {
+    //   throw new ApiError(400, "Cancellation policy changed. Please review.");
+    // }
 
     /* ================= STEP 4: GET FRESH BOOKING CODE ================= */
 
-    const freshBookingCode = preBookResult?.BookingCode || bookingCode;
+    // const freshBookingCode = preBookResult?.BookingCode || bookingCodes;
 
     console.log("FRESH BOOKING CODE:", freshBookingCode);
 
     /* ================= STEP 5: BOOK ================= */
 
+    // const selectedRooms = booking.hotelRequest?.allRooms || [];
+    // const travellers = booking.travellers || [];
+
+    // const selectedRooms = booking.hotelRequest?.allRooms || [];
+
+const travellers = booking.travellers || [];
+
+const roomsCount = selectedRooms.length;
+
+// 🔥 AUTO FIX roomGuests
+let roomGuests = booking.hotelRequest?.roomGuests || [];
+
+// 🚨 FIX: If wrong, rebuild it
+if (
+  !roomGuests.length ||
+  roomGuests.length !== roomsCount ||
+  roomGuests.some(r => !r.noOfAdults || r.noOfAdults === 0)
+) {
+  roomGuests = Array.from({ length: roomsCount }).map(() => ({
+    noOfAdults: Math.floor(travellers.length / roomsCount),
+    noOfChild: 0,
+  }));
+
+  // distribute remaining
+  for (let i = 0; i < travellers.length % roomsCount; i++) {
+    roomGuests[i].noOfAdults += 1;
+  }
+}
+
+    let travellerIndex = 0;
+
+   const HotelRoomsDetails = roomGuests.map((room) => {
+  const passengers = [];
+
+  for (let i = 0; i < room.noOfAdults; i++) {
+    const traveller = travellers[travellerIndex];
+
+    if (!traveller) {
+      throw new ApiError(400, "Traveller count mismatch with rooms");
+    }
+
+    passengers.push({
+      Title: traveller.title,
+      FirstName: traveller.firstName,
+      LastName: traveller.lastName,
+      Email: traveller.email || null,
+      Phoneno: String(traveller.phoneWithCode || "").replace(/\D/g, ""),
+
+      PaxType: 1,
+
+      // ✅ FIX: Lead per room
+      LeadPassenger: i === 0,
+    });
+
+    travellerIndex++;
+  }
+
+  return {
+    HotelPassenger: passengers,
+  };
+});
+
     const bookResp = await hotelService.bookHotel({
-      BookingCode: freshBookingCode,
+      BookingCode: freshBookingCode.join(","),
       IsVoucherBooking: true,
       GuestNationality: booking.hotelRequest?.guestNationality || "IN",
       EndUserIp: process.env.TBO_END_USER_IP,
@@ -336,19 +445,7 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
       NetAmount: netAmount,
       ClientReferenceId: booking.bookingReference,
 
-      HotelRoomsDetails: [
-        {
-          HotelPassenger: booking.travellers.map((t) => ({
-            Title: t.title,
-            FirstName: t.firstName,
-            LastName: t.lastName,
-            Email: t.email || null,
-            Phoneno: String(t.phoneWithCode || "").replace(/\D/g, ""),
-            PaxType: 1,
-            LeadPassenger: t.isLeadPassenger,
-          })),
-        },
-      ],
+      HotelRoomsDetails,
     });
 
     console.log("BOOK RESPONSE:", JSON.stringify(bookResp, null, 2));
@@ -392,6 +489,24 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     await booking.save();
 
     /* ================= STEP 10: PAYMENT ================= */
+
+    // 🔥 FIX: Ensure pricingSnapshot has totalAmount
+    if (!booking.pricingSnapshot?.totalAmount) {
+      const totalFare =
+        booking.hotelRequest?.allRooms?.[0]?.price?.totalFare ||
+        booking.hotelRequest?.selectedRoom?.rawRoomData?.[0]?.TotalFare ||
+        0;
+
+      const roomCount = booking.hotelRequest?.noOfRooms || 1;
+
+      booking.pricingSnapshot = {
+        ...booking.pricingSnapshot,
+        totalAmount: totalFare * roomCount,
+        currency: booking.pricingSnapshot?.currency || "INR",
+      };
+
+      await booking.save();
+    }
 
     const corporate = await Corporate.findById(booking.corporateId);
 
@@ -527,7 +642,6 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
 // @desc    Get booked hotel details (TBO)
 // @route   GET /api/v1/hotel-bookings/:id/details
 // @access  Private
-
 exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -558,15 +672,8 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
     travellers = [],
     bookingResult = {},
   } = booking;
+
   const amendment = booking.amendment || null;
-
-  // 🔥 Extract images from DB (IMPORTANT)
-  const hotelReq = booking.hotelRequest || {};
-  const selectedRoom = hotelReq.selectedRoom || {};
-  const rawRoom = selectedRoom.rawRoomData || {};
-
-  const images = rawRoom.images || [];
-  const heroImage = images[0] || null;
 
   /* ================= EXTRACT IDENTIFIERS ================= */
 
@@ -598,30 +705,100 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
     console.log("TBO FAILED → fallback to DB");
   }
 
-  /* ================= MERGE LOGIC ================= */
+  /* ================= ROOMS NORMALIZATION ================= */
 
-  // 🔥 Guests (TBO > DB)
+  // ✅ TBO rooms
+  const tboRooms = Array.isArray(result?.Rooms) ? result.Rooms : [];
+
+  // ✅ DB rooms (rawRoomData can be array or object)
+  const dbRoomsRaw =
+    booking?.hotelRequest?.selectedRoom?.rawRoomData;
+
+  const dbRooms = Array.isArray(dbRoomsRaw)
+    ? dbRoomsRaw
+    : dbRoomsRaw
+    ? [dbRoomsRaw]
+    : [];
+
+  // ✅ FINAL ROOMS (TBO priority)
+  let rooms = [];
+
+if (tboRooms.length > 0 && dbRooms.length > 0) {
+  // 🔥 MERGE TBO + DB (KEEP ORIGINAL ROOM TYPES)
+  rooms = tboRooms.map((tboRoom, index) => {
+    const dbRoom = dbRooms[index] || {};
+
+    return {
+      ...tboRoom,
+
+      // ✅ FIX ROOM NAME FROM DB
+      RoomTypeName:
+        dbRoom?.Name?.[0]?.split(",")[0] ||
+        tboRoom.RoomTypeName,
+
+      // ✅ FIX MEAL
+      Inclusion:
+        dbRoom?.Inclusion || tboRoom.Inclusion,
+
+      // ✅ FIX REFUNDABLE
+      IsRefundable:
+        dbRoom?.IsRefundable ?? tboRoom.IsRefundable,
+    };
+  });
+} else {
+  rooms = tboRooms.length > 0 ? tboRooms : dbRooms;
+}
+
+  /* ================= IMAGES ================= */
+
+  const images = rooms.flatMap(
+    (r) => r?.images || r?.Images || []
+  );
+
+  const heroImage = images[0] || null;
+
+  /* ================= GUESTS ================= */
+
   const guests =
-    result?.Rooms?.flatMap((room) => room?.HotelPassenger || []) ||
+    rooms.flatMap((room) => room?.HotelPassenger || []) ||
     travellers ||
     [];
 
-  // 🔥 Pricing (TBO > DB)
-  const totalFare = result?.InvoiceAmount || pricingSnapshot?.totalAmount || 0;
+  /* ================= PRICING ================= */
 
-  const currency = result?.Currency || pricingSnapshot?.currency || "INR";
+  const totalFare =
+    result?.InvoiceAmount ||
+    pricingSnapshot?.totalAmount ||
+    0;
 
-  // 🔥 Dates (TBO > DB)
-  const checkIn = result?.CheckInDate || bookingSnapshot?.checkInDate;
+  const currency =
+    result?.Currency ||
+    pricingSnapshot?.currency ||
+    "INR";
 
-  const checkOut = result?.CheckOutDate || bookingSnapshot?.checkOutDate;
+  /* ================= DATES ================= */
 
-  // 🔥 Hotel info (TBO > DB)
-  const hotelName = result?.HotelName || bookingSnapshot?.hotelName;
+  const checkIn =
+    result?.CheckInDate ||
+    bookingSnapshot?.checkInDate;
 
-  const city = result?.City || bookingSnapshot?.city;
+  const checkOut =
+    result?.CheckOutDate ||
+    bookingSnapshot?.checkOutDate;
 
-  const status = result?.HotelBookingStatus || executionStatus;
+  /* ================= HOTEL INFO ================= */
+
+  const hotelName =
+    result?.HotelName ||
+    bookingSnapshot?.hotelName;
+
+  const city =
+    result?.City ||
+    bookingSnapshot?.city;
+
+  const status =
+    result?.HotelBookingStatus ||
+    executionStatus;
 
   /* ================= FINAL RESPONSE ================= */
 
@@ -631,7 +808,6 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
     data: {
       bookingId: booking._id,
       bookingReference,
-
       purposeOfTravel: booking.purposeOfTravel,
 
       // ✅ DB (stable)
@@ -641,6 +817,10 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
       pricingSnapshot,
       travellers,
 
+      // ✅ NEW (CRITICAL FIX)
+      rooms,
+
+      // ✅ MEDIA
       images,
       heroImage,
 
@@ -662,7 +842,7 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
 
       amendment,
 
-      // ✅ audit fields (ADD THESE)
+      // ✅ audit fields
       createdAt: booking.createdAt,
       approvedAt: booking.approvedAt,
       approvedBy: booking.approvedBy,

@@ -35,6 +35,20 @@ router.get("/flights", adminBookingCtrl.getAllFlightBookingsAdmin);
  * ============================================================
  */
 router.get("/hotels", adminBookingCtrl.getAllHotelBookingsAdmin);
-router.get("/hotels/cancelled", adminBookingCtrl.getCancelledHotelBookingsAdmin);
+router.get(
+  "/hotels/cancelled",
+  adminBookingCtrl.getCancelledHotelBookingsAdmin,
+);
+
+
+router.get("/", adminBookingCtrl.getAllEmployees); // list all employees
+router.get("/:id", adminBookingCtrl.getEmployee); // single employee
+router.put("/:id", adminBookingCtrl.updateEmployee); // update employee
+router.patch("/:id/toggle-status", adminBookingCtrl.toggleEmployeeStatus); // toggle status
+router.delete("/:id", adminBookingCtrl.removeEmployee); // delete employee
+
+//MANAGER ONBOARDING PROCESS (PROMOTION OF MANAGER)
+router.put("/promote/:userId", adminBookingCtrl.promoteToManager);
+router.put("/demote/:userId", adminBookingCtrl.demoteToEmployee);
 
 module.exports = router;
