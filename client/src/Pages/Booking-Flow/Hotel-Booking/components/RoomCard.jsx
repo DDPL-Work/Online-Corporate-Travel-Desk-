@@ -19,7 +19,7 @@ import {
 } from "react-icons/fa";
 import { RiRestaurant2Line } from "react-icons/ri";
 
-const RoomCard = ({ room, onSelect }) => {
+const RoomCard = ({ room, count, onAdd, onRemove }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [imgIndex, setImgIndex] = useState(0);
 
@@ -61,7 +61,9 @@ const RoomCard = ({ room, onSelect }) => {
       lower.includes("meal") ||
       lower.includes("dinner")
     )
-      return <RiRestaurant2Line className="text-amber-500 text-sm sm:text-base" />;
+      return (
+        <RiRestaurant2Line className="text-amber-500 text-sm sm:text-base" />
+      );
     if (lower.includes("bed") || lower.includes("occupancy"))
       return <FaBed className="text-blue-500 text-sm sm:text-base" />;
     if (lower.includes("wifi") || lower.includes("internet"))
@@ -80,7 +82,6 @@ const RoomCard = ({ room, onSelect }) => {
   return (
     <div className="group w-full bg-white rounded-lg sm:rounded-xl lg:rounded-2xl border border-slate-200 hover:border-blue-400 hover:shadow-md sm:hover:shadow-lg lg:hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 overflow-hidden">
       <div className="flex flex-col lg:flex-row h-full">
-        
         {/* IMAGE SECTION - Responsive */}
         <div className="w-full lg:w-50 shrink-0 relative bg-slate-100 overflow-hidden aspect-video sm:aspect-video lg:aspect-square">
           <img
@@ -95,8 +96,12 @@ const RoomCard = ({ room, onSelect }) => {
           {/* Photo Counter - Mobile Optimized */}
           <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3 flex items-center gap-2">
             <span className="bg-black/60 backdrop-blur-sm text-white text-[8px] sm:text-[9px] lg:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded uppercase tracking-wider">
-              <span className="inline sm:hidden">{imgIndex + 1}/{totalImages}</span>
-              <span className="hidden sm:inline">{imgIndex + 1} / {totalImages} PHOTOS</span>
+              <span className="inline sm:hidden">
+                {imgIndex + 1}/{totalImages}
+              </span>
+              <span className="hidden sm:inline">
+                {imgIndex + 1} / {totalImages} PHOTOS
+              </span>
             </span>
           </div>
 
@@ -135,12 +140,19 @@ const RoomCard = ({ room, onSelect }) => {
               </span>
             </span>
           </div>
+
+          {/* {isSelected && (
+            <div className="absolute top-2 right-2 z-10">
+              <span className="bg-green-600 text-white text-[9px] font-bold px-2 py-1 rounded-md shadow">
+                ✓ Selected
+              </span>
+            </div>
+          )} */}
         </div>
 
         {/* INFO SECTION - Responsive */}
         <div className="flex-1 p-3 sm:p-4 lg:p-5 flex flex-col justify-between border-b sm:border-b lg:border-b-0 lg:border-r border-slate-100">
           <div className="space-y-2 sm:space-y-3 lg:space-y-4">
-            
             {/* Title Section */}
             <div>
               <h3 className="text-base sm:text-lg lg:text-xl font-black text-[#0a2540] tracking-tight leading-tight">
@@ -176,7 +188,10 @@ const RoomCard = ({ room, onSelect }) => {
             {/* Inclusions Grid - Responsive Columns */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-y-1.5 sm:gap-y-2 gap-x-2 sm:gap-x-3 lg:gap-x-4">
               {inclusions.slice(0, showDetails ? 100 : 3).map((inc, i) => (
-                <div key={i} className="flex items-center gap-1.5 sm:gap-2 group/inc min-w-0">
+                <div
+                  key={i}
+                  className="flex items-center gap-1.5 sm:gap-2 group/inc min-w-0"
+                >
                   <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 lg:w-5 lg:h-5 rounded bg-slate-50 flex items-center justify-center group-hover/inc:bg-blue-50 transition-colors flex-shrink-0">
                     {getInclusionIcon(inc)}
                   </div>
@@ -202,7 +217,9 @@ const RoomCard = ({ room, onSelect }) => {
                 ) : (
                   <>
                     <MdExpandMore className="text-sm sm:text-base" />
-                    <span className="hidden sm:inline">VIEW {inclusions.length - 3} MORE</span>
+                    <span className="hidden sm:inline">
+                      VIEW {inclusions.length - 3} MORE
+                    </span>
                     <span className="sm:hidden">+{inclusions.length - 3}</span>
                   </>
                 )}
@@ -213,7 +230,6 @@ const RoomCard = ({ room, onSelect }) => {
 
         {/* BOOKING SECTION - Responsive */}
         <div className="w-full lg:w-64 p-3 sm:p-4 lg:p-5 bg-slate-50/50 flex flex-col sm:flex-row lg:flex-col justify-between items-start sm:items-center lg:items-stretch gap-2 sm:gap-3 lg:gap-0">
-          
           {/* Price Information - Responsive */}
           <div className="flex-1 sm:flex-1 lg:flex-none space-y-0.5 sm:space-y-1 lg:space-y-1.5 w-full">
             <div className="text-[8px] sm:text-[9px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -246,13 +262,34 @@ const RoomCard = ({ room, onSelect }) => {
 
           {/* CTA Button - Responsive */}
           <div className="w-full sm:w-auto lg:w-full">
-            <button
-              onClick={onSelect}
-              className="w-full px-2 sm:px-4 lg:px-0 bg-[#0a2540] hover:bg-blue-700 active:bg-blue-800 text-white text-[9px] sm:text-xs lg:text-xs font-black py-2 sm:py-2.5 lg:py-3 rounded-lg sm:rounded-xl border border-[#0a2540] transition-all transform active:scale-[0.98] hover:shadow-md sm:hover:shadow-lg whitespace-nowrap"
-            >
-              <span className="hidden sm:inline">SELECT THIS ROOM</span>
-              <span className="sm:hidden">SELECT</span>
-            </button>
+            <div className="w-full flex items-center justify-center gap-2">
+  {count > 0 ? (
+    <>
+      <button
+        onClick={onRemove}
+        className="w-8 h-8 bg-gray-300 rounded text-lg font-bold"
+      >
+        -
+      </button>
+
+      <span className="font-bold text-lg">{count}</span>
+
+      <button
+        onClick={onAdd}
+        className="w-8 h-8 bg-[#0A4D68] text-white rounded text-lg font-bold"
+      >
+        +
+      </button>
+    </>
+  ) : (
+    <button
+      onClick={onAdd}
+      className="w-full bg-[#0A4D68] text-white py-2 rounded-lg font-semibold"
+    >
+      ADD
+    </button>
+  )}
+</div>
           </div>
         </div>
       </div>

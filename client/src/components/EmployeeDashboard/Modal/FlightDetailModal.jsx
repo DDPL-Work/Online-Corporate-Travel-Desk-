@@ -516,6 +516,8 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
     const status = changeStatus?.Response?.ChangeRequestStatus;
 
     switch (status) {
+      case 0:
+        return "not_set";
       case 1:
         return "unassigned";
       case 2:
@@ -530,10 +532,82 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
         return "closed";
       case 7:
         return "pending";
+      case 8:
+        return "other";
       default:
         return null;
     }
   })();
+
+  const getCancellationUI = () => {
+    switch (liveStatus) {
+      case "completed":
+        return {
+          text: "Booking Cancelled Successfully",
+          bg: "bg-red-50 border-red-100",
+          textColor: "text-red-700",
+          iconColor: "text-red-500",
+        };
+
+      case "rejected":
+        return {
+          text: "Cancellation Rejected",
+          bg: "bg-red-50 border-red-100",
+          textColor: "text-red-700",
+          iconColor: "text-red-500",
+        };
+
+      case "unassigned":
+        return {
+          text: "Cancellation Requested",
+          bg: "bg-orange-50 border-orange-100",
+          textColor: "text-orange-700",
+          iconColor: "text-orange-500",
+        };
+
+      case "assigned":
+        return {
+          text: "Cancellation Assigned",
+          bg: "bg-orange-50 border-orange-100",
+          textColor: "text-orange-700",
+          iconColor: "text-orange-500",
+        };
+
+      case "acknowledged":
+        return {
+          text: "Cancellation in Progress",
+          bg: "bg-orange-50 border-orange-100",
+          textColor: "text-orange-700",
+          iconColor: "text-orange-500",
+        };
+
+      case "pending":
+        return {
+          text: "Cancellation Pending",
+          bg: "bg-amber-50 border-amber-100",
+          textColor: "text-amber-700",
+          iconColor: "text-amber-500",
+        };
+
+      case "closed":
+        return {
+          text: "Request Closed",
+          bg: "bg-slate-50 border-slate-200",
+          textColor: "text-slate-700",
+          iconColor: "text-slate-500",
+        };
+
+      default:
+        return {
+          text: "Processing cancellation...",
+          bg: "bg-orange-50 border-orange-100",
+          textColor: "text-orange-700",
+          iconColor: "text-orange-500",
+        };
+    }
+  };
+
+  const cancelUI = getCancellationUI();
 
   // ── Fetch on open
   useEffect(() => {
@@ -566,16 +640,16 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
   useEffect(() => {
     if (!booking?.amendment?.changeRequestId) return;
 
-    const interval = setInterval(() => {
-      dispatch(
-        fetchChangeStatus({
-          changeRequestId: booking.amendment.changeRequestId,
-          bookingId: booking._id,
-        }),
-      );
-    }, 5000); // every 5 sec
+    // const interval = setInterval(() => {
+    dispatch(
+      fetchChangeStatus({
+        changeRequestId: booking.amendment.changeRequestId,
+        bookingId: booking._id,
+      }),
+    );
+    // }, 60000); // every 10 sec
 
-    return () => clearInterval(interval);
+    // return () => clearInterval(interval);
   }, [booking, dispatch]);
 
   if (!isOpen) return null;
@@ -600,6 +674,36 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
     booking?.totalFare ||
     itinerary?.Fare?.PublishedFare ||
     0;
+
+  const getHeaderBadge = () => {
+    if (executionStatus === "cancelled" || liveStatus === "completed") {
+      return {
+        text: "Cancelled",
+        className: "bg-red-100 text-red-700",
+        icon: <MdCancel size={11} />,
+      };
+    }
+
+    if (liveStatus && liveStatus !== "completed") {
+      return {
+        text: "Cancelling...",
+        className: "bg-orange-100 text-orange-700",
+        icon: <FiRefreshCw size={11} />,
+      };
+    }
+
+    if (isConfirmed) {
+      return {
+        text: "Ticketed",
+        className: "bg-emerald-100 text-emerald-800",
+        icon: <MdVerifiedUser size={11} />,
+      };
+    }
+
+    return null;
+  };
+
+  const headerBadge = getHeaderBadge();
 
   return (
     <>
@@ -634,9 +738,12 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
               )}
             </div>
 
-            {isConfirmed && (
-              <span className="hidden sm:flex items-center gap-1 bg-emerald-100 text-emerald-800 rounded-full px-2.5 py-1 text-[10px] font-bold whitespace-nowrap">
-                <MdVerifiedUser size={11} /> Ticketed
+            {headerBadge && (
+              <span
+                className={`hidden sm:flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold whitespace-nowrap ${headerBadge.className}`}
+              >
+                {headerBadge.icon}
+                {headerBadge.text}
               </span>
             )}
 
@@ -692,49 +799,28 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
                   <SectionCard>
                     <CardLabel icon={MdCancel} label="Cancellation" />
                     <div
-                      className={`flex items-start gap-3 rounded-xl px-4 py-3 border ${
-                        liveStatus === "completed" || liveStatus === "rejected"
-                          ? "bg-red-50 border-red-100"
-                          : "bg-orange-50 border-orange-100"
-                      }`}
+                      className={`flex items-start gap-3 rounded-xl px-4 py-3 border ${cancelUI.bg}`}
                     >
                       <FiXCircle
                         size={16}
-                        className={`shrink-0 mt-0.5 ${executionStatus === "cancelled" ? "text-red-500" : "text-orange-500"}`}
+                        className={`shrink-0 mt-0.5 ${cancelUI.iconColor}`}
                       />
+
                       <div>
                         <p
-                          className={`text-[13px] font-bold ${executionStatus === "cancelled" ? "text-red-700" : "text-orange-700"}`}
+                          className={`text-[13px] font-bold ${cancelUI.textColor}`}
                         >
-                          {liveStatus === "completed"
-                            ? "Booking Cancelled Successfully"
-                            : liveStatus === "rejected"
-                              ? "Cancellation Rejected"
-                              : liveStatus === "unassigned"
-                                ? "Cancellation Requested"
-                                : liveStatus === "assigned"
-                                  ? "Cancellation Assigned"
-                                  : liveStatus === "acknowledged"
-                                    ? "Cancellation in Progress..."
-                                    : liveStatus === "pending"
-                                      ? "Cancellation Pending"
-                                      : executionStatus === "cancelled"
-                                        ? "This booking has been cancelled"
-                                        : "Processing cancellation..."}
+                          {cancelUI.text}
                         </p>
+
                         {booking?.amendment?.changeRequestId && (
                           <p className="text-[11px] text-orange-500 mt-1">
                             Request ID: {booking.amendment.changeRequestId}
                           </p>
                         )}
+
                         {booking?.cancelledAt && (
-                          <p
-                            className={`text-[11px] mt-0.5 ${executionStatus === "cancelled" ? "text-red-500" : "text-orange-500"}`}
-                          >
-                            {executionStatus === "cancelled"
-                              ? "Cancelled"
-                              : "Requested"}{" "}
-                            on{" "}
+                          <p className="text-[11px] mt-0.5 text-slate-500">
                             {formatDate(
                               booking.cancelledAt || booking.updatedAt,
                             )}

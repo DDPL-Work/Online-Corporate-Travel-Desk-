@@ -26,7 +26,7 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
 
   // PRIMARY CONTACT
  const primaryContact = req.body.primaryContact || {};
-const secondaryContact = req.body.secondaryContact || {};
+// const secondaryContact = req.body.secondaryContact || {};
 const billingDepartment = req.body.billingDepartment || {};
 const registeredAddress = req.body.registeredAddress || {};
 const ssoConfig = req.body.ssoConfig || {};
@@ -136,7 +136,7 @@ const gstDetails = req.body.gstDetails || {};
     corporateName,
     registeredAddress,
     primaryContact,
-    secondaryContact,
+    // secondaryContact,
     billingDepartment,
 
     ssoConfig: { ...ssoConfig, verified: false },
@@ -240,9 +240,9 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
 
   corporate.primaryContact.role = "corporate-super-admin";
 
-  if (corporate.secondaryContact?.email) {
-    corporate.secondaryContact.role = "travel-admin";
-  }
+  // if (corporate.secondaryContact?.email) {
+  //   corporate.secondaryContact.role = "travel-admin";
+  // }
 
   await corporate.save();
 
@@ -290,13 +290,13 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
 
   const primaryAdmin = await createOrUpdateUserWithRole(
     corporate.primaryContact,
-    "corporate-super-admin",
-  );
-
-  const secondaryAdmin = await createOrUpdateUserWithRole(
-    corporate.secondaryContact,
     "travel-admin",
   );
+
+  // const secondaryAdmin = await createOrUpdateUserWithRole(
+  //   corporate.secondaryContact,
+  //   "travel-admin",
+  // );
 
   try {
     if (primaryAdmin) {
@@ -307,13 +307,13 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
       );
     }
 
-    if (secondaryAdmin) {
-      await emailService.sendCorporateOnboarding(
-        corporate,
-        secondaryAdmin.token,
-        secondaryAdmin.user,
-      );
-    }
+    // if (secondaryAdmin) {
+    //   await emailService.sendCorporateOnboarding(
+    //     corporate,
+    //     secondaryAdmin.token,
+    //     secondaryAdmin.user,
+    //   );
+    // }
   } catch (err) {
     console.error("Email sending failed:", err);
   }

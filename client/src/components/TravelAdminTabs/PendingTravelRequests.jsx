@@ -8,7 +8,9 @@ import {
   rejectApproval,
 } from "../../Redux/Actions/approval.thunks";
 import Swal from "sweetalert2";
-import PendingHotelDetailsModal from "./Modal/PendingHotelDetailsModal";
+import PendingHotelDetailsModal, {
+  PendingFlightDetailsModal,
+} from "./Modal/PendingHotelDetailsModal";
 import {
   LabeledField,
   StatCard,
@@ -50,7 +52,31 @@ export default function PendingTravelRequests() {
           "Employee",
         employeeId: b.userId?.employeeId || b.userId?._id || "N/A",
         bookedDate: b.createdAt ? new Date(b.createdAt) : new Date(),
-        estimatedCost: b.pricingSnapshot?.totalAmount || 0,
+        // estimatedCost: b.pricingSnapshot?.totalAmount || b.hotelRequest.selectedRoom.rawRoomData[0].Price.totalFare || 0,
+        estimatedCost: (() => {
+          const rooms = b.hotelRequest?.selectedRoom?.rawRoomData || [];
+
+          if (!Array.isArray(rooms)) return 0;
+
+          return rooms.reduce((total, room) => {
+            // ✅ Priority 1: Use TotalFare (already final)
+            if (room.TotalFare) return total + room.TotalFare;
+
+            // ✅ Priority 2: Use Price.totalFare
+            if (room.Price?.totalFare) return total + room.Price.totalFare;
+
+            // ✅ Priority 3: Calculate from DayRates
+            if (Array.isArray(room.DayRates)) {
+              const roomTotal = room.DayRates.flat().reduce(
+                (sum, day) => sum + (day.BasePrice || 0),
+                0,
+              );
+              return total + roomTotal;
+            }
+
+            return total;
+          }, 0);
+        })(),
         originalData: b, // Important for the detailed modal
       };
 
@@ -185,11 +211,7 @@ export default function PendingTravelRequests() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse min-w-[860px]">
               <thead>
-                <tr
-                  className={
-                    activeTab === "flight" ? "bg-[#0A4D68]" : "bg-[#088395]"
-                  }
-                >
+                <tr className="bg-[#dac448]">
                   <Th>Request ID</Th>
                   <Th>Traveller Name</Th>
                   <Th>Requested Date</Th>
@@ -200,59 +222,82 @@ export default function PendingTravelRequests() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredData.map((r, i) => (
-                  <tr
-                    key={r.id}
-                    className={`transition-colors hover:bg-slate-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
-                  >
-                    <td className="px-4 py-3">
-                      <IdCell id={r.id} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-[13px] text-slate-800">
-                          {r.employee}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          {r.employeeId}
-                        </span>
+                {filteredData.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-4 py-10 text-center">
+                      <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
+                        <FiList size={28} />
+                        <p className="text-sm font-semibold">
+                          No {activeTab === "flight" ? "flight" : "hotel"}{" "}
+                          requests found
+                        </p>
+                        <p className="text-xs">
+                          There are currently no pending {activeTab} requests to
+                          display.
+                        </p>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {r.bookedDate.toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className="px-4 py-3 font-bold text-slate-900 text-[13px]">
-                      ₹{r.estimatedCost.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={r.status} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-slate-800 text-[13px]">
-                          {activeTab === "flight"
-                            ? `${r.cityFrom} → ${r.cityTo}`
-                            : r.hotelName}
-                        </span>
-                        {/* <span className="font-mono text-[11px] text-slate-400">
-                          {activeTab === "flight" ? r.pnr : r.city}
-                        </span> */}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => setSelectedRequest(r)}
-                        className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] transition shadow-sm"
-                      >
-                        View
-                      </button>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredData.map((r, i) => (
+                    <tr
+                      key={r.id}
+                      className={`transition-colors hover:bg-slate-50 ${
+                        i % 2 === 0 ? "bg-white" : "bg-slate-50/50"
+                      }`}
+                    >
+                      <td className="px-4 py-3">
+                        <IdCell id={r.id} />
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-[13px] text-slate-800">
+                            {r.employee}
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            {r.employeeId}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3 text-[13px] text-slate-500">
+                        {r.bookedDate.toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </td>
+
+                      <td className="px-4 py-3 font-bold text-slate-900 text-[13px]">
+                        ₹{r.estimatedCost.toLocaleString()}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <StatusBadge status={r.status} />
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-800 text-[13px]">
+                            {activeTab === "flight"
+                              ? `${r.cityFrom} → ${r.cityTo}`
+                              : r.hotelName}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => setSelectedRequest(r)}
+                          className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] transition shadow-sm"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -271,43 +316,12 @@ export default function PendingTravelRequests() {
 
       {/* Flight Modal placeholder (if needed) */}
       {selectedRequest && selectedRequest.type === "flight" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-8 max-w-lg w-full">
-            <div className="flex justify-between mb-4">
-              <h2 className="text-xl font-bold">Flight Review (Simple View)</h2>
-              <button onClick={() => setSelectedRequest(null)}>
-                <FiX />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <p>
-                <strong>Route:</strong> {selectedRequest.cityFrom} to{" "}
-                {selectedRequest.cityTo}
-              </p>
-              <p>
-                <strong>Cost:</strong> ₹{selectedRequest.estimatedCost}
-              </p>
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={() =>
-                    handleAction(selectedRequest.id, "flight", "reject")
-                  }
-                  className="px-4 py-2 border rounded text-red-600"
-                >
-                  Reject
-                </button>
-                <button
-                  onClick={() =>
-                    handleAction(selectedRequest.id, "flight", "approve")
-                  }
-                  className="px-4 py-2 bg-green-600 text-white rounded"
-                >
-                  Approve
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PendingFlightDetailsModal
+          booking={selectedRequest.originalData}
+          onClose={() => setSelectedRequest(null)}
+          onApprove={handleAction}
+          onReject={handleAction}
+        />
       )}
     </div>
   );

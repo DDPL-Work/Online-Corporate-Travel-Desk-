@@ -1,10 +1,13 @@
 // ==========================================
 // FILE: src/routes/dashboard.routes.js
 // ==========================================
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const dashboardController = require('../controllers/dashboard.controller');
-const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
+const dashboardController = require("../controllers/dashboard.controller");
+const {
+  verifyToken,
+  authorizeRoles,
+} = require("../middleware/auth.middleware");
 
 router.use(verifyToken);
 
@@ -12,9 +15,9 @@ router.use(verifyToken);
    EMPLOYEE DASHBOARD
 ========================================== */
 router.get(
-  '/employee',
-  authorizeRoles('employee'),
-  dashboardController.getEmployeeDashboard
+  "/employee",
+  authorizeRoles("employee"),
+  dashboardController.getEmployeeDashboard,
 );
 
 /* ==========================================
@@ -22,18 +25,28 @@ router.get(
    (Travel Admin + Corporate Super Admin)
 ========================================== */
 router.get(
-  '/corporate',
-  authorizeRoles('travel-admin', 'corporate-super-admin'),
-  dashboardController.getCorporateDashboard
+  "/corporate",
+  authorizeRoles("travel-admin", "corporate-super-admin"),
+  dashboardController.getCorporateDashboard,
+);
+
+/* ==========================================
+   CORPORATE DASHBOARD
+   (Manager)
+========================================== */
+router.get(
+  "/corporate-manager",
+  authorizeRoles("manager"),
+  dashboardController.getManagerDashboard,
 );
 
 /* ==========================================
    PLATFORM SUPER ADMIN DASHBOARD
 ========================================== */
 router.get(
-  '/super-admin',
-  authorizeRoles('super-admin'),
-  dashboardController.getSuperAdminDashboard
+  "/super-admin",
+  authorizeRoles("super-admin"),
+  dashboardController.getSuperAdminDashboard,
 );
 
 module.exports = router;

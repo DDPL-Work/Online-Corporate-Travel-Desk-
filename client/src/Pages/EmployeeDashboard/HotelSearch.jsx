@@ -278,13 +278,12 @@ export default function HotelSearchPage() {
       CityCode: selectedCityCode, // string is fine
       GuestNationality: country, // 🔥 IMPORTANT
       NoOfRooms: rooms,
-      PaxRooms: [
-        {
-          Adults: adults,
-          Children: children,
-          ChildrenAges: children > 0 ? Array(children).fill(5) : [],
-        },
-      ],
+      PaxRooms: Array.from({ length: rooms }, (_, i) => ({
+        Adults: Math.floor(adults / rooms) + (i < adults % rooms ? 1 : 0),
+        Children: Math.floor(children / rooms) + (i < children % rooms ? 1 : 0),
+        ChildrenAges:
+          children > 0 ? Array(Math.floor(children / rooms)).fill(5) : [],
+      })),
       IsDetailedResponse: true,
       Filters: {
         Refundable: false,
@@ -638,7 +637,7 @@ export default function HotelSearchPage() {
             </div>
 
             {/* Popular Pills — updates based on selected country */}
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            {/* <div className="mt-4 flex flex-wrap items-center gap-2">
               <span className="text-xs font-semibold text-gray-400">
                 Popular:
               </span>
@@ -652,7 +651,7 @@ export default function HotelSearchPage() {
                   <FaMapMarkerAlt className="text-xs" /> {c}
                 </button>
               ))}
-            </div>
+            </div> */}
 
             {/* Search Button */}
             <div className="mt-5">

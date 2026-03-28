@@ -5,7 +5,7 @@ export const getMyTravelAdmin = createAsyncThunk(
   "employee/getMyTravelAdmin",
   async (_, { rejectWithValue }) => {
     try {
-      const res = await api.get("/my-travel-admin/me");
+      const res = await api.get("/employees/me");
       return res.data.data;
     } catch (error) {
       return rejectWithValue(

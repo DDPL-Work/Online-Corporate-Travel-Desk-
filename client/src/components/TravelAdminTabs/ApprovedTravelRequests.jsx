@@ -46,6 +46,7 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
   const [search, setSearch] = useState("");
   const [startDate, setStart] = useState("");
   const [endDate, setEnd] = useState("");
+  const [travelDate, setTravelDate] = useState("");
   const [execFilter, setExec] = useState("All");
   const [selected, setSelected] = useState(null);
 
@@ -136,7 +137,7 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <LabeledField label="Search">
             <SearchBar
               value={search}
@@ -157,6 +158,14 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
               type="date"
               value={endDate}
               onChange={(e) => setEnd(e.target.value)}
+              className={dateCls}
+            />
+          </LabeledField>
+          <LabeledField label="Travel Date">
+            <input
+              type="date"
+              value={travelDate}
+              onChange={(e) => setTravelDate(e.target.value)}
               className={dateCls}
             />
           </LabeledField>
@@ -191,25 +200,17 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
+              {filtered.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan="9"
-                    className="py-16 text-center text-slate-400 text-sm animate-pulse"
-                  >
-                    Loading…
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="py-16 text-center text-slate-400">
-                    <FaPlane size={32} className="mx-auto opacity-20 mb-3" />
+                  <td colSpan="8" className="py-16 text-center text-slate-400">
+                    <div className="flex justify-center mb-3">
+                      <FaPlane size={32} className="opacity-20" />
+                    </div>
                     <p className="font-semibold text-sm">
-                      No flight approvals found
+                      No cancelled flight bookings found
                     </p>
-                    <p className="text-xs mt-1 text-red-400">
-                      Ticketed &amp; cancelled bookings are excluded from this
-                      view
+                    <p className="text-xs mt-1">
+                      Try adjusting the filters or search query
                     </p>
                   </td>
                 </tr>
@@ -313,6 +314,8 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
   const [search, setSearch] = useState("");
   const [startDate, setStart] = useState("");
   const [endDate, setEnd] = useState("");
+  const [checkInDate, setCheckInDate] = useState("");
+  const [checkOutDate, setCheckOutDate] = useState("");
   const [execFilter, setExec] = useState("All");
   const [selected, setSelected] = useState(null);
 
@@ -399,7 +402,7 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
           <LabeledField label="Search">
             <SearchBar
               value={search}
@@ -420,6 +423,22 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
               type="date"
               value={endDate}
               onChange={(e) => setEnd(e.target.value)}
+              className={dateCls}
+            />
+          </LabeledField>
+          <LabeledField label="CheckIn Date">
+            <input
+              type="date"
+              value={checkInDate}
+              onChange={(e) => setCheckInDate(e.target.value)}
+              className={dateCls}
+            />
+          </LabeledField>
+          <LabeledField label="CheckOut Date">
+            <input
+              type="date"
+              value={checkOutDate}
+              onChange={(e) => setCheckOutDate(e.target.value)}
               className={dateCls}
             />
           </LabeledField>
@@ -454,24 +473,17 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
+              {filtered.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan="9"
-                    className="py-16 text-center text-slate-400 text-sm animate-pulse"
-                  >
-                    Loading…
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="py-16 text-center text-slate-400">
-                    <FiHome size={32} className="mx-auto opacity-20 mb-3" />
+                  <td colSpan="8" className="py-16 text-center text-slate-400">
+                    <div className="flex justify-center mb-3">
+                      <FaPlane size={32} className="opacity-20" />
+                    </div>
                     <p className="font-semibold text-sm">
-                      No hotel approvals found
+                      No cancelled flight bookings found
                     </p>
-                    <p className="text-xs mt-1 text-red-400">
-                      Voucher-generated &amp; cancelled bookings are excluded
+                    <p className="text-xs mt-1">
+                      Try adjusting the filters or search query
                     </p>
                   </td>
                 </tr>

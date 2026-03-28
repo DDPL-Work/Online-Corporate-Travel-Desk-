@@ -140,7 +140,17 @@ exports.searchHotels = asyncHandler(async (req, res) => {
   const hotelCodeResponse = await tboService.getTBOHotelCodeList(CityCode);
 
   if (!hotelCodeResponse?.Hotels?.length) {
-    throw new ApiError(404, "No hotels found for this city");
+    console.log("⚠️ No hotel codes found, returning empty safely");
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          HotelResult: [],
+        },
+        "No hotels found for this city",
+      ),
+    );
   }
 
   const hotelCodesArray = hotelCodeResponse.Hotels.slice(0, 200); // 🔥 reduce for performance
@@ -150,7 +160,18 @@ exports.searchHotels = asyncHandler(async (req, res) => {
      STEP 2: SEARCH (PRICE + ROOMS)
   ===================================================== */
 
-  const searchResults = await tboService.searchHotels({
+  // const searchResults = await tboService.searchHotels({
+  //   CheckIn,
+  //   CheckOut,
+  //   HotelCodes: hotelCodes,
+  //   GuestNationality: "IN",
+  //   NoOfRooms,
+  //   PaxRooms,
+  //   IsDetailedResponse,
+  //   Filters,
+  // });
+
+  let searchResults = await tboService.searchHotels({
     CheckIn,
     CheckOut,
     HotelCodes: hotelCodes,
@@ -160,6 +181,27 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     IsDetailedResponse,
     Filters,
   });
+
+  // ✅ 🔥 ONLY IF EMPTY → APPLY INTERNATIONAL FIX
+  if (!searchResults?.HotelResult?.length) {
+    console.log("⚠️ Empty result, retrying for international...");
+
+    searchResults = await tboService.searchHotels({
+      CheckIn,
+      CheckOut,
+      HotelCodes: hotelCodes,
+
+      // 🔥 override only in fallback
+      GuestNationality: "IN",
+
+      NoOfRooms,
+      PaxRooms,
+      IsDetailedResponse,
+
+      // 🔥 remove filters only in fallback
+      Filters: {},
+    });
+  }
 
   /* =====================================================
      STEP 3: DETAILS (BATCH)

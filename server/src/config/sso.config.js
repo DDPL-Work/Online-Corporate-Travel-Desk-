@@ -79,6 +79,8 @@ const upsertSSOUser = async ({
     options,
   ).lean();
 
+
+
   // If user existed already (not just created), update missing provider/id/picture/name if safe
   // Re-fetch as mongoose doc to allow save, only if we need to mutate more.
   let needSave = false;
@@ -195,14 +197,22 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           // );
 
           // 🔥 Determine correct role
-          let role = "employee";
+          // 🔥 CHECK EXISTING USER FIRST
+          let existingUser = await User.findOne({
+            email,
+            corporateId: corporate._id,
+          });
 
-          if (corporate.primaryContact?.email?.toLowerCase() === email) {
-            role = "corporate-super-admin";
-          } else if (
-            corporate.secondaryContact?.email?.toLowerCase() === email
-          ) {
-            role = "travel-admin";
+          let role;
+
+          if (existingUser) {
+            role = existingUser.role; // ✅ PRESERVE ROLE
+          } else {
+            role = "employee";
+
+            if (corporate.primaryContact?.email?.toLowerCase() === email) {
+              role = "travel-admin";
+            }
           }
 
           let user = await User.findOneAndUpdate(
@@ -226,20 +236,18 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             { new: true, upsert: true },
           );
 
+          user = await User.findById(user._id); 
+
           // 🔥 Ensure role stays correct even if user existed before
           let expectedRole = "employee";
           if (corporate.primaryContact?.email?.toLowerCase() === email) {
-            expectedRole = "corporate-super-admin";
-          } else if (
-            corporate.secondaryContact?.email?.toLowerCase() === email
-          ) {
             expectedRole = "travel-admin";
           }
 
-          if (user.role !== expectedRole) {
-            user.role = expectedRole;
-            await user.save();
-          }
+          // if (user.role) {
+          //   user.role = expectedRole;
+          //   await user.save();
+          // }
 
           // ✅ BLOCK USER LEVEL
           if (!user.isActive) {
@@ -247,7 +255,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           }
 
           // ✅ BLOCK EMPLOYEE IF EMPLOYEE PROFILE INACTIVE
-          if (user.role === "employee") {
+          if (!existingUser && user.role === "employee") {
             const emp = await Employee.findOneAndUpdate(
               { userId: user._id },
               {
@@ -323,13 +331,26 @@ if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET) {
           }
 
           // 🔥 Resolve correct role
-          let role = "employee";
-          if (corporate.primaryContact?.email?.toLowerCase() === email) {
-            role = "corporate-super-admin";
-          } else if (
-            corporate.secondaryContact?.email?.toLowerCase() === email
-          ) {
-            role = "travel-admin";
+          let existingUser = await User.findOne({
+            email,
+            corporateId: corporate._id,
+          });
+
+          let role;
+
+          if (existingUser) {
+            role = existingUser.role;
+          } else {
+            role = "employee";
+
+            if (corporate.primaryContact?.email?.toLowerCase() === email) {
+              role = "travel-admin";
+            }
+            // else if (
+            //   corporate.secondaryContact?.email?.toLowerCase() === email
+            // ) {
+            //   role = "travel-admin";
+            // }
           }
 
           let user = await User.findOneAndUpdate(
@@ -352,6 +373,8 @@ if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET) {
             { new: true, upsert: true },
           );
 
+          user = await User.findById(user._id);
+
           // 🔥 Ensure role stays correct
           let expectedRole = "employee";
           if (corporate.primaryContact?.email?.toLowerCase() === email) {
@@ -362,16 +385,16 @@ if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET) {
             expectedRole = "travel-admin";
           }
 
-          if (user.role !== expectedRole) {
-            user.role = expectedRole;
-            await user.save();
-          }
+          // if (user.role !== expectedRole) {
+          //   user.role = expectedRole;
+          //   await user.save();
+          // }
 
           if (!user.isActive) {
             return done(null, false, { message: "User account disabled" });
           }
 
-          if (user.role === "employee") {
+          if (!existingUser && user.role === "employee") {
             const emp = await Employee.findOne({ userId: user._id });
             if (emp && emp.status === "inactive") {
               return done(null, false, {
@@ -443,13 +466,26 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
           }
 
           // 🔥 Resolve correct role
-          let role = "employee";
-          if (corporate.primaryContact?.email?.toLowerCase() === email) {
-            role = "corporate-super-admin";
-          } else if (
-            corporate.secondaryContact?.email?.toLowerCase() === email
-          ) {
-            role = "travel-admin";
+          let existingUser = await User.findOne({
+            email,
+            corporateId: corporate._id,
+          });
+
+          let role;
+
+          if (existingUser) {
+            role = existingUser.role;
+          } else {
+            role = "employee";
+
+            if (corporate.primaryContact?.email?.toLowerCase() === email) {
+              role = "travel-admin";
+            }
+            // else if (
+            //   corporate.secondaryContact?.email?.toLowerCase() === email
+            // ) {
+            //   role = "travel-admin";
+            // }
           }
 
           let user = await User.findOneAndUpdate(
@@ -469,6 +505,8 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
             { new: true, upsert: true },
           );
 
+          user = await User.findById(user._id); 
+
           // 🔥 Ensure role stays correct
           let expectedRole = "employee";
           if (corporate.primaryContact?.email?.toLowerCase() === email) {
@@ -479,16 +517,16 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
             expectedRole = "travel-admin";
           }
 
-          if (user.role !== expectedRole) {
-            user.role = expectedRole;
-            await user.save();
-          }
+          // if (user.role !== expectedRole) {
+          //   user.role = expectedRole;
+          //   await user.save();
+          // }
 
           if (!user.isActive) {
             return done(null, false, { message: "User account disabled" });
           }
 
-          if (user.role === "employee") {
+          if (!existingUser && user.role === "employee") {
             const emp = await Employee.findOneAndUpdate(
               { userId: user._id },
               {

@@ -11,7 +11,7 @@ export default function EmployeeManagement() {
         <h1 className="text-2xl font-bold text-slate-800">
           Employee Management
         </h1>
-        <button className="bg-gradient-to-r from-teal-700 to-blue-600 text-white px-4 py-2 rounded-xl">
+        <button className="bg-linear-to-r from-teal-700 to-blue-600 text-white px-4 py-2 rounded-xl">
           + Add Employee
         </button>
       </div>

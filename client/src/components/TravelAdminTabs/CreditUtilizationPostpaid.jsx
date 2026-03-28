@@ -1,11 +1,20 @@
-import React, { useEffect, useState } from "react";
-import { FiFilter } from "react-icons/fi";
-import { FaRupeeSign } from "react-icons/fa";
+import React, { useEffect, useState, useMemo } from "react";
+import {
+  FiFilter,
+  FiDownload,
+  FiSearch,
+  FiCalendar,
+  FiDollarSign,
+  FiCreditCard,
+  FiActivity,
+} from "react-icons/fi";
+import { FaRupeeSign, FaBuilding } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchPostpaidBalance,
   fetchPostpaidTransactions,
 } from "../../Redux/Actions/postpaidThunks";
+import {Pagination} from "./Shared/Pagination";
 
 const colors = {
   primary: "#0A4D68",
@@ -13,203 +22,313 @@ const colors = {
   accent: "#05BFDB",
   light: "#F8FAFC",
   dark: "#1E293B",
+  success: "#10B981",
+  warning: "#F59E0B",
+  danger: "#EF4444",
 };
 
 export default function CreditUtilizationPostpaid() {
   const dispatch = useDispatch();
 
+  // Date presets: current month
   const today = new Date();
-
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
     .toISOString()
     .split("T")[0];
-
   const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0)
     .toISOString()
     .split("T")[0];
 
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState(firstDay);
   const [endDate, setEndDate] = useState(lastDay);
-  const [department, setDepartment] = useState("All");
+  const [corporate, setCorporate] = useState("All");
+  const [status, setStatus] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const { balance, transactions, loadingBalance, loadingTransactions } =
+  const { balance, transactions, pagination, loadingBalance, loadingTransactions } =
     useSelector((state) => state.postpaid);
 
-  // ✅ Fetch balance once
+  // Fetch balance once
   useEffect(() => {
     dispatch(fetchPostpaidBalance());
   }, [dispatch]);
 
-  // ✅ Fetch transactions when filters change
+  // Fetch transactions when filters/page change
   useEffect(() => {
     const params = {
       startDate,
       endDate,
+      page: currentPage,
+      limit: 10,
     };
-
-    if (department !== "All") {
-      params.department = department;
-    }
-
+    if (corporate !== "All") params.corporateId = corporate;
+    if (status !== "All") params.status = status;
     dispatch(fetchPostpaidTransactions(params));
-  }, [dispatch, startDate, endDate, department]);
+  }, [dispatch, startDate, endDate, corporate, status, currentPage]);
 
-  // ✅ Safe array fallback
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [startDate, endDate, corporate, status]);
+
+  // Safe arrays
   const safeTransactions = transactions || [];
 
-  const departments = [
-    "All",
-    ...new Set(safeTransactions.map((t) => t.department)),
-  ];
+  // Client-side search (search across corporate name, booking ID, description)
+  const searchedTransactions = useMemo(() => {
+    if (!searchTerm) return safeTransactions;
+    const term = searchTerm.toLowerCase();
+    return safeTransactions.filter(
+      (t) =>
+        (t.corporateId?.corporateName || "").toLowerCase().includes(term) ||
+        t.bookingId?.toLowerCase().includes(term) ||
+        t.description?.toLowerCase().includes(term)
+    );
+  }, [safeTransactions, searchTerm]);
+
+  // Get unique corporates for dropdown (from loaded transactions)
+  const corporates = useMemo(() => {
+    const unique = new Set(
+      safeTransactions.map((t) => t.corporateId?.corporateName).filter(Boolean)
+    );
+    return ["All", ...Array.from(unique)];
+  }, [safeTransactions]);
+
+  const statuses = ["All", "paid", "pending", "failed"]; // adjust based on actual statuses
+
+  // Summary stats (based on filtered results)
+  const totalTransactions = searchedTransactions.length;
+  const totalAmount = searchedTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+  const totalCreditUsed = searchedTransactions.reduce((sum, t) => sum + (t.creditUsed || 0), 0);
 
   return (
-    <div className="p-6" style={{ backgroundColor: colors.light }}>
-      <div className="max-w-6xl mx-auto">
-        {/* HEADER */}
-        <h1 className="text-3xl font-bold mb-6" style={{ color: colors.dark }}>
-          Credit Utilization (Postpaid)
-        </h1>
-
-        {/* SUMMARY CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div
-            className="bg-white shadow rounded-lg p-6"
-            style={{ borderLeft: `6px solid ${colors.primary}` }}
-          >
-            <p className="text-gray-600">Total Credit Limit</p>
-            <h2
-              className="text-3xl font-bold flex items-center gap-1 mt-2"
-              style={{ color: colors.primary }}
-            >
-              <FaRupeeSign />
-              {loadingBalance
-                ? "..."
-                : balance?.totalLimit?.toLocaleString() || 0}
-            </h2>
+    <div className="min-h-screen p-6 font-sans" style={{ backgroundColor: colors.light }}>
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* PAGE HEADER */}
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-12 h-12 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white">
+            <FiCreditCard size={24} />
           </div>
-
-          <div
-            className="bg-white shadow rounded-lg p-6"
-            style={{ borderLeft: `6px solid #F59E0B` }}
-          >
-            <p className="text-gray-600">Used Credit</p>
-            <h2 className="text-3xl font-bold flex items-center gap-1 mt-2 text-[#F59E0B]">
-              <FaRupeeSign />
-              {loadingBalance
-                ? "..."
-                : balance?.usedCredit?.toLocaleString() || 0}
-            </h2>
-          </div>
-
-          <div
-            className="bg-white shadow rounded-lg p-6"
-            style={{ borderLeft: `6px solid #10B981` }}
-          >
-            <p className="text-gray-600">Available Credit</p>
-            <h2 className="text-3xl font-bold flex items-center gap-1 mt-2 text-[#10B981]">
-              <FaRupeeSign />
-              {loadingBalance
-                ? "..."
-                : balance?.availableCredit?.toLocaleString() || 0}
-            </h2>
+          <div className="text-left">
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase leading-none">
+              Credit Utilization (Postpaid)
+            </h1>
+            <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-widest">
+              Monitor corporate credit usage
+            </p>
           </div>
         </div>
 
-        {/* FILTERS */}
-        <div className="bg-white shadow rounded-lg p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <FiFilter className="text-[#0A4D68]" size={22} />
-            <h2 className="text-lg font-semibold">Filters</h2>
-          </div>
+        {/* STATS CARDS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            label="Total Credit Limit"
+            value={
+              loadingBalance
+                ? "..."
+                : `₹${(balance?.totalLimit || 0).toLocaleString()}`
+            }
+            Icon={FaRupeeSign}
+            borderCls="border-[#0A4D68]"
+            iconBgCls="bg-[#0A4D68]/10"
+            iconColorCls="text-[#0A4D68]"
+          />
+          <StatCard
+            label="Used Credit"
+            value={
+              loadingBalance
+                ? "..."
+                : `₹${(balance?.usedCredit || 0).toLocaleString()}`
+            }
+            Icon={FiActivity}
+            borderCls="border-[#F59E0B]"
+            iconBgCls="bg-amber-50"
+            iconColorCls="text-amber-600"
+          />
+          <StatCard
+            label="Available Credit"
+            value={
+              loadingBalance
+                ? "..."
+                : `₹${(balance?.availableCredit || 0).toLocaleString()}`
+            }
+            Icon={FiDollarSign}
+            borderCls="border-[#10B981]"
+            iconBgCls="bg-emerald-50"
+            iconColorCls="text-emerald-600"
+          />
+          <StatCard
+            label="Total Transactions (filtered)"
+            value={totalTransactions}
+            Icon={FiActivity}
+            borderCls="border-[#088395]"
+            iconBgCls="bg-[#088395]/10"
+            iconColorCls="text-[#088395]"
+          />
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-sm font-medium">Start Date</label>
-              <input
-                type="date"
-                className="border w-full p-2 rounded mt-1"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
+        {/* FILTERS SECTION */}
+        <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <LabeledInput label="Search">
+              <div className="relative">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Corporate / Booking ID / Description..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+                />
+              </div>
+            </LabeledInput>
 
-            <div>
-              <label className="text-sm font-medium">End Date</label>
-              <input
-                type="date"
-                className="border w-full p-2 rounded mt-1"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
+            <LabeledInput label="From Date">
+              <div className="relative">
+                <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+                />
+              </div>
+            </LabeledInput>
 
-            <div>
-              <label className="text-sm font-medium">Department</label>
+            <LabeledInput label="To Date">
+              <div className="relative">
+                <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+                />
+              </div>
+            </LabeledInput>
+
+            <LabeledInput label="Corporate">
               <select
-                className="border w-full p-2 rounded mt-1"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
+                value={corporate}
+                onChange={(e) => setCorporate(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
               >
-                {departments.map((d, i) => (
-                  <option key={i}>{d}</option>
+                {corporates.map((c) => (
+                  <option key={c} value={c}>
+                    {c === "All" ? "All Corporates" : c}
+                  </option>
                 ))}
               </select>
-            </div>
+            </LabeledInput>
+
+            <LabeledInput label="Status">
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
+              >
+                {statuses.map((s) => (
+                  <option key={s} value={s}>
+                    {s === "All" ? "All Statuses" : s}
+                  </option>
+                ))}
+              </select>
+            </LabeledInput>
           </div>
         </div>
 
-        {/* TRANSACTION TABLE */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="p-6 border-b">
-            <h2 className="text-xl font-semibold">Credit Usage History</h2>
+        {/* TABLE SECTION */}
+        <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
+              Credit Usage History
+            </h2>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-bold transition-all shadow-md uppercase bg-[#0A4D68] hover:bg-[#088395]"
+              onClick={() => {}} // optional export
+            >
+              <FiDownload /> Export
+            </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead style={{ backgroundColor: colors.primary }}>
-                <tr>
-                  {["Date", "Employee", "Department", "Purpose", "Amount"].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        className="px-6 py-3 text-sm text-white font-semibold"
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr style={{ backgroundColor: colors.primary }} className="text-white">
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Date
+                  </th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Corporate
+                  </th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Booking ID
+                  </th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Type
+                  </th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Amount
+                  </th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Credit Used
+                  </th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Description
+                  </th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                    Status
+                  </th>
                 </tr>
               </thead>
-
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-slate-100 text-sm">
                 {loadingTransactions ? (
                   <tr>
-                    <td colSpan="5" className="text-center py-8 text-gray-500">
-                      Loading...
+                    <td colSpan="8" className="py-8 text-center text-slate-500">
+                      Loading transactions...
                     </td>
                   </tr>
-                ) : safeTransactions.length === 0 ? (
+                ) : searchedTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="text-center py-8 text-gray-500">
-                      No usage found for the selected filters
+                    <td colSpan="8" className="py-8 text-center text-slate-500">
+                      No transactions found for the selected filters.
                     </td>
                   </tr>
                 ) : (
-                  safeTransactions.map((t) => (
-                    <tr key={t._id} className="hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 text-sm">
-                        {new Date(
-                          t.paidDate || t.createdAt,
-                        ).toLocaleDateString()}
+                  searchedTransactions.map((t) => (
+                    <tr key={t._id} className="hover:bg-slate-50 transition-all">
+                      <td className="px-6 py-4 text-slate-600 font-medium">
+                        {new Date(t.paidDate || t.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 text-sm">
-                        {t.employeeId?.name?.firstName || ""}{" "}
-                        {t.employeeId?.name?.lastName || ""}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-800 text-[13px]">
+                            {t.corporateId?.corporateName || "—"}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            ID: {t.corporateId?._id || "—"}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-sm">{t.department}</td>
-                      <td className="px-6 py-4 text-sm">{t.purpose}</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-red-600">
-                        - ₹{t.amount?.toLocaleString()}
+                      <td className="px-6 py-4 font-mono text-slate-600 text-xs">
+                        {t.bookingId || "—"}
+                      </td>
+                      <td className="px-6 py-4 capitalize text-slate-600">
+                        {t.type || "—"}
+                      </td>
+                      <td className="px-6 py-4 font-black text-red-600">
+                        - ₹{(t.amount || 0).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-slate-600">
+                        ₹{(t.creditUsed || 0).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-slate-600 max-w-xs truncate">
+                        {t.description || "—"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <StatusBadge status={t.status} />
                       </td>
                     </tr>
                   ))
@@ -217,8 +336,84 @@ export default function CreditUtilizationPostpaid() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Footer */}
+          <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            <span>Showing {searchedTransactions.length} transaction(s)</span>
+            <Pagination
+              currentPage={pagination?.page || 1}
+              totalPages={pagination?.pages || 1}
+              onPageChange={setCurrentPage}
+              showFirstLast={true}
+            />
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/* ------------------- HELPER COMPONENTS ------------------- */
+function StatCard({ label, value, borderCls, iconBgCls, iconColorCls, Icon }) {
+  return (
+    <div
+      className={`bg-white rounded-xl p-4 flex items-center gap-3 shadow-sm border-l-4 ${borderCls}`}
+    >
+      <div
+        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBgCls}`}
+      >
+        <Icon size={18} className={iconColorCls} />
+      </div>
+      <div className="text-left">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
+          {label}
+        </p>
+        <p className="text-xl font-black text-slate-900 leading-none">
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function LabeledInput({ label, children }) {
+  return (
+    <div className="flex flex-col gap-1 text-left">
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function StatusBadge({ status }) {
+  const config = {
+    paid: {
+      bg: "bg-emerald-50",
+      text: "text-emerald-700",
+      border: "border-emerald-100",
+      label: "Paid",
+    },
+    pending: {
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      border: "border-amber-100",
+      label: "Pending",
+    },
+    failed: {
+      bg: "bg-rose-50",
+      text: "text-rose-700",
+      border: "border-rose-100",
+      label: "Failed",
+    },
+  };
+  const style = config[status] || config.pending;
+  return (
+    <span
+      className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border ${style.bg} ${style.text} ${style.border}`}
+    >
+      {style.label}
+    </span>
   );
 }

@@ -228,7 +228,28 @@ function HotelBookingCard({ b, navigate }) {
   const hotelReq = b.hotelRequest || {};
   const selectedHotel = hotelReq.selectedHotel || {};
   const selectedRoom = hotelReq.selectedRoom || {};
-  const rawRoom = selectedRoom.rawRoomData || {};
+  // const rawRoom = selectedRoom.rawRoomData || {};
+  const rawRooms = Array.isArray(selectedRoom.rawRoomData)
+  ? selectedRoom.rawRoomData
+  : selectedRoom.rawRoomData
+  ? [selectedRoom.rawRoomData]
+  : [];
+
+// ✅ FINAL CORRECT PRICE (MULTI ROOM SAFE)
+const finalPrice = rawRooms.reduce((total, room) => {
+  if (room.TotalFare) return total + room.TotalFare;
+
+  if (room.Price?.totalFare) return total + room.Price.totalFare;
+
+  if (Array.isArray(room.DayRates)) {
+    const roomTotal = room.DayRates.reduce((sum, days) => {
+      return sum + days.reduce((dSum, d) => dSum + (d.BasePrice || 0), 0);
+    }, 0);
+    return total + roomTotal;
+  }
+
+  return total;
+}, 0);
 
   const hotelName = snapshot.hotelName || selectedHotel.hotelName || "Hotel";
   const city = selectedHotel.city || snapshot.city || "";
@@ -244,11 +265,11 @@ function HotelBookingCard({ b, navigate }) {
         )
       : 1;
   const roomType =
-    rawRoom?.Name?.[0] ||
+    rawRooms?.Name?.[0] ||
     selectedRoom?.roomTypeName ||
     b?.bookingSnapshot?.roomType ||
     "Room details unavailable";
-  const images = rawRoom.images || [];
+  const images = rawRooms.images || [];
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // auto change every 500ms
@@ -265,7 +286,7 @@ function HotelBookingCard({ b, navigate }) {
   const heroImage = images[currentIndex] || null;
   const mealType = selectedRoom.mealType || "—";
   const cancelPolicies =
-    rawRoom?.CancelPolicies ||
+    rawRooms?.CancelPolicies ||
     selectedRoom?.cancelPolicies ||
     b?.raw?.Rooms?.[0]?.CancelPolicies ||
     [];
@@ -375,7 +396,7 @@ function HotelBookingCard({ b, navigate }) {
         <div className="flex items-center justify-between pt-3 border-t border-slate-100">
           <span className="text-lg font-black text-[#0A4D68]">
             ₹
-            {Number(b.pricingSnapshot?.totalAmount || 0).toLocaleString(
+            {Number(finalPrice || 0).toLocaleString(
               "en-IN",
             )}
           </span>
@@ -494,7 +515,8 @@ export default function MyBookings() {
     if (
       status === "failed" ||
       status === "cancelled" ||
-      status === "cancel_requested"
+      status === "cancel_requested" ||
+      status === "not_started"
     ) {
       return false;
     }
