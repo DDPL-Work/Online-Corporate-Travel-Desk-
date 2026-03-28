@@ -26,7 +26,7 @@ import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { CABIN_MAP } from "../../../utils/formatter";
-import { getMyTravelAdmin } from "../../../Redux/Actions/travelAdmin.thunks";
+import { getMyTravelAdmin } from "../../../Redux/Actions/employee.thunks";
 
 // ✅ NORMALIZE FULL FARE RULE API RESPONSE (FareRule API)
 const normalizeFareRules = (fareRule) => {
@@ -115,7 +115,7 @@ export default function RoundTripFlightBooking() {
     approver,
     loading: approverLoading,
     error: approverError,
-  } = useSelector((state) => state.travelAdmin);
+  } = useSelector((state) => state.employee);
 
   const traceId = location.state?.traceId || reduxTraceId || null;
 

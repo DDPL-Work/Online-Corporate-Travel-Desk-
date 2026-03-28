@@ -46,7 +46,7 @@ router.use("/corporate-admin", corporateAdmin);
 router.use("/wallet-logs", walletLogsRoutes);
 // router.use("/tbo", tboRoutes);
 router.use("/validate-price", validatePrice);
-router.use("/my-travel-admin", travelAdmin);
+router.use("/travel-admin", travelAdmin);
 router.use("/postpaid", postPaidCorporate);
 router.use("/flights/amendments", flightAmendment);
 router.use("/hotels/amendments", hotelAmendment);
@@ -76,7 +76,7 @@ router.get("/", (req, res) => {
       walletLogsRoutes: "/api/v1/wallet-logs",
       // tboRoutes: '/api/v1/tbo'
       validatePrice: "api/v1/validate-price",
-      travelAdmin: "api/v1/my-travel-admin",
+      travelAdmin: "api/v1/travel-admin",
       corporateSuperAdmin: "api/v1/corporate-super-admin",
       postPaidCorporate: "api/v1/postpaid",
       flightAmendment: "api/v1/flights/amendments",

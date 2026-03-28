@@ -1,6 +1,5 @@
 // client\src\Redux\Slice\employeeActionSlice.js
 
-
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../API/axios";
 
@@ -43,7 +42,7 @@ export const fetchEmployees = createAsyncThunk(
   "employee/fetchEmployees",
   async (_, { rejectWithValue }) => {
     try {
-      const res = await api.get("/employees");
+      const res = await api.get("/travel-admin");
       return res.data.employees;
     } catch (err) {
       return rejectWithValue(
@@ -58,7 +57,7 @@ export const fetchEmployeeById = createAsyncThunk(
   "employee/fetchEmployeeById",
   async (id, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/employees/${id}`);
+      const res = await api.get(`/travel-admin/${id}`);
       return res.data.employee;
     } catch (err) {
       return rejectWithValue(
@@ -73,7 +72,7 @@ export const updateEmployee = createAsyncThunk(
   "employee/updateEmployee",
   async ({ id, data }, { rejectWithValue }) => {
     try {
-      const res = await api.put(`/employees/${id}`, data);
+      const res = await api.put(`/travel-admin/${id}`, data);
       return res.data.employee;
     } catch (err) {
       return rejectWithValue(
@@ -88,7 +87,7 @@ export const toggleEmployeeStatus = createAsyncThunk(
   "employee/toggleStatus",
   async (id, { rejectWithValue }) => {
     try {
-      const res = await api.patch(`/employees/${id}/toggle-status`);
+      const res = await api.patch(`/travel-admin/${id}/toggle-status`);
       return { id, status: res.data.status };
     } catch (err) {
       return rejectWithValue(
@@ -103,11 +102,47 @@ export const deleteEmployee = createAsyncThunk(
   "employee/deleteEmployee",
   async (id, { rejectWithValue }) => {
     try {
-      await api.delete(`/employees/${id}`);
+      await api.delete(`/travel-admin/${id}`);
       return id;
     } catch (err) {
       return rejectWithValue(
         err.response?.data?.message || "Failed to delete employee",
+      );
+    }
+  },
+);
+
+// 🔹 Admin: Promote employee → manager
+export const promoteEmployee = createAsyncThunk(
+  "employee/promoteEmployee",
+  async (userId, { rejectWithValue }) => {
+    try {
+      const res = await api.put(`/travel-admin/promote/${userId}`);
+      return {
+        userId,
+        role: res.data.data.role, // manager
+      };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to promote employee",
+      );
+    }
+  },
+);
+
+// 🔹 Admin: Demote manager → employee
+export const demoteEmployee = createAsyncThunk(
+  "employee/demoteEmployee",
+  async (userId, { rejectWithValue }) => {
+    try {
+      await api.put(`/travel-admin/demote/${userId}`);
+      return {
+        userId,
+        role: "employee",
+      };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to demote manager",
       );
     }
   },
@@ -203,6 +238,28 @@ const employeeActionSlice = createSlice({
       .addCase(deleteEmployee.fulfilled, (state, action) => {
         state.employees = state.employees.filter(
           (emp) => emp._id !== action.payload,
+        );
+      })
+
+      // -------------------------
+      // PROMOTE EMPLOYEE
+      // -------------------------
+      .addCase(promoteEmployee.fulfilled, (state, action) => {
+        state.employees = state.employees.map((emp) =>
+          emp._id === action.payload.userId
+            ? { ...emp, role: action.payload.role }
+            : emp,
+        );
+      })
+
+      // -------------------------
+      // DEMOTE MANAGER
+      // -------------------------
+      .addCase(demoteEmployee.fulfilled, (state, action) => {
+        state.employees = state.employees.map((emp) =>
+          emp._id === action.payload.userId
+            ? { ...emp, role: action.payload.role }
+            : emp,
         );
       });
   },

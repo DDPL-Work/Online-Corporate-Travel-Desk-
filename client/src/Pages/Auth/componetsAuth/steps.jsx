@@ -276,7 +276,7 @@ export const Step2 = ({ form, setForm, errors }) => (
       }
     />
 
-    <ContactGroup
+    {/* <ContactGroup
       color="bg-gradient-to-r from-slate-500 to-slate-600"
       title="Secondary Contact"
       optional
@@ -315,7 +315,7 @@ export const Step2 = ({ form, setForm, errors }) => (
           </Grid>
         </div>
       }
-    />
+    /> */}
 
     <ContactGroup
       color="bg-gradient-to-r from-orange-500 to-orange-600"

@@ -666,14 +666,23 @@ export default function BookingDetails() {
       // 🔥 CALL YOUR EXISTING THUNK
       const res = await dispatch(fullCancellation({ bookingId: booking._id }));
 
+      console.log("Full Cancel Response:", res);
+
       const changeRequestId =
-        res.payload?.Response?.ChangeRequestId || res.payload?.ChangeRequestId;
+        res.payload?.data?.Response?.TicketCRInfo?.[0]?.ChangeRequestId;
 
       // 🔁 POLLING (same logic from modal)
       let status = "requested";
 
-      while (status === "requested" || status === "in_progress") {
+      let attempts = 0;
+      const maxAttempts = 12;
+
+      while (
+        (status === "requested" || status === "in_progress") &&
+        attempts < maxAttempts
+      ) {
         await new Promise((r) => setTimeout(r, 4000));
+        attempts++;
 
         const statusRes = await dispatch(
           fetchChangeStatus({
@@ -682,22 +691,29 @@ export default function BookingDetails() {
           }),
         );
 
-        const apiStatus = statusRes.payload?.Response?.ChangeRequestStatus;
+        const apiStatus =
+          statusRes.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus;
 
-        if (apiStatus === 4) status = "completed";
-        else if ([1, 2, 3, 7].includes(apiStatus)) status = "in_progress";
-        else status = "failed";
+        console.log("📊 API STATUS:", apiStatus);
+
+        if (apiStatus === 4) {
+          status = "completed";
+        } else if ([1, 2, 3].includes(apiStatus)) {
+          status = "in_progress";
+        } else if (apiStatus === 5) {
+          status = "failed";
+        } else {
+          console.warn("⚠️ Unknown status, retrying...");
+          continue;
+        }
       }
 
       // 🔥 3️⃣ VERIFY FINAL DB STATE
-      const updated = await dispatch(fetchMyBookingById(booking._id));
-
-      const finalStatus = updated.payload?.executionStatus;
-
-      // ❌ NOT COMPLETED
-      if (finalStatus !== "cancelled") {
-        throw new Error("Cancellation not completed yet");
+      if (status !== "completed") {
+        throw new Error("Cancellation failed");
       }
+
+      Swal.close();
 
       Swal.fire({
         icon: "success",

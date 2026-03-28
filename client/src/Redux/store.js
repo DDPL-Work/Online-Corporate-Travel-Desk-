@@ -19,7 +19,7 @@ import walletRechargeLogsReducer from "./Slice/walletRechargeLogsSlice";
 import tboBalanceReducer from "./Slice/tboBalanceSlice";
 import approvalReducer from "./Slice/approval.slice.js";
 import bookingReducer from "./Slice/booking.slice.js";
-import travelAdminReducer from "./Slice/travelAdmin.slice";
+import employeeReducer from "./Slice/employee.slice.js";
 import corporateSuperAdminReducer from "./Slice/corporateSuperAdmin.slice.js";
 import postpaidReducer from "./Slice/postpaidSlice.js";
 import amendmentReducer from "./Slice/amendmentSlice.js";
@@ -27,6 +27,9 @@ import amendmentReducer from "./Slice/amendmentSlice.js";
 import hotelReducer from "./Slice/hotelSlice.js";
 import hotelBookingReducer from "./Slice/hotelBooking.slice";
 import hotelAmendmentReducer from "./Slice/hotelAmendment.slice.js";
+
+
+import adminBookingReducer from "./Slice/travelAdmin.slice.js";
 
 export const store = configureStore({
   reducer: {
@@ -46,9 +49,11 @@ export const store = configureStore({
     postpaid: postpaidReducer,
 
     tboBalance: tboBalanceReducer,
-    travelAdmin: travelAdminReducer,
+    employee: employeeReducer,
     corporateSuperAdmin: corporateSuperAdminReducer,
     approvals: approvalReducer,
+
+    adminBooking: adminBookingReducer,
 
     //Flight Reducers
     flights: flightReducer,

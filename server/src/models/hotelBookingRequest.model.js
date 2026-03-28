@@ -13,6 +13,12 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       index: true,
     },
 
+    bookingType: {
+      type: String,
+      enum: ["flight", "hotel"],
+      required: true,
+    },
+
     corporateId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Corporate",

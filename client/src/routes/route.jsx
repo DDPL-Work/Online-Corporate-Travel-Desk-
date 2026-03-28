@@ -48,6 +48,8 @@ import HotelReviewBooking from "../Pages/Booking-Flow/Hotel-Booking/HotelReviewB
 import HotelBookNow from "../Pages/Booking-Flow/Hotel-Booking/HotelBooking";
 import HotelBookingDetails from "../components/EmployeeDashboard/Hotelbookingdetails";
 import CancelledFlightsPage from "../components/EmployeeDashboard/MyCancelledBookings";
+import CancelledBookings from "../components/TravelAdminTabs/CancelledBookings";
+import PromoteEmployee from "../components/TravelAdminTabs/PromoteEmployee";
 
 export const appRouter = createBrowserRouter([
   // -------------------------------
@@ -79,12 +81,13 @@ export const appRouter = createBrowserRouter([
         children: [
           { path: "/update-profile", element: <ProfileSettings /> },
           { path: "total-bookings", element: <BookingsDashboard /> },
+          { path: "/total-cancelled-bookings", element: <CancelledBookings /> },
           { path: "/pending-requests", element: <PendingTravelRequests /> },
           { path: "/approved-requests", element: <ApprovedTravelRequests /> },
           { path: "/rejected-requests", element: <RejectedTravelRequests /> },
           { path: "/upcoming-trips", element: <UpcomingTrips /> },
           { path: "/past-trips", element: <PastTrips /> },
-          { path: "/user-management", element: <UserManagement /> },
+          { path: "/user-management", element: <PromoteEmployee /> },
           { path: "/travel-profile-settings", element: <TravelAdminProfile /> },
           { path: "/corporate-wallet", element: <CorporateWallet /> },
           {
@@ -120,14 +123,13 @@ export const appRouter = createBrowserRouter([
         ],
       },
     ],
-    
   },
 
   // -------------------------------
   // CORPORATE SUPER ADMIN ROUTES
   // -------------------------------
   {
-    element: <ProtectedRoute allowedRoles={["corporate-super-admin"]} />,
+    element: <ProtectedRoute allowedRoles={["manager"]} />,
     children: [
       {
         path: "/",
