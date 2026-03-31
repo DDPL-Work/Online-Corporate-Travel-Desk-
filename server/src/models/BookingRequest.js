@@ -74,6 +74,7 @@ const bookingRequestSchema = new mongoose.Schema(
         dateOfBirth: Date,
         gender: String,
         passportNumber: String,
+        PassportIssueDate: Date,
         passportExpiry: Date,
         nationality: String,
         isLeadPassenger: Boolean,
@@ -103,6 +104,7 @@ const bookingRequestSchema = new mongoose.Schema(
         "booking_initiated",
         "booked",
         "ticket_pending",
+        "on_hold",
         "ticketed",
         "failed",
         "cancel_requested", // ✅ ADD

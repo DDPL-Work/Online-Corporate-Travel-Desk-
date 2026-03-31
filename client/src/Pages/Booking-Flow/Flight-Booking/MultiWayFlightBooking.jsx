@@ -91,6 +91,7 @@ export default function MultiCityFlightBooking() {
     email: "",
     phoneWithCode: "",
     passportNumber: "",
+    PassportIssueDate: "",
     passportExpiry: "",
     nationality: "",
     dob: "",
@@ -120,6 +121,7 @@ export default function MultiCityFlightBooking() {
       mobile: "",
       phoneWithCode: "",
       passportNumber: "",
+      PassportIssueDate: "",
       passportExpiry: "",
       nationality: "India",
       dob: "",
@@ -568,6 +570,7 @@ export default function MultiCityFlightBooking() {
         dateOfBirth: t.dob,
 
         passportNumber: t.passportNumber,
+        PassportIssueDate: t.PassportIssueDate,
         passportExpiry: t.passportExpiry,
         nationality: t.nationality,
 

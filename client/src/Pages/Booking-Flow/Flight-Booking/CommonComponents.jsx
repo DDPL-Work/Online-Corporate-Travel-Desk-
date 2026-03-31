@@ -791,7 +791,9 @@ export const FareRulesAccordion = ({
 
   // ✅ Theme gradient (dynamic from airlineThemes map)
   const gradient =
-    airlineThemes[airlineCode]?.gradient || airlineThemes.DEFAULT.gradient;
+    airlineThemes?.[airlineCode]?.gradient ||
+    airlineThemes?.DEFAULT?.gradient ||
+    "from-gray-400 to-gray-600"; // fallback gradient
 
   // 🔒 Original Logic (Unchanged)
   const rules =
@@ -1669,24 +1671,44 @@ export const TravelerForm = ({
                     required
                   />
                 </div>
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Passport Issue <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={traveler.PassportIssueDate || ""}
+                      onChange={(e) =>
+                        updateTraveler(
+                          traveler.id,
+                          "PassportIssueDate",
+                          e.target.value,
+                        )
+                      }
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                      required
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Passport Expiry <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={traveler.passportExpiry || ""}
-                    onChange={(e) =>
-                      updateTraveler(
-                        traveler.id,
-                        "passportExpiry",
-                        e.target.value,
-                      )
-                    }
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
-                    required
-                  />
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Passport Expiry <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={traveler.passportExpiry || ""}
+                      onChange={(e) =>
+                        updateTraveler(
+                          traveler.id,
+                          "passportExpiry",
+                          e.target.value,
+                        )
+                      }
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
             )}

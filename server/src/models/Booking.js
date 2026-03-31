@@ -66,6 +66,7 @@ const bookingSchema = new mongoose.Schema({
     dateOfBirth: Date,
     gender: String,
     passportNumber: String,
+    PassportIssueDate: Date,
     passportExpiry: Date,
     nationality: String,
     isLeadPassenger: Boolean,
