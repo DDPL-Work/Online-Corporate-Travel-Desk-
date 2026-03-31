@@ -477,6 +477,51 @@ class FlightService {
 
     const itinerary = response.Response?.FlightItinerary || {};
 
+    const segments = itinerary?.Segments?.flat() || [];
+
+    const hasNN = segments.some((s) => s.Status === "NN");
+    const hasHK = segments.every((s) => s.Status === "HK");
+
+    /* 🔁 HANDLE NN (WAIT & RETRY USING BOOKING DETAILS) */
+    if (hasNN) {
+      logger.warn("⚠️ NN STATUS DETECTED - WAITING FOR CONFIRMATION");
+
+      const pnr = itinerary?.PNR;
+
+      if (!pnr) {
+        throw new ApiError(500, "PNR missing for NN booking");
+      }
+
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (attempts < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 3000));
+
+        const details = await this.getBookingDetails(pnr);
+
+        const retrySegments =
+          details?.Response?.Response?.FlightItinerary?.Segments?.flat() || [];
+
+        const nowHK = retrySegments.every((s) => s.Status === "HK");
+
+        if (nowHK) {
+          logger.info("✅ STATUS UPDATED TO HK");
+
+          return {
+            bookingId: itinerary.BookingId,
+            pnr,
+            raw: details,
+          };
+        }
+
+        attempts++;
+      }
+
+      /* ❌ STILL NN AFTER RETRY */
+      throw new ApiError(400, `Flight not confirmed (still NN after retry)`);
+    }
+
     return {
       bookingId: itinerary.BookingId || null,
       pnr: itinerary.PNR || null,
@@ -485,83 +530,72 @@ class FlightService {
   }
 
   /* ---------------- TICKET ---------------- */
+  async ticketFlight({
+    traceId,
+    resultIndex,
+    bookingId,
+    pnr,
+    passengers,
+    isLCC,
+  }) {
+    let payload = {};
 
-  /* ---------------- TICKET ---------------- */
-  // async ticketFlight({ traceId, resultIndex, bookingId, pnr, isLCC }) {
-  //   let payload;
+    /* ================= LCC ================= */
+    if (isLCC) {
+      if (!traceId || !resultIndex) {
+        throw new ApiError(
+          400,
+          "traceId and resultIndex are required for LCC ticketing",
+        );
+      }
 
-  //   if (isLCC) {
-  //     // ✅ LCC → NO PNR, NO BOOKING ID
-  //     if (!traceId || !resultIndex) {
-  //       throw new ApiError(
-  //         400,
-  //         "traceId and resultIndex are required for LCC ticketing",
-  //       );
-  //     }
+      payload = {
+        TraceId: traceId,
+        ResultIndex: resultIndex,
 
-  //     payload = {
-  //       TraceId: traceId,
-  //       ResultIndex: resultIndex,
-  //     };
-  //   } else {
-  //     // ✅ Non-LCC → requires BookingId or PNR
-  //     if (!bookingId && !pnr) {
-  //       throw new ApiError(
-  //         400,
-  //         "bookingId or pnr required for Non-LCC ticketing",
-  //       );
-  //     }
+        // 🔥 MOST IMPORTANT FIX
+        Passengers: passengers.map((p) => ({
+          ...this.mapPassenger(p),
 
-  //     payload = {
-  //       BookingId: bookingId,
-  //       PNR: pnr,
-  //     };
-  //   }
+          // 🔥 REQUIRED FOR LCC
+         Fare: {
+  BaseFare: p.fare?.BaseFare || 0,
+  Tax: p.fare?.Tax || 0,
+  YQTax: p.fare?.YQTax || 0,
+  AdditionalTxnFeePub: 0,
+  AdditionalTxnFeeOfrd: 0,
+  OtherCharges: 0,
+},
+        })),
+      };
+    } else {
+      /* ================= NON-LCC ================= */
+      if (!bookingId || !pnr) {
+        throw new ApiError(
+          400,
+          "BookingId and PNR required for Non-LCC ticketing",
+        );
+      }
 
-  //   logger.info(
-  //     "TBO TICKET PAYLOAD",
-  //     JSON.stringify({ isLCC, payload }, null, 2),
-  //   );
+      payload = {
+        TraceId: traceId, // ✅ REQUIRED
+        BookingId: bookingId,
+        PNR: pnr,
+      };
 
-  //   return this.postLive(config.live.endpoints.flightTicket, payload, "live");
-  // }
-
-  async ticketFlight({ traceId, resultIndex, result, passengers, ssr, isLCC }) {
-    if (!traceId || !resultIndex) {
-      throw new ApiError(
-        400,
-        "traceId and resultIndex are required for LCC ticketing",
-      );
+      /* 🔥 PASSPORT BLOCK (IMPORTANT) */
+      if (passengers?.length) {
+        payload.Passport = passengers.map((p, i) => ({
+          PaxId: p.paxId, // ⚠️ MUST come from BOOK RESPONSE
+          PassportNo: p.passportNo,
+          PassportIssueDate: p.PassportIssueDate,
+          PassportExpiry: p.passportExpiry,
+          DateOfBirth: p.dateOfBirth,
+        }));
+      }
     }
 
-    if (!result || !result.Fare || !result.FareBreakdown) {
-      throw new ApiError(400, "Fare data missing for ticketing");
-    }
-
-    const payload = {
-      TraceId: traceId,
-      ResultIndex: resultIndex,
-      IsLCC: true,
-      Fare: result.Fare,
-
-      Passengers: passengers.map((p, i) => ({
-        ...this.mapPassenger(p),
-
-        // 🔥 THIS IS CRITICAL FOR LCC
-        Fare: result.FareBreakdown[0],
-      })),
-
-      SSR:
-        ssr && (ssr.baggage?.length || ssr.meals?.length || ssr.seats?.length)
-          ? {
-              Baggage: ssr.baggage || [],
-              Meal: ssr.meals || [],
-              Seat: ssr.seats || [],
-            }
-          : null,
-    };
-
-    logger.info("TBO TICKET PAYLOAD", JSON.stringify(payload, null, 2));
+    logger.info("TBO TICKET PAYLOAD", payload);
 
     const response = await this.postLive(
       config.live.endpoints.flightTicket,
@@ -570,22 +604,14 @@ class FlightService {
     );
 
     if (response?.Response?.ResponseStatus !== 1) {
-      logger.error(
-        "LCC TICKET SUPPLIER ERROR",
-        JSON.stringify(response, null, 2),
-      );
-
       throw new ApiError(
         400,
-        response?.Response?.Error?.ErrorMessage ||
-          response?.Response?.Error?.ErrorDescription ||
-          "Ticketing failed from supplier",
+        response?.Response?.Error?.ErrorMessage || "Ticketing failed",
       );
     }
 
     return response;
   }
-
   /* ---------------- BOOKING DETAILS ---------------- */
   async getBookingDetails(pnr) {
     if (!pnr) {
@@ -658,6 +684,7 @@ class FlightService {
           : 2,
 
       PassportNo: pax.passportNo || "",
+      PassportIssueDate: pax.PassportIssueDate || "",
       PassportExpiry: pax.passportExpiry || "",
 
       PassportIssueCountryCode: nationalityCode,

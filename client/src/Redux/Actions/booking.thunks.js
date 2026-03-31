@@ -138,33 +138,28 @@ export const cancelBooking = createAsyncThunk(
   },
 );
 
+export const manualTicketNonLcc = createAsyncThunk(
+  "booking/manualTicketNonLcc",
+  async (bookingId, { rejectWithValue }) => {
+    try {
+      const res = await api.post(`/bookings/${bookingId}/manual-ticket`);
 
-export const ticketTBO = createAsyncThunk(
-  "bookings/ticketTBO",
-  async ({bookingId, journeyType}, {rejectWithValue}) =>{
-    try{
-      const response = await api.get(`/bookings/${bookingId}/ticket-tbo`,{
-        params: {journeyType},
-        responseType: "application/json",
-      });
-      return response;
+      return res.data.data;
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data?.message || "Ticket Data fetching failed",
-      );
+      return rejectWithValue(err.response?.data?.message || err.message);
     }
-  }
-)
+  },
+);
 
 /* =====================================================
  * ✅ Ticket Flight (issue ticket & optionally download)
  * ===================================================== */
 export const downloadTicketPdf = createAsyncThunk(
   "bookings/downloadTicketPdf",
-  async ({bookingId, journeyType}, { rejectWithValue }) => {
+  async ({ bookingId, journeyType }, { rejectWithValue }) => {
     try {
       const response = await api.get(`/bookings/${bookingId}/ticket-pdf`, {
-        params: {journeyType},
+        params: { journeyType },
         responseType: "blob",
       });
 

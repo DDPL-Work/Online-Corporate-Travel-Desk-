@@ -88,8 +88,8 @@ const bookFlight = Joi.object({
         email: Joi.string().email().required(),
         dateOfBirth: Joi.date().optional(),
         passportNo: Joi.string().optional(),
+        PassportIssueDate: Joi.date().optional(),
         passportExpiry: Joi.date().optional(),
-        passportIssueDate: Joi.date().optional(),
         Fare: Joi.object({
           // Optional now
           Currency: Joi.string().required(),

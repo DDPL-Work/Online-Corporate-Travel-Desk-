@@ -104,6 +104,7 @@ export default function OneFlightBooking() {
     email: "",
     phoneWithCode: "",
     passportNumber: "",
+    PassportIssueDate: "",
     passportExpiry: "",
     nationality: "",
     dob: "",
@@ -133,6 +134,7 @@ export default function OneFlightBooking() {
       mobile: "",
       phoneWithCode: "",
       passportNumber: "",
+      PassportIssueDate: "",
       passportExpiry: "",
       nationality: "India",
       dob: "",
@@ -584,6 +586,7 @@ export default function OneFlightBooking() {
         dateOfBirth: t.dob,
 
         passportNumber: t.passportNumber,
+        PassportIssueDate: t.PassportIssueDate,
         passportExpiry: t.passportExpiry,
         nationality: t.nationality,
 

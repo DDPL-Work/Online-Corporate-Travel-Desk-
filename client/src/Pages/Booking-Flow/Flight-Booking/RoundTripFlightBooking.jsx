@@ -79,6 +79,7 @@ export default function RoundTripFlightBooking() {
     email: "",
     phoneWithCode: "",
     passportNumber: "",
+    PassportIssueDate: "",
     passportExpiry: "",
     nationality: "",
     dob: "",
@@ -104,7 +105,7 @@ export default function RoundTripFlightBooking() {
 
   const [travelerErrors, setTravelerErrors] = useState({});
   const [purposeOfTravel, setPurposeOfTravel] = useState("");
-
+ const { actionLoading } = useSelector((state) => state.bookings);
   const fareQuote = useSelector((state) => state.flightsRT.fareQuoteRT);
   const fareRule = useSelector((state) => state.flightsRT.fareRuleRT);
   const ssr = useSelector((state) => state.flightsRT.ssrRT);
@@ -223,6 +224,7 @@ export default function RoundTripFlightBooking() {
       mobile: "",
       phoneWithCode: "",
       passportNumber: "",
+      PassportIssueDate: "",
       passportExpiry: "",
       nationality: "India",
       dob: "",
@@ -1004,6 +1006,7 @@ export default function RoundTripFlightBooking() {
         dateOfBirth: t.dob,
 
         passportNumber: t.passportNumber,
+        PassportIssueDate: t.PassportIssueDate,
         passportExpiry: t.passportExpiry,
         nationality: t.nationality,
 
@@ -1429,6 +1432,7 @@ export default function RoundTripFlightBooking() {
                 approverLoading={approverLoading}
                 approverError={approverError}
                 onSendForApproval={handleSendForApproval}
+                loading={actionLoading}
               />
 
               <Amenities />
