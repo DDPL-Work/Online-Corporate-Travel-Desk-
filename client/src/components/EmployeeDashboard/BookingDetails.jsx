@@ -77,6 +77,16 @@ function InfoRow({ label, value, accent }) {
   );
 }
 
+function formatPaxType(paxType) {
+  const map = {
+    ADULT: "Adult",
+    CHILD: "Child",
+    INFANT: "Infant",
+  };
+
+  return map[paxType] || paxType || "Unknown";
+}
+
 function BentoCard({ children, className = "" }) {
   return (
     <div
@@ -571,6 +581,219 @@ function RescheduleScreen({ booking, onClose }) {
   );
 }
 
+function PartialCancelModal({ booking, onClose }) {
+  const dispatch = useDispatch();
+  const [selectedJourney, setSelectedJourney] = useState(null);
+  const [remarks, setRemarks] = useState("User requested partial cancellation");
+  const [loading, setLoading] = useState(false);
+
+  const segments = booking?.flightRequest?.segments || [];
+
+  const journeyTypeOf = (seg) => {
+    const jt =
+      (seg?.journeyType ||
+        seg?.segmentType ||
+        seg?.tripIndicator ||
+        seg?.TripIndicator ||
+        "").toString().toLowerCase();
+    if (jt === "return" || jt === "2") return "return";
+    return "onward";
+  };
+
+  const onwardSegments = segments.filter((s) => journeyTypeOf(s) === "onward");
+  const returnSegments = segments.filter((s) => journeyTypeOf(s) === "return");
+
+  const hasReturn = returnSegments.length > 0;
+
+  useEffect(() => {
+    if (!hasReturn) setSelectedJourney("onward");
+  }, [hasReturn]);
+
+  const sectorLabel = (segList) => {
+    if (!segList.length) return "N/A";
+    const first = segList[0];
+    const last = segList[segList.length - 1];
+    const from =
+      first?.origin?.airportCode ||
+      first?.origin?.code ||
+      first?.Origin ||
+      first?.OriginAirportCode ||
+      "-";
+    const to =
+      last?.destination?.airportCode ||
+      last?.destination?.code ||
+      last?.Destination ||
+      last?.DestinationAirportCode ||
+      "-";
+    return `${from} -> ${to}`;
+  };
+
+  const onwardLabel = sectorLabel(onwardSegments);
+  const returnLabel = sectorLabel(returnSegments);
+
+  const onwardPassengers =
+    booking?.bookingResult?.onwardResponse?.raw?.Response?.Response
+      ?.FlightItinerary?.Passenger || [];
+  const returnPassengers =
+    booking?.bookingResult?.returnResponse?.raw?.Response?.Response
+      ?.FlightItinerary?.Passenger || [];
+
+  const passengerSource =
+    selectedJourney === "return" ? returnPassengers : onwardPassengers;
+  const passengerIds = passengerSource
+    .map((p) => p?.Ticket?.TicketId || p?.TicketId || p?.PaxId)
+    .filter(Boolean);
+
+  const onwardBookingId =
+    booking?.bookingResult?.onwardResponse?.raw?.Response?.Response
+      ?.FlightItinerary?.BookingId;
+  const returnBookingId =
+    booking?.bookingResult?.returnResponse?.raw?.Response?.Response
+      ?.FlightItinerary?.BookingId;
+  const tboBookingId =
+    selectedJourney === "return"
+      ? returnBookingId || onwardBookingId || booking?.bookingResult?.bookingId
+      : onwardBookingId || returnBookingId || booking?.bookingResult?.bookingId;
+
+  const buildSectors = () => {
+    const pick =
+      selectedJourney === "return" ? returnSegments : onwardSegments;
+    return pick.map((seg) => ({
+      Origin:
+        seg?.origin?.airportCode ||
+        seg?.Origin ||
+        seg?.origin?.code ||
+        seg?.originCode,
+      Destination:
+        seg?.destination?.airportCode ||
+        seg?.Destination ||
+        seg?.destination?.code ||
+        seg?.destinationCode,
+    }));
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedJourney) return;
+    if (!passengerIds.length) {
+      Swal.fire({
+        icon: "error",
+        title: "Passenger data missing",
+        text: "We could not find ticketed passengers for this booking.",
+      });
+      return;
+    }
+    const sectors = buildSectors().filter(
+      (s) => s.Origin && s.Destination,
+    );
+    if (!sectors.length) return;
+    const payload = {
+      bookingId: tboBookingId || booking?._id,
+      passengerIds,
+      segments: sectors,
+      remarks,
+    };
+    try {
+      setLoading(true);
+      const res = await dispatch(partialCancellation(payload));
+      if (res.error) throw new Error(res.payload || "Partial cancellation failed");
+      await dispatch(fetchMyBookingById(booking._id));
+      Swal.fire({
+        icon: "success",
+        title: "Cancellation request submitted successfully",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      onClose();
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Failed to submit cancellation",
+        text: err.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const disableSubmit = !selectedJourney || loading;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl w-full max-w-xl p-6 shadow-2xl">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-lg font-extrabold">Partial Cancellation</h2>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-bold uppercase text-slate-400 mb-2">
+              Select Route
+            </p>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="route"
+                  disabled={!onwardSegments.length}
+                  checked={selectedJourney === "onward"}
+                  onChange={() => setSelectedJourney("onward")}
+                />
+                <span>Onward ({onwardLabel})</span>
+              </label>
+              {hasReturn && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="route"
+                    checked={selectedJourney === "return"}
+                    onChange={() => setSelectedJourney("return")}
+                  />
+                  <span>Return ({returnLabel})</span>
+                </label>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold uppercase text-slate-400 mb-2">
+              Remarks (optional)
+            </p>
+            <textarea
+              className="w-full border border-slate-200 rounded-lg p-2 text-sm"
+              rows={3}
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100"
+              disabled={loading}
+            >
+              Close
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={disableSubmit}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
+            >
+              {loading ? "Submitting..." : "Submit Cancellation"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ModifyTravellerScreen({ booking, onClose }) {
   const dispatch = useDispatch();
   const traveller = booking.travellers?.[0];
@@ -637,6 +860,7 @@ export default function BookingDetails() {
 
   const [downloading, setDownloading] = useState(null);
   const [amendmentType, setAmendmentType] = useState(null);
+  const [showPartialCancel, setShowPartialCancel] = useState(false);
   // values: "cancel" | "reschedule" | "modify" | null
 
   const isCancelled = booking?.executionStatus === "cancelled";
@@ -761,7 +985,7 @@ export default function BookingDetails() {
 
   /* ── Data ── */
   const flights = booking.flightRequest?.segments || [];
-  const traveller = booking.travellers?.[0];
+  const travellers = booking.travellers || [];
   const fare = booking.pricingSnapshot;
 
   const isInternationalRT =
@@ -932,22 +1156,60 @@ export default function BookingDetails() {
           </div>
         )}
 
-        {/* ── Traveller ── */}
-        <BentoCard>
-          <CardLabel icon={FiUser} label="Traveller" />
-          <div className="mb-4">
-            <p className="text-lg font-extrabold text-slate-900 leading-snug">
-              {traveller?.title} {traveller?.firstName} {traveller?.lastName}
-            </p>
-            <p className="text-xs text-slate-400 mt-1">{traveller?.email}</p>
-          </div>
-          <InfoRow label="Phone" value={traveller?.phoneWithCode} />
-          <InfoRow label="Gender" value={traveller?.gender} />
-          <InfoRow
-            label="Date of Birth"
-            value={formatDateWithYear(traveller?.dateOfBirth)}
-          />
-          <InfoRow label="Nationality" value={traveller?.nationality} />
+        {/* ── Travellers ── */}
+        <BentoCard className="md:col-span-2">
+          <CardLabel icon={FiUser} label="Travellers" />
+
+          {travellers.length === 0 ? (
+            <p className="text-sm text-slate-500">No traveller details available.</p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {travellers.map((trav, idx) => (
+                <div
+                  key={trav._id || idx}
+                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-4"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <p className="text-lg font-extrabold text-slate-900 leading-snug">
+                        {trav.title} {trav.firstName} {trav.lastName}
+                      </p>
+                      {trav.email && (
+                        <p className="text-xs text-slate-400 mt-1">{trav.email}</p>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-black uppercase tracking-widest text-teal-600 bg-teal-50 px-3 py-1 rounded-full">
+                      {formatPaxType(trav.paxType)}
+                    </span>
+                  </div>
+
+                  {trav.phoneWithCode && (
+                    <InfoRow label="Phone" value={trav.phoneWithCode} />
+                  )}
+                  <InfoRow label="Gender" value={trav.gender || "N/A"} />
+                  <InfoRow
+                    label="Date of Birth"
+                    value={trav.dateOfBirth ? formatDateWithYear(trav.dateOfBirth) : "N/A"}
+                  />
+                  <InfoRow label="Nationality" value={trav.nationality || "N/A"} />
+                  {typeof trav.linkedAdultIndex === "number" &&
+                    trav.linkedAdultIndex >= 0 && (
+                      <InfoRow
+                        label="Linked Adult"
+                        value={`Traveller ${trav.linkedAdultIndex + 1}`}
+                      />
+                    )}
+
+                  {trav.isLeadPassenger && (
+                    <div className="mt-3 inline-flex items-center gap-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">
+                      <FiCheckCircle size={12} />
+                      Lead passenger
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </BentoCard>
 
         {/* ── Fare Summary — hidden for employees ── */}
@@ -991,7 +1253,7 @@ export default function BookingDetails() {
               accent={refundable}
             />
 
-            <div className="mt-4 bg-gradient-to-r from-cyan-50 to-teal-50 rounded-xl px-4 py-4 flex justify-between items-center border border-teal-100">
+            <div className="mt-4 bg-linear-to-r from-cyan-50 to-teal-50 rounded-xl px-4 py-4 flex justify-between items-center border border-teal-100">
               <span className="text-sm text-teal-700 font-semibold">
                 Total Paid Amount
               </span>
@@ -1218,16 +1480,16 @@ export default function BookingDetails() {
               <CardLabel icon={FiRefreshCw} label="Amendment Actions" />
               <div className="flex flex-wrap gap-3">
                 <button
-                  onClick={() => setAmendmentType("reschedule")}
+                  onClick={() => setAmendmentType("reissue")}
                   className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition"
                 >
-                  Reschedule Flight
+                  Reissue Flight
                 </button>
                 <button
-                  onClick={() => setAmendmentType("modify")}
-                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition"
+                  onClick={() => setShowPartialCancel(true)}
+                  className="px-5 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition"
                 >
-                  Modify Traveller
+                  Partial Cancel
                 </button>
                 <button
                   onClick={handleCancelBooking}
@@ -1245,6 +1507,13 @@ export default function BookingDetails() {
           type={amendmentType}
           booking={booking}
           onClose={() => setAmendmentType(null)}
+        />
+      )}
+
+      {showPartialCancel && (
+        <PartialCancelModal
+          booking={booking}
+          onClose={() => setShowPartialCancel(false)}
         />
       )}
     </div>

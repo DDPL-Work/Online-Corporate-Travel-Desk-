@@ -55,6 +55,14 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       required: true,
     },
 
+    /* ================= GST DETAILS ================= */
+
+    gstDetails: {
+      gstin: String,
+      legalName: String,
+      address: String,
+    },
+
     travellers: [
       {
         title: String,
@@ -70,6 +78,11 @@ const hotelBookingRequestSchema = new mongoose.Schema(
 
         nationality: String,
         countryCode: String,
+
+        panCard: String,
+        PassportNo: String,
+        	PassportIssueDate: Date,
+          PassportExpDate: Date,
 
         isLeadPassenger: Boolean,
         paxType: String, // lead | adult | child

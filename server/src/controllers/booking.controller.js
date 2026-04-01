@@ -131,6 +131,57 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Lead passenger email is required");
   }
 
+  const ageFromDob = (dob) => {
+    if (!dob) return null;
+    const birth = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
+  };
+
+  const adultCount = travellers.filter(
+    (t) => (t.paxType || "ADULT") === "ADULT",
+  ).length;
+  const infantCount = travellers.filter(
+    (t) => (t.paxType || "ADULT") === "INFANT",
+  ).length;
+
+  if (infantCount > adultCount) {
+    throw new ApiError(400, "Infants cannot exceed adults");
+  }
+
+  travellers.forEach((t, idx) => {
+    const paxType = (t.paxType || "ADULT").toUpperCase();
+    const age = ageFromDob(t.dateOfBirth || t.dob);
+
+    if (!t.dateOfBirth && !t.dob) {
+      throw new ApiError(400, `Date of birth missing for traveler ${idx + 1}`);
+    }
+
+    if (age != null) {
+      if (paxType === "ADULT" && age < 12) {
+        throw new ApiError(400, "Adult passengers must be 12+ years");
+      }
+      if (paxType === "CHILD" && (age < 2 || age > 11)) {
+        throw new ApiError(400, "Child passengers must be 2-11 years");
+      }
+      if (paxType === "INFANT" && age >= 2) {
+        throw new ApiError(400, "Infant passengers must be under 2 years");
+      }
+    }
+
+    if (
+      paxType === "INFANT" &&
+      (typeof t.linkedAdultIndex !== "number" ||
+        t.linkedAdultIndex < 0 ||
+        t.linkedAdultIndex >= adultCount)
+    ) {
+      throw new ApiError(400, "Each infant must be linked to an adult traveler");
+    }
+  });
+
   const fareResult = Array.isArray(flightRequest.fareQuote?.Results)
     ? flightRequest.fareQuote.Results[0]
     : flightRequest.fareQuote?.Results;
@@ -425,7 +476,15 @@ const buildTboRevalidationSearchPayload = (booking, intent) => {
   const segments = booking.flightRequest.segments;
   const isRoundTrip = segments.length === 2;
 
-  const adultCount = 1;
+  const adultCount =
+    booking.travellers.filter((t) => (t.paxType || "ADULT") === "ADULT")
+      .length || 1;
+  const childCount = booking.travellers.filter(
+    (t) => (t.paxType || "ADULT") === "CHILD",
+  ).length;
+  const infantCount = booking.travellers.filter(
+    (t) => (t.paxType || "ADULT") === "INFANT",
+  ).length;
 
   if (adultCount < 1) {
     throw new ApiError(400, "At least one adult is required for TBO search");
@@ -435,9 +494,8 @@ const buildTboRevalidationSearchPayload = (booking, intent) => {
 
   const basePayload = {
     AdultCount: adultCount,
-    ChildCount: booking.travellers.filter((t) => t.paxType === "CHILD").length,
-    InfantCount: booking.travellers.filter((t) => t.paxType === "INFANT")
-      .length,
+    ChildCount: childCount,
+    InfantCount: infantCount,
     DirectFlight: false,
     OneStopFlight: false,
     JourneyType: isRoundTrip ? 2 : 1,
@@ -520,6 +578,51 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
 
   booking.executionStatus = "booking_initiated";
   await booking.save();
+
+  /* ===== Validate passenger counts vs fare breakdown ===== */
+  const fareResult = Array.isArray(booking.flightRequest.fareQuote?.Results)
+    ? booking.flightRequest.fareQuote.Results[0]
+    : booking.flightRequest.fareQuote?.Results;
+
+  const fareBreakdown = fareResult?.FareBreakdown || [];
+  if (fareBreakdown.length) {
+    const expected = fareBreakdown.reduce(
+      (acc, fb) => {
+        const type =
+          fb.PassengerType === 1
+            ? "ADULT"
+            : fb.PassengerType === 2
+              ? "CHILD"
+              : "INFANT";
+        acc[type] = (acc[type] || 0) + (fb.PassengerCount || 0);
+        acc.total += fb.PassengerCount || 0;
+        return acc;
+      },
+      { ADULT: 0, CHILD: 0, INFANT: 0, total: 0 },
+    );
+
+    const actual = passengers.reduce(
+      (acc, p) => {
+        const type = p.paxType === 2 ? "CHILD" : p.paxType === 3 ? "INFANT" : "ADULT";
+        acc[type] = (acc[type] || 0) + 1;
+        acc.total += 1;
+        return acc;
+      },
+      { ADULT: 0, CHILD: 0, INFANT: 0, total: 0 },
+    );
+
+    if (
+      expected.total !== actual.total ||
+      expected.ADULT !== actual.ADULT ||
+      expected.CHILD !== actual.CHILD ||
+      expected.INFANT !== actual.INFANT
+    ) {
+      throw new ApiError(
+        400,
+        `Invalid passenger count: expected A${expected.ADULT}/C${expected.CHILD}/I${expected.INFANT}, got A${actual.ADULT}/C${actual.CHILD}/I${actual.INFANT}`,
+      );
+    }
+  }
 
   /* ===================================================
    🌍 INTERNATIONAL ROUND-TRIP (COMBINED)
@@ -1024,13 +1127,20 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
     leadPassenger.email,
   );
 
-  const passengers = booking.travellers.map((t) => ({
+  const passengers = booking.travellers.map((t, idx) => ({
     title: t.gender?.toUpperCase() === "MALE" ? "Mr" : "Ms",
 
     firstName: t.firstName?.trim(),
     lastName: t.lastName?.trim(),
 
-    paxType: 1, // always adult
+    paxType:
+      t.paxType === "CHILD"
+        ? 2
+        : t.paxType === "INFANT"
+          ? 3
+          : 1,
+    linkedAdultIndex:
+      t.paxType === "INFANT" ? t.linkedAdultIndex ?? 0 : undefined,
 
     dateOfBirth: t.dateOfBirth,
     gender: t.gender,
@@ -1039,12 +1149,12 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
     PassportIssueDate: t.PassportIssueDate,
     passportExpiry: t.passportExpiry,
 
-    nationality: t.nationality || "IN",
+    nationality: (t.nationality || "IN").toString().slice(0, 2).toUpperCase(),
 
     email: t.email || leadPassenger.email,
     contactNo: t.phoneWithCode || leadPassenger.phoneWithCode,
 
-    isLeadPax: true,
+    isLeadPax: t.isLeadPassenger === true || idx === 0,
 
     // 🔥 Inject corporate address for TBO validation
     addressLine1: corporateAddress.AddressLine1,

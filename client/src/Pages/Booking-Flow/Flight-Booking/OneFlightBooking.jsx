@@ -28,16 +28,24 @@ import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { getMyTravelAdmin } from "../../../Redux/Actions/employee.thunks";
+import api from "../../../API/axios";
 
 const normalizeFareRules = (fareRule) => {
   const rules = fareRule?.Response?.FareRules;
   if (!rules || !rules.length) return null;
 
   return {
-    cancellation: [],
-    dateChange: [],
-    baggage: [],
-    important: rules.map((r) => r.FareRuleDetail).filter(Boolean),
+    cancellation: rules.filter((r) => r.Category === "CANCELLATION"),
+    dateChange: rules.filter((r) => r.Category === "DATECHANGE"),
+    baggage: rules.filter((r) => r.Category === "BAGGAGE"),
+
+    // ✅ IMPORTANT FIX
+    important: rules
+      .map((r) => r.FareRuleDetail)
+      .filter(Boolean),
+      
+    // ✅ ADD THIS (fallback support)
+    raw: rules,
   };
 };
 
@@ -92,9 +100,15 @@ export default function OneFlightBooking() {
 
   const [travelerErrors, setTravelerErrors] = useState({});
   const [purposeOfTravel, setPurposeOfTravel] = useState("");
+  const [gstDetails, setGstDetails] = useState({
+    gstin: "",
+    legalName: "",
+    address: "",
+  });
   // ===== Traveler State =====
-  const initialTraveler = (id) => ({
+const initialTraveler = (id, type = "ADULT") => ({
     id,
+    type,
     title: "MR",
     firstName: "",
     middleName: "",
@@ -106,39 +120,39 @@ export default function OneFlightBooking() {
     passportNumber: "",
     PassportIssueDate: "",
     passportExpiry: "",
-    nationality: "",
+    nationality: "IN",
     dob: "",
+    linkedAdultIndex: type === "INFANT" ? 0 : null,
   });
 
-  const [travelers, setTravelers] = useState([]);
+const [travelers, setTravelers] = useState([]);
+
+  const adultCount =
+    searchParams?.passengers?.adults || searchParams?.adults || 1;
+  const childCount =
+    searchParams?.passengers?.children || searchParams?.children || 0;
+  const infantCount =
+    searchParams?.passengers?.infants || searchParams?.infants || 0;
+  const seatEligibleCount = adultCount + childCount;
+  const maxForms = adultCount + childCount;
 
   // ✅ AUTO-FILL LEAD TRAVELER
   useEffect(() => {
-    const adultCount =
-      searchParams?.passengers?.adults || searchParams?.adults || 1;
-    const childCount =
-      searchParams?.passengers?.children || searchParams?.children || 0;
-    const infantCount =
-      searchParams?.passengers?.infants || searchParams?.infants || 0;
-    const totalCount = adultCount + childCount + infantCount;
+  const initial = [];
 
-    const initial = Array.from({ length: totalCount || 1 }, (_, i) => ({
-      id: i + 1,
-      title: "MR",
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      gender: "",
-      age: "",
-      email: "",
-      mobile: "",
-      phoneWithCode: "",
-      passportNumber: "",
-      PassportIssueDate: "",
-      passportExpiry: "",
-      nationality: "India",
-      dob: "",
-    }));
+  for (let i = 0; i < adultCount; i++) {
+    initial.push(initialTraveler(initial.length + 1, "ADULT"));
+  }
+  for (let i = 0; i < childCount; i++) {
+    initial.push(initialTraveler(initial.length + 1, "CHILD"));
+  }
+  for (let i = 0; i < infantCount; i++) {
+    const linkedAdult = Math.min(i, Math.max(adultCount - 1, 0));
+    initial.push({
+      ...initialTraveler(initial.length + 1, "INFANT"),
+      linkedAdultIndex: linkedAdult,
+    });
+  }
 
     // Pre-fill first traveler if user is logged in
     if (user && initial[0]) {
@@ -204,6 +218,25 @@ export default function OneFlightBooking() {
       dispatch(getMyTravelAdmin());
     }
   }, [dispatch, user]);
+
+  useEffect(() => {
+    const fetchGst = async () => {
+      try {
+        const { data } = await api.get("/employees/gst");
+        if (data?.data) {
+          setGstDetails((prev) => ({
+            ...prev,
+            gstin: data.data.gstin || "",
+            legalName: data.data.legalName || "",
+            address: data.data.address || "",
+          }));
+        }
+      } catch (err) {
+        console.warn("GST fetch failed", err?.message);
+      }
+    };
+    fetchGst();
+  }, []);
 
   useEffect(() => {
     if (!traceId || !selectedFlight?.ResultIndex) return;
@@ -345,6 +378,10 @@ export default function OneFlightBooking() {
     travelersCount,
   ) => {
     const key = `${journeyType}|${segmentIndex}`;
+    const allowedCount =
+      typeof travelersCount === "number" && travelersCount > 0
+        ? travelersCount
+        : seatEligibleCount || 1;
 
     setSelectedMeals((prev) => {
       const list = prev[key] || [];
@@ -354,10 +391,10 @@ export default function OneFlightBooking() {
         return { ...prev, [key]: list.filter((m) => m.Code !== meal.Code) };
       }
 
-      if (list.length >= travelersCount) {
+      if (list.length >= allowedCount) {
         ToastWithTimer({
           type: "info",
-          message: `You can add meals for only ${travelersCount} traveler(s)`,
+          message: `You can add meals for only ${allowedCount} traveler(s)`,
         });
         return prev;
       }
@@ -380,15 +417,18 @@ export default function OneFlightBooking() {
     );
   };
 
-  const perAdultFare = useMemo(() => {
+  const fareTotals = useMemo(() => {
     const fare = fareQuote?.Response?.Results?.Fare;
-    if (!fare) return { base: 0, tax: 0 };
+    if (!fare) return { total: 0, base: 0, tax: 0, otherCharges: 0 };
 
-    return {
-      base: Number(Math.ceil(fare.BaseFare) || fare.PublishedFare || 0),
-      tax: Number(Math.ceil(fare.Tax) || 0),
-      otherCharges: Number(Math.ceil(fare.OtherCharges) || 0),
-    };
+    const base = Number(fare.BaseFare || 0);
+    const tax = Number(fare.Tax || 0);
+    const otherCharges = Number(fare.OtherCharges || 0);
+    const total = Number(
+      fare.PublishedFare || fare.OfferedFare || base + tax + otherCharges,
+    );
+
+    return { total, base, tax, otherCharges };
   }, [fareQuote]);
 
   const buildSeatSSR = () => {
@@ -528,6 +568,32 @@ export default function OneFlightBooking() {
     const lastSegment = segments[segments.length - 1];
     const cabinClass = CABIN_MAP[firstSegment?.cabinClass] || "Economy";
 
+    // synthesize infant passengers (no form) to satisfy fare breakdown
+    const travelersWithInfants = [...travelers];
+    const needInfants = infantCount;
+    for (let i = 0; i < needInfants; i++) {
+      const linkedAdult = adultCount ? i % adultCount : 0;
+      const fallbackLast = travelers[linkedAdult]?.lastName || "INFANT";
+      const inferredDob = firstSegment?.dt
+        ? (() => {
+            const d = new Date(firstSegment.dt);
+            d.setFullYear(d.getFullYear() - 1); // ~1 year old infant
+            return d.toISOString().split("T")[0];
+          })()
+        : "";
+      travelersWithInfants.push({
+        id: travelersWithInfants.length + 1,
+        type: "INFANT",
+        title: "MSTR",
+        firstName: `INFANT${i + 1}`,
+        lastName: fallbackLast,
+        gender: "MALE",
+        dob: inferredDob,
+        linkedAdultIndex: linkedAdult,
+        nationality: "IN",
+      });
+    }
+
     const bookingSnapshot = {
       bookingType: "flight",
       sectors: segments.map((s) => `${s.from}-${s.to}`),
@@ -535,13 +601,10 @@ export default function OneFlightBooking() {
       travelDate: firstSegment?.dt || "N/A",
       returnDate: lastSegment?.at || "N/A",
       cabinClass,
-      amount:
-        perAdultFare.base * travelers.length +
-        perAdultFare.tax * travelers.length +
-        perAdultFare.otherCharges * travelers.length +
-        calculateSSRTotal(),
+      amount: fareTotals.total + calculateSSRTotal(),
       purposeOfTravel: purposeOfTravel || "N/A",
       city: lastSegment?.to || "N/A",
+      gstDetails,
     };
 
     const TRACE_VALIDITY_MINUTES = 15;
@@ -590,20 +653,31 @@ export default function OneFlightBooking() {
         passportExpiry: t.passportExpiry,
         nationality: t.nationality,
 
+        paxType: (t.type || "ADULT").toUpperCase(),
+        linkedAdultIndex:
+          t.type === "INFANT" ? t.linkedAdultIndex ?? 0 : null,
+
         isLeadPassenger: idx === 0,
       })),
 
       purposeOfTravel,
       bookingSnapshot, // ✅ include summary for backend to save
       pricingSnapshot: {
-        totalAmount:
-          perAdultFare.base * travelers.length +
-          perAdultFare.tax * travelers.length +
-          perAdultFare.otherCharges * travelers.length +
-          calculateSSRTotal(),
+        totalAmount: fareTotals.total + calculateSSRTotal(),
         currency: "INR",
       },
+      gstDetails,
     };
+  };
+
+  const ageFromDob = (dob) => {
+    if (!dob) return null;
+    const birth = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
   };
 
   const validateTravelers = () => {
@@ -616,11 +690,37 @@ export default function OneFlightBooking() {
       if (!t.firstName?.trim()) e.firstName = "First name is required";
       if (!t.lastName?.trim()) e.lastName = "Last name is required";
       if (!t.gender?.trim()) e.gender = "Gender is required";
-      if (!t.email?.trim()) e.email = "Email is required";
+      if (idx === 0 && !t.email?.trim()) e.email = "Email is required";
       if (!t.dob?.trim()) e.dob = "Date of birth is required";
-      if (!t.phoneWithCode?.trim())
+      if (idx === 0 && !t.phoneWithCode?.trim())
         e.phoneWithCode = "Phone number is required";
-      if (!t.nationality?.trim()) e.nationality = "Nationality is required";
+      if (!t.nationality?.trim())
+        e.nationality = "Nationality is required";
+
+      const paxType = (t.type || "ADULT").toUpperCase();
+      const age = ageFromDob(t.dob);
+
+      if (age != null) {
+        if (paxType === "ADULT" && age < 12) {
+          e.dob = "Adult must be 12+ years";
+        }
+        if (paxType === "CHILD" && (age < 2 || age > 11)) {
+          e.dob = "Child age must be 2-11 years";
+        }
+        if (paxType === "INFANT" && age >= 2) {
+          e.dob = "Infant must be under 2 years";
+        }
+      }
+
+      if (paxType === "INFANT") {
+        if (
+          typeof t.linkedAdultIndex !== "number" ||
+          t.linkedAdultIndex < 0 ||
+          t.linkedAdultIndex >= adultCount
+        ) {
+          e.linkedAdultIndex = "Infant must be linked to an adult";
+        }
+      }
 
       // passportNumber validation: only if flight is international
       const isInternational = Boolean(
@@ -642,6 +742,11 @@ export default function OneFlightBooking() {
         isValid = false;
       }
     });
+
+    if (infantCount > adultCount) {
+      isValid = false;
+      errors.infants = { message: "Infants cannot exceed adults" };
+    }
 
     setTravelerErrors(errors);
     return isValid;
@@ -675,7 +780,10 @@ export default function OneFlightBooking() {
     } catch (err) {
       ToastWithTimer({
         type: "error",
-        message: "Failed to submit booking request",
+        message:
+          err?.message ||
+          err?.payload ||
+          "Failed to submit booking request",
       });
     }
   };
@@ -716,12 +824,12 @@ export default function OneFlightBooking() {
   const departureDateTime = segments[0]?.dt;
   const arrivalDateTime = segments[segments.length - 1]?.at;
 
-  const travelerCount =
-    searchParams?.passengers?.adults || searchParams?.adults || 1;
-
-  const travelersForSeat = Array.from({ length: travelerCount }, (_, i) => ({
-    id: i + 1,
-  }));
+  const travelersForSeat = Array.from(
+    { length: Math.max(1, seatEligibleCount) },
+    (_, i) => ({
+      id: i + 1,
+    }),
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 font-[DM Sans]">
@@ -846,9 +954,29 @@ export default function OneFlightBooking() {
                 updateTraveler={updateTraveler}
                 errors={travelerErrors}
                 parsedFlightData={parsedFlightData}
-                purposeOfTravel={purposeOfTravel}
-                setPurposeOfTravel={setPurposeOfTravel}
-                isInternational={isInternational}
+              purposeOfTravel={purposeOfTravel}
+              setPurposeOfTravel={setPurposeOfTravel}
+              isInternational={isInternational}
+              gstDetails={gstDetails}
+              setGstDetails={setGstDetails}
+              canAddMore={travelers.length < maxForms}
+              onAddTraveler={() =>
+                setTravelers((prev) => {
+                    const renderedCount = prev.filter(
+                      (t) => (t.type || "ADULT") !== "INFANT",
+                    ).length;
+                    if (renderedCount >= maxForms) return prev;
+                    const currentChildren = prev.filter(
+                      (t) => t.type === "CHILD",
+                    ).length;
+                    const nextType =
+                      currentChildren < childCount ? "CHILD" : "ADULT";
+                    return [
+                      ...prev,
+                      initialTraveler(prev.length + 1, nextType),
+                    ];
+                  })
+                }
               />
             </div>
 
@@ -874,9 +1002,10 @@ export default function OneFlightBooking() {
               <PriceSummary
                 parsedFlightData={{
                   ...parsedFlightData,
-                  baseFare: perAdultFare.base * travelers.length,
-                  taxFare: perAdultFare.tax * travelers.length,
-                  otherCharges: perAdultFare.otherCharges * travelers.length,
+                  baseFare: fareTotals.total, // total from card
+                  taxFare: 0,
+                  otherCharges: 0,
+                  baseFareIsTotal: true,
                 }}
                 travelers={travelers}
                 selectedSeats={selectedSeats}

@@ -1088,6 +1088,7 @@ export const PriceSummary = ({
   if (!parsedFlightData) return null;
 
   const travelerCount = Math.max(travelers.length || 1);
+  const baseFareIsTotal = parsedFlightData.baseFareIsTotal === true;
 
   const baseFare = Math.ceil(parsedFlightData.baseFare) || 0;
   const taxFare =
@@ -1146,7 +1147,9 @@ export const PriceSummary = ({
         {/* Base Fare */}
         <div className="flex justify-between">
           <span className="text-sm text-gray-600">
-            Base Fare ({travelerCount} Adult)
+            {baseFareIsTotal
+              ? "Total Fare (Incl.Taxes & Extra charges)"
+              : `Base Fare (${travelerCount} Adult)`}
           </span>
           <span className="font-semibold">₹{baseFare.toLocaleString()}</span>
         </div>
@@ -1382,11 +1385,23 @@ export const TravelerForm = ({
   purposeOfTravel,
   setPurposeOfTravel,
   isInternational: isIntlFromProp,
+  onAddTraveler,
+  canAddMore = false,
+  gstDetails = { gstin: "", legalName: "", address: "" },
+  setGstDetails = () => {},
 }) => {
   if (!Array.isArray(travelers)) travelers = [];
 
   const isInternational =
     isIntlFromProp ?? isInternationalTrip(parsedFlightData);
+
+  const adultOptions = travelers
+    .map((t, idx) =>
+      t?.type === "INFANT" || t?.type === "CHILD"
+        ? null
+        : { value: idx, label: `Adult ${idx + 1}` },
+    )
+    .filter(Boolean);
 
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
@@ -1438,11 +1453,86 @@ export const TravelerForm = ({
           </p>
         </div>
 
+        {/* ================= GST DETAILS ================= */}
+        <div className="bg-white border-2 border-blue-100 rounded-xl p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-blue-900 mb-2">
+            GST Details (Optional)
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                GSTIN
+              </label>
+              <input
+                type="text"
+                value={gstDetails.gstin || ""}
+                onChange={(e) =>
+                  setGstDetails((prev) => ({
+                    ...prev,
+                    gstin: e.target.value.toUpperCase(),
+                  }))
+                }
+                placeholder="27ABCDE1234F2Z5"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Legal Name
+              </label>
+              <input
+                type="text"
+                value={gstDetails.legalName || ""}
+                onChange={(e) =>
+                  setGstDetails((prev) => ({
+                    ...prev,
+                    legalName: e.target.value,
+                  }))
+                }
+                placeholder="Company legal name"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Billing Address
+              </label>
+              <input
+                type="text"
+                value={gstDetails.address || ""}
+                onChange={(e) =>
+                  setGstDetails((prev) => ({
+                    ...prev,
+                    address: e.target.value,
+                  }))
+                }
+                placeholder="Street, City, State, PIN"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+
         {travelers.map((traveler, index) => (
           <div
             key={traveler.id ?? index}
             className="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition"
           >
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-xs text-gray-500 font-semibold uppercase">
+                  Passenger {index + 1}
+                </p>
+                <p className="text-sm font-bold text-gray-800">
+                  {(traveler.type || "ADULT").toUpperCase()}
+                </p>
+              </div>
+              {traveler.type === "INFANT" && (
+                <span className="text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  Infant must be linked to an adult
+                </span>
+              )}
+            </div>
             {/* ===== Name Section ===== */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
               <div>
@@ -1457,10 +1547,14 @@ export const TravelerForm = ({
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
                   required
                 >
-                  <option value="MR">Mr</option>
-                  <option value="MRS">Mrs</option>
-                  <option value="MS">Ms</option>
-                  <option value="MISS">Miss</option>
+                  {((traveler.type || "ADULT") === "ADULT"
+                    ? ["MR", "MRS", "MS", "MISS"]
+                    : ["MSTR", "MISS"]
+                  ).map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt === "MSTR" ? "Master" : opt === "MR" ? "Mr" : opt}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1549,22 +1643,10 @@ export const TravelerForm = ({
                     onChange={(phone, countryData) => {
                       updateTraveler(traveler.id, "phoneWithCode", phone);
 
-                      // ✅ Get ISO country code (e.g. "in", "us", "gb")
+                      // set nationality to 2-letter ISO code
                       const isoCode = countryData?.countryCode?.toUpperCase();
                       if (isoCode) {
-                        try {
-                          const regionNames = new Intl.DisplayNames(["en"], {
-                            type: "region",
-                          });
-                          const nationality = regionNames.of(isoCode); // e.g. "India", "United States"
-                          updateTraveler(
-                            traveler.id,
-                            "nationality",
-                            nationality,
-                          );
-                        } catch (err) {
-                          console.warn("Failed to resolve country name:", err);
-                        }
+                        updateTraveler(traveler.id, "nationality", isoCode);
                       }
                     }}
                     enableSearch
@@ -1587,7 +1669,7 @@ export const TravelerForm = ({
                   </label>
                   <input
                     type="text"
-                    value={traveler.nationality || "India"}
+                    value={traveler.nationality || "IN"}
                     readOnly
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
                   />
@@ -1650,6 +1732,46 @@ export const TravelerForm = ({
                 />
               </div>
             </div>
+
+            {traveler.type === "INFANT" && adultOptions.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Linked Adult <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={
+                      typeof traveler.linkedAdultIndex === "number"
+                        ? traveler.linkedAdultIndex
+                        : ""
+                    }
+                    onChange={(e) =>
+                      updateTraveler(
+                        traveler.id,
+                        "linkedAdultIndex",
+                        Number(e.target.value),
+                      )
+                    }
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    required
+                  >
+                    <option value="" disabled>
+                      Select adult
+                    </option>
+                    {adultOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  {errors?.[index]?.linkedAdultIndex && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {errors[index].linkedAdultIndex}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {isInternational && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
@@ -1722,6 +1844,16 @@ export const TravelerForm = ({
             </div>
           </div>
         ))}
+
+        {canAddMore && (
+          <button
+            type="button"
+            onClick={onAddTraveler}
+            className="w-full py-3 border-2 border-dashed border-blue-200 text-blue-700 font-semibold rounded-lg hover:border-blue-400 hover:bg-blue-50 transition"
+          >
+            + Add Traveler
+          </button>
+        )}
       </div>
     </div>
   );
