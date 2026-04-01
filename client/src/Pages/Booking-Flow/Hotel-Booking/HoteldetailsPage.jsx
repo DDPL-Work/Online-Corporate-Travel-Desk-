@@ -192,6 +192,7 @@ const HotelDetailsPage = () => {
           childAges: r.ChildAge,
         })),
         city: hotelFromSearch?.CityName,
+        guestNationality: searchPayload?.GuestNationality || "",
       },
     };
 
