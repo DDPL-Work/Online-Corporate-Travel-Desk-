@@ -64,6 +64,12 @@ const bookingRequestSchema = new mongoose.Schema(
       trim: true,
     },
 
+    gstDetails: {
+      gstin: String,
+      legalName: String,
+      address: String,
+    },
+
     travellers: [
       {
         title: String,
@@ -77,6 +83,12 @@ const bookingRequestSchema = new mongoose.Schema(
         PassportIssueDate: Date,
         passportExpiry: Date,
         nationality: String,
+        paxType: {
+          type: String,
+          enum: ["ADULT", "CHILD", "INFANT"],
+          default: "ADULT",
+        },
+        linkedAdultIndex: Number,
         isLeadPassenger: Boolean,
       },
     ],

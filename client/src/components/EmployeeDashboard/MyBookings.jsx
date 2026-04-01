@@ -452,7 +452,8 @@ export default function MyBookings() {
         if (
           status === "failed" ||
           status === "cancelled" ||
-          status === "cancel_requested"
+          status === "cancel_requested" ||
+          status === "not_started"
         ) {
           return false; // ❌ skip these completely
         }

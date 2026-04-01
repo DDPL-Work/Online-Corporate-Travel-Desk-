@@ -45,6 +45,30 @@ const getTboBookingId = (booking) => {
 };
 
 /* ======================================================
+   🔎 HELPER: FETCH TICKET IDS FROM TBO IF MISSING
+====================================================== */
+const tboService = require("../services/tektravels/flight.service");
+
+const fetchTicketIdsFromTbo = async (pnr) => {
+  if (!pnr) return [];
+  try {
+    const details = await tboService.getBookingDetails(pnr);
+    const paxArr =
+      details?.Response?.Response?.FlightItinerary?.Passenger ||
+      details?.Response?.FlightItinerary?.Passenger ||
+      [];
+    return (
+      paxArr
+        .map((p) => p?.Ticket?.TicketId || p?.TicketId)
+        .filter(Boolean) || []
+    );
+  } catch (err) {
+    console.error("TBO fetch ticket IDs failed:", err.message);
+    return [];
+  }
+};
+
+/* ======================================================
    🔧 COMMON DB UPDATE HELPER (FIXED)
 ====================================================== */
 const updateBooking = async (bookingId, update = {}) => {
@@ -164,28 +188,140 @@ exports.fullCancellation = async (req, res) => {
 ====================================================== */
 exports.partialCancellation = async (req, res) => {
   try {
-    const { bookingId, passengerIds, segments, remarks } = req.body;
+    const { bookingId, passengerIds = [], segments, remarks } = req.body;
 
-    if (!passengerIds?.length) {
-      return res.status(400).json({ message: "PassengerIds required" });
+    /* Support both internal Mongo _id and direct TBO BookingId */
+    let booking = null;
+    try {
+      booking = await BookingRequest.findById(bookingId);
+    } catch (err) {
+      /* ignore cast errors - may be numeric TBO id */
     }
 
-    const booking = await BookingRequest.findById(bookingId);
-    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    /* If not found by _id, try to locate via TBO BookingId */
+    const numericBookingId = Number(bookingId);
+    if (!booking && !Number.isNaN(numericBookingId)) {
+      booking = await BookingRequest.findOne({
+        $or: [
+          {
+            "bookingResult.onwardResponse.raw.Response.Response.FlightItinerary.BookingId":
+              { $in: [numericBookingId, bookingId] },
+          },
+          {
+            "bookingResult.returnResponse.raw.Response.Response.FlightItinerary.BookingId":
+              { $in: [numericBookingId, bookingId] },
+          },
+          { "bookingResult.bookingId": { $in: [numericBookingId, bookingId] } },
+        ],
+      });
+    }
 
-    const tboBookingId = getTboBookingId(booking);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
 
-    const sectors = segments?.map((seg) => ({
-      Origin: seg.origin || seg.Origin,
-      Destination: seg.destination || seg.Destination,
+    const tboBookingId = Number(
+      bookingId && !Number.isNaN(numericBookingId)
+        ? numericBookingId
+        : getTboBookingId(booking),
+    );
+
+    if (!tboBookingId) {
+      return res.status(400).json({ message: "Invalid BookingId" });
+    }
+
+    const sectors = (segments || []).map((seg) => ({
+      Origin: seg?.Origin || seg?.origin,
+      Destination: seg?.Destination || seg?.destination,
     }));
+
+    if (!sectors.length) {
+      return res.status(400).json({ message: "At least one sector required" });
+    }
+
+    /*  Collect ticket ids from booking (preferred) */
+    const onwardPassengers =
+      booking?.bookingResult?.onwardResponse?.raw?.Response?.Response
+        ?.FlightItinerary?.Passenger || [];
+    const returnPassengers =
+      booking?.bookingResult?.returnResponse?.raw?.Response?.Response
+        ?.FlightItinerary?.Passenger || [];
+
+    const selectPassengersByBookingId = (id) => {
+      if (
+        booking?.bookingResult?.onwardResponse?.raw?.Response?.Response
+          ?.FlightItinerary?.BookingId === id
+      )
+        return onwardPassengers;
+      if (
+        booking?.bookingResult?.returnResponse?.raw?.Response?.Response
+          ?.FlightItinerary?.BookingId === id
+      )
+        return returnPassengers;
+      return [];
+    };
+
+    const chosenPassengers = selectPassengersByBookingId(tboBookingId);
+
+    const ticketIdsFromBooking =
+      chosenPassengers
+        .map((p) => p?.Ticket?.TicketId || p?.TicketId)
+        .filter(Boolean) || [];
+
+    let ticketIds =
+      ticketIdsFromBooking.length > 0 ? ticketIdsFromBooking : [];
+
+    /* Fallback: fetch from TBO booking details using PNR */
+    if (!ticketIds.length) {
+      const pnrPrimary =
+        tboBookingId ===
+        booking?.bookingResult?.returnResponse?.raw?.Response?.Response
+          ?.FlightItinerary?.BookingId
+          ? booking?.bookingResult?.returnPNR
+          : booking?.bookingResult?.onwardPNR ||
+            booking?.bookingResult?.pnr ||
+            null;
+
+      const pnrFallback =
+        tboBookingId ===
+        booking?.bookingResult?.onwardResponse?.raw?.Response?.Response
+          ?.FlightItinerary?.BookingId
+          ? booking?.bookingResult?.returnPNR
+          : booking?.bookingResult?.onwardPNR;
+
+      const tried = new Set();
+      const pnrList = [pnrPrimary, pnrFallback].filter(Boolean);
+      for (const pnr of pnrList) {
+        if (tried.has(pnr)) continue;
+        tried.add(pnr);
+        const fetched = await fetchTicketIdsFromTbo(pnr);
+        if (fetched.length) {
+          ticketIds = fetched;
+          break;
+        }
+      }
+    }
+
+    if (!ticketIds.length) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "TicketId missing for this booking. Please retry after ticketing is confirmed.",
+      });
+    }
+
+    if (!ticketIds.length) {
+      return res
+        .status(400)
+        .json({ message: "TicketId missing for selected journey" });
+    }
 
     const result = await amendmentService.sendChangeRequest({
       BookingId: tboBookingId,
-      RequestType: 2,
-      CancellationType: 1,
-      PassengerIds: passengerIds,
-      Sectors: sectors, // ✅ FIXED
+      RequestType: 2, // Partial cancellation as per TBO
+      CancellationType: 3, // Partial
+      Sectors: sectors,
+      TicketId: ticketIds, // send as array for SOAP deserialization
       Remarks: remarks || "Partial cancellation",
     });
 
@@ -201,7 +337,7 @@ exports.partialCancellation = async (req, res) => {
     const changeRequestId =
       result?.Response?.TicketCRInfo?.[0]?.ChangeRequestId || null;
 
-    await updateBooking(bookingId, {
+    await updateBooking(booking._id, {
       executionStatus: "cancel_requested",
       amendment: {
         type: "PARTIAL_CANCEL",

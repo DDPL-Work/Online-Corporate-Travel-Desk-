@@ -41,6 +41,39 @@ export default function PendingTravelRequests() {
   const requests = useMemo(() => {
     return list.map((b) => {
       const isHotel = b.bookingType === "hotel";
+      const isFlight = b.bookingType === "flight";
+
+      const estimatedCost = (() => {
+        if (isHotel) {
+          const rooms = b.hotelRequest?.selectedRoom?.rawRoomData || [];
+          if (!Array.isArray(rooms)) return 0;
+
+          return rooms.reduce((total, room) => {
+            if (room.TotalFare) return total + room.TotalFare;
+            if (room.Price?.totalFare) return total + room.Price.totalFare;
+            if (Array.isArray(room.DayRates)) {
+              const roomTotal = room.DayRates.flat().reduce(
+                (sum, day) => sum + (day.BasePrice || 0),
+                0,
+              );
+              return total + roomTotal;
+            }
+            return total;
+          }, 0);
+        }
+
+        if (isFlight) {
+          return (
+            b.pricingSnapshot?.totalAmount ||
+            b.bookingSnapshot?.amount ||
+            b.flightRequest?.fareSnapshot?.publishedFare ||
+            0
+          );
+        }
+
+        return 0;
+      })();
+
       const common = {
         id: b._id,
         bookingRef: b.bookingReference,
@@ -52,31 +85,7 @@ export default function PendingTravelRequests() {
           "Employee",
         employeeId: b.userId?.employeeId || b.userId?._id || "N/A",
         bookedDate: b.createdAt ? new Date(b.createdAt) : new Date(),
-        // estimatedCost: b.pricingSnapshot?.totalAmount || b.hotelRequest.selectedRoom.rawRoomData[0].Price.totalFare || 0,
-        estimatedCost: (() => {
-          const rooms = b.hotelRequest?.selectedRoom?.rawRoomData || [];
-
-          if (!Array.isArray(rooms)) return 0;
-
-          return rooms.reduce((total, room) => {
-            // ✅ Priority 1: Use TotalFare (already final)
-            if (room.TotalFare) return total + room.TotalFare;
-
-            // ✅ Priority 2: Use Price.totalFare
-            if (room.Price?.totalFare) return total + room.Price.totalFare;
-
-            // ✅ Priority 3: Calculate from DayRates
-            if (Array.isArray(room.DayRates)) {
-              const roomTotal = room.DayRates.flat().reduce(
-                (sum, day) => sum + (day.BasePrice || 0),
-                0,
-              );
-              return total + roomTotal;
-            }
-
-            return total;
-          }, 0);
-        })(),
+        estimatedCost,
         originalData: b, // Important for the detailed modal
       };
 
@@ -94,12 +103,51 @@ export default function PendingTravelRequests() {
       }
 
       const segments = b.flightRequest?.segments || [];
+      const onwardSegments = segments.filter(
+        (s) => s.journeyType === "onward",
+      );
+      const returnSegments = segments.filter(
+        (s) => s.journeyType === "return",
+      );
+
+      const buildLeg = (segs, label) => {
+        if (!segs.length) return null;
+        const first = segs[0];
+        const last = segs[segs.length - 1];
+
+        return {
+          label,
+          fromCity: first?.origin?.city || first?.origin?.airportCode || "N/A",
+          toCity:
+            last?.destination?.city || last?.destination?.airportCode || "N/A",
+          fromCode: first?.origin?.airportCode || "",
+          toCode: last?.destination?.airportCode || "",
+        };
+      };
+
+      const routes = [];
+      const onwardLeg = buildLeg(onwardSegments, "Onward");
+      const returnLeg = buildLeg(returnSegments, "Return");
+
+      if (onwardLeg) routes.push(onwardLeg);
+      if (returnLeg) routes.push(returnLeg);
+      if (!routes.length) {
+        const fallbackLeg = buildLeg(segments, "Route");
+        if (fallbackLeg) routes.push(fallbackLeg);
+      }
       return {
         ...common,
-        cityFrom: segments[0]?.origin?.city || "N/A",
-        cityTo: segments[segments.length - 1]?.destination?.city || "N/A",
+        cityFrom:
+          onwardSegments[0]?.origin?.city ||
+          segments[0]?.origin?.city ||
+          "N/A",
+        cityTo:
+          (returnLeg ? returnLeg.toCity : onwardLeg?.toCity) ||
+          segments[segments.length - 1]?.destination?.city ||
+          "N/A",
         pnr: b.bookingReference?.substring(0, 6).toUpperCase() || "N/A",
         providerId: "P-882910",
+        routes,
       };
     });
   }, [list]);
@@ -279,11 +327,28 @@ export default function PendingTravelRequests() {
 
                       <td className="px-4 py-3">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-slate-800 text-[13px]">
-                            {activeTab === "flight"
-                              ? `${r.cityFrom} → ${r.cityTo}`
-                              : r.hotelName}
-                          </span>
+                          {activeTab === "flight" ? (
+                            <div className="flex flex-col gap-1">
+                              {r.routes?.map((leg) => (
+                                <div
+                                  key={`${leg.label}-${leg.fromCode}-${leg.toCode}`}
+                                  className="flex items-center gap-2"
+                                >
+                                  <span className="text-[11px] uppercase text-slate-400 font-semibold tracking-wide">
+                                    {leg.label}
+                                  </span>
+                                  <span className="font-semibold text-slate-800 text-[13px]">
+                                    {leg.fromCode || leg.fromCity} →{" "}
+                                    {leg.toCode || leg.toCity}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="font-semibold text-slate-800 text-[13px]">
+                              {r.hotelName}
+                            </span>
+                          )}
                         </div>
                       </td>
 

@@ -27,6 +27,7 @@ export default function OneWayFlightCard({
   flight,
   traceId,
   travelClass,
+  passengers,
   onOpenFareUpsell,
 }) {
   const navigate = useNavigate();
@@ -247,7 +248,7 @@ export default function OneWayFlightCard({
                       state: {
                         selectedFlight: flight,
                         rawFlightData: flight,
-                        searchParams: { traceId },
+                        searchParams: { traceId, passengers },
                         tripType: "one-way",
                         isInternational,
                       },

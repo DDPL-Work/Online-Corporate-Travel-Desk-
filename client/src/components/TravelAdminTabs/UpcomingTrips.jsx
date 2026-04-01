@@ -25,14 +25,20 @@ import {
   getAllHotelBookingsAdmin,
 } from "../../Redux/Actions/travelAdmin.thunks";
 import { useDispatch, useSelector } from "react-redux";
-import { HotelBookingModal } from "./Modal/BookingRequestDetailsModal";
+import {
+  HotelBookingModal,
+  FlightBookingModal,
+} from "./Modal/BookingRequestDetailsModal";
+import { Pagination } from "./Shared/Pagination";
 
 // ── FLIGHT SECTION ────────────────────────────────────────────────────────────
 function FlightSection() {
   const dispatch = useDispatch();
   const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState("2024-01-01");
-  const [endDate, setEndDate] = useState("2024-12-31");
+  const [startDate, setStartDate] = useState("");
+  const [selectedBooking, setSelectedBooking] = useState(null);
+
+  const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
 
   const flightBookings = useSelector(
@@ -44,42 +50,70 @@ function FlightSection() {
   }, [dispatch]);
 
   const today = new Date().toISOString().slice(0, 10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const flightTrips = useMemo(() => {
     return (flightBookings || [])
-      .filter((b) => {
-        const travelDate =
-          b.bookingSnapshot?.travelDate ||
-          b.flightRequest?.segments?.[0]?.departureDateTime;
+      .map((b) => {
+        const segments = b.flightRequest?.segments || [];
+        const onward = segments.filter((s) => s.journeyType === "onward");
+        const returns = segments.filter((s) => s.journeyType === "return");
+        const firstSeg = onward[0] || segments[0];
+        const lastOnward = onward[onward.length - 1] || firstSeg;
+        const firstReturn = returns[0];
 
-        if (!travelDate) return false;
+        const departureDate =
+          firstSeg?.departureDateTime || b.bookingSnapshot?.travelDate;
+        const returnDate =
+          firstReturn?.departureDateTime || b.bookingSnapshot?.returnDate;
+        const airlineName =
+          firstSeg?.airlineName || b.bookingSnapshot?.airline || "N/A";
+        const flightNumber = firstSeg?.flightNumber || "—";
 
-        const travel = new Date(travelDate).toISOString().slice(0, 10);
+        const travelKey = departureDate
+          ? new Date(departureDate).toISOString().slice(0, 10)
+          : null;
+        const exec = (b.executionStatus || "").toLowerCase();
+        const req = (b.requestStatus || "").toLowerCase();
+        const status =
+          exec === "cancel_requested" || req === "cancelled"
+            ? "Cancelled"
+            : exec === "ticketed" || exec === "confirmed" || req === "approved"
+              ? "Confirmed"
+              : "Pending";
+        const isFailed = exec === "failed";
 
-        const validStatuses = ["ticketed", "confirmed"];
-
-        return (
-          validStatuses.includes(b.executionStatus) &&
-          b.executionStatus !== "cancel_requested" &&
-          travel > today
-        );
+        return {
+          id: b._id,
+          employee:
+            `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim() ||
+            b.userId?.email ||
+            "N/A",
+          department: b.corporateId || "N/A",
+          destination:
+            lastOnward?.destination?.city ||
+            lastOnward?.destination?.airportCode ||
+            b.bookingSnapshot?.city ||
+            "N/A",
+          departureDate,
+          returnDate,
+          airlineName,
+          flightNumber,
+          status,
+          travelKey,
+          raw: b,
+          isFailed,
+        };
       })
-      .map((b) => ({
-        id: b._id,
-        employee:
-          `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim(),
-        department: b.corporateId || "N/A",
-        destination:
-          b.bookingSnapshot?.city ||
-          b.flightRequest?.segments?.[0]?.destination?.city ||
-          "N/A",
-        departureDate:
-          b.bookingSnapshot?.travelDate ||
-          b.flightRequest?.segments?.[0]?.departureDateTime,
-        returnDate: b.bookingSnapshot?.returnDate,
-        status: "Confirmed",
-      }));
-  }, [flightBookings]);
+      .filter(
+        (t) =>
+          t.travelKey &&
+          t.status === "Confirmed" &&
+          t.travelKey >= today &&
+          !t.isFailed,
+      );
+  }, [flightBookings, today]);
 
   const departments = ["All", ...new Set(flightTrips.map((t) => t.department))];
 
@@ -88,7 +122,8 @@ function FlightSection() {
     return flightTrips.filter((t) => {
       const depDate = new Date(t.departureDate);
       const dateOk =
-        depDate >= new Date(startDate) && depDate <= new Date(endDate);
+        (!startDate || depDate >= new Date(startDate)) &&
+        (!endDate || depDate <= new Date(endDate));
       const deptOk = deptFilter === "All" || t.department === deptFilter;
       const searchOk =
         !q ||
@@ -103,6 +138,10 @@ function FlightSection() {
   const pending = filtered.filter(
     (t) => t.status === "Pending" || !t.status,
   ).length;
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage],
+  );
 
   return (
     <div className="space-y-4">
@@ -214,15 +253,15 @@ function FlightSection() {
               <tr className="bg-[#0A4D68] text-[#bfdbfe]">
                 <Th>Trip ID</Th>
                 <Th>Employee</Th>
-                <Th>Destination</Th>
+                {/* <Th>Destination</Th> */}
                 <Th>Departure Date</Th>
-                <Th>Return Date</Th>
+                <Th>Airline</Th>
                 <Th>Status</Th>
                 <Th>Action</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
+              {paginated.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="py-16 text-center text-slate-400">
                     <div className="flex justify-center mb-3">
@@ -237,7 +276,7 @@ function FlightSection() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((t, i) => (
+                paginated.map((t, i) => (
                   <tr
                     key={t.id}
                     className={`transition-colors hover:bg-sky-50 ${
@@ -252,38 +291,54 @@ function FlightSection() {
                         <div className="w-7 h-7 rounded-full bg-[#0A4D68]/10 flex items-center justify-center text-[11px] font-black text-[#0A4D68] shrink-0">
                           {t.employee[0]}
                         </div>
-                        <span className="font-semibold text-[13px] text-slate-800">
-                          {t.employee}
-                        </span>
+                        <div className="flex flex-col text-left">
+                          <span className="font-semibold text-[13px] text-slate-800">
+                            {t.employee}
+                          </span>
+                          <span className="text-xs text-[#0A4D68] font-medium">
+                            {t.department}
+                          </span>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    {/* <td className="px-4 py-3">
                       <span className="px-2.5 py-0.5 text-xs rounded-full bg-blue-50 text-[#0A4D68] font-medium">
                         {t.department}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-700 font-medium">
+                    </td> */}
+                    {/* <td className="px-4 py-3 text-[13px] text-slate-700 font-medium">
                       {t.destination}
+                    </td> */}
+                    <td className="px-4 py-3 text-[13px] text-slate-500">
+                      {t.departureDate
+                        ? new Date(t.departureDate).toLocaleDateString(
+                            "en-IN",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            },
+                          )
+                        : "—"}
                     </td>
                     <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {new Date(t.departureDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {new Date(t.returnDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-slate-800 text-[13px]">
+                          {t.airlineName || "N/A"}
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          {t.flightNumber ? `Flight ${t.flightNumber}` : "—"}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={t.status || "Pending"} />
                     </td>
                     <td className="px-4 py-3">
-                      <button className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] flex items-center gap-1">
+                      <button
+                        onClick={() => setSelectedBooking(t.raw)}
+                        className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] flex items-center gap-1"
+                      >
                         <FiEye size={12} /> View
                       </button>
                     </td>
@@ -296,12 +351,32 @@ function FlightSection() {
         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
           <span>
             Showing{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> of{" "}
+            <strong className="text-slate-600">
+              {filtered.length === 0
+                ? 0
+                : `${Math.min((currentPage - 1) * PAGE_SIZE + 1, filtered.length)}-${Math.min(
+                    currentPage * PAGE_SIZE,
+                    filtered.length,
+                  )}`}
+            </strong>{" "}
+            of{" "}
             <strong className="text-slate-600">{flightTrips.length}</strong>{" "}
             flight trips
           </span>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
+        />
       </div>
+      {selectedBooking && (
+        <FlightBookingModal
+          booking={selectedBooking}
+          onClose={() => setSelectedBooking(null)}
+        />
+      )}
     </div>
   );
 }

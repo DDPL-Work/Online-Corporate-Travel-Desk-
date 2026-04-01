@@ -21,6 +21,7 @@ export default function MultiCityFlightCard({
   onOpenFareUpsell,
   travelClass,
   resultIndex,
+  searchPayload,
 }) {
   const [openIndex, setOpenIndex] = useState(-1);
   const navigate = useNavigate();
@@ -246,6 +247,12 @@ export default function MultiCityFlightCard({
                   },
                   searchParams: {
                     traceId,
+                    passengers:
+                      searchPayload?.passengers || {
+                        adults: searchPayload?.adults || 1,
+                        children: searchPayload?.children || 0,
+                        infants: searchPayload?.infants || 0,
+                      },
                   },
                   tripType: "multi-city",
                   isInternational,

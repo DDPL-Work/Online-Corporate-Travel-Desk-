@@ -51,6 +51,13 @@ router.get(
   employeeCtrl.getMyTravelAdmin,
 );
 
+router.get(
+  "/gst",
+  verifyToken,
+  authorizeRoles("employee", "travel-admin"),
+  employeeCtrl.getMyGstDetails,
+);
+
 
 
 module.exports = router;

@@ -29,6 +29,9 @@ import {
   FiStar,
   FiTag,
   FiClock,
+  FiInfo,
+  FiBookOpen,
+  FiX,
 } from "react-icons/fi";
 import { FaUserPlus, FaHotel } from "react-icons/fa";
 import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
@@ -42,6 +45,7 @@ import Swal from "sweetalert2";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { Country } from "country-state-city";
+import api from "../../../API/axios";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Room Image Gallery                                             */
@@ -193,9 +197,9 @@ function HotelHeroBanner({
   totalAdults,
 }) {
   const nights = calculateNights(
-  displaySearchParams?.checkIn,
-  displaySearchParams?.checkOut
-);
+    displaySearchParams?.checkIn,
+    displaySearchParams?.checkOut,
+  );
 
   return (
     <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mb-6">
@@ -362,9 +366,9 @@ function SelectedRoomDetailsCard({
   const inclusion = selectedRoom?.Inclusion || displayRoom?.Inclusion || "";
   const dayRates = selectedRoom?.DayRates || displayRoom?.DayRates || [];
   const nights = calculateNights(
-  displaySearchParams?.checkIn,
-  displaySearchParams?.checkOut
-);
+    displaySearchParams?.checkIn,
+    displaySearchParams?.checkOut,
+  );
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
@@ -521,6 +525,26 @@ const calculateNights = (checkIn, checkOut) => {
   return nights > 0 ? nights : 1;
 };
 
+// Add these above your main component
+
+const Required = () => <span className="text-red-400">*</span>;
+
+const Divider = () => <hr className="border-slate-100" />;
+
+const SectionHeading = ({ icon, title, badge }) => (
+  <div className="flex items-center gap-2 mb-3">
+    <span className="text-[#0A4D68]">{icon}</span>
+    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+      {title}
+    </p>
+    {badge && (
+      <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+        {badge}
+      </span>
+    )}
+  </div>
+);
+
 /* ─────────────────────────────────────────────────────────────── */
 /*  Main Component                                                 */
 /* ─────────────────────────────────────────────────────────────── */
@@ -543,6 +567,11 @@ const HotelReviewBooking = () => {
   const [travelers, setTravelers] = useState([]);
   const [purposeOfTravel, setPurposeOfTravel] = useState("");
   const [bookingRequest, setBookingRequest] = useState(null);
+  const [gstDetails, setGstDetails] = useState({
+    gstin: "",
+    legalName: "",
+    address: "",
+  });
 
   const queryParams = new URLSearchParams(location.search);
   const bookingId = id || queryParams.get("id");
@@ -563,6 +592,25 @@ const HotelReviewBooking = () => {
   useEffect(() => {
     if (id) dispatch(fetchHotelRequestById(id));
   }, [dispatch, id]);
+
+  useEffect(() => {
+    const fetchGst = async () => {
+      try {
+        const { data } = await api.get("/employees/gst");
+        if (data?.data) {
+          setGstDetails((prev) => ({
+            ...prev,
+            gstin: data.data.gstin || "",
+            legalName: data.data.legalName || "",
+            address: data.data.address || "",
+          }));
+        }
+      } catch (err) {
+        console.warn("GST fetch failed", err?.message);
+      }
+    };
+    fetchGst();
+  }, []);
 
   useEffect(() => {
     if (selectedRequest) {
@@ -590,6 +638,7 @@ const HotelReviewBooking = () => {
           phoneWithCode: i === 0 ? user?.phone || "" : "",
           countryCode: "IN",
           nationality: "IN",
+          panCard: "",
         }),
       );
 
@@ -621,6 +670,10 @@ const HotelReviewBooking = () => {
         phoneWithCode: "",
         countryCode: "",
         nationality: "",
+        PassportNo: "",
+        PassportIssueDate: "",
+        PassportExpDate: "",
+        panCard: "",
       },
     ]);
   };
@@ -677,6 +730,32 @@ const HotelReviewBooking = () => {
       };
 
   const selectedRoom = rooms || [];
+
+  const hotelCountry =
+    displayHotel?.country ||
+    displayHotel?.CountryName ||
+    displayHotel?.address?.split(",")?.slice(-1)[0]?.trim() ||
+    "";
+
+  const getCountryCode = (countryNameOrCode) => {
+    if (!countryNameOrCode) return "";
+
+    // If already code like "IN"
+    if (countryNameOrCode.length === 2) return countryNameOrCode;
+
+    const found = Country.getAllCountries().find(
+      (c) => c.name.toLowerCase() === countryNameOrCode.toLowerCase(),
+    );
+
+    return found?.isoCode || "";
+  };
+
+  const hotelCountryCode = getCountryCode(hotelCountry);
+
+  // 🔥 THIS IS YOUR MAIN FLAG
+  const isInternationalBooking = travelers.some(
+    (t) => getCountryCode(t.nationality || t.countryCode) !== hotelCountryCode,
+  );
 
   const displayRoom = {
     RoomTypeName:
@@ -767,18 +846,17 @@ const HotelReviewBooking = () => {
       return;
     }
 
-
     const totalAdults = travelers.length;
-const totalRooms = selectedRoom.length;
+    const totalRooms = selectedRoom.length;
 
-const adultsPerRoom = Math.floor(totalAdults / totalRooms);
-const extra = totalAdults % totalRooms;
+    const adultsPerRoom = Math.floor(totalAdults / totalRooms);
+    const extra = totalAdults % totalRooms;
 
-const roomGuests = selectedRoom.map((_, i) => ({
-  noOfAdults: adultsPerRoom + (i < extra ? 1 : 0),
-  noOfChild: 0,
-  childAge: [],
-}));
+    const roomGuests = selectedRoom.map((_, i) => ({
+      noOfAdults: adultsPerRoom + (i < extra ? 1 : 0),
+      noOfChild: 0,
+      childAge: [],
+    }));
     const payload = {
       bookingType: "hotel",
       hotelRequest: {
@@ -845,8 +923,13 @@ const roomGuests = selectedRoom.map((_, i) => ({
         phoneWithCode: t.phoneWithCode,
         nationality: t.nationality || "IN",
         isLeadPassenger: t.leadPassenger,
+        panCard: t.panCard || "",
+        PassportExpDate: t.PassportExpDate || "",
+        PassportIssueDate: t.PassportIssueDate || "",
+        PassportNo: t.PassportNo || "",
       })),
       purposeOfTravel,
+      gstDetails,
       pricingSnapshot: {
         totalAmount: displayRoom?.TotalFare,
         currency: displayRoom?.Currency || "INR",
@@ -859,9 +942,9 @@ const roomGuests = selectedRoom.map((_, i) => ({
         checkOutDate: displaySearchParams?.checkOut,
         roomCount: displaySearchParams?.rooms?.length || 1,
         nights: calculateNights(
-  displaySearchParams?.checkIn,
-  displaySearchParams?.checkOut
-),
+          displaySearchParams?.checkIn,
+          displaySearchParams?.checkOut,
+        ),
         amount: displayRoom?.TotalFare,
         currency: displayRoom?.Currency || "INR",
       },
@@ -947,13 +1030,12 @@ const roomGuests = selectedRoom.map((_, i) => ({
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
             onClick={() => {
-              if (isApproved) navigate("/my-bookings");
-              else navigate(-1);
+              navigate(-1);
             }}
             className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#0A4D68] transition font-medium"
           >
             <MdArrowBack size={18} />
-            {isApproved ? "Back to Requests" : "Back to Details"}
+            Back to Details
           </button>
           {isApproved && (
             <div className="flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-full">
@@ -1113,192 +1195,381 @@ const roomGuests = selectedRoom.map((_, i) => ({
                     </button>
                   )}
                 </div>
-
-                <div className="p-6 space-y-6">
+                <div className="p-6 space-y-5">
                   {travelers.map((t, index) => (
                     <div
                       key={t.id || t._id || index}
-                      className="rounded-xl border border-slate-200 overflow-hidden"
+                      className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm"
                     >
-                      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-                        <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                          <FiUser size={12} className="text-slate-400" /> Guest{" "}
-                          {index + 1}
-                        </span>
+                      {/* Card Header */}
+                      <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-[#0A4D68]/5 to-[#0A4D68]/10 border-b border-slate-200">
                         <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-[#0A4D68] flex items-center justify-center text-white text-xs font-bold">
+                            {index + 1}
+                          </div>
+                          <span className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                            <FiUser size={13} className="text-[#0A4D68]" />
+                            Guest {index + 1}
+                          </span>
                           {t.leadPassenger && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-[#0A4D68] bg-[#0A4D68]/10 px-2 py-0.5 rounded-full">
-                              Primary
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#0A4D68] bg-[#0A4D68]/10 px-2.5 py-0.5 rounded-full border border-[#0A4D68]/20">
+                              Primary Guest
                             </span>
                           )}
-                          {travelers.length > 1 && !isBookNowMode && (
-                            <button
-                              onClick={() => handleRemoveGuest(t.id)}
-                              className="text-xs text-red-500 hover:text-red-700 font-medium"
-                            >
-                              Remove
-                            </button>
-                          )}
                         </div>
+                        {travelers.length > 1 && !isBookNowMode && (
+                          <button
+                            onClick={() => handleRemoveGuest(t.id)}
+                            className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50 transition"
+                          >
+                            <FiX size={12} /> Remove
+                          </button>
+                        )}
                       </div>
 
-                      <div className="p-5 space-y-5">
+                      <div className="p-5 space-y-6 bg-white">
+                        {/* ── Full Name ── */}
                         <div>
-                          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                            Full Name
-                          </p>
+                          <SectionHeading
+                            icon={<FiUser size={12} />}
+                            title="Full Name"
+                          />
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <select
-                              value={t.title}
-                              disabled={isBookNowMode}
-                              onChange={(e) =>
-                                updateTraveler(t.id, "title", e.target.value)
-                              }
-                              className="h-10 px-3 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition"
-                            >
-                              <option>Mr</option>
-                              <option>Mrs</option>
-                              <option>Ms</option>
-                            </select>
-                            <input
-                              type="text"
-                              placeholder="First Name *"
-                              value={t.firstName}
-                              disabled={isBookNowMode}
-                              onChange={(e) =>
-                                updateTraveler(
-                                  t.id,
-                                  "firstName",
-                                  e.target.value,
-                                )
-                              }
-                              className="h-10 px-3 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition disabled:bg-slate-50"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Middle (Optional)"
-                              value={t.middleName || ""}
-                              disabled={isBookNowMode}
-                              onChange={(e) =>
-                                updateTraveler(
-                                  t.id,
-                                  "middleName",
-                                  e.target.value,
-                                )
-                              }
-                              className="h-10 px-3 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition disabled:bg-slate-50"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Last Name *"
-                              value={t.lastName}
-                              disabled={isBookNowMode}
-                              onChange={(e) =>
-                                updateTraveler(t.id, "lastName", e.target.value)
-                              }
-                              className="h-10 px-3 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition disabled:bg-slate-50"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                            Contact Details
-                          </p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="relative">
-                              <FiMail
-                                className="absolute left-3 top-3 text-slate-400"
-                                size={14}
-                              />
-                              <input
-                                type="email"
-                                placeholder="Email Address *"
-                                value={t.email}
+                            <div className="flex flex-col gap-1">
+                              <label className="field-label">Title</label>
+                              <select
+                                value={t.title}
                                 disabled={isBookNowMode}
                                 onChange={(e) =>
-                                  updateTraveler(t.id, "email", e.target.value)
+                                  updateTraveler(t.id, "title", e.target.value)
                                 }
-                                className="h-10 w-full pl-9 pr-3 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition disabled:bg-slate-50"
+                                className="field-input"
+                              >
+                                <option>Mr</option>
+                                <option>Mrs</option>
+                                <option>Ms</option>
+                              </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="field-label">
+                                First Name <Required />
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Rahul"
+                                value={t.firstName}
+                                disabled={isBookNowMode}
+                                onChange={(e) =>
+                                  updateTraveler(
+                                    t.id,
+                                    "firstName",
+                                    e.target.value,
+                                  )
+                                }
+                                className="field-input"
                               />
                             </div>
-                            <PhoneInput
-                              country={"in"}
-                              value={t.phoneWithCode}
-                              disabled={isBookNowMode}
-                              onChange={(value, data) => {
-                                updateTraveler(t.id, "phoneWithCode", value);
-                                updateTraveler(
-                                  t.id,
-                                  "countryCode",
-                                  data?.countryCode?.toUpperCase(),
-                                );
-                              }}
-                              inputClass="!h-10 !w-full !text-sm !bg-white !border !border-slate-200 !rounded-lg"
-                              buttonClass="!border !border-slate-200 !rounded-l-lg"
-                              containerClass="w-full"
-                              enableSearch
-                            />
+                            <div className="flex flex-col gap-1">
+                              <label className="field-label">
+                                Middle Name{" "}
+                                <span className="text-slate-400 font-normal normal-case">
+                                  (optional)
+                                </span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Kumar"
+                                value={t.middleName || ""}
+                                disabled={isBookNowMode}
+                                onChange={(e) =>
+                                  updateTraveler(
+                                    t.id,
+                                    "middleName",
+                                    e.target.value,
+                                  )
+                                }
+                                className="field-input"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="field-label">
+                                Last Name <Required />
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Singh"
+                                value={t.lastName}
+                                disabled={isBookNowMode}
+                                onChange={(e) =>
+                                  updateTraveler(
+                                    t.id,
+                                    "lastName",
+                                    e.target.value,
+                                  )
+                                }
+                                className="field-input"
+                              />
+                            </div>
                           </div>
                         </div>
 
+                        <Divider />
+
+                        {/* ── Contact Details ── */}
                         <div>
-                          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                            Additional Info
-                          </p>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <select
-                              value={t.nationality}
-                              disabled={isBookNowMode}
-                              onChange={(e) =>
-                                updateTraveler(
-                                  t.id,
-                                  "nationality",
-                                  e.target.value,
-                                )
-                              }
-                              className="h-10 px-3 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition"
-                            >
-                              <option value="">Select Nationality *</option>
-                              {countries.map((c) => (
-                                <option key={c.isoCode} value={c.isoCode}>
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
-                            <input
-                              type="date"
-                              value={t.dob || ""}
-                              disabled={isBookNowMode}
-                              onChange={(e) => {
-                                const dob = e.target.value;
-                                const today = new Date();
-                                const birth = new Date(dob);
-                                let age =
-                                  today.getFullYear() - birth.getFullYear();
-                                const m = today.getMonth() - birth.getMonth();
-                                if (
-                                  m < 0 ||
-                                  (m === 0 && today.getDate() < birth.getDate())
-                                )
-                                  age--;
-                                updateTraveler(t.id, "dob", dob);
-                                updateTraveler(t.id, "age", age);
-                              }}
-                              className="h-10 px-3 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition"
-                            />
-                            <input
-                              type="number"
-                              value={t.age || ""}
-                              readOnly
-                              placeholder="Age (auto)"
-                              className="h-10 w-full px-3 text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-lg cursor-not-allowed"
-                            />
+                          <SectionHeading
+                            icon={<FiMail size={12} />}
+                            title="Contact Details"
+                          />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1">
+                              <label className="field-label">
+                                Email Address <Required />
+                              </label>
+                              <div className="relative">
+                                <FiMail
+                                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                                  size={14}
+                                />
+                                <input
+                                  type="email"
+                                  placeholder="e.g. rahul@email.com"
+                                  value={t.email}
+                                  disabled={isBookNowMode}
+                                  onChange={(e) =>
+                                    updateTraveler(
+                                      t.id,
+                                      "email",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="field-input pl-9"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="field-label">
+                                Phone Number <Required />
+                              </label>
+                              <PhoneInput
+                                country={"in"}
+                                value={t.phoneWithCode}
+                                disabled={isBookNowMode}
+                                onChange={(value, data) => {
+                                  updateTraveler(t.id, "phoneWithCode", value);
+                                  updateTraveler(
+                                    t.id,
+                                    "countryCode",
+                                    data?.countryCode?.toUpperCase(),
+                                  );
+                                }}
+                                inputClass="!h-10 !w-full !text-sm !bg-white !border !border-slate-200 !rounded-lg !text-slate-700 focus:!border-[#0A4D68] focus:!ring-2 focus:!ring-[#0A4D68]/10"
+                                buttonClass="!border !border-slate-200 !rounded-l-lg !bg-white"
+                                containerClass="w-full"
+                                enableSearch
+                              />
+                            </div>
                           </div>
                         </div>
+
+                        <Divider />
+
+                        {/* ── Additional Info ── */}
+                        <div>
+                          <SectionHeading
+                            icon={<FiInfo size={12} />}
+                            title="Personal Details"
+                          />
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="flex flex-col gap-1">
+                              <label className="field-label">
+                                Nationality <Required />
+                              </label>
+                              <select
+                                value={t.nationality}
+                                disabled={isBookNowMode}
+                                onChange={(e) =>
+                                  updateTraveler(
+                                    t.id,
+                                    "nationality",
+                                    e.target.value,
+                                  )
+                                }
+                                className="field-input"
+                              >
+                                <option value="">Select country</option>
+                                {countries.map((c) => (
+                                  <option key={c.isoCode} value={c.isoCode}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="field-label">
+                                Date of Birth
+                              </label>
+                              <input
+                                type="date"
+                                value={t.dob || ""}
+                                disabled={isBookNowMode}
+                                onChange={(e) => {
+                                  const dob = e.target.value;
+                                  const today = new Date();
+                                  const birth = new Date(dob);
+                                  let age =
+                                    today.getFullYear() - birth.getFullYear();
+                                  const m = today.getMonth() - birth.getMonth();
+                                  if (
+                                    m < 0 ||
+                                    (m === 0 &&
+                                      today.getDate() < birth.getDate())
+                                  )
+                                    age--;
+                                  updateTraveler(t.id, "dob", dob);
+                                  updateTraveler(t.id, "age", age);
+                                }}
+                                className="field-input"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="field-label">
+                                Age{" "}
+                                <span className="text-slate-400 font-normal normal-case">
+                                  (auto-calculated)
+                                </span>
+                              </label>
+                              <input
+                                type="number"
+                                value={t.age || ""}
+                                readOnly
+                                placeholder="—"
+                                className="field-input bg-slate-50 text-slate-400 cursor-not-allowed"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="field-label">PAN Card</label>
+                              <input
+                                type="text"
+                                value={t.panCard || ""}
+                                disabled={isBookNowMode}
+                                onChange={(e) =>
+                                  updateTraveler(
+                                    t.id,
+                                    "panCard",
+                                    e.target.value.toUpperCase(),
+                                  )
+                                }
+                                placeholder="ABCDE1234F"
+                                maxLength={10}
+                                className="field-input font-mono tracking-widest"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* ── Passport (International only) ── */}
+                        {isInternationalBooking && (
+                          <>
+                            <Divider />
+                            <div>
+                              <SectionHeading
+                                icon={<FiBookOpen size={12} />}
+                                title="Passport Details"
+                                badge="International"
+                              />
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div className="flex flex-col gap-1">
+                                  <label className="field-label">
+                                    Passport Number <Required />
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. A1234567"
+                                    value={t.PassportNo || ""}
+                                    onChange={(e) =>
+                                      updateTraveler(
+                                        t.id,
+                                        "PassportNo",
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="field-input font-mono tracking-widest"
+                                  />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label className="field-label">
+                                    Issue Date <Required />
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={t.PassportIssueDate || ""}
+                                    onChange={(e) =>
+                                      updateTraveler(
+                                        t.id,
+                                        "PassportIssueDate",
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="field-input"
+                                  />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label className="field-label">
+                                    Expiry Date <Required />
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={t.PassportExpDate || ""}
+                                    onChange={(e) =>
+                                      updateTraveler(
+                                        t.id,
+                                        "PassportExpDate",
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="field-input"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
+
+                  <style>{`
+                    .field-label {
+                      font-size: 11px;
+                      font-weight: 600;
+                      color: #64748b;
+                      text-transform: uppercase;
+                      letter-spacing: 0.05em;
+                    }
+                    .field-input {
+                      height: 40px;
+                      width: 100%;
+                      padding: 0 12px;
+                      font-size: 14px;
+                      color: #334155;
+                      background: white;
+                      border: 1px solid #e2e8f0;
+                      border-radius: 8px;
+                      outline: none;
+                      transition: border-color 0.15s, box-shadow 0.15s;
+                    }
+                    .field-input:focus {
+                      border-color: #0A4D68;
+                      box-shadow: 0 0 0 3px rgba(10,77,104,0.08);
+                    }
+                    .field-input:disabled {
+                      background: #f8fafc;
+                      color: #94a3b8;
+                      cursor: not-allowed;
+                    }
+                    .field-input::placeholder { color: #cbd5e1; }
+                  `}</style>
                 </div>
               </div>
             )}
@@ -1318,23 +1589,85 @@ const roomGuests = selectedRoom.map((_, i) => ({
                   </p>
                 </div>
               </div>
-              {isApproved ? (
-                <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm text-slate-700 min-h-20">
-                  {purposeOfTravel || (
-                    <span className="text-slate-400 italic">
-                      No purpose provided
+              <textarea
+                // value={purposeOfTravel}
+                onChange={(e) => setPurposeOfTravel(e.target.value)}
+                placeholder="Describe the reason for this booking…"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 focus:bg-white min-h-[100px] transition resize-none"
+              />
+            </div>
+
+            {/* ── GST Details ── */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <div className="flex items-center gap-2.5 mb-4">
+                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 text-green-600">
+                  <FiTag size={15} />
+                </span>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-700">
+                    GST Details{" "}
+                    <span className="text-xs font-normal text-slate-400">
+                      (Optional)
                     </span>
-                  )}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Add GST information for invoicing
+                  </p>
                 </div>
-              ) : (
-                <textarea
-                  value={purposeOfTravel}
-                  disabled={isBookNowMode && !isApproved}
-                  onChange={(e) => setPurposeOfTravel(e.target.value)}
-                  placeholder="Describe the reason for this booking…"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 focus:bg-white min-h-[100px] transition disabled:bg-slate-100 disabled:text-slate-400 resize-none"
-                />
-              )}
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    GSTIN
+                  </label>
+                  <input
+                    type="text"
+                    value={gstDetails.gstin || ""}
+                    onChange={(e) =>
+                      setGstDetails((prev) => ({
+                        ...prev,
+                        gstin: e.target.value.toUpperCase(),
+                      }))
+                    }
+                    placeholder="27ABCDE1234F2Z5"
+                    className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/10 transition bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Legal Name
+                  </label>
+                  <input
+                    type="text"
+                    value={gstDetails.legalName || ""}
+                    onChange={(e) =>
+                      setGstDetails((prev) => ({
+                        ...prev,
+                        legalName: e.target.value,
+                      }))
+                    }
+                    placeholder="Company legal name"
+                    className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/10 transition bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Billing Address
+                  </label>
+                  <input
+                    type="text"
+                    value={gstDetails.address || ""}
+                    onChange={(e) =>
+                      setGstDetails((prev) => ({
+                        ...prev,
+                        address: e.target.value,
+                      }))
+                    }
+                    placeholder="Street, City, State, PIN"
+                    className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/10 transition bg-white"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

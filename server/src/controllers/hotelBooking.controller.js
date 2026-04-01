@@ -12,7 +12,7 @@ const { generateBookingReference } = require("../utils/helpers");
    CREATE HOTEL BOOKING REQUEST (Approval First)
 ====================================================== */
 exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
-  const { hotelRequest, travellers, purposeOfTravel, pricingSnapshot } =
+  const { hotelRequest, travellers, purposeOfTravel, pricingSnapshot, gstDetails } =
     req.body;
 
   const user = req.user;
@@ -158,6 +158,11 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     nationality: t.nationality,
     countryCode: t.countryCode,
 
+    panCard: t.panCard || "",
+    PassportNo:t. PassportNo || "",
+    	PassportIssueDate:t. 	PassportIssueDate || "",
+    PassportExpDate:t. PassportExpDate || "",
+
     isLeadPassenger: index === 0,
     paxType: index === 0 ? "lead" : "adult",
 
@@ -174,6 +179,11 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     requestStatus: "pending_approval",
 
     purposeOfTravel,
+    gstDetails: {
+      gstin: gstDetails?.gstin || "",
+      legalName: gstDetails?.legalName || "",
+      address: gstDetails?.address || "",
+    },
     travellers: transformedTravellers,
 
     hotelRequest: transformedHotelRequest,
@@ -415,7 +425,7 @@ if (
       throw new ApiError(400, "Traveller count mismatch with rooms");
     }
 
-    passengers.push({
+    const passenger = {
       Title: traveller.title,
       FirstName: traveller.firstName,
       LastName: traveller.lastName,
@@ -426,8 +436,20 @@ if (
 
       // ✅ FIX: Lead per room
       LeadPassenger: i === 0,
-    });
+      
+      // 🔥 PAN Card for domestic bookings
+      PAN: traveller.panCard || "",
+      PassportNo: traveller.PassportNo || "",
+      	PassportIssueDate: traveller.	PassportIssueDate || "",
+      	PassportExpDate: traveller.	PassportExpDate || "",
+    };
 
+    // 🔥 ADD AGE IF EXISTS
+    if (traveller.age) {
+      passenger.Age = parseInt(traveller.age);
+    }
+
+    passengers.push(passenger);
     travellerIndex++;
   }
 

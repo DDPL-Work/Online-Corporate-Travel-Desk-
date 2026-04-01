@@ -777,6 +777,13 @@ export default function FlightSearchResults() {
           flight={flight}
           traceId={traceId}
           travelClass={cabinClass}
+          passengers={
+            searchPayload?.passengers || {
+              adults: searchPayload?.adults || 1,
+              children: searchPayload?.children || 0,
+              infants: searchPayload?.infants || 0,
+            }
+          }
           onOpenFareUpsell={(fareData) => {
             setSelectedFareUpsell(fareData);
             setFareUpsellOpen(true);
@@ -794,6 +801,7 @@ export default function FlightSearchResults() {
           traceId={traceId}
           travelClass={cabinClass}
           resultIndex={flight.ResultIndex}
+          searchPayload={searchPayload}
         />
       );
     }
@@ -1098,6 +1106,12 @@ export default function FlightSearchResults() {
                         traceId,
                         journeyType: 2,
                         isInternational: true,
+                        passengers:
+                          searchPayload?.passengers || {
+                            adults: searchPayload?.adults || 1,
+                            children: searchPayload?.children || 0,
+                            infants: searchPayload?.infants || 0,
+                          },
                       },
                     })
                   }
@@ -1177,6 +1191,12 @@ export default function FlightSearchResults() {
                         },
                         traceId,
                         isInternational,
+                        passengers:
+                          searchPayload?.passengers || {
+                            adults: searchPayload?.adults || 1,
+                            children: searchPayload?.children || 0,
+                            infants: searchPayload?.infants || 0,
+                          },
                       },
                     });
                   }}
