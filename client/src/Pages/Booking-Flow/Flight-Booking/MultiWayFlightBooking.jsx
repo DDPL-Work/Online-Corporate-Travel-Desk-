@@ -21,6 +21,7 @@ import {
   getFareRule,
   getSSR,
 } from "../../../Redux/Actions/flight.thunks";
+import api from "../../../API/axios";
 import SeatSelectionModal from "./SSR/SeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
@@ -79,9 +80,15 @@ export default function MultiCityFlightBooking() {
 
   const [travelerErrors, setTravelerErrors] = useState({});
   const [purposeOfTravel, setPurposeOfTravel] = useState("");
+  const [gstDetails, setGstDetails] = useState({
+    gstin: "",
+    legalName: "",
+    address: "",
+  });
   // ===== Traveler State =====
-  const initialTraveler = (id) => ({
+  const initialTraveler = (id, type = "ADULT") => ({
     id,
+    type,
     title: "MR",
     firstName: "",
     middleName: "",
@@ -91,39 +98,40 @@ export default function MultiCityFlightBooking() {
     email: "",
     phoneWithCode: "",
     passportNumber: "",
+    PassportIssueDate: "",
     passportExpiry: "",
-    nationality: "",
+    nationality: "IN",
     dob: "",
+    linkedAdultIndex: type === "INFANT" ? 0 : null,
   });
 
   const [travelers, setTravelers] = useState([]);
+  const adultCount =
+    searchParams?.passengers?.adults || searchParams?.adults || 1;
+  const childCount =
+    searchParams?.passengers?.children || searchParams?.children || 0;
+  const infantCount =
+    searchParams?.passengers?.infants || searchParams?.infants || 0;
+  const seatEligibleCount = adultCount + childCount;
+  const maxForms = adultCount + childCount;
 
   // ✅ AUTO-FILL LEAD TRAVELER
   useEffect(() => {
-    const adultCount =
-      searchParams?.passengers?.adults || searchParams?.adults || 1;
-    const childCount =
-      searchParams?.passengers?.children || searchParams?.children || 0;
-    const infantCount =
-      searchParams?.passengers?.infants || searchParams?.infants || 0;
-    const totalCount = adultCount + childCount + infantCount;
+    const initial = [];
 
-    const initial = Array.from({ length: totalCount || 1 }, (_, i) => ({
-      id: i + 1,
-      title: "MR",
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      gender: "",
-      age: "",
-      email: "",
-      mobile: "",
-      phoneWithCode: "",
-      passportNumber: "",
-      passportExpiry: "",
-      nationality: "India",
-      dob: "",
-    }));
+    for (let i = 0; i < adultCount; i++) {
+      initial.push(initialTraveler(initial.length + 1, "ADULT"));
+    }
+    for (let i = 0; i < childCount; i++) {
+      initial.push(initialTraveler(initial.length + 1, "CHILD"));
+    }
+    for (let i = 0; i < infantCount; i++) {
+      const linkedAdult = Math.min(i, Math.max(adultCount - 1, 0));
+      initial.push({
+        ...initialTraveler(initial.length + 1, "INFANT"),
+        linkedAdultIndex: linkedAdult,
+      });
+    }
 
     // Pre-fill first traveler if user is logged in
     if (user && initial[0]) {
@@ -146,6 +154,25 @@ export default function MultiCityFlightBooking() {
 
     setTravelers(initial);
   }, [user, searchParams]);
+
+  useEffect(() => {
+    const fetchGst = async () => {
+      try {
+        const { data } = await api.get("/employee/gst");
+        if (data?.data) {
+          setGstDetails((prev) => ({
+            ...prev,
+            gstin: data.data.gstin || "",
+            legalName: data.data.legalName || "",
+            address: data.data.address || "",
+          }));
+        }
+      } catch (err) {
+        console.warn("GST fetch failed", err?.message);
+      }
+    };
+    fetchGst();
+  }, []);
 
   const formatDateTime = (dateString) => {
     if (!dateString) return "N/A";
@@ -329,6 +356,10 @@ export default function MultiCityFlightBooking() {
     travelersCount,
   ) => {
     const key = `${journeyType}|${segmentIndex}`;
+    const allowedCount =
+      typeof travelersCount === "number" && travelersCount > 0
+        ? travelersCount
+        : seatEligibleCount || 1;
 
     setSelectedMeals((prev) => {
       const list = prev[key] || [];
@@ -338,10 +369,10 @@ export default function MultiCityFlightBooking() {
         return { ...prev, [key]: list.filter((m) => m.Code !== meal.Code) };
       }
 
-      if (list.length >= travelersCount) {
+      if (list.length >= allowedCount) {
         ToastWithTimer({
           type: "info",
-          message: `You can add meals for only ${travelersCount} traveler(s)`,
+          message: `You can add meals for only ${allowedCount} traveler(s)`,
         });
         return prev;
       }
@@ -511,6 +542,31 @@ export default function MultiCityFlightBooking() {
     const lastSegment = segments[segments.length - 1];
     const cabinClass = CABIN_MAP[firstSegment?.cabinClass] || "Economy";
 
+    const travelersWithInfants = [...travelers];
+    for (let i = 0; i < infantCount; i++) {
+      const linkedAdult = adultCount ? i % adultCount : 0;
+      const fallbackLast = travelers[linkedAdult]?.lastName || "INFANT";
+      const depDate = firstSegment?.dt;
+      const inferredDob = depDate
+        ? (() => {
+            const d = new Date(depDate);
+            d.setFullYear(d.getFullYear() - 1);
+            return d.toISOString().split("T")[0];
+          })()
+        : "";
+      travelersWithInfants.push({
+        id: travelersWithInfants.length + 1,
+        type: "INFANT",
+        title: "MSTR",
+        firstName: `INFANT${i + 1}`,
+        lastName: fallbackLast,
+        gender: "MALE",
+        dob: inferredDob,
+        linkedAdultIndex: linkedAdult,
+        nationality: "IN",
+      });
+    }
+
     const bookingSnapshot = {
       bookingType: "flight",
       sectors: segments.map((s) => `${s.from}-${s.to}`),
@@ -524,6 +580,7 @@ export default function MultiCityFlightBooking() {
         calculateSSRTotal(),
       purposeOfTravel: purposeOfTravel || "N/A",
       city: lastSegment?.to || "N/A",
+      gstDetails,
     };
 
     const TRACE_VALIDITY_MINUTES = 15;
@@ -556,7 +613,7 @@ export default function MultiCityFlightBooking() {
         fareExpiry,
       },
 
-      travellers: travelers.map((t, idx) => ({
+      travellers: travelersWithInfants.map((t, idx) => ({
         title: t.title,
         firstName: t.firstName,
         lastName: t.lastName,
@@ -568,8 +625,13 @@ export default function MultiCityFlightBooking() {
         dateOfBirth: t.dob,
 
         passportNumber: t.passportNumber,
+        PassportIssueDate: t.PassportIssueDate,
         passportExpiry: t.passportExpiry,
         nationality: t.nationality,
+
+        paxType: (t.type || "ADULT").toUpperCase(),
+        linkedAdultIndex:
+          t.type === "INFANT" ? t.linkedAdultIndex ?? 0 : null,
 
         isLeadPassenger: idx === 0,
       })),
@@ -583,7 +645,18 @@ export default function MultiCityFlightBooking() {
           calculateSSRTotal(),
         currency: "INR",
       },
+      gstDetails,
     };
+  };
+
+  const ageFromDob = (dob) => {
+    if (!dob) return null;
+    const birth = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
   };
 
   const validateTravelers = () => {
@@ -596,11 +669,36 @@ export default function MultiCityFlightBooking() {
       if (!t.firstName?.trim()) e.firstName = "First name is required";
       if (!t.lastName?.trim()) e.lastName = "Last name is required";
       if (!t.gender?.trim()) e.gender = "Gender is required";
-      if (!t.email?.trim()) e.email = "Email is required";
+      if (idx === 0 && !t.email?.trim()) e.email = "Email is required";
       if (!t.dob?.trim()) e.dob = "Date of birth is required";
-      if (!t.phoneWithCode?.trim())
+      if (idx === 0 && !t.phoneWithCode?.trim())
         e.phoneWithCode = "Phone number is required";
       if (!t.nationality?.trim()) e.nationality = "Nationality is required";
+
+      const paxType = (t.type || "ADULT").toUpperCase();
+      const age = ageFromDob(t.dob);
+
+      if (age != null) {
+        if (paxType === "ADULT" && age < 12) {
+          e.dob = "Adult must be 12+ years";
+        }
+        if (paxType === "CHILD" && (age < 2 || age > 11)) {
+          e.dob = "Child age must be 2-11 years";
+        }
+        if (paxType === "INFANT" && age >= 2) {
+          e.dob = "Infant must be under 2 years";
+        }
+      }
+
+      if (paxType === "INFANT") {
+        if (
+          typeof t.linkedAdultIndex !== "number" ||
+          t.linkedAdultIndex < 0 ||
+          t.linkedAdultIndex >= adultCount
+        ) {
+          e.linkedAdultIndex = "Infant must be linked to an adult";
+        }
+      }
 
       // passportNumber validation: only if flight is international
       const isInternational = Boolean(
@@ -622,6 +720,11 @@ export default function MultiCityFlightBooking() {
         isValid = false;
       }
     });
+
+    if (infantCount > adultCount) {
+      isValid = false;
+      errors.infants = { message: "Infants cannot exceed adults" };
+    }
 
     setTravelerErrors(errors);
     return isValid;
@@ -655,7 +758,10 @@ export default function MultiCityFlightBooking() {
     } catch (err) {
       ToastWithTimer({
         type: "error",
-        message: "Failed to submit booking request",
+        message:
+          err?.message ||
+          err?.payload ||
+          "Failed to submit booking request",
       });
     }
   };
@@ -715,12 +821,12 @@ export default function MultiCityFlightBooking() {
     arrivalDateTime = parsedFlightData.segments?.slice(-1)[0]?.at;
   }
 
-  const travelerCount =
-    searchParams?.passengers?.adults || searchParams?.adults || 1;
-
-  const travelersForSeat = Array.from({ length: travelerCount }, (_, i) => ({
-    id: i + 1,
-  }));
+  const travelersForSeat = Array.from(
+    { length: Math.max(1, seatEligibleCount) },
+    (_, i) => ({
+      id: i + 1,
+    }),
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 font-[DM Sans]">
@@ -893,15 +999,31 @@ export default function MultiCityFlightBooking() {
 
             {/* Traveller Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <TravelerForm
-                travelers={travelers}
-                updateTraveler={updateTraveler}
-                errors={travelerErrors}
-                parsedFlightData={parsedFlightData}
-                purposeOfTravel={purposeOfTravel}
-                setPurposeOfTravel={setPurposeOfTravel}
-                isInternational={isInternational}
-              />
+        <TravelerForm
+          travelers={travelers}
+          updateTraveler={updateTraveler}
+          errors={travelerErrors}
+          parsedFlightData={parsedFlightData}
+          purposeOfTravel={purposeOfTravel}
+          setPurposeOfTravel={setPurposeOfTravel}
+          isInternational={isInternational}
+          gstDetails={gstDetails}
+          setGstDetails={setGstDetails}
+          canAddMore={travelers.filter((t) => t.type !== "INFANT").length < maxForms}
+          onAddTraveler={() =>
+            setTravelers((prev) => {
+              const renderedCount = prev.filter(
+                (t) => (t.type || "ADULT") !== "INFANT",
+              ).length;
+              if (renderedCount >= maxForms) return prev;
+              const currentChildren = prev.filter((t) => t.type === "CHILD")
+                .length;
+              const nextType =
+                currentChildren < childCount ? "CHILD" : "ADULT";
+              return [...prev, initialTraveler(prev.length + 1, nextType)];
+            })
+          }
+        />
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">

@@ -25,13 +25,35 @@ import {
   FiList,
   FiRefreshCw,
 } from "react-icons/fi";
-import { formatDate, formatDateTime } from "../../../utils/formatter";
+import {
+  formatDate,
+  formatDateTime,
+  formatDateWithYear,
+} from "../../../utils/formatter";
 import {
   InfoBadge,
   InfoRow,
   MiniStatCard,
   SectionLabel,
 } from "../Shared/CommonComponents";
+
+// Shared traveller helpers
+const formatPaxDob = (pax) =>
+  formatDateWithYear(pax?.dateOfBirth || pax?.dob);
+const formatPaxPhone = (pax) =>
+  pax?.phoneWithCode ? `+${pax.phoneWithCode}` : "N/A";
+const formatPaxEmail = (pax) => pax?.email || "N/A";
+const formatNationality = (pax) => pax?.nationality || "N/A";
+const formatGender = (pax) => pax?.gender || "N/A";
+const calcAge = (pax) => {
+  const dobStr = pax?.dateOfBirth || pax?.dob;
+  if (!dobStr) return "N/A";
+  const dob = new Date(dobStr);
+  if (Number.isNaN(dob.getTime())) return "N/A";
+  const diff = Date.now() - dob.getTime();
+  const age = new Date(diff).getUTCFullYear() - 1970;
+  return `${age} yrs`;
+};
 
 // ─────────────────────────────────────────────
 // HOTEL MODAL
@@ -518,32 +540,32 @@ const nights =
                     <TravellerField
                       icon={<FiUser size={10} />}
                       label="Gender"
-                      value={pax.gender}
+                      value={formatGender(pax)}
                     />
                     <TravellerField
                       icon={<FiCalendar size={10} />}
                       label="Date of Birth"
-                      value={formatDate(pax.dob)}
+                      value={formatPaxDob(pax)}
                     />
                     <TravellerField
                       icon={<FiInfo size={10} />}
                       label="Age"
-                      value={`${pax.age} years`}
+                      value={calcAge(pax)}
                     />
                     <TravellerField
                       icon={<FiGlobe size={10} />}
                       label="Nationality"
-                      value={pax.nationality}
+                      value={formatNationality(pax)}
                     />
                     <TravellerField
                       icon={<FiMail size={10} />}
                       label="Email"
-                      value={pax.email}
+                      value={formatPaxEmail(pax)}
                     />
                     <TravellerField
                       icon={<FiPhone size={10} />}
                       label="Phone"
-                      value={`+${pax.phoneWithCode}`}
+                      value={formatPaxPhone(pax)}
                     />
                   </div>
                 </div>
@@ -697,9 +719,35 @@ export const PendingFlightDetailsModal = ({
   const travelers = booking.travellers || [];
   const bookSnap = booking.bookingSnapshot || {};
 
+  // Journey-level routes (collapse layovers per journey)
+  const routeByJourney = segments.reduce((acc, seg) => {
+    const key = seg.journeyType === "return" ? "return" : "onward";
+    if (!acc[key]) {
+      acc[key] = {
+        from: seg.origin?.airportCode,
+        to: seg.destination?.airportCode,
+      };
+    } else {
+      acc[key].to = seg.destination?.airportCode;
+    }
+    return acc;
+  }, {});
+
+  const displayRoutes = [];
+  if (routeByJourney.onward?.from && routeByJourney.onward?.to) {
+    displayRoutes.push(`${routeByJourney.onward.from}-${routeByJourney.onward.to}`);
+  }
+  if (routeByJourney.return?.from && routeByJourney.return?.to) {
+    displayRoutes.push(`${routeByJourney.return.from}-${routeByJourney.return.to}`);
+  }
+
   const isRoundTrip =
     flightRequest.tripType === "roundTrip" || bookSnap.sectors?.length > 1;
   const isMultiCity = flightRequest.tripType === "multiCity";
+  const onwardSegments = segments.filter(
+    (s) => (s.journeyType || "onward") !== "return",
+  );
+  const returnSegments = segments.filter((s) => s.journeyType === "return");
 
   // Cabin class label map (TBO numeric codes)
   const cabinLabel = {
@@ -758,7 +806,7 @@ export const PendingFlightDetailsModal = ({
             </span>
             <span className="flex items-center gap-1">
               <FiTag size={11} />
-              Route: {bookSnap.sectors?.join(", ") || "—"}
+              Route: {displayRoutes.join(", ") || bookSnap.sectors?.join(", ") || "—"}
             </span>
             <span className="flex items-center gap-1">
               <FaPlane size={10} />
@@ -822,11 +870,26 @@ export const PendingFlightDetailsModal = ({
                   ? `${Math.floor(seg.durationMinutes / 60)}h ${seg.durationMinutes % 60}m`
                   : "—";
                 const isNonStop = seg.stopOver === false;
-                const segLabel = isMultiCity
-                  ? `Leg ${idx + 1}`
-                  : isRoundTrip && idx === 1
-                    ? "Return"
-                    : "Outbound";
+                const isRefundable =
+                  fareSnapshot.refundable ??
+                  fareQuoteResult?.IsRefundable ??
+                  fareQuoteResult?.Fare?.IsRefundable ??
+                  false;
+                const cabinDisplay =
+                  cabinLabel[seg.cabinClass] ||
+                  bookSnap.cabinClass ||
+                  flightRequest.cabinClass ||
+                  (seg.cabinClass ? `Class ${seg.cabinClass}` : "Cabin N/A");
+                const journeyKey = seg.journeyType === "return" ? "return" : "onward";
+                const journeyList =
+                  journeyKey === "return" ? returnSegments : onwardSegments;
+                const legIndexWithinJourney = journeyList.indexOf(seg);
+                const legTotal = journeyList.length || 1;
+
+                let segLabel = journeyKey === "return" ? "Return" : "Onward";
+                if (legTotal > 1) {
+                  segLabel += ` · Leg ${legIndexWithinJourney + 1}/${legTotal}`;
+                }
 
                 return (
                   <div
@@ -850,34 +913,22 @@ export const PendingFlightDetailsModal = ({
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {isNonStop ? (
-                          <InfoBadge color="green">
-                            <FiCheckCircle size={9} className="mr-1" />
-                            Non-Stop
-                          </InfoBadge>
-                        ) : (
-                          <InfoBadge color="amber">With Stopover</InfoBadge>
-                        )}
-                        <InfoBadge color="blue">
-                          {cabinLabel[seg.cabinClass] ||
-                            `Class ${seg.cabinClass}`}
-                        </InfoBadge>
-                        <InfoBadge color="teal">
-                          Fare: {seg.fareClass}
-                        </InfoBadge>
-                        {fareSnapshot.refundable ? (
-                          <InfoBadge color="green">
-                            <FiCheckCircle size={9} className="mr-1" />
-                            Refundable
-                          </InfoBadge>
-                        ) : (
-                          <InfoBadge color="red">
-                            <FiXCircle size={9} className="mr-1" />
-                            Non-Refundable
-                          </InfoBadge>
-                        )}
-                      </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <InfoBadge color="blue">
+                      {cabinLabel[cabinDisplay] || ` ${cabinDisplay}`}
+                    </InfoBadge>
+                    {isRefundable ? (
+                      <InfoBadge color="green">
+                        <FiCheckCircle size={9} className="mr-1" />
+                        Refundable
+                      </InfoBadge>
+                    ) : (
+                      <InfoBadge color="red">
+                        <FiXCircle size={9} className="mr-1" />
+                        Non-Refundable
+                      </InfoBadge>
+                    )}
+                  </div>
                     </div>
 
                     {/* Route timeline */}
@@ -1224,27 +1275,27 @@ export const PendingFlightDetailsModal = ({
                     <TravellerField
                       icon={<FiUser size={10} />}
                       label="Gender"
-                      value={pax.gender}
+                      value={formatGender(pax)}
                     />
                     <TravellerField
                       icon={<FiCalendar size={10} />}
                       label="Date of Birth"
-                      value={formatDate(pax.dateOfBirth || pax.dob)}
+                      value={formatPaxDob(pax)}
                     />
                     <TravellerField
                       icon={<FiGlobe size={10} />}
                       label="Nationality"
-                      value={pax.nationality}
+                      value={formatNationality(pax)}
                     />
                     <TravellerField
                       icon={<FiMail size={10} />}
                       label="Email"
-                      value={pax.email}
+                      value={formatPaxEmail(pax)}
                     />
                     <TravellerField
                       icon={<FiPhone size={10} />}
                       label="Phone"
-                      value={`+${pax.phoneWithCode}`}
+                      value={formatPaxPhone(pax)}
                     />
                     {pax.passportNumber && (
                       <TravellerField

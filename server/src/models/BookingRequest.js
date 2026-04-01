@@ -64,6 +64,12 @@ const bookingRequestSchema = new mongoose.Schema(
       trim: true,
     },
 
+    gstDetails: {
+      gstin: String,
+      legalName: String,
+      address: String,
+    },
+
     travellers: [
       {
         title: String,
@@ -74,8 +80,15 @@ const bookingRequestSchema = new mongoose.Schema(
         dateOfBirth: Date,
         gender: String,
         passportNumber: String,
+        PassportIssueDate: Date,
         passportExpiry: Date,
         nationality: String,
+        paxType: {
+          type: String,
+          enum: ["ADULT", "CHILD", "INFANT"],
+          default: "ADULT",
+        },
+        linkedAdultIndex: Number,
         isLeadPassenger: Boolean,
       },
     ],
@@ -103,6 +116,7 @@ const bookingRequestSchema = new mongoose.Schema(
         "booking_initiated",
         "booked",
         "ticket_pending",
+        "on_hold",
         "ticketed",
         "failed",
         "cancel_requested", // ✅ ADD

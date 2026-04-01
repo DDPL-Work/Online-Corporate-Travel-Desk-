@@ -10,6 +10,7 @@ import {
   fetchMyBookingRequestById,
   fetchMyRejectedRequests,
   executeApprovedFlightBooking,
+  manualTicketNonLcc,
   // ticketFlight,
 } from "../Actions/booking.thunks";
 
@@ -19,6 +20,8 @@ const initialState = {
   myRejected: [],
   pagination: null,
   selected: null,
+  manualTicketStatus: null,
+  manualTicketLoading: false,
   loading: false,
   actionLoading: false,
   error: null,
@@ -117,6 +120,43 @@ const bookingSlice = createSlice({
 
       .addCase(executeApprovedFlightBooking.rejected, (state, action) => {
         state.actionLoading = false;
+        state.error = action.payload;
+      })
+
+      /* ================= MANUAL TICKET (NON-LCC) ================= */
+      .addCase(manualTicketNonLcc.pending, (state) => {
+        state.manualTicketLoading = true;
+        state.error = null;
+        state.manualTicketStatus = "pending";
+      })
+
+      .addCase(manualTicketNonLcc.fulfilled, (state, action) => {
+        state.manualTicketLoading = false;
+        state.manualTicketStatus = "success";
+
+        const { bookingId, status } = action.payload;
+
+        /* 🔥 UPDATE SELECTED */
+        if (state.selected?._id === bookingId) {
+          state.selected.executionStatus = status;
+        }
+
+        /* 🔥 UPDATE LIST */
+        const idx = state.list.findIndex((b) => b._id === bookingId);
+        if (idx !== -1) {
+          state.list[idx].executionStatus = status;
+        }
+
+        /* 🔥 UPDATE MY REQUESTS */
+        const reqIdx = state.myRequests.findIndex((b) => b._id === bookingId);
+        if (reqIdx !== -1) {
+          state.myRequests[reqIdx].executionStatus = status;
+        }
+      })
+
+      .addCase(manualTicketNonLcc.rejected, (state, action) => {
+        state.manualTicketLoading = false;
+        state.manualTicketStatus = "failed";
         state.error = action.payload;
       })
 

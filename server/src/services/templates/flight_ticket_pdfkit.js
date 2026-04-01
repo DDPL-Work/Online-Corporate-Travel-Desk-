@@ -369,11 +369,11 @@ async function generateFlightTicketPdfKit({
         "—";
 
       const seatNo =
-        booking.flightRequest?.ssrSnapshot?.seats?.[0]?.seatNo || "—";
+        booking.flightRequest?.ssrSnapshot?.seats?.[0]?.seatNo || "Auto Assign";
 
       const hasMeal =
         booking.flightRequest?.fareQuote?.Results?.[0]?.IsFreeMealAvailable;
-      const mealOption = hasMeal ? "Complimentary" : "—";
+      const mealOption = hasMeal ? "Complimentary" : "Not Selected";
 
       const ssrList =
         journeyResponse?.FlightItinerary?.Passenger?.[0]?.Ssr || [];
@@ -1026,6 +1026,7 @@ async function generateFlightTicketPdfKit({
       booking.travellers.forEach((t) => {
         const tName =
           `${t.title.toUpperCase()}. ${t.firstName} ${t.lastName}`.toUpperCase();
+        const paxType = t.paxType || t.PaxType || t.type;
         doc
           .font("Helvetica-Bold")
           .fontSize(8.5)
@@ -1035,7 +1036,7 @@ async function generateFlightTicketPdfKit({
           .font("Helvetica")
           .fontSize(6.5)
           .fillColor(C.muted)
-          .text("Adult", cols[0], trY + 12, { lineBreak: false });
+          .text(paxType, cols[0], trY + 12, { lineBreak: false });
         doc
           .font("Helvetica-Bold")
           .fontSize(8.5)

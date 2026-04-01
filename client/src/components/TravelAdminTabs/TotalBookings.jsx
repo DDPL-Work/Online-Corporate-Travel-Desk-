@@ -91,7 +91,10 @@ function FlightSection() {
       b.bookingResult?.providerResponse?.raw?.Response?.Response?.BookingId ||
       "-";
 
-    const amount = b.pricingSnapshot?.totalAmount || 0;
+    const amount =
+      b.pricingSnapshot?.totalAmount ??
+      b.bookingSnapshot?.amount ??
+      0;
 
     return {
       ...b,
@@ -170,7 +173,7 @@ function FlightSection() {
   //     });
   // }, [search, flightBookings]);
 
-  const total = filtered.reduce((s, b) => s + b.amount, 0);
+  const total = filtered.reduce((s, b) => s + (b.amount || 0), 0);
   const confirmed = filtered.filter((b) => b.status === "Confirmed").length;
   const pending = filtered.filter((b) => b.status === "Pending").length;
 
@@ -482,11 +485,10 @@ function HotelSection() {
     const invoiceNo = bookResult.InvoiceNumber || "-";
     const providerBookingId = bookResult.BookingId || "-";
 
-    const allRooms = b.hotelRequest?.allRooms || [];
-
-    const amount = allRooms.length
-      ? allRooms.reduce((sum, room) => sum + (room.totalFare || 0), 0)
-      : 0;
+    const amount =
+      b.pricingSnapshot?.totalAmount ??
+      b.bookingSnapshot?.amount ??
+      0;
 
     return {
       ...b,
@@ -556,7 +558,7 @@ function HotelSection() {
     [filtered, currentPage],
   );
 
-  const total = filtered.reduce((s, b) => s + b.amount, 0);
+  const total = filtered.reduce((s, b) => s + (b.amount || 0), 0);
   const confirmed = filtered.filter(
     (b) => b.status === "voucher_generated",
   ).length;
@@ -903,3 +905,4 @@ export default function BookingsDashboard() {
     </div>
   );
 }
+

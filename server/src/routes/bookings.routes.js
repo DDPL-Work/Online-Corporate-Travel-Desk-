@@ -24,6 +24,11 @@ router.post(
   bookingsController.executeApprovedFlightBooking
 );
 
+router.post(
+  "/:bookingId/manual-ticket",
+  bookingsController.manualTicketNonLcc
+);
+
 router.get(
   "/:id/ticket-pdf",
   bookingsController.downloadTicketPdf

@@ -19,7 +19,11 @@ import {
   FiStar,
   FiLayers,
 } from "react-icons/fi";
-import { formatDate, formatDateTime } from "../../../utils/formatter";
+import {
+  formatDate,
+  formatDateTime,
+  formatDateWithYear,
+} from "../../../utils/formatter";
 import {
   ExecStatusBadge,
   getSegCity,
@@ -29,6 +33,14 @@ import {
   SectionLabel,
   TraceTimer,
 } from "../Shared/CommonComponents";
+
+const getPaxCategory = (pax) => {
+  const t = (pax?.paxType || "").toString().toLowerCase();
+  if (t.includes("inf")) return "Infant";
+  if (t.includes("chd") || t.includes("cnn") || t.includes("child"))
+    return "Child";
+  return "Adult";
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOTEL BOOKING MODAL — full details (multi-room fixed)
@@ -52,6 +64,16 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
   const user = raw.userId || {};
   const amendment = raw.amendment || {};
   const bookRes = raw.bookingResult || {};
+  const travellerCountsHotel = travelers.reduce(
+    (acc, t) => {
+      const cat = getPaxCategory(t);
+      if (cat === "Infant") acc.infant += 1;
+      else if (cat === "Child") acc.child += 1;
+      else acc.adult += 1;
+      return acc;
+    },
+    { adult: 0, child: 0, infant: 0 },
+  );
 
   // Aggregate all cancellation policies from all rooms (deduplicated by FromDate)
   const allPoliciesMap = new Map();
@@ -455,6 +477,26 @@ const currency = allRooms[0]?.price?.currency || "INR";
               icon={<FiUser size={11} />}
               title={`Travellers (${travelers.length})`}
             />
+            <div className="flex flex-wrap gap-2 mt-2">
+              {travellerCountsHotel.adult > 0 && (
+                <InfoBadge color="blue">
+                  {travellerCountsHotel.adult} Adult
+                  {travellerCountsHotel.adult > 1 ? "s" : ""}
+                </InfoBadge>
+              )}
+              {travellerCountsHotel.child > 0 && (
+                <InfoBadge color="amber">
+                  {travellerCountsHotel.child} Child
+                  {travellerCountsHotel.child > 1 ? "ren" : ""}
+                </InfoBadge>
+              )}
+              {travellerCountsHotel.infant > 0 && (
+                <InfoBadge color="purple">
+                  {travellerCountsHotel.infant} Infant
+                  {travellerCountsHotel.infant > 1 ? "s" : ""}
+                </InfoBadge>
+              )}
+            </div>
             <div className="space-y-3">
               {travelers.map((pax, i) => (
                 <div
@@ -471,7 +513,8 @@ const currency = allRooms[0]?.price?.currency || "INR";
                           {pax.title} {pax.firstName} {pax.lastName}
                         </p>
                         <p className="text-[10px] text-slate-400 uppercase font-bold mt-0.5">
-                          {pax.paxType} passenger
+                          {getPaxCategory(pax)}
+                          {pax.isLeadPassenger ? " • Lead" : ""}
                         </p>
                       </div>
                     </div>
@@ -484,12 +527,14 @@ const currency = allRooms[0]?.price?.currency || "INR";
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-2 border-t border-slate-200">
                     {[
                       { icon: <FiUser size={10} />, label: "Gender", value: pax.gender },
-                      { icon: <FiCalendar size={10} />, label: "Date of Birth", value: formatDate(pax.dob) },
+                      { icon: <FiCalendar size={10} />, label: "Date of Birth", value: formatDateWithYear(pax.dob || pax.dateOfBirth) },
                       { icon: <FiInfo size={10} />, label: "Age", value: `${pax.age} years` },
                       { icon: <FiGlobe size={10} />, label: "Nationality", value: pax.nationality },
-                      { icon: <FiMail size={10} />, label: "Email", value: pax.email },
-                      { icon: <FiPhone size={10} />, label: "Phone", value: `+${pax.phoneWithCode}` },
-                    ].map(({ icon, label, value }, j) => (
+                      pax.isLeadPassenger && { icon: <FiMail size={10} />, label: "Email", value: pax.email },
+                      pax.isLeadPassenger && { icon: <FiPhone size={10} />, label: "Phone", value: pax.phoneWithCode ? `+${pax.phoneWithCode}` : "—" },
+                    ]
+                      .filter(Boolean)
+                      .map(({ icon, label, value }, j) => (
                       <div key={j}>
                         <p className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-0.5">
                           {icon} {label}
@@ -647,6 +692,19 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
   if (!raw) return null;
   const timer = traceTimers?.[raw._id];
   const segments = raw.flightRequest?.segments || [];
+  const onwardSegments = segments.filter(
+    (s) => s.journeyType === "onward",
+  );
+  const returnSegments = segments.filter(
+    (s) => s.journeyType === "return",
+  );
+  const journeys =
+    onwardSegments.length || returnSegments.length
+      ? [
+          { label: "Onward", segs: onwardSegments },
+          { label: "Return", segs: returnSegments },
+        ].filter((j) => j.segs.length)
+      : [{ label: "Route", segs: segments }];
   const fareSnap = raw.flightRequest?.fareSnapshot || {};
   const ssrSnap = raw.flightRequest?.ssrSnapshot || {};
   const pricing = raw.pricingSnapshot || {};
@@ -670,8 +728,33 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
     bookRes.providerResponse?.FlightItinerary ||
     {};
   const pnr = bookRes.pnr || flightItin?.PNR;
+  const onwardPNR = bookRes.onwardPNR || pnr;
+  const returnPNR = bookRes.returnPNR || null;
   const invoices = flightItin?.Invoice || [];
   const passengerInfo = flightItin?.Passenger || [];
+  const totalAmount =
+    pricing?.totalAmount ??
+    snap?.amount ??
+    0;
+  const amountCurrency = pricing?.currency || snap?.currency || "INR";
+  const firstOnwardDate = onwardSegments[0]?.departureDateTime;
+  const firstReturnDate = returnSegments[0]?.departureDateTime;
+  const airlineNames =
+    Array.from(
+      new Set(segments.map((s) => s.airlineName).filter(Boolean)),
+    ).join(", ") || "N/A";
+
+  const travellerCounts = travelers.reduce(
+    (acc, t) => {
+      const type = (t.paxType || "").toString().toLowerCase();
+      if (type.includes("infant") || type === "inf") acc.infant += 1;
+      else if (type.includes("child") || type === "cnn" || type === "chd")
+        acc.child += 1;
+      else acc.adult += 1;
+      return acc;
+    },
+    { adult: 0, child: 0, infant: 0 },
+  );
 
   return (
     <div
@@ -711,9 +794,14 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
             <span className="text-xs text-sky-700 font-medium capitalize">
               {raw.requestStatus?.replace(/_/g, " ")}
             </span>
-            {pnr && (
+            {onwardPNR && (
               <span className="font-mono text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded font-bold">
-                PNR: {pnr}
+                Onward PNR: {onwardPNR}
+              </span>
+            )}
+            {returnPNR && (
+              <span className="font-mono text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded font-bold">
+                Return PNR: {returnPNR}
               </span>
             )}
             {amendment.status && amendment.status !== "not_requested" && (
@@ -735,164 +823,189 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                 icon={<FiMapPin size={11} />}
                 title="Route Summary"
               />
-              <div className="bg-slate-50 rounded-xl p-5 border border-slate-100 flex items-center gap-4">
-                <div className="text-center">
-                  <p className="text-2xl font-black text-slate-900">
-                    {segments[0]?.origin?.airportCode}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {getSegCity(segments[0], "origin")}
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    {formatDateTime(segments[0]?.departureDateTime)}
-                  </p>
-                  {segments[0]?.origin?.terminal && (
-                    <p className="text-[10px] bg-slate-200 text-slate-600 rounded px-1 mt-1">
-                      T{segments[0].origin.terminal}
-                    </p>
-                  )}
-                </div>
-                <div className="flex-1 flex items-center gap-2 justify-center">
-                  <div className="h-px flex-1 bg-slate-300" />
-                  <div className="flex flex-col items-center gap-1">
-                    <FaPlane size={14} className="text-[#0A4D68]" />
-                    <span className="text-[10px] text-slate-400">
-                      {snap.airline}
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {snap.cabinClass}
-                    </span>
-                  </div>
-                  <div className="h-px flex-1 bg-slate-300" />
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-black text-slate-900">
-                    {segments[segments.length - 1]?.destination?.airportCode}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {getSegCity(segments[segments.length - 1], "destination")}
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    {formatDateTime(
-                      segments[segments.length - 1]?.arrivalDateTime,
-                    )}
-                  </p>
-                  {segments[segments.length - 1]?.destination?.terminal && (
-                    <p className="text-[10px] bg-slate-200 text-slate-600 rounded px-1 mt-1">
-                      T{segments[segments.length - 1].destination.terminal}
-                    </p>
-                  )}
-                </div>
+              <div className="bg-slate-50 rounded-xl p-5 border border-slate-100 space-y-3">
+                {journeys.map((j, idx) => {
+                  const first = j.segs[0];
+                  const last = j.segs[j.segs.length - 1];
+                  return (
+                    <div
+                      key={j.label}
+                      className={`flex flex-wrap items-center gap-4 ${idx > 0 ? "pt-3 border-t border-slate-200" : ""}`}
+                    >
+                      <span className="text-[11px] font-black uppercase text-slate-500 bg-white px-2 py-1 rounded-full border border-slate-200">
+                        {j.label}
+                      </span>
+                      <div className="text-center">
+                        <p className="text-2xl font-black text-slate-900">
+                          {first?.origin?.airportCode || "N/A"}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {getSegCity(first, "origin")}
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          {formatDateTime(first?.departureDateTime)}
+                        </p>
+                        {first?.origin?.terminal && (
+                          <p className="text-[10px] bg-slate-200 text-slate-600 rounded px-1 mt-1">
+                            T{first.origin.terminal}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-1 flex items-center gap-2 justify-center">
+                        <div className="h-px flex-1 bg-slate-300" />
+                        <div className="flex flex-col items-center gap-1">
+                          <FaPlane size={14} className="text-[#0A4D68]" />
+                          <span className="text-[10px] text-slate-400">
+                            {airlineNames}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {snap.cabinClass || "N/A"}
+                          </span>
+                        </div>
+                        <div className="h-px flex-1 bg-slate-300" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-black text-slate-900">
+                          {last?.destination?.airportCode || "N/A"}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {getSegCity(last, "destination")}
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          {formatDateTime(last?.arrivalDateTime)}
+                        </p>
+                        {last?.destination?.terminal && (
+                          <p className="text-[10px] bg-slate-200 text-slate-600 rounded px-1 mt-1">
+                            T{last.destination.terminal}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Segments */}
+          {/* Segments grouped */}
           {segments.length > 0 && (
             <div>
               <SectionLabel
                 icon={<FaPlane size={11} />}
                 title={`Segments (${segments.length})`}
               />
-              <div className="space-y-3">
-                {segments.map((seg, i) => (
-                  <div
-                    key={i}
-                    className="bg-slate-50 border border-slate-100 rounded-xl p-4"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-slate-900">
-                          {seg.airlineCode} {seg.flightNumber}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          {seg.airlineName}
-                        </span>
-                        <InfoBadge color="sky">{seg.aircraft}</InfoBadge>
-                      </div>
-                      <div className="flex gap-2">
-                        <InfoBadge color="teal">
-                          Fare: {seg.fareClass}
-                        </InfoBadge>
-                        {seg.cabinClass === 2 && (
-                          <InfoBadge color="blue">Economy</InfoBadge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          From
-                        </p>
-                        <p className="text-sm font-bold">
-                          {getSegCity(seg, "origin")} ({seg.origin?.airportCode}
-                          )
-                        </p>
-                        <p className="text-[11px] text-slate-400">
-                          T{seg.origin?.terminal || "—"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          To
-                        </p>
-                        <p className="text-sm font-bold">
-                          {getSegCity(seg, "destination")} (
-                          {seg.destination?.airportCode})
-                        </p>
-                        <p className="text-[11px] text-slate-400">
-                          T{seg.destination?.terminal || "—"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          Departure
-                        </p>
-                        <p className="text-sm font-bold">
-                          {formatDateTime(seg.departureDateTime)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          Arrival
-                        </p>
-                        <p className="text-sm font-bold">
-                          {formatDateTime(seg.arrivalDateTime)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          Duration
-                        </p>
-                        <p className="text-sm font-bold">
-                          {Math.floor(seg.durationMinutes / 60)}h{" "}
-                          {seg.durationMinutes % 60}m
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          Stop Over
-                        </p>
-                        <p className="text-sm font-bold">
-                          {seg.stopOver ? "Yes" : "Non-Stop"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          Check-in Bag
-                        </p>
-                        <p className="text-sm font-bold">
-                          {seg.baggage?.checkIn || "—"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          Cabin Bag
-                        </p>
-                        <p className="text-sm font-bold">
-                          {seg.baggage?.cabin || "—"}
-                        </p>
-                      </div>
+              <div className="space-y-4">
+                {journeys.map((j) => (
+                  <div key={j.label} className="space-y-2">
+                    <p className="text-[11px] font-black uppercase text-slate-500">
+                      {j.label}
+                    </p>
+                    <div className="space-y-3">
+                      {j.segs.map((seg, i) => (
+                        <div
+                          key={`${j.label}-${i}`}
+                          className="bg-slate-50 border border-slate-100 rounded-xl p-4"
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-slate-900">
+                                {seg.airlineCode} {seg.flightNumber}
+                              </span>
+                              <span className="text-xs text-slate-500">
+                                {seg.airlineName}
+                              </span>
+                              {seg.aircraft && (
+                                <InfoBadge color="sky">{seg.aircraft}</InfoBadge>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              {seg.fareClass && (
+                                <InfoBadge color="teal">
+                                  Fare: {seg.fareClass}
+                                </InfoBadge>
+                              )}
+                              {seg.cabinClass === 2 && (
+                                <InfoBadge color="blue">Economy</InfoBadge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">
+                                From
+                              </p>
+                              <p className="text-sm font-bold">
+                                {getSegCity(seg, "origin")} (
+                                {seg.origin?.airportCode || "N/A"})
+                              </p>
+                              <p className="text-[11px] text-slate-400">
+                                T{seg.origin?.terminal || "—"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">
+                                To
+                              </p>
+                              <p className="text-sm font-bold">
+                                {getSegCity(seg, "destination")} (
+                                {seg.destination?.airportCode || "N/A"})
+                              </p>
+                              <p className="text-[11px] text-slate-400">
+                                T{seg.destination?.terminal || "—"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">
+                                Departure
+                              </p>
+                              <p className="text-sm font-bold">
+                                {formatDateTime(seg.departureDateTime)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">
+                                Arrival
+                              </p>
+                              <p className="text-sm font-bold">
+                                {formatDateTime(seg.arrivalDateTime)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">
+                                Duration
+                              </p>
+                              <p className="text-sm font-bold">
+                                {Math.floor((seg.durationMinutes || 0) / 60)}h{" "}
+                                {(seg.durationMinutes || 0) % 60}m
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">
+                                Stop Over
+                              </p>
+                              <p className="text-sm font-bold">
+                                {seg.stopOver ? "Yes" : "Non-Stop"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">
+                                Check-in Bag
+                              </p>
+                              <p className="text-sm font-bold">
+                                {seg.baggage?.checkIn || "—"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">
+                                Cabin Bag
+                              </p>
+                              <p className="text-sm font-bold">
+                                {seg.baggage?.cabin || "—"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -912,7 +1025,7 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                   Total Amount
                 </p>
                 <p className="text-3xl font-black mt-1">
-                  {pricing.currency} {pricing.totalAmount?.toLocaleString()}
+                  {amountCurrency} {totalAmount.toLocaleString()}
                 </p>
                 <p className="text-slate-500 text-[10px] mt-1">
                   Captured: {formatDateTime(pricing.capturedAt)}
@@ -956,8 +1069,12 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                 value={fareSnap.refundable ? "Yes" : "No"}
               />
               <MiniStatCard
-                label="Travel Date"
-                value={formatDate(snap.travelDate)}
+                label="Onward Date"
+                value={formatDate(firstOnwardDate || snap.travelDate)}
+              />
+              <MiniStatCard
+                label="Return Date"
+                value={formatDate(firstReturnDate || snap.returnDate)}
               />
               <MiniStatCard
                 label="Last Ticket"
@@ -1067,6 +1184,26 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
               icon={<FiUser size={11} />}
               title={`Travellers (${travelers.length})`}
             />
+            <div className="flex flex-wrap gap-2 mt-2">
+              {travellerCounts.adult > 0 && (
+                <InfoBadge color="blue">
+                  {travellerCounts.adult} Adult
+                  {travellerCounts.adult > 1 ? "s" : ""}
+                </InfoBadge>
+              )}
+              {travellerCounts.child > 0 && (
+                <InfoBadge color="amber">
+                  {travellerCounts.child} Child
+                  {travellerCounts.child > 1 ? "ren" : ""}
+                </InfoBadge>
+              )}
+              {travellerCounts.infant > 0 && (
+                <InfoBadge color="purple">
+                  {travellerCounts.infant} Infant
+                  {travellerCounts.infant > 1 ? "s" : ""}
+                </InfoBadge>
+              )}
+            </div>
             <div className="space-y-3">
               {travelers.map((pax, i) => {
                 const provPax = passengerInfo.find(
@@ -1088,9 +1225,8 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                             {pax.title} {pax.firstName} {pax.lastName}
                           </p>
                           <p className="text-[10px] text-slate-400 uppercase font-bold mt-0.5">
-                            {pax.isLeadPassenger
-                              ? "Lead Passenger"
-                              : "Passenger"}
+                            {getPaxCategory(pax)}
+                            {pax.isLeadPassenger ? " • Lead" : ""}
                           </p>
                         </div>
                       </div>
@@ -1109,14 +1245,14 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                           {pax.gender || "—"}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          DOB
-                        </p>
-                        <p className="text-xs font-semibold text-slate-700">
-                          {formatDate(pax.dateOfBirth || pax.dob)}
-                        </p>
-                      </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">
+                            DOB
+                          </p>
+                          <p className="text-xs font-semibold text-slate-700">
+                            {formatDateWithYear(pax.dateOfBirth || pax.dob)}
+                          </p>
+                        </div>
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase">
                           Nationality
@@ -1125,22 +1261,26 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                           {pax.nationality || "—"}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          Email
-                        </p>
-                        <p className="text-xs font-semibold text-slate-700">
-                          {pax.email || "—"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          Phone
-                        </p>
-                        <p className="text-xs font-semibold text-slate-700">
-                          +{pax.phoneWithCode || "—"}
-                        </p>
-                      </div>
+                      {pax.isLeadPassenger && (
+                        <>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">
+                              Email
+                            </p>
+                            <p className="text-xs font-semibold text-slate-700">
+                              {pax.email || "—"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">
+                              Phone
+                            </p>
+                            <p className="text-xs font-semibold text-slate-700">
+                              {pax.phoneWithCode ? `+${pax.phoneWithCode}` : "—"}
+                            </p>
+                          </div>
+                        </>
+                      )}
                       {pax.passportNumber && (
                         <div>
                           <p className="text-[10px] font-bold text-slate-400 uppercase">

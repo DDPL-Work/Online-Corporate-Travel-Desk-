@@ -24,12 +24,33 @@ export const FlightSearchProvider = ({ children }) => {
   const [departureDate, setDepartureDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
 
-  /* ---------------- FIXED TRAVELERS ---------------- */
-  const adults = 1; // 🔒 FIXED
-  const travelers = 1; // 🔒 FIXED
+  /* ---------------- TRAVELERS ---------------- */
+  const [passengers, setPassengers] = useState({
+    adults: 1,
+    children: 0,
+    infants: 0,
+  });
   const [travelClass, setTravelClass] = useState("Economy");
 
-  const displayText = "1 Adult";
+  const totalTravelers =
+    (passengers.adults || 0) +
+    (passengers.children || 0) +
+    (passengers.infants || 0);
+
+  const displayText = [
+    passengers.adults
+      ? `${passengers.adults} Adult${passengers.adults > 1 ? "s" : ""}`
+      : null,
+    passengers.children
+      ? `${passengers.children} Child${passengers.children > 1 ? "ren" : ""}`
+      : null,
+    passengers.infants
+      ? `${passengers.infants} Infant${passengers.infants > 1 ? "s" : ""}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(", ")
+    .concat(` · ${travelClass}`);
 
   /* ---------------- OPTIONS ---------------- */
   const [flexibleDates, setFlexibleDates] = useState(false);
@@ -64,9 +85,26 @@ export const FlightSearchProvider = ({ children }) => {
     setIsModalOpen(false);
   };
 
-  // 🔒 Apply only cabin class + direct flight
-  const handleApply = ({ travelClass }) => {
-    setTravelClass(travelClass);
+  const handleApply = ({
+    adults,
+    children,
+    infants,
+    travelClass: newClass,
+  }) => {
+    const safeAdults = Math.max(1, Number(adults ?? passengers.adults) || 1);
+    const safeChildren = Math.max(0, Number(children ?? 0) || 0);
+    const safeInfants = Math.max(
+      0,
+      Math.min(Number(infants ?? 0) || 0, safeAdults),
+    );
+
+    setPassengers({
+      adults: safeAdults,
+      children: safeChildren,
+      infants: safeInfants,
+    });
+
+    if (newClass) setTravelClass(newClass);
     setIsModalOpen(false);
   };
 
@@ -115,9 +153,13 @@ export const FlightSearchProvider = ({ children }) => {
     returnDate,
     setReturnDate,
 
-    // Travelers (READ-ONLY)
-    adults,
-    travelers,
+    // Travelers
+    passengers,
+    adults: passengers.adults,
+    children: passengers.children,
+    infants: passengers.infants,
+    travelers: totalTravelers,
+    setPassengers,
     travelClass,
     setTravelClass,
     displayText,
