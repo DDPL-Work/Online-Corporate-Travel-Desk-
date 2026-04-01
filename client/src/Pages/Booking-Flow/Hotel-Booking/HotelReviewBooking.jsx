@@ -732,6 +732,7 @@ const HotelReviewBooking = () => {
   const selectedRoom = rooms || [];
 
   const hotelCountry =
+    searchParams?.guestNationality ||
     displayHotel?.country ||
     displayHotel?.CountryName ||
     displayHotel?.address?.split(",")?.slice(-1)[0]?.trim() ||
@@ -753,9 +754,11 @@ const HotelReviewBooking = () => {
   const hotelCountryCode = getCountryCode(hotelCountry);
 
   // 🔥 THIS IS YOUR MAIN FLAG
-  const isInternationalBooking = travelers.some(
-    (t) => getCountryCode(t.nationality || t.countryCode) !== hotelCountryCode,
-  );
+  const isInternationalBooking = travelers.some((t) => {
+    const travelerCountryCode = getCountryCode(t.nationality || t.countryCode);
+    if (!travelerCountryCode || !hotelCountryCode) return false;
+    return travelerCountryCode !== hotelCountryCode;
+  });
 
   const displayRoom = {
     RoomTypeName:
@@ -1328,7 +1331,7 @@ const HotelReviewBooking = () => {
                               </label>
                               <div className="relative">
                                 <FiMail
-                                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                                  className="absolute right-3  top-1/2 -translate-y-1/2 text-slate-400"
                                   size={14}
                                 />
                                 <input
@@ -1741,8 +1744,8 @@ const HotelReviewBooking = () => {
 function InfoCell({ icon: Icon, label, value }) {
   return (
     <div className="px-4 py-3 flex flex-col gap-0.5 bg-white">
-      <div className="flex items-center gap-1.5 mb-0.5">
-        <Icon size={11} className="text-slate-400" />
+      <div className="flex items-center gap-2.5 mb-0.5">
+        <Icon size={15} className="text-slate-400" />
         <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
           {label}
         </span>
