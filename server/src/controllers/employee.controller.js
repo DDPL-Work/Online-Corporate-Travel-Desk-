@@ -257,3 +257,52 @@ exports.getMyTravelAdmin = async (req, res) => {
     });
   }
 };
+
+// ===============================
+// GET GST DETAILS FOR EMPLOYEE'S CORPORATE
+// ===============================
+exports.getMyGstDetails = async (req, res, next) => {
+  try {
+    const { email } = req.user;
+
+    if (!email || !email.includes("@")) {
+      return next(new ApiError(400, "Invalid employee email"));
+    }
+
+    const domain = email.split("@")[1].toLowerCase();
+
+    const corporate = await Corporate.findOne({
+      "ssoConfig.domain": domain,
+      isActive: true,
+    }).select("gstDetails corporateName registeredAddress");
+
+    if (!corporate) {
+      return next(new ApiError(404, "Corporate not found for your domain"));
+    }
+
+    const gst = corporate.gstDetails || {};
+
+    return res.json({
+      success: true,
+      data: {
+        corporateName: corporate.corporateName,
+        gstin: gst.gstin || "",
+        legalName: gst.legalName || "",
+        address:
+          gst.address ||
+          [
+            corporate.registeredAddress?.street,
+            corporate.registeredAddress?.city,
+            corporate.registeredAddress?.state,
+            corporate.registeredAddress?.pincode,
+            corporate.registeredAddress?.country,
+          ]
+            .filter(Boolean)
+            .join(", "),
+        verified: gst.verified || false,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};

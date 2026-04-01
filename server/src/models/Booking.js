@@ -66,14 +66,23 @@ const bookingSchema = new mongoose.Schema({
     dateOfBirth: Date,
     gender: String,
     passportNumber: String,
+    PassportIssueDate: Date,
     passportExpiry: Date,
     nationality: String,
+    paxType: { type: String, enum: ['ADULT', 'CHILD', 'INFANT'], default: 'ADULT' },
+    linkedAdultIndex: Number,
     isLeadPassenger: Boolean,
     seatNumber: String,
     mealPreference: String
   }],
 
   purposeOfTravel: { type: String, required: true, trim: true },
+
+  gstDetails: {
+    gstin: String,
+    legalName: String,
+    address: String,
+  },
 
   pricing: {
     baseFare: { type: Number, required: true },

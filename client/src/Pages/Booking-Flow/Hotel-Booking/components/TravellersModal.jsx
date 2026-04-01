@@ -29,6 +29,7 @@ const EMPTY_PASSENGER = (paxType = 1, isLead = false) => ({
   PassportNo: "",
   PassportIssueDate: "",
   PassportExpDate: "",
+  Nationality: "IN",
   PAN: "",
 });
 
@@ -57,6 +58,7 @@ const validatePassenger = (p, isInternational) => {
     if (!PASSPORT_RE.test(p.PassportNo)) errors.PassportNo = "Valid passport number required";
     if (!p.PassportIssueDate) errors.PassportIssueDate = "Required for international";
     if (!p.PassportExpDate) errors.PassportExpDate = "Required for international";
+    if (!p.Nationality || p.Nationality.length !== 2) errors.Nationality = "2-letter country code required";
   }
   if (p.PAN && !PAN_RE.test(p.PAN)) errors.PAN = "Invalid PAN format (e.g. ABCDE1234F)";
   return errors;
@@ -316,6 +318,20 @@ const PassengerCard = ({ passenger, index, roomIndex, onChange, errors, isIntern
                 />
               </Field>
             </div>
+
+            {/* Nationality */}
+            <div>
+              <Field label="Nationality" required={isInternational} error={errors.Nationality}>
+                <input
+                  type="text"
+                  value={passenger.Nationality}
+                  onChange={e => update("Nationality", e.target.value.toUpperCase())}
+                  placeholder="IN (Country Code)"
+                  className={inputCls(errors.Nationality)}
+                  maxLength={2}
+                />
+              </Field>
+            </div>
           </div>
 
           {/* PAN Card (domestic optional) */}
@@ -475,11 +491,12 @@ const TravellersModal = ({
         Age: p.PaxType === 2 ? parseInt(p.Age) : 0,
         PassportNo: p.PassportNo || "",
         PassportIssueDate: p.PassportIssueDate
-          ? new Date(p.PassportIssueDate).toISOString()
-          : "0001-01-01T00:00:00",
+          ? new Date(p.PassportIssueDate).toISOString().split("T")[0]
+          : "",
         PassportExpDate: p.PassportExpDate
-          ? new Date(p.PassportExpDate).toISOString()
-          : "0001-01-01T00:00:00",
+          ? new Date(p.PassportExpDate).toISOString().split("T")[0]
+          : "",
+        Nationality: p.Nationality || "IN",
         PAN: p.PAN || "",
       }))
     );

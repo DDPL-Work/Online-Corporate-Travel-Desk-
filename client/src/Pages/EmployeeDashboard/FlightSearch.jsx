@@ -212,12 +212,14 @@ export default function FlightSearchPage() {
     isModalOpen,
     modalPosition,
     handleApply,
-    adults,
+    passengers,
     travelClass,
     directOnly,
     openDropdown,
     closeDropdown,
   } = useFlightSearch();
+
+  const { adults = 1, children = 0, infants = 0 } = passengers || {};
 
   useEffect(() => {
     if (returnDate && departureDate && returnDate < departureDate) {
@@ -257,6 +259,8 @@ export default function FlightSearchPage() {
     let payload = {
       journeyType,
       adults,
+      children,
+      infants,
       cabinClass: CABIN_CLASS_MAP[travelClass] || "economy",
       directFlight: directOnly,
       nearbyAirportsFrom,
@@ -273,6 +277,8 @@ export default function FlightSearchPage() {
       payload = {
         journeyType: 3,
         adults,
+        children,
+        infants,
         cabinClass: CABIN_CLASS_MAP[travelClass] || "economy",
         directFlight: directOnly,
         segments: multiCityFlights.map((f) => ({
@@ -887,7 +893,7 @@ export default function FlightSearchPage() {
           onClose={closeDropdown}
           onApply={handleApply}
           modalPosition={modalPosition}
-          initialData={{ adults, travelClass, directOnly }}
+          initialData={{ passengers, travelClass, directOnly }}
         />
       )}
     </div>

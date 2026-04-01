@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 
 import Layout from "../layout/Layout";
+import RootLayout from "../layout/RootLayout";
 import ProtectedRoute from "./ProtectedRoute";
 
 // Auth Pages
@@ -50,137 +51,129 @@ import HotelBookingDetails from "../components/EmployeeDashboard/Hotelbookingdet
 import CancelledFlightsPage from "../components/EmployeeDashboard/MyCancelledBookings";
 import CancelledBookings from "../components/TravelAdminTabs/CancelledBookings";
 import PromoteEmployee from "../components/TravelAdminTabs/PromoteEmployee";
+import Independent from "../Pages/Landing/WhoIt'sFor/Independent";
 
 export const appRouter = createBrowserRouter([
-  // -------------------------------
-  // PUBLIC ROUTES
-  // -------------------------------
-  // {
-  //   path: "/sso-login",
-  //   element: <SSOLogin />,
-  // },
-  { path: "/iapindia", element: <LandingPage /> },
   {
-    path: "/sso/callback",
-    element: <SSOCallback />, // ✅ REQUIRED
-  },
-  {
-    path: "/unauthorized",
-    element: <Unauthorized />,
-  },
-
-  // -------------------------------
-  // TRAVEL-ADMIN PROTECTED ROUTES
-  // -------------------------------
-  {
-    element: <ProtectedRoute allowedRoles={["travel-admin"]} />,
+    element: <RootLayout />, // ✅ Root layout with PageTitleHandler
     children: [
+      // PUBLIC ROUTES
+      { path: "/iapindia", element: <LandingPage /> },
       {
-        path: "/",
-        element: <Layout />,
+        path: "/sso/callback",
+        element: <SSOCallback />,
+      },
+      {
+        path: "/unauthorized",
+        element: <Unauthorized />,
+      },
+
+      // TRAVEL-ADMIN PROTECTED ROUTES
+      {
+        element: <ProtectedRoute allowedRoles={["travel-admin"]} />,
         children: [
-          { path: "/update-profile", element: <ProfileSettings /> },
-          { path: "total-bookings", element: <BookingsDashboard /> },
-          { path: "/total-cancelled-bookings", element: <CancelledBookings /> },
-          { path: "/pending-requests", element: <PendingTravelRequests /> },
-          { path: "/approved-requests", element: <ApprovedTravelRequests /> },
-          { path: "/rejected-requests", element: <RejectedTravelRequests /> },
-          { path: "/upcoming-trips", element: <UpcomingTrips /> },
-          { path: "/past-trips", element: <PastTrips /> },
-          { path: "/user-management", element: <PromoteEmployee /> },
-          { path: "/travel-profile-settings", element: <TravelAdminProfile /> },
-          { path: "/corporate-wallet", element: <CorporateWallet /> },
           {
-            path: "/credit-utilization",
-            element: <CreditUtilizationPostpaid />,
+            path: "/",
+            element: <Layout />,
+            children: [
+              { path: "/update-profile", element: <ProfileSettings /> },
+              { path: "total-bookings", element: <BookingsDashboard /> },
+              { path: "/total-cancelled-bookings", element: <CancelledBookings /> },
+              { path: "/pending-requests", element: <PendingTravelRequests /> },
+              { path: "/approved-requests", element: <ApprovedTravelRequests /> },
+              { path: "/rejected-requests", element: <RejectedTravelRequests /> },
+              { path: "/upcoming-trips", element: <UpcomingTrips /> },
+              { path: "/past-trips", element: <PastTrips /> },
+              { path: "/user-management", element: <PromoteEmployee /> },
+              { path: "/travel-profile-settings", element: <TravelAdminProfile /> },
+              { path: "/corporate-wallet", element: <CorporateWallet /> },
+              {
+                path: "/credit-utilization",
+                element: <CreditUtilizationPostpaid />,
+              },
+            ],
           },
         ],
       },
-    ],
-  },
 
-  // -------------------------------
-  // EMPLOYEE PROTECTED ROUTES
-  // -------------------------------
-  {
-    element: <ProtectedRoute allowedRoles={["employee"]} />,
-    children: [
+      // EMPLOYEE PROTECTED ROUTES
       {
-        path: "/",
-        element: <Layout />,
-        children: [
-          { path: "/my-bookings", element: <MyBookings /> },
-          { path: "/my-cancelled-bookings", element: <CancelledFlightsPage /> },
-          { path: "/my-bookings/:id", element: <BookingDetails /> },
-          { path: "/my-upcoming-trips", element: <MyUpcomingTrips /> },
-          { path: "/my-past-trips", element: <MyPastTrips /> },
-          { path: "/my-pending-approvals", element: <MyPendingApprovals /> },
-          { path: "/my-rejected-requests", element: <MyRejectedRequests /> },
-          { path: "/my-profile", element: <MyProfile /> },
-          { path: "/travel-documents", element: <TravelDocuments /> },
-          { path: "/bookings/:id/book", element: <BookApprovedFlight /> },
-          { path: "/my-hotel-booking/:id", element: <HotelBookingDetails /> },
-        ],
-      },
-    ],
-  },
-
-  // -------------------------------
-  // CORPORATE SUPER ADMIN ROUTES
-  // -------------------------------
-  {
-    element: <ProtectedRoute allowedRoles={["manager"]} />,
-    children: [
-      {
-        path: "/",
-        element: <Layout />,
+        element: <ProtectedRoute allowedRoles={["employee"]} />,
         children: [
           {
-            path: "/corporate-dashboard",
-            element: <CorporateSuperAdminDashboard />,
-          },
-          {
-            path: "/admin-management",
-            element: <TravelAdminManagement />,
-          },
-          {
-            path: "/employee-management",
-            element: <EmployeeManagement />,
-          },
-          {
-            path: "/corporate-total-bookings",
-            element: <CorporateTotalBookings />,
+            path: "/",
+            element: <Layout />,
+            children: [
+              { path: "/my-bookings", element: <MyBookings /> },
+              { path: "/my-cancelled-bookings", element: <CancelledFlightsPage /> },
+              { path: "/my-bookings/:id", element: <BookingDetails /> },
+              { path: "/my-upcoming-trips", element: <MyUpcomingTrips /> },
+              { path: "/my-past-trips", element: <MyPastTrips /> },
+              { path: "/my-pending-approvals", element: <MyPendingApprovals /> },
+              { path: "/my-rejected-requests", element: <MyRejectedRequests /> },
+              { path: "/my-profile", element: <MyProfile /> },
+              { path: "/travel-documents", element: <TravelDocuments /> },
+              { path: "/bookings/:id/book", element: <BookApprovedFlight /> },
+              { path: "/my-hotel-booking/:id", element: <HotelBookingDetails /> },
+            ],
           },
         ],
       },
+
+      // CORPORATE SUPER ADMIN ROUTES
+      {
+        element: <ProtectedRoute allowedRoles={["manager"]} />,
+        children: [
+          {
+            path: "/",
+            element: <Layout />,
+            children: [
+              {
+                path: "/corporate-dashboard",
+                element: <CorporateSuperAdminDashboard />,
+              },
+              {
+                path: "/admin-management",
+                element: <TravelAdminManagement />,
+              },
+              {
+                path: "/employee-management",
+                element: <EmployeeManagement />,
+              },
+              {
+                path: "/corporate-total-bookings",
+                element: <CorporateTotalBookings />,
+              },
+            ],
+          },
+        ],
+      },
+
+      // SHARED ROUTES
+      { path: "/search-flight", element: <FlightSearch /> },
+      { path: "/search-flight-results", element: <FlightSearchResults /> },
+      { path: "/one-way-flight/booking", element: <OneFlightBooking /> },
+      {
+        path: "/round-trip-flight/booking",
+        element: <RoundTripFlightBooking />,
+      },
+      {
+        path: "/multi-city-flight/booking",
+        element: <MultiCityFlightBooking />,
+      },
+      { path: "/search-hotel", element: <HotelSearchPage /> },
+      { path: "/search-hotel-results", element: <HotelSearchResults /> },
+      { path: "/one-hotel-details", element: <HotelDetailsPage /> },
+      { path: "/hotel-review-booking", element: <HotelReviewBooking /> },
+      { path: "/hotel-review-booking/:id", element: <HotelReviewBooking /> },
+      { path: "/hotel-booking/:id", element: <HotelBookNow /> },
+
+      // DEFAULT ROUTES
+      { path: "/who-it's-for/independent", element: <Independent /> },
+      {
+        path: "*",
+        element: <LandingPage />,
+      },
     ],
-  },
-
-  //SHARED ROUTES
-
-  { path: "/iapindia", element: <LandingPage /> },
-  { path: "/search-flight", element: <FlightSearch /> },
-  { path: "/search-flight-results", element: <FlightSearchResults /> },
-  { path: "/one-way-flight/booking", element: <OneFlightBooking /> },
-  {
-    path: "/round-trip-flight/booking",
-    element: <RoundTripFlightBooking />,
-  },
-  {
-    path: "/multi-city-flight/booking",
-    element: <MultiCityFlightBooking />,
-  },
-  { path: "/search-hotel", element: <HotelSearchPage /> },
-  { path: "/search-hotel-results", element: <HotelSearchResults /> },
-  { path: "/one-hotel-details", element: <HotelDetailsPage /> },
-  { path: "/hotel-review-booking", element: <HotelReviewBooking /> },
-  { path: "/hotel-review-booking/:id", element: <HotelReviewBooking /> },
-  { path: "/hotel-booking/:id", element: <HotelBookNow /> },
-
-  // DEFAULT REDIRECT
-  {
-    path: "*",
-    // element: <SSOLogin />,
-    element: <LandingPage />,
   },
 ]);

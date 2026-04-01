@@ -16,6 +16,7 @@ import {
 import {
   downloadTicketPdf,
   fetchMyBookingById,
+  manualTicketNonLcc,
 } from "../../Redux/Actions/booking.thunks";
 import {
   fetchCancellationCharges,
@@ -74,6 +75,16 @@ function InfoRow({ label, value, accent }) {
       </span>
     </div>
   );
+}
+
+function formatPaxType(paxType) {
+  const map = {
+    ADULT: "Adult",
+    CHILD: "Child",
+    INFANT: "Infant",
+  };
+
+  return map[paxType] || paxType || "Unknown";
 }
 
 function BentoCard({ children, className = "" }) {
@@ -146,6 +157,7 @@ function RouteConnector({ duration }) {
     </div>
   );
 }
+
 function FlightCard({
   flight,
   pnrsByJourney,
@@ -408,6 +420,7 @@ function AmendmentModal({ type, booking, onClose }) {
     </div>
   );
 }
+
 function CancelScreen({ booking, onClose }) {
   const dispatch = useDispatch();
 
@@ -568,6 +581,219 @@ function RescheduleScreen({ booking, onClose }) {
   );
 }
 
+function PartialCancelModal({ booking, onClose }) {
+  const dispatch = useDispatch();
+  const [selectedJourney, setSelectedJourney] = useState(null);
+  const [remarks, setRemarks] = useState("User requested partial cancellation");
+  const [loading, setLoading] = useState(false);
+
+  const segments = booking?.flightRequest?.segments || [];
+
+  const journeyTypeOf = (seg) => {
+    const jt =
+      (seg?.journeyType ||
+        seg?.segmentType ||
+        seg?.tripIndicator ||
+        seg?.TripIndicator ||
+        "").toString().toLowerCase();
+    if (jt === "return" || jt === "2") return "return";
+    return "onward";
+  };
+
+  const onwardSegments = segments.filter((s) => journeyTypeOf(s) === "onward");
+  const returnSegments = segments.filter((s) => journeyTypeOf(s) === "return");
+
+  const hasReturn = returnSegments.length > 0;
+
+  useEffect(() => {
+    if (!hasReturn) setSelectedJourney("onward");
+  }, [hasReturn]);
+
+  const sectorLabel = (segList) => {
+    if (!segList.length) return "N/A";
+    const first = segList[0];
+    const last = segList[segList.length - 1];
+    const from =
+      first?.origin?.airportCode ||
+      first?.origin?.code ||
+      first?.Origin ||
+      first?.OriginAirportCode ||
+      "-";
+    const to =
+      last?.destination?.airportCode ||
+      last?.destination?.code ||
+      last?.Destination ||
+      last?.DestinationAirportCode ||
+      "-";
+    return `${from} -> ${to}`;
+  };
+
+  const onwardLabel = sectorLabel(onwardSegments);
+  const returnLabel = sectorLabel(returnSegments);
+
+  const onwardPassengers =
+    booking?.bookingResult?.onwardResponse?.raw?.Response?.Response
+      ?.FlightItinerary?.Passenger || [];
+  const returnPassengers =
+    booking?.bookingResult?.returnResponse?.raw?.Response?.Response
+      ?.FlightItinerary?.Passenger || [];
+
+  const passengerSource =
+    selectedJourney === "return" ? returnPassengers : onwardPassengers;
+  const passengerIds = passengerSource
+    .map((p) => p?.Ticket?.TicketId || p?.TicketId || p?.PaxId)
+    .filter(Boolean);
+
+  const onwardBookingId =
+    booking?.bookingResult?.onwardResponse?.raw?.Response?.Response
+      ?.FlightItinerary?.BookingId;
+  const returnBookingId =
+    booking?.bookingResult?.returnResponse?.raw?.Response?.Response
+      ?.FlightItinerary?.BookingId;
+  const tboBookingId =
+    selectedJourney === "return"
+      ? returnBookingId || onwardBookingId || booking?.bookingResult?.bookingId
+      : onwardBookingId || returnBookingId || booking?.bookingResult?.bookingId;
+
+  const buildSectors = () => {
+    const pick =
+      selectedJourney === "return" ? returnSegments : onwardSegments;
+    return pick.map((seg) => ({
+      Origin:
+        seg?.origin?.airportCode ||
+        seg?.Origin ||
+        seg?.origin?.code ||
+        seg?.originCode,
+      Destination:
+        seg?.destination?.airportCode ||
+        seg?.Destination ||
+        seg?.destination?.code ||
+        seg?.destinationCode,
+    }));
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedJourney) return;
+    if (!passengerIds.length) {
+      Swal.fire({
+        icon: "error",
+        title: "Passenger data missing",
+        text: "We could not find ticketed passengers for this booking.",
+      });
+      return;
+    }
+    const sectors = buildSectors().filter(
+      (s) => s.Origin && s.Destination,
+    );
+    if (!sectors.length) return;
+    const payload = {
+      bookingId: tboBookingId || booking?._id,
+      passengerIds,
+      segments: sectors,
+      remarks,
+    };
+    try {
+      setLoading(true);
+      const res = await dispatch(partialCancellation(payload));
+      if (res.error) throw new Error(res.payload || "Partial cancellation failed");
+      await dispatch(fetchMyBookingById(booking._id));
+      Swal.fire({
+        icon: "success",
+        title: "Cancellation request submitted successfully",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      onClose();
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Failed to submit cancellation",
+        text: err.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const disableSubmit = !selectedJourney || loading;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl w-full max-w-xl p-6 shadow-2xl">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-lg font-extrabold">Partial Cancellation</h2>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-bold uppercase text-slate-400 mb-2">
+              Select Route
+            </p>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="route"
+                  disabled={!onwardSegments.length}
+                  checked={selectedJourney === "onward"}
+                  onChange={() => setSelectedJourney("onward")}
+                />
+                <span>Onward ({onwardLabel})</span>
+              </label>
+              {hasReturn && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="route"
+                    checked={selectedJourney === "return"}
+                    onChange={() => setSelectedJourney("return")}
+                  />
+                  <span>Return ({returnLabel})</span>
+                </label>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold uppercase text-slate-400 mb-2">
+              Remarks (optional)
+            </p>
+            <textarea
+              className="w-full border border-slate-200 rounded-lg p-2 text-sm"
+              rows={3}
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100"
+              disabled={loading}
+            >
+              Close
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={disableSubmit}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
+            >
+              {loading ? "Submitting..." : "Submit Cancellation"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ModifyTravellerScreen({ booking, onClose }) {
   const dispatch = useDispatch();
   const traveller = booking.travellers?.[0];
@@ -621,8 +847,20 @@ export default function BookingDetails() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { selected: booking, loading } = useSelector((s) => s.bookings);
+
+  // ── Pull the logged-in user's role from your auth slice ──────
+  // Adjust the selector path to match your actual Redux store shape.
+  // Common patterns:
+  //   s.auth.user.role
+  //   s.user.role
+  //   s.auth.role
+  const userRole = useSelector((s) => s.auth?.user?.role);
+  const isEmployee = userRole === "employee";
+  // ─────────────────────────────────────────────────────────────
+
   const [downloading, setDownloading] = useState(null);
   const [amendmentType, setAmendmentType] = useState(null);
+  const [showPartialCancel, setShowPartialCancel] = useState(false);
   // values: "cancel" | "reschedule" | "modify" | null
 
   const isCancelled = booking?.executionStatus === "cancelled";
@@ -632,7 +870,11 @@ export default function BookingDetails() {
   }, [id, dispatch]);
 
   useEffect(() => {
-    if (!booking?._id || booking.executionStatus !== "ticket_pending") return;
+    if (
+      !booking?._id ||
+      !["ticket_pending", "on_hold"].includes(booking.executionStatus)
+    )
+      return;
     const iv = setInterval(
       () => dispatch(fetchMyBookingById(booking._id)),
       15000,
@@ -663,7 +905,6 @@ export default function BookingDetails() {
         },
       });
 
-      // 🔥 CALL YOUR EXISTING THUNK
       const res = await dispatch(fullCancellation({ bookingId: booking._id }));
 
       console.log("Full Cancel Response:", res);
@@ -671,9 +912,7 @@ export default function BookingDetails() {
       const changeRequestId =
         res.payload?.data?.Response?.TicketCRInfo?.[0]?.ChangeRequestId;
 
-      // 🔁 POLLING (same logic from modal)
       let status = "requested";
-
       let attempts = 0;
       const maxAttempts = 12;
 
@@ -708,7 +947,6 @@ export default function BookingDetails() {
         }
       }
 
-      // 🔥 3️⃣ VERIFY FINAL DB STATE
       if (status !== "completed") {
         throw new Error("Cancellation failed");
       }
@@ -747,14 +985,35 @@ export default function BookingDetails() {
 
   /* ── Data ── */
   const flights = booking.flightRequest?.segments || [];
-  const traveller = booking.travellers?.[0];
+  const travellers = booking.travellers || [];
   const fare = booking.pricingSnapshot;
 
-  const pnrsByJourney = {
-    onward:
-      booking.bookingResult?.onwardPNR || booking.bookingResult?.pnr || null,
-    return: booking.bookingResult?.returnPNR || null,
-  };
+  const isInternationalRT =
+  flights.length > 1 &&
+  flights.some(
+    (f) =>
+      f.origin?.country !== "IN" || f.destination?.country !== "IN"
+  ) &&
+  flights.some((f) => f.journeyType === "return");
+
+  // const pnrsByJourney = {
+  //   onward:
+  //     booking.bookingResult?.onwardPNR || booking.bookingResult?.pnr || null,
+  //   return: booking.bookingResult?.returnPNR || null,
+  // };
+
+  const pnrsByJourney = isInternationalRT
+  ? {
+      onward: booking.bookingResult?.pnr || null,
+      return: booking.bookingResult?.pnr || null, // SAME PNR
+    }
+  : {
+      onward:
+        booking.bookingResult?.onwardPNR ||
+        booking.bookingResult?.pnr ||
+        null,
+      return: booking.bookingResult?.returnPNR || null,
+    };
 
   const displayPnr =
     booking.bookingResult?.pnr ||
@@ -773,35 +1032,25 @@ export default function BookingDetails() {
   };
 
   const fareSnapshot = booking.flightRequest?.fareSnapshot;
-
-  const departureTime =
-    booking?.flightRequest?.segments?.[0]?.departureDateTime;
-
+  const departureTime = booking?.flightRequest?.segments?.[0]?.departureDateTime;
   const isTravelPassed = departureTime && new Date() > new Date(departureTime);
 
   const allRules = fareSnapshot?.miniFareRules?.flat() || [];
-
-  const cancellationPolicies = allRules.filter(
-    (r) => r.Type === "Cancellation",
-  );
-
+  const cancellationPolicies = allRules.filter((r) => r.Type === "Cancellation");
   const reissuePolicies = allRules.filter((r) => r.Type === "Reissue");
   const getAmount = (str) => Number(str?.replace(/\D/g, "") || 0);
 
   const minCancelFee = Math.min(
     ...cancellationPolicies.map((r) => getAmount(r.Details)),
   );
-
   const minReissueFee = Math.min(
     ...reissuePolicies.map((r) => getAmount(r.Details)),
   );
 
   const getPolicyDisplay = (rule) => {
     const dep = new Date(departureTime);
-
     const fromHours = Number(rule.From || 0);
     const toHours = rule.To ? Number(rule.To) : null;
-
     const fromDate = new Date(dep - fromHours * 3600000);
     const toDate = toHours ? new Date(dep - toHours * 3600000) : null;
 
@@ -819,20 +1068,22 @@ export default function BookingDetails() {
   };
 
   const seatSelections = booking.flightRequest?.ssrSnapshot?.seats || [];
+  const mealSelections = booking.flightRequest?.ssrSnapshot?.meals || [];
 
   const totalSeatPrice = seatSelections.reduce(
     (sum, seat) => sum + (seat?.price || 0),
     0,
   );
+  const totalMealPrice = mealSelections.reduce(
+    (sum, meal) => sum + (meal?.price || 0),
+    0,
+  );
 
-  // const isRoundTrip = fareSnapshot?.onwardFare && fareSnapshot?.returnFare;
   const journeyTypes = [
     ...new Set(flights.map((f) => f.journeyType || "onward")),
   ];
-
   const isRoundTrip =
     journeyTypes.includes("onward") && journeyTypes.includes("return");
-
   const isOneWay = !isRoundTrip;
 
   let baseFare = 0;
@@ -843,10 +1094,9 @@ export default function BookingDetails() {
     baseFare =
       (fareSnapshot.onwardFare?.BaseFare || 0) +
       (fareSnapshot.returnFare?.BaseFare || 0);
-
     tax =
-      (fareSnapshot.onwardFare?.Tax || 0) + (fareSnapshot.returnFare?.Tax || 0);
-
+      (fareSnapshot.onwardFare?.Tax || 0) +
+      (fareSnapshot.returnFare?.Tax || 0);
     refundable =
       fareSnapshot.onwardFare?.IsRefundable ||
       fareSnapshot.returnFare?.IsRefundable;
@@ -858,45 +1108,12 @@ export default function BookingDetails() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
-      {/* ── Header ── */}
-      {/* <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 h-[60px] px-6 flex items-center gap-4 shadow-sm">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-teal-600 hover:text-teal-700 text-sm font-semibold transition-colors bg-transparent border-none p-0 cursor-pointer"
-        >
-          <FiArrowLeft size={15} /> Back
-        </button>
-        <span className="w-px h-5 bg-slate-200" />
-        <h1 className="text-[15px] font-bold text-slate-900">
-          Booking Details
-        </h1>
-
-        <div className="ml-auto flex items-center gap-3">
-          {executionStatus === "ticketed" && (
-            <span className="flex items-center gap-1.5 bg-emerald-100 text-emerald-800 rounded-full px-3 py-1 text-xs font-bold">
-              <FiCheckCircle size={12} /> Ticket Issued
-            </span>
-          )}
-          {executionStatus === "ticket_pending" && (
-            <span className="flex items-center gap-1.5 bg-amber-100 text-amber-800 rounded-full px-3 py-1 text-xs font-bold">
-              <FiRefreshCw size={11} className="animate-spin" /> Issuing Ticket…
-            </span>
-          )}
-          {displayPnr && (
-            <span className="text-xs text-slate-400 font-medium">
-              Ref: <strong className="text-slate-900">{displayPnr}</strong>
-            </span>
-          )}
-        </div>
-      </header> */}
-
       {/* ── Bento grid ── */}
       <main className="max-w-7xl mx-auto px-5 py-8 pb-24 grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Flight segment cards — each full width */}
         {flights.map((flight, index) => {
           const isLast = index === flights.length - 1;
           const isOdd = flights.length % 2 !== 0;
-
           const shouldSpanFull = flights.length === 1 || (isOdd && isLast);
 
           return (
@@ -923,15 +1140,15 @@ export default function BookingDetails() {
               onClick={() => handleDownloadTicket("onward")}
               disabled={downloading === "onward"}
               className="
-        flex items-center gap-2
-        px-6 py-3
-        bg-teal-600 text-white
-        hover:bg-teal-700
-        rounded-xl text-sm font-bold
-        transition-all duration-150
-        disabled:opacity-50 disabled:cursor-not-allowed
-        shadow-lg
-      "
+                flex items-center gap-2
+                px-6 py-3
+                bg-teal-600 text-white
+                hover:bg-teal-700
+                rounded-xl text-sm font-bold
+                transition-all duration-150
+                disabled:opacity-50 disabled:cursor-not-allowed
+                shadow-lg
+              "
             >
               <FiDownload size={15} />
               {downloading === "onward" ? "Downloading…" : "Download Ticket"}
@@ -939,68 +1156,116 @@ export default function BookingDetails() {
           </div>
         )}
 
-        {/* ── Traveller ── */}
-        <BentoCard>
-          <CardLabel icon={FiUser} label="Traveller" />
-          <div className="mb-4">
-            <p className="text-lg font-extrabold text-slate-900 leading-snug">
-              {traveller?.title} {traveller?.firstName} {traveller?.lastName}
-            </p>
-            <p className="text-xs text-slate-400 mt-1">{traveller?.email}</p>
-          </div>
-          <InfoRow label="Phone" value={traveller?.phoneWithCode} />
-          <InfoRow label="Gender" value={traveller?.gender} />
-          <InfoRow
-            label="Date of Birth"
-            value={formatDateWithYear(traveller?.dateOfBirth)}
-          />
-          <InfoRow label="Nationality" value={traveller?.nationality} />
-        </BentoCard>
+        {/* ── Travellers ── */}
+        <BentoCard className="md:col-span-2">
+          <CardLabel icon={FiUser} label="Travellers" />
 
-        {/* ── Fare ── */}
-        {/* <BentoCard>
-          <CardLabel icon={FiCreditCard} label="Fare Summary" />
+          {travellers.length === 0 ? (
+            <p className="text-sm text-slate-500">No traveller details available.</p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {travellers.map((trav, idx) => (
+                <div
+                  key={trav._id || idx}
+                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-4"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <p className="text-lg font-extrabold text-slate-900 leading-snug">
+                        {trav.title} {trav.firstName} {trav.lastName}
+                      </p>
+                      {trav.email && (
+                        <p className="text-xs text-slate-400 mt-1">{trav.email}</p>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-black uppercase tracking-widest text-teal-600 bg-teal-50 px-3 py-1 rounded-full">
+                      {formatPaxType(trav.paxType)}
+                    </span>
+                  </div>
 
-          <InfoRow label="Base Fare" value={`₹${baseFare}`} />
+                  {trav.phoneWithCode && (
+                    <InfoRow label="Phone" value={trav.phoneWithCode} />
+                  )}
+                  <InfoRow label="Gender" value={trav.gender || "N/A"} />
+                  <InfoRow
+                    label="Date of Birth"
+                    value={trav.dateOfBirth ? formatDateWithYear(trav.dateOfBirth) : "N/A"}
+                  />
+                  <InfoRow label="Nationality" value={trav.nationality || "N/A"} />
+                  {typeof trav.linkedAdultIndex === "number" &&
+                    trav.linkedAdultIndex >= 0 && (
+                      <InfoRow
+                        label="Linked Adult"
+                        value={`Traveller ${trav.linkedAdultIndex + 1}`}
+                      />
+                    )}
 
-          <InfoRow label="Tax" value={`₹${tax}`} />
-
-          {totalSeatPrice > 0 && (
-            <InfoRow label="Seat Charges" value={`₹${totalSeatPrice}`} />
-          )}
-
-          {isRoundTrip && (
-            <div className="mt-4 space-y-2 text-xs text-slate-500">
-              <p className="font-semibold text-slate-700">Fare Breakdown</p>
-              <div className="flex justify-between">
-                <span>Onward (Base Fare + Tax)</span>
-                <span>₹{Math.ceil(fareSnapshot.onwardFare.PublishedFare)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Return (Base Fare + Tax)</span>
-                <span>₹{Math.ceil(fareSnapshot.returnFare.PublishedFare)}</span>
-              </div>
+                  {trav.isLeadPassenger && (
+                    <div className="mt-3 inline-flex items-center gap-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">
+                      <FiCheckCircle size={12} />
+                      Lead passenger
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
+        </BentoCard>
 
-          <InfoRow label="Currency" value={fare?.currency} />
-          <InfoRow
-            label="Refundable"
-            value={refundable ? "Yes" : "No"}
-            accent={refundable}
-          />
-          <div className="mt-4 bg-linear-to-r from-cyan-50 to-teal-50 rounded-xl px-4 py-4 flex justify-between items-center border border-teal-100">
-            <span className="text-sm text-teal-700 font-semibold">
-              Total Paid Amount
-            </span>
-            <span className="text-2xl font-black text-slate-900">
-              ₹{fare?.totalAmount}
-            </span>
-          </div>
-        </BentoCard> */}
+        {/* ── Fare Summary — hidden for employees ── */}
+        {!isEmployee && (
+          <BentoCard>
+            <CardLabel icon={FiCreditCard} label="Fare Summary" />
+
+            <InfoRow label="Base Fare" value={`₹${baseFare}`} />
+            <InfoRow label="Tax" value={`₹${tax}`} />
+
+            {totalSeatPrice > 0 && (
+              <InfoRow label="Seat Charges" value={`₹${totalSeatPrice}`} />
+            )}
+
+            {totalMealPrice > 0 && (
+              <InfoRow label="Meal Charges" value={`₹${totalMealPrice}`} />
+            )}
+
+            {isRoundTrip && (
+              <div className="mt-4 space-y-2 text-xs text-slate-500">
+                <p className="font-semibold text-slate-700">Fare Breakdown</p>
+                <div className="flex justify-between">
+                  <span>Onward (Base Fare + Tax)</span>
+                  <span>
+                    ₹{Math.ceil(fareSnapshot.onwardFare.PublishedFare)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Return (Base Fare + Tax)</span>
+                  <span>
+                    ₹{Math.ceil(fareSnapshot.returnFare.PublishedFare)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <InfoRow label="Currency" value={fare?.currency} />
+            <InfoRow
+              label="Refundable"
+              value={refundable ? "Yes" : "No"}
+              accent={refundable}
+            />
+
+            <div className="mt-4 bg-linear-to-r from-cyan-50 to-teal-50 rounded-xl px-4 py-4 flex justify-between items-center border border-teal-100">
+              <span className="text-sm text-teal-700 font-semibold">
+                Total Paid Amount
+              </span>
+              <span className="text-2xl font-black text-slate-900">
+                ₹{fare?.totalAmount}
+              </span>
+            </div>
+          </BentoCard>
+        )}
 
         {/* ── Payment & Status — full width ── */}
-        <BentoCard className="col-span-2">
+        <BentoCard className="md:col-span-2">
           <CardLabel icon={FiCreditCard} label="Payment & Booking Status" />
           <div className="grid grid-cols-3 gap-3">
             {/* Payment tile */}
@@ -1041,6 +1306,8 @@ export default function BookingDetails() {
               <div className="flex items-center gap-2 mb-1">
                 {executionStatus === "ticketed" ? (
                   <FiCheckCircle size={16} className="text-emerald-500" />
+                ) : executionStatus === "on_hold" ? (
+                  <FiAlertCircle size={16} className="text-amber-500" />
                 ) : (
                   <FiRefreshCw
                     size={16}
@@ -1056,7 +1323,11 @@ export default function BookingDetails() {
               <p
                 className={`text-lg font-black ${executionStatus === "ticketed" ? "text-emerald-800" : "text-amber-800"}`}
               >
-                {executionStatus === "ticketed" ? "Issued" : "Issuing…"}
+                {executionStatus === "ticketed"
+                  ? "Issued"
+                  : executionStatus === "on_hold"
+                    ? "On Hold (Manual Required)"
+                    : "Issuing…"}
               </p>
               {executionStatus === "ticket_pending" && (
                 <p className="text-[11px] text-amber-500">
@@ -1064,6 +1335,35 @@ export default function BookingDetails() {
                 </p>
               )}
             </div>
+
+            {["ticket_pending", "on_hold"].includes(executionStatus) && (
+              <div className="col-span-3 mt-3 flex justify-end">
+                <button
+                  onClick={async () => {
+                    try {
+                      await dispatch(manualTicketNonLcc(booking._id));
+                      Swal.fire({
+                        icon: "info",
+                        title: "Retrying Ticket",
+                        text: "We are attempting ticket issuance again...",
+                        timer: 2000,
+                        showConfirmButton: false,
+                      });
+                    } catch (err) {
+                      Swal.fire({
+                        icon: "error",
+                        title: "Retry Failed",
+                        text: "Please try again later",
+                      });
+                    }
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl text-sm font-bold"
+                >
+                  <FiRefreshCw size={14} />
+                  Retry Ticket
+                </button>
+              </div>
+            )}
 
             {/* Purpose tile */}
             <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col gap-1.5">
@@ -1082,13 +1382,11 @@ export default function BookingDetails() {
 
         {/* ── Cancellation Policy ── */}
         {cancellationPolicies.length > 0 && (
-          <BentoCard className="col-span-2">
+          <BentoCard className="md:col-span-2">
             <CardLabel icon={FiAlertCircle} label="Cancellation Policy" />
-
             <p className="text-xs text-slate-400 mb-3">
               Charges vary depending on how close you are to departure.
             </p>
-
             <div className="space-y-3">
               {cancellationPolicies.map((rule, index) => {
                 const policy = getPolicyDisplay(rule);
@@ -1100,20 +1398,14 @@ export default function BookingDetails() {
                   <div
                     key={index}
                     className={`flex justify-between items-center rounded-xl px-4 py-3 border
-              ${
-                isUrgent
-                  ? "bg-red-50 border-red-200"
-                  : "bg-slate-50 border-slate-200"
-              }`}
+                      ${isUrgent ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"}`}
                   >
-                    {/* Time window */}
                     <div>
                       <p className="text-xs text-slate-400 font-medium">
                         {policy.range}
                       </p>
                       <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                         {policy.label}
-
                         {isCheapest && (
                           <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
                             Cheapest
@@ -1121,8 +1413,6 @@ export default function BookingDetails() {
                         )}
                       </p>
                     </div>
-
-                    {/* Charge */}
                     <div className="text-right">
                       <p className="text-xs text-slate-400">Cancellation Fee</p>
                       <p className="text-sm font-bold text-red-600">
@@ -1138,13 +1428,11 @@ export default function BookingDetails() {
 
         {/* ── Reissue Policy ── */}
         {reissuePolicies.length > 0 && (
-          <BentoCard className="col-span-2">
+          <BentoCard className="md:col-span-2">
             <CardLabel icon={FiRefreshCw} label="Reschedule / Reissue Policy" />
-
             <p className="text-xs text-slate-400 mb-3">
               Charges depend on how early you reschedule.
             </p>
-
             <div className="space-y-3">
               {reissuePolicies.map((rule, index) => {
                 const policy = getPolicyDisplay(rule);
@@ -1156,20 +1444,14 @@ export default function BookingDetails() {
                   <div
                     key={index}
                     className={`flex justify-between items-center rounded-xl px-4 py-3 border
-              ${
-                isUrgent
-                  ? "bg-amber-50 border-amber-200"
-                  : "bg-slate-50 border-slate-200"
-              }`}
+                      ${isUrgent ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-200"}`}
                   >
-                    {/* Time window */}
                     <div>
                       <p className="text-xs text-slate-400 font-medium">
                         {policy.range}
                       </p>
                       <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                         {policy.label}
-
                         {isCheapest && (
                           <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
                             Cheapest
@@ -1177,8 +1459,6 @@ export default function BookingDetails() {
                         )}
                       </p>
                     </div>
-
-                    {/* Charge */}
                     <div className="text-right">
                       <p className="text-xs text-slate-400">Reissue Fee</p>
                       <p className="text-sm font-bold text-blue-600">
@@ -1196,24 +1476,21 @@ export default function BookingDetails() {
         {paymentSuccessful &&
           executionStatus === "ticketed" &&
           !isTravelPassed && (
-            <BentoCard className="col-span-2">
+            <BentoCard className="md:col-span-2">
               <CardLabel icon={FiRefreshCw} label="Amendment Actions" />
-
               <div className="flex flex-wrap gap-3">
                 <button
-                  onClick={() => setAmendmentType("reschedule")}
+                  onClick={() => setAmendmentType("reissue")}
                   className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition"
                 >
-                  Reschedule Flight
+                  Reissue Flight
                 </button>
-
                 <button
-                  onClick={() => setAmendmentType("modify")}
-                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition"
+                  onClick={() => setShowPartialCancel(true)}
+                  className="px-5 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition"
                 >
-                  Modify Traveller
+                  Partial Cancel
                 </button>
-
                 <button
                   onClick={handleCancelBooking}
                   className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition"
@@ -1224,11 +1501,19 @@ export default function BookingDetails() {
             </BentoCard>
           )}
       </main>
+
       {amendmentType && (
         <AmendmentModal
           type={amendmentType}
           booking={booking}
           onClose={() => setAmendmentType(null)}
+        />
+      )}
+
+      {showPartialCancel && (
+        <PartialCancelModal
+          booking={booking}
+          onClose={() => setShowPartialCancel(false)}
         />
       )}
     </div>

@@ -50,49 +50,46 @@ function FlightSection() {
 
   const flightTrips = useMemo(() => {
     return (flightBookings || [])
-      .filter((b) => {
-        const travelDate =
-          b.bookingSnapshot?.travelDate ||
-          b.flightRequest?.segments?.[0]?.departureDateTime;
-
-        if (!travelDate) return false;
-
-        const travel = new Date(travelDate).toISOString().slice(0, 10);
-
-        const excludedStatuses = [
-          "pending",
-          "processing",
-          "failed",
-          "cancel_requested",
-        ];
-
-        const isPast = travel < today;
-
-        console.log("TODAY:", today);
-        console.log("TRAVEL:", travel);
-
-        const isValidStatus = !excludedStatuses.includes(b.executionStatus);
-
-        return isPast && isValidStatus;
+      .map((b) => {
+        const segments = b.flightRequest?.segments || [];
+        const onward = segments.filter((s) => s.journeyType === "onward");
+        const firstSeg = onward[0] || segments[0];
+        const departureDate =
+          firstSeg?.departureDateTime || b.bookingSnapshot?.travelDate;
+        const travelKey = departureDate
+          ? new Date(departureDate).toISOString().slice(0, 10)
+          : null;
+        const exec = (b.executionStatus || "").toLowerCase();
+        const req = (b.requestStatus || "").toLowerCase();
+        const status =
+          exec === "cancel_requested" || req === "cancelled"
+            ? "Cancelled"
+            : exec === "ticketed" || exec === "confirmed" || req === "approved"
+              ? "Completed"
+              : "Pending";
+        return {
+          raw: b,
+          id: b._id,
+          employee:
+            `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim() ||
+            b.userId?.email ||
+            "N/A",
+          employeeId: b.userId?._id || "N/A",
+          destination:
+            b.bookingSnapshot?.city ||
+            firstSeg?.destination?.city ||
+            firstSeg?.destination?.airportCode ||
+            "N/A",
+          departureDate,
+          airlineName:
+            firstSeg?.airlineName || b.bookingSnapshot?.airline || "N/A",
+          flightNumber: firstSeg?.flightNumber || "—",
+          status,
+          travelKey,
+        };
       })
-      .map((b) => ({
-        raw: b,
-        id: b._id,
-        raw: b,
-        employee:
-          `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim(),
-        employeeId: b.userId?._id || "N/A",
-        destination:
-          b.bookingSnapshot?.city ||
-          b.flightRequest?.segments?.[0]?.destination?.city ||
-          "N/A",
-        departureDate:
-          b.bookingSnapshot?.travelDate ||
-          b.flightRequest?.segments?.[0]?.departureDateTime,
-        returnDate: b.bookingSnapshot?.returnDate,
-        status: "Completed",
-      }));
-  }, [flightBookings]);
+      .filter((t) => t.travelKey && t.travelKey < today && t.status !== "Cancelled");
+  }, [flightBookings, today]);
   const departments = ["All", ...new Set(flightTrips.map((t) => t.department))];
 
   const filtered = useMemo(() => {
@@ -232,7 +229,7 @@ function FlightSection() {
                 {/* <Th>Department</Th> */}
                 <Th>Destination</Th>
                 <Th>Departure Date</Th>
-                <Th>Return Date</Th>
+                <Th>Airline</Th>
                 {/* <Th>Rating</Th> */}
                 <Th>Status</Th>
                 <Th>Action</Th>
@@ -281,18 +278,26 @@ function FlightSection() {
                       {t.destination}
                     </td>
                     <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {new Date(t.departureDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      {t.departureDate
+                        ? new Date(t.departureDate).toLocaleDateString(
+                            "en-IN",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            },
+                          )
+                        : "—"}
                     </td>
                     <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {new Date(t.returnDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-slate-800 text-[13px]">
+                          {t.airlineName || "N/A"}
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          {t.flightNumber ? `Flight ${t.flightNumber}` : "—"}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={t.status || "Completed"} />
@@ -572,18 +577,26 @@ function HotelSection() {
                       {t.destination}
                     </td>
                     <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {new Date(t.departureDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      {t.departureDate
+                        ? new Date(t.departureDate).toLocaleDateString(
+                            "en-IN",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            },
+                          )
+                        : "—"}
                     </td>
                     <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {new Date(t.returnDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-slate-800 text-[13px]">
+                          {t.airlineName || "N/A"}
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          {t.flightNumber ? `Flight ${t.flightNumber}` : "—"}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <RatingStars rating={t.rating} />
