@@ -182,11 +182,19 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     }
   });
 
-  const fareResult = Array.isArray(flightRequest.fareQuote?.Results)
-    ? flightRequest.fareQuote.Results[0]
-    : flightRequest.fareQuote?.Results;
+  const fareResults = Array.isArray(flightRequest.fareQuote?.Results)
+    ? flightRequest.fareQuote.Results
+    : flightRequest.fareQuote?.Response?.Results
+      ? [flightRequest.fareQuote.Response.Results]
+      : flightRequest.fareQuote?.Results
+        ? [flightRequest.fareQuote.Results]
+        : [];
 
-  if (!fareResult?.FareBreakdown || !fareResult.FareBreakdown.length) {
+  const fareResult = fareResults.find(
+    (fr) => fr?.FareBreakdown && fr.FareBreakdown.length,
+  );
+
+  if (!fareResult) {
     throw new ApiError(400, "Valid FareQuote is required");
   }
 
