@@ -31,14 +31,42 @@ import api from "../../../API/axios";
 
 // ✅ NORMALIZE FULL FARE RULE API RESPONSE (FareRule API)
 const normalizeFareRules = (fareRule) => {
-  const list = fareRule?.Response?.FareRules;
-  if (!Array.isArray(list)) return null;
-  return {
-    cancellation: list.filter((r) => r.Category === "CANCELLATION"),
-    dateChange: list.filter((r) => r.Category === "DATECHANGE"),
-    baggage: list.filter((r) => r.Category === "BAGGAGE"),
-    important: list.filter((r) => r.Category === "IMPORTANT"),
-  };
+  // TBO sometimes returns {Response:{FareRules:[...]}} and sometimes flat {FareRules:[...]}
+  const list =
+    fareRule?.Response?.FareRules ||
+    fareRule?.FareRules ||
+    fareRule?.data?.Response?.FareRules ||
+    [];
+
+  if (!Array.isArray(list) || list.length === 0) return null;
+
+  const hasCategory = list.some((r) => r?.Category);
+
+  const cancellation = hasCategory
+    ? list.filter((r) => r.Category === "CANCELLATION")
+    : [];
+  const dateChange = hasCategory
+    ? list.filter((r) => r.Category === "DATECHANGE")
+    : [];
+  const baggage = hasCategory
+    ? list.filter((r) => r.Category === "BAGGAGE")
+    : [];
+
+  // For responses without Category (common in intl round-trip), fall back to FareRuleDetail strings
+  let important = hasCategory
+    ? list.filter((r) => r.Category === "IMPORTANT")
+    : [];
+
+  if (important.length === 0) {
+    const details = list
+      .map((r) => r?.FareRuleDetail)
+      .filter((x) => typeof x === "string" && x.trim().length > 0);
+    if (details.length > 0) {
+      important = details;
+    }
+  }
+
+  return { cancellation, dateChange, baggage, important };
 };
 
 export default function RoundTripFlightBooking() {
@@ -58,6 +86,12 @@ export default function RoundTripFlightBooking() {
     tripType = "round-trip",
     isInternational = false,
   } = location.state || {};
+  const originalSearchData = location.state?.rawFlightData;
+  const passengerCounts =
+    searchParams?.passengers ||
+    location.state?.passengers ||
+    searchParams ||
+    {};
 
   const [expandedSections, setExpandedSections] = useState({
     onwardFlightDetails: true,
@@ -128,14 +162,12 @@ export default function RoundTripFlightBooking() {
 
   const traceId = location.state?.traceId || reduxTraceId || null;
 
-  const adultCount =
-    searchParams?.passengers?.adults || searchParams?.adults || 1;
-  const childCount =
-    searchParams?.passengers?.children || searchParams?.children || 0;
-  const infantCount =
-    searchParams?.passengers?.infants || searchParams?.infants || 0;
+  const adultCount = passengerCounts?.adults ?? searchParams?.adults ?? 1;
+  const childCount = passengerCounts?.children ?? searchParams?.children ?? 0;
+  const infantCount = passengerCounts?.infants ?? searchParams?.infants ?? 0;
+  const totalPassengerCount = adultCount + childCount + infantCount;
   const seatEligibleCount = adultCount + childCount;
-  const maxForms = adultCount + childCount;
+  const maxForms = totalPassengerCount;
 
   // ✅ INTERNATIONAL NORMALIZATION (ADD THIS)
   const rawFlightData = useMemo(() => {
@@ -222,7 +254,7 @@ export default function RoundTripFlightBooking() {
   useEffect(() => {
     const fetchGst = async () => {
       try {
-        const { data } = await api.get("/employee/gst");
+        const { data } = await api.get("/employees/gst");
         if (data?.data) {
           setGstDetails((prev) => ({
             ...prev,
@@ -276,7 +308,7 @@ export default function RoundTripFlightBooking() {
     }
 
     setTravelers(initial);
-  }, [user, searchParams]);
+  }, [user, searchParams, adultCount, childCount, infantCount]);
 
   useEffect(() => {
     console.log("🟢 Seat Ready Check", {
@@ -403,6 +435,52 @@ export default function RoundTripFlightBooking() {
       Number(returnFare?.OtherCharges || 0)
     );
   }, [fareQuote, isInternational]);
+
+  const searchTotalFare = useMemo(() => {
+    if (!originalSearchData) return 0;
+
+    // International grouped: use the published fare from search response directly
+    if (isInternational && originalSearchData?.Fare?.PublishedFare != null) {
+      return Math.ceil(Number(originalSearchData.Fare.PublishedFare || 0));
+    }
+
+    // Domestic (or split international fallback): sum onward + return published fares from search response
+    const onwardPublished =
+      rawFlightData?.onward?.Fare?.PublishedFare ??
+      originalSearchData?.onward?.Fare?.PublishedFare ??
+      0;
+    const returnPublished =
+      rawFlightData?.return?.Fare?.PublishedFare ??
+      originalSearchData?.return?.Fare?.PublishedFare ??
+      0;
+
+    const onwardTotal = onwardPublished ? Math.ceil(Number(onwardPublished)) : 0;
+    const returnTotal = returnPublished
+      ? Math.ceil(Number(returnPublished))
+      : 0;
+
+    return onwardTotal + returnTotal;
+  }, [rawFlightData, originalSearchData, isInternational]);
+
+  // Build a resilient Fare.Results array for booking payload (avoids nulls)
+  const safeFareResults = useMemo(() => {
+    const results = [];
+
+    // Primary: fare quote responses
+    const onwardRes = fareQuote?.onward?.Response?.Results;
+    const returnRes = fareQuote?.return?.Response?.Results;
+    if (onwardRes) results.push(onwardRes);
+    if (returnRes) results.push(returnRes);
+
+    // Fallback: search result objects (grouped intl has Fare & FareBreakdown)
+    if (results.length === 0) {
+      if (originalSearchData?.Fare) results.push(originalSearchData);
+      if (rawFlightData?.onward?.Fare) results.push(rawFlightData.onward);
+      if (rawFlightData?.return?.Fare) results.push(rawFlightData.return);
+    }
+
+    return results;
+  }, [fareQuote, rawFlightData, originalSearchData]);
 
   useEffect(() => {
     console.log(
@@ -547,9 +625,11 @@ export default function RoundTripFlightBooking() {
 
       const isSelected = current.list.includes(seatNum);
 
-      if (!isSelected && current.list.length >= travelers.length) {
+      const seatLimit = seatEligibleCount || travelers.length || 1;
+
+      if (!isSelected && current.list.length >= seatLimit) {
         ToastWithTimer({
-          message: `You can only select ${travelers.length} seat(s)`,
+          message: `You can only select ${seatLimit} seat(s)`,
           type: "info",
         });
         return prev;
@@ -783,12 +863,39 @@ export default function RoundTripFlightBooking() {
     };
   }, [fareQuote, isInternational]);
 
-  const totalPayableAmount =
-    Math.ceil(
-      perAdultFare.base + perAdultFare.tax + perAdultFare.otherCharges,
-    ) *
-      travelers.length +
-    calculateSSRTotal();
+  const fareQuoteTotal = useMemo(() => {
+    const perTravellerTotal =
+      Number(perAdultFare.base || 0) +
+      Number(perAdultFare.tax || 0) +
+      Number(perAdultFare.otherCharges || 0);
+
+    const paxCount = Math.max(totalPassengerCount || travelers.length || 1, 1);
+
+    // If fare quote already returned a combined total and only one pax, use it directly
+    const aggregatedFare =
+      Number(totalBaseFare || 0) +
+      Number(totalTaxFare || 0) +
+      Number(totalOtherCharges || 0);
+    if (aggregatedFare > 0 && paxCount === 1) {
+      return Math.ceil(aggregatedFare);
+    }
+
+    return Math.ceil(perTravellerTotal * paxCount);
+  }, [
+    perAdultFare,
+    totalPassengerCount,
+    travelers.length,
+    totalBaseFare,
+    totalTaxFare,
+    totalOtherCharges,
+  ]);
+
+  const uiTotalFare = useMemo(
+    () => (searchTotalFare > 0 ? searchTotalFare : fareQuoteTotal),
+    [searchTotalFare, fareQuoteTotal],
+  );
+
+  const totalPayableAmount = Math.ceil(uiTotalFare) + calculateSSRTotal();
 
   const buildMealSSR = () => {
     const meals = [];
@@ -963,9 +1070,12 @@ export default function RoundTripFlightBooking() {
     const lastSegment = segments[segments.length - 1];
     const cabinClass = CABIN_MAP[firstSegment?.cabinClass] || "Economy";
 
-    // synthesize infants (no form) to align with fare breakdown
+    // synthesize missing infants (if forms already include infants, skip duplicates)
     const travelersWithInfants = [...travelers];
-    for (let i = 0; i < infantCount; i++) {
+    const existingInfants = travelers.filter((t) => t.type === "INFANT").length;
+    const missingInfants = Math.max(infantCount - existingInfants, 0);
+
+    for (let i = 0; i < missingInfants; i++) {
       const linkedAdult = adultCount ? i % adultCount : 0;
       const fallbackLast = travelers[linkedAdult]?.lastName || "INFANT";
       const depDate = segments[0]?.departureDateTime;
@@ -1031,11 +1141,7 @@ export default function RoundTripFlightBooking() {
         // fareQuote: buildConsolidatedFareQuote(),
         // fareQuote: fareQuote?.onward?.Response, // ✅ contains FareBreakdown
         fareQuote: {
-          Results: [
-            fareQuote?.onward?.Response?.Results,
-            fareQuote?.return?.Response?.Results,
-          ],
-          // Results: [fareQuote?.return?.Response?.Results],
+          Results: safeFareResults,
         },
 
         segments: buildFullSegments(),
@@ -1097,6 +1203,42 @@ export default function RoundTripFlightBooking() {
     if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
     return age;
   };
+
+  // Auto-calculate and keep traveler age (incl. infants) in sync with DOB
+  useEffect(() => {
+    if (!Array.isArray(travelers) || travelers.length === 0) return;
+
+    let changed = false;
+    const updated = travelers.map((t) => {
+      if (!t?.dob) return t;
+      const derivedAge = ageFromDob(t.dob);
+      if (derivedAge !== t.age) {
+        changed = true;
+        return { ...t, age: derivedAge };
+      }
+      return t;
+    });
+
+    if (changed) setTravelers(updated);
+  }, [travelers]);
+
+  // Keep nationality in sync across all passengers, following lead passenger
+  useEffect(() => {
+    if (!Array.isArray(travelers) || travelers.length === 0) return;
+    const leadNat = travelers[0]?.nationality;
+    if (!leadNat) return;
+
+    let changed = false;
+    const synced = travelers.map((t, idx) => {
+      if (idx === 0) return t;
+      if (t.nationality && t.nationality !== "IN") return t; // preserve explicit overrides
+      if (t.nationality === leadNat) return t;
+      changed = true;
+      return { ...t, nationality: leadNat };
+    });
+
+    if (changed) setTravelers(synced);
+  }, [travelers, travelers?.[0]?.nationality]);
 
   const validateTravelers = () => {
     const errors = {};
@@ -1369,8 +1511,11 @@ export default function RoundTripFlightBooking() {
                     label="Travelers"
                     value={
                       <div className="font-semibold text-sm">
-                        {travelers.length} Adult
-                        {travelers.length > 1 ? "s" : ""}
+                        {totalPassengerCount} Traveler
+                        {totalPassengerCount > 1 ? "s" : ""}
+                        <div className="text-[11px] font-normal text-slate-500">
+                          {adultCount}A · {childCount}C · {infantCount}I
+                        </div>
                       </div>
                     }
                   />
@@ -1506,18 +1651,34 @@ export default function RoundTripFlightBooking() {
           isInternational={isInternational}
           gstDetails={gstDetails}
           setGstDetails={setGstDetails}
-          canAddMore={travelers.filter((t) => t.type !== "INFANT").length < maxForms}
+          canAddMore={travelers.length < maxForms}
           onAddTraveler={() =>
             setTravelers((prev) => {
-              const renderedCount = prev.filter(
-                (t) => (t.type || "ADULT") !== "INFANT",
-              ).length;
-              if (renderedCount >= maxForms) return prev;
+              if (prev.length >= maxForms) return prev;
+
+              const currentAdults = prev.filter((t) => t.type === "ADULT")
+                .length;
               const currentChildren = prev.filter((t) => t.type === "CHILD")
                 .length;
-              const nextType =
-                currentChildren < childCount ? "CHILD" : "ADULT";
-              return [...prev, initialTraveler(prev.length + 1, nextType)];
+              const currentInfants = prev.filter((t) => t.type === "INFANT")
+                .length;
+
+              let nextType = "ADULT";
+              if (currentChildren < childCount) nextType = "CHILD";
+              else if (currentInfants < infantCount) nextType = "INFANT";
+
+              const newTraveler = initialTraveler(
+                prev.length + 1,
+                nextType,
+              );
+              if (nextType === "INFANT") {
+                newTraveler.linkedAdultIndex = Math.min(
+                  currentInfants,
+                  Math.max(adultCount - 1, 0),
+                );
+              }
+
+              return [...prev, newTraveler];
             })
           }
         />
@@ -1544,9 +1705,10 @@ export default function RoundTripFlightBooking() {
             <div className="sticky top-6 space-y-6">
               <PriceSummary
                 parsedFlightData={{
-                  baseFare: totalBaseFare,
-                  taxFare: totalTaxFare,
-                  otherCharges: totalOtherCharges,
+                  baseFare: uiTotalFare,
+                  taxFare: 0,
+                  otherCharges: 0,
+                  baseFareIsTotal: true,
                 }}
                 selectedSeats={selectedSeats}
                 selectedMeals={selectedMeals}

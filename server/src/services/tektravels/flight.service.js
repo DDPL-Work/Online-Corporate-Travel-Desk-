@@ -434,21 +434,50 @@ class FlightService {
       throw new ApiError(400, "FareBreakdown missing");
     }
 
-    if (!result.IsLCC && passengers.length !== result.FareBreakdown.length) {
-      throw new ApiError(
-        400,
-        `Passenger count (${passengers.length}) does not match FareBreakdown (${result.FareBreakdown.length})`,
-      );
+    const totalFareBreakdownCount = result.FareBreakdown.reduce(
+      (sum, fb) => sum + (Number(fb.PassengerCount) || 0),
+      0,
+    );
+
+    if (!result.IsLCC && totalFareBreakdownCount > 0) {
+      if (passengers.length !== totalFareBreakdownCount) {
+        throw new ApiError(
+          400,
+          `Passenger count (${passengers.length}) does not match FareBreakdown (${totalFareBreakdownCount})`,
+        );
+      }
     }
+
+    // Map pax type to fare breakdown for non-LCC bookings
+    const paxTypeToFare = {};
+    result.FareBreakdown.forEach((fb) => {
+      paxTypeToFare[fb.PassengerType] = fb;
+    });
+
+    const getFareForPassenger = (p) => {
+      if (result.IsLCC) return result.FareBreakdown[0];
+
+      const paxType = (p.paxType || p.PaxType || "").toString().toUpperCase();
+      const tboCode =
+        paxType === "ADULT"
+          ? 1
+          : paxType === "CHILD"
+            ? 2
+            : paxType === "INFANT"
+              ? 3
+              : null;
+
+      return paxTypeToFare[tboCode] || result.FareBreakdown[0];
+    };
 
     const payload = {
       TraceId: traceId,
       ResultIndex: resultIndex,
       IsLCC: result.IsLCC,
       Fare: result.Fare,
-      Passengers: passengers.map((p, i) => ({
+      Passengers: passengers.map((p) => ({
         ...this.mapPassenger(p),
-        Fare: result.IsLCC ? result.FareBreakdown[0] : result.FareBreakdown[i],
+        Fare: getFareForPassenger(p),
       })),
       SSR:
         ssr && (ssr.baggage?.length || ssr.meals?.length || ssr.seats?.length)
