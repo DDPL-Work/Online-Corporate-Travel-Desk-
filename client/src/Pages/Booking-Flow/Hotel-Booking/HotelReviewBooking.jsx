@@ -588,6 +588,18 @@ const HotelReviewBooking = () => {
       (sum, r) => sum + (r.Adults || r.adults || 0),
       0,
     ) || 1;
+  const totalChildrenFromSearch =
+    (searchParams?.rooms || []).reduce(
+      (sum, r) => sum + (r.Children || r.children || 0),
+      0,
+    ) || 0;
+  const totalGuestsFromSearch = totalAdultsFromSearch + totalChildrenFromSearch;
+
+  // const totalChildrenFromSearch =
+  //   (searchParams?.rooms || []).reduce(
+  //     (sum, r) => sum + (r.Children || r.children || 0),
+  //     0,
+  //   ) || 0;
 
   useEffect(() => {
     if (id) dispatch(fetchHotelRequestById(id));
@@ -622,35 +634,93 @@ const HotelReviewBooking = () => {
 
   useEffect(() => {
     if (!isBookNowMode && travelers.length === 0 && user) {
-      const generatedTravelers = Array.from(
-        { length: totalAdultsFromSearch },
-        (_, i) => ({
-          id: i + 1,
+      const generatedTravelers = [];
+
+      const roomsFromSearch = searchParams?.rooms || [];
+
+      roomsFromSearch.forEach((room, roomIdx) => {
+        const adults = room.Adults || room.adults || 0;
+        const children = room.Children || room.children || 0;
+        const childAges =
+          room.ChildrenAges || room.ChildAge || room.childAges || [];
+
+        for (let a = 0; a < adults; a++) {
+          const isLead = generatedTravelers.length === 0;
+          generatedTravelers.push({
+            id: generatedTravelers.length + 1,
+            title: "Mr",
+            firstName: isLead ? user?.name?.firstName || "" : "",
+            lastName: isLead ? user?.name?.lastName || "" : "",
+            paxType: 1,
+            age: "",
+            dob: "",
+            gender: "Male",
+            leadPassenger: isLead,
+            email: isLead ? user?.email || "" : "",
+            phoneWithCode: isLead ? user?.phone || "" : "",
+            countryCode: "IN",
+            nationality: "IN",
+            panCard: "",
+            roomIndex: roomIdx,
+          });
+        }
+
+        for (let c = 0; c < children; c++) {
+          generatedTravelers.push({
+            id: generatedTravelers.length + 1,
+            title: "Master",
+            firstName: "",
+            lastName: "",
+            paxType: 2,
+            age: childAges[c] || "",
+            dob: "",
+            gender: "Male",
+            leadPassenger: false,
+            email: "",
+            phoneWithCode: "",
+            countryCode: "IN",
+            nationality: "IN",
+            panCard: "",
+            roomIndex: roomIdx,
+          });
+        }
+      });
+
+      if (generatedTravelers.length === 0) {
+        generatedTravelers.push({
+          id: 1,
           title: "Mr",
-          firstName: i === 0 ? user?.name?.firstName || "" : "",
-          lastName: i === 0 ? user?.name?.lastName || "" : "",
+          firstName: user?.name?.firstName || "",
+          lastName: user?.name?.lastName || "",
           paxType: 1,
           age: "",
           dob: "",
           gender: "Male",
-          leadPassenger: i === 0, // ✅ only first is lead
-          email: i === 0 ? user?.email || "" : "",
-          phoneWithCode: i === 0 ? user?.phone || "" : "",
+          leadPassenger: true,
+          email: user?.email || "",
+          phoneWithCode: user?.phone || "",
           countryCode: "IN",
           nationality: "IN",
           panCard: "",
-        }),
-      );
+        });
+      }
 
       setTravelers(generatedTravelers);
     }
-  }, [user, isBookNowMode, totalAdultsFromSearch]);
+  }, [
+    user,
+    isBookNowMode,
+    totalAdultsFromSearch,
+    totalChildrenFromSearch,
+    searchParams,
+  ]);
 
-  const handleAddGuest = () => {
-    if (travelers.length >= totalAdultsFromSearch) {
+  const handleAddGuest = (paxType = 1) => {
+    const limit = totalGuestsFromSearch || totalAdultsFromSearch;
+    if (travelers.length >= limit) {
       ToastWithTimer({
         type: "error",
-        message: "Guest count cannot exceed selected adults",
+        message: "Guest count cannot exceed selected guests",
       });
       return;
     }
@@ -661,7 +731,7 @@ const HotelReviewBooking = () => {
         title: "Mr",
         firstName: "",
         lastName: "",
-        paxType: 1,
+        paxType,
         age: "",
         dob: "",
         gender: "Male",
@@ -679,10 +749,11 @@ const HotelReviewBooking = () => {
   };
 
   const handleRemoveGuest = (id) => {
-    if (travelers.length <= totalAdultsFromSearch) {
+    const limit = totalGuestsFromSearch || totalAdultsFromSearch;
+    if (travelers.length <= limit) {
       ToastWithTimer({
         type: "error",
-        message: "Cannot have less guests than selected adults",
+        message: "Cannot have less guests than selected",
       });
       return;
     }
@@ -805,10 +876,10 @@ const HotelReviewBooking = () => {
   const search = searchParams;
 
   const handleRequestApproval = async () => {
-    if (travelers.length !== totalAdultsFromSearch) {
+    if (travelers.length !== totalGuestsFromSearch) {
       ToastWithTimer({
         type: "error",
-        message: `Please add exactly ${totalAdultsFromSearch} guests`,
+        message: `Please add exactly ${totalGuestsFromSearch} guests`,
       });
       return;
     }
@@ -820,18 +891,22 @@ const HotelReviewBooking = () => {
       return;
     }
     for (let t of travelers) {
-      if (
-        !t.firstName ||
-        !t.lastName ||
-        !t.email ||
-        !t.phoneWithCode ||
-        !t.nationality
-      ) {
+      const isChild = t.paxType === 2;
+      if (!t.firstName || !t.lastName || !t.nationality) {
         ToastWithTimer({
           type: "error",
           message: "Please fill all guest details",
         });
         return;
+      }
+      if (!isChild) {
+        if (!t.email || !t.phoneWithCode) {
+          ToastWithTimer({
+            type: "error",
+            message: "Email and phone required for adults",
+          });
+          return;
+        }
       }
     }
     const resolvedBookingCode =
@@ -860,6 +935,16 @@ const HotelReviewBooking = () => {
       noOfChild: 0,
       childAge: [],
     }));
+
+    const buildPaxRooms = (rooms) => {
+      return rooms.map((room) => ({
+        Adults: Number(room.Adults || room.adults || 0),
+        Children: Number(room.Children || room.children || 0),
+        ChildrenAges:
+          room.ChildrenAges || room.childAges || room.ChildAge || [],
+      }));
+    };
+
     const payload = {
       bookingType: "hotel",
       hotelRequest: {
@@ -898,7 +983,12 @@ const HotelReviewBooking = () => {
         roomIndex: selectedRoom?.RoomIndex,
         checkIn: search?.checkIn,
         checkOut: search?.checkOut,
-        roomGuests: roomGuests,
+        roomGuests:
+          displaySearchParams?.rooms?.map((r) => ({
+            noOfAdults: r.Adults || r.adults || 0,
+            noOfChild: r.Children || r.children || 0,
+            childAge: r.ChildrenAges || r.ChildAge || r.childAges || [],
+          })) || roomGuests,
         // bookingCode: selectedRoom?.BookingCode || selectedRoom?.RoomTypeCode || selectedRoom?.RatePlanCode,
         // price: selectedRoom?.Price, guestNationality: "IN",
         rooms: selectedRoom.map((room) => ({
@@ -914,6 +1004,8 @@ const HotelReviewBooking = () => {
           mealType: room.MealType,
           isRefundable: room.IsRefundable,
         })),
+        PaxRooms: buildPaxRooms(searchParams.rooms),
+        NoOfRooms: searchParams.rooms.length,
       },
       travellers: travelers.map((t) => ({
         title: t.title,
@@ -1212,7 +1304,7 @@ const HotelReviewBooking = () => {
                           </div>
                           <span className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
                             <FiUser size={13} className="text-[#0A4D68]" />
-                            Guest {index + 1}
+                            {t.paxType === 2 ? "Child" : "Adult"} {index + 1}
                           </span>
                           {t.leadPassenger && (
                             <span className="text-[10px] font-bold uppercase tracking-wider text-[#0A4D68] bg-[#0A4D68]/10 px-2.5 py-0.5 rounded-full border border-[#0A4D68]/20">
@@ -1235,7 +1327,9 @@ const HotelReviewBooking = () => {
                         <div>
                           <SectionHeading
                             icon={<FiUser size={12} />}
-                            title="Full Name"
+                            title={`${
+                              t.paxType === 2 ? "Child" : "Adult"
+                            } Details`}
                           />
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div className="flex flex-col gap-1">
@@ -1318,62 +1412,68 @@ const HotelReviewBooking = () => {
 
                         <Divider />
 
-                        {/* ── Contact Details ── */}
-                        <div>
-                          <SectionHeading
-                            icon={<FiMail size={12} />}
-                            title="Contact Details"
-                          />
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1">
-                              <label className="field-label">
-                                Email Address <Required />
-                              </label>
-                              <div className="relative">
-                                <FiMail
-                                  className="absolute right-3  top-1/2 -translate-y-1/2 text-slate-400"
-                                  size={14}
-                                />
-                                <input
-                                  type="email"
-                                  placeholder="e.g. rahul@email.com"
-                                  value={t.email}
+                        {/* ── Contact Details (hide for children) ── */}
+                        {t.paxType !== 2 && (
+                          <div>
+                            <SectionHeading
+                              icon={<FiMail size={12} />}
+                              title="Contact Details"
+                            />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="flex flex-col gap-1">
+                                <label className="field-label">
+                                  Email Address <Required />
+                                </label>
+                                <div className="relative">
+                                  <FiMail
+                                    className="absolute right-3  top-1/2 -translate-y-1/2 text-slate-400"
+                                    size={14}
+                                  />
+                                  <input
+                                    type="email"
+                                    placeholder="e.g. rahul@email.com"
+                                    value={t.email}
+                                    disabled={isBookNowMode}
+                                    onChange={(e) =>
+                                      updateTraveler(
+                                        t.id,
+                                        "email",
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="field-input pl-9"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="field-label">
+                                  Phone Number {t.leadPassenger && <Required />}
+                                </label>
+                                <PhoneInput
+                                  country={"in"}
+                                  value={t.phoneWithCode}
                                   disabled={isBookNowMode}
-                                  onChange={(e) =>
+                                  onChange={(value, data) => {
                                     updateTraveler(
                                       t.id,
-                                      "email",
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="field-input pl-9"
+                                      "phoneWithCode",
+                                      value,
+                                    );
+                                    updateTraveler(
+                                      t.id,
+                                      "countryCode",
+                                      data?.countryCode?.toUpperCase(),
+                                    );
+                                  }}
+                                  inputClass="!h-10 !w-full !text-sm !bg-white !border !border-slate-200 !rounded-lg !text-slate-700 focus:!border-[#0A4D68] focus:!ring-2 focus:!ring-[#0A4D68]/10"
+                                  buttonClass="!border !border-slate-200 !rounded-l-lg !bg-white"
+                                  containerClass="w-full"
+                                  enableSearch
                                 />
                               </div>
                             </div>
-                            <div className="flex flex-col gap-1">
-                              <label className="field-label">
-                                Phone Number <Required />
-                              </label>
-                              <PhoneInput
-                                country={"in"}
-                                value={t.phoneWithCode}
-                                disabled={isBookNowMode}
-                                onChange={(value, data) => {
-                                  updateTraveler(t.id, "phoneWithCode", value);
-                                  updateTraveler(
-                                    t.id,
-                                    "countryCode",
-                                    data?.countryCode?.toUpperCase(),
-                                  );
-                                }}
-                                inputClass="!h-10 !w-full !text-sm !bg-white !border !border-slate-200 !rounded-lg !text-slate-700 focus:!border-[#0A4D68] focus:!ring-2 focus:!ring-[#0A4D68]/10"
-                                buttonClass="!border !border-slate-200 !rounded-l-lg !bg-white"
-                                containerClass="w-full"
-                                enableSearch
-                              />
-                            </div>
                           </div>
-                        </div>
+                        )}
 
                         <Divider />
 
@@ -1451,11 +1551,23 @@ const HotelReviewBooking = () => {
                               />
                             </div>
                             <div className="flex flex-col gap-1">
-                              <label className="field-label">PAN Card</label>
+                              <label className="field-label">
+                                PAN Card{" "}
+                                {(t.paxType === 2 ||
+                                  (t.age && Number(t.age) <= 18)) && (
+                                  <span className="text-slate-400 font-normal normal-case">
+                                    (Not required)
+                                  </span>
+                                )}
+                              </label>
                               <input
                                 type="text"
                                 value={t.panCard || ""}
-                                disabled={isBookNowMode}
+                                disabled={
+                                  isBookNowMode ||
+                                  t.paxType === 2 ||
+                                  (t.age && Number(t.age) <= 18)
+                                }
                                 onChange={(e) =>
                                   updateTraveler(
                                     t.id,
@@ -1467,6 +1579,9 @@ const HotelReviewBooking = () => {
                                 maxLength={10}
                                 className="field-input font-mono tracking-widest"
                               />
+                              <p className="text-[10px] text-slate-400">
+                                Required only for adults older than 18.
+                              </p>
                             </div>
                           </div>
                         </div>

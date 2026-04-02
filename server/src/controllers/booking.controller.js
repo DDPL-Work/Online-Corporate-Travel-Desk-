@@ -123,12 +123,18 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   const leadPassenger =
     travellers.find((t) => t.isLeadPassenger) || travellers[0];
 
-  if (!leadPassenger?.phoneWithCode) {
-    throw new ApiError(400, "Lead passenger phone number is required");
-  }
+  const leadIsChild =
+    (leadPassenger?.paxType || leadPassenger?.PaxType || "ADULT").toUpperCase() ===
+    "CHILD";
 
-  if (!leadPassenger?.email) {
-    throw new ApiError(400, "Lead passenger email is required");
+  if (!leadIsChild) {
+    if (!leadPassenger?.phoneWithCode) {
+      throw new ApiError(400, "Lead passenger phone number is required");
+    }
+
+    if (!leadPassenger?.email) {
+      throw new ApiError(400, "Lead passenger email is required");
+    }
   }
 
   const ageFromDob = (dob) => {
@@ -167,9 +173,9 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
       if (paxType === "CHILD" && (age < 2 || age > 11)) {
         throw new ApiError(400, "Child passengers must be 2-11 years");
       }
-      if (paxType === "INFANT" && age >= 2) {
-        throw new ApiError(400, "Infant passengers must be under 2 years");
-      }
+    if (paxType === "INFANT" && age >= 2) {
+      throw new ApiError(400, "Infant passengers must be under 2 years");
+    }
     }
 
     if (
@@ -180,6 +186,13 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     ) {
       throw new ApiError(400, "Each infant must be linked to an adult traveler");
     }
+
+    // PAN required only for adults > 18
+    // if (paxType === "ADULT" && (age == null || age > 18)) {
+    //   if (!t.panCard) {
+    //     throw new ApiError(400, `PAN card is required for adult traveler ${idx + 1}`);
+    //   }
+    // }
   });
 
   const fareResults = Array.isArray(flightRequest.fareQuote?.Results)
