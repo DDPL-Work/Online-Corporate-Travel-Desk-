@@ -1,29 +1,21 @@
-//flight.service.js
-
 const axios = require("axios");
 const config = require("../../config/tbo.config");
 const logger = require("../../utils/logger");
 const ApiError = require("../../utils/ApiError");
 
+/* ---------------- DATE FORMAT ---------------- */
 const toTboDate = (value) => {
-  if (!value) {
-    throw new ApiError(400, `Invalid date value: ${value}`);
-  }
+  if (!value) throw new ApiError(400, `Invalid date value: ${value}`);
 
-  // Case 1: already valid TBO datetime → return as-is
   if (
     typeof value === "string" &&
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(value)
-  ) {
-    return value;
-  }
+  ) return value;
 
-  // Case 2: ISO string (Mongo / JS)
   if (typeof value === "string" && !isNaN(Date.parse(value))) {
     return new Date(value).toISOString().slice(0, 19);
   }
 
-  // Case 3: Date object
   if (value instanceof Date) {
     return value.toISOString().slice(0, 19);
   }
@@ -32,10 +24,6 @@ const toTboDate = (value) => {
 };
 
 class FlightService {
-  getEnv() {
-    return process.env.NODE_ENV === "production" ? "live" : "dummy";
-  }
-
   constructor() {
     this.tokens = {
       dummy: { value: null, expiry: 0 },
@@ -43,42 +31,43 @@ class FlightService {
     };
   }
 
-  /* ---------------- TOKEN ---------------- */
+  getEnv() {
+    return process.env.NODE_ENV === "production" ? "live" : "dummy";
+  }
+
   isExpired(token) {
     return !token.value || Date.now() >= token.expiry;
   }
 
+  /* ---------------- AUTH ---------------- */
   async authenticate(type) {
     const cfg = config[type];
 
     try {
-      const payload = {
-        ClientId: cfg.credentials.clientId,
-        UserName: cfg.credentials.username,
-        Password: cfg.credentials.password,
-        EndUserIp: cfg.endUserIp,
-      };
+      const { data } = await axios.post(
+        `${cfg.authBase}${cfg.endpoints.authenticate}`, // ✅ FIXED
+        {
+          ClientId: cfg.credentials.clientId,
+          UserName: cfg.credentials.username,
+          Password: cfg.credentials.password,
+          EndUserIp: cfg.endUserIp,
+        },
+        { timeout: config.timeout }
+      );
 
-      const url = `${cfg.sharedBase || cfg.base}${cfg.endpoints.authenticate}`;
-      const { data } = await axios.post(url, payload, {
-        timeout: config.timeout,
-      });
-
-      if (data?.Status !== 1 && data?.Status !== "Success") {
+      if (data?.Status !== 1) {
         throw new Error(data?.Error?.ErrorMessage || "Auth failed");
       }
 
       this.tokens[type] = {
-        value: data.TokenId || data.Token,
-        expiry: Date.now() + 24 * 60 * 60 * 1000,
+        value: data.TokenId,
+        expiry: Date.now() + 23 * 60 * 60 * 1000,
       };
 
-      return this.tokens[type].value;
+      return data.TokenId;
     } catch (err) {
-      logger.error(
-        `TBO ${type} auth error, err?.response?.data ` || err.message,
-      );
-      throw new ApiError(500, `TBO ${type} authentication failed`);
+      logger.error("TBO AUTH ERROR", err.response?.data || err.message);
+      throw new ApiError(500, "TBO authentication failed");
     }
   }
 
@@ -89,21 +78,27 @@ class FlightService {
     return this.tokens[type].value;
   }
 
-  /* ---------------- SEARCH (DUMMY) ---------------- */
-  /* ---------------- SEARCH (DUMMY) ---------------- */
-  // ===============================
-  // HELPERS (DO NOT REMOVE)
-  // ===============================
+  /* ---------------- COMMON HEADERS ---------------- */
+  getHeaders(cfg, token) {
+    const base64Auth = Buffer.from(
+      `${cfg.credentials.username}:${cfg.credentials.password}`
+    ).toString("base64");
 
-  // ===============================
-  // SEARCH FLIGHTS
-  // ===============================
+    return {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Basic ${base64Auth}`,
+      TokenId: token,
+      ClientId: cfg.credentials.clientId,
+    };
+  }
+
+  /* ---------------- SEARCH ---------------- */
   async searchFlights(params) {
     const env = this.getEnv();
     const cfg = config[env];
     const token = await this.getToken(env);
 
-    // const cabinMap = { economy: 2, business: 4, first: 6 };
     const cabinMap = {
       all: 1,
       economy: 2,
@@ -114,18 +109,11 @@ class FlightService {
     };
 
     const resolveCabinClass = (value) => {
-      // ✅ NUMBER (preferred – TBO compliant)
-      if (typeof value === "number" && value >= 1 && value <= 6) {
-        return value;
-      }
-
-      // ✅ STRING (frontend / legacy)
+      if (typeof value === "number" && value >= 1 && value <= 6) return value;
       if (typeof value === "string") {
         const key = value.trim().toLowerCase();
         if (cabinMap[key]) return cabinMap[key];
       }
-
-      // 🔒 SAFE DEFAULT → Economy
       return 2;
     };
 
@@ -136,7 +124,6 @@ class FlightService {
         Origin: params.origin,
         Destination: params.destination,
         PreferredDepartureTime: toTboDate(params.departureDate),
-        // FlightCabinClass: cabinMap[params.cabinClass?.toLowerCase()] || 1,
         FlightCabinClass: resolveCabinClass(params.cabinClass),
       });
     }
@@ -147,37 +134,15 @@ class FlightService {
           Origin: params.origin,
           Destination: params.destination,
           PreferredDepartureTime: toTboDate(params.departureDate),
-          // FlightCabinClass: cabinMap[params.cabinClass?.toLowerCase()] || 1,
           FlightCabinClass: resolveCabinClass(params.cabinClass),
         },
         {
           Origin: params.destination,
           Destination: params.origin,
           PreferredDepartureTime: toTboDate(params.returnDate),
-          // FlightCabinClass: cabinMap[params.cabinClass?.toLowerCase()] || 1,
           FlightCabinClass: resolveCabinClass(params.cabinClass),
-        },
-      );
-    }
-
-    /* ---------- MULTI CITY (🔥 MISSING LOGIC) ---------- */
-    if (Number(params.journeyType) === 3) {
-      if (!Array.isArray(params.segments) || params.segments.length === 0) {
-        throw new ApiError(400, "Multi-city search requires flight segments");
-      }
-
-      segments = params.segments.map((seg, index) => {
-        if (!seg.origin || !seg.destination || !seg.departureDate) {
-          throw new ApiError(400, `Invalid segment at index ${index}`);
         }
-
-        return {
-          Origin: seg.origin,
-          Destination: seg.destination,
-          PreferredDepartureTime: toTboDate(seg.departureDate),
-          FlightCabinClass: cabinMap[params.cabinClass?.toLowerCase()] || 1,
-        };
-      });
+      );
     }
 
     const payload = {
@@ -186,590 +151,104 @@ class FlightService {
       AdultCount: Number(params.adults ?? 1),
       ChildCount: Number(params.children ?? 0),
       InfantCount: Number(params.infants ?? 0),
-      DirectFlight: Boolean(params.directFlight ?? false),
-      OneStopFlight: Boolean(params.oneStop ?? false),
       JourneyType: Number(params.journeyType),
       Segments: segments,
+      DirectFlight: false,
+      OneStopFlight: false,
       Sources: null,
     };
 
     const { data } = await axios.post(
       `${cfg.base}${cfg.endpoints.flightSearch}`,
       payload,
-      { timeout: config.timeout },
+      {
+        timeout: config.timeout,
+        headers: this.getHeaders(cfg, token), // ✅ FIXED
+      }
     );
 
     return data;
   }
 
-  /* ---------------- FARE RULE ---------------- */
-  async getFareRule(traceId, resultIndex) {
-    if (!traceId || !resultIndex) {
-      throw new ApiError(400, "traceId and resultIndex are required");
-    }
-
-    // Dummy support
-    if (process.env.NODE_ENV !== "production") {
-      return {
-        FareRules: [
-          {
-            Airline: "AI",
-            Origin: "DEL",
-            Destination: "BOM",
-            FareBasisCode: "Y",
-            FareRestriction: "Non Refundable",
-            FareRuleDetail: [
-              "Cancellation fee applies",
-              "Reissue charges applicable",
-            ],
-          },
-        ],
-      };
-    }
-
-    // LIVE
-    return this.postLive(
-      "/BookingEngineService_Air/AirService.svc/rest/FareRule",
-      {
-        TraceId: traceId,
-        ResultIndex: resultIndex,
-      },
-      "live",
-    );
-  }
-
-  /* ---------------- FARE QUOTE ---------------- */
-  async getFareQuote(traceId, resultIndex) {
-    // 🔹 Dummy environment
-    if (process.env.NODE_ENV !== "production") {
-      return {
-        Status: 1,
-        TraceId: traceId,
-        Results: [
-          {
-            ResultIndex: resultIndex,
-            Fare: {
-              Currency: "INR",
-              BaseFare: 1250,
-              Tax: 645,
-              PublishedFare: 1895,
-              OfferedFare: 1895,
-            },
-            IsLCC: false,
-          },
-        ],
-      };
-    }
-
-    // 🔹 Live
-    return this.postLive(
-      config.live.endpoints.flightFareQuote,
-      {
-        TraceId: traceId,
-        ResultIndex: resultIndex,
-      },
-      "live",
-    );
-  }
-
-  /* ---------------- REAL SSR ---------------- */
-  async getSSR(traceId, resultIndex) {
-    // Dummy for non-production
-    if (process.env.NODE_ENV !== "production") {
-      return {
-        Status: 1,
-        TraceId: traceId,
-        Results: {
-          Baggage: [],
-          Meal: [],
-          Seat: [],
-        },
-      };
-    }
-
-    // LIVE SSR
-    return this.postLive(
-      config.live.endpoints.flightSSR,
-      {
-        TraceId: traceId,
-        ResultIndex: resultIndex,
-      },
-      "live",
-    );
-  }
-
-  /* ---------------- SEAT MAP ---------------- */
-  async getSeatMap(traceId, resultIndex) {
-    if (!traceId || !resultIndex) {
-      throw new ApiError(400, "traceId and resultIndex are required");
-    }
-
-    // 🔹 Dummy environment
-    if (process.env.NODE_ENV !== "production") {
-      return {
-        Status: 1,
-        TraceId: traceId,
-        SeatMap: [
-          {
-            SegmentIndex: 0,
-            Seats: [
-              {
-                Code: "12A",
-                SeatType: "WINDOW",
-                Price: 0,
-                IsBooked: false,
-                IsChargeable: false,
-              },
-              {
-                Code: "12B",
-                SeatType: "MIDDLE",
-                Price: 250,
-                IsBooked: false,
-                IsChargeable: true,
-              },
-            ],
-          },
-        ],
-      };
-    }
-
-    // 🔹 LIVE Seat Map
-    return this.postLive(
-      config.live.endpoints.flightSeatMap,
-      {
-        TraceId: traceId,
-        ResultIndex: resultIndex,
-      },
-      "live",
-    );
-  }
-
-  /* ---------------- FARE UPSELL ---------------- */
-  async getFareUpsell(traceId, resultIndex) {
-    if (!traceId || !resultIndex) {
-      throw new ApiError(400, "traceId and resultIndex are required");
-    }
-
-    // Dummy
-    if (process.env.NODE_ENV !== "production") {
-      return {
-        TraceId: traceId,
-        ResultIndex: resultIndex,
-        FareFamilies: [
-          {
-            code: "ECONOMY",
-            name: "Economy",
-            passengerType: 1,
-            price: 0,
-            services: [
-              {
-                code: "SEAT",
-                description: "Standard Seat",
-                included: true,
-              },
-            ],
-          },
-          {
-            code: "ECONOMY_PLUS",
-            name: "Economy Plus",
-            passengerType: 1,
-            price: 899,
-            services: [
-              {
-                code: "SEAT",
-                description: "Free Seat Selection",
-                included: true,
-              },
-              {
-                code: "BAG",
-                description: "Extra Baggage",
-                included: true,
-              },
-            ],
-          },
-        ],
-      };
-    }
-
-    // LIVE
-    const response = await this.postLive(
-      "/BookingEngineService_Air/AirService.svc/rest/FareUpsell",
-      { TraceId: traceId, ResultIndex: resultIndex },
-      "live",
-    );
-    const upsellList = response?.UpsellOptionsList?.UpsellList || [];
-
-    return {
-      TraceId: traceId,
-      ResultIndex: resultIndex,
-      FareFamilies: upsellList.map((u) => ({
-        code: u.FareFamilyCode,
-        name: u.FareFamilyName,
-        passengerType: u.PassengerType,
-        price: u.Price || 0,
-        services: (u.ServicesList || []).map((s) => ({
-          code: s.Code,
-          description: s.UpsellDescription,
-          included: s.IsIncluded,
-          chargeable: s.IsChargeable,
-        })),
-      })),
-    };
-  }
-
-  /* ---------------- BOOK (NON-LCC) ---------------- */
-  async bookFlight({ traceId, resultIndex, result, passengers, ssr }) {
-    if (!result) {
-      throw new ApiError(400, "Selected flight result is required");
-    }
-
-    if (typeof resultIndex !== "string") {
-      throw new ApiError(
-        500,
-        "Invalid ResultIndex passed to TBO Book API (must be string)",
-      );
-    }
-
-    if (!Array.isArray(result.FareBreakdown) || !result.FareBreakdown.length) {
-      throw new ApiError(400, "FareBreakdown missing");
-    }
-
-    const totalFareBreakdownCount = result.FareBreakdown.reduce(
-      (sum, fb) => sum + (Number(fb.PassengerCount) || 0),
-      0,
-    );
-
-    if (!result.IsLCC && totalFareBreakdownCount > 0) {
-      if (passengers.length !== totalFareBreakdownCount) {
-        throw new ApiError(
-          400,
-          `Passenger count (${passengers.length}) does not match FareBreakdown (${totalFareBreakdownCount})`,
-        );
-      }
-    }
-
-    // Map pax type to fare breakdown for non-LCC bookings
-    const paxTypeToFare = {};
-    result.FareBreakdown.forEach((fb) => {
-      paxTypeToFare[fb.PassengerType] = fb;
-    });
-
-    const getFareForPassenger = (p) => {
-      if (result.IsLCC) return result.FareBreakdown[0];
-
-      const paxType = (p.paxType || p.PaxType || "").toString().toUpperCase();
-      const tboCode =
-        paxType === "ADULT"
-          ? 1
-          : paxType === "CHILD"
-            ? 2
-            : paxType === "INFANT"
-              ? 3
-              : null;
-
-      return paxTypeToFare[tboCode] || result.FareBreakdown[0];
-    };
-
-    const payload = {
-      TraceId: traceId,
-      ResultIndex: resultIndex,
-      IsLCC: result.IsLCC,
-      Fare: result.Fare,
-      Passengers: passengers.map((p) => ({
-        ...this.mapPassenger(p),
-        Fare: getFareForPassenger(p),
-      })),
-      SSR:
-        ssr && (ssr.baggage?.length || ssr.meals?.length || ssr.seats?.length)
-          ? {
-              Baggage: ssr.baggage || [],
-              Meal: ssr.meals || [],
-              Seat: ssr.seats || [],
-            }
-          : null,
-    };
-
-    logger.info("TBO BOOK PAYLOAD", JSON.stringify(payload, null, 2));
-
-    const response = await this.postLive(
-      config.live.endpoints.flightBook,
-      payload,
-      "live",
-    );
-
-    if (response?.Response?.ResponseStatus !== 1) {
-      throw new ApiError(
-        400,
-        response?.Response?.Error?.ErrorMessage || "Booking failed",
-      );
-    }
-
-    const itinerary = response.Response?.FlightItinerary || {};
-
-    const segments = itinerary?.Segments?.flat() || [];
-
-    const hasNN = segments.some((s) => s.Status === "NN");
-    const hasHK = segments.every((s) => s.Status === "HK");
-
-    /* 🔁 HANDLE NN (WAIT & RETRY USING BOOKING DETAILS) */
-    if (hasNN) {
-      logger.warn("⚠️ NN STATUS DETECTED - WAITING FOR CONFIRMATION");
-
-      const pnr = itinerary?.PNR;
-
-      if (!pnr) {
-        throw new ApiError(500, "PNR missing for NN booking");
-      }
-
-      let attempts = 0;
-      const maxAttempts = 3;
-
-      while (attempts < maxAttempts) {
-        await new Promise((r) => setTimeout(r, 3000));
-
-        const details = await this.getBookingDetails(pnr);
-
-        const retrySegments =
-          details?.Response?.Response?.FlightItinerary?.Segments?.flat() || [];
-
-        const nowHK = retrySegments.every((s) => s.Status === "HK");
-
-        if (nowHK) {
-          logger.info("✅ STATUS UPDATED TO HK");
-
-          return {
-            bookingId: itinerary.BookingId,
-            pnr,
-            raw: details,
-          };
-        }
-
-        attempts++;
-      }
-
-      /* ❌ STILL NN AFTER RETRY */
-      throw new ApiError(400, `Flight not confirmed (still NN after retry)`);
-    }
-
-    return {
-      bookingId: itinerary.BookingId || null,
-      pnr: itinerary.PNR || null,
-      raw: response,
-    };
-  }
-
-  /* ---------------- TICKET ---------------- */
-  async ticketFlight({
-    traceId,
-    resultIndex,
-    bookingId,
-    pnr,
-    passengers,
-    isLCC,
-  }) {
-    let payload = {};
-
-    /* ================= LCC ================= */
-    if (isLCC) {
-      if (!traceId || !resultIndex) {
-        throw new ApiError(
-          400,
-          "traceId and resultIndex are required for LCC ticketing",
-        );
-      }
-
-      payload = {
-        TraceId: traceId,
-        ResultIndex: resultIndex,
-
-        // 🔥 MOST IMPORTANT FIX
-        Passengers: passengers.map((p) => ({
-          ...this.mapPassenger(p),
-
-          // 🔥 REQUIRED FOR LCC
-         Fare: {
-  BaseFare: p.fare?.BaseFare || 0,
-  Tax: p.fare?.Tax || 0,
-  YQTax: p.fare?.YQTax || 0,
-  AdditionalTxnFeePub: 0,
-  AdditionalTxnFeeOfrd: 0,
-  OtherCharges: 0,
-},
-        })),
-      };
-    } else {
-      /* ================= NON-LCC ================= */
-      if (!bookingId || !pnr) {
-        throw new ApiError(
-          400,
-          "BookingId and PNR required for Non-LCC ticketing",
-        );
-      }
-
-      payload = {
-        TraceId: traceId, // ✅ REQUIRED
-        BookingId: bookingId,
-        PNR: pnr,
-      };
-
-      /* 🔥 PASSPORT BLOCK (IMPORTANT) */
-      if (passengers?.length) {
-        payload.Passport = passengers.map((p, i) => ({
-          PaxId: p.paxId, // ⚠️ MUST come from BOOK RESPONSE
-          PassportNo: p.passportNo,
-          PassportIssueDate: p.PassportIssueDate,
-          PassportExpiry: p.passportExpiry,
-          DateOfBirth: p.dateOfBirth,
-        }));
-      }
-    }
-
-    logger.info("TBO TICKET PAYLOAD", payload);
-
-    const response = await this.postLive(
-      config.live.endpoints.flightTicket,
-      payload,
-      "live",
-    );
-
-    if (response?.Response?.ResponseStatus !== 1) {
-      throw new ApiError(
-        400,
-        response?.Response?.Error?.ErrorMessage || "Ticketing failed",
-      );
-    }
-
-    return response;
-  }
-  /* ---------------- BOOKING DETAILS ---------------- */
-  async getBookingDetails(pnr) {
-    if (!pnr) {
-      throw new ApiError(400, "PNR is required to fetch booking details");
-    }
-
-    return this.postLive(
-      config.live.endpoints.flightBookingDetails,
-      { PNR: pnr },
-      "live",
-    );
-  }
-
-  /* ---------------- PASSENGER MAPPER ---------------- */
-  // mapPassenger(pax) {
-  //   return {
-  //     Title: pax.title,
-  //     FirstName: pax.firstName,
-  //     LastName: pax.lastName,
-
-  //     PaxType:
-  //       pax.paxType === "ADULT" || pax.paxType === 1
-  //         ? 1
-  //         : pax.paxType === "CHILD" || pax.paxType === 2
-  //           ? 2
-  //           : 3,
-
-  //     DateOfBirth: pax.dateOfBirth
-  //       ? new Date(pax.dateOfBirth).toISOString().split("T")[0]
-  //       : null,
-
-  //     Gender: pax.gender === "Male" || pax.gender === 1 ? 1 : 2,
-
-  //     PassportNo: pax.passportNo || "",
-  //     PassportExpiry: pax.passportExpiry || "",
-
-  //     AddressLine1: "NA",
-  //     City: "DELHI",
-  //     CountryCode: "356",
-  //     CountryName: "India",
-
-  //     ContactNo: pax.contactNo,
-  //     Email: pax.email,
-  //     IsLeadPax: pax.isLeadPax === true,
-  //     Nationality: "IN",
-  //   };
-  // }
-
-  mapPassenger(pax) {
-    const nationalityCode = (pax.nationality || "IN").toUpperCase();
-    return {
-      Title: pax.title,
-      FirstName: pax.firstName,
-      LastName: pax.lastName,
-
-      PaxType:
-        pax.paxType === "ADULT" || pax.paxType === 1
-          ? 1
-          : pax.paxType === "CHILD" || pax.paxType === 2
-            ? 2
-            : 3,
-
-      DateOfBirth: pax.dateOfBirth
-        ? new Date(pax.dateOfBirth).toISOString().split("T")[0]
-        : null,
-
-      Gender:
-        pax.gender === "Male" || pax.gender === "MALE" || pax.gender === 1
-          ? 1
-          : 2,
-
-      PassportNo: pax.passportNo || "",
-      PassportIssueDate: pax.PassportIssueDate || "",
-      PassportExpiry: pax.passportExpiry || "",
-
-      PassportIssueCountryCode: nationalityCode,
-      PassportIssueCountry: nationalityCode,
-
-      /* ===============================
-       🔥 DYNAMIC ADDRESS SUPPORT
-    =============================== */
-
-      AddressLine1: pax.addressLine1 || pax.AddressLine1 || "NA",
-
-      City: pax.city || pax.City || "DELHI",
-
-      CountryCode: pax.countryCode || pax.CountryCode || "IN",
-
-      CountryName: pax.countryName || pax.CountryName || "India",
-
-      /* =============================== */
-
-      ContactNo: pax.contactNo,
-      Email: pax.email,
-      IsLeadPax: pax.isLeadPax === true,
-      Nationality: nationalityCode,
-    };
-  }
-
-  /* ---------------- LIVE POST ---------------- */
+  /* ---------------- COMMON POST ---------------- */
   async postLive(endpoint, payload, type = "live") {
+    const cfg = config[type];
     const token = await this.getToken(type);
 
     try {
       const { data } = await axios.post(
-        `${type === "live" ? config.live.base : config.dummy.base}${endpoint}`,
+        `${cfg.base}${endpoint}`,
         {
-          EndUserIp:
-            type === "live" ? config.live.endUserIp : config.dummy.endUserIp,
+          EndUserIp: cfg.endUserIp,
           TokenId: token,
           ...payload,
         },
-        { timeout: config.timeout },
+        {
+          timeout: config.timeout,
+          headers: this.getHeaders(cfg, token), // ✅ FIXED
+        }
       );
+
       return data;
     } catch (err) {
-      logger.error("TBO ERROR", {
-        status: err.response?.status,
-        data: err.response?.data,
-        payload,
-      });
+      const errorMsg =
+        err.response?.data?.Error?.ErrorMessage ||
+        err.response?.data?.Response?.Error?.ErrorMessage;
+
+      // 🔥 AUTO RETRY ON TOKEN EXPIRE
+      if (errorMsg?.includes("Invalid Token")) {
+        this.tokens[type] = { value: null, expiry: 0 };
+
+        const newToken = await this.getToken(type);
+
+        const { data } = await axios.post(
+          `${cfg.base}${endpoint}`,
+          {
+            EndUserIp: cfg.endUserIp,
+            TokenId: newToken,
+            ...payload,
+          },
+          {
+            headers: this.getHeaders(cfg, newToken),
+          }
+        );
+
+        return data;
+      }
+
+      logger.error("TBO ERROR", err.response?.data || err.message);
 
       throw new ApiError(
         500,
-        err.response?.data?.Response?.Error?.ErrorMessage ||
-          err.response?.data?.Error?.ErrorMessage ||
-          "TBO live request failed",
+        errorMsg || "TBO request failed"
       );
     }
+  }
+
+  /* ---------------- FARE QUOTE ---------------- */
+  async getFareQuote(traceId, resultIndex) {
+    return this.postLive(config.live.endpoints.flightFareQuote, {
+      TraceId: traceId,
+      ResultIndex: resultIndex,
+    });
+  }
+
+  /* ---------------- SSR ---------------- */
+  async getSSR(traceId, resultIndex) {
+    return this.postLive(config.live.endpoints.flightSSR, {
+      TraceId: traceId,
+      ResultIndex: resultIndex,
+    });
+  }
+
+  /* ---------------- BOOK ---------------- */
+  async bookFlight(payload) {
+    return this.postLive(config.live.endpoints.flightBook, payload);
+  }
+
+  /* ---------------- TICKET ---------------- */
+  async ticketFlight(payload) {
+    return this.postLive(config.live.endpoints.flightTicket, payload);
   }
 }
 
