@@ -1381,8 +1381,8 @@ exports.downloadTicketPdf = asyncHandler(async (req, res) => {
 
 exports.getMyBookings = asyncHandler(async (req, res) => {
   const {
-    page = 1,
-    limit = 100,
+    // page = 1,
+    // limit = 100,
     bookingType = "flight",
     executionStatus,
     requestStatus,
@@ -1406,7 +1406,7 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
     query.requestStatus = requestStatus;
   }
 
-  const skip = (Number(page) - 1) * Number(limit);
+  // const skip = (Number(page) - 1) * Number(limit);
 
   /* ================= FETCH DATA ================= */
   const [rawBookings, total] = await Promise.all([
@@ -1427,8 +1427,8 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
       `,
       )
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit))
+      // .skip(skip)
+      // .limit(Number(limit))
       .lean(),
 
     BookingRequest.countDocuments(query),
@@ -1479,8 +1479,8 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
         bookings,
         pagination: {
           total,
-          page: Number(page),
-          pages: Math.ceil(total / limit),
+          // page: Number(page),
+          // pages: Math.ceil(total / limit),
         },
       },
       "Flight bookings fetched successfully",
@@ -1610,8 +1610,8 @@ exports.getMyBookingById = asyncHandler(async (req, res) => {
 // @access  Private
 exports.getAllBookings = asyncHandler(async (req, res) => {
   const {
-    page = 1,
-    limit = 10,
+    // page = 1,
+    // limit = 10,
     status,
     bookingType,
     dateFrom,
@@ -1633,12 +1633,12 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
     if (dateTo) query.createdAt.$lte = new Date(dateTo);
   }
 
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+  // const skip = (parseInt(page) - 1) * parseInt(limit);
 
   const bookings = await Booking.find(query)
     .populate("userId", "name email")
-    .skip(skip)
-    .limit(parseInt(limit))
+    // .skip(skip)
+    // .limit(parseInt(limit))
     .sort({ createdAt: -1 });
 
   const total = await Booking.countDocuments(query);
@@ -1650,8 +1650,8 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
         bookings,
         pagination: {
           total,
-          page: parseInt(page),
-          pages: Math.ceil(total / limit),
+          // page: parseInt(page),
+          // pages: Math.ceil(total / limit),
         },
       },
       "Bookings fetched successfully",

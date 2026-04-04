@@ -174,7 +174,7 @@ export default function HotelSearchPage() {
   const [checkOut, setCheckOut] = useState("");
   const [rooms, setRooms] = useState(1);
   const [roomConfigs, setRoomConfigs] = useState([
-    { adults: 2, children: 0, childrenAges: [] },
+    { adults: 1, children: 0, childrenAges: [] },
   ]);
   const [showGuestDropdown, setShowGuestDropdown] = useState(false);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);

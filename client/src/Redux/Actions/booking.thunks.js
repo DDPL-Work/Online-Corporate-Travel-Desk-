@@ -85,14 +85,14 @@ export const executeApprovedFlightBooking = createAsyncThunk(
 export const fetchMyBookings = createAsyncThunk(
   "bookings/fetchMyBookings",
   async (
-    { page = 1, limit = 100, requestStatus, executionStatus, bookingType } = {},
+    {  requestStatus, executionStatus, bookingType } = {},
     { rejectWithValue },
   ) => {
     try {
       const { data } = await api.get("/bookings/my-bookings", {
         params: {
-          page,
-          limit,
+          // page,
+          // limit,
           requestStatus,
           executionStatus,
           bookingType,
