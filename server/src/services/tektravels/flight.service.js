@@ -68,9 +68,10 @@ class FlightService {
         throw new Error(data?.Error?.ErrorMessage || "Auth failed");
       }
 
+      // TBO tokens are short‑lived (typically 20–30 minutes). Cache for 25 minutes to avoid “Invalid Token”.
       this.tokens[type] = {
         value: data.TokenId || data.Token,
-        expiry: Date.now() + 24 * 60 * 60 * 1000,
+        expiry: Date.now() + 25 * 60 * 1000,
       };
 
       return this.tokens[type].value;
@@ -193,11 +194,26 @@ class FlightService {
       Sources: null,
     };
 
-    const { data } = await axios.post(
-      `${cfg.base}${cfg.endpoints.flightSearch}`,
-      payload,
-      { timeout: config.timeout },
-    );
+    const doSearch = async () =>
+      axios.post(
+        `${cfg.base}${cfg.endpoints.flightSearch}`,
+        payload,
+        { timeout: config.timeout },
+      );
+
+    let { data } = await doSearch();
+
+    // Auto-retry once on Invalid Token from TBO
+    if (
+      data?.Response?.ResponseStatus === 4 &&
+      data?.Response?.Error?.ErrorCode === 6
+    ) {
+      // force refresh token
+      this.tokens[env] = { value: null, expiry: 0 };
+      const freshToken = await this.getToken(env);
+      payload.TokenId = freshToken;
+      ({ data } = await doSearch());
+    }
 
     return data;
   }

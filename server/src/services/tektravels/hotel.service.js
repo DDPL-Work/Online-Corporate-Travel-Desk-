@@ -48,7 +48,7 @@ class HotelService {
 
       this.tokens[type] = {
         value: data.TokenId || data.Token,
-        expiry: Date.now() + 23 * 60 * 60 * 1000,
+        expiry: Date.now() + 25 * 60 * 1000,
       };
 
       return this.tokens[type].value;
@@ -161,6 +161,42 @@ class HotelService {
       throw new ApiError(500, "TBO token API failed");
     }
   }
+
+  async basicAuthPost(endpoint, payload, baseType = "base") {
+  const env = this.getEnv();
+  const cfg = config[env];
+
+  const base64Auth = Buffer.from(
+    `${cfg.credentials.username}:${cfg.credentials.password}`
+  ).toString("base64");
+
+  try {
+    const { data } = await axios.post(
+      `${cfg[baseType]}${endpoint}`,
+      {
+        EndUserIp: cfg.endUserIp,
+        ...payload, // ❗ NO TokenId here
+      },
+      {
+        timeout: config.timeout,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Basic ${base64Auth}`, // ✅ ONLY THIS AUTH
+          ClientId: cfg.credentials.clientId,
+        },
+      }
+    );
+
+    return data;
+  } catch (err) {
+    console.log(
+      "HOTEL BOOK ERROR:",
+      JSON.stringify(err.response?.data, null, 2)
+    );
+    throw new ApiError(500, "TBO hotel booking failed");
+  }
+}
 
   /* =====================================================
      STATIC SERVICES
@@ -311,7 +347,7 @@ class HotelService {
      HOTEL BOOK (base)
   ====================================================== */
   async bookHotel(payload) {
-    return this.tokenPost(
+    return this.basicAuthPost(
       config[this.getEnv()].endpoints.hotelBook,
       payload,
       "base",

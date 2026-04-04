@@ -545,7 +545,7 @@ if (totalGuestsFromRooms !== totalTravellers) {
     let adultIdx = 0;
     let childIdx = 0;
 
-    const HotelRoomsDetails = roomGuests.map((room) => {
+    const HotelRoomsDetails = roomGuests.map((room, idx) => {
       const passengers = [];
 
       // Adults first
@@ -562,6 +562,7 @@ const phone = rawPhone.slice(-10);
         const passenger = {
           Title: traveller.title,
           FirstName: traveller.firstName,
+          MiddleName: traveller.middleName || "",
           LastName: traveller.lastName,
           Email: traveller.email || leadTraveller.email,
           // Phoneno: String(traveller.phoneWithCode || "").replace(/\D/g, ""),
@@ -574,9 +575,9 @@ const phone = rawPhone.slice(-10);
 
           // 🔥 PAN Card for domestic bookings
           PAN: traveller.panCard || bookingPAN,
-          PassportNo: traveller.PassportNo || "",
-          PassportIssueDate: traveller.PassportIssueDate || "",
-          PassportExpDate: traveller.PassportExpDate || "",
+          PassportNo: traveller.PassportNo || null,
+          PassportIssueDate: traveller.PassportIssueDate || null,
+          PassportExpDate: traveller.PassportExpDate || null,
         };
 
         if (traveller.age) passenger.Age = parseInt(traveller.age);
@@ -593,15 +594,16 @@ const phone = rawPhone.slice(-10);
         const passenger = {
           Title: traveller.title || "Master",
           FirstName: traveller.firstName,
+          MiddleName: traveller.middleName || "",
           LastName: traveller.lastName,
           PaxType: 2,
           LeadPassenger: false,
           Email: null,
           Phoneno: String(leadTraveller.phoneWithCode || "").replace(/\D/g, "").slice(-10),
           PAN: bookingPAN,
-          PassportNo: traveller.PassportNo || "",
-          PassportIssueDate: traveller.PassportIssueDate || "",
-          PassportExpDate: traveller.PassportExpDate || "",
+          PassportNo: traveller.PassportNo || null,
+          PassportIssueDate: traveller.PassportIssueDate || null,
+          PassportExpDate: traveller.PassportExpDate || null,
         };
 
         const ages = room.childAge || [];
@@ -614,6 +616,8 @@ const phone = rawPhone.slice(-10);
       }
 
       return {
+        // TBO expects RoomIndex (1-based) alongside passengers
+        RoomIndex: idx + 1,
         HotelPassenger: passengers,
       };
     });
@@ -623,9 +627,13 @@ const phone = rawPhone.slice(-10);
       IsVoucherBooking: true,
       GuestNationality: booking.hotelRequest?.guestNationality || "IN",
       EndUserIp: process.env.TBO_END_USER_IP,
-      RequestedBookingMode: 5,
+      // RequestedBookingMode: 5, // optional; omit to mirror Postman success cases
       NetAmount: netAmount,
       ClientReferenceId: booking.bookingReference,
+      TraceId:
+        preBookResp?.TraceId ||
+        booking.hotelRequest?.traceId ||
+        booking.hotelRequest?.TraceId,
 
       HotelRoomsDetails,
     });
@@ -728,7 +736,7 @@ const phone = rawPhone.slice(-10);
 // @route   GET /api/v1/hotel-bookings/my
 // @access  Private (Employee)
 exports.getMyHotelBookings = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10 } = req.query;
+  // const { page = 1, limit = 10 } = req.query;
 
   const query = {
     userId: req.user._id,
@@ -736,7 +744,7 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
     executionStatus: { $in: ["voucher_generated"] }, // ✅ FIXED
   };
 
-  const skip = (Number(page) - 1) * Number(limit);
+  // const skip = (Number(page) - 1) * Number(limit);
 
   const [rawBookings, total] = await Promise.all([
     HotelBookingRequest.find(query)
@@ -756,8 +764,8 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
   `,
       )
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit))
+      // .skip(skip)
+      // .limit(Number(limit))
       .lean(),
     HotelBookingRequest.countDocuments(query),
   ]);
@@ -805,18 +813,18 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
     };
   });
 
-  const pagination = {
-    total,
-    page: Number(page),
-    pages: Math.ceil(total / limit),
-  };
+  // const pagination = {
+  //   total,
+  //   // page: Number(page),
+  //   // pages: Math.ceil(total / limit),
+  // };
 
   res.status(200).json({
     success: true,
     message: "Hotel bookings fetched successfully",
     data: {
       bookings,
-      pagination,
+      // pagination,
     },
   });
 });
