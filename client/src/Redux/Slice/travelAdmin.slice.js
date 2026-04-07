@@ -162,7 +162,7 @@ const adminBookingSlice = createSlice({
           // ✅ update UI instantly
           emp.isActive = isActive;
 
-          // optional (if employee.status मौजूद है frontend में)
+          // optional (if employee.status is available on frontend side)
           emp.status = isActive ? "active" : "inactive";
         }
       })

@@ -28,6 +28,8 @@ import { FareDetailsModal } from "./FareDetailsModal";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { getMyTravelAdmin } from "../../../Redux/Actions/employee.thunks";
 import api from "../../../API/axios";
+import { selectManager } from "../../../Redux/Actions/manager.thunk";
+import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
 
 // ✅ NORMALIZE FULL FARE RULE API RESPONSE (FareRule API)
 const normalizeFareRules = (fareRule) => {
@@ -74,10 +76,12 @@ export default function RoundTripFlightBooking() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  if (!location.state) {
-    navigate("/search-flight", { replace: true });
-    return null;
-  }
+  const hasState = Boolean(location.state);
+  useEffect(() => {
+    if (!hasState) {
+      navigate("/search-flight", { replace: true });
+    }
+  }, [hasState, navigate]);
 
   const {
     selectedFlight,
@@ -142,6 +146,10 @@ export default function RoundTripFlightBooking() {
 
   const [travelerErrors, setTravelerErrors] = useState({});
   const [purposeOfTravel, setPurposeOfTravel] = useState("");
+  const [projectApproverData, setProjectApproverData] = useState({
+    project: null,
+    approver: null,
+  });
   const [gstDetails, setGstDetails] = useState({
     gstin: "",
     legalName: "",
@@ -1128,6 +1136,14 @@ export default function RoundTripFlightBooking() {
 
     return {
       bookingType: "flight",
+      projectName: projectApproverData.project?.name,
+      projectId: projectApproverData.project?.id,
+      projectClient: projectApproverData.project?.client,
+      projectCodeId: projectApproverData.project?.id,
+      approverId: projectApproverData.approver?.id,
+      approverEmail: projectApproverData.approver?.email,
+      approverName: projectApproverData.approver?.name,
+      approverRole: projectApproverData.approver?.role,
       flightRequest: {
         // traceId: searchParams.traceId,
         traceId,
@@ -1312,18 +1328,18 @@ export default function RoundTripFlightBooking() {
   };
 
   const handleSendForApproval = async () => {
-    if (!approver) {
-      ToastWithTimer({
-        type: "error",
-        message: "No approver assigned. Please contact admin.",
-      });
-      return;
-    }
-
     if (!purposeOfTravel) {
       ToastWithTimer({
         type: "error",
         message: "Please enter purpose of travel",
+      });
+      return;
+    }
+
+    if (!projectApproverData.project || !projectApproverData.approver) {
+      ToastWithTimer({
+        type: "error",
+        message: "Please select a project and approver",
       });
       return;
     }
@@ -1339,6 +1355,16 @@ export default function RoundTripFlightBooking() {
 
     try {
       const payload = buildBookingRequestPayload();
+      await dispatch(
+        selectManager({
+          approverId: projectApproverData.approver?.id,
+          approverEmail: projectApproverData.approver?.email,
+          projectCodeId: projectApproverData.project?.id,
+          projectName: projectApproverData.project?.name,
+          projectClient: projectApproverData.project?.client,
+        }),
+      ).unwrap();
+
       await dispatch(createBookingRequest(payload)).unwrap();
 
       navigate("/my-bookings", {
@@ -1364,6 +1390,52 @@ export default function RoundTripFlightBooking() {
     "RETURN PRICE LIST:",
     rawFlightData?.tripInfos?.RETURN?.[0]?.totalPriceList,
   );
+
+  // Readiness check for submit button (must stay before any early returns)
+  const isFormReady = useMemo(() => {
+    if (!purposeOfTravel?.trim()) return false;
+    if (!projectApproverData.project || !projectApproverData.approver) return false;
+    if (infantCount > adultCount) return false;
+
+    const isIntl = Boolean(
+      parsedFlightData?.segments?.some(
+        (s) =>
+          s?.origin?.country &&
+          s?.destination?.country &&
+          s.origin.country !== s.destination.country,
+      ),
+    );
+
+    for (let i = 0; i < travelers.length; i++) {
+      const t = travelers[i];
+      if (!t.firstName?.trim() || !t.lastName?.trim()) return false;
+      if (!t.gender) return false;
+      if (!t.email?.trim()) return false;
+      if (!t.phoneWithCode?.trim()) return false;
+      if (!t.dob) return false;
+
+      if (t.type === "INFANT") {
+        if (
+          typeof t.linkedAdultIndex !== "number" ||
+          t.linkedAdultIndex < 0 ||
+          t.linkedAdultIndex >= adultCount
+        ) {
+          return false;
+        }
+      }
+
+      if (isIntl && !t.passportNumber?.trim()) return false;
+    }
+
+    return true;
+  }, [
+    purposeOfTravel,
+    projectApproverData,
+    infantCount,
+    adultCount,
+    travelers,
+    parsedFlightData,
+  ]);
 
   if (loading) {
     return (
@@ -1405,6 +1477,7 @@ export default function RoundTripFlightBooking() {
     (t) => (t.type || "ADULT") !== "INFANT",
   );
 
+  // Readiness check for submit button
   return (
     <div className="min-h-screen bg-slate-50 font-[DM Sans]">
       <EmployeeHeader />
@@ -1703,6 +1776,7 @@ export default function RoundTripFlightBooking() {
           {/* RIGHT SIDEBAR */}
           <div className="lg:col-span-1">
             <div className="sticky top-6 space-y-6">
+              <ProjectApproverBlock onChange={setProjectApproverData} />
               <PriceSummary
                 parsedFlightData={{
                   baseFare: uiTotalFare,
@@ -1719,6 +1793,7 @@ export default function RoundTripFlightBooking() {
                 approverError={approverError}
                 onSendForApproval={handleSendForApproval}
                 loading={actionLoading}
+                disabled={!isFormReady}
               />
 
               <Amenities />

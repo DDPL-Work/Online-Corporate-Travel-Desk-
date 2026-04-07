@@ -971,10 +971,6 @@ export default function MyTeam() {
             of <strong className="text-slate-600">{filtered.length}</strong>{" "}
             reportees
           </span>
-          <span>
-            Logged in as:{" "}
-            <strong className="text-[#0A4D68]">Rajesh Kumar</strong>
-          </span>
         </div>
 
         <Pagination

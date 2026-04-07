@@ -12,11 +12,13 @@ import {
   FiSearch,
   FiAlertTriangle,
   FiList,
+  FiRefreshCw,
 } from "react-icons/fi";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import {
   getRejectedHotelRequests,
+  getRejectedFlightRequests,
 } from "../../Redux/Actions/manager.thunk";
 import {
   formatDate,
@@ -57,7 +59,8 @@ function normalize(rejectedRequests) {
       employeeMail: employeeEmail,
 
       department: "N/A",
-      type: r.bookingType === "flight" ? "Flight" : "Hotel",
+      type:
+        r.bookingType === "flight" || r.flightRequest ? "Flight" : "Hotel",
 
       destination: r.hotelRequest?.selectedHotel?.hotelName || "N/A",
 
@@ -614,22 +617,41 @@ export default function RejectedTravelRequestsForManager() {
   const [activeTab, setActiveTab] = useState("flight");
 
   const dispatch = useDispatch();
-  const rejectedRequests = useSelector(
-  (state) => state.manager.rejectedHotelRequests
-);
+  const {
+    rejectedHotelRequests,
+    rejectedFlightRequests,
+    loadingRejectedRequests,
+    loadingRejectedFlightRequests,
+  } = useSelector((state) => state.manager);
 
-const loading = useSelector(
-  (state) => state.manager.loadingRejectedRequests
-);
-
-useEffect(() => {
-  dispatch(getRejectedHotelRequests());
-}, [dispatch]);
+  useEffect(() => {
+    if (activeTab === "flight") {
+      dispatch(getRejectedFlightRequests());
+    } else {
+      dispatch(getRejectedHotelRequests());
+    }
+  }, [activeTab, dispatch]);
 
   const allRequests = useMemo(
-    () => normalize(rejectedRequests),
-    [rejectedRequests],
+    () => normalize([
+      ...(rejectedFlightRequests || []),
+      ...(rejectedHotelRequests || []),
+    ]),
+    [rejectedFlightRequests, rejectedHotelRequests],
   );
+
+  const loadingActive =
+    activeTab === "flight"
+      ? loadingRejectedFlightRequests
+      : loadingRejectedRequests;
+
+  const handleRefresh = () => {
+    if (activeTab === "flight") {
+      dispatch(getRejectedFlightRequests());
+      return;
+    }
+    dispatch(getRejectedHotelRequests());
+  };
 
   const tabs = [
     {
@@ -664,6 +686,14 @@ useEffect(() => {
               Review and analyze all rejected or cancelled travel requests
             </p>
           </div>
+          <button
+            onClick={handleRefresh}
+            disabled={loadingActive}
+            className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-slate-800 hover:border-slate-300 disabled:opacity-50"
+          >
+            <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
+            Refresh
+          </button>
         </div>
 
         {/* Tab Bar */}
@@ -692,9 +722,15 @@ useEffect(() => {
 
         {/* Tab Content */}
         {activeTab === "flight" ? (
-          <FlightSection allRequests={allRequests} loading={loading} />
+          <FlightSection
+            allRequests={allRequests}
+            loading={loadingRejectedFlightRequests}
+          />
         ) : (
-          <HotelSection allRequests={allRequests} loading={loading} />
+          <HotelSection
+            allRequests={allRequests}
+            loading={loadingRejectedRequests}
+          />
         )}
       </div>
     </div>

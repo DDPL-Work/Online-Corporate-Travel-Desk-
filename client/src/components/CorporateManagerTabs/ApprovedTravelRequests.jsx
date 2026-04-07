@@ -7,8 +7,12 @@ import {
   FiClock,
   FiDollarSign,
   FiX,
+  FiRefreshCw,
 } from "react-icons/fi";
-import { getApprovedHotelRequests } from "../../Redux/Actions/manager.thunk";
+import {
+  getApprovedHotelRequests,
+  getApprovedFlightRequests,
+} from "../../Redux/Actions/manager.thunk";
 import {
   FlightBookingModal,
   HotelBookingModal,
@@ -609,18 +613,29 @@ export default function ApprovedTravelRequestsForManager() {
   const [traceTimers, setTimers] = useState({});
 
   const dispatch = useDispatch();
-  const { approvedHotelRequests, loadingApprovedRequests } = useSelector(
-    (state) => state.manager,
-  );
+  const {
+    approvedHotelRequests,
+    loadingApprovedRequests,
+    approvedFlightRequests,
+    loadingApprovedFlightRequests,
+  } = useSelector((state) => state.manager);
 
   useEffect(() => {
-    dispatch(getApprovedHotelRequests());
-  }, [dispatch]);
+    if (activeTab === "flight") {
+      dispatch(getApprovedFlightRequests());
+    } else {
+      dispatch(getApprovedHotelRequests());
+    }
+  }, [activeTab, dispatch]);
 
   useEffect(() => {
+    if (!approvedFlightRequests?.length) {
+      setTimers({});
+      return undefined;
+    }
     const interval = setInterval(() => {
       const updated = {};
-      approvedHotelRequests.forEach((a) => {
+      approvedFlightRequests.forEach((a) => {
         const exp = a.flightRequest?.fareExpiry;
         if (!exp) return;
         const diff = new Date(exp.$date || exp) - new Date();
@@ -636,11 +651,24 @@ export default function ApprovedTravelRequestsForManager() {
       setTimers(updated);
     }, 1000);
     return () => clearInterval(interval);
-  }, [approvedHotelRequests]);
+  }, [approvedFlightRequests]);
 
-  const flightCount = 0; // ❗ you are not fetching flight approved
+  const flightCount = approvedFlightRequests.length;
 
   const hotelCount = approvedHotelRequests.length;
+
+  const loadingActive =
+    activeTab === "flight"
+      ? loadingApprovedFlightRequests
+      : loadingApprovedRequests;
+
+  const handleRefresh = () => {
+    if (activeTab === "flight") {
+      dispatch(getApprovedFlightRequests());
+      return;
+    }
+    dispatch(getApprovedHotelRequests());
+  };
 
   const tabs = [
     {
@@ -679,6 +707,14 @@ export default function ApprovedTravelRequestsForManager() {
               </span>
             </p>
           </div>
+          <button
+            onClick={handleRefresh}
+            disabled={loadingActive}
+            className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-slate-800 hover:border-slate-300 disabled:opacity-50"
+          >
+            <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
+            Refresh
+          </button>
         </div>
 
         <div className="flex items-end gap-0 mb-5 border-b-2 border-slate-200">
@@ -704,9 +740,9 @@ export default function ApprovedTravelRequestsForManager() {
 
         {activeTab === "flight" ? (
           <FlightApprovalsSection
-            rawApprovals={[]} // ✅ no flight data yet
+            rawApprovals={approvedFlightRequests}
             traceTimers={traceTimers}
-            loading={false}
+            loading={loadingApprovedFlightRequests}
           />
         ) : (
           <HotelApprovalsSection

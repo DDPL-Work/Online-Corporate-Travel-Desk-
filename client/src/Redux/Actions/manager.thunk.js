@@ -59,6 +59,23 @@ export const getPendingHotelRequests = createAsyncThunk(
   }
 );
 
+export const getPendingFlightRequests = createAsyncThunk(
+  "manager/getPendingFlightRequests",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.get(
+        "/corporate-manager/flight/pending-requests",
+        { withCredentials: true }
+      );
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data || { message: "Failed to fetch flight requests" }
+      );
+    }
+  }
+);
+
 
 // 🔥 NEW: Get employees who selected me as manager
 export const getMyEmployees = createAsyncThunk(
@@ -99,6 +116,23 @@ export const getApprovedHotelRequests = createAsyncThunk(
   }
 );
 
+export const getApprovedFlightRequests = createAsyncThunk(
+  "manager/getApprovedFlightRequests",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.get(
+        "/corporate-manager/flight/approved-requests",
+        { withCredentials: true }
+      );
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data || { message: "Failed to fetch approved flight requests" }
+      );
+    }
+  }
+);
+
 export const getRejectedHotelRequests = createAsyncThunk(
   "manager/getRejectedHotelRequests",
   async (_, { rejectWithValue }) => {
@@ -112,6 +146,23 @@ export const getRejectedHotelRequests = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(
         err.response?.data || { message: "Failed to fetch rejected requests" }
+      );
+    }
+  }
+);
+
+export const getRejectedFlightRequests = createAsyncThunk(
+  "manager/getRejectedFlightRequests",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.get(
+        "/corporate-manager/flight/rejected-requests",
+        { withCredentials: true }
+      );
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data || { message: "Failed to fetch rejected flight requests" }
       );
     }
   }
@@ -131,6 +182,25 @@ export const getTeamExecutedHotelRequests = createAsyncThunk(
       return rejectWithValue(
         err.response?.data || {
           message: "Failed to fetch executed approved requests",
+        }
+      );
+    }
+  }
+);
+
+export const getTeamExecutedFlightRequests = createAsyncThunk(
+  "manager/getExecutedApprovedFlightRequests",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.get(
+        "/corporate-manager/flight/team-executed-requests",
+        { withCredentials: true }
+      );
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data || {
+          message: "Failed to fetch executed approved flight requests",
         }
       );
     }

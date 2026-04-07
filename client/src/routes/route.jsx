@@ -64,6 +64,7 @@ import BookingsDashboardForManager from "../components/CorporateManagerTabs/Tota
 import CancelledBookingsForManager from "../components/CorporateManagerTabs/CancelledBookings";
 import UpcomingTripsForManager from "../components/CorporateManagerTabs/UpcomingTrips";
 import EmployeeManagement from "../components/TravelAdminTabs/EmployeeManagement";
+// import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 
 export const appRouter = createBrowserRouter([
   {
@@ -213,6 +214,7 @@ export const appRouter = createBrowserRouter([
       { path: "/who-it's-for/independent", element: <Independent /> },
       { path: "/who-it's-for/growing-business", element: <GrowingBusiness /> },
       { path: "/who-it's-for/small-business", element: <SmallBusiness /> },
+      // { path: "/who-it's-for/mid-size-business", element: <MidSizeLanding /> },
       { path: "/platform/flight-booking-info", element: <FlightBookingInfo /> },
       { path: "/platform/hotel-booking-info", element: <HotelBookingInfo /> },
       {

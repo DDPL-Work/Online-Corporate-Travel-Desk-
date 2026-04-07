@@ -110,6 +110,25 @@ function SearchDropdown({ placeholder, items, onSelect, renderItem, renderSelect
 /*  Main Block                                                      */
 /* ─────────────────────────────────────────────────────────────── */
 export function ProjectApproverBlock({ onChange }) {
+  const getDisplayName = (item) => {
+    if (!item) return "Unnamed";
+    if (typeof item.name === "string") return item.name || "Unnamed";
+    return `${item.name?.firstName || ""} ${item.name?.lastName || ""}`.trim() || "Unnamed";
+  };
+
+  const getInitials = (item) => {
+    const nameStr = getDisplayName(item);
+    return (
+      nameStr
+        .split(" ")
+        .filter(Boolean)
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || "NA"
+    );
+  };
+
   // Project state
   const [selectedProject, setSelectedProject] = useState(null);
   const [manualProject, setManualProject] = useState(false);
@@ -297,30 +316,49 @@ export function ProjectApproverBlock({ onChange }) {
             <>
               <SearchDropdown
                 placeholder="Search manager by name or email…"
-                items={employees.map(e => ({ id: e.userId || e._id, userId: e.userId, employeeId: e._id, name: e.name, email: e.email, role: e.role }))}
+                items={employees.map(e => ({
+                  id: e.userId || e._id,
+                  userId: e.userId,
+                  employeeId: e._id,
+                  name: e.name,
+                  email: e.email,
+                  role: e.role,
+                }))}
                 selectedItem={selectedApprover}
                 onSelect={setSelectedApprover}
-                filterFn={(item, q) =>
-                  item.name.toLowerCase().includes(q.toLowerCase()) ||
-                  item.email.toLowerCase().includes(q.toLowerCase())
-                }
+                filterFn={(item, q) => {
+                  const nameStr =
+                    typeof item.name === "string"
+                      ? item.name
+                      : `${item.name?.firstName || ""} ${item.name?.lastName || ""}`.trim();
+                  return (
+                    nameStr.toLowerCase().includes(q.toLowerCase()) ||
+                    (item.email || "").toLowerCase().includes(q.toLowerCase())
+                  );
+                }}
                 renderItem={(item) => (
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center text-[11px] font-bold text-violet-700 shrink-0">
-                      {item.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      {getInitials(item)}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[13px] font-semibold text-slate-700">{item.name}</p>
-                      <p className="text-[11px] text-slate-400 truncate">{item.email} · {item.role}</p>
+                      <p className="text-[13px] font-semibold text-slate-700">
+                        {getDisplayName(item)}
+                      </p>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        {item.email} · {item.role}
+                      </p>
                     </div>
                   </div>
                 )}
                 renderSelected={(item) => (
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-5 h-5 rounded-full bg-violet-100 flex items-center justify-center text-[9px] font-bold text-[#0A4D68] shrink-0">
-                      {item.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      {getInitials(item)}
                     </div>
-                    <span className="text-[13px] font-semibold text-slate-700 truncate">{item.name}</span>
+                    <span className="text-[13px] font-semibold text-slate-700 truncate">
+                      {getDisplayName(item)}
+                    </span>
                     <span className="text-[11px] text-slate-400 truncate hidden sm:block">· {item.role}</span>
                   </div>
                 )}
@@ -329,10 +367,12 @@ export function ProjectApproverBlock({ onChange }) {
                 <div className="flex items-center justify-between bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-full bg-violet-200 flex items-center justify-center text-[11px] font-bold text-[#0A4D68] shrink-0">
-                      {selectedApprover.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      {getInitials(selectedApprover)}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[13px] font-bold text-[#0A4D68]">{selectedApprover.name}</p>
+                      <p className="text-[13px] font-bold text-[#0A4D68]">
+                        {getDisplayName(selectedApprover)}
+                      </p>
                       <p className="text-[11px] text-[#0A4D68]/50 truncate">{selectedApprover.email}</p>
                     </div>
                   </div>

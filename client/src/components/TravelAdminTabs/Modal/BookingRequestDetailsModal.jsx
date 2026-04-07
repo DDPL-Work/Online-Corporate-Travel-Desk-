@@ -273,7 +273,7 @@ const currency = allRooms[0]?.price?.currency || "INR";
                     className="border border-slate-200 rounded-2xl overflow-hidden"
                   >
                     {/* Room header */}
-                    <div className="bg-gradient-to-r from-[#088395]/10 to-slate-50 px-5 py-3 flex items-center justify-between border-b border-slate-200">
+                    <div className="bg-linear-to-r from-[#088395]/10 to-slate-50 px-5 py-3 flex items-center justify-between border-b border-slate-200">
                       <div className="flex items-center gap-2">
                         <span className="w-6 h-6 rounded-full bg-[#088395] text-white text-[11px] font-black flex items-center justify-center shrink-0">
                           {idx + 1}

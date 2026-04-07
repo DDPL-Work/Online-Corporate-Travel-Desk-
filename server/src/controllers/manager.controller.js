@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Employee = require('../models/Employee');
 const ManagerRequest = require('../models/ManagerRequest');
 const HotelBookingRequest = require('../models/hotelBookingRequest.model');
+const BookingRequest = require('../models/BookingRequest');
 
 exports.handleManagerSelection = async (req, res) => {
   try {
@@ -160,46 +161,6 @@ exports.handleManagerSelection = async (req, res) => {
   }
 };
 
-
-
-exports.getPendingHotelRequestsForApprover = async (req, res) => {
-  try {
-    // 🔐 Auth check
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
-
-    const approverId = req.user._id;
-    const corporateId = req.user.corporateId;
-
-    // 🔥 Only NOT approved requests (pending_approval)
-    const requests = await HotelBookingRequest.find({
-      approverId,
-      corporateId,
-      bookingType: "hotel",
-      requestStatus: "pending_approval", // ✅ key condition
-    })
-      .sort({ createdAt: -1 })
-      .lean();
-
-    return res.status(200).json({
-      success: true,
-      count: requests.length,
-      data: requests, // ✅ full data
-    });
-  } catch (error) {
-    console.error("Error fetching pending hotel approvals:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch pending hotel requests",
-    });
-  }
-};
-
-
 exports.getMyEmployees = async (req, res) => {
   try {
     if (!req.user) {
@@ -264,6 +225,44 @@ exports.getMyEmployees = async (req, res) => {
     });
   }
 };
+
+exports.getPendingHotelRequestsForApprover = async (req, res) => {
+  try {
+    // 🔐 Auth check
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const approverId = req.user._id;
+    const corporateId = req.user.corporateId;
+
+    // 🔥 Only NOT approved requests (pending_approval)
+    const requests = await HotelBookingRequest.find({
+      approverId,
+      corporateId,
+      bookingType: "hotel",
+      requestStatus: "pending_approval", // ✅ key condition
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: requests.length,
+      data: requests, // ✅ full data
+    });
+  } catch (error) {
+    console.error("Error fetching pending hotel approvals:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch pending hotel requests",
+    });
+  }
+};
+
 
 exports.getApprovedHotelRequestsForApprover = async (req, res) => {
   try {
@@ -433,6 +432,163 @@ exports.getTeamBookedHotelRequests = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch requests",
+    });
+  }
+};
+
+/* ============================================================
+   FLIGHT BOOKING REQUESTS (Approver Views)
+   Uses BookingRequest model (bookingType: flight)
+   ============================================================ */
+
+exports.getPendingFlightRequestsForApprover = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const approverId = req.user._id?.toString();
+    const corporateId = req.user.corporateId;
+
+    const requests = await BookingRequest.find({
+      bookingType: "flight",
+      requestStatus: "pending_approval",
+      corporateId,
+      approverId: { $in: [approverId, req.user._id] },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: requests.length,
+      data: requests,
+    });
+  } catch (error) {
+    console.error("Error fetching pending flight approvals:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch pending flight requests" });
+  }
+};
+
+exports.getApprovedFlightRequestsForApprover = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const approverId = req.user._id?.toString();
+    const corporateId = req.user.corporateId;
+
+    const requests = await BookingRequest.find({
+      bookingType: "flight",
+      requestStatus: "approved",
+      corporateId,
+      approverId: { $in: [approverId, req.user._id] },
+    })
+      .populate({ path: "approvedBy", select: "name email role" })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const data = requests.map((reqItem) => ({
+      ...reqItem,
+      approvedByDetails: reqItem.approvedBy
+        ? {
+            name: `${reqItem.approvedBy.name?.firstName || ""} ${reqItem.approvedBy.name?.lastName || ""}`.trim(),
+            email: reqItem.approvedBy.email,
+            role: reqItem.approvedBy.role,
+          }
+        : null,
+    }));
+
+    return res.status(200).json({ success: true, count: data.length, data });
+  } catch (error) {
+    console.error("Error fetching approved flight requests:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch approved flight requests" });
+  }
+};
+
+exports.getRejectedFlightRequestsForApprover = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const approverId = req.user._id?.toString();
+    const corporateId = req.user.corporateId;
+
+    const requests = await BookingRequest.find({
+      bookingType: "flight",
+      requestStatus: "rejected",
+      corporateId,
+      approverId: { $in: [approverId, req.user._id] },
+    })
+      .populate({ path: "rejectedBy", select: "name email role" })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const data = requests.map((reqItem) => ({
+      ...reqItem,
+      rejectedByDetails: reqItem.rejectedBy
+        ? {
+            name: `${reqItem.rejectedBy.name?.firstName || ""} ${reqItem.rejectedBy.name?.lastName || ""}`.trim(),
+            email: reqItem.rejectedBy.email,
+            role: reqItem.rejectedBy.role,
+          }
+        : null,
+    }));
+
+    return res.status(200).json({ success: true, count: data.length, data });
+  } catch (error) {
+    console.error("Error fetching rejected flight requests:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch rejected flight requests" });
+  }
+};
+
+exports.getTeamBookedFlightRequests = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const userId = req.user._id;
+    const corporateId = req.user.corporateId;
+
+    const requests = await BookingRequest.find({
+      bookingType: "flight",
+      requestStatus: "approved",
+      corporateId,
+      $or: [{ approverId: { $in: [userId, userId.toString()] } }, { approvedBy: userId }],
+    })
+      .populate({ path: "approvedBy", select: "name email role" })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const data = requests.map((reqItem) => ({
+      ...reqItem,
+      approvedByDetails: reqItem.approvedBy
+        ? {
+            name: `${reqItem.approvedBy.name?.firstName || ""} ${reqItem.approvedBy.name?.lastName || ""}`.trim(),
+            email: reqItem.approvedBy.email,
+            role: reqItem.approvedBy.role,
+          }
+        : null,
+      approvedByMe: reqItem.approvedBy?._id?.toString() === userId.toString(),
+      isBooked: reqItem.executionStatus === "booked" || reqItem.executionStatus === "ticketed",
+      isCancelled: reqItem.executionStatus === "cancelled",
+    }));
+
+    return res.status(200).json({ success: true, count: data.length, data });
+  } catch (error) {
+    console.error("Error fetching executed approved flight requests:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch flight requests",
     });
   }
 };

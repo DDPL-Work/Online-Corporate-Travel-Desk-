@@ -11,8 +11,10 @@ import {
   FiClock,
 } from "react-icons/fi";
 import { BsBuilding } from "react-icons/bs";
-import { getAllFlightBookingsAdmin } from "../../Redux/Actions/travelAdmin.thunks";
-import { getTeamExecutedHotelRequests } from "../../Redux/Actions/manager.thunk";
+import {
+  getTeamExecutedHotelRequests,
+  getTeamExecutedFlightRequests,
+} from "../../Redux/Actions/manager.thunk";
 import {
   FlightBookingModal,
   HotelBookingModal,
@@ -75,12 +77,12 @@ function CancelledFlightSection() {
   const PAGE_SIZE = 10;
 
   const dispatch = useDispatch();
-  const flightBookings = useSelector(
-    (state) => state.adminBooking.flightBookings,
+  const { teamExecutedFlightRequests: flightBookings } = useSelector(
+    (state) => state.manager,
   );
 
   useEffect(() => {
-    dispatch(getAllFlightBookingsAdmin());
+    dispatch(getTeamExecutedFlightRequests());
   }, [dispatch]);
 
   useEffect(() => {
@@ -743,6 +745,22 @@ function CancelledHotelSection() {
 
 export default function CancelledBookingsForManager() {
   const [activeTab, setActiveTab] = useState("flight");
+  const dispatch = useDispatch();
+  const loadingFlights = useSelector(
+    (state) => state.manager.loadingTeamExecutedFlightRequests,
+  );
+  const loadingHotels = useSelector(
+    (state) => state.manager.loadingTeamExecutedRequests,
+  );
+  const loadingActive = activeTab === "flight" ? loadingFlights : loadingHotels;
+
+  const handleRefresh = () => {
+    if (activeTab === "flight") {
+      dispatch(getTeamExecutedFlightRequests());
+      return;
+    }
+    dispatch(getTeamExecutedHotelRequests());
+  };
 
   const tabs = [
     {
@@ -776,6 +794,14 @@ export default function CancelledBookingsForManager() {
               View & track cancelled flight and hotel bookings
             </p>
           </div>
+          <button
+            onClick={handleRefresh}
+            disabled={loadingActive}
+            className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-slate-800 hover:border-slate-300 disabled:opacity-50"
+          >
+            <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
+            Refresh
+          </button>
         </div>
 
         <div className="flex items-end gap-0 mb-5 border-b-2 border-slate-200">

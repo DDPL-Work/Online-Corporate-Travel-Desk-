@@ -31,7 +31,7 @@ exports.getWalletBalance = asyncHandler(async (req, res) => {
 // @route   GET /api/v1/wallet/transactions
 // @access  Private (Travel Admin)
 exports.getWalletTransactions = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, type, dateFrom, dateTo } = req.query;
+  const { type, dateFrom, dateTo } = req.query;
 
   const query = { corporateId: req.user.corporateId };
 
@@ -42,26 +42,16 @@ exports.getWalletTransactions = asyncHandler(async (req, res) => {
     if (dateTo) query.createdAt.$lte = new Date(dateTo);
   }
 
-  const skip = (parseInt(page) - 1) * parseInt(limit);
 
   const transactions = await WalletTransaction.find(query)
     .populate("bookingId", "bookingReference")
-    .skip(skip)
-    .limit(parseInt(limit))
     .sort({ createdAt: -1 });
-
-  const total = await WalletTransaction.countDocuments(query);
 
   res.status(200).json(
     new ApiResponse(
       200,
       {
         transactions,
-        pagination: {
-          total,
-          page: parseInt(page),
-          pages: Math.ceil(total / limit),
-        },
       },
       "Wallet transactions fetched successfully"
     )

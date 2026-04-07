@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { FiClock, FiDollarSign, FiCheck, FiX, FiList } from "react-icons/fi";
+import { FiClock, FiDollarSign, FiCheck, FiX, FiList, FiRefreshCw } from "react-icons/fi";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import {
   approveApproval,
   rejectApproval,
 } from "../../Redux/Actions/approval.thunks";
-import { getPendingHotelRequests } from "../../Redux/Actions/manager.thunk";
+import {
+  getPendingHotelRequests,
+  getPendingFlightRequests,
+} from "../../Redux/Actions/manager.thunk";
 
 import Swal from "sweetalert2";
 import PendingHotelDetailsModal, {
@@ -27,22 +30,46 @@ import {
 
 export default function PendingTravelRequestsForManager() {
   const dispatch = useDispatch();
-  const { pendingHotelRequests, loadingPendingRequests } = useSelector(
-    (state) => state.manager,
-  );
+  const {
+    pendingHotelRequests,
+    loadingPendingRequests,
+    pendingFlightRequests,
+    loadingPendingFlightRequests,
+  } = useSelector((state) => state.manager);
 
   const [activeTab, setActiveTab] = useState("flight");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   useEffect(() => {
+    if (activeTab === "flight") {
+      dispatch(getPendingFlightRequests());
+    } else {
+      dispatch(getPendingHotelRequests());
+    }
+  }, [activeTab, dispatch]);
+
+  const loadingActive =
+    activeTab === "flight"
+      ? loadingPendingFlightRequests
+      : loadingPendingRequests;
+
+  const handleRefresh = () => {
+    if (activeTab === "flight") {
+      dispatch(getPendingFlightRequests());
+      return;
+    }
     dispatch(getPendingHotelRequests());
-  }, [dispatch]);
+  };
 
   const requests = useMemo(() => {
-    return pendingHotelRequests.map((b) => {
-      const isHotel = b.bookingType === "hotel";
-      const isFlight = b.bookingType === "flight";
+    const source =
+      activeTab === "flight" ? pendingFlightRequests : pendingHotelRequests;
+
+    return source.map((b) => {
+      const bookingType = b.bookingType || activeTab;
+      const isHotel = bookingType === "hotel";
+      const isFlight = bookingType === "flight";
 
       const estimatedCost = (() => {
         if (isHotel) {
@@ -80,7 +107,7 @@ export default function PendingTravelRequestsForManager() {
       const common = {
         id: b._id,
         bookingRef: b.bookingReference,
-        type: b.bookingType,
+        type: bookingType,
         status: b.requestStatus || "pending_approval",
         employee: leadTraveller
           ? `${leadTraveller.firstName} ${leadTraveller.lastName}`
@@ -148,7 +175,7 @@ export default function PendingTravelRequestsForManager() {
         routes,
       };
     });
-  }, [pendingHotelRequests]);
+  }, [activeTab, pendingFlightRequests, pendingHotelRequests]);
 
   const filteredData = requests.filter(
     (r) =>
@@ -195,6 +222,14 @@ export default function PendingTravelRequestsForManager() {
               Manage and approve corporate travel requirements
             </p>
           </div>
+          <button
+            onClick={handleRefresh}
+            disabled={loadingActive}
+            className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-slate-800 hover:border-slate-300 disabled:opacity-50"
+          >
+            <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
+            Refresh
+          </button>
         </div>
 
         <div className="flex items-end gap-0 mb-5 border-b-2 border-slate-200">

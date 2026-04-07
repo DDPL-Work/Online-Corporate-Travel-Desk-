@@ -9,6 +9,7 @@ import {
   FiList,
   FiEye,
   FiUser,
+  FiRefreshCw,
 } from "react-icons/fi";
 import { pastTripsData } from "../../data/dummyData";
 import {
@@ -23,9 +24,9 @@ import {
   RatingStars,
 } from "./Shared/CommonComponents";
 import {
-  getAllFlightBookingsAdmin,
   getAllHotelBookingsAdmin,
 } from "../../Redux/Actions/travelAdmin.thunks";
+import { getTeamExecutedFlightRequests } from "../../Redux/Actions/manager.thunk";
 import { useDispatch, useSelector } from "react-redux";
 import { FlightBookingModal } from "./Modal/BookingRequestDetailsModal";
 
@@ -38,12 +39,12 @@ function FlightSection() {
   const [deptFilter, setDept] = useState("All");
   const [selectedBooking, setSelectedBooking] = useState(null);
 
-  const flightBookings = useSelector(
-    (state) => state.adminBooking.flightBookings,
+  const { teamExecutedFlightRequests: flightBookings } = useSelector(
+    (state) => state.manager,
   );
 
   useEffect(() => {
-    dispatch(getAllFlightBookingsAdmin());
+    dispatch(getTeamExecutedFlightRequests());
   }, [dispatch]);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -631,6 +632,19 @@ function HotelSection() {
 // ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function PastTripsForManager() {
   const [activeTab, setActiveTab] = useState("flight");
+  const dispatch = useDispatch();
+  const loadingFlights = useSelector(
+    (state) => state.manager.loadingTeamExecutedFlightRequests,
+  );
+  const loadingActive = activeTab === "flight" ? loadingFlights : false;
+
+  const handleRefresh = () => {
+    if (activeTab === "flight") {
+      dispatch(getTeamExecutedFlightRequests());
+      return;
+    }
+    dispatch(getAllHotelBookingsAdmin());
+  };
 
   const tabs = [
     {
@@ -665,6 +679,14 @@ export default function PastTripsForManager() {
               View all completed business travel records
             </p>
           </div>
+          <button
+            onClick={handleRefresh}
+            disabled={loadingActive}
+            className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-slate-800 hover:border-slate-300 disabled:opacity-50"
+          >
+            <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
+            Refresh
+          </button>
         </div>
 
         {/* Tab Bar */}

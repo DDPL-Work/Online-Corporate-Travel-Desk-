@@ -272,7 +272,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                     className="border border-slate-200 rounded-2xl overflow-hidden"
                   >
                     {/* Room header */}
-                    <div className="bg-gradient-to-r from-[#088395]/10 to-slate-50 px-5 py-3 flex items-center justify-between border-b border-slate-200">
+                    <div className="bg-linear-to-r from-[#088395]/10 to-slate-50 px-5 py-3 flex items-center justify-between border-b border-slate-200">
                       <div className="flex items-center gap-2">
                         <span className="w-6 h-6 rounded-full bg-[#088395] text-white text-[11px] font-black flex items-center justify-center shrink-0">
                           {idx + 1}
@@ -795,6 +795,12 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                   padded
                 />
                 <InfoRow
+                  label="Project Code ID"
+                  value={raw.projectCodeId}
+                  mono
+                  padded
+                />
+                <InfoRow
                   label="Execution Status"
                   value={raw.executionStatus?.replace(/_/g, " ")}
                   capitalize
@@ -809,6 +815,38 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                 <InfoRow
                   label="Updated At"
                   value={formatDateTime(raw.updatedAt)}
+                  padded
+                />
+              </div>
+
+              <SectionLabel icon={<FiLayers size={11} />} title="Project Details" />
+              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                <InfoRow label="Project ID" value={raw.projectId} padded />
+                <InfoRow label="Project Name" value={raw.projectName} padded />
+                <InfoRow label="Client" value={raw.projectClient} padded />
+              </div>
+
+              <SectionLabel icon={<FiUser size={11} />} title="Approver Details" />
+              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                <InfoRow label="Approver ID" value={raw.approverId} padded />
+                <InfoRow
+                  label="Approver Name"
+                  value={
+                    approverDetails.name ||
+                    `${approver.name?.firstName || ""} ${approver.name?.lastName || ""}`.trim() ||
+                    raw.approverName ||
+                    "—"
+                  }
+                  padded
+                />
+                <InfoRow
+                  label="Approver Email"
+                  value={approverDetails.email || raw.approverEmail || "—"}
+                  padded
+                />
+                <InfoRow
+                  label="Approver Role"
+                  value={approverDetails.role || raw.approverRole || approver.role || "—"}
                   padded
                 />
               </div>
@@ -852,7 +890,21 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
 export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
   if (!raw) return null;
   const timer = traceTimers?.[raw._id];
-  const segments = raw.flightRequest?.segments || [];
+  const snap = raw.bookingSnapshot || {};
+
+  // Prefer rich segments from flightRequest; fall back to snapshot sectors
+  let segments = raw.flightRequest?.segments || [];
+  if (!segments.length && Array.isArray(snap.sectors)) {
+    segments = snap.sectors.map((s) => {
+      const [o, d] = s.split("-");
+      return {
+        origin: { airportCode: o },
+        destination: { airportCode: d },
+        departureDateTime: snap.travelDate,
+        arrivalDateTime: snap.returnDate,
+      };
+    });
+  }
   const onwardSegments = segments.filter((s) => s.journeyType === "onward");
   const returnSegments = segments.filter((s) => s.journeyType === "return");
   const journeys =
@@ -865,13 +917,15 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
   const fareSnap = raw.flightRequest?.fareSnapshot || {};
   const ssrSnap = raw.flightRequest?.ssrSnapshot || {};
   const pricing = raw.pricingSnapshot || {};
-  const snap = raw.bookingSnapshot || {};
   const travelers = raw.travellers || [];
+  const leadTraveller =
+    travelers.find((t) => t.isLeadPassenger) || travelers[0] || {};
   const amendment = raw.amendment || {};
   const amendHist = raw.amendmentHistory || [];
   const bookRes = raw.bookingResult || {};
   const user = raw.userId || {};
   const approver = raw.approvedBy || {};
+  const approverDetails = raw.approvedByDetails || {};
 
   const miniFareRules = (
     fareSnap.miniFareRules?.[0] ||
@@ -884,7 +938,7 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
     bookRes.providerResponse?.Response?.Response?.FlightItinerary ||
     bookRes.providerResponse?.FlightItinerary ||
     {};
-  const pnr = bookRes.pnr || flightItin?.PNR;
+  const pnr = bookRes.pnr || flightItin?.PNR || snap.pnr || raw.pnr;
   const onwardPNR = bookRes.onwardPNR || pnr;
   const returnPNR = bookRes.returnPNR || null;
   const invoices = flightItin?.Invoice || [];
@@ -927,7 +981,7 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
             <div>
               <h2 className="text-lg font-black">Flight Booking Detail</h2>
               <p className="text-xs text-blue-200 font-mono mt-0.5">
-                {raw.bookingReference}
+                {raw.bookingReference || raw.bookingRef || raw._id}
               </p>
             </div>
           </div>
@@ -1592,16 +1646,17 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
               <SectionLabel icon={<FiUser size={11} />} title="Requested By" />
               <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-black text-sm shrink-0">
-                  {user.name?.firstName?.[0]}
-                  {user.name?.lastName?.[0]}
+                  {(leadTraveller.firstName || user.name?.firstName || "?")[0]}
+                  {(leadTraveller.lastName || user.name?.lastName || "?")[0]}
                 </div>
                 <div className="flex-1">
                   <p className="font-bold text-slate-900">
-                    {user.name?.firstName} {user.name?.lastName}
+                    {leadTraveller.firstName || user.name?.firstName}{" "}
+                    {leadTraveller.lastName || user.name?.lastName}
                   </p>
                   <p className="text-xs text-slate-500 flex items-center gap-1">
                     <FiMail size={10} />
-                    {user.email}
+                    {leadTraveller.email || user.email}
                   </p>
                 </div>
                 {approver._id && (
@@ -1618,6 +1673,30 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                   </div>
                 )}
               </div>
+               <InfoRow
+                  label="Approver Name"
+                  value={
+                    approverDetails.name ||
+                    `${approver.name?.firstName || ""} ${approver.name?.lastName || ""}`.trim() ||
+                    raw.approverName ||
+                    "—"
+                  }
+                  padded
+                />
+                <InfoRow
+                  label="Approver Email"
+                  value={approverDetails.email || raw.approverEmail || "—"}
+                  padded
+                />
+                <InfoRow
+                  label="Approver Role"
+                  value={approverDetails.role || raw.approverRole || approver.role || "—"}
+                  padded
+                />
+
+                 <InfoRow label="Project ID" value={raw.projectId} padded />
+                <InfoRow label="Project Name" value={raw.projectName} padded />
+                <InfoRow label="Client" value={raw.projectClient} padded />
             </div>
             <div>
               <SectionLabel icon={<FiTag size={11} />} title="Booking Meta" />
@@ -1629,6 +1708,13 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                   mono
                   padded
                 />
+                <InfoRow
+                  label="Project Code ID"
+                  value={raw.projectCodeId}
+                  mono
+                  padded
+                />
+               
                 <InfoRow
                   label="Execution Status"
                   value={raw.executionStatus?.replace(/_/g, " ")}
@@ -1646,6 +1732,7 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                   value={formatDateTime(raw.updatedAt)}
                   padded
                 />
+               
               </div>
             </div>
           </div>

@@ -7,6 +7,10 @@ const {
   getRejectedHotelRequestsForApprover,
   getApprovedHotelRequestsForApprover,
   getTeamBookedHotelRequests,
+  getPendingFlightRequestsForApprover,
+  getApprovedFlightRequestsForApprover,
+  getRejectedFlightRequestsForApprover,
+  getTeamBookedFlightRequests,
 } = require("../controllers/manager.controller");
 const {
   verifyToken,
@@ -25,6 +29,12 @@ router.get(
   authorizeRoles("manager"),
   getPendingHotelRequestsForApprover,
 );
+router.get(
+  "/flight/pending-requests",
+  verifyToken,
+  authorizeRoles("manager"),
+  getPendingFlightRequestsForApprover
+);
 
 // 🔴 Rejected
 router.get(
@@ -32,6 +42,12 @@ router.get(
   verifyToken,
   authorizeRoles("manager"),
   getRejectedHotelRequestsForApprover
+);
+router.get(
+  "/flight/rejected-requests",
+  verifyToken,
+  authorizeRoles("manager"),
+  getRejectedFlightRequestsForApprover
 );
 
 // 🟢 Approved
@@ -41,12 +57,23 @@ router.get(
   authorizeRoles("manager"),
   getApprovedHotelRequestsForApprover
 );
+router.get(
+  "/flight/approved-requests",
+  verifyToken,
+  authorizeRoles("manager"),
+  getApprovedFlightRequestsForApprover
+);
 
 // 🟢 Booked
 router.get(
   "/hotel/team-executed-requests",
   authorizeRoles("manager"),
   getTeamBookedHotelRequests
+);
+router.get(
+  "/flight/team-executed-requests",
+  authorizeRoles("manager"),
+  getTeamBookedFlightRequests
 );
 
 module.exports = router;

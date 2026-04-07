@@ -28,16 +28,16 @@ const AZURE_MID = "#475569"; // slate-600 approx
 ───────────────────────────────────────────── */
 function Hero() {
   return (
-    <section className="relative bg-gradient-to-l from-blue-900 to-slate-950 overflow-hidden min-h-screen">
+    <section className="relative bg-linear-to-l from-blue-900 to-slate-950 overflow-hidden min-h-screen">
       {/* ambient glows */}
       <div
-        className="absolute top-[-160px] right-[-120px] w-[700px] h-[700px] rounded-full opacity-10 pointer-events-none"
+        className="absolute -top-40 right-[-120px] w-[700px] h-[700px] rounded-full opacity-10 pointer-events-none"
         style={{
           background: `radial-gradient(circle, ${ORANGE} 0%, transparent 65%)`,
         }}
       />
       <div
-        className="absolute bottom-[-80px] left-[-60px] w-[450px] h-[450px] rounded-full opacity-10 pointer-events-none"
+        className="absolute -bottom-20 left-[-60px] w-[450px] h-[450px] rounded-full opacity-10 pointer-events-none"
         style={{
           background: "radial-gradient(circle, #3B82F6 0%, transparent 65%)",
         }}

@@ -108,11 +108,15 @@ export const PendingHotelDetailsModal = ({
 
   const finalTotal = baseFare + tax;
 
-  const totalAdults = travelers.filter(
-    (t) => t.paxType === "adult" || t.paxType === "lead",
-  ).length;
+  const totalAdults = travelers.filter((t) => {
+    const type = (t.paxType || "").toString().toLowerCase();
+    return type === "adult" || type === "lead" || type === "1";
+  }).length;
 
-  const totalChildren = travelers.filter((t) => t.paxType === 2).length;
+  const totalChildren = travelers.filter((t) => {
+    const type = (t.paxType || "").toString().toLowerCase();
+    return type === "child" || type === "cnn" || type === "2";
+  }).length;
 
   // const totalChildren = travelers.filter((t) => t.paxType === "child").length;
 
@@ -723,7 +727,19 @@ export const PendingFlightDetailsModal = ({
   // booking.bookingSnapshot                   → quick display fields
   // ────────────────────────────────────────────────────────────────────────────
   const flightRequest = booking.flightRequest || {};
-  const segments = flightRequest.segments || [];
+  let segments =
+    flightRequest.segments || booking.bookingSnapshot?.segments || [];
+  if (!segments.length && Array.isArray(booking.bookingSnapshot?.sectors)) {
+    segments = booking.bookingSnapshot.sectors.map((s) => {
+      const [o, d] = s.split("-");
+      return {
+        origin: { airportCode: o },
+        destination: { airportCode: d },
+        departureDateTime: booking.bookingSnapshot.travelDate,
+        arrivalDateTime: booking.bookingSnapshot.returnDate,
+      };
+    });
+  }
   const fareSnapshot = flightRequest.fareSnapshot || {};
   const fareQuoteResult = flightRequest.fareQuote?.Results?.[0] || {};
   const fareBreakdown = fareQuoteResult.FareBreakdown || [];
@@ -731,6 +747,7 @@ export const PendingFlightDetailsModal = ({
   const ssrSnapshot = flightRequest.ssrSnapshot || {};
   const pricing = booking.pricingSnapshot || {};
   const travelers = booking.travellers || [];
+  const lead = travelers.find((t) => t.isLeadPassenger);
   const bookSnap = booking.bookingSnapshot || {};
 
   // Journey-level routes (collapse layovers per journey)
@@ -797,7 +814,7 @@ export const PendingFlightDetailsModal = ({
                 Flight Approval Request
               </h2>
               <p className="text-xs text-indigo-200 font-mono mt-0.5">
-                {booking.bookingReference}
+                {booking.bookingReference || booking.bookingRef || booking._id}
               </p>
             </div>
           </div>
@@ -1366,16 +1383,23 @@ export const PendingFlightDetailsModal = ({
 
           {/* ── Section 7: Purpose + Booking Meta ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
+            <div className="space-y-3">
               <SectionLabel icon={<FiInfo />} title="Purpose of Travel" />
               <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
                 <p className="text-sm text-amber-900 italic">
                   "{booking.purposeOfTravel}"
                 </p>
               </div>
+
+              <SectionLabel icon={<FiTag />} title="Project Details" />
+              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                <InfoRow label="Project ID" value={booking.projectId} padded />
+                <InfoRow label="Project Name" value={booking.projectName} padded />
+                <InfoRow label="Client" value={booking.projectClient} padded />
+              </div>
             </div>
 
-            <div>
+            <div className="space-y-3">
               <SectionLabel icon={<FiTag />} title="Booking Meta" />
               <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
                 <InfoRow label="Booking ID" value={booking._id} mono padded />
@@ -1405,6 +1429,21 @@ export const PendingFlightDetailsModal = ({
                 <InfoRow
                   label="Updated At"
                   value={formatDateTime(booking.updatedAt)}
+                  padded
+                />
+              </div>
+
+              <SectionLabel icon={<FiUser />} title="Approver Details" />
+              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                <InfoRow label="Approver ID" value={booking.approverId} padded />
+                <InfoRow
+                  label="Approver Name"
+                  value={booking.approverName || "—"}
+                  padded
+                />
+                <InfoRow
+                  label="Approver Email"
+                  value={booking.approverEmail || "—"}
                   padded
                 />
               </div>
