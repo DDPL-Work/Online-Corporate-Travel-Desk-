@@ -11,6 +11,8 @@ import corporateListReducer from "./Slice/corporateListSlice.js";
 import employeeActionReducer from "./Slice/employeeActionSlice.js";
 import documentReducer from "./Slice/documentSlice.js";
 import corporateAdminReducer from "./Slice/corporateAdminSlice.js";
+import corporateProjectReducer from "./Slice/project.slice.js";
+import managerReducer from "./Slice/manager.slice.js";
 import walletReducer from "./Slice/walletSlice.js";
 import flightReducer from "./Slice/flightSearchSlice.js";
 import flightReducerRT from "./Slice/flightSearchSliceRT.js";
@@ -19,7 +21,7 @@ import walletRechargeLogsReducer from "./Slice/walletRechargeLogsSlice";
 import tboBalanceReducer from "./Slice/tboBalanceSlice";
 import approvalReducer from "./Slice/approval.slice.js";
 import bookingReducer from "./Slice/booking.slice.js";
-import employeeReducer from "./Slice/employee.slice.js";
+import employeeReducer from "./Slice/employeeActionSlice.js";
 import corporateSuperAdminReducer from "./Slice/corporateSuperAdmin.slice.js";
 import postpaidReducer from "./Slice/postpaidSlice.js";
 import amendmentReducer from "./Slice/amendmentSlice.js";
@@ -44,6 +46,10 @@ export const store = configureStore({
     documents: documentReducer,
 
     corporateAdmin: corporateAdminReducer,
+    
+    corporateProject: corporateProjectReducer,
+    manager: managerReducer,
+
     wallet: walletReducer,
     walletRechargeLogs: walletRechargeLogsReducer,
     postpaid: postpaidReducer,

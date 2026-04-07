@@ -5,6 +5,7 @@ import { jwtDecode } from "jwt-decode";
 
 import { ssoLoginSuccess } from "../../Redux/Slice/authSlice";
 import { fetchDashboardData } from "../../Redux/Slice/dashboardSlice";
+import { ToastWithTimer } from "../../utils/ToastConfirm";
 
 const SSOCallback = () => {
   const dispatch = useDispatch();
@@ -14,9 +15,26 @@ const SSOCallback = () => {
   useEffect(() => {
     const token = params.get("token");
     const error = params.get("error");
+    const admin = params.get("admin");
 
     if (error) {
-      navigate("/unauthorized", { replace: true });
+      const lower = error.toLowerCase();
+      const isInactive =
+        lower.includes("inactive") || lower.includes("disabled");
+      const contactText = admin ? ` (${admin})` : "";
+
+      ToastWithTimer({
+        message: isInactive
+          ? `Your account is inactive. Please contact your travel admin${contactText} to reactivate your access.`
+          : error,
+        type: "error",
+        duration: 6000,
+      });
+
+      const qs = new URLSearchParams();
+      qs.set("error", error);
+      if (admin) qs.set("admin", admin);
+      navigate(`/iapindia?${qs.toString()}`, { replace: true });
       return;
     }
 
@@ -48,7 +66,7 @@ const SSOCallback = () => {
       } else if (role === "employee") {
         navigate("/my-bookings", { replace: true });
       } else if (role === "manager") {
-        navigate("/corporate-dashboard", { replace: true });
+        navigate("/manager/total-bookings", { replace: true });
       }
     } catch (err) {
       navigate("/iapindia", { replace: true });

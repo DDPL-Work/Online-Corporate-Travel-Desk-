@@ -164,28 +164,35 @@ export default function Sidebar({ isOpen, onClose }) {
     { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },
   ];
 
-  const manager = [
-    {
-      to: "/corporate-dashboard",
-      label: "Dashboard",
-      icon: <FaClipboardList />,
-    },
-    {
-      to: "/admin-management",
-      label: "Admin Management",
-      icon: <FaShieldAlt />,
-    },
-    {
-      to: "/employee-management",
-      label: "Employee Management",
-      icon: <FaUsers />,
-    },
-    {
-      to: "/corporate-total-bookings",
-      label: "Total Bookings",
-      icon: <FaListAlt />,
-    },
-  ];
+   const manager = useMemo(() => {
+    const menu = [
+      {
+        to: "/manager/total-bookings",
+        label: "Total Bookings",
+        icon: <FaClipboardList />,
+      },
+      {
+        to: "/manager/total-cancelled-bookings",
+        label: "Cancelled Bookings",
+        icon: <FaClipboardList />,
+      },
+      { to: "/manager/pending-requests", label: "Pending Requests", icon: <FaClock /> },
+      {
+        to: "/manager/approved-requests",
+        label: "Approved Requests",
+        icon: <FaCheck />,
+      },
+      {
+        to: "/manager/rejected-requests",
+        label: "Rejected Requests",
+        icon: <FaTimes />,
+      },
+      { to: "/manager/upcoming-trips", label: "Upcoming Trips", icon: <FaClock /> },
+      { to: "/manager/past-trips", label: "Past Trips", icon: <FaClipboardList /> },
+      { to: "/manager/team-management", label: "Team Management", icon: <FaUsers /> },
+    ];
+    return menu;
+  }, [classification]);
 
   const menus = {
     "super-admin": travelCompanyMenu,

@@ -112,6 +112,25 @@ function FlightSection() {
     const q = search.toLowerCase();
 
     return flightBookings.map(formatFlight).filter((b) => {
+      // Base visibility rules
+      const isConfirmed = b.executionStatus === "ticketed";
+      const isCancelled =
+        b.executionStatus === "cancel_requested" ||
+        b.executionStatus === "cancelled" ||
+        b.requestStatus === "cancelled";
+      const isFailedOrNotStarted =
+        b.executionStatus === "failed" || b.executionStatus === "not_started";
+      const amendmentRequested = b.amendment?.status === "requested";
+
+      if (
+        !isConfirmed ||
+        isCancelled ||
+        isFailedOrNotStarted ||
+        amendmentRequested
+      ) {
+        return false;
+      }
+
       const searchOk =
         !q ||
         b.travellerName?.toLowerCase().includes(q) ||
@@ -506,6 +525,25 @@ function HotelSection() {
     const q = search.toLowerCase();
 
     return hotelBookings.map(formatHotel).filter((b) => {
+      // Base visibility rules
+      const isConfirmed = b.executionStatus === "voucher_generated";
+      const isCancelled =
+        b.executionStatus === "cancel_requested" ||
+        b.executionStatus === "cancelled" ||
+        b.requestStatus === "cancelled";
+      const isFailedOrNotStarted =
+        b.executionStatus === "failed" || b.executionStatus === "not_started";
+      const amendmentRequested = b.amendment?.status === "requested";
+
+      if (
+        !isConfirmed ||
+        isCancelled ||
+        isFailedOrNotStarted ||
+        amendmentRequested
+      ) {
+        return false;
+      }
+
       // Search
       const searchOk =
         !q ||
@@ -559,9 +597,7 @@ function HotelSection() {
   );
 
   const total = filtered.reduce((s, b) => s + (b.amount || 0), 0);
-  const confirmed = filtered.filter(
-    (b) => b.status === "voucher_generated",
-  ).length;
+  const confirmed = filtered.filter((b) => b.status === "Confirmed").length;
   const pending = filtered.filter((b) => b.status === "Pending").length;
 
   return (

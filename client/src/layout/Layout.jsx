@@ -60,6 +60,8 @@ export default function Layout() {
   if (location.pathname === "/") {
     if (role === "travel-admin")
       return <Navigate to="/pending-requests" replace />;
+    if (role === "manager")
+      return <Navigate to="/pending-requests" replace />;
     if (role === "employee") return <Navigate to="/my-bookings" replace />;
   }
 

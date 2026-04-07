@@ -55,6 +55,31 @@ const calcAge = (pax) => {
   return `${age} yrs`;
 };
 
+// Approver resolver shared by both modals
+const resolveApproverDetails = (booking) => {
+  const approver =
+    booking?.approverId ||
+    booking?.approvedBy ||
+    booking?.approvedByDetails ||
+    {};
+
+  const first =
+    approver?.name?.firstName ||
+    approver?.firstName ||
+    booking?.approverName ||
+    "";
+  const last =
+    approver?.name?.lastName || approver?.lastName || booking?.approverLastName || "";
+
+  const name = `${first} ${last}`.trim() || "Not assigned";
+
+  return {
+    name,
+    email: approver?.email || booking?.approverEmail || "N/A",
+    role: approver?.role || booking?.approverRole || "manager",
+  };
+};
+
 // ─────────────────────────────────────────────
 // HOTEL MODAL
 // ─────────────────────────────────────────────
@@ -129,6 +154,13 @@ const nights =
   const [date] = dateStr.split(" ");
   return date;
 };
+
+  const approver = resolveApproverDetails(booking);
+  const project = {
+    name: booking.projectName || booking.project?.name,
+    id: booking.projectId || booking.project?.id,
+    client: booking.projectClient || booking.project?.client,
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
@@ -601,7 +633,27 @@ const nights =
             </div>
           </div>
 
-          {/* ── Section 8: Purpose + Booking Meta ── */}
+          {/* ── Section 8: Project & Approver ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <SectionLabel icon={<FiInfo />} title="Project Details" />
+              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                <InfoRow label="Project Name" value={project.name || "Not provided"} padded />
+                <InfoRow label="Project ID" value={project.id || "Not provided"} padded mono />
+                <InfoRow label="Client" value={project.client || "Not provided"} padded />
+              </div>
+            </div>
+            <div>
+              <SectionLabel icon={<FiShield />} title="Approver Selected" />
+              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                <InfoRow label="Approver" value={approver.name} padded />
+                <InfoRow label="Email" value={approver.email} padded />
+                <InfoRow label="Role" value={approver.role} padded capitalize />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Section 9: Purpose + Booking Meta ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <SectionLabel icon={<FiInfo />} title="Purpose of Travel" />
@@ -718,6 +770,12 @@ export const PendingFlightDetailsModal = ({
   const pricing = booking.pricingSnapshot || {};
   const travelers = booking.travellers || [];
   const bookSnap = booking.bookingSnapshot || {};
+  const approver = resolveApproverDetails(booking);
+  const project = {
+    name: booking.projectName || booking.project?.name,
+    id: booking.projectId || booking.project?.id,
+    client: booking.projectClient || booking.project?.client,
+  };
 
   // Journey-level routes (collapse layovers per journey)
   const routeByJourney = segments.reduce((acc, seg) => {
@@ -1345,7 +1403,27 @@ export const PendingFlightDetailsModal = ({
             </div>
           </div>
 
-          {/* ── Section 7: Purpose + Booking Meta ── */}
+          {/* ── Section 7: Project & Approver ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <SectionLabel icon={<FiInfo />} title="Project Details" />
+              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                <InfoRow label="Project Name" value={project.name || "Not provided"} padded />
+                <InfoRow label="Project ID" value={project.id || "Not provided"} padded mono />
+                <InfoRow label="Client" value={project.client || "Not provided"} padded />
+              </div>
+            </div>
+            <div>
+              <SectionLabel icon={<FiShield />} title="Approver Selected" />
+              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                <InfoRow label="Approver" value={approver.name} padded />
+                <InfoRow label="Email" value={approver.email} padded />
+                <InfoRow label="Role" value={approver.role} padded capitalize />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Section 8: Purpose + Booking Meta ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <SectionLabel icon={<FiInfo />} title="Purpose of Travel" />

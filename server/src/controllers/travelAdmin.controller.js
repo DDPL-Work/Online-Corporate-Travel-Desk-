@@ -2,6 +2,8 @@ const { default: mongoose } = require("mongoose");
 const BookingRequest = require("../models/BookingRequest");
 const HotelBooking = require("../models/hotelBookingRequest.model"); // if separate model exists
 const User = require("../models/User");
+const Employee = require("../models/Employee");
+const ManagerRequest = require("../models/ManagerRequest");
 
 /**
  * ============================================================
@@ -71,6 +73,8 @@ exports.getAllHotelBookingsAdmin = async (req, res) => {
       requestStatus: "approved",
     })
       .populate("userId", "name email")
+      .populate("approvedBy", "name email role")
+      .populate("approverId", "name email role")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -115,6 +119,8 @@ exports.getCancelledHotelBookingsAdmin = async (req, res) => {
       ],
     })
       .populate("userId", "name email")
+      .populate("approvedBy", "name email role")
+      .populate("approverId", "name email role")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -342,14 +348,48 @@ exports.getEmployee = async (req, res, next) => {
 // ===============================
 exports.getAllEmployees = async (req, res, next) => {
   try {
-    const admin = await User.findById(req.user.id);
-    if (!admin) return next(new ApiError(401, "Unauthorized"));
+    // 🔐 Auth check
+    if (!req.user) {
+      return next(new ApiError(401, "Unauthorized"));
+    }
 
-    const employees = await Employee.find({
-      corporateId: admin.corporateId,
-    }).select("-__v");
+    const { corporateId, domain } = req.user;
 
-    res.json({ success: true, employees });
+    // ❗ Must belong to something
+    if (!corporateId && !domain) {
+      return next(
+        new ApiError(400, "CorporateId or domain is required")
+      );
+    }
+
+    // ✅ Base query (role filter)
+    let query = {
+      role: { $in: ["manager", "employee"] },
+    };
+
+    // ✅ Scope filter (corporate OR domain)
+    if (corporateId && domain) {
+      query.$or = [
+        { corporateId },
+        { domain },
+      ];
+    } else if (corporateId) {
+      query.corporateId = corporateId;
+    } else if (domain) {
+      query.domain = domain;
+    }
+
+    // ✅ Fetch users
+    const employees = await User.find(query)
+      .select("-password -__v") // 🔒 remove sensitive fields
+      .sort({ createdAt: -1 }) // optional
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      count: employees.length,
+      employees,
+    });
   } catch (err) {
     next(err);
   }
@@ -395,27 +435,89 @@ exports.updateEmployee = async (req, res, next) => {
   }
 };
 
+
 // ===============================
-// ADMIN: TOGGLE ACTIVE/INACTIVE
+// ADMIN: TOGGLE USER + EMPLOYEE STATUS
 // ===============================
 exports.toggleEmployeeStatus = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    let emp = null;
-    const id = req.params.id;
+    // 🔐 Auth check
+    if (!req.user) {
+      throw new ApiError(401, "Unauthorized");
+    }
 
-    if (mongoose.Types.ObjectId.isValid(id)) emp = await Employee.findById(id);
-    if (!emp) emp = await Employee.findOne({ userId: id });
-    if (!emp) return next(new ApiError(404, "Employee not found"));
+    const { corporateId, domain } = req.user;
+    const userId = req.params.id;
 
-    emp.status = emp.status === "active" ? "inactive" : "active";
-    await emp.save();
+    // ❗ Validate ID
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new ApiError(400, "Invalid user ID");
+    }
 
-    res.json({
+    // ✅ Build scoped query (multi-tenant safe)
+    let query = {
+      _id: userId,
+      role: { $in: ["employee", "manager"] },
+    };
+
+    if (corporateId && domain) {
+      query.$or = [{ corporateId }, { domain }];
+    } else if (corporateId) {
+      query.corporateId = corporateId;
+    } else if (domain) {
+      query.domain = domain;
+    }
+
+    // 🔍 Find user
+    const user = await User.findOne(query).session(session);
+
+    if (!user) {
+      throw new ApiError(404, "User not found or unauthorized");
+    }
+
+    // 🔁 Toggle boolean
+    const newIsActive = !user.isActive;
+
+    // ✅ Update USER
+    user.isActive = newIsActive;
+    await user.save({ session });
+
+    // 🔁 Map to Employee.status
+    const newStatus = newIsActive ? "active" : "inactive";
+
+    // ✅ Update EMPLOYEE
+    const employee = await Employee.findOneAndUpdate(
+      { userId: user._id },
+      { status: newStatus },
+      { new: true, session }
+    );
+
+    // ⚠️ Optional strict check
+    if (!employee) {
+      throw new ApiError(404, "Employee record not found");
+    }
+
+    // ✅ Commit transaction
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({
       success: true,
-      message: `Employee ${emp.status} successfully`,
-      status: emp.status,
+      message: `User ${
+        newIsActive ? "activated" : "deactivated"
+      } successfully`,
+      data: {
+        userId: user._id,
+        isActive: newIsActive,
+        employeeStatus: newStatus,
+      },
     });
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     next(err);
   }
 };
@@ -440,3 +542,145 @@ exports.removeEmployee = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
+//manager related routes
+
+exports.getManagerRequests = async (req, res) => {
+  try {
+    // 🔒 1. ONLY TRAVEL ADMIN CAN ACCESS
+    if (req.user.role !== "travel-admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    // 🔒 2. FETCH ONLY SAME CORPORATE DATA
+    const requests = await ManagerRequest.find({
+      corporateId: req.user.corporateId,
+    })
+      .populate({
+        path: "employeeId",
+        select: "email name",
+      })
+      .populate({
+        path: "managerId",
+        select: "email name role isTempManager",
+      })
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: requests.length,
+      data: requests,
+    });
+
+  } catch (err) {
+    console.error("Fetch Manager Requests Error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+
+exports.reviewManagerRequest = async (req, res) => {
+  try {
+    const { requestId, action } = req.body;
+
+    // 🔒 1. ROLE CHECK (VERY IMPORTANT)
+    if (req.user.role !== "travel-admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only travel admin can review requests",
+      });
+    }
+
+    // 🔒 2. VALIDATE ACTION
+    if (!["approve", "reject"].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid action",
+      });
+    }
+
+    const request = await ManagerRequest.findById(requestId);
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Request not found",
+      });
+    }
+
+    // 🔒 3. PREVENT DOUBLE ACTION
+    if (request.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Request already processed",
+      });
+    }
+
+    // 🔒 4. CORPORATE CHECK
+    if (String(request.corporateId) !== String(req.user.corporateId)) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized access",
+      });
+    }
+
+    const user = await User.findById(request.managerId);
+    const employee = await Employee.findOne({
+      userId: request.managerId,
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // ✅ APPROVE
+    if (action === "approve") {
+      user.role = "manager";
+      user.isTempManager = false;
+      user.managerRequestStatus = "approved";
+
+      if (employee) {
+        employee.role = "manager";
+        await employee.save();
+      }
+
+      request.status = "approved";
+    }
+
+    // ❌ REJECT
+    if (action === "reject") {
+      user.isTempManager = false;
+      user.managerRequestStatus = "rejected";
+      request.status = "rejected";
+    }
+
+    await user.save();
+    await request.save();
+
+    return res.json({
+      success: true,
+      message: `Request ${action}ed successfully`,
+    });
+
+  } catch (err) {
+    console.error("Review Manager Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+

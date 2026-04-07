@@ -17,6 +17,7 @@ const superAdminRoutes = require("./superAdmin.routes");
 const authSSORoutes = require("./auth.sso.routes");
 const employeeRoutes = require("./employee.routes");
 const corporateAdmin = require("./corporateAdmin.routes");
+const corporateManager = require("./manager.routes");
 const walletLogsRoutes = require("./wallet-logs.routes");
 const validatePrice = require("./checkApprovedRequestPrice.routes");
 const travelAdmin = require("./travelAdmin.routes");
@@ -25,6 +26,7 @@ const flightAmendment = require("./flightAmendment.routes");
 const hotelAmendment = require("./hotelAmendment.routes");
 const gestRoutes = require("./gst.routes");
 const hotelBooking = require('./hotelBooking.routes');
+const project = require('./project.routes');
 
 // ------------------ ✅ IMPORTANT FIX ------------------
 // ✅ SSO MUST BE MOUNTED BEFORE /auth (to avoid JWT blocking)
@@ -40,13 +42,19 @@ router.use("/hotels", hotelRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/wallet", walletRoutes);
 router.use("/vouchers", voucherRoutes);
+
+
 router.use("/super-admin", superAdminRoutes);
 router.use("/employees", employeeRoutes);
 router.use("/corporate-admin", corporateAdmin);
+router.use("/travel-admin", travelAdmin);
+router.use("/corporate-manager", corporateManager);
+router.use("/corporate-projects", project);
+
+
 router.use("/wallet-logs", walletLogsRoutes);
 // router.use("/tbo", tboRoutes);
 router.use("/validate-price", validatePrice);
-router.use("/travel-admin", travelAdmin);
 router.use("/postpaid", postPaidCorporate);
 router.use("/flights/amendments", flightAmendment);
 router.use("/hotels/amendments", hotelAmendment);
@@ -69,14 +77,21 @@ router.get("/", (req, res) => {
       dashboard: "/api/v1/dashboard",
       wallet: "/api/v1/wallet",
       vouchers: "/api/v1/vouchers",
-      superAdmin: "/api/v1/super-admin",
       sso: "/api/v1/auth/sso",
+
+
+      
+      superAdmin: "/api/v1/super-admin",
       employees: "/api/v1/employees",
-      corporateAdmin: "/api/v1/corporate-admin",
+      corporateAdmin: "/api/v1/corporate-admin",    
+      travelAdmin: "api/v1/travel-admin",
+      corporateManager: "/api/v1/corporate-manager",    
+      project: "/api/v1/corporate-projects",   
+      
+      
       walletLogsRoutes: "/api/v1/wallet-logs",
       // tboRoutes: '/api/v1/tbo'
       validatePrice: "api/v1/validate-price",
-      travelAdmin: "api/v1/travel-admin",
       corporateSuperAdmin: "api/v1/corporate-super-admin",
       postPaidCorporate: "api/v1/postpaid",
       flightAmendment: "api/v1/flights/amendments",

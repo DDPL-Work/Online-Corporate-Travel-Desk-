@@ -18,6 +18,13 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     purposeOfTravel,
     pricingSnapshot,
     gstDetails,
+    projectName,
+    projectId,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
   } = req.body;
 
   const user = req.user;
@@ -228,6 +235,15 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     requestStatus: "pending_approval",
 
     purposeOfTravel,
+
+    projectName,
+    projectId,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
+
     gstDetails: {
       gstin: gstDetails?.gstin || "",
       legalName: gstDetails?.legalName || "",
