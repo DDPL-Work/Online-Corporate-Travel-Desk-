@@ -21,26 +21,22 @@ import { fetchEmployees } from "../../../../Redux/Slice/employeeActionSlice";
 /* ─────────────────────────────────────────────────────────────── */
 /*  Mock data — replace with your real API calls                   */
 /* ─────────────────────────────────────────────────────────────── */
-const MOCK_PROJECTS = [
-  { id: "PRJ-001", name: "Website Redesign", client: "Acme Corp", code: "WR2024" },
-  { id: "PRJ-002", name: "Mobile App Development", client: "TechStart Ltd", code: "MAD2024" },
-  { id: "PRJ-003", name: "Data Analytics Platform", client: "Insight Co", code: "DAP2024" },
-  { id: "PRJ-004", name: "ERP Implementation", client: "Global Mfg", code: "ERP2024" },
-  { id: "PRJ-005", name: "Cloud Migration", client: "RetailMax", code: "CM2024" },
-];
 
-const MOCK_MANAGERS = [
-  { id: "M001", name: "Priya Sharma", email: "priya.sharma@company.com", role: "Engineering Manager" },
-  { id: "M002", name: "Rahul Verma", email: "rahul.verma@company.com", role: "Product Manager" },
-  { id: "M003", name: "Anita Desai", email: "anita.desai@company.com", role: "Senior Manager" },
-  { id: "M004", name: "Vikram Nair", email: "vikram.nair@company.com", role: "Operations Head" },
-  { id: "M005", name: "Sunita Rao", email: "sunita.rao@company.com", role: "Director" },
-];
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Dropdown with search                                            */
 /* ─────────────────────────────────────────────────────────────── */
-function SearchDropdown({ placeholder, items, onSelect, renderItem, renderSelected, selectedItem, filterFn }) {
+function SearchDropdown({
+  placeholder,
+  items,
+  onSelect,
+  renderItem,
+  renderSelected,
+  selectedItem,
+  filterFn,
+  getLabel = () => "",
+  showAllOnEmpty = false,
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const ref = useRef(null);
@@ -51,36 +47,28 @@ function SearchDropdown({ placeholder, items, onSelect, renderItem, renderSelect
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const filtered = query ? items.filter((i) => filterFn(i, query)) : items;
+  const filtered =
+    query?.trim() || showAllOnEmpty ? items.filter((i) => filterFn(i, query)) : [];
+
+  const displayValue =
+    query !== "" ? query : selectedItem ? getLabel(selectedItem) : "";
 
   return (
     <div ref={ref} className="">
-      <button
-        type="button"
-        onClick={() => { setOpen((o) => !o); setQuery(""); }}
-        className="w-full flex items-center justify-between gap-2 h-10 px-3 text-sm bg-white border border-slate-200 rounded-lg hover:border-[#0A4D68]/40 focus:outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition text-left"
-      >
-        {selectedItem ? renderSelected(selectedItem) : (
-          <span className="text-slate-400 text-[13px]">{placeholder}</span>
-        )}
-        <FiChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
+      <div className="relative">
+        <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          type="text"
+          value={displayValue}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          placeholder={placeholder}
+          className="w-full h-10 pl-8 pr-3 text-sm bg-white border border-slate-200 rounded-lg hover:border-[#0A4D68]/40 focus:outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition text-left text-slate-700 placeholder:text-slate-400"
+        />
+      </div>
 
-      {open && (
+      {open && (query?.trim() || showAllOnEmpty) && (
         <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
-          <div className="p-2 border-b border-slate-100">
-            <div className="relative">
-              <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                autoFocus
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Type to search…"
-                className="w-full h-8 pl-8 pr-3 text-[13px] bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-[#0A4D68]"
-              />
-            </div>
-          </div>
           <div className="max-h-48 overflow-y-auto">
             {filtered.length === 0 ? (
               <p className="text-[12px] text-slate-400 text-center py-4">No results found</p>
@@ -89,7 +77,7 @@ function SearchDropdown({ placeholder, items, onSelect, renderItem, renderSelect
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => { onSelect(item); setOpen(false); }}
+                  onClick={() => { onSelect(item); setOpen(false); setQuery(""); }}
                   className="w-full text-left px-3 py-2.5 hover:bg-[#0A4D68]/5 transition flex items-center justify-between group"
                 >
                   {renderItem(item)}
@@ -104,10 +92,7 @@ function SearchDropdown({ placeholder, items, onSelect, renderItem, renderSelect
       )}
     </div>
   );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Main Block                                                      */
+}/*  Main Block                                                      */
 /* ─────────────────────────────────────────────────────────────── */
 export function ProjectApproverBlock({ onChange }) {
   const getDisplayName = (item) => {
@@ -164,6 +149,21 @@ export function ProjectApproverBlock({ onChange }) {
   const clearProject = () => { setSelectedProject(null); setProjectManual({ id: "", name: "", client: "" }); };
   const clearApprover = () => { setSelectedApprover(null); setApproverEmail(""); };
 
+  const matchingApprovers = (query) => {
+    if (!query || query.length < 2) return [];
+    const q = query.toLowerCase();
+    return employees.filter((e) => {
+      const nameStr =
+        typeof e.name === "string"
+          ? e.name
+          : `${e.name?.firstName || ""} ${e.name?.lastName || ""}`.trim();
+      return (
+        (nameStr && nameStr.toLowerCase().includes(q)) ||
+        (e.email || "").toLowerCase().includes(q)
+      );
+    });
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-4">
       {/* ── Header ── */}
@@ -207,6 +207,8 @@ export function ProjectApproverBlock({ onChange }) {
                 items={projects.map(p => ({ name: p.projectName, id: p.projectCodeId, client: p.clientName, _id: p._id }))}
                 selectedItem={selectedProject}
                 onSelect={setSelectedProject}
+                getLabel={(item) => item.name || item.id || ""}
+                showAllOnEmpty={true}
                 filterFn={(item, q) =>
                   item.name.toLowerCase().includes(q.toLowerCase()) ||
                   item.id.toLowerCase().includes(q.toLowerCase()) ||
@@ -326,6 +328,8 @@ export function ProjectApproverBlock({ onChange }) {
                 }))}
                 selectedItem={selectedApprover}
                 onSelect={setSelectedApprover}
+                getLabel={(item) => `${getDisplayName(item)} (${item.email || ""})`}
+                showAllOnEmpty={false}
                 filterFn={(item, q) => {
                   const nameStr =
                     typeof item.name === "string"
@@ -397,6 +401,41 @@ export function ProjectApproverBlock({ onChange }) {
                   className="h-10 w-full pl-9 pr-3 text-[13px] bg-white border border-slate-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-400/10 transition text-slate-700 placeholder:text-slate-300"
                 />
               </div>
+
+              {approverEmail && matchingApprovers(approverEmail).length > 0 && (
+                <div className="border border-violet-100 rounded-lg mt-1 max-h-40 overflow-y-auto divide-y divide-violet-50 bg-violet-50/50">
+                  {matchingApprovers(approverEmail).map((emp) => (
+                    <button
+                      key={emp._id || emp.userId}
+                      type="button"
+                      onClick={() => {
+                        setSelectedApprover({
+                          id: emp.userId || emp._id,
+                          userId: emp.userId,
+                          employeeId: emp._id,
+                          name: emp.name,
+                          email: emp.email,
+                          role: emp.role,
+                        });
+                        setManualApprover(false);
+                        setApproverEmail("");
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-white transition flex items-center gap-2"
+                    >
+                      <div className="w-6 h-6 rounded-full bg-violet-200 flex items-center justify-center text-[10px] font-bold text-[#0A4D68] shrink-0">
+                        {getInitials(emp)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold text-slate-700 truncate">
+                          {getDisplayName(emp)}
+                        </p>
+                        <p className="text-[11px] text-slate-400 truncate">{emp.email} · {emp.role}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {approverEmail && /\S+@\S+\.\S+/.test(approverEmail) && (
                 <div className="flex items-center gap-2 mt-1 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 text-[12px] text-[#0A4D68] font-semibold">
                   <FiCheck size={12} className="text-violet-500" />
@@ -431,3 +470,7 @@ export function ProjectApproverBlock({ onChange }) {
 /*     approverId: projectApproverData.approver?.id,               */
 /*     approverEmail: projectApproverData.approver?.email,         */
 /* ─────────────────────────────────────────────────────────────── */
+
+
+
+

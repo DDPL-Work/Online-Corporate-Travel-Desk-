@@ -21,10 +21,12 @@ exports.handleManagerSelection = async (req, res) => {
       projectClient,
     } = req.body;
 
-    if (!approverId || !approverEmail || !projectCodeId) {
+    const normalizedEmail = (approverEmail || "").trim().toLowerCase();
+
+    if (!normalizedEmail || !projectCodeId) {
       return res.status(400).json({
         success: false,
-        message: "Approver ID, email and project code are required",
+        message: "Approver email and project code are required",
       });
     }
 
@@ -65,17 +67,46 @@ exports.handleManagerSelection = async (req, res) => {
     // 🔥 STEP 2: RESOLVE MANAGER
     // ============================================================
 
-    let managerUser = await User.findOne({
-      _id: approverId,
-      email: approverEmail,
-    });
+    let managerUser = null;
 
-    if (!managerUser) {
-      const approverEmployee = await Employee.findById(approverId);
+    // Resolve by explicit id + email when provided
+    if (approverId) {
+      managerUser = await User.findOne({
+        _id: approverId,
+        email: normalizedEmail,
+      });
 
-      if (approverEmployee && approverEmployee.email === approverEmail) {
-        managerUser = await User.findById(approverEmployee.userId);
+      if (!managerUser) {
+        const approverEmployee = await Employee.findById(approverId);
+
+        if (approverEmployee && approverEmployee.email?.toLowerCase() === normalizedEmail) {
+          managerUser = await User.findById(approverEmployee.userId);
+        }
       }
+    }
+
+    // Fallback: resolve just by email (manual entry) via User or Employee
+    if (!managerUser) {
+      managerUser =
+        (await User.findOne({ email: normalizedEmail })) ||
+        (await (async () => {
+          const emp = await Employee.findOne({ email: normalizedEmail });
+          if (emp?.userId) return User.findById(emp.userId);
+          return null;
+        })());
+    }
+
+    // If still not found, bootstrap a temp manager user for this corporate
+    if (!managerUser) {
+      const namePart = normalizedEmail.split("@")[0] || "Manager";
+      managerUser = await User.create({
+        corporateId: req.user?.corporateId,
+        email: normalizedEmail,
+        name: { firstName: namePart, lastName: "" },
+        role: "manager",
+        isTempManager: true,
+        managerRequestStatus: "pending",
+      });
     }
 
     if (!managerUser) {
@@ -592,3 +623,4 @@ exports.getTeamBookedFlightRequests = async (req, res) => {
     });
   }
 };
+
