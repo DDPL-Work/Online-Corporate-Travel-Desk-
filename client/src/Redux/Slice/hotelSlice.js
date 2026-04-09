@@ -11,12 +11,36 @@ import {
   searchHotels,
 } from "../Actions/hotelThunks";
 
+const dedupeHotels = (existing = [], incoming = []) => {
+  const seen = new Set();
+  const result = [];
+
+  const addList = (list = []) =>
+    list.forEach((hotel) => {
+      const key =
+        hotel?._index ??
+        hotel?.HotelCode ??
+        `${(hotel?.HotelName || "").trim().toLowerCase()}|${(hotel?.CityName || "").trim().toLowerCase()}|${(hotel?.Address || "").trim().toLowerCase()}`;
+
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push(hotel);
+    });
+
+  addList(existing);
+  addList(incoming);
+
+  return result;
+};
+
 const hotelSlice = createSlice({
   name: "hotel",
   initialState: {
     countries: [],
     citiesByCountry: {},
     hotels: [],
+    pagination: { total: 0, page: 1, limit: 10, hasMore: false },
+    traceId: null,
     selectedHotel: null,
     searchPayload: null,
     hotelDetailsById: {},
@@ -26,6 +50,7 @@ const hotelSlice = createSlice({
       countries: false,
       cities: false,
       search: false,
+      loadMore: false,
       details: false,
       rooms: false,
       bookingDetails: false,
@@ -44,6 +69,8 @@ const hotelSlice = createSlice({
   reducers: {
     clearHotels: (state) => {
       state.hotels = [];
+      state.pagination = { total: 0, page: 1, limit: 10, hasMore: false };
+      state.traceId = null;
     },
     clearSelectedHotel: (state) => {
       state.selectedHotel = null;
@@ -85,17 +112,46 @@ const hotelSlice = createSlice({
       })
 
       /* ---------------- SEARCH ---------------- */
-      .addCase(searchHotels.pending, (state) => {
-        state.loading.search = true;
+      .addCase(searchHotels.pending, (state, action) => {
+        const page = action.meta?.arg?.page || 1;
+        const isLoadMore = page > 1;
+        state.loading.search = !isLoadMore;
+        state.loading.loadMore = isLoadMore;
         state.error.search = null;
       })
       .addCase(searchHotels.fulfilled, (state, action) => {
+        const page =
+          action.payload?.pagination?.page || action.meta?.arg?.page || 1;
+
         state.loading.search = false;
-        state.hotels = action.payload.hotels || [];
-        state.searchPayload = action.meta.arg;
+        state.loading.loadMore = false;
+
+        const incomingHotels = action.payload?.hotels || [];
+        const pagination = action.payload?.pagination || {
+          total: incomingHotels.length,
+          page,
+          limit: action.meta?.arg?.limit || 10,
+          hasMore: false,
+        };
+
+        const isFirstPage = page <= 1;
+        state.hotels = isFirstPage
+          ? dedupeHotels([], incomingHotels)
+          : dedupeHotels(state.hotels, incomingHotels);
+
+        state.pagination = pagination;
+
+        const metaArg = action.meta?.arg;
+        const payloadForStore =
+          metaArg && typeof metaArg === "object" && "payload" in metaArg
+            ? metaArg.payload
+            : metaArg;
+        state.searchPayload = payloadForStore || state.searchPayload;
+        state.traceId = action.payload?.traceId || state.traceId;
       })
       .addCase(searchHotels.rejected, (state, action) => {
         state.loading.search = false;
+        state.loading.loadMore = false;
         state.error.search = action.payload;
       })
 

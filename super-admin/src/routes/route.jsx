@@ -49,7 +49,7 @@ export const appRouter = createBrowserRouter([
           { path: "/corporate-revenue", element: <CorporateRevenue /> },
           { path: "/credit-status", element: <CreditStatusAlerts /> },
           { path: "/wallet-recharge-logs", element: <WalletRechargeLogs /> },
-          { path: "/corporate-access", element: <CorporateAccessControl /> },
+          { path: "/corporate-management", element: <CorporateAccessControl /> },
           { path: "/pending-amendments", element: <PendingAmendments /> },
           { path: "/commission-settings", element: <CommissionSettings /> },
           { path: "/api-configurations", element: <ApiConfigurations /> },

@@ -10,7 +10,7 @@ export default function ProtectedRoute({ allowedRoles }) {
     sessionStorage.getItem("token") ||
     localStorage.getItem("token");
 
-  if (!token) return <Navigate to="/iapindia" replace />;
+  if (!token) return <Navigate to="/platform/flight-booking-info" replace />;
 
   let role = auth.role;
 
@@ -21,7 +21,7 @@ export default function ProtectedRoute({ allowedRoles }) {
       role = decoded.role || decoded.userRole;
     } catch (err) {
       console.error("Invalid token");
-      return <Navigate to="/iapindia" replace />;
+      return <Navigate to="/platform/flight-booking-info" replace />;
     }
   }
 

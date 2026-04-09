@@ -2,6 +2,8 @@
 
 const Corporate = require("../models/Corporate");
 const User = require("../models/User");
+const BookingRequest = require("../models/BookingRequest");
+const HotelBookingRequest = require("../models/hotelBookingRequest.model");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
@@ -25,12 +27,12 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
   const metadata = req.body.metadata || {};
 
   // PRIMARY CONTACT
- const primaryContact = req.body.primaryContact || {};
-// const secondaryContact = req.body.secondaryContact || {};
-const billingDepartment = req.body.billingDepartment || {};
-const registeredAddress = req.body.registeredAddress || {};
-const ssoConfig = req.body.ssoConfig || {};
-const gstDetails = req.body.gstDetails || {};
+  const primaryContact = req.body.primaryContact || {};
+  // const secondaryContact = req.body.secondaryContact || {};
+  const billingDepartment = req.body.billingDepartment || {};
+  const registeredAddress = req.body.registeredAddress || {};
+  const ssoConfig = req.body.ssoConfig || {};
+  const gstDetails = req.body.gstDetails || {};
 
   const travelPolicy = {
     allowedCabinClass: Array.isArray(
@@ -318,9 +320,9 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
     console.error("Email sending failed:", err);
   }
 
-  res.status(200).json(
-    new ApiResponse(200, corporate, "Corporate approved & activated"),
-  );
+  res
+    .status(200)
+    .json(new ApiResponse(200, corporate, "Corporate approved & activated"));
 });
 
 // -----------------------------------------------------
@@ -372,3 +374,289 @@ exports.toggleCorporateStatus = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, corporate, "Corporate status updated"));
 });
+
+/* =====================================================
+   GET BOOKINGS DATA DONE BY CORPORATE (FLIGHT + HOTEL)
+===================================================== */
+
+/**
+ * ============================================================
+ * 🛫 GET ALL FLIGHT BOOKINGS (SUPER ADMIN)
+ * ============================================================
+ */
+exports.getAllFlightBookings = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      status,
+      corporateId,
+      fromDate,
+      toDate,
+    } = req.query;
+
+    const blockedStatuses = ["failed", "not_started"];
+    const query = {};
+
+    // 🔎 Search by bookingReference
+    if (search) {
+      query.bookingReference = { $regex: search, $options: "i" };
+    }
+
+    // 📊 Filters
+    if (status) {
+      query.requestStatus = status;
+    } else {
+      query.requestStatus = { $nin: blockedStatuses };
+      query.executionStatus = { $nin: blockedStatuses };
+    }
+    if (corporateId) query.corporateId = corporateId;
+
+    if (fromDate || toDate) {
+      query.createdAt = {};
+      if (fromDate) query.createdAt.$gte = new Date(fromDate);
+      if (toDate) query.createdAt.$lte = new Date(toDate);
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      BookingRequest.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .populate({ path: "corporateId", select: "corporateName" })
+        .lean(),
+
+      BookingRequest.countDocuments(query),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Flight bookings fetched successfully",
+      data,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("SuperAdmin Flight Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch flight bookings",
+    });
+  }
+};
+
+/**
+ * ============================================================
+ * 🏨 GET ALL HOTEL BOOKINGS (SUPER ADMIN)
+ * ============================================================
+ */
+exports.getAllHotelBookings = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      status,
+      corporateId,
+      fromDate,
+      toDate,
+    } = req.query;
+
+    const blockedStatuses = ["failed", "not_started"];
+    const query = {};
+
+    if (search) {
+      query.bookingReference = { $regex: search, $options: "i" };
+    }
+
+    if (status) {
+      query.requestStatus = status;
+    } else {
+      query.requestStatus = { $nin: blockedStatuses };
+      query.executionStatus = { $nin: blockedStatuses };
+    }
+    if (corporateId) query.corporateId = corporateId;
+
+    if (fromDate || toDate) {
+      query.createdAt = {};
+      if (fromDate) query.createdAt.$gte = new Date(fromDate);
+      if (toDate) query.createdAt.$lte = new Date(toDate);
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      HotelBookingRequest.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .populate({ path: "corporateId", select: "corporateName" })
+        .lean(),
+
+      HotelBookingRequest.countDocuments(query),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Hotel bookings fetched successfully",
+      data,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("SuperAdmin Hotel Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch hotel bookings",
+    });
+  }
+};
+
+
+exports.getCancelledOrRequestedFlights = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      corporateId,
+      fromDate,
+      toDate,
+    } = req.query;
+
+    // Only flights that have a cancel request raised or are fully cancelled
+    const query = {
+      bookingType: "flight",
+      executionStatus: { $in: ["cancel_requested", "cancelled"] },
+    };
+
+    // 🔍 Search
+    if (search) {
+      query.bookingReference = { $regex: search, $options: "i" };
+    }
+
+    if (corporateId) query.corporateId = corporateId;
+
+    if (fromDate || toDate) {
+      query.createdAt = {};
+      if (fromDate) query.createdAt.$gte = new Date(fromDate);
+      if (toDate) query.createdAt.$lte = new Date(toDate);
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      BookingRequest.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .populate({ path: "corporateId", select: "corporateName" })
+        .lean(),
+
+      BookingRequest.countDocuments(query),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Cancelled/Requested flight bookings fetched",
+      data,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Flight Cancellation Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch cancelled flight bookings",
+    });
+  }
+};
+
+exports.getCancelledOrRequestedHotels = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      corporateId,
+      fromDate,
+      toDate,
+    } = req.query;
+
+    // Business rule:
+    // 1) Booking must be approved.
+    // 2) Execution should have progressed to voucher (i.e., hotel is confirmed).
+    // 3) An amendment/cancellation must be in progress or completed (not "not_requested").
+    const allowedAmendStatuses = [
+      "requested",
+      "in_progress",
+      "approved",
+      "rejected",
+      "failed",
+    ];
+
+    const query = {
+      requestStatus: "approved",
+      executionStatus: "voucher_generated",
+      "amendment.status": { $in: allowedAmendStatuses },
+    };
+
+    if (search) {
+      query.bookingReference = { $regex: search, $options: "i" };
+    }
+
+    if (corporateId) query.corporateId = corporateId;
+
+    if (fromDate || toDate) {
+      query.createdAt = {};
+      if (fromDate) query.createdAt.$gte = new Date(fromDate);
+      if (toDate) query.createdAt.$lte = new Date(toDate);
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      HotelBookingRequest.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .populate({ path: "corporateId", select: "corporateName" })
+        .lean(),
+
+      HotelBookingRequest.countDocuments(query),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Cancelled/Requested hotel bookings fetched",
+      data,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Hotel Cancellation Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch cancelled hotel bookings",
+    });
+  }
+};

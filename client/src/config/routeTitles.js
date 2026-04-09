@@ -96,5 +96,5 @@ export const getPageTitle = (pathname) => {
   }
 
   // Default title
-  return "iapindia - Corporate Travel";
+  return "Traveamer - Corporate Travel Desk";
 };

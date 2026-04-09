@@ -5,6 +5,45 @@ const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const Country = require("../models/CountryList");
+const redis = require("../config/redis");
+const stringify = require("fast-json-stable-stringify");
+
+/* =====================================================
+   HELPERS
+===================================================== */
+const buildCacheKey = (payload = {}) => `hotel:${stringify(payload)}`;
+
+const addIndex = (list = []) =>
+  list.map((hotel, idx) =>
+    hotel && typeof hotel === "object" && hotel._index !== undefined
+      ? hotel
+      : { ...hotel, _index: idx },
+  );
+
+const deduplicateHotels = (hotels = []) => {
+  const seenKeys = new Set();
+  const unique = [];
+
+  hotels.forEach((hotel) => {
+    const hotelCodeKey = hotel?.HotelCode
+      ? String(hotel.HotelCode).trim()
+      : "";
+    const compositeKey = `${(hotel.HotelName || "")
+      .trim()
+      .toLowerCase()}|${(hotel.CityName || hotel.City || "")
+      .trim()
+      .toLowerCase()}|${(hotel.Address || "").trim().toLowerCase()}`;
+
+    const key = hotelCodeKey || compositeKey || `row-${unique.length}`;
+
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      unique.push(hotel);
+    }
+  });
+
+  return unique;
+};
 
 /* =====================================================
    STATIC SERVICES
@@ -104,6 +143,11 @@ exports.getStaticHotelDetails = asyncHandler(async (req, res) => {
    POST /api/v1/hotels/search
 ===================================================== */
 exports.searchHotels = asyncHandler(async (req, res) => {
+  const pageParam = Number(req.query.page) || 1;
+  const limitParam = Number(req.query.limit) || 10;
+  const page = pageParam > 0 ? pageParam : 1;
+  const limit = limitParam > 0 ? limitParam : 10;
+
   const {
     CheckIn,
     CheckOut,
@@ -133,119 +177,142 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     throw new ApiError(400, "NoOfRooms must match PaxRooms length");
   }
 
-  /* =====================================================
-     STEP 1: GET HOTEL CODE LIST
-  ===================================================== */
-
-  const hotelCodeResponse = await tboService.getTBOHotelCodeList(CityCode);
-
-  if (!hotelCodeResponse?.Hotels?.length) {
-    console.log("⚠️ No hotel codes found, returning empty safely");
-
-    return res.status(200).json(
-      new ApiResponse(
-        200,
-        {
-          HotelResult: [],
-        },
-        "No hotels found for this city",
-      ),
-    );
-  }
-
-  const hotelCodesArray = hotelCodeResponse.Hotels.slice(0, 200); // 🔥 reduce for performance
-  const hotelCodes = hotelCodesArray.map((h) => h.HotelCode).join(",");
-
-  /* =====================================================
-     STEP 2: SEARCH (PRICE + ROOMS)
-  ===================================================== */
-
-  // const searchResults = await tboService.searchHotels({
-  //   CheckIn,
-  //   CheckOut,
-  //   HotelCodes: hotelCodes,
-  //   GuestNationality: "IN",
-  //   NoOfRooms,
-  //   PaxRooms,
-  //   IsDetailedResponse,
-  //   Filters,
-  // });
-
-  let searchResults = await tboService.searchHotels({
+  const cacheKeyPayload = {
     CheckIn,
     CheckOut,
-    HotelCodes: hotelCodes,
+    CityCode,
     GuestNationality,
     NoOfRooms,
     PaxRooms,
     IsDetailedResponse,
     Filters,
-  });
+  };
 
-  // ✅ 🔥 ONLY IF EMPTY → APPLY INTERNATIONAL FIX
-  if (!searchResults?.HotelResult?.length) {
-    console.log("⚠️ Empty result, retrying for international...");
+  const cacheKey = buildCacheKey(cacheKeyPayload);
 
-    searchResults = await tboService.searchHotels({
-      CheckIn,
-      CheckOut,
-      HotelCodes: hotelCodes,
+  let indexedHotels = null;
+  let traceId = null;
 
-      // 🔥 override only in fallback
-      GuestNationality: "IN",
-
-      NoOfRooms,
-      PaxRooms,
-      IsDetailedResponse,
-
-      // 🔥 remove filters only in fallback
-      Filters: {},
-    });
+  /* =====================================================
+     TRY CACHE FIRST
+  ===================================================== */
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      const cachedHotels = Array.isArray(parsed)
+        ? parsed
+        : parsed?.hotels;
+      if (Array.isArray(cachedHotels)) {
+        indexedHotels = addIndex(cachedHotels);
+        traceId = parsed?.traceId || null;
+      }
+    }
+  } catch (err) {
+    console.error("[hotel-search] Redis read failed:", err?.message || err);
   }
 
   /* =====================================================
-     STEP 3: DETAILS (BATCH)
+     CACHE MISS → CALL TBO
   ===================================================== */
+  if (!indexedHotels) {
+    const hotelCodeResponse = await tboService.getTBOHotelCodeList(CityCode);
 
-  const detailsResponse = await tboService.getStaticHotelDetails(hotelCodes);
+    if (!hotelCodeResponse?.Hotels?.length) {
+      console.log("[hotel-search] no hotel codes found for city", CityCode);
+      indexedHotels = [];
+    } else {
+      const hotelCodesArray = hotelCodeResponse.Hotels.slice(0, 200);
+      const hotelCodes = hotelCodesArray.map((h) => h.HotelCode).join(",");
 
-  // 🔥 SAFE EXTRACTION
-  const detailsList =
-    detailsResponse?.HotelDetails ||
-    detailsResponse?.HotelDetails?.HotelDetails ||
-    [];
+      let searchResults = await tboService.searchHotels({
+        CheckIn,
+        CheckOut,
+        HotelCodes: hotelCodes,
+        GuestNationality,
+        NoOfRooms,
+        PaxRooms,
+        IsDetailedResponse,
+        Filters,
+      });
+
+      if (!searchResults?.HotelResult?.length) {
+        console.log("[hotel-search] empty search result, retrying with defaults");
+        searchResults = await tboService.searchHotels({
+          CheckIn,
+          CheckOut,
+          HotelCodes: hotelCodes,
+          GuestNationality: "IN",
+          NoOfRooms,
+          PaxRooms,
+          IsDetailedResponse,
+          Filters: {},
+        });
+      }
+
+      traceId = searchResults?.TraceId || null;
+
+      const detailsResponse = await tboService.getStaticHotelDetails(
+        hotelCodes,
+      );
+
+      const detailsList =
+        detailsResponse?.HotelDetails ||
+        detailsResponse?.HotelDetails?.HotelDetails ||
+        [];
+
+      const detailsMap = {};
+      detailsList.forEach((hotel) => {
+        detailsMap[hotel.HotelCode] = hotel;
+      });
+
+      const mergedHotels = (searchResults?.HotelResult || []).map((hotel) => {
+        const details = detailsMap[hotel.HotelCode];
+
+        return {
+          ...hotel,
+          HotelName: details?.HotelName || hotel.HotelName || "Hotel",
+          Address: details?.Address || hotel.Address || "",
+          CityName: details?.CityName || hotel.CityName || "",
+          CountryName: details?.CountryName || hotel.CountryName || "",
+          StarRating: details?.HotelRating || hotel.StarRating || 0,
+          Description: details?.Description || hotel.Description || "",
+          Images: details?.Images || hotel.Images || [],
+          Amenities: details?.HotelFacilities || hotel.Amenities || [],
+          Map: details?.Map || hotel.Map,
+        };
+      });
+
+      const dedupedHotels = deduplicateHotels(mergedHotels);
+      indexedHotels = addIndex(dedupedHotels);
+    }
+
+    try {
+      await redis.set(
+        cacheKey,
+        JSON.stringify({ hotels: indexedHotels, traceId }),
+        "EX",
+        600,
+      );
+    } catch (err) {
+      console.error("[hotel-search] Redis write failed:", err?.message || err);
+    }
+  }
+
+  indexedHotels = indexedHotels || [];
 
   /* =====================================================
-     STEP 4: CREATE MAP (FAST LOOKUP)
+     STEP 9: PAGINATION (SERVER-SIDE)
   ===================================================== */
-
-  const detailsMap = {};
-  detailsList.forEach((hotel) => {
-    detailsMap[hotel.HotelCode] = hotel;
-  });
-
-  /* =====================================================
-     STEP 5: MERGE DATA
-  ===================================================== */
-
-  const mergedHotels = (searchResults?.HotelResult || []).map((hotel) => {
-    const details = detailsMap[hotel.HotelCode];
-
-    return {
-      ...hotel,
-
-      // 🔥 ENRICH DATA
-      HotelName: details?.HotelName || "Hotel",
-      Address: details?.Address || "",
-      CityName: details?.CityName || "",
-      CountryName: details?.CountryName || "",
-      StarRating: details?.HotelRating || 0,
-      Description: details?.Description || "",
-      Images: details?.Images || [],
-      Amenities: details?.HotelFacilities || [],
-      Map: details?.Map,
-    };
-  });
+  const total = indexedHotels.length;
+  const start = (page - 1) * limit;
+  const paginatedHotels = indexedHotels.slice(start, start + limit);
+  const pagination = {
+    total,
+    page,
+    limit,
+    hasMore: start + limit < total,
+  };
 
   /* =====================================================
      FINAL RESPONSE
@@ -255,7 +322,10 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     new ApiResponse(
       200,
       {
-        HotelResult: mergedHotels,
+        hotels: paginatedHotels,
+        HotelResult: paginatedHotels, // backward compatibility with existing consumers
+        pagination,
+        traceId,
       },
       "Hotel search completed with details",
     ),

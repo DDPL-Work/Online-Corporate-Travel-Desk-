@@ -180,10 +180,10 @@ export const STEPS = [
   { id: 2, label: "Contacts", icon: <MdPerson /> },
   { id: 3, label: "Address", icon: <MdLocationOn /> },
   { id: 4, label: "SSO", icon: <MdShield /> },
-  { id: 5, label: "Billing", icon: <MdCreditCard /> },
-  { id: 6, label: "Policy", icon: <MdPolicy /> },
-  { id: 7, label: "Docs", icon: <MdUploadFile /> },
-  { id: 8, label: "Done", icon: <MdDone /> },
+  // { id: 5, label: "Billing", icon: <MdCreditCard /> },
+  { id: 5, label: "Policy", icon: <MdPolicy /> },
+  { id: 6, label: "Docs", icon: <MdUploadFile /> },
+  { id: 7, label: "Done", icon: <MdDone /> },
 ];
 
 // ── Tiny UI atoms ─────────────────────────────────────────────────────────────

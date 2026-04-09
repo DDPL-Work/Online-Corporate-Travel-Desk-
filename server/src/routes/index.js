@@ -5,7 +5,7 @@ const router = express.Router();
 
 // Import route modules
 const authRoutes = require("./auth.routes");
-const corporateRoutes = require("./corporate.routes");
+const corporateRelatedRoutes = require("./corporate.related.routes");
 const bookingRoutes = require("./bookings.routes");
 const approvalRoutes = require("./approval.routes");
 const flightRoutes = require("./flight.routes");
@@ -34,7 +34,7 @@ router.use("/auth/sso", authSSORoutes);
 
 // ------------------ Normal Protected Routes ------------------
 router.use("/auth", authRoutes);
-router.use("/corporate", corporateRoutes);
+router.use("/corporate-related", corporateRelatedRoutes);
 router.use("/bookings", bookingRoutes);
 router.use("/approvals", approvalRoutes);
 router.use("/flights", flightRoutes);

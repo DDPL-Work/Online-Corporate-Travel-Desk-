@@ -23,23 +23,37 @@ const SSOCallback = () => {
         lower.includes("inactive") || lower.includes("disabled");
       const contactText = admin ? ` (${admin})` : "";
 
+      const msg = isInactive
+        ? `Your account is inactive. Please contact your travel admin${contactText} to reactivate your access.`
+        : error;
+
+      // Persist for pages that mount later (e.g., landing header)
+      try {
+        sessionStorage.setItem("auth_inactive_msg", msg);
+      } catch (_) {}
+
       ToastWithTimer({
-        message: isInactive
-          ? `Your account is inactive. Please contact your travel admin${contactText} to reactivate your access.`
-          : error,
+        message: msg,
         type: "error",
         duration: 6000,
       });
 
+      // Broadcast to show global inactive modal (handled in LandingHeader)
+      window.dispatchEvent(
+        new CustomEvent("auth:inactive", {
+          detail: { message: msg },
+        }),
+      );
+
       const qs = new URLSearchParams();
       qs.set("error", error);
       if (admin) qs.set("admin", admin);
-      navigate(`/iapindia?${qs.toString()}`, { replace: true });
+      navigate(`/platform/flight-booking-info?${qs.toString()}`, { replace: true });
       return;
     }
 
     if (!token) {
-      navigate("/iapindia", { replace: true });
+      navigate("/platform/flight-booking-info", { replace: true });
       return;
     }
 
@@ -69,7 +83,7 @@ const SSOCallback = () => {
         navigate("/manager/total-bookings", { replace: true });
       }
     } catch (err) {
-      navigate("/iapindia", { replace: true });
+      navigate("/platform/flight-booking-info", { replace: true });
     }
   }, [dispatch, navigate, params]);
 

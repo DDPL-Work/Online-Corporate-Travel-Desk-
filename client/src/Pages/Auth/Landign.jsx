@@ -1448,7 +1448,7 @@ export default function LandingPage() {
       setShowInactiveModal(true);
 
       // Clean the URL
-      navigate("/iapindia", { replace: true });
+      navigate("/platform/flight-booking-info", { replace: true });
     }
   }, [location.search, navigate]);
 

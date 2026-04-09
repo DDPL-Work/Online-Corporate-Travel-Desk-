@@ -18,6 +18,7 @@ import {
   initiateWalletRecharge,
   verifyWalletPayment,
 } from "../../Redux/Slice/walletSlice";
+import { Pagination } from "./Shared/Pagination";
 
 // Extended color palette matching CreditUtilizationPostpaid
 const colors = {
@@ -109,58 +110,17 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const Pagination = ({
-  currentPage,
-  totalPages,
-  onPageChange,
-  showFirstLast = true,
-}) => {
-  const pages = [];
-  for (let i = 1; i <= totalPages; i++) pages.push(i);
-  if (totalPages <= 1) return null;
-
-  return (
-    <div className="flex items-center gap-1">
-      {showFirstLast && (
-        <button
-          onClick={() => onPageChange(1)}
-          disabled={currentPage === 1}
-          className="px-2 py-1 rounded text-xs font-bold disabled:opacity-40"
-        >
-          First
-        </button>
-      )}
-      {pages.map((p) => (
-        <button
-          key={p}
-          onClick={() => onPageChange(p)}
-          className={`w-7 h-7 rounded text-xs font-bold transition ${
-            currentPage === p
-              ? "bg-[#0A4D68] text-white"
-              : "text-slate-600 hover:bg-slate-100"
-          }`}
-        >
-          {p}
-        </button>
-      ))}
-      {showFirstLast && (
-        <button
-          onClick={() => onPageChange(totalPages)}
-          disabled={currentPage === totalPages}
-          className="px-2 py-1 rounded text-xs font-bold disabled:opacity-40"
-        >
-          Last
-        </button>
-      )}
-    </div>
-  );
-};
-
 export default function CorporateWallet() {
   const dispatch = useDispatch();
 
-  const { balance, currency, transactions, loading, rechargeOrder } =
-    useSelector((state) => state.wallet);
+  const {
+    balance,
+    currency,
+    transactions,
+    loading,
+    rechargeOrder,
+    pagination,
+  } = useSelector((state) => state.wallet);
 
   // Original filter states
   const [filterType, setFilterType] = useState("All");
@@ -171,38 +131,36 @@ export default function CorporateWallet() {
   // New UI filters (client-side)
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // all, success, pending, failed
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
 
   // Modal state
   const [showRecharge, setShowRecharge] = useState(false);
   const [rechargeAmount, setRechargeAmount] = useState("");
 
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
   // INITIAL LOAD (preserved)
   useEffect(() => {
     dispatch(fetchWalletBalance());
-    dispatch(fetchWalletTransactions());
+    dispatch(fetchWalletTransactions({ page: 1, limit: 10 }));
   }, [dispatch]);
 
   // APPLY FILTERS (original server-side logic)
   const applyFilters = () => {
     dispatch(
       fetchWalletTransactions({
+        page: 1,
+        limit: 10,
         type: filterType !== "All" ? filterType.toLowerCase() : undefined,
         dateFrom: startDate || undefined,
         dateTo: endDate || undefined,
       }),
     );
     // Reset pagination and client-side filters when server filters change
-    setCurrentPage(1);
     setSearchTerm("");
     setStatusFilter("all");
   };
 
-  // Reset page when client-side filters or tab change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter, activeTab]);
 
   // Helper: determine transaction status (fallback to 'success')
   const getTransactionStatus = (tx) => {
@@ -254,11 +212,11 @@ export default function CorporateWallet() {
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
   // Pagination
-  const totalPages = Math.ceil(totalTransactions / itemsPerPage);
-  const paginatedTransactions = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredTransactions.slice(start, start + itemsPerPage);
-  }, [filteredTransactions, currentPage, itemsPerPage]);
+  // const totalPages = Math.ceil(totalTransactions / itemsPerPage);
+  // const paginatedTransactions = useMemo(() => {
+  //   const start = (currentPage - 1) * itemsPerPage;
+  //   return filteredTransactions.slice(start, start + itemsPerPage);
+  // }, [filteredTransactions, currentPage, itemsPerPage]);
 
   // Export to CSV (based on filtered transactions)
   const handleExport = () => {
@@ -573,14 +531,14 @@ export default function CorporateWallet() {
                       Loading transactions...
                     </td>
                   </tr>
-                ) : paginatedTransactions.length === 0 ? (
+                ) : transactions.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="py-8 text-center text-slate-500">
                       No transactions found for the selected filters.
                     </td>
                   </tr>
                 ) : (
-                  paginatedTransactions.map((tx) => (
+                  transactions.map((tx) => (
                     <tr
                       key={tx._id}
                       className="hover:bg-slate-50 transition-all"
@@ -633,14 +591,27 @@ export default function CorporateWallet() {
           {/* Pagination Footer */}
           <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
             <span>
-              Showing {paginatedTransactions.length} of {totalTransactions}{" "}
+              Showing {transactions.length} of {pagination?.total || 0}{" "}
               transaction(s)
             </span>
             <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              showFirstLast={true}
+              currentPage={pagination?.page || 1}
+              totalItems={pagination?.total || 0}
+              pageSize={pagination?.limit || 10}
+              onPageChange={(page) => {
+                dispatch(
+                  fetchWalletTransactions({
+                    page,
+                    limit: pagination?.limit || 10,
+                    type:
+                      filterType !== "All"
+                        ? filterType.toLowerCase()
+                        : undefined,
+                    dateFrom: startDate || undefined,
+                    dateTo: endDate || undefined,
+                  }),
+                );
+              }}
             />
           </div>
         </div>

@@ -51,7 +51,7 @@ export default function Layout() {
   // REDIRECT IF NOT AUTHENTICATED
   // =============================
   if (!isAuthenticated || !token) {
-    return <Navigate to="/iapindia" replace />;
+    return <Navigate to="/platform/flight-booking-info" replace />;
   }
 
   // =============================

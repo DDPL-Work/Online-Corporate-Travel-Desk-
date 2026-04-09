@@ -51,7 +51,7 @@ export default function EmployeeHeader() {
   /* ================= ACTIONS ================= */
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate("/iapindia", { replace: true });
+    navigate("/platform/flight-booking-info", { replace: true });
   };
 
   const goToProfile = () => {
