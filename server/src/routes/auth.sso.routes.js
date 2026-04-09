@@ -4,6 +4,35 @@ const passport = require('../config/sso.config');
 const { generateSSOToken } = require('../utils/jwt');
 
 const router = express.Router();
+const FRONTEND_URL =
+  process.env.FRONTEND_URL || 'http://localhost:5173';
+
+/**
+ * Build a safe redirect URL back to the frontend with error context
+ */
+const buildFailureRedirect = (info = {}) => {
+  const url = new URL(`${FRONTEND_URL}/sso/callback`);
+  url.searchParams.set('error', info.message || 'SSO failed');
+  if (info.contactEmail) url.searchParams.set('admin', info.contactEmail);
+  return url.toString();
+};
+
+/**
+ * Shared callback handler to capture failure reasons and redirect accordingly
+ */
+const handleSSOCallback = (strategy) => (req, res, next) =>
+  passport.authenticate(
+    strategy,
+    { session: false },
+    (err, user, info) => {
+      if (err || !user) {
+        const redirectUrl = buildFailureRedirect(info || {});
+        return res.redirect(redirectUrl);
+      }
+      req.user = user;
+      return generateSSOToken(req, res);
+    },
+  )(req, res, next);
 
 /* --------------------------------------------------
    GOOGLE SSO
@@ -19,14 +48,7 @@ router.get(
 );
 
 // Google callback → returns JWT
-router.get(
-  '/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: '/api/v1/auth/sso/failure',
-    session: false
-  }),
-  generateSSOToken
-);
+router.get('/google/callback', handleSSOCallback('google'));
 
 
 /* --------------------------------------------------
@@ -43,14 +65,7 @@ router.get(
 );
 
 // Microsoft callback (POST from Azure)
-router.post(
-  '/microsoft/callback',
-  passport.authenticate('azuread-openidconnect', {
-    failureRedirect: '/api/v1/auth/sso/failure',
-    session: false
-  }),
-  generateSSOToken
-);
+router.post('/microsoft/callback', handleSSOCallback('azuread-openidconnect'));
 
 
 /* --------------------------------------------------
@@ -66,14 +81,7 @@ router.get(
 );
 
 // Zoho callback → returns JWT (consistent with others)
-router.get(
-  '/zoho/callback',
-  passport.authenticate('zoho', {
-    failureRedirect: '/api/v1/auth/sso/failure',
-    session: false
-  }),
-  generateSSOToken
-);
+router.get('/zoho/callback', handleSSOCallback('zoho'));
 
 
 /* --------------------------------------------------

@@ -89,6 +89,15 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     travellers,
     purposeOfTravel,
     pricingSnapshot,
+    gstDetails,
+    projectCodeId,
+    projectId,
+    projectName,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
   } = req.body;
 
   const corporate = req.corporate;
@@ -310,6 +319,15 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     fareQuote: freshFareQuote,
 
     purposeOfTravel,
+    gstDetails,
+    projectCodeId,
+    projectId,
+    projectName,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
     travellers,
     flightRequest:
       bookingType === "flight"

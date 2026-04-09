@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import {
@@ -19,8 +19,11 @@ import {
   FaIdCard,
   FaUser,
   FaBars,
+  FaFileExcel,
+  FaChevronDown,
 } from "react-icons/fa";
 import { MdCancel } from "react-icons/md";
+import { GrUserManager } from "react-icons/gr";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCorporateAdmin } from "../Redux/Slice/corporateAdminSlice";
 
@@ -51,29 +54,20 @@ export default function Sidebar({ isOpen, onClose }) {
   const travelAdminMenu = useMemo(() => {
     const menu = [
       {
-        to: "/total-bookings",
-        label: "Total Bookings",
-        icon: <FaClipboardList />,
+        to: "/project-management",
+        label: "Project Management",
+        icon: <FaFileExcel />,
       },
       {
-        to: "/total-cancelled-bookings",
-        label: "Cancelled Bookings",
-        icon: <FaClipboardList />,
-      },
-      { to: "/pending-requests", label: "Pending Requests", icon: <FaClock /> },
-      {
-        to: "/approved-requests",
-        label: "Approved Requests",
-        icon: <FaCheck />,
+        to: "/manager-management",
+        label: "Manager Management",
+        icon: <GrUserManager />,
       },
       {
-        to: "/rejected-requests",
-        label: "Rejected Requests",
-        icon: <FaTimes />,
+        to: "/user-management",
+        label: "Employee Management",
+        icon: <FaUsers />,
       },
-      { to: "/upcoming-trips", label: "Upcoming Trips", icon: <FaClock /> },
-      { to: "/past-trips", label: "Past Trips", icon: <FaClipboardList /> },
-      { to: "/user-management", label: "Employee Management", icon: <FaUsers /> },
     ];
     if (classification === "prepaid") {
       menu.push({
@@ -89,6 +83,46 @@ export default function Sidebar({ isOpen, onClose }) {
         icon: <FaCreditCard />,
       });
     }
+    menu.push(
+      {
+        label: "Company Bookings",
+        icon: <FaClipboardList />,
+        children: [
+          {
+            to: "/total-bookings",
+            label: "Total Bookings",
+            icon: <FaClipboardList />,
+          },
+          {
+            to: "/total-cancelled-bookings",
+            label: "Cancelled Bookings",
+            icon: <FaClipboardList />,
+          },
+          {
+            to: "/pending-requests",
+            label: "Pending Requests",
+            icon: <FaClock />,
+          },
+          {
+            to: "/approved-requests",
+            label: "Approved Requests",
+            icon: <FaCheck />,
+          },
+          {
+            to: "/rejected-requests",
+            label: "Rejected Requests",
+            icon: <FaTimes />,
+          },
+          { to: "/upcoming-trips", label: "Upcoming Trips", icon: <FaClock /> },
+          { to: "/past-trips", label: "Past Trips", icon: <FaClipboardList /> },
+        ],
+      },
+      {
+        to: "/travel-profile-settings",
+        label: "Corporate Profile",
+        icon: <FaBuilding />,
+      },
+    );
     return menu;
   }, [classification]);
 
@@ -158,34 +192,63 @@ export default function Sidebar({ isOpen, onClose }) {
     {
       to: "/my-cancelled-bookings",
       label: "Cancelled Bookings",
-      icon: <MdCancel />
+      icon: <MdCancel />,
     },
     { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
     { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },
   ];
 
-  const manager = [
-    {
-      to: "/corporate-dashboard",
-      label: "Dashboard",
-      icon: <FaClipboardList />,
-    },
-    {
-      to: "/admin-management",
-      label: "Admin Management",
-      icon: <FaShieldAlt />,
-    },
-    {
-      to: "/employee-management",
-      label: "Employee Management",
-      icon: <FaUsers />,
-    },
-    {
-      to: "/corporate-total-bookings",
-      label: "Total Bookings",
-      icon: <FaListAlt />,
-    },
-  ];
+  const manager = useMemo(() => {
+    const menu = [
+      {
+        label: "Company Bookings",
+        icon: <FaClipboardList />,
+        children: [
+          {
+            to: "/manager/total-bookings",
+            label: "Total Bookings",
+            icon: <FaClipboardList />,
+          },
+          {
+            to: "/manager/total-cancelled-bookings",
+            label: "Cancelled Bookings",
+            icon: <FaClipboardList />,
+          },
+          {
+            to: "/manager/pending-requests",
+            label: "Pending Requests",
+            icon: <FaClock />,
+          },
+          {
+            to: "/manager/approved-requests",
+            label: "Approved Requests",
+            icon: <FaCheck />,
+          },
+          {
+            to: "/manager/rejected-requests",
+            label: "Rejected Requests",
+            icon: <FaTimes />,
+          },
+          {
+            to: "/manager/upcoming-trips",
+            label: "Upcoming Trips",
+            icon: <FaClock />,
+          },
+          {
+            to: "/manager/past-trips",
+            label: "Past Trips",
+            icon: <FaClipboardList />,
+          },
+        ],
+      },
+      {
+        to: "/manager/team-management",
+        label: "Team Management",
+        icon: <FaUsers />,
+      },
+    ];
+    return menu;
+  }, [classification]);
 
   const menus = {
     "super-admin": travelCompanyMenu,
@@ -194,6 +257,10 @@ export default function Sidebar({ isOpen, onClose }) {
     manager: manager,
   };
   const activeMenu = menus[role] || [];
+  const [openGroups, setOpenGroups] = useState({});
+
+  const toggleGroup = (label) =>
+    setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
 
   const roleLabels = {
     "super-admin": "Super Admin",
@@ -237,26 +304,75 @@ export default function Sidebar({ isOpen, onClose }) {
           {role === "travel-admin" && loading ? (
             <div className="text-center text-gray-400 py-6">Loading...</div>
           ) : (
-            activeMenu.map((m) => (
-              <NavLink
-                key={m.to}
-                to={m.to}
-                onClick={() => window.innerWidth < 1024 && onClose()}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium transition-all duration-200
-                  ${
-                    isActive
-                      ? "bg-[#0A4D68] text-white shadow-sm"
-                      : "text-gray-700 hover:bg-gray-100 hover:text-[#0A4D68]"
-                  }`
-                }
-              >
-                <span className="w-5 h-5 flex items-center justify-center text-lg">
-                  {m.icon}
-                </span>
-                <span>{m.label}</span>
-              </NavLink>
-            ))
+            activeMenu.map((m) =>
+              m.children ? (
+                <div key={m.label} className="space-y-1">
+                  <button
+                    onClick={() => toggleGroup(m.label)}
+                    className={`w-full flex items-center justify-between px-3 py-3 rounded-md text-sm font-semibold transition-all duration-200 ${
+                      openGroups[m.label]
+                        ? "bg-[#0A4D68] text-white shadow-sm"
+                        : "text-gray-700 hover:bg-gray-100 hover:text-[#0A4D68]"
+                    }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="w-5 h-5 flex items-center justify-center text-lg">
+                        {m.icon}
+                      </span>
+                      <span>{m.label}</span>
+                    </span>
+                    <FaChevronDown
+                      className={`transition-transform ${
+                        openGroups[m.label] ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                  {openGroups[m.label] && (
+                    <div className="ml-4 border-l border-slate-200 pl-2 space-y-1">
+                      {m.children.map((c) => (
+                        <NavLink
+                          key={c.to}
+                          to={c.to}
+                          onClick={() => window.innerWidth < 1024 && onClose()}
+                          className={({ isActive }) =>
+                            `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200
+                            ${
+                              isActive
+                                ? "bg-[#0A4D68] text-white shadow-sm"
+                                : "text-gray-700 hover:bg-gray-100 hover:text-[#0A4D68]"
+                            }`
+                          }
+                        >
+                          <span className="w-5 h-5 flex items-center justify-center text-lg">
+                            {c.icon}
+                          </span>
+                          <span>{c.label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <NavLink
+                  key={m.to}
+                  to={m.to}
+                  onClick={() => window.innerWidth < 1024 && onClose()}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium transition-all duration-200
+                    ${
+                      isActive
+                        ? "bg-[#0A4D68] text-white shadow-sm"
+                        : "text-gray-700 hover:bg-gray-100 hover:text-[#0A4D68]"
+                    }`
+                  }
+                >
+                  <span className="w-5 h-5 flex items-center justify-center text-lg">
+                    {m.icon}
+                  </span>
+                  <span>{m.label}</span>
+                </NavLink>
+              ),
+            )
           )}
         </nav>
       </aside>

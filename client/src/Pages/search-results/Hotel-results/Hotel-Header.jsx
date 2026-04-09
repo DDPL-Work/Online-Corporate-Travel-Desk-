@@ -251,20 +251,29 @@ const Header = () => {
 
   const handleSearch = () => {
     if (!form.cityCode || !form.checkIn || !form.checkOut) return;
-    dispatch(searchHotels({
-      CheckIn: form.checkIn,
-      CheckOut: form.checkOut,
-      CityCode: form.cityCode,
-      GuestNationality: form.country,
-      NoOfRooms: form.rooms,
-      PaxRooms: [{
-        Adults: form.adults,
-        Children: form.children,
-        ChildrenAges: form.children > 0 ? Array(form.children).fill(5) : [],
-      }],
-      IsDetailedResponse: true,
-      Filters: { Refundable: false, MealType: "All" },
-    }));
+    dispatch(
+      searchHotels({
+        payload: {
+          CheckIn: form.checkIn,
+          CheckOut: form.checkOut,
+          CityCode: form.cityCode,
+          GuestNationality: form.country,
+          NoOfRooms: form.rooms,
+          PaxRooms: [
+            {
+              Adults: form.adults,
+              Children: form.children,
+              ChildrenAges:
+                form.children > 0 ? Array(form.children).fill(5) : [],
+            },
+          ],
+          IsDetailedResponse: true,
+          Filters: { Refundable: false, MealType: "All" },
+        },
+        page: 1,
+        limit: 10,
+      }),
+    );
   };
 
   const nights = form.checkIn && form.checkOut

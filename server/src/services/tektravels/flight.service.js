@@ -5,6 +5,57 @@ const config = require("../../config/tbo.config");
 const logger = require("../../utils/logger");
 const ApiError = require("../../utils/ApiError");
 
+const BOOKING_ENDPOINTS = new Set([
+  "flightBook",
+  "flightTicket",
+  "flightBookingDetails",
+  "flightCancel",
+  "flightCancellationCharges",
+  "flightSendChangeRequest",
+  "flightGetChangeRequestStatus",
+  "flightReleasePNR",
+]);
+
+const SHARED_ENDPOINTS = new Set(["authenticate", "getAgencyBalance"]);
+
+const getTboEnvKey = () => {
+  const envFlag = (process.env.TBO_ENV || process.env.NODE_ENV || "").toLowerCase();
+
+  // Production + test/UAT map to "live" config; anything else falls back to dummy.
+  if (
+    ["production", "prod", "live", "staging", "test", "uat"].includes(envFlag)
+  ) {
+    return "live";
+  }
+
+  return "dummy";
+};
+
+const buildUrl = (envKey, endpointKey) => {
+  if (typeof config.resolveUrl === "function") {
+    return config.resolveUrl(envKey, endpointKey);
+  }
+
+  const cfg = config[envKey];
+
+  if (!cfg || !cfg.endpoints) {
+    throw new ApiError(500, `Missing TBO config for env ${envKey}`);
+  }
+
+  const endpoint = cfg.endpoints[endpointKey] || endpointKey;
+
+  if (endpoint.startsWith("http")) return endpoint;
+
+  const base =
+    BOOKING_ENDPOINTS.has(endpointKey) && cfg.bookingBase
+      ? cfg.bookingBase
+      : SHARED_ENDPOINTS.has(endpointKey) && cfg.sharedBase
+        ? cfg.sharedBase
+        : cfg.base;
+
+  return `${base}${endpoint}`;
+};
+
 const toTboDate = (value) => {
   if (!value) {
     throw new ApiError(400, `Invalid date value: ${value}`);
@@ -33,7 +84,7 @@ const toTboDate = (value) => {
 
 class FlightService {
   getEnv() {
-    return process.env.NODE_ENV === "production" ? "live" : "dummy";
+    return getTboEnvKey();
   }
 
   constructor() {
@@ -59,7 +110,7 @@ class FlightService {
         EndUserIp: cfg.endUserIp,
       };
 
-      const url = `${cfg.sharedBase || cfg.base}${cfg.endpoints.authenticate}`;
+      const url = buildUrl(type, "authenticate");
       const { data } = await axios.post(url, payload, {
         timeout: config.timeout,
       });
@@ -194,12 +245,10 @@ class FlightService {
       Sources: null,
     };
 
+    const searchUrl = buildUrl(env, "flightSearch");
+
     const doSearch = async () =>
-      axios.post(
-        `${cfg.base}${cfg.endpoints.flightSearch}`,
-        payload,
-        { timeout: config.timeout },
-      );
+      axios.post(searchUrl, payload, { timeout: config.timeout });
 
     let { data } = await doSearch();
 
@@ -224,8 +273,10 @@ class FlightService {
       throw new ApiError(400, "traceId and resultIndex are required");
     }
 
+    const env = this.getEnv();
+
     // Dummy support
-    if (process.env.NODE_ENV !== "production") {
+    if (env === "dummy") {
       return {
         FareRules: [
           {
@@ -245,19 +296,21 @@ class FlightService {
 
     // LIVE
     return this.postLive(
-      "/BookingEngineService_Air/AirService.svc/rest/FareRule",
+      "flightFareRule",
       {
         TraceId: traceId,
         ResultIndex: resultIndex,
       },
-      "live",
+      env,
     );
   }
 
   /* ---------------- FARE QUOTE ---------------- */
   async getFareQuote(traceId, resultIndex) {
-    // 🔹 Dummy environment
-    if (process.env.NODE_ENV !== "production") {
+    const env = this.getEnv();
+
+    // Dummy environment
+    if (env === "dummy") {
       return {
         Status: 1,
         TraceId: traceId,
@@ -277,21 +330,23 @@ class FlightService {
       };
     }
 
-    // 🔹 Live
+    // Live / Test
     return this.postLive(
-      config.live.endpoints.flightFareQuote,
+      "flightFareQuote",
       {
         TraceId: traceId,
         ResultIndex: resultIndex,
       },
-      "live",
+      env,
     );
   }
 
   /* ---------------- REAL SSR ---------------- */
   async getSSR(traceId, resultIndex) {
+    const env = this.getEnv();
+
     // Dummy for non-production
-    if (process.env.NODE_ENV !== "production") {
+    if (env === "dummy") {
       return {
         Status: 1,
         TraceId: traceId,
@@ -305,12 +360,12 @@ class FlightService {
 
     // LIVE SSR
     return this.postLive(
-      config.live.endpoints.flightSSR,
+      "flightSSR",
       {
         TraceId: traceId,
         ResultIndex: resultIndex,
       },
-      "live",
+      env,
     );
   }
 
@@ -320,8 +375,9 @@ class FlightService {
       throw new ApiError(400, "traceId and resultIndex are required");
     }
 
-    // 🔹 Dummy environment
-    if (process.env.NODE_ENV !== "production") {
+    const env = this.getEnv();
+
+    if (env === "dummy") {
       return {
         Status: 1,
         TraceId: traceId,
@@ -349,14 +405,13 @@ class FlightService {
       };
     }
 
-    // 🔹 LIVE Seat Map
     return this.postLive(
-      config.live.endpoints.flightSeatMap,
+      "flightSeatMap",
       {
         TraceId: traceId,
         ResultIndex: resultIndex,
       },
-      "live",
+      env,
     );
   }
 
@@ -366,8 +421,10 @@ class FlightService {
       throw new ApiError(400, "traceId and resultIndex are required");
     }
 
+    const env = this.getEnv();
+
     // Dummy
-    if (process.env.NODE_ENV !== "production") {
+    if (env === "dummy") {
       return {
         TraceId: traceId,
         ResultIndex: resultIndex,
@@ -409,9 +466,9 @@ class FlightService {
 
     // LIVE
     const response = await this.postLive(
-      "/BookingEngineService_Air/AirService.svc/rest/FareUpsell",
+      "flightFareUpsell",
       { TraceId: traceId, ResultIndex: resultIndex },
-      "live",
+      env,
     );
     const upsellList = response?.UpsellOptionsList?.UpsellList || [];
 
@@ -438,6 +495,8 @@ class FlightService {
     if (!result) {
       throw new ApiError(400, "Selected flight result is required");
     }
+
+    const env = this.getEnv();
 
     if (typeof resultIndex !== "string") {
       throw new ApiError(
@@ -507,11 +566,7 @@ class FlightService {
 
     logger.info("TBO BOOK PAYLOAD", JSON.stringify(payload, null, 2));
 
-    const response = await this.postLive(
-      config.live.endpoints.flightBook,
-      payload,
-      "live",
-    );
+    const response = await this.postLive("flightBook", payload, env);
 
     if (response?.Response?.ResponseStatus !== 1) {
       throw new ApiError(
@@ -583,6 +638,8 @@ class FlightService {
     passengers,
     isLCC,
   }) {
+    const env = this.getEnv();
+
     let payload = {};
 
     /* ================= LCC ================= */
@@ -642,11 +699,7 @@ class FlightService {
 
     logger.info("TBO TICKET PAYLOAD", payload);
 
-    const response = await this.postLive(
-      config.live.endpoints.flightTicket,
-      payload,
-      "live",
-    );
+    const response = await this.postLive("flightTicket", payload, env);
 
     if (response?.Response?.ResponseStatus !== 1) {
       throw new ApiError(
@@ -663,11 +716,9 @@ class FlightService {
       throw new ApiError(400, "PNR is required to fetch booking details");
     }
 
-    return this.postLive(
-      config.live.endpoints.flightBookingDetails,
-      { PNR: pnr },
-      "live",
-    );
+    const env = this.getEnv();
+
+    return this.postLive("flightBookingDetails", { PNR: pnr }, env);
   }
 
   /* ---------------- PASSENGER MAPPER ---------------- */
@@ -758,14 +809,30 @@ class FlightService {
 
   /* ---------------- LIVE POST ---------------- */
   async postLive(endpoint, payload, type = "live") {
-    const token = await this.getToken(type);
+    const envKey = type || "live";
+    const cfg = config[envKey];
+
+    if (!cfg) {
+      throw new ApiError(500, `Missing TBO config for env ${envKey}`);
+    }
+
+    const hasEndpointKey =
+      cfg.endpoints &&
+      Object.prototype.hasOwnProperty.call(cfg.endpoints, endpoint);
+
+    const url = hasEndpointKey
+      ? buildUrl(envKey, endpoint)
+      : endpoint.startsWith("http")
+        ? endpoint
+        : `${cfg.base}${endpoint}`;
+
+    const token = await this.getToken(envKey);
 
     try {
       const { data } = await axios.post(
-        `${type === "live" ? config.live.base : config.dummy.base}${endpoint}`,
+        url,
         {
-          EndUserIp:
-            type === "live" ? config.live.endUserIp : config.dummy.endUserIp,
+          EndUserIp: cfg.endUserIp,
           TokenId: token,
           ...payload,
         },
@@ -774,6 +841,8 @@ class FlightService {
       return data;
     } catch (err) {
       logger.error("TBO ERROR", {
+        env: envKey,
+        url,
         status: err.response?.status,
         data: err.response?.data,
         payload,
@@ -790,3 +859,6 @@ class FlightService {
 }
 
 module.exports = new FlightService();
+
+
+

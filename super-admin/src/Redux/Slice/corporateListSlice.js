@@ -23,7 +23,7 @@ export const fetchCorporates = createAsyncThunk(
   "corporate/fetchAll",
   async (_, { rejectWithValue }) => {
     try {
-      const res = await axios.get(`${API_URL}/corporate`, authHeader());
+      const res = await axios.get(`${API_URL}/corporate-related`, authHeader());
       return res.data.data;
     } catch (err) {
       return rejectWithValue(
@@ -41,7 +41,7 @@ export const fetchCorporateById = createAsyncThunk(
   "corporate/fetchById",
   async (id, { rejectWithValue }) => {
     try {
-      const res = await axios.get(`${API_URL}/corporate/${id}`, authHeader());
+      const res = await axios.get(`${API_URL}/corporate-related/${id}`, authHeader());
       return res.data.data;
     } catch (err) {
       return rejectWithValue(
@@ -60,7 +60,7 @@ export const approveCorporate = createAsyncThunk(
   async ({ id, payload }, { rejectWithValue }) => {
     try {
       const res = await axios.put(
-        `${API_URL}/corporate/${id}/approve`,
+        `${API_URL}/corporate-related/${id}/approve`,
         payload, // ✅ send financial config
         authHeader()
       );
@@ -82,7 +82,7 @@ export const updateCorporate = createAsyncThunk(
   async ({ id, payload }, { rejectWithValue }) => {
     try {
       const res = await axios.put(
-        `${API_URL}/corporate/${id}`,
+        `${API_URL}/corporate-related/${id}`,
         payload,
         authHeader()
       );
@@ -104,7 +104,7 @@ export const toggleCorporateStatus = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const res = await axios.patch(
-        `${API_URL}/corporate/${id}/toggle-status`,
+        `${API_URL}/corporate-related/${id}/toggle-status`,
         {},
         authHeader()
       );

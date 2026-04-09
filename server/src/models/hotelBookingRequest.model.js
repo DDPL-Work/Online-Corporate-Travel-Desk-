@@ -55,6 +55,17 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       required: true,
     },
 
+    /* ================= PROJECT & APPROVER ================= */
+
+    projectName: String,
+    projectId: String,
+    projectClient: String,
+
+    approverId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    approverEmail: String,
+    approverName: String,
+    approverRole: String,
+
     /* ================= GST DETAILS ================= */
 
     gstDetails: {

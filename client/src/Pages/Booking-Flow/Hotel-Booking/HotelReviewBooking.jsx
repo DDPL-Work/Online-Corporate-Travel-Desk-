@@ -46,6 +46,8 @@ import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { Country } from "country-state-city";
 import api from "../../../API/axios";
+import { ProjectApproverBlock } from "./components/ProjectApproverBlock";
+import { selectManager } from "../../../Redux/Actions/manager.thunk";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Room Image Gallery                                             */
@@ -553,6 +555,11 @@ const HotelReviewBooking = () => {
   const location = useLocation();
   const { id } = useParams();
   const dispatch = useDispatch();
+
+  const [projectApproverData, setProjectApproverData] = useState({
+    project: null,
+    approver: null,
+  });
   const { user } = useSelector((state) => state.auth);
   const { loading: actionLoading } = useSelector(
     (state) => state.hotelBookings,
@@ -947,6 +954,13 @@ const HotelReviewBooking = () => {
 
     const payload = {
       bookingType: "hotel",
+      projectName: projectApproverData.project?.name,
+      projectId: projectApproverData.project?.id,
+      projectClient: projectApproverData.project?.client,
+      approverId: projectApproverData.approver?.id,
+      approverEmail: projectApproverData.approver?.email,
+      approverName: projectApproverData.approver?.name,
+      approverRole: projectApproverData.approver?.role,
       hotelRequest: {
         hotelCode:
           safeHotel?.HotelCode ||
@@ -1045,16 +1059,30 @@ const HotelReviewBooking = () => {
       },
     };
     try {
+      // ✅ STEP 1: CALL MANAGER API FIRST
+      await dispatch(
+        selectManager({
+          approverId: projectApproverData.approver?.id,
+          approverEmail: projectApproverData.approver?.email,
+          projectCodeId: projectApproverData.project?.id,
+          projectName: projectApproverData.project?.name,
+          projectClient: projectApproverData.project?.client,
+        }),
+      ).unwrap();
+
+      // ✅ STEP 2: THEN CREATE BOOKING
       await dispatch(createHotelBookingRequest(payload)).unwrap();
+
       ToastWithTimer({
         type: "success",
         message: "Booking request submitted successfully",
       });
+
       navigate("/my-pending-approvals");
     } catch (err) {
       ToastWithTimer({
         type: "error",
-        message: err || "Failed to submit request",
+        message: err?.message || "Failed to submit request",
       });
     }
   };
@@ -1792,6 +1820,7 @@ const HotelReviewBooking = () => {
           {/* ── RIGHT: Price Summary ── */}
           <div className="lg:col-span-1">
             <div className="sticky top-20 space-y-4">
+              <ProjectApproverBlock onChange={setProjectApproverData} />
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="bg-gradient-to-r from-[#0A4D68] to-[#088395] px-5 py-4">
                   <h3 className="text-sm font-bold text-white mb-0.5">
@@ -1830,9 +1859,14 @@ const HotelReviewBooking = () => {
                     .
                   </p>
                 )}
+
                 <button
                   onClick={handleAction}
-                  disabled={actionLoading}
+                  disabled={
+                    actionLoading ||
+                    !projectApproverData.project ||
+                    !projectApproverData.approver
+                  }
                   className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white uppercase tracking-wider bg-gradient-to-r from-[#0A4D68] to-[#088395] hover:from-[#093f54] hover:to-[#066876] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[#0A4D68]/20"
                 >
                   {actionLoading ? (

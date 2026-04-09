@@ -1084,6 +1084,7 @@ export const PriceSummary = ({
   approverError,
   onSendForApproval,
   loading = false,
+  disabled = false,
 }) => {
   if (!parsedFlightData) return null;
 
@@ -1209,18 +1210,19 @@ export const PriceSummary = ({
           </span>
         </div>
 
-        <div
-          onClick={!loading ? onSendForApproval : undefined}
-          className={`text-white font-bold px-3 py-1.5 flex items-center justify-center rounded-xl
-    ${
-      loading
-        ? "bg-gray-400 cursor-not-allowed"
-        : "bg-blue-600 hover:bg-[#0A4D68] cursor-pointer"
-    }
-  `}
+        <button
+          type="button"
+          onClick={!loading && !disabled ? onSendForApproval : undefined}
+          disabled={loading || disabled}
+          className={`w-full text-white font-bold px-3 py-2 flex items-center justify-center rounded-xl transition-colors
+            ${
+              loading || disabled
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-[#0A4D68]"
+            }`}
         >
-          {loading ? "Submitting..." : "Send For Approval"}
-        </div>
+          {loading ? "Submitting..." : disabled ? "Complete details to submit" : "Send For Approval"}
+        </button>
         {/* Approver Message */}
         <div className="mt-3 text-sm text-center">
           {approverLoading && (

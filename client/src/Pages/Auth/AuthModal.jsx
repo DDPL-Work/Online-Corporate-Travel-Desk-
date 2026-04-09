@@ -16,8 +16,8 @@ import {
 import { LeftPanel, STEPS, StepTracker } from "./componetsAuth/components";
 
 // ── MAIN MODAL ────────────────────────────────────────────────────────────────
-export default function AuthModal({ onClose }) {
-  const [step, setStep] = useState(0);
+export default function AuthModal({ onClose, initialStep = 0 }) {
+  const [step, setStep] = useState(initialStep || 0);
   const scrollRef = useRef(null);
   const dispatch = useDispatch();
   const { loading: onboardingLoading } = useSelector(
@@ -83,6 +83,11 @@ export default function AuthModal({ onClose }) {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [step]);
+
+  // Reset step when opener requests a different starting step (e.g., Sign Up)
+  useEffect(() => {
+    setStep(initialStep || 0);
+  }, [initialStep]);
 
   const TOTAL = STEPS.length; // 9
   const isLast = step === TOTAL - 1;

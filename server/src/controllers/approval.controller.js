@@ -40,13 +40,15 @@ exports.getAllApprovals = asyncHandler(async (req, res) => {
   const flightRequests = await BookingRequest.find(query)
     .populate("userId", "name email")
     .populate("approvedBy", "name email")
-    .populate("rejectedBy", "name email");
+    .populate("rejectedBy", "name email")
+    .populate("approverId", "name email role");
 
   // 🔹 Fetch hotel requests
   const hotelRequests = await HotelBookingRequest.find(query)
     .populate("userId", "name email")
     .populate("approvedBy", "name email")
-    .populate("rejectedBy", "name email");
+    .populate("rejectedBy", "name email")
+    .populate("approverId", "name email role");
 
   // 🔥 Add type (VERY IMPORTANT)
   const taggedFlights = flightRequests.map((r) => ({
@@ -92,7 +94,8 @@ exports.getApproval = asyncHandler(async (req, res) => {
   const bookingRequest = await BookingRequest.findById(req.params.id)
     .populate("userId", "name email")
     .populate("approvedBy", "name email")
-    .populate("rejectedBy", "name email");
+    .populate("rejectedBy", "name email")
+    .populate("approverId", "name email role");
 
   if (!bookingRequest) {
     throw new ApiError(404, "Booking request not found");
@@ -122,8 +125,8 @@ exports.getApproval = asyncHandler(async (req, res) => {
 exports.approveRequest = asyncHandler(async (req, res) => {
   const { comments = "" } = req.body;
 
-  if (req.user.role !== "travel-admin") {
-    throw new ApiError(403, "Only admin can approve requests");
+  if (!["travel-admin", "manager"].includes(req.user.role)) {
+    throw new ApiError(403, "Only admin/manager can approve requests");
   }
 
   const bookingRequest = await BookingRequest.findOne({
@@ -230,8 +233,8 @@ exports.rejectRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Rejection comments are required");
   }
 
-  if (req.user.role !== "travel-admin") {
-    throw new ApiError(403, "Only admin can reject requests");
+  if (!["travel-admin", "manager"].includes(req.user.role)) {
+    throw new ApiError(403, "Only admin/manager can approve requests");
   }
 
   const bookingRequest = await BookingRequest.findOne({
@@ -277,13 +280,14 @@ exports.getHotelApproval = asyncHandler(async (req, res) => {
   const bookingRequest = await HotelBookingRequest.findById(req.params.id)
     .populate("userId", "name email")
     .populate("approvedBy", "name email")
-    .populate("rejectedBy", "name email");
+    .populate("rejectedBy", "name email")
+    .populate("approverId", "name email role");
 
-  if (!bookingRequest) {
-    throw new ApiError(404, "Hotel booking request not found");
+  if (!["travel-admin", "manager"].includes(req.user.role)) {
+    throw new ApiError(403, "Only admin/manager can approve requests");
   }
 
-  const isAdmin = req.user.role === "travel-admin";
+  const isAdmin = req.user.role === "travel-admin" || "manager";
   const isOwner = bookingRequest.userId._id.toString() === req.user.id;
 
   if (!isAdmin && !isOwner) {
@@ -307,8 +311,8 @@ exports.getHotelApproval = asyncHandler(async (req, res) => {
 exports.approveHotelRequest = asyncHandler(async (req, res) => {
   const { comments = "" } = req.body;
 
-  if (req.user.role !== "travel-admin") {
-    throw new ApiError(403, "Only admin can approve requests");
+  if (!["travel-admin", "manager"].includes(req.user.role)) {
+    throw new ApiError(403, "Only admin/manager can approve requests");
   }
 
   const bookingRequest = await HotelBookingRequest.findOne({
@@ -349,8 +353,8 @@ exports.rejectHotelRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Rejection comments are required");
   }
 
-  if (req.user.role !== "travel-admin") {
-    throw new ApiError(403, "Only admin can reject requests");
+  if (!["travel-admin", "manager"].includes(req.user.role)) {
+    throw new ApiError(403, "Only admin/manager can approve requests");
   }
 
   const bookingRequest = await HotelBookingRequest.findOne({

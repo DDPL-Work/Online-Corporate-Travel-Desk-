@@ -28,7 +28,9 @@ import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { getMyTravelAdmin } from "../../../Redux/Actions/employee.thunks";
+import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import api from "../../../API/axios";
+import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
 
 const normalizeFareRules = (fareRule) => {
   const rules = fareRule?.Response?.FareRules;
@@ -104,6 +106,10 @@ export default function OneFlightBooking() {
     gstin: "",
     legalName: "",
     address: "",
+  });
+  const [projectApproverData, setProjectApproverData] = useState({
+    project: null,
+    approver: null,
   });
   // ===== Traveler State =====
 const initialTraveler = (id, type = "ADULT") => ({
@@ -615,6 +621,14 @@ const [travelers, setTravelers] = useState([]);
 
     return {
       bookingType: "flight",
+      projectName: projectApproverData.project?.name,
+      projectId: projectApproverData.project?.id,
+      projectClient: projectApproverData.project?.client,
+      projectCodeId: projectApproverData.project?.id,
+      approverId: projectApproverData.approver?.id,
+      approverEmail: projectApproverData.approver?.email,
+      approverName: projectApproverData.approver?.name,
+      approverRole: projectApproverData.approver?.role,
       flightRequest: {
         traceId: searchParams.traceId,
         resultIndex: selectedFlight.ResultIndex,
@@ -761,6 +775,14 @@ const [travelers, setTravelers] = useState([]);
       return;
     }
 
+    if (!projectApproverData.project || !projectApproverData.approver) {
+      ToastWithTimer({
+        type: "error",
+        message: "Please select a project and approver",
+      });
+      return;
+    }
+
     // Validate traveler details before submission
     if (!validateTravelers()) {
       ToastWithTimer({
@@ -772,6 +794,16 @@ const [travelers, setTravelers] = useState([]);
 
     try {
       const payload = buildBookingRequestPayload();
+      await dispatch(
+        selectManager({
+          approverId: projectApproverData.approver?.id,
+          approverEmail: projectApproverData.approver?.email,
+          projectCodeId: projectApproverData.project?.id,
+          projectName: projectApproverData.project?.name,
+          projectClient: projectApproverData.project?.client,
+        }),
+      ).unwrap();
+
       await dispatch(createBookingRequest(payload)).unwrap();
 
       navigate("/my-bookings", {
@@ -787,6 +819,52 @@ const [travelers, setTravelers] = useState([]);
       });
     }
   };
+
+  // Lightweight readiness check to control submit disable state
+  const isFormReady = useMemo(() => {
+    if (!purposeOfTravel?.trim()) return false;
+    if (!projectApproverData.project || !projectApproverData.approver) return false;
+    if (infantCount > adultCount) return false;
+
+    const isIntl = Boolean(
+      parsedFlightData?.segments?.some(
+        (s) =>
+          s?.origin?.country &&
+          s?.destination?.country &&
+          s.origin.country !== s.destination.country,
+      ),
+    );
+
+    for (let i = 0; i < travelers.length; i++) {
+      const t = travelers[i];
+      if (!t.firstName?.trim() || !t.lastName?.trim()) return false;
+      if (!t.gender) return false;
+      if (!t.email?.trim()) return false;
+      if (!t.phoneWithCode?.trim()) return false;
+      if (!t.dob) return false;
+
+      if (t.type === "INFANT") {
+        if (
+          typeof t.linkedAdultIndex !== "number" ||
+          t.linkedAdultIndex < 0 ||
+          t.linkedAdultIndex >= adultCount
+        ) {
+          return false;
+        }
+      }
+
+      if (isIntl && !t.passportNumber?.trim()) return false;
+    }
+
+    return true;
+  }, [
+    purposeOfTravel,
+    projectApproverData,
+    infantCount,
+    adultCount,
+    travelers,
+    parsedFlightData,
+  ]);
 
   if (loading) {
     return (
@@ -999,6 +1077,7 @@ const [travelers, setTravelers] = useState([]);
           {/* RIGHT */}
           <div className="space-y-6">
             <div className="sticky top-6 space-y-6">
+              <ProjectApproverBlock onChange={setProjectApproverData} />
               <PriceSummary
                 parsedFlightData={{
                   ...parsedFlightData,
@@ -1016,6 +1095,7 @@ const [travelers, setTravelers] = useState([]);
                 approverError={approverError}
                 onSendForApproval={handleSendForApproval}
                 loading={actionLoading}
+                disabled={!isFormReady}
               />
 
               <Amenities />

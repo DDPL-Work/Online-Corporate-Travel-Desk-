@@ -53,7 +53,7 @@ export default function Sidebar({ isOpen, onClose }) {
     //   icon: <FaBuilding />,
     // },
     {
-      to: "/corporate-access",
+      to: "/corporate-management",
       label: "Corporate Access Control",
       icon: <FaShieldAlt />,
     },

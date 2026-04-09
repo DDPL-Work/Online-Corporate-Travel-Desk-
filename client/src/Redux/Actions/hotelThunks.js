@@ -56,12 +56,45 @@ export const fetchCities = createAsyncThunk(
 /* ---------- HOTEL SEARCH ---------- */
 export const searchHotels = createAsyncThunk(
   "hotel/searchHotels",
-  async (payload, { rejectWithValue }) => {
+  async (params, { rejectWithValue }) => {
     try {
-      const { data } = await api.post("/hotels/search", payload);
-      console.log("🏨 HOTEL SEARCH RESPONSE:", data.data);
+      const hasWrapper = params && typeof params === "object" && "payload" in params;
+      const payload = hasWrapper ? params.payload : params;
+      const page = hasWrapper ? params.page || 1 : 1;
+      const limit = hasWrapper ? params.limit || 10 : 10;
+
+      const { data } = await api.post(
+        `/hotels/search?page=${page}&limit=${limit}`,
+        payload,
+      );
+
+      const hotels =
+        data?.data?.hotels ||
+        data?.data?.HotelResult ||
+        data?.data?.HotelResult?.HotelResult ||
+        [];
+
+      const pagination =
+        data?.data?.pagination || {
+          total: hotels.length,
+          page,
+          limit,
+          hasMore: false,
+        };
+
+      console.log("🏨 HOTEL SEARCH RESPONSE:", {
+        page,
+        limit,
+        total: pagination.total,
+        hotels: hotels.length,
+      });
+
       return {
-        hotels: data.data.HotelResult || [],
+        hotels,
+        pagination,
+        traceId: data?.data?.traceId || data?.data?.TraceId || null,
+        page,
+        limit,
       };
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);

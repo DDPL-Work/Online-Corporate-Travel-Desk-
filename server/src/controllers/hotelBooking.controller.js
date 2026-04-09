@@ -18,6 +18,13 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     purposeOfTravel,
     pricingSnapshot,
     gstDetails,
+    projectName,
+    projectId,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
   } = req.body;
 
   const user = req.user;
@@ -32,6 +39,35 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
   if (!travellers?.length)
     throw new ApiError(400, "At least one guest required");
+
+  /* ================= APPROVER RESOLUTION ================= */
+  let resolvedApproverId = approverId;
+  let resolvedApproverName = approverName;
+  let resolvedApproverRole = approverRole;
+
+  if (!resolvedApproverId && approverEmail) {
+    const normalizedEmail = approverEmail.trim().toLowerCase();
+    let approverUser = await (await require("../models/User")).findOne({ email: normalizedEmail });
+
+    if (!approverUser) {
+      // bootstrap temp manager user
+      const firstName = normalizedEmail.split("@")[0] || "Manager";
+      approverUser = await (await require("../models/User")).create({
+        corporateId: corporate._id,
+        email: normalizedEmail,
+        name: { firstName, lastName: "" },
+        role: "manager",
+        isTempManager: true,
+        managerRequestStatus: "pending",
+      });
+    }
+
+    resolvedApproverId = approverUser._id;
+    resolvedApproverName =
+      resolvedApproverName ||
+      `${approverUser.name?.firstName || ""} ${approverUser.name?.lastName || ""}`.trim();
+    resolvedApproverRole = resolvedApproverRole || approverUser.role || "manager";
+  }
 
   /* ================= TRANSFORM DATA ================= */
 
@@ -228,6 +264,15 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     requestStatus: "pending_approval",
 
     purposeOfTravel,
+
+    projectName,
+    projectId,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
+
     gstDetails: {
       gstin: gstDetails?.gstin || "",
       legalName: gstDetails?.legalName || "",
@@ -442,26 +487,30 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     const travellers = booking.travellers || [];
 
     // 🔥 STEP 1: GET LEAD PASSENGER PAN
-const leadTraveller = travellers.find((t) => t.isLeadPassenger);
+    const leadTraveller = travellers.find((t) => t.isLeadPassenger);
 
-if (!leadTraveller || !leadTraveller.panCard) {
-  throw new ApiError(400, "Lead passenger PAN is required to proceed booking");
-}
+    if (!leadTraveller || !leadTraveller.panCard) {
+      throw new ApiError(
+        400,
+        "Lead passenger PAN is required to proceed booking",
+      );
+    }
 
-const leadPhoneRaw = String(leadTraveller?.phoneWithCode || "").replace(/\D/g, "");
-const leadPhone = leadPhoneRaw.slice(-10);
+    const leadPhoneRaw = String(leadTraveller?.phoneWithCode || "").replace(
+      /\D/g,
+      "",
+    );
+    const leadPhone = leadPhoneRaw.slice(-10);
 
-if (!leadTraveller?.email) {
-  throw new ApiError(400, "Lead passenger email is required");
-}
+    if (!leadTraveller?.email) {
+      throw new ApiError(400, "Lead passenger email is required");
+    }
 
-if (leadPhone.length !== 10) {
-  throw new ApiError(400, "Lead passenger must have valid 10 digit phone");
-}
+    if (leadPhone.length !== 10) {
+      throw new ApiError(400, "Lead passenger must have valid 10 digit phone");
+    }
 
-
-
-const bookingPAN = leadTraveller.panCard;
+    const bookingPAN = leadTraveller.panCard;
 
     // derive room count from booking codes (handle comma-combined codes)
     const countCodes = (codes) =>
@@ -490,33 +539,33 @@ const bookingPAN = leadTraveller.panCard;
     });
 
     // 🔥 AUTO FIX roomGuests
-  let paxRooms =
-  booking.hotelRequest?.paxRooms || booking.hotelRequest?.PaxRooms || [];
+    let paxRooms =
+      booking.hotelRequest?.paxRooms || booking.hotelRequest?.PaxRooms || [];
 
-// ✅ fallback for OLD bookings
-let roomGuests = booking.hotelRequest?.roomGuests || [];
+    // ✅ fallback for OLD bookings
+    let roomGuests = booking.hotelRequest?.roomGuests || [];
 
-// ✅ PRIORITY 1 → use saved correct data
-if (roomGuests.length === roomsCount) {
-  // perfect → do nothing
-} else {
-  // fallback ONLY if completely broken
-  console.warn("⚠️ roomGuests invalid → fallback");
+    // ✅ PRIORITY 1 → use saved correct data
+    if (roomGuests.length === roomsCount) {
+      // perfect → do nothing
+    } else {
+      // fallback ONLY if completely broken
+      console.warn("⚠️ roomGuests invalid → fallback");
 
-  roomGuests = Array.from({ length: roomsCount }).map(() => ({
-    noOfAdults: Math.floor(adultTravellers.length / roomsCount),
-    noOfChild: Math.floor(childTravellers.length / roomsCount),
-    childAge: [],
-  }));
+      roomGuests = Array.from({ length: roomsCount }).map(() => ({
+        noOfAdults: Math.floor(adultTravellers.length / roomsCount),
+        noOfChild: Math.floor(childTravellers.length / roomsCount),
+        childAge: [],
+      }));
 
-  for (let i = 0; i < adultTravellers.length % roomsCount; i++) {
-    roomGuests[i].noOfAdults += 1;
-  }
+      for (let i = 0; i < adultTravellers.length % roomsCount; i++) {
+        roomGuests[i].noOfAdults += 1;
+      }
 
-  for (let i = 0; i < childTravellers.length % roomsCount; i++) {
-    roomGuests[i].noOfChild += 1;
-  }
-}
+      for (let i = 0; i < childTravellers.length % roomsCount; i++) {
+        roomGuests[i].noOfChild += 1;
+      }
+    }
 
     // const roomGuests = paxRooms.map((r) => ({
     //   noOfAdults: Number(r.Adults || 0),
@@ -524,24 +573,22 @@ if (roomGuests.length === roomsCount) {
     //   childAge: r.ChildrenAges || [],
     // }));
 
-
     // ✅ ADD THIS BLOCK HERE (EXACT PLACE)
 
-// 🔥 VALIDATION (CRITICAL FIX)
-const totalGuestsFromRooms = roomGuests.reduce(
-  (sum, r) => sum + r.noOfAdults + r.noOfChild,
-  0
-);
+    // 🔥 VALIDATION (CRITICAL FIX)
+    const totalGuestsFromRooms = roomGuests.reduce(
+      (sum, r) => sum + r.noOfAdults + r.noOfChild,
+      0,
+    );
 
-const totalTravellers =
-  adultTravellers.length + childTravellers.length;
+    const totalTravellers = adultTravellers.length + childTravellers.length;
 
-if (totalGuestsFromRooms !== totalTravellers) {
-  throw new ApiError(
-    400,
-    `Mismatch: roomGuests=${totalGuestsFromRooms}, travellers=${totalTravellers}`
-  );
-}
+    if (totalGuestsFromRooms !== totalTravellers) {
+      throw new ApiError(
+        400,
+        `Mismatch: roomGuests=${totalGuestsFromRooms}, travellers=${totalTravellers}`,
+      );
+    }
     let adultIdx = 0;
     let childIdx = 0;
 
@@ -556,8 +603,11 @@ if (totalGuestsFromRooms !== totalTravellers) {
           throw new ApiError(400, "Adult traveller count mismatch with rooms");
         }
 
-        const rawPhone = String(traveller.phoneWithCode || "").replace(/\D/g, "");
-const phone = rawPhone.slice(-10);
+        const rawPhone = String(traveller.phoneWithCode || "").replace(
+          /\D/g,
+          "",
+        );
+        const phone = rawPhone.slice(-10);
 
         const passenger = {
           Title: traveller.title,
@@ -599,7 +649,9 @@ const phone = rawPhone.slice(-10);
           PaxType: 2,
           LeadPassenger: false,
           Email: null,
-          Phoneno: String(leadTraveller.phoneWithCode || "").replace(/\D/g, "").slice(-10),
+          Phoneno: String(leadTraveller.phoneWithCode || "")
+            .replace(/\D/g, "")
+            .slice(-10),
           PAN: bookingPAN,
           PassportNo: traveller.PassportNo || null,
           PassportIssueDate: traveller.PassportIssueDate || null,

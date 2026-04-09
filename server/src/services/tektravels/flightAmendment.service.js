@@ -4,11 +4,14 @@ const logger = require("../../utils/logger");
 
 class FlightAmendmentService {
   constructor() {
-    this.tokens = {}; // ✅ same as hotel
+    this.tokens = {}; // same as hotel
   }
 
   getEnv() {
-    return process.env.NODE_ENV === "production" ? "live" : "dummy";
+    const envFlag = (process.env.TBO_ENV || process.env.NODE_ENV || "").toLowerCase();
+    return ["production", "prod", "live", "staging", "test", "uat"].includes(envFlag)
+      ? "live"
+      : "dummy";
   }
 
   isExpired(tokenObj) {
@@ -28,14 +31,16 @@ class FlightAmendmentService {
         EndUserIp: cfg.endUserIp,
       };
 
-      const url = `${cfg.sharedBase}${cfg.endpoints.authenticate}`;
+      const url =
+        typeof config.resolveUrl === "function"
+          ? config.resolveUrl(env, "authenticate")
+          : `${cfg.sharedBase}${cfg.endpoints.authenticate}`;
 
       const { data } = await axios.post(url, payload, {
         timeout: config.timeout,
       });
 
       const token = data?.TokenId || data?.Response?.TokenId;
-
       const status = data?.Status ?? data?.Response?.ResponseStatus;
 
       if (!token || status !== 1) {
@@ -87,18 +92,15 @@ class FlightAmendmentService {
         payload: finalPayload,
       });
 
-     const cfg = config[env];
+      const cfg = config[env];
+      const url =
+        typeof config.resolveUrl === "function"
+          ? config.resolveUrl(env, endpoint)
+          : `${cfg.base}${cfg.endpoints[endpoint]}`;
 
-// 🔥 ALWAYS USE AIR BASE FOR FLIGHT APIs
-const url = `${cfg.base}${cfg.endpoints[endpoint]}`;
-
-console.log("FINAL URL:", url);
-
-const response = await axios.post(
-  url,
-  finalPayload,
-  { timeout: config.timeout },
-);
+      const response = await axios.post(url, finalPayload, {
+        timeout: config.timeout,
+      });
 
       logger.info("TBO FLIGHT RESPONSE", {
         endpoint,
@@ -111,11 +113,9 @@ const response = await axios.post(
     } catch (err) {
       const errorCode = err?.response?.data?.Response?.Error?.ErrorCode;
 
-      /* 🔥 TOKEN EXPIRED HANDLING */
+      // Token expired handling
       if (errorCode === 4) {
-        logger.warn("FLIGHT TOKEN EXPIRED → REFRESHING");
-
-        const env = this.getEnv();
+        logger.warn("FLIGHT TOKEN EXPIRED - REFRESHING");
 
         this.tokens[env] = null;
 

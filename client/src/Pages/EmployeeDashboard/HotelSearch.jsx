@@ -313,7 +313,9 @@ export default function HotelSearchPage() {
     };
 
     try {
-      const result = await dispatch(searchHotels(payload)).unwrap();
+      const result = await dispatch(
+        searchHotels({ payload, page: 1, limit: 10 }),
+      ).unwrap();
 
       if (result) {
         navigate("/search-hotel-results");

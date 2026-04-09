@@ -44,7 +44,7 @@ const Login = () => {
 
           switch (role) {
             case "super-admin":
-              navigate("/onboarded-corporates");
+              navigate("/corporate-management");
               break;
 
             default:

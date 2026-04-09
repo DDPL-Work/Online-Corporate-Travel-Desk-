@@ -78,6 +78,15 @@ const bookingSchema = new mongoose.Schema({
 
   purposeOfTravel: { type: String, required: true, trim: true },
 
+  projectCodeId: String,
+  projectId: String,
+  projectName: String,
+  projectClient: String,
+  approverId: String,
+  approverEmail: String,
+  approverName: String,
+  approverRole: String,
+
   gstDetails: {
     gstin: String,
     legalName: String,

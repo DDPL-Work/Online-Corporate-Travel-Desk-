@@ -41,10 +41,6 @@ import MultiCityFlightBooking from "../Pages/Booking-Flow/Flight-Booking/MultiWa
 import HotelSearchResults from "../Pages/search-results/Hotel-results/Hotel-Search-Results";
 import HotelDetailsPage from "../Pages/Booking-Flow/Hotel-Booking/HoteldetailsPage";
 import LandingPage from "../Pages/Auth/Landign";
-import CorporateSuperAdminDashboard from "../components/CorporateSuperAdmin/CorporateSuperAdminDashboard";
-import TravelAdminManagement from "../components/CorporateSuperAdmin/TravelAdminManagement";
-import CorporateTotalBookings from "../components/CorporateSuperAdmin/TotalBookings";
-import EmployeeManagement from "../components/CorporateSuperAdmin/EmployeeManagement";
 import HotelReviewBooking from "../Pages/Booking-Flow/Hotel-Booking/HotelReviewBooking";
 import HotelBookNow from "../Pages/Booking-Flow/Hotel-Booking/HotelBooking";
 import HotelBookingDetails from "../components/EmployeeDashboard/Hotelbookingdetails";
@@ -52,6 +48,25 @@ import CancelledFlightsPage from "../components/EmployeeDashboard/MyCancelledBoo
 import CancelledBookings from "../components/TravelAdminTabs/CancelledBookings";
 import PromoteEmployee from "../components/TravelAdminTabs/PromoteEmployee";
 import Independent from "../Pages/Landing/WhoIt'sFor/Independent";
+import GrowingBusiness from "../Pages/Landing/WhoIt'sFor/GrowingBusiness";
+import FlightBookingInfo from "../Pages/Landing/Platform/FlightBookingInfo";
+import HotelBookingInfo from "../Pages/Landing/Platform/HotelBookingInfo";
+import SmallBusiness from "../Pages/Landing/WhoIt'sFor/SmallBusiness";
+import ProjectManagement from "../components/TravelAdminTabs/ProjectManagement";
+import ProjectsTable from "../components/TravelAdminTabs/ProjectTable";
+import ManagerRequestsPage from "../components/TravelAdminTabs/ManagerRequestsPage";
+import PendingTravelRequestsForManager from "../components/CorporateManagerTabs/PendingTravelRequests";
+import MyTeam from "../components/CorporateManagerTabs/MyTeam";
+import ApprovedTravelRequestsForManager from "../components/CorporateManagerTabs/ApprovedTravelRequests";
+import RejectedTravelRequestsForManager from "../components/CorporateManagerTabs/RejectedTravelRequests";
+import PastTripsForManager from "../components/CorporateManagerTabs/PastTrips";
+import BookingsDashboardForManager from "../components/CorporateManagerTabs/TotalBookings";
+import CancelledBookingsForManager from "../components/CorporateManagerTabs/CancelledBookings";
+import UpcomingTripsForManager from "../components/CorporateManagerTabs/UpcomingTrips";
+import EmployeeManagement from "../components/TravelAdminTabs/EmployeeManagement";
+import MidSizeBusiness from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
+import ApprovalWorkflow from "../Pages/Landing/Platform/ApprovalWorkflow";
+// import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 
 export const appRouter = createBrowserRouter([
   {
@@ -78,14 +93,29 @@ export const appRouter = createBrowserRouter([
             children: [
               { path: "/update-profile", element: <ProfileSettings /> },
               { path: "total-bookings", element: <BookingsDashboard /> },
-              { path: "/total-cancelled-bookings", element: <CancelledBookings /> },
+              {
+                path: "/total-cancelled-bookings",
+                element: <CancelledBookings />,
+              },
               { path: "/pending-requests", element: <PendingTravelRequests /> },
-              { path: "/approved-requests", element: <ApprovedTravelRequests /> },
-              { path: "/rejected-requests", element: <RejectedTravelRequests /> },
+              {
+                path: "/approved-requests",
+                element: <ApprovedTravelRequests />,
+              },
+              {
+                path: "/rejected-requests",
+                element: <RejectedTravelRequests />,
+              },
               { path: "/upcoming-trips", element: <UpcomingTrips /> },
               { path: "/past-trips", element: <PastTrips /> },
-              { path: "/user-management", element: <PromoteEmployee /> },
-              { path: "/travel-profile-settings", element: <TravelAdminProfile /> },
+              { path: "/manager-management", element: <ManagerRequestsPage /> },
+              { path: "/user-management", element: <EmployeeManagement /> },
+              { path: "/project-management", element: <ProjectManagement /> },
+              { path: "/projects-table", element: <ProjectsTable /> },
+              {
+                path: "/travel-profile-settings",
+                element: <TravelAdminProfile />,
+              },
               { path: "/corporate-wallet", element: <CorporateWallet /> },
               {
                 path: "/credit-utilization",
@@ -105,22 +135,34 @@ export const appRouter = createBrowserRouter([
             element: <Layout />,
             children: [
               { path: "/my-bookings", element: <MyBookings /> },
-              { path: "/my-cancelled-bookings", element: <CancelledFlightsPage /> },
+              {
+                path: "/my-cancelled-bookings",
+                element: <CancelledFlightsPage />,
+              },
               { path: "/my-bookings/:id", element: <BookingDetails /> },
               { path: "/my-upcoming-trips", element: <MyUpcomingTrips /> },
               { path: "/my-past-trips", element: <MyPastTrips /> },
-              { path: "/my-pending-approvals", element: <MyPendingApprovals /> },
-              { path: "/my-rejected-requests", element: <MyRejectedRequests /> },
+              {
+                path: "/my-pending-approvals",
+                element: <MyPendingApprovals />,
+              },
+              {
+                path: "/my-rejected-requests",
+                element: <MyRejectedRequests />,
+              },
               { path: "/my-profile", element: <MyProfile /> },
               { path: "/travel-documents", element: <TravelDocuments /> },
               { path: "/bookings/:id/book", element: <BookApprovedFlight /> },
-              { path: "/my-hotel-booking/:id", element: <HotelBookingDetails /> },
+              {
+                path: "/my-hotel-booking/:id",
+                element: <HotelBookingDetails />,
+              },
             ],
           },
         ],
       },
 
-      // CORPORATE SUPER ADMIN ROUTES
+      // CORPORATE MANAGER ROUTES
       {
         element: <ProtectedRoute allowedRoles={["manager"]} />,
         children: [
@@ -128,22 +170,24 @@ export const appRouter = createBrowserRouter([
             path: "/",
             element: <Layout />,
             children: [
+              { path: "/manager/update-profile", element: <ProfileSettings /> },
+              { path: "/manager/total-bookings", element: <BookingsDashboardForManager /> },
               {
-                path: "/corporate-dashboard",
-                element: <CorporateSuperAdminDashboard />,
+                path: "/manager/total-cancelled-bookings",
+                element: <CancelledBookingsForManager />,
+              },
+              { path: "/manager/pending-requests", element: <PendingTravelRequestsForManager /> },
+              {
+                path: "/manager/approved-requests",
+                element: <ApprovedTravelRequestsForManager />,
               },
               {
-                path: "/admin-management",
-                element: <TravelAdminManagement />,
+                path: "/manager/rejected-requests",
+                element: <RejectedTravelRequestsForManager />,
               },
-              {
-                path: "/employee-management",
-                element: <EmployeeManagement />,
-              },
-              {
-                path: "/corporate-total-bookings",
-                element: <CorporateTotalBookings />,
-              },
+              { path: "/manager/upcoming-trips", element: <UpcomingTripsForManager /> },
+              { path: "/manager/past-trips", element: <PastTripsForManager /> },
+              { path: "/manager/team-management", element: <MyTeam /> },
             ],
           },
         ],
@@ -170,9 +214,15 @@ export const appRouter = createBrowserRouter([
 
       // DEFAULT ROUTES
       { path: "/who-it's-for/independent", element: <Independent /> },
+      { path: "/who-it's-for/growing-business", element: <GrowingBusiness /> },
+      { path: "/who-it's-for/small-business", element: <SmallBusiness /> },
+      { path: "/who-it's-for/mid-size-business", element: <MidSizeBusiness /> },
+      { path: "/platform/flight-booking-info", element: <FlightBookingInfo /> },
+      { path: "/platform/hotel-booking-info", element: <HotelBookingInfo /> },
+      { path: "/platform/approval-and-workflow", element: <ApprovalWorkflow /> },
       {
         path: "*",
-        element: <LandingPage />,
+        element: <FlightBookingInfo />,
       },
     ],
   },

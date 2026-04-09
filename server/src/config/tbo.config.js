@@ -1,11 +1,84 @@
 // server/src/config/tbo.config.js
 
-module.exports = {
+const tboMode = (process.env.TBO_ENV || process.env.NODE_ENV || "development").toLowerCase();
+const isProdTbo = ["production", "prod"].includes(tboMode);
+
+const sandboxEndpoints = {
+  authenticate: "/SharedData.svc/rest/Authenticate",
+  getAgencyBalance: "/SharedData.svc/rest/GetAgencyBalance",
+
+  // Search / pricing
+  flightSearch: "/BookingEngineService_Air/AirService.svc/rest/Search",
+  flightFareQuote: "/BookingEngineService_Air/AirService.svc/rest/FareQuote",
+  flightFareRule: "/BookingEngineService_Air/AirService.svc/rest/FareRule",
+  flightFareUpsell: "/BookingEngineService_Air/AirService.svc/rest/FareUpsell",
+  flightSSR: "/BookingEngineService_Air/AirService.svc/rest/SSR",
+  flightSeatMap: "/BookingEngineService_Air/AirService.svc/rest/SeatMap",
+  flightMeal: "/BookingEngineService_Air/AirService.svc/rest/Meal",
+
+  // Booking / post-booking
+  flightBook: "/BookingEngineService_Air/AirService.svc/rest/Book",
+  flightTicket: "/BookingEngineService_Air/AirService.svc/rest/Ticket",
+  flightBookingDetails:
+    "/BookingEngineService_Air/AirService.svc/rest/GetBookingDetails",
+  flightCancel: "/BookingEngineService_Air/AirService.svc/rest/Cancel",
+  flightCancellationCharges:
+    "/BookingEngineService_Air/AirService.svc/rest/GetCancellationCharges",
+  flightSendChangeRequest:
+    "/BookingEngineService_Air/AirService.svc/rest/SendChangeRequest",
+  flightGetChangeRequestStatus:
+    "/BookingEngineService_Air/AirService.svc/rest/GetChangeRequestStatus",
+  flightReleasePNR:
+    "/BookingEngineService_Air/AirService.svc/rest/ReleasePNRRequest",
+};
+
+const productionEndpoints = {
+  authenticate: "/SharedData.svc/rest/Authenticate",
+  getAgencyBalance: "/SharedData.svc/rest/GetAgencyBalance",
+
+  // Search / pricing
+  flightSearch: "/AirAPI_V10/AirService.svc/rest/Search",
+  flightFareQuote: "/AirAPI_V10/AirService.svc/rest/FareQuote",
+  flightFareRule: "/AirAPI_V10/AirService.svc/rest/FareRule",
+  flightFareUpsell: "/AirAPI_V10/AirService.svc/rest/FareUpsell",
+  flightSSR: "/AirAPI_V10/AirService.svc/rest/SSR",
+  flightSeatMap: "/AirAPI_V10/AirService.svc/rest/SeatMap",
+  flightMeal: "/AirAPI_V10/AirService.svc/rest/Meal",
+
+  // Booking / post-booking
+  flightBook: "/AirAPI_V10/AirService.svc/rest/Book",
+  flightTicket: "/AirAPI_V10/AirService.svc/rest/Ticket",
+  flightBookingDetails:
+    "/AirAPI_V10/AirService.svc/rest/GetBookingDetails",
+  flightCancel: "/AirAPI_V10/AirService.svc/rest/Cancel",
+  flightCancellationCharges: "/AirAPI_V10/AirService.svc/rest/GetCancellationCharges",
+  flightSendChangeRequest:
+    "/AirAPI_V10/AirService.svc/rest/SendChangeRequest",
+  flightGetChangeRequestStatus:
+    "/AirAPI_V10/AirService.svc/rest/GetChangeRequestStatus",
+  flightReleasePNR:
+    "/AirAPI_V10/AirService.svc/rest/ReleasePNRRequest",
+};
+
+const bookingEndpoints = new Set([
+  "flightBook",
+  "flightTicket",
+  "flightBookingDetails",
+  "flightCancel",
+  "flightCancellationCharges",
+  "flightSendChangeRequest",
+  "flightGetChangeRequestStatus",
+  "flightReleasePNR",
+]);
+
+const sharedEndpoints = new Set(["authenticate", "getAgencyBalance"]);
+
+const config = {
   timeout: 500000,
 
   /* ---------------- COMMON ---------------- */
   common: {
-    base: "https://api.tektravels.com",
+    base: process.env.TBO_API_URL || "https://api.tektravels.com",
     sharedBase: "https://Sharedapi.tektravels.com",
 
     airService: "/BookingEngineService_Air/AirService.svc/rest",
@@ -15,6 +88,7 @@ module.exports = {
   /* ---------------- DUMMY (SEARCH ONLY) ---------------- */
   dummy: {
     base: "https://api.tektravels.com",
+    bookingBase: "https://api.tektravels.com",
     sharedBase: "https://Sharedapi.tektravels.com",
 
     endUserIp: process.env.TBO_END_USER_IP,
@@ -31,29 +105,35 @@ module.exports = {
       memberId: process.env.TBO_DUMMY_TOKEN_MEMBER_ID,
     },
 
-    endpoints: {
-      // Authentication
-      authenticate: "/SharedData.svc/rest/Authenticate",
-
-      // Agency Balance
-      getAgencyBalance: "/SharedData.svc/rest/GetAgencyBalance",
-
-      // Air Search
-      flightSearch: "/BookingEngineService_Air/AirService.svc/rest/Search",
-    },
+    endpoints: sandboxEndpoints,
   },
 
-  /* ---------------- LIVE (FULL FLOW) ---------------- */
+  /* ---------------- LIVE (TEST / PROD) ---------------- */
   live: {
-    base: "https://api.tektravels.com",
-    sharedBase: "https://Sharedapi.tektravels.com",
+    base: isProdTbo
+      ? "https://tboapi.travelboutiqueonline.com"
+      : "https://api.tektravels.com",
+    bookingBase: isProdTbo
+      ? "https://booking.travelboutiqueonline.com"
+      : "https://api.tektravels.com",
+    sharedBase: isProdTbo
+      ? "https://api.travelboutiqueonline.com/SharedAPI"
+      : "https://Sharedapi.tektravels.com",
 
-    endUserIp: process.env.TBO_END_USER_IP,
+    endUserIp: isProdTbo
+      ? process.env.TBO_PROD_END_USER_IP
+      : process.env.TBO_END_USER_IP,
 
     credentials: {
-      username: process.env.TBO_LIVE_USERNAME,
-      password: process.env.TBO_LIVE_PASSWORD,
-      clientId: process.env.TBO_LIVE_CLIENT_ID,
+      username: isProdTbo
+        ? process.env.TBO_PROD_USERNAME
+        : process.env.TBO_LIVE_USERNAME,
+      password: isProdTbo
+        ? process.env.TBO_PROD_PASSWORD
+        : process.env.TBO_LIVE_PASSWORD,
+      clientId: isProdTbo
+        ? process.env.TBO_PROD_CLIENT_ID
+        : process.env.TBO_LIVE_CLIENT_ID,
     },
 
     tokens: {
@@ -62,50 +142,37 @@ module.exports = {
       memberId: process.env.TBO_LIVE_TOKEN_MEMBER_ID,
     },
 
-    endpoints: {
-      // Authentication
-      authenticate: "/SharedData.svc/rest/Authenticate",
-
-      // Agency Balance
-      getAgencyBalance: "/SharedData.svc/rest/GetAgencyBalance",
-
-      // Core Flow
-      flightSearch: "/BookingEngineService_Air/AirService.svc/rest/Search",
-      flightFareQuote:
-        "/BookingEngineService_Air/AirService.svc/rest/FareQuote",
-      flightFareRule: "/BookingEngineService_Air/AirService.svc/rest/FareRule",
-
-      // Booking
-      flightBook: "/BookingEngineService_Air/AirService.svc/rest/Book",
-      flightTicket: "/BookingEngineService_Air/AirService.svc/rest/Ticket",
-
-      // Post Booking
-      flightBookingDetails:
-        "/BookingEngineService_Air/AirService.svc/rest/GetBookingDetails",
-      flightCancel: "/BookingEngineService_Air/AirService.svc/rest/Cancel",
-
-      /* -------- Amendments / Change -------- */
-
-      // Release PNR (If PNR held but not ticketed)
-      flightReleasePNR:
-        "/BookingEngineService_Air/AirService.svc/rest/ReleasePNRRequest",
-
-      // Send Change Request (Amendment / Cancellation)
-      flightSendChangeRequest:
-        "/BookingEngineService_Air/AirService.svc/rest/SendChangeRequest",
-
-      // Get Change Request Status
-      flightGetChangeRequestStatus:
-        "/BookingEngineService_Air/AirService.svc/rest/GetChangeRequestStatus",
-
-      // Get Cancellation Charges
-      flightCancellationCharges:
-        "/BookingEngineService_Air/AirService.svc/rest/GetCancellationCharges",
-
-      // SSR / Extras
-      flightSSR: "/BookingEngineService_Air/AirService.svc/rest/SSR",
-      flightSeatMap: "/BookingEngineService_Air/AirService.svc/rest/SeatMap",
-      flightMeal: "/BookingEngineService_Air/AirService.svc/rest/Meal",
-    },
+    endpoints: isProdTbo ? productionEndpoints : sandboxEndpoints,
   },
 };
+
+config.resolveUrl = (envKey, endpointKey) => {
+  const cfg = config[envKey];
+
+  if (!cfg || !cfg.endpoints) {
+    throw new Error(`TBO config missing for env: ${envKey}`);
+  }
+
+  const endpoint = cfg.endpoints[endpointKey];
+
+  if (!endpoint) {
+    throw new Error(`TBO endpoint "${endpointKey}" missing for env: ${envKey}`);
+  }
+
+  if (endpoint.startsWith("http")) return endpoint;
+
+  if (sharedEndpoints.has(endpointKey) && cfg.sharedBase) {
+    return `${cfg.sharedBase}${endpoint}`;
+  }
+
+  if (bookingEndpoints.has(endpointKey) && cfg.bookingBase) {
+    return `${cfg.bookingBase}${endpoint}`;
+  }
+
+  return `${cfg.base}${endpoint}`;
+};
+
+config.tboMode = tboMode;
+config.isProdTbo = isProdTbo;
+
+module.exports = config;

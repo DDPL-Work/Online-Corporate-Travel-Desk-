@@ -12,53 +12,6 @@ const ApiResponse = require("../utils/ApiResponse");
 
 
 
-// =============================
-// TOGGLE EMPLOYEE STATUS (Activate/Deactivate)
-// =============================
-// exports.toggleEmployeeStatus = async (req, res, next) => {
-//   try {
-//     let emp = null;
-//     const id = req.params.id;
-
-//     if (mongoose.Types.ObjectId.isValid(id)) {
-//       emp = await Employee.findById(id);
-//     }
-//     if (!emp) {
-//       emp = await Employee.findOne({ userId: id });
-//     }
-//     if (!emp) return next(new ApiError(404, 'Employee not found'));
-
-//     emp.status = emp.status === 'active' ? 'inactive' : 'active';
-//     await emp.save();
-
-//     res.json({ success: true, message: `Employee ${emp.status} successfully`, status: emp.status });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
-// =============================
-// REMOVE EMPLOYEE
-// =============================
-// exports.removeEmployee = async (req, res, next) => {
-//   try {
-//     let emp = null;
-//     const id = req.params.id;
-
-//     if (mongoose.Types.ObjectId.isValid(id)) {
-//       emp = await Employee.findById(id);
-//     }
-//     if (!emp) {
-//       emp = await Employee.findOne({ userId: id });
-//     }
-//     if (!emp) return next(new ApiError(404, 'Employee not found'));
-
-//     await Employee.findByIdAndDelete(emp._id);
-
-//     res.json({ success: true, message: 'Employee removed successfully' });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
 
 // -----------------------------------------------------
 // GET LOGGED-IN TRAVEL ADMIN CORPORATE PROFILE
@@ -80,3 +33,62 @@ exports.getMyCorporateProfile = asyncHandler(async (req, res) => {
     new ApiResponse(200, corporate, "Corporate profile fetched successfully")
   );
 });
+
+// -----------------------------------------------------
+// UPDATE CORPORATE PROFILE (FULL FLEXIBLE UPDATE)
+// -----------------------------------------------------
+exports.updateMyCorporateProfile = asyncHandler(async (req, res) => {
+  const corporateId = req.user.corporateId;
+
+  if (!corporateId) {
+    throw new ApiError(403, "Corporate context not found");
+  }
+
+  if (!req.body || Object.keys(req.body).length === 0) {
+    throw new ApiError(400, "No data provided for update");
+  }
+
+  // ❗ Prevent critical fields overwrite
+  const restrictedFields = [
+    "_id",
+    "createdAt",
+    "updatedAt",
+    "__v",
+  ];
+
+  restrictedFields.forEach((field) => {
+    if (req.body[field]) {
+      delete req.body[field];
+    }
+  });
+
+  /**
+   * ✅ Direct update (supports nested fields automatically)
+   * Example:
+   * {
+   *   "gstDetails": { verified: true },
+   *   "ssoConfig": { domain: "newdomain.com" }
+   * }
+   */
+  const updatedCorporate = await Corporate.findByIdAndUpdate(
+    corporateId,
+    { $set: req.body },
+    {
+      new: true,
+      runValidators: true,
+    }
+  );
+
+  if (!updatedCorporate) {
+    throw new ApiError(404, "Corporate not found");
+  }
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      updatedCorporate,
+      "Corporate profile updated successfully"
+    )
+  );
+});
+

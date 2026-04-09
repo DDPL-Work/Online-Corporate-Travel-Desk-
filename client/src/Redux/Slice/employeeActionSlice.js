@@ -42,7 +42,8 @@ export const fetchEmployees = createAsyncThunk(
   "employee/fetchEmployees",
   async (_, { rejectWithValue }) => {
     try {
-      const res = await api.get("/travel-admin");
+      // Backend list endpoint lives at /travel-admin/all-employees
+      const res = await api.get("/travel-admin/all-employees");
       return res.data.employees;
     } catch (err) {
       return rejectWithValue(
