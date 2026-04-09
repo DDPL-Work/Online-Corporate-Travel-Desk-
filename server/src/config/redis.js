@@ -1,3 +1,5 @@
+// Redis temporarily disabled for deployment push. Original implementation kept below.
+/*
 const Redis = require("ioredis");
 
 const redis = new Redis({
@@ -14,3 +16,12 @@ redis.on("error", (err) => {
 });
 
 module.exports = redis;
+*/
+
+// Lightweight stub to avoid connection attempts while code is commented out
+module.exports = {
+  status: "disabled",
+  on: () => {},
+  quit: () => {},
+  disconnect: () => {},
+};
