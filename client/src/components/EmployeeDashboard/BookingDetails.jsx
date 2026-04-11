@@ -459,7 +459,14 @@ function CancelScreen({ booking, onClose }) {
       // 2️⃣ POLLING (CRITICAL)
       let status = "requested";
 
-      while (status === "requested" || status === "in_progress") {
+      let attempts = 0;
+      const maxAttempts = 2;
+
+      while (
+        (status === "requested" || status === "in_progress") &&
+        attempts < maxAttempts
+      ) {
+        attempts++;
         await new Promise((r) => setTimeout(r, 4000));
 
         const statusRes = await dispatch(
@@ -469,15 +476,32 @@ function CancelScreen({ booking, onClose }) {
           }),
         );
 
-        const apiStatus = statusRes.payload?.Response?.Status;
+        const apiStatus =
+          statusRes.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus;
 
-        if (apiStatus === 1) status = "completed";
-        else if (apiStatus === 2) status = "in_progress";
-        else status = "failed";
+        if (apiStatus === 4) {
+          status = "completed";
+        } else if ([1, 2, 3].includes(apiStatus)) {
+          status = "in_progress";
+        } else if (apiStatus === 5) {
+          status = "failed";
+        } else {
+          status = "unknown";
+        }
+      }
+
+      if (status === "failed") {
+        throw new Error("Cancellation failed by airline/supplier");
       }
 
       if (status !== "completed") {
-        throw new Error("Cancellation failed");
+        Swal.fire({
+          icon: "info",
+          title: "Cancellation in Progress",
+          text: "Your cancellation request is being processed. Please check status later.",
+        });
+
+        return;
       }
 
       // 3️⃣ Refresh booking
@@ -488,6 +512,7 @@ function CancelScreen({ booking, onClose }) {
       console.error(err);
     } finally {
       setLoading(false);
+      dispatch(fetchMyBookingById(booking._id));
     }
   };
 
@@ -590,12 +615,15 @@ function PartialCancelModal({ booking, onClose }) {
   const segments = booking?.flightRequest?.segments || [];
 
   const journeyTypeOf = (seg) => {
-    const jt =
-      (seg?.journeyType ||
-        seg?.segmentType ||
-        seg?.tripIndicator ||
-        seg?.TripIndicator ||
-        "").toString().toLowerCase();
+    const jt = (
+      seg?.journeyType ||
+      seg?.segmentType ||
+      seg?.tripIndicator ||
+      seg?.TripIndicator ||
+      ""
+    )
+      .toString()
+      .toLowerCase();
     if (jt === "return" || jt === "2") return "return";
     return "onward";
   };
@@ -656,8 +684,7 @@ function PartialCancelModal({ booking, onClose }) {
       : onwardBookingId || returnBookingId || booking?.bookingResult?.bookingId;
 
   const buildSectors = () => {
-    const pick =
-      selectedJourney === "return" ? returnSegments : onwardSegments;
+    const pick = selectedJourney === "return" ? returnSegments : onwardSegments;
     return pick.map((seg) => ({
       Origin:
         seg?.origin?.airportCode ||
@@ -682,9 +709,7 @@ function PartialCancelModal({ booking, onClose }) {
       });
       return;
     }
-    const sectors = buildSectors().filter(
-      (s) => s.Origin && s.Destination,
-    );
+    const sectors = buildSectors().filter((s) => s.Origin && s.Destination);
     if (!sectors.length) return;
     const payload = {
       bookingId: tboBookingId || booking?._id,
@@ -695,7 +720,8 @@ function PartialCancelModal({ booking, onClose }) {
     try {
       setLoading(true);
       const res = await dispatch(partialCancellation(payload));
-      if (res.error) throw new Error(res.payload || "Partial cancellation failed");
+      if (res.error)
+        throw new Error(res.payload || "Partial cancellation failed");
       await dispatch(fetchMyBookingById(booking._id));
       Swal.fire({
         icon: "success",
@@ -914,7 +940,7 @@ export default function BookingDetails() {
 
       let status = "requested";
       let attempts = 0;
-      const maxAttempts = 12;
+      const maxAttempts = 2;
 
       while (
         (status === "requested" || status === "in_progress") &&
@@ -947,8 +973,18 @@ export default function BookingDetails() {
         }
       }
 
+      if (status === "failed") {
+        throw new Error("Cancellation failed by airline");
+      }
+
       if (status !== "completed") {
-        throw new Error("Cancellation failed");
+        Swal.fire({
+          icon: "info",
+          title: "Cancellation in Progress",
+          text: "Your request is still being processed. Please check later.",
+        });
+
+        return;
       }
 
       Swal.close();
@@ -963,10 +999,15 @@ export default function BookingDetails() {
     } catch (err) {
       console.error(err);
 
+      const supplierMsg =
+        err?.response?.data?.Response?.SupplierErrorMsg ||
+        err?.response?.data?.Response?.Error?.ErrorMessage ||
+        err.message;
+
       Swal.fire({
         icon: "error",
-        title: "Failed!",
-        text: "Cancellation failed. Please try again.",
+        title: "Cancellation Failed",
+        text: supplierMsg || "Something went wrong",
       });
     }
   };
@@ -989,12 +1030,11 @@ export default function BookingDetails() {
   const fare = booking.pricingSnapshot;
 
   const isInternationalRT =
-  flights.length > 1 &&
-  flights.some(
-    (f) =>
-      f.origin?.country !== "IN" || f.destination?.country !== "IN"
-  ) &&
-  flights.some((f) => f.journeyType === "return");
+    flights.length > 1 &&
+    flights.some(
+      (f) => f.origin?.country !== "IN" || f.destination?.country !== "IN",
+    ) &&
+    flights.some((f) => f.journeyType === "return");
 
   // const pnrsByJourney = {
   //   onward:
@@ -1003,17 +1043,17 @@ export default function BookingDetails() {
   // };
 
   const pnrsByJourney = isInternationalRT
-  ? {
-      onward: booking.bookingResult?.pnr || null,
-      return: booking.bookingResult?.pnr || null, // SAME PNR
-    }
-  : {
-      onward:
-        booking.bookingResult?.onwardPNR ||
-        booking.bookingResult?.pnr ||
-        null,
-      return: booking.bookingResult?.returnPNR || null,
-    };
+    ? {
+        onward: booking.bookingResult?.pnr || null,
+        return: booking.bookingResult?.pnr || null, // SAME PNR
+      }
+    : {
+        onward:
+          booking.bookingResult?.onwardPNR ||
+          booking.bookingResult?.pnr ||
+          null,
+        return: booking.bookingResult?.returnPNR || null,
+      };
 
   const displayPnr =
     booking.bookingResult?.pnr ||
@@ -1032,11 +1072,14 @@ export default function BookingDetails() {
   };
 
   const fareSnapshot = booking.flightRequest?.fareSnapshot;
-  const departureTime = booking?.flightRequest?.segments?.[0]?.departureDateTime;
+  const departureTime =
+    booking?.flightRequest?.segments?.[0]?.departureDateTime;
   const isTravelPassed = departureTime && new Date() > new Date(departureTime);
 
   const allRules = fareSnapshot?.miniFareRules?.flat() || [];
-  const cancellationPolicies = allRules.filter((r) => r.Type === "Cancellation");
+  const cancellationPolicies = allRules.filter(
+    (r) => r.Type === "Cancellation",
+  );
   const reissuePolicies = allRules.filter((r) => r.Type === "Reissue");
   const getAmount = (str) => Number(str?.replace(/\D/g, "") || 0);
 
@@ -1095,8 +1138,7 @@ export default function BookingDetails() {
       (fareSnapshot.onwardFare?.BaseFare || 0) +
       (fareSnapshot.returnFare?.BaseFare || 0);
     tax =
-      (fareSnapshot.onwardFare?.Tax || 0) +
-      (fareSnapshot.returnFare?.Tax || 0);
+      (fareSnapshot.onwardFare?.Tax || 0) + (fareSnapshot.returnFare?.Tax || 0);
     refundable =
       fareSnapshot.onwardFare?.IsRefundable ||
       fareSnapshot.returnFare?.IsRefundable;
@@ -1161,7 +1203,9 @@ export default function BookingDetails() {
           <CardLabel icon={FiUser} label="Travellers" />
 
           {travellers.length === 0 ? (
-            <p className="text-sm text-slate-500">No traveller details available.</p>
+            <p className="text-sm text-slate-500">
+              No traveller details available.
+            </p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {travellers.map((trav, idx) => (
@@ -1175,7 +1219,9 @@ export default function BookingDetails() {
                         {trav.title} {trav.firstName} {trav.lastName}
                       </p>
                       {trav.email && (
-                        <p className="text-xs text-slate-400 mt-1">{trav.email}</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {trav.email}
+                        </p>
                       )}
                     </div>
                     <span className="text-[11px] font-black uppercase tracking-widest text-teal-600 bg-teal-50 px-3 py-1 rounded-full">
@@ -1189,9 +1235,16 @@ export default function BookingDetails() {
                   <InfoRow label="Gender" value={trav.gender || "N/A"} />
                   <InfoRow
                     label="Date of Birth"
-                    value={trav.dateOfBirth ? formatDateWithYear(trav.dateOfBirth) : "N/A"}
+                    value={
+                      trav.dateOfBirth
+                        ? formatDateWithYear(trav.dateOfBirth)
+                        : "N/A"
+                    }
                   />
-                  <InfoRow label="Nationality" value={trav.nationality || "N/A"} />
+                  <InfoRow
+                    label="Nationality"
+                    value={trav.nationality || "N/A"}
+                  />
                   {typeof trav.linkedAdultIndex === "number" &&
                     trav.linkedAdultIndex >= 0 && (
                       <InfoRow

@@ -15,13 +15,18 @@ import {
   RiTimeLine,
   RiBarChartLine,
   RiUserLine,
+  RiMailCloseLine,
+  RiClipboardLine,
 } from "react-icons/ri";
 import LandingHeader from "../../../layout/LandingHeader";
 import LandingFooter from "../../../layout/LandingFooter";
 import { FiAirplay, FiCalendar, FiHome } from "react-icons/fi";
-import { MdFlight } from "react-icons/md";
+import { MdFlight, MdOutlineShield } from "react-icons/md";
 import { LuPlane, LuSendHorizontal } from "react-icons/lu";
-import { BsSend } from "react-icons/bs";
+import { BsBell, BsSend } from "react-icons/bs";
+import { CiCircleCheck, CiStar } from "react-icons/ci";
+import { TbPointFilled, TbUsers } from "react-icons/tb";
+import { AiOutlineThunderbolt } from "react-icons/ai";
 
 // ─── Brand Color Constants ────────────────────────────────────────────────────
 const C = {
@@ -584,7 +589,7 @@ const STEPS = [
 
 const HowItWorksSection = () => (
   <section
-    className="py-24 px-6 md:pl-[51px] pr-[53px] "
+    className="w-full mx-[53px] py-24 px-6 "
     style={{ background: C.offWhite }}
   >
     <div className="w-[1338px] inline-flex flex-col justify-start items-start gap-3.5">
@@ -620,12 +625,18 @@ const HowItWorksSection = () => (
         </div>
       </div>
     </div>
-    <div className="w-[1337px] inline-flex justify-between items-center gap-[60px] mt-[68px]">
+    <div className="w-[1337px] inline-flex justify-between items-end gap-[60px] mt-[68px]">
       {/* Left Column*/}
-      <div className="w-[648px] inline-flex flex-col justify-start items-start gap-14 ">
+      <div className="w-[648px] inline-flex flex-col justify-start items-start gap-[70px] ">
         <div className="self-stretch h-20 inline-flex justify-start items-start gap-5">
-          <div style={{background: ORANGE_FADE}} className="w-10 h-10 py-1.5  rounded-full flex justify-center items-center">
-            <div style={{color: ORANGE}} className="text-center justify-center  text-lg font-bold font-['Plus_Jakarta_Sans'] leading-7">
+          <div
+            style={{ background: ORANGE_FADE }}
+            className="w-10 h-10 py-1.5  rounded-full flex justify-center items-center"
+          >
+            <div
+              style={{ color: ORANGE }}
+              className="text-center justify-center  text-lg font-bold font-['Plus_Jakarta_Sans'] leading-7"
+            >
               1
             </div>
           </div>
@@ -646,8 +657,14 @@ const HowItWorksSection = () => (
           </div>
         </div>
         <div className="self-stretch h-20 inline-flex justify-start items-start gap-5">
-          <div style={{background: ORANGE_FADE}} className="w-10 h-10 py-1.5  rounded-full flex justify-center items-center">
-            <div style={{color: ORANGE}} className="text-center justify-center  text-lg font-bold font-['Plus_Jakarta_Sans'] leading-7">
+          <div
+            style={{ background: ORANGE_FADE }}
+            className="w-10 h-10 py-1.5  rounded-full flex justify-center items-center"
+          >
+            <div
+              style={{ color: ORANGE }}
+              className="text-center justify-center  text-lg font-bold font-['Plus_Jakarta_Sans'] leading-7"
+            >
               2
             </div>
           </div>
@@ -669,8 +686,14 @@ const HowItWorksSection = () => (
           </div>
         </div>
         <div className="w-[648px] inline-flex justify-start items-start gap-5">
-          <div style={{background: ORANGE_FADE}} className="w-10 h-10 py-1.5  rounded-full flex justify-center items-center">
-            <div style={{color: ORANGE}}  className="text-center justify-center text-lg font-bold font-['Plus_Jakarta_Sans'] leading-7">
+          <div
+            style={{ background: ORANGE_FADE }}
+            className="w-10 h-10 py-1.5  rounded-full flex justify-center items-center"
+          >
+            <div
+              style={{ color: ORANGE }}
+              className="text-center justify-center text-lg font-bold font-['Plus_Jakarta_Sans'] leading-7"
+            >
               3
             </div>
           </div>
@@ -693,8 +716,14 @@ const HowItWorksSection = () => (
           </div>
         </div>
         <div className="self-stretch h-20 inline-flex justify-start items-start gap-5">
-          <div style={{background: ORANGE_FADE}} className="w-10 h-10 py-1.5  rounded-full flex justify-center items-center">
-            <div style={{color: ORANGE}} className="text-center justify-center  text-lg font-bold font-['Plus_Jakarta_Sans'] leading-7">
+          <div
+            style={{ background: ORANGE_FADE }}
+            className="w-10 h-10 py-1.5  rounded-full flex justify-center items-center"
+          >
+            <div
+              style={{ color: ORANGE }}
+              className="text-center justify-center  text-lg font-bold font-['Plus_Jakarta_Sans'] leading-7"
+            >
               4
             </div>
           </div>
@@ -717,11 +746,17 @@ const HowItWorksSection = () => (
       </div>
       {/* Right Column */}
       <div className="w-[628px] inline-flex flex-col justify-start items-start gap-8">
-        <div className="w-[629px] h-56 bg-white rounded-xl shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.10)] shadow-lg flex flex-col justify-start items-start gap-2.5 overflow-hidden">
-          <div style={{background: ORANGE_FADE_20}} className="self-stretch h-11 px-5 py-3  border-b border-gray-100 inline-flex justify-start items-center gap-2">
-            <BsSend style={{color: ORANGE}} />
+        <div className="w-[629px]  bg-white rounded-xl shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.10)] shadow-lg flex flex-col justify-start items-start gap-2.5 overflow-hidden">
+          <div
+            style={{ background: ORANGE_FADE_20 }}
+            className="self-stretch h-11 px-5 py-3  border-b border-gray-100 inline-flex justify-start items-center gap-2"
+          >
+            <BsSend style={{ color: ORANGE }} />
             <div className="inline-flex flex-col justify-start items-start">
-              <div style={{color: ORANGE}} className="justify-center  text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
+              <div
+                style={{ color: ORANGE }}
+                className="justify-center  text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5"
+              >
                 Travel Admin — Action Required
               </div>
             </div>
@@ -753,8 +788,11 @@ const HowItWorksSection = () => (
                 </span>
               </div>
             </div>
-            <div className="self-stretch inline-flex justify-start items-start gap-28">
-              <div style={{background: ORANGE}} className="w-80 px-5 py-2 rounded-lg flex justify-center items-center">
+            <div className="self-stretch inline-flex justify-start items-start gap-28 mb-4">
+              <div
+                style={{ background: ORANGE }}
+                className="w-80 px-5 py-2 rounded-lg flex justify-center items-center"
+              >
                 <div className="text-center justify-center text-slate-950 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
                   Approve Request
                 </div>
@@ -767,12 +805,9 @@ const HowItWorksSection = () => (
             </div>
           </div>
         </div>
-        <div className="w-[629px] pb-3.5 bg-color-white-solid rounded-xl shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.10)] shadow-lg outline outline-1 outline-offset-[-1px] outline-color-grey-91 flex flex-col justify-start items-center gap-3.5 overflow-hidden">
-          <div className="self-stretch h-11 px-5 py-3 bg-color-azure-14-10%/10 border-b border-color-grey-91 inline-flex justify-start items-center gap-2">
-            <div className="w-4 h-4 relative overflow-hidden">
-              <div className="w-3 h-2.5 left-[2px] top-[1.33px] absolute outline outline-[1.33px] outline-offset-[-0.67px] outline-slate-950" />
-              <div className="w-0.5 h-[0.67px] left-[6.87px] top-[14px] absolute outline outline-[1.33px] outline-offset-[-0.67px] outline-slate-950" />
-            </div>
+        <div className="w-[629px] pb-3.5 bg-white rounded-xl shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.10)] shadow-lg  outline-1 -outline-offset-1 outline-gray-100 flex flex-col justify-start items-center gap-3.5 overflow-hidden">
+          <div className="self-stretch h-11 px-5 py-3 bg-[#65758B]/10 border-b border-gray-100 inline-flex justify-start items-center gap-2">
+            <BsBell />
             <div className="inline-flex flex-col justify-start items-start">
               <div className="justify-center text-slate-950 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
                 Manager — For Your Information
@@ -787,26 +822,26 @@ const HowItWorksSection = () => (
             </div>
           </div>
         </div>
-        <div className="w-[629px] h-44 relative bg-color-white-solid rounded-xl shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.10)] shadow-lg outline outline-1 outline-offset-[-1px] outline-color-grey-91 overflow-hidden">
-          <div className="w-[627px] h-11 px-5 py-3 left-[1px] top-[1px] absolute bg-color-grey-96 border-b border-color-grey-91 inline-flex justify-start items-center gap-2">
-            <div className="w-4 h-4 relative overflow-hidden">
-              <div className="w-3.5 h-3.5 left-[1.33px] top-[1.33px] absolute outline outline-[1.33px] outline-offset-[-0.67px] outline-color-spring-green-30" />
-              <div className="w-1 h-[2.67px] left-[6px] top-[6.67px] absolute outline outline-[1.33px] outline-offset-[-0.67px] outline-color-spring-green-30" />
-            </div>
+        <div className="w-[629px] h-44 relative bg-white rounded-xl shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.10)] shadow-lg  outline-1 -outline-offset-1 outline-gray-100 overflow-hidden">
+          <div className="w-[627px] h-11 px-5 py-3 left-px top-px absolute bg-[#FFFBEB] border-b border-gray-100 inline-flex justify-start items-center gap-2">
+            <CiCircleCheck className="text-[#059669]" />
             <div className="inline-flex flex-col justify-start items-start">
-              <div className="justify-center text-color-spring-green-30 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
+              <div className="justify-center text-[#059669] text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
                 Employee — Trip Approved
               </div>
             </div>
           </div>
-          <div className="w-[627px] px-5 py-4 left-[1px] top-[46px] absolute inline-flex flex-col justify-start items-start gap-4">
+          <div className="w-[627px] px-5 py-4 left-px top-[46px] absolute inline-flex flex-col justify-start items-start gap-4">
             <div className="self-stretch flex flex-col justify-start items-start">
               <div className="self-stretch justify-center text-[#65758B] text-sm font-normal font-['Plus_Jakarta_Sans'] leading-6">
                 Your Delhi trip has been approved. IndiGo 6E 456 on 22 April is
                 confirmed and ready. Tap below to get your PNR instantly.
               </div>
             </div>
-            <div className="self-stretch px-5 py-2 bg-color-orange-52 rounded-lg inline-flex justify-center items-center">
+            <div
+              style={{ background: ORANGE }}
+              className="self-stretch px-5 py-2  rounded-lg inline-flex justify-center items-center"
+            >
               <div className="text-center justify-center text-slate-950 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
                 Book Now → Get PNR
               </div>
@@ -821,7 +856,7 @@ const HowItWorksSection = () => (
 // ─── 4. Who Approves ──────────────────────────────────────────────────────────
 const ROLES = [
   {
-    icon: <RiShieldCheckLine size={22} />,
+    icon: <MdOutlineShield size={22} />,
     title: "Travel Admin",
     sub: "Manages operations · Ensures compliance",
     points: [
@@ -832,7 +867,7 @@ const ROLES = [
     ],
   },
   {
-    icon: <RiTeamLine size={22} />,
+    icon: <TbUsers size={22} />,
     title: "Manager",
     sub: "Informed · Set budgets",
     points: [
@@ -843,7 +878,7 @@ const ROLES = [
     ],
   },
   {
-    icon: <RiSettings3Line size={22} />,
+    icon: <CiStar size={22} />,
     title: "Super User",
     sub: "Full access · Any booking",
     points: [
@@ -857,32 +892,37 @@ const ROLES = [
 
 const WhoApprovesSection = () => (
   <section className="py-20 px-10" style={{ background: C.offWhite }}>
-    <div className="max-w-[1280px] mx-auto">
-      <div className="mb-14">
-        <SectionLabel>Who Approves</SectionLabel>
-        <h2
-          className="font-normal leading-[1.2] mb-3"
-          style={{
-            fontFamily: "'DM Serif Display', serif",
-            fontSize: 40,
-            color: "#1e293b",
-          }}
+    <div className="w-full mx-[53px] space-y-16">
+      <div className="self-stretch inline-flex flex-col justify-start items-start gap-3.5">
+        <div
+          style={{ background: ORANGE }}
+          className="w-[512px] px-[5px] py-0.5  flex flex-col justify-start items-start"
         >
-          Every role has a
-          <br />
-          <span style={{ color: C.gold }}>clear purpose.</span>
-        </h2>
-        <p
-          className="text-[15px] leading-relaxed max-w-[500px]"
-          style={{
-            color: C.muted,
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-          }}
-        >
-          From booking to approvals, Managers and Admin stay informed.
-          Experience effortless travel management through a purpose-driven
-          dashboard.
-        </p>
+          <div className="justify-center text-black text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.40px]">
+            Who Approves
+          </div>
+        </div>
+        <div className="w-[1336px] flex flex-col justify-start items-start">
+          <div className="justify-center">
+            <span class="text-slate-800 text-4xl font-normal font-['DM_Serif_Display'] leading-10">
+              Every role has a<br />
+            </span>
+            <span
+              style={{ color: ORANGE }}
+              className="italic text-4xl font-normal font-['DM_Serif_Display'] leading-10"
+            >
+              clear purpose.
+            </span>
+          </div>
+        </div>
+        <div className="w-[576px] max-w-[576px] flex flex-col justify-start items-center">
+          <div className="justify-center text-slate-500 text-base font-normal font-['Plus_Jakarta_Sans'] leading-6">
+            From booking to approvals, Managers and Admin stay informed.
+            Experience
+            <br />
+            effortless travel management through a purpose-driven dashboard.
+          </div>
+        </div>
       </div>
 
       <div
@@ -926,7 +966,7 @@ const WhoApprovesSection = () => (
                     className="mt-[3px] flex-none"
                     style={{ color: C.gold }}
                   >
-                    <RiCheckLine size={14} />
+                    <TbPointFilled size={14} />
                   </span>
                   <span
                     className="text-sm leading-[1.6]"
@@ -950,102 +990,86 @@ const WhoApprovesSection = () => (
 // ─── 5. Why It Matters ────────────────────────────────────────────────────────
 const STATS = [
   {
-    icon: <RiTimeLine size={22} />,
+    icon: <AiOutlineThunderbolt color={ORANGE} size={24} />,
     value: "60s",
     label: "Average Approval Time",
   },
   {
-    icon: <RiFileTextLine size={22} />,
+    icon: <RiFileTextLine className="text-blue-400" size={24} />,
     value: "100%",
     label: "Auditable trail of approvals",
   },
   {
-    icon: <RiBarChartLine size={22} />,
+    icon: <RiMailCloseLine className="text-green-400" size={24} />,
     value: "0",
     label: "Manual Reconciliation",
   },
   {
-    icon: <RiBriefcaseLine size={22} />,
+    icon: <RiClipboardLine color={ORANGE} size={24} />,
     value: "1",
     label: "Consolidated Report",
   },
 ];
 
-const WhyItMattersSection = () => (
-  <section
-    className="py-20 px-10 overflow-hidden"
-    style={{
-      background: `linear-gradient(to left, #1e3a8a, ${C.navyDeep})`,
-    }}
-  >
-    <div className="max-w-[1280px] mx-auto">
-      <div className="mb-14">
-        <SectionLabel>Why It Matters</SectionLabel>
-        <h2
-          className="font-normal leading-[1.2] mb-4"
-          style={{
-            fontFamily: "'DM Serif Display', serif",
-            fontSize: 40,
-            color: C.white,
-          }}
-        >
-          Every trip. Every approval.
-          <br />
-          Always on record.
-        </h2>
-        <p
-          className="text-[15px] leading-relaxed max-w-[500px]"
-          style={{
-            color: "rgba(255,255,255,0.5)",
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-          }}
-        >
-          Whether you are a startup or a growing business, stay organized. Know
-          exactly who approved what — and keep travel on track.
-        </p>
+const WhyItMattersSection = () => {
+  return (
+    <section className="relative w-full min-h-[600px] bg-gradient-to-b from-slate-950 to-blue-900 py-20 px-10 flex flex-col justify-center overflow-hidden">
+      {/* Background Large Text Overlay */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5">
+        <h1 className="text-[180px] font-bold font-sans whitespace-nowrap text-white/20">
+          Always on Record
+        </h1>
       </div>
 
-      <div
-        className="grid gap-5"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}
-      >
-        {STATS.map((s) => (
+      <div className="relative z-10 max-w-7xl mx-auto w-full">
+        {/* Header Section */}
+        <div className="mb-16">
           <div
-            key={s.label}
-            className="rounded-2xl p-8 text-center"
-            style={{ border: "2px solid rgba(255,255,255,0.2)" }}
+            style={{ background: ORANGE }}
+            className="w-[512px] px-[5px] py-0.5  inline-flex flex-col justify-start items-start"
           >
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-5"
-              style={{ background: C.white, color: C.gold }}
-            >
-              {s.icon}
+            <div className="justify-center text-black text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.40px]">
+              Why It Matters
             </div>
-            <p
-              className="font-normal mb-2"
-              style={{
-                fontFamily: "'DM Serif Display', serif",
-                fontSize: 34,
-                color: C.gold,
-              }}
-            >
-              {s.value}
-            </p>
-            <p
-              className="text-[13px]"
-              style={{
-                color: "rgba(255,255,255,0.5)",
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-              }}
-            >
-              {s.label}
-            </p>
           </div>
-        ))}
+
+          <div className="justify-center text-white text-4xl font-normal font-['DM_Serif_Display'] leading-10 my-3">
+            Every trip. Every approval.
+            <br />
+            Always on record.
+          </div>
+
+          <div className="self-stretch justify-center text-white/50 text-base font-normal font-['Plus_Jakarta_Sans'] leading-6">
+            Whether you are a startup or a growing business, stay organized.
+            Know
+            <br />
+            exactly who approved what — and keep travel on track.
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {STATS.map((stat, index) => (
+            <div
+              key={index}
+              className="border-2 border-white rounded-xl p-8 flex flex-col items-center justify-center"
+            >
+              <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mb-6">
+                {stat.icon}
+              </div>
+              <div style={{color: ORANGE}} className=" text-4xl font-serif mb-2">
+                {stat.value}
+              </div>
+              <div className="text-white/50 text-sm text-center font-sans">
+                {stat.label}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
-  </section>
-);
+    </section>
+  );
+};
 
 // ─── 6. CTA Section ───────────────────────────────────────────────────────────
 const PERKS = [
@@ -1056,7 +1080,7 @@ const PERKS = [
 ];
 
 const CTASection = () => (
-  <section className="py-20 px-10" style={{ background: C.navyDeep }}>
+  <section className="py-10 px-10 mt-15" style={{ background: C.navyDeep }}>
     <div className="max-w-[640px] mx-auto text-center">
       <p
         className="text-[11px] font-bold uppercase tracking-[0.18em] mb-5"

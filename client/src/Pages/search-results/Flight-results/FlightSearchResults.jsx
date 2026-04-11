@@ -16,7 +16,7 @@ import ReturnFlightList from "./ReturnFlight/ReturnFlightList";
 import { formatDate } from "../../../utils/formatter";
 import { useLocation } from "react-router-dom";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
-import FareUpsellModal from "../../Booking-Flow/Flight-Booking/FareUpsellModal";
+import FareUpsellModal from "./FareUpsellModal";
 import ReturnInternationalFlightCard from "./ReturnFlight/ReturnInternationalFlightCard";
 
 const extractRoutes = (flights, journeyType) => {
@@ -71,6 +71,197 @@ const normalizeSearchDate = (dateStr) => {
   }
 
   return null;
+};
+
+const toFiniteNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getOneWayFlightKey = (item) => {
+  const segment = item?.Segments?.[0]?.[0];
+  if (!segment) return null;
+
+  const airlineCode = segment?.Airline?.AirlineCode || "";
+  const flightNumber = segment?.Airline?.FlightNumber || "";
+  const originCode = segment?.Origin?.Airport?.AirportCode || "";
+  const destinationCode = segment?.Destination?.Airport?.AirportCode || "";
+  const depTime = segment?.Origin?.DepTime || "";
+
+  return `${airlineCode}_${flightNumber}_${originCode}_${destinationCode}_${depTime}`;
+};
+
+const groupFlightsByIdentity = (results = []) => {
+  if (!Array.isArray(results) || results.length === 0) return [];
+
+  const groupedMap = new Map();
+
+  results.forEach((item) => {
+    const segment = item?.Segments?.[0]?.[0];
+    const flightKey = getOneWayFlightKey(item);
+
+    if (!segment || !flightKey) return;
+
+    if (!groupedMap.has(flightKey)) {
+      groupedMap.set(flightKey, {
+        flightKey,
+        flightInfo: item,
+        fareOptions: [],
+        flightOptionsByResultIndex: {},
+        fareOptionIndexByClass: {},
+      });
+    }
+
+    const group = groupedMap.get(flightKey);
+
+    const supplierFareClass = `${segment?.SupplierFareClass || ""}`.trim() || "Standard";
+    const fareClassKey = supplierFareClass.toLowerCase();
+    const publishedFare = toFiniteNumber(
+      item?.Fare?.PublishedFare ?? item?.Fare?.OfferedFare,
+      0,
+    );
+
+    const fareOption = {
+      supplierFareClass,
+      publishedFare,
+      resultIndex: item?.ResultIndex,
+    };
+
+    if (item?.ResultIndex != null) {
+      group.flightOptionsByResultIndex[item.ResultIndex] = item;
+    }
+
+    const existingIndex = group.fareOptionIndexByClass[fareClassKey];
+
+    if (existingIndex === undefined) {
+      group.fareOptionIndexByClass[fareClassKey] = group.fareOptions.length;
+      group.fareOptions.push(fareOption);
+    } else {
+      const existingFare = toFiniteNumber(
+        group.fareOptions[existingIndex]?.publishedFare,
+        Number.POSITIVE_INFINITY,
+      );
+      if (publishedFare < existingFare) {
+        group.fareOptions[existingIndex] = fareOption;
+      }
+    }
+
+    const currentBestFare = toFiniteNumber(
+      group.flightInfo?.Fare?.PublishedFare ??
+        group.flightInfo?.Fare?.OfferedFare,
+      Number.POSITIVE_INFINITY,
+    );
+    if (publishedFare < currentBestFare) {
+      group.flightInfo = item;
+    }
+  });
+
+  return Array.from(groupedMap.values()).map((group) => ({
+    flightKey: group.flightKey,
+    flightInfo: group.flightInfo,
+    flightOptionsByResultIndex: group.flightOptionsByResultIndex,
+    fareOptions: [...group.fareOptions].sort(
+      (a, b) => a.publishedFare - b.publishedFare,
+    ),
+  }));
+};
+
+const getGroupKey = (item) => {
+  if (!item?.Segments || !Array.isArray(item.Segments)) return null;
+
+  return item.Segments.map(leg => {
+    const legArray = Array.isArray(leg) ? leg : [leg];
+    return legArray.map(seg => {
+      const airlineCode = seg?.Airline?.AirlineCode || "";
+      const flightNumber = seg?.Airline?.FlightNumber || "";
+      const originCode = seg?.Origin?.Airport?.AirportCode || "";
+      const destinationCode = seg?.Destination?.Airport?.AirportCode || "";
+      const depTime = seg?.Origin?.DepTime || "";
+      const arrTime = seg?.Destination?.ArrTime || "";
+      return `${airlineCode}_${flightNumber}_${originCode}_${destinationCode}_${depTime}_${arrTime}`;
+    }).join("|");
+  }).join("||");
+};
+
+const groupFlightsByFareOptions = (results = []) => {
+  if (!Array.isArray(results) || results.length === 0) return [];
+
+  const groupedMap = new Map();
+
+  results.forEach((item) => {
+    const flightKey = getGroupKey(item);
+    if (!flightKey) return;
+
+    if (!groupedMap.has(flightKey)) {
+      groupedMap.set(flightKey, {
+        flightKey,
+        flightInfo: item,
+        fareOptions: [],
+        flightOptionsByResultIndex: {},
+      });
+    }
+
+    const group = groupedMap.get(flightKey);
+
+    if (item?.ResultIndex != null) {
+      group.flightOptionsByResultIndex[item.ResultIndex] = item;
+    }
+
+    const supplierFareClass = `${item?.Segments?.[0]?.[0]?.SupplierFareClass || ""}`.trim() || "Standard";
+    const publishedFare = toFiniteNumber(
+      item?.Fare?.PublishedFare ?? item?.Fare?.OfferedFare,
+      0,
+    );
+
+    const fareOption = {
+      supplierFareClass,
+      publishedFare,
+      resultIndex: item?.ResultIndex,
+      fareDetails: item?.Fare,
+      refundable: item?.IsRefundable,
+      cabinClass: getCabinClassKey(item?.Segments?.[0]?.[0]?.CabinClass),
+      baggage: item?.Segments?.[0]?.[0]?.Baggage
+    };
+
+    const existingIndex = group.fareOptions.findIndex(
+      (opt) => opt.supplierFareClass.toLowerCase() === supplierFareClass.toLowerCase()
+    );
+
+    if (existingIndex === -1) {
+      group.fareOptions.push(fareOption);
+    } else {
+      const existingFare = toFiniteNumber(
+        group.fareOptions[existingIndex]?.publishedFare,
+        Number.POSITIVE_INFINITY,
+      );
+      if (publishedFare < existingFare) {
+        group.fareOptions[existingIndex] = fareOption;
+      }
+    }
+
+    const currentBestFare = toFiniteNumber(
+      group.flightInfo?.Fare?.PublishedFare ??
+        group.flightInfo?.Fare?.OfferedFare,
+      Number.POSITIVE_INFINITY,
+    );
+    if (publishedFare < currentBestFare) {
+      group.flightInfo = item;
+    }
+  });
+
+  return Array.from(groupedMap.values()).map((group) => ({
+    flightKey: group.flightKey,
+    flightInfo: group.flightInfo,
+    flightOptionsByResultIndex: group.flightOptionsByResultIndex,
+    fareOptions: [...group.fareOptions].sort(
+      (a, b) => a.publishedFare - b.publishedFare,
+    ),
+  }));
+};
+
+// Helper for cabin class fallback (same as in formatter, but isolated)
+const getCabinClassKey = (code) => {
+  return code || 2; // Default to Economy if missing
 };
 
 /* -------------------- Component -------------------- */
@@ -327,7 +518,15 @@ export default function FlightSearchResults() {
       })
     : "";
 
-  const flightsCount = filteredFlights.length || normalizedFlights.length || 0;
+  const groupedOneWayFlights = useMemo(() => {
+    if (Number(journeyType) !== 1) return [];
+    return groupFlightsByIdentity(filteredFlights);
+  }, [filteredFlights, journeyType]);
+
+  const flightsCount =
+    Number(journeyType) === 1
+      ? groupedOneWayFlights.length
+      : filteredFlights.length || normalizedFlights.length || 0;
 
   const domesticOnwardFlights = useMemo(() => {
     if (Number(journeyType) !== 2 || isInternationalReturnGrouped) return [];
@@ -347,18 +546,20 @@ export default function FlightSearchResults() {
 
   const onwardFlights = useMemo(() => {
     if (Number(journeyType) !== 2) return [];
-    return filteredFlights.filter((f) => {
+    const filtered = filteredFlights.filter((f) => {
       const seg = f.Segments?.[0]?.[0];
       return seg?.Origin?.Airport?.AirportCode === fromCode;
     });
+    return groupFlightsByFareOptions(filtered);
   }, [filteredFlights, journeyType, fromCode]);
 
   const returnFlights = useMemo(() => {
     if (!selectedOnward) return [];
-    return filteredFlights.filter((f) => {
+    const filtered = filteredFlights.filter((f) => {
       const seg = f.Segments?.[0]?.[0];
       return seg?.Origin?.Airport?.AirportCode === toCode;
     });
+    return groupFlightsByFareOptions(filtered);
   }, [filteredFlights, selectedOnward, toCode]);
 
   const routeHeader = useMemo(() => {
@@ -773,7 +974,7 @@ export default function FlightSearchResults() {
     if (jt === 1) {
       return (
         <OneWayFlightCard
-          key={idx}
+          key={flight?.flightKey || flight?.flightInfo?.ResultIndex || idx}
           flight={flight}
           traceId={traceId}
           travelClass={cabinClass}
@@ -802,6 +1003,10 @@ export default function FlightSearchResults() {
           travelClass={cabinClass}
           resultIndex={flight.ResultIndex}
           searchPayload={searchPayload}
+          onOpenFareUpsell={(fareData) => {
+            setSelectedFareUpsell(fareData);
+            setFareUpsellOpen(true);
+          }}
         />
       );
     }
@@ -813,6 +1018,11 @@ export default function FlightSearchResults() {
     headerStats.minPrice &&
     headerStats.maxPrice &&
     headerStats.minPrice < headerStats.maxPrice * 0.6;
+
+  const noFlightsAfterFilters =
+    Number(journeyType) === 1
+      ? groupedOneWayFlights.length === 0
+      : filteredFlights.length === 0;
 
   if (!loading && flights.length === 0 && !location.state?.searchPayload) {
     return (
@@ -1054,7 +1264,7 @@ export default function FlightSearchResults() {
               </div>
             )}
 
-            {!loading && filteredFlights.length === 0 && (
+            {!loading && noFlightsAfterFilters && (
               <div className="bg-white p-6 rounded-lg text-center text-gray-500">
                 No flights match your filters
               </div>
@@ -1095,14 +1305,14 @@ export default function FlightSearchResults() {
             )}
 
             {Number(journeyType) === 2 && isInternationalReturnGrouped ? (
-              filteredFlights.map((flight) => (
+              groupFlightsByFareOptions(filteredFlights).map((groupedFlight) => (
                 <ReturnInternationalFlightCard
-                  key={flight.ResultIndex}
-                  flight={flight}
-                  onContinue={() =>
+                  key={groupedFlight.flightKey}
+                  group={groupedFlight}
+                  onContinue={(selectedVariant) =>
                     navigate("/round-trip-flight/booking", {
                       state: {
-                        rawFlightData: flight, // ✅ PASS FULL GROUPED FLIGHT
+                        rawFlightData: selectedVariant, // Pass the specific fare variant
                         traceId,
                         journeyType: 2,
                         isInternational: true,
@@ -1203,9 +1413,10 @@ export default function FlightSearchResults() {
                 />
               </>
             ) : (
-              filteredFlights.map((flight, idx) =>
-                renderFlightCard(flight, idx),
-              )
+              (Number(journeyType) === 1
+                ? groupedOneWayFlights
+                : filteredFlights
+              ).map((flight, idx) => renderFlightCard(flight, idx))
             )}
 
             {/* Bottom Padding for Sticky Summary */}
@@ -1218,6 +1429,9 @@ export default function FlightSearchResults() {
         isOpen={fareUpsellOpen}
         onClose={() => setFareUpsellOpen(false)}
         fareUpsellData={selectedFareUpsell}
+        searchPayload={searchPayload}
+        journeyType={journeyType}
+        searchTraceId={traceId}
       />
     </div>
   );

@@ -19,7 +19,11 @@ const BOOKING_ENDPOINTS = new Set([
 const SHARED_ENDPOINTS = new Set(["authenticate", "getAgencyBalance"]);
 
 const getTboEnvKey = () => {
-  const envFlag = (process.env.TBO_ENV || process.env.NODE_ENV || "").toLowerCase();
+  const envFlag = (
+    process.env.TBO_ENV ||
+    process.env.NODE_ENV ||
+    ""
+  ).toLowerCase();
 
   // Production + test/UAT map to "live" config; anything else falls back to dummy.
   if (
@@ -82,6 +86,185 @@ const toTboDate = (value) => {
   throw new ApiError(400, `Invalid TBO date format: ${value}`);
 };
 
+const normalizeAmount = (value) => Number(value || 0);
+
+const getPassengerTypeCode = (paxType) => {
+  const value = String(paxType || "").toUpperCase();
+
+  if (value === "1" || value === "ADULT") return 1;
+  if (value === "2" || value === "CHILD") return 2;
+  if (value === "3" || value === "INFANT") return 3;
+
+  return 1;
+};
+
+const toTboFare = (fare = {}, currency = "INR") => ({
+  Currency: fare.Currency || currency,
+  BaseFare: normalizeAmount(fare.BaseFare),
+  Tax: normalizeAmount(fare.Tax),
+  YQTax: normalizeAmount(fare.YQTax),
+  TransactionFee: normalizeAmount(fare.TransactionFee),
+  AdditionalTxnFeePub: normalizeAmount(fare.AdditionalTxnFeePub),
+  AdditionalTxnFeeOfrd: normalizeAmount(fare.AdditionalTxnFeeOfrd),
+  OtherCharges: normalizeAmount(fare.OtherCharges),
+  AirTransFee: normalizeAmount(fare.AirTransFee),
+  PublishedFare: normalizeAmount(
+    fare.PublishedFare ||
+      normalizeAmount(fare.BaseFare) +
+        normalizeAmount(fare.Tax) +
+        normalizeAmount(fare.YQTax) +
+        normalizeAmount(fare.OtherCharges),
+  ),
+  OfferedFare: normalizeAmount(fare.OfferedFare || fare.PublishedFare),
+});
+
+const getFareForPassenger = (result, passenger) => {
+  const fareBreakdown = Array.isArray(result?.FareBreakdown)
+    ? result.FareBreakdown
+    : [];
+
+  const paxType = getPassengerTypeCode(
+    passenger?.paxType || passenger?.PaxType,
+  );
+  const matchedFare = fareBreakdown.find(
+    (fare) => Number(fare?.PassengerType) === paxType,
+  );
+
+  return toTboFare(
+    matchedFare || fareBreakdown[0] || result?.Fare,
+    result?.Fare?.Currency,
+  );
+};
+
+const getLccFareForPassenger = (result, passenger) => {
+  const inlineFare = passenger?.Fare || passenger?.fare;
+
+  if (inlineFare) {
+    return toTboFare(inlineFare, inlineFare.Currency || result?.Fare?.Currency);
+  }
+
+  return getFareForPassenger(result, passenger);
+};
+
+function buildLccTicketSsrPayload({ ssr, liveSsrResponse, passengers }) {
+  // const allMeals = ssrResponse.MealDynamic.flat();
+  const mealOptions = [...(liveSsrResponse?.Response?.MealDynamic?.flat() || [])];
+
+  const seatOptions = [...(
+    liveSsrResponse?.Response?.SeatDynamic?.flatMap((seg) =>
+      seg.SegmentSeat?.flatMap((s) =>
+        s.RowSeats?.flatMap((r) => r.Seats || []),
+      ),
+    ) || []
+  )];
+
+  const baggageOptions = [...(liveSsrResponse?.Response?.Baggage?.flat() || [])];
+
+  const MealDynamic = (ssr?.meals || []).map((m) => {
+    // 1. Try strict match using generated journeyType (WayType 1 vs 2) + Code
+    // 2. Fallback to just Code if journeyType is missing from older DB schemas
+    const expectedWayType = m.journeyType === "return" ? 2 : (m.journeyType === "onward" ? 1 : null);
+    
+    let idx = mealOptions.findIndex(
+      (opt) => String(opt.Code).trim() === String(m.code).trim() && (expectedWayType ? Number(opt.WayType) === expectedWayType : true)
+    );
+    
+    // Fallback if strict WayType match failed but the code exists
+    if (idx === -1) {
+      idx = mealOptions.findIndex((opt) => String(opt.Code).trim() === String(m.code).trim());
+    }
+
+    if (idx === -1) {
+      throw new Error(`Meal code ${m.code} not found in SSR response`);
+    }
+    
+    const matched = mealOptions.splice(idx, 1)[0];
+
+    return {
+      AirlineCode: matched.AirlineCode,
+      FlightNumber: matched.FlightNumber,
+      WayType: matched.SeatWayType || 1,
+      Code: matched.Code, // ✅ REQUIRED
+      Description: Number(matched.Code) || 0, // ✅ REQUIRED
+      Origin: matched.Origin,
+      Destination: matched.Destination,
+      Amount: matched.Price || 0,
+      Currency: "INR",
+    };
+  });
+
+  const SeatDynamic = (ssr?.seats || []).map((s) => {
+    const expectedWayType = s.journeyType === "return" ? 2 : (s.journeyType === "onward" ? 1 : null);
+
+    let idx = seatOptions.findIndex(
+      (opt) => (String(opt.Code).trim() === String(s.seatNo).trim() || `${opt.RowNo}${opt.ColumnNo}`.trim() === String(s.seatNo).trim()) &&
+               (expectedWayType ? Number(opt.SeatWayType || opt.WayType) === expectedWayType : true)
+    );
+
+    if (idx === -1) {
+      idx = seatOptions.findIndex(
+        (opt) => String(opt.Code).trim() === String(s.seatNo).trim() || `${opt.RowNo}${opt.ColumnNo}`.trim() === String(s.seatNo).trim()
+      );
+    }
+
+    if (idx === -1) {
+      throw new Error(`Seat ${s.seatNo} not found in SSR`);
+    }
+    
+    const matched = seatOptions.splice(idx, 1)[0];
+
+    // ✅ ADD THIS
+    return {
+      AirlineCode: matched.AirlineCode || "",
+      FlightNumber: matched.FlightNumber || "",
+      WayType: matched.SeatWayType || 1,
+      Code: matched.Code,
+      Description: Number(matched.Code) || 0,
+      Origin: matched.Origin,
+      Destination: matched.Destination,
+      Amount: matched.Price || 0,
+      Currency: "INR",
+    };
+  });
+
+  const Baggage = (ssr?.baggage || []).map((b) => {
+    const expectedWayType = b.journeyType === "return" ? 2 : (b.journeyType === "onward" ? 1 : null);
+
+    let idx = baggageOptions.findIndex(
+      (opt) => String(opt.Code).trim() === String(b.code).trim() && (expectedWayType ? Number(opt.WayType) === expectedWayType : true)
+    );
+
+    if (idx === -1) {
+       idx = baggageOptions.findIndex((opt) => String(opt.Code).trim() === String(b.code).trim());
+    }
+
+    if (idx === -1) {
+      throw new Error(`Invalid baggage code ${b.code}`);
+    }
+
+    const matched = baggageOptions.splice(idx, 1)[0];
+
+    return {
+      AirlineCode: matched.AirlineCode,
+      FlightNumber: matched.FlightNumber,
+      WayType: matched.WayType,
+      Code: matched.Code,
+      Description: matched.Description,
+      Weight: matched.Weight ? Number(matched.Weight) : 0,
+      Origin: matched.Origin,
+      Destination: matched.Destination,
+      Amount: matched.Price || 0,
+      Currency: "INR",
+    };
+  });
+
+  return {
+    MealDynamic,
+    SeatDynamic,
+    Baggage,
+  };
+}
+
 class FlightService {
   getEnv() {
     return getTboEnvKey();
@@ -111,6 +294,15 @@ class FlightService {
       };
 
       const url = buildUrl(type, "authenticate");
+
+      logger.info("TBO AUTH CALL", {
+        env: type,
+        url,
+        username: payload.UserName,
+        clientId: payload.ClientId,
+        endUserIp: payload.EndUserIp,
+      });
+
       const { data } = await axios.post(url, payload, {
         timeout: config.timeout,
       });
@@ -141,8 +333,7 @@ class FlightService {
     return this.tokens[type].value;
   }
 
-  /* ---------------- SEARCH (DUMMY) ---------------- */
-  /* ---------------- SEARCH (DUMMY) ---------------- */
+  /* ---------------- SEARCH ---------------- */
   // ===============================
   // HELPERS (DO NOT REMOVE)
   // ===============================
@@ -247,6 +438,15 @@ class FlightService {
 
     const searchUrl = buildUrl(env, "flightSearch");
 
+    logger.info("TBO FLIGHT SEARCH CALL", {
+      env,
+      url: searchUrl,
+      username: cfg.credentials?.username,
+      clientId: cfg.credentials?.clientId,
+      endUserIp: cfg.endUserIp,
+      journeyType: params.journeyType,
+    });
+
     const doSearch = async () =>
       axios.post(searchUrl, payload, { timeout: config.timeout });
 
@@ -275,26 +475,6 @@ class FlightService {
 
     const env = this.getEnv();
 
-    // Dummy support
-    if (env === "dummy") {
-      return {
-        FareRules: [
-          {
-            Airline: "AI",
-            Origin: "DEL",
-            Destination: "BOM",
-            FareBasisCode: "Y",
-            FareRestriction: "Non Refundable",
-            FareRuleDetail: [
-              "Cancellation fee applies",
-              "Reissue charges applicable",
-            ],
-          },
-        ],
-      };
-    }
-
-    // LIVE
     return this.postLive(
       "flightFareRule",
       {
@@ -309,28 +489,6 @@ class FlightService {
   async getFareQuote(traceId, resultIndex) {
     const env = this.getEnv();
 
-    // Dummy environment
-    if (env === "dummy") {
-      return {
-        Status: 1,
-        TraceId: traceId,
-        Results: [
-          {
-            ResultIndex: resultIndex,
-            Fare: {
-              Currency: "INR",
-              BaseFare: 1250,
-              Tax: 645,
-              PublishedFare: 1895,
-              OfferedFare: 1895,
-            },
-            IsLCC: false,
-          },
-        ],
-      };
-    }
-
-    // Live / Test
     return this.postLive(
       "flightFareQuote",
       {
@@ -345,20 +503,6 @@ class FlightService {
   async getSSR(traceId, resultIndex) {
     const env = this.getEnv();
 
-    // Dummy for non-production
-    if (env === "dummy") {
-      return {
-        Status: 1,
-        TraceId: traceId,
-        Results: {
-          Baggage: [],
-          Meal: [],
-          Seat: [],
-        },
-      };
-    }
-
-    // LIVE SSR
     return this.postLive(
       "flightSSR",
       {
@@ -376,34 +520,6 @@ class FlightService {
     }
 
     const env = this.getEnv();
-
-    if (env === "dummy") {
-      return {
-        Status: 1,
-        TraceId: traceId,
-        SeatMap: [
-          {
-            SegmentIndex: 0,
-            Seats: [
-              {
-                Code: "12A",
-                SeatType: "WINDOW",
-                Price: 0,
-                IsBooked: false,
-                IsChargeable: false,
-              },
-              {
-                Code: "12B",
-                SeatType: "MIDDLE",
-                Price: 250,
-                IsBooked: false,
-                IsChargeable: true,
-              },
-            ],
-          },
-        ],
-      };
-    }
 
     return this.postLive(
       "flightSeatMap",
@@ -423,71 +539,34 @@ class FlightService {
 
     const env = this.getEnv();
 
-    // Dummy
-    if (env === "dummy") {
-      return {
-        TraceId: traceId,
-        ResultIndex: resultIndex,
-        FareFamilies: [
-          {
-            code: "ECONOMY",
-            name: "Economy",
-            passengerType: 1,
-            price: 0,
-            services: [
-              {
-                code: "SEAT",
-                description: "Standard Seat",
-                included: true,
-              },
-            ],
-          },
-          {
-            code: "ECONOMY_PLUS",
-            name: "Economy Plus",
-            passengerType: 1,
-            price: 899,
-            services: [
-              {
-                code: "SEAT",
-                description: "Free Seat Selection",
-                included: true,
-              },
-              {
-                code: "BAG",
-                description: "Extra Baggage",
-                included: true,
-              },
-            ],
-          },
-        ],
-      };
-    }
+    // 🔸 Log request
+    logger.info("TBO FARE UPSELL REQUEST", {
+      traceId,
+      resultIndex,
+      env,
+    });
 
-    // LIVE
     const response = await this.postLive(
       "flightFareUpsell",
       { TraceId: traceId, ResultIndex: resultIndex },
       env,
     );
-    const upsellList = response?.UpsellOptionsList?.UpsellList || [];
 
-    return {
-      TraceId: traceId,
-      ResultIndex: resultIndex,
-      FareFamilies: upsellList.map((u) => ({
-        code: u.FareFamilyCode,
-        name: u.FareFamilyName,
-        passengerType: u.PassengerType,
-        price: u.Price || 0,
-        services: (u.ServicesList || []).map((s) => ({
-          code: s.Code,
-          description: s.UpsellDescription,
-          included: s.IsIncluded,
-          chargeable: s.IsChargeable,
-        })),
-      })),
-    };
+    // 🔥 FULL RAW RESPONSE LOG (MAIN DEBUG)
+    logger.info(
+      "TBO FARE UPSELL RESPONSE:\n" + JSON.stringify(response, null, 2),
+    );
+
+    // 🔥 ERROR HANDLING (IMPORTANT)
+    if (response?.Response?.ResponseStatus !== 1) {
+      logger.error("TBO FARE UPSELL ERROR", {
+        traceId,
+        resultIndex,
+        error: response?.Response?.Error,
+      });
+    }
+
+    return response;
   }
 
   /* ---------------- BOOK (NON-LCC) ---------------- */
@@ -636,6 +715,8 @@ class FlightService {
     bookingId,
     pnr,
     passengers,
+    result,
+    ssr,
     isLCC,
   }) {
     const env = this.getEnv();
@@ -651,23 +732,93 @@ class FlightService {
         );
       }
 
+      if (!Array.isArray(passengers) || passengers.length === 0) {
+        throw new ApiError(
+          400,
+          "At least one passenger is required for LCC ticketing",
+        );
+      }
+
+      if (
+        !result &&
+        !passengers.every((passenger) => passenger?.Fare || passenger?.fare)
+      ) {
+        throw new ApiError(
+          400,
+          "Selected fare result or passenger fare details are required for LCC ticketing",
+        );
+      }
+
+      if (
+        (ssr?.seats?.length || 0) > 0 ||
+        (ssr?.meals?.length || 0) > 0 ||
+        (ssr?.baggage?.length || 0) > 0
+      ) {
+        logger.warn(
+          "LCC SSR selections are present but not yet mapped into TBO passenger SSR payload",
+          {
+            seatCount: ssr?.seats?.length || 0,
+            mealCount: ssr?.meals?.length || 0,
+            baggageCount: ssr?.baggage?.length || 0,
+          },
+        );
+      }
+
+      let lccSsrPayload = {
+        MealDynamic: [],
+        SeatDynamic: [],
+        Baggage: [],
+      };
+
+      if (
+        (ssr?.meals?.length || 0) > 0 ||
+        (ssr?.seats?.length || 0) > 0 ||
+        (ssr?.baggage?.length || 0) > 0
+      ) {
+        logger.info("BUILDING SSR PAYLOAD FOR LCC", {
+          mealCount: ssr?.meals?.length || 0,
+          seatCount: ssr?.seats?.length || 0,
+          baggageCount: ssr?.baggage?.length || 0,
+        });
+
+        const liveSsr = await this.getSSR(traceId, resultIndex);
+
+        lccSsrPayload = buildLccTicketSsrPayload({
+          ssr,
+          liveSsrResponse: liveSsr,
+          passengers,
+        });
+
+        // 🚨 STEP 2: ADD THIS EXACT BLOCK HERE (IMPORTANT)
+        if (lccSsrPayload.MealDynamic.some((m) => !m.Code)) {
+          throw new Error(
+            "Invalid MealDynamic payload (Code/Description missing)",
+          );
+        }
+
+        if (lccSsrPayload.SeatDynamic.some((s) => !s.Code)) {
+          throw new Error("Invalid SeatDynamic payload (Code missing)");
+        }
+      }
+
+      logger.info("FINAL SSR PAYLOAD", lccSsrPayload);
+
       payload = {
         TraceId: traceId,
         ResultIndex: resultIndex,
+
+        IsPriceChanged: false, // ✅ ADD THIS
+        IsBookAndTicket: true, // ✅ ADD THIS (CRITICAL)
 
         // 🔥 MOST IMPORTANT FIX
         Passengers: passengers.map((p) => ({
           ...this.mapPassenger(p),
 
           // 🔥 REQUIRED FOR LCC
-         Fare: {
-  BaseFare: p.fare?.BaseFare || 0,
-  Tax: p.fare?.Tax || 0,
-  YQTax: p.fare?.YQTax || 0,
-  AdditionalTxnFeePub: 0,
-  AdditionalTxnFeeOfrd: 0,
-  OtherCharges: 0,
-},
+          Fare: getLccFareForPassenger(result, p),
+          MealDynamic: lccSsrPayload.MealDynamic || [],
+          SeatDynamic: lccSsrPayload.SeatDynamic || [],
+          Baggage: lccSsrPayload.Baggage || [],
         })),
       };
     } else {
@@ -829,6 +980,15 @@ class FlightService {
     const token = await this.getToken(envKey);
 
     try {
+      logger.info("TBO LIVE CALL", {
+        env: envKey,
+        endpoint,
+        url,
+        username: cfg.credentials?.username,
+        clientId: cfg.credentials?.clientId,
+        endUserIp: cfg.endUserIp,
+      });
+
       const { data } = await axios.post(
         url,
         {
@@ -859,6 +1019,3 @@ class FlightService {
 }
 
 module.exports = new FlightService();
-
-
-

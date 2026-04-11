@@ -1239,11 +1239,11 @@ export const PriceSummary = ({
             </p>
           )}
 
-          {!approverLoading && !approver && !approverError && (
+          {/* {!approverLoading && !approver && !approverError && (
             <p className="text-red-500">
               No approver assigned to your account.
             </p>
-          )}
+          )} */}
         </div>
       </div>
     </div>
