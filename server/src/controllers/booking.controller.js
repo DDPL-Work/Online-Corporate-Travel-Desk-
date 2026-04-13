@@ -810,12 +810,21 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
 
     /* ================= LCC FLOW ================= */
     if (isLCC) {
+      const splitSSR = (snapshot, type) => {
+        if (!snapshot) return null;
+        return {
+          seats: (snapshot.seats || []).filter(s => s.journeyType === type),
+          meals: (snapshot.meals || []).filter(m => m.journeyType === type),
+          baggage: (snapshot.baggage || []).filter(b => b.journeyType === type)
+        };
+      };
+
       const onwardResp = await tboService.ticketFlight({
         traceId: booking.flightRequest.traceId,
         resultIndex: onwardIndex,
         result: booking.flightRequest.fareQuote.Results[0],
         passengers,
-        ssr: booking.flightRequest.ssrSnapshot,
+        ssr: splitSSR(booking.flightRequest.ssrSnapshot, "onward"),
         isLCC: true,
       });
 
@@ -824,7 +833,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         resultIndex: returnIndex,
         result: booking.flightRequest.fareQuote.Results[1],
         passengers,
-        ssr: booking.flightRequest.ssrSnapshot,
+        ssr: splitSSR(booking.flightRequest.ssrSnapshot, "return"),
         isLCC: true,
       });
 
@@ -872,13 +881,22 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
 
     /* ================= NON-LCC (UNCHANGED) ================= */
 
+    const splitSSR = (snapshot, type) => {
+      if (!snapshot) return null;
+      return {
+        seats: (snapshot.seats || []).filter(s => s.journeyType === type),
+        meals: (snapshot.meals || []).filter(m => m.journeyType === type),
+        baggage: (snapshot.baggage || []).filter(b => b.journeyType === type)
+      };
+    };
+
     const onwardResp = await tboService.bookFlight({
       IsLCC: false,
       traceId: booking.flightRequest.traceId,
       resultIndex: onwardIndex,
       result: booking.flightRequest.fareQuote.Results[0],
       passengers,
-      ssr: booking.flightRequest.ssrSnapshot,
+      ssr: splitSSR(booking.flightRequest.ssrSnapshot, "onward"),
     });
 
     const returnResp = await tboService.bookFlight({
@@ -887,7 +905,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       resultIndex: returnIndex,
       result: booking.flightRequest.fareQuote.Results[1],
       passengers,
-      ssr: booking.flightRequest.ssrSnapshot,
+      ssr: splitSSR(booking.flightRequest.ssrSnapshot, "return"),
     });
 
     const onwardPNR =

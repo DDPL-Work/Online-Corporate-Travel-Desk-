@@ -153,7 +153,14 @@ function buildLccTicketSsrPayload({ ssr, liveSsrResponse, passengers }) {
   const seatOptions = [...(
     liveSsrResponse?.Response?.SeatDynamic?.flatMap((seg) =>
       seg.SegmentSeat?.flatMap((s) =>
-        s.RowSeats?.flatMap((r) => r.Seats || []),
+        s.RowSeats?.flatMap((r) => 
+          (r.Seats || []).map(seatObj => ({
+            ...seatObj,
+            WayType: seg.SegmentSeat[0]?.WayType || s.WayType || 1,
+            AirlineCode: s.AirlineCode || seatObj.AirlineCode,
+            FlightNumber: s.FlightNumber || seatObj.FlightNumber
+          }))
+        ),
       ),
     ) || []
   )];
@@ -178,12 +185,13 @@ function buildLccTicketSsrPayload({ ssr, liveSsrResponse, passengers }) {
       throw new Error(`Meal code ${m.code} not found in SSR response`);
     }
     
-    const matched = mealOptions.splice(idx, 1)[0];
+    const matched = mealOptions[idx];
 
     return {
+      travelerIndex: m.travelerIndex,
       AirlineCode: matched.AirlineCode,
       FlightNumber: matched.FlightNumber,
-      WayType: matched.SeatWayType || 1,
+      WayType: expectedWayType || matched.WayType || 1,
       Code: matched.Code, // ✅ REQUIRED
       Description: Number(matched.Code) || 0, // ✅ REQUIRED
       Origin: matched.Origin,
@@ -211,13 +219,14 @@ function buildLccTicketSsrPayload({ ssr, liveSsrResponse, passengers }) {
       throw new Error(`Seat ${s.seatNo} not found in SSR`);
     }
     
-    const matched = seatOptions.splice(idx, 1)[0];
+    const matched = seatOptions[idx];
 
     // ✅ ADD THIS
     return {
+      travelerIndex: s.travelerIndex,
       AirlineCode: matched.AirlineCode || "",
       FlightNumber: matched.FlightNumber || "",
-      WayType: matched.SeatWayType || 1,
+      WayType: expectedWayType || matched.WayType || matched.SeatWayType || 1,
       Code: matched.Code,
       Description: Number(matched.Code) || 0,
       Origin: matched.Origin,
@@ -242,12 +251,13 @@ function buildLccTicketSsrPayload({ ssr, liveSsrResponse, passengers }) {
       throw new Error(`Invalid baggage code ${b.code}`);
     }
 
-    const matched = baggageOptions.splice(idx, 1)[0];
+    const matched = baggageOptions[idx];
 
     return {
+      travelerIndex: b.travelerIndex || b.segmentIndex || 0, // Fallback if missing
       AirlineCode: matched.AirlineCode,
       FlightNumber: matched.FlightNumber,
-      WayType: matched.WayType,
+      WayType: expectedWayType || matched.WayType || 1,
       Code: matched.Code,
       Description: matched.Description,
       Weight: matched.Weight ? Number(matched.Weight) : 0,
@@ -811,14 +821,22 @@ class FlightService {
         IsBookAndTicket: true, // ✅ ADD THIS (CRITICAL)
 
         // 🔥 MOST IMPORTANT FIX
-        Passengers: passengers.map((p) => ({
+        Passengers: passengers.map((p, pIndex) => ({
           ...this.mapPassenger(p),
 
           // 🔥 REQUIRED FOR LCC
           Fare: getLccFareForPassenger(result, p),
-          MealDynamic: lccSsrPayload.MealDynamic || [],
-          SeatDynamic: lccSsrPayload.SeatDynamic || [],
-          Baggage: lccSsrPayload.Baggage || [],
+          MealDynamic: (lccSsrPayload.MealDynamic || [])
+            .filter((m) => m.travelerIndex === pIndex)
+            .map(({ travelerIndex, ...rest }) => rest),
+            
+          SeatDynamic: (lccSsrPayload.SeatDynamic || [])
+            .filter((s) => s.travelerIndex === pIndex)
+            .map(({ travelerIndex, ...rest }) => rest),
+            
+          Baggage: (lccSsrPayload.Baggage || [])
+            .filter((b) => b.travelerIndex === pIndex)
+            .map(({ travelerIndex, ...rest }) => rest),
         })),
       };
     } else {
