@@ -21,6 +21,11 @@ import {
   FiChevronDown,
   FiChevronUp,
   FiStar,
+  FiXCircle,
+  FiAlertTriangle,
+  FiDollarSign,
+  FiX,
+  FiLoader,
 } from "react-icons/fi";
 import {
   downloadTicketPdf,
@@ -34,6 +39,7 @@ import {
   amendBooking,
   fetchChangeStatus,
 } from "../../Redux/Actions/amendmentThunks";
+import { resetAmendmentState } from "../../Redux/Slice/amendmentSlice";
 import {
   formatDate,
   formatTime,
@@ -59,7 +65,6 @@ function safeGet(obj, ...keys) {
   return keys.reduce((acc, key) => (acc != null ? acc[key] : undefined), obj);
 }
 
-/** Compute layover minutes between two segments */
 function layoverMinutes(prevSeg, nextSeg) {
   const arr = new Date(prevSeg.arrivalDateTime);
   const dep = new Date(nextSeg.departureDateTime);
@@ -181,9 +186,6 @@ function RouteConnector({ duration, stops = 0 }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Layover Banner (shown between segments inside a journey card) */
-/* ─────────────────────────────────────────────────────────────── */
 function LayoverBanner({ prevSeg, nextSeg }) {
   const mins = layoverMinutes(prevSeg, nextSeg);
   const airport =
@@ -209,9 +211,6 @@ function LayoverBanner({ prevSeg, nextSeg }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Supplier Fare Class badge                                      */
-/* ─────────────────────────────────────────────────────────────── */
 function FareClassBadge({ label, color }) {
   const bgStyle = color ? { backgroundColor: color + "33", borderColor: color + "66" } : {};
   return (
@@ -225,13 +224,9 @@ function FareClassBadge({ label, color }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Single-segment row inside journey card                        */
-/* ─────────────────────────────────────────────────────────────── */
 function SegmentRow({ seg, fareClassInfo, isFirst, isLast }) {
   return (
     <div className="grid grid-cols-[1fr_160px_1fr] items-center py-5 border-b border-white/10 last:border-0">
-      {/* Origin */}
       <div className="space-y-1">
         {isFirst && (
           <p className="text-[11px] text-white/40 font-bold uppercase tracking-widest">From</p>
@@ -249,10 +244,8 @@ function SegmentRow({ seg, fareClassInfo, isFirst, isLast }) {
         </div>
       </div>
 
-      {/* Connector */}
       <RouteConnector duration={formatDuration(seg?.durationMinutes)} />
 
-      {/* Destination */}
       <div className="text-right space-y-1">
         {isFirst && (
           <p className="text-[11px] text-white/40 font-bold uppercase tracking-widest">To</p>
@@ -273,9 +266,6 @@ function SegmentRow({ seg, fareClassInfo, isFirst, isLast }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Journey card — ONE card per journeyType, multi-segment aware  */
-/* ─────────────────────────────────────────────────────────────── */
 function JourneyCard({
   journeyType,
   segments,
@@ -291,7 +281,6 @@ function JourneyCard({
   const lastSeg = segments[segments.length - 1];
   const isDownloading = downloading === journeyType;
 
-  // Supplier fare class — try bookingResult FlightItinerary first, then fareQuote segments
   let supplierFareClass = null;
   let fareClassColor = null;
 
@@ -305,7 +294,6 @@ function JourneyCard({
     fareClassColor = fi?.FareClassification?.split?.("#")?.[1];
   }
 
-  // Fallback to fareQuote segments
   if (!supplierFareClass && fareQuoteResults?.length) {
     const idx = journeyType === "return" ? 1 : 0;
     const result = fareQuoteResults[idx] || fareQuoteResults[0];
@@ -322,16 +310,11 @@ function JourneyCard({
   };
   const gradient = `linear-gradient(140deg, ${theme.primary} 0%, ${theme.secondary} 60%, ${theme.primary} 100%)`;
 
-  const statusLabel =
-    FLIGHT_STATUS_MAP?.["Confirmed"]?.label || "Confirmed";
+  const statusLabel = FLIGHT_STATUS_MAP?.["Confirmed"]?.label || "Confirmed";
 
-  // Ticket info from booking result
   let ticketNumber = null;
   let issueDate = null;
   let validatingAirline = null;
-  let invoiceNo = null;
-  let invoiceAmount = null;
-  let invoiceDate = null;
 
   const responseKey = journeyType === "return" ? "returnResponse" : "onwardResponse";
   const fi = safeGet(bookingResult, responseKey, "Response", "Response", "FlightItinerary");
@@ -339,9 +322,6 @@ function JourneyCard({
     ticketNumber = fi.Passenger?.[0]?.Ticket?.TicketNumber;
     issueDate = fi.Passenger?.[0]?.Ticket?.IssueDate;
     validatingAirline = fi.ValidatingAirlineCode;
-    invoiceNo = fi.InvoiceNo || fi.Invoice?.[0]?.InvoiceNo;
-    invoiceAmount = fi.InvoiceAmount || fi.Invoice?.[0]?.InvoiceAmount;
-    invoiceDate = fi.InvoiceCreatedOn || fi.Invoice?.[0]?.InvoiceCreatedOn;
   }
 
   return (
@@ -349,7 +329,6 @@ function JourneyCard({
       className="rounded-2xl overflow-hidden shadow-2xl text-white relative"
       style={{ background: gradient }}
     >
-      {/* Grid texture */}
       <div
         className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
@@ -359,7 +338,6 @@ function JourneyCard({
       />
 
       <div className="relative p-6 grid gap-0">
-        {/* ── ROW 1: Airline + Journey label + Status ── */}
         <div className="flex items-center gap-3 pb-5 border-b border-white/10">
           {airlineLogo?.(firstSeg?.airlineCode) ? (
             <img
@@ -387,7 +365,6 @@ function JourneyCard({
           </div>
         </div>
 
-        {/* ── Supplier Fare Class ── */}
         {supplierFareClass && (
           <div className="py-3 border-b border-white/10 flex items-center gap-2">
             <FareClassBadge label={supplierFareClass} color={fareClassColor} />
@@ -395,7 +372,6 @@ function JourneyCard({
           </div>
         )}
 
-        {/* ── ROW 2: Segments with layovers ── */}
         <div className="border-b border-white/10">
           {segments.map((seg, i) => (
             <React.Fragment key={i}>
@@ -409,39 +385,20 @@ function JourneyCard({
           ))}
         </div>
 
-        {/* ── ROW 3: Baggage + Terminal meta chips ── */}
         <div className="grid grid-cols-3 gap-2.5 py-4 border-b border-white/10">
-          <MetaChip
-            icon={FiPackage}
-            label="Check-in"
-            value={firstSeg?.baggage?.checkIn}
-          />
-          <MetaChip
-            icon={FiPackage}
-            label="Cabin bag"
-            value={firstSeg?.baggage?.cabin}
-          />
-          <MetaChip
-            icon={FiMapPin}
-            label="Terminal"
-            value={firstSeg?.origin?.terminal || "N/A"}
-          />
+          <MetaChip icon={FiPackage} label="Check-in" value={firstSeg?.baggage?.checkIn} />
+          <MetaChip icon={FiPackage} label="Cabin bag" value={firstSeg?.baggage?.cabin} />
+          <MetaChip icon={FiMapPin} label="Terminal" value={firstSeg?.origin?.terminal || "N/A"} />
         </div>
 
-        {/* ── Ticket Details row ── */}
         {ticketNumber && (
           <div className="grid grid-cols-3 gap-2.5 py-4 border-b border-white/10">
             <MetaChip icon={FiFileText} label="Ticket No." value={ticketNumber} />
-            <MetaChip
-              icon={FiCalendar}
-              label="Issue Date"
-              value={issueDate ? formatDate(issueDate) : "—"}
-            />
+            <MetaChip icon={FiCalendar} label="Issue Date" value={issueDate ? formatDate(issueDate) : "—"} />
             <MetaChip icon={FiTag} label="Validating Airline" value={validatingAirline} />
           </div>
         )}
 
-        {/* ── ROW 4: PNR + Download ── */}
         {paymentSuccessful && (
           <div className="pt-4 flex items-center justify-between gap-4">
             <div>
@@ -489,7 +446,7 @@ function JourneyCard({
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  SSR Section per journey                                        */
+/*  SSR Section                                                    */
 /* ─────────────────────────────────────────────────────────────── */
 function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
   if (!ssrSnapshot) return null;
@@ -497,7 +454,6 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
   const { seats = [], meals = [], baggage = [] } = ssrSnapshot;
   if (!seats.length && !meals.length && !baggage.length) return null;
 
-  // Group by traveler
   const travelerMap = {};
   travellers.forEach((t, idx) => {
     travelerMap[idx] = `${t.title} ${t.firstName} ${t.lastName}`;
@@ -532,16 +488,10 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
                       {seg.origin?.airportCode} → {seg.destination?.airportCode}
                     </p>
 
-                    {/* Seats */}
                     {segSeats.map((seat, i) => (
-                      <div
-                        key={i}
-                        className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0"
-                      >
+                      <div key={i} className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0">
                         <div>
-                          <p className="text-xs font-semibold text-slate-700">
-                            Seat: {seat.seatNo}
-                          </p>
+                          <p className="text-xs font-semibold text-slate-700">Seat: {seat.seatNo}</p>
                           <p className="text-[10px] text-slate-400">
                             {travelerMap[seat.travelerIndex] || `Traveller ${seat.travelerIndex + 1}`}
                           </p>
@@ -552,19 +502,12 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
                       </div>
                     ))}
 
-                    {/* Meals */}
                     {segMeals.map((meal, i) => (
-                      <div
-                        key={i}
-                        className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0"
-                      >
+                      <div key={i} className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0">
                         <div>
-                          <p className="text-xs font-semibold text-slate-700">
-                            Meal: {meal.code}
-                          </p>
+                          <p className="text-xs font-semibold text-slate-700">Meal: {meal.code}</p>
                           <p className="text-[10px] text-slate-400">
-                            Qty: {meal.description || 1} ·{" "}
-                            {travelerMap[meal.travelerIndex] || `Traveller ${meal.travelerIndex + 1}`}
+                            Qty: {meal.description || 1} · {travelerMap[meal.travelerIndex] || `Traveller ${meal.travelerIndex + 1}`}
                           </p>
                         </div>
                         {!isEmployee && meal.price > 0 && (
@@ -573,12 +516,8 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
                       </div>
                     ))}
 
-                    {/* Extra baggage */}
                     {segBag.map((b, i) => (
-                      <div
-                        key={i}
-                        className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0"
-                      >
+                      <div key={i} className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0">
                         <div>
                           <p className="text-xs font-semibold text-slate-700">
                             Extra Baggage: {b.weight || b.description || "—"}
@@ -615,50 +554,10 @@ function BookingSummaryCard({ booking, displayPnr }) {
     <div className="">
       <CardLabel icon={FiFileText} label="Booking Summary" />
       <div className="grid grid-cols-1 gap-x-8">
-        {/* <div>
-          <InfoRow
-            label="Booking Reference"
-            value={booking.bookingReference}
-            mono
-            accent
-          />
-          <InfoRow
-            label="PNR"
-            value={displayPnr || "—"}
-            mono
-          />
-          <InfoRow
-            label="Booking Status"
-            value={
-              <StatusPill status={booking.requestStatus} />
-            }
-          />
-          <InfoRow
-            label="Execution Status"
-            value={
-              <StatusPill status={booking.executionStatus} />
-            }
-          />
-          <InfoRow
-            label="Booking Date"
-            value={
-              booking.createdAt
-                ? formatDateWithYear(booking.createdAt)
-                : "—"
-            }
-          />
-          {booking.approvedAt && (
-            <InfoRow
-              label="Approved At"
-              value={formatDateWithYear(booking.approvedAt)}
-            />
-          )}
-        </div> */}
         <div>
           <InfoRow label="Project Name" value={booking.projectName} />
           <InfoRow label="Project Code" value={booking.projectCodeId} />
           <InfoRow label="Project Client" value={booking.projectClient} />
-          {/* <InfoRow label="Purpose of Travel" value={booking.purposeOfTravel} /> */}
           <InfoRow label="Approver Email" value={booking.approverEmail} />
           <InfoRow label="Approver Role" value={booking.approverRole} />
           {booking.approverComments && (
@@ -678,20 +577,8 @@ function InvoiceSection({ bookingResult, isEmployee }) {
 
   const invoices = [];
 
-  const onwardFI = safeGet(
-    bookingResult,
-    "onwardResponse",
-    "Response",
-    "Response",
-    "FlightItinerary",
-  );
-  const returnFI = safeGet(
-    bookingResult,
-    "returnResponse",
-    "Response",
-    "Response",
-    "FlightItinerary",
-  );
+  const onwardFI = safeGet(bookingResult, "onwardResponse", "Response", "Response", "FlightItinerary");
+  const returnFI = safeGet(bookingResult, "returnResponse", "Response", "Response", "FlightItinerary");
 
   if (onwardFI?.InvoiceNo) {
     invoices.push({
@@ -725,11 +612,7 @@ function InvoiceSection({ bookingResult, isEmployee }) {
             </p>
             <InfoRow label="Invoice No." value={inv.no} mono />
             <InfoRow label="Invoice Date" value={inv.date ? formatDate(inv.date) : "—"} />
-            <InfoRow
-              label="Invoice Amount"
-              value={inv.amount != null ? `₹${inv.amount}` : "—"}
-              accent
-            />
+            <InfoRow label="Invoice Amount" value={inv.amount != null ? `₹${inv.amount}` : "—"} accent />
           </div>
         ))}
       </div>
@@ -754,10 +637,7 @@ function FareRulesSection({ bookingResult }) {
 
   return (
     <BentoCard className="md:col-span-2">
-      <button
-        className="w-full flex items-center justify-between"
-        onClick={() => setOpen((v) => !v)}
-      >
+      <button className="w-full flex items-center justify-between" onClick={() => setOpen((v) => !v)}>
         <CardLabel icon={FiShield} label="Fare Rules" />
         {open ? <FiChevronUp size={16} className="text-slate-400" /> : <FiChevronDown size={16} className="text-slate-400" />}
       </button>
@@ -765,9 +645,7 @@ function FareRulesSection({ bookingResult }) {
         <div className="mt-2 space-y-4">
           {rules.map((r, i) => (
             <div key={i}>
-              <p className="text-xs font-black uppercase tracking-widest text-teal-600 mb-2">
-                {r.label}
-              </p>
+              <p className="text-xs font-black uppercase tracking-widest text-teal-600 mb-2">{r.label}</p>
               {r.rules.map((rule, j) => (
                 <div key={j} className="mb-3">
                   <p className="text-xs font-semibold text-slate-600">
@@ -790,7 +668,654 @@ function FareRulesSection({ bookingResult }) {
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Amendment Modals (unchanged from original)                     */
+/*  ★ CANCELLATION CHARGES MODAL (NEW)                            */
+/* ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Step machine:
+ *  "charges"         → show fetched charges + 3 action buttons
+ *  "full-confirm"    → confirm dialog for full cancellation
+ *  "partial-select"  → route selection for partial cancellation
+ *  "partial-confirm" → confirm partial after route chosen
+ *  "reissue"         → date picker for reissue
+ *  "processing"      → spinner while API call in flight
+ *  "success"         → success summary
+ *  "error"           → error fallback
+ */
+function CancellationModal({ booking, onClose, onSuccess }) {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const [step, setStep] = useState("loading"); // starts loading charges
+  const [charges, setCharges] = useState(null);
+  const [chargesError, setChargesError] = useState(null);
+
+  const [selectedJourney, setSelectedJourney] = useState(null);
+  const [reissueDate, setReissueDate] = useState("");
+  const [remarksText, setRemarksText] = useState("");
+  const [successData, setSuccessData] = useState(null);
+  const [processingLabel, setProcessingLabel] = useState("Processing…");
+
+  const segments = booking?.flightRequest?.segments || [];
+  const journeyTypeOf = (seg) => {
+    const jt = (seg?.journeyType || "").toString().toLowerCase();
+    return jt === "return" ? "return" : "onward";
+  };
+  const onwardSegs = segments.filter((s) => journeyTypeOf(s) === "onward");
+  const returnSegs = segments.filter((s) => journeyTypeOf(s) === "return");
+  const hasReturn = returnSegs.length > 0;
+
+  const sectorLabel = (segList) => {
+    if (!segList.length) return "N/A";
+    const first = segList[0];
+    const last = segList[segList.length - 1];
+    return `${first?.origin?.airportCode || "?"} → ${last?.destination?.airportCode || "?"}`;
+  };
+
+  // Fetch charges on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await dispatch(fetchCancellationCharges(booking._id));
+        if (res.payload) {
+          setCharges(res.payload);
+          setStep("charges");
+        } else {
+          throw new Error("No charges data");
+        }
+      } catch (err) {
+        setChargesError("Could not fetch cancellation charges. Please try again.");
+        setStep("error");
+      }
+    })();
+  }, []);
+
+  // Extract TicketCRInfo[0] from charges response
+  const ticketInfo = charges?.Response?.TicketCRInfo?.[0] || null;
+  const cancellationCharge = ticketInfo?.CancellationCharge ?? charges?.CancellationCharge ?? null;
+  const refundedAmount = ticketInfo?.RefundedAmount ?? charges?.RefundedAmount ?? null;
+  const creditNoteNo = ticketInfo?.CreditNoteNo ?? charges?.CreditNoteNo ?? null;
+
+  /* ── Full Cancellation ── */
+  const handleFullCancel = async () => {
+    setStep("processing");
+    setProcessingLabel("Submitting cancellation request…");
+    try {
+      const res = await dispatch(fullCancellation({ bookingId: booking._id, remarks: remarksText || undefined }));
+      const changeRequestId =
+        res.payload?.Response?.ChangeRequestId ||
+        res.payload?.data?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
+        res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId;
+
+      if (!changeRequestId) throw new Error("No ChangeRequestId returned");
+
+      setProcessingLabel("Waiting for airline confirmation…");
+      let status = "requested";
+      let attempts = 0;
+      let finalInfo = null;
+
+      while ((status === "requested" || status === "in_progress") && attempts < 3) {
+        attempts++;
+        await new Promise((r) => setTimeout(r, 4000));
+        const statusRes = await dispatch(
+          fetchChangeStatus({ changeRequestId, bookingId: booking._id })
+        );
+        const crInfo =
+          statusRes.payload?.Response?.TicketCRInfo?.[0] || statusRes.payload?.Response;
+        const apiStatus = crInfo?.ChangeRequestStatus;
+        finalInfo = crInfo;
+
+        if (apiStatus === 4) status = "completed";
+        else if ([1, 2, 3].includes(apiStatus)) status = "in_progress";
+        else if (apiStatus === 5) status = "failed";
+        else status = "unknown";
+      }
+
+      if (status === "failed") throw new Error("Cancellation failed by airline/supplier");
+
+      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
+      await dispatch(fetchMyBookingById(booking._id));
+
+      setSuccessData({
+        type: "full",
+        status,
+        cancellationCharge: finalInfo?.CancellationCharge ?? cancellationCharge,
+        refundedAmount: finalInfo?.RefundedAmount ?? refundedAmount,
+        creditNoteNo: finalInfo?.CreditNoteNo ?? creditNoteNo,
+      });
+      setStep("success");
+    } catch (err) {
+      setChargesError(err?.message || "Cancellation failed. Please try again.");
+      setStep("error");
+    }
+  };
+
+  /* ── Partial Cancellation ── */
+  const buildSectors = () => {
+    const pick = selectedJourney === "return" ? returnSegs : onwardSegs;
+    return pick
+      .map((seg) => ({ Origin: seg?.origin?.airportCode, Destination: seg?.destination?.airportCode }))
+      .filter((s) => s.Origin && s.Destination);
+  };
+
+  const handlePartialCancel = async () => {
+    const sectors = buildSectors();
+    if (!sectors.length) return;
+    setStep("processing");
+    setProcessingLabel("Submitting partial cancellation…");
+    try {
+      const res = await dispatch(
+        partialCancellation({
+          bookingId: booking._id,
+          segments: sectors,
+          remarks: remarksText || "User requested partial cancellation",
+        })
+      );
+      if (res.error) throw new Error(res.payload || "Partial cancellation failed");
+
+      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
+      await dispatch(fetchMyBookingById(booking._id));
+
+      setSuccessData({ type: "partial", route: sectorLabel(selectedJourney === "return" ? returnSegs : onwardSegs) });
+      setStep("success");
+    } catch (err) {
+      setChargesError(err?.message || "Partial cancellation failed.");
+      setStep("error");
+    }
+  };
+
+  /* ── Reissue ── */
+  const handleReissue = async () => {
+    if (!reissueDate) return;
+    setStep("processing");
+    setProcessingLabel("Submitting reissue request…");
+    try {
+      const res = await dispatch(
+        amendBooking({
+          bookingId: booking._id,
+          segments: [{ newDate: reissueDate }],
+          remarks: remarksText || "User requested reissue",
+        })
+      );
+      if (res.error) throw new Error(res.payload || "Reissue failed");
+      await dispatch(fetchMyBookingById(booking._id));
+      setSuccessData({ type: "reissue", newDate: reissueDate });
+      setStep("success");
+    } catch (err) {
+      setChargesError(err?.message || "Reissue failed. Please try again.");
+      setStep("error");
+    }
+  };
+
+  const handleSuccessClose = () => {
+    dispatch(resetAmendmentState());
+    onClose();
+    if (successData?.type === "full" || successData?.type === "partial") {
+      navigate("/my-cancelled-bookings");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={step !== "processing" ? onClose : undefined}
+      />
+
+      {/* Panel */}
+      <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <span className="bg-red-50 rounded-xl p-2">
+              <FiXCircle size={16} className="text-red-500" />
+            </span>
+            <div>
+              <h2 className="text-base font-black text-slate-900">
+                {step === "reissue" ? "Reissue Flight" : "Cancellation"}
+              </h2>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Booking · {booking.bookingReference}
+              </p>
+            </div>
+          </div>
+          {step !== "processing" && (
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition"
+            >
+              <FiX size={15} className="text-slate-500" />
+            </button>
+          )}
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5">
+          {/* ── Loading ── */}
+          {step === "loading" && (
+            <div className="flex flex-col items-center gap-3 py-10">
+              <div className="w-10 h-10 rounded-full border-[3px] border-slate-200 border-t-red-400 animate-spin" />
+              <p className="text-sm text-slate-400 font-medium">Fetching cancellation charges…</p>
+            </div>
+          )}
+
+          {/* ── Processing ── */}
+          {step === "processing" && (
+            <div className="flex flex-col items-center gap-3 py-10">
+              <div className="w-10 h-10 rounded-full border-[3px] border-slate-200 border-t-indigo-400 animate-spin" />
+              <p className="text-sm text-slate-500 font-medium text-center">{processingLabel}</p>
+              <p className="text-xs text-slate-400">Please do not close this window</p>
+            </div>
+          )}
+
+          {/* ── Error ── */}
+          {step === "error" && (
+            <div className="flex flex-col items-center gap-4 py-8 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
+                <FiAlertTriangle size={24} className="text-red-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800 mb-1">Something went wrong</p>
+                <p className="text-xs text-slate-400">{chargesError}</p>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => { setStep("loading"); setChargesError(null); }}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl transition"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Success ── */}
+          {step === "success" && successData && (
+            <div className="flex flex-col items-center gap-4 py-6 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                <FiCheckCircle size={28} className="text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-base font-black text-slate-800 mb-1">
+                  {successData.type === "full" && "Cancellation Successful"}
+                  {successData.type === "partial" && "Partial Cancellation Submitted"}
+                  {successData.type === "reissue" && "Reissue Request Submitted"}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {successData.type === "full" && successData.status !== "completed"
+                    ? "Your request is being processed. You'll be notified shortly."
+                    : successData.type === "full"
+                    ? "Your ticket has been cancelled successfully."
+                    : successData.type === "partial"
+                    ? `Route ${successData.route} cancellation submitted.`
+                    : `Reissue for ${successData.newDate} submitted.`}
+                </p>
+              </div>
+
+              {/* Refund summary for full cancel */}
+              {successData.type === "full" && (
+                <div className="w-full bg-slate-50 rounded-xl p-4 space-y-2 text-left">
+                  {successData.cancellationCharge != null && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Cancellation Charge</span>
+                      <span className="font-bold text-red-600">₹{successData.cancellationCharge}</span>
+                    </div>
+                  )}
+                  {successData.refundedAmount != null && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Refund Amount</span>
+                      <span className="font-bold text-emerald-600">₹{successData.refundedAmount}</span>
+                    </div>
+                  )}
+                  {successData.creditNoteNo && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Credit Note No.</span>
+                      <span className="font-mono text-xs font-semibold text-slate-700">{successData.creditNoteNo}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={handleSuccessClose}
+                className="w-full mt-2 py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition"
+              >
+                {successData.type === "full" || successData.type === "partial"
+                  ? "Go to Cancelled Bookings"
+                  : "Close"}
+              </button>
+            </div>
+          )}
+
+          {/* ── Charges view ── */}
+          {step === "charges" && (
+            <div className="space-y-5">
+              {/* Charges breakdown */}
+              <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-4 space-y-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-1">
+                  Cancellation Charges
+                </p>
+                {cancellationCharge != null && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600">Airline Charge</span>
+                    <span className="font-black text-red-600">₹{cancellationCharge}</span>
+                  </div>
+                )}
+                {refundedAmount != null && (
+                  <div className="flex justify-between items-center text-sm border-t border-amber-200 pt-2">
+                    <span className="text-slate-600 font-semibold">Estimated Refund</span>
+                    <span className="font-black text-emerald-600 text-base">₹{refundedAmount}</span>
+                  </div>
+                )}
+                {creditNoteNo && (
+                  <div className="flex justify-between items-center text-sm border-t border-amber-200 pt-2">
+                    <span className="text-slate-600">Credit Note</span>
+                    <span className="font-mono text-xs font-semibold text-slate-700">{creditNoteNo}</span>
+                  </div>
+                )}
+                {cancellationCharge == null && refundedAmount == null && (
+                  <p className="text-xs text-amber-600 italic">
+                    Contact support for exact charges. Charges may apply as per fare rules.
+                  </p>
+                )}
+              </div>
+
+              {/* Mini fare rules quick reference */}
+              {booking?.flightRequest?.fareSnapshot?.miniFareRules?.length > 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Fare Rules Summary</p>
+                  {booking.flightRequest.fareSnapshot.miniFareRules.flat().map((rule, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <span className={`font-semibold ${rule.Type === "Cancellation" ? "text-red-600" : "text-blue-600"}`}>
+                        {rule.Type} · {rule.JourneyPoints}
+                      </span>
+                      <span className="text-slate-600">{rule.Details}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 3 action buttons */}
+              <div className="grid grid-cols-1 gap-2 pt-1">
+                <button
+                  onClick={() => setStep("full-confirm")}
+                  className="w-full py-3 bg-red-600 text-white font-bold text-sm rounded-xl hover:bg-red-700 transition flex items-center justify-center gap-2"
+                >
+                  <FiXCircle size={15} />
+                  Full Cancellation
+                </button>
+                {hasReturn && (
+                  <button
+                    onClick={() => setStep("partial-select")}
+                    className="w-full py-3 bg-amber-500 text-white font-bold text-sm rounded-xl hover:bg-amber-600 transition flex items-center justify-center gap-2"
+                  >
+                    <FiAlertTriangle size={15} />
+                    Partial Cancellation
+                  </button>
+                )}
+                <button
+                  onClick={() => setStep("reissue")}
+                  className="w-full py-3 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 transition flex items-center justify-center gap-2"
+                >
+                  <FiCalendar size={15} />
+                  Reissue Flight
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Full cancel confirm ── */}
+          {step === "full-confirm" && (
+            <div className="space-y-5">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3">
+                <FiAlertTriangle size={18} className="text-red-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-red-800 mb-1">This action cannot be undone</p>
+                  <p className="text-xs text-red-600">
+                    Your ticket will be cancelled permanently. Refund (if applicable) will be
+                    processed as per fare rules.
+                  </p>
+                </div>
+              </div>
+
+              {cancellationCharge != null && (
+                <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Cancellation Charge</span>
+                    <span className="font-bold text-red-600">₹{cancellationCharge}</span>
+                  </div>
+                  {refundedAmount != null && (
+                    <div className="flex justify-between text-sm border-t border-slate-200 pt-2">
+                      <span className="text-slate-500 font-semibold">You will receive</span>
+                      <span className="font-black text-emerald-600">₹{refundedAmount}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
+                  Remarks (optional)
+                </p>
+                <textarea
+                  className="w-full border border-slate-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-200 transition"
+                  rows={2}
+                  placeholder="Reason for cancellation…"
+                  value={remarksText}
+                  onChange={(e) => setRemarksText(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setStep("charges")}
+                  className="flex-1 py-2.5 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleFullCancel}
+                  className="flex-1 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition"
+                >
+                  Confirm Cancellation
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Partial cancel — route selection ── */}
+          {step === "partial-select" && (
+            <div className="space-y-5">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">
+                  Select Route to Cancel
+                </p>
+                <div className="space-y-2">
+                  {onwardSegs.length > 0 && (
+                    <label
+                      className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition ${selectedJourney === "onward" ? "border-amber-400 bg-amber-50" : "border-slate-200 bg-slate-50 hover:border-slate-300"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="route"
+                        value="onward"
+                        checked={selectedJourney === "onward"}
+                        onChange={() => setSelectedJourney("onward")}
+                        className="accent-amber-500"
+                      />
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">↗ Onward</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{sectorLabel(onwardSegs)}</p>
+                      </div>
+                    </label>
+                  )}
+                  {returnSegs.length > 0 && (
+                    <label
+                      className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition ${selectedJourney === "return" ? "border-amber-400 bg-amber-50" : "border-slate-200 bg-slate-50 hover:border-slate-300"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="route"
+                        value="return"
+                        checked={selectedJourney === "return"}
+                        onChange={() => setSelectedJourney("return")}
+                        className="accent-amber-500"
+                      />
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">↩ Return</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{sectorLabel(returnSegs)}</p>
+                      </div>
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
+                  Remarks (optional)
+                </p>
+                <textarea
+                  className="w-full border border-slate-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-300"
+                  rows={2}
+                  placeholder="Add a note…"
+                  value={remarksText}
+                  onChange={(e) => setRemarksText(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setStep("charges")}
+                  className="flex-1 py-2.5 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => setStep("partial-confirm")}
+                  disabled={!selectedJourney}
+                  className="flex-1 py-2.5 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-40 rounded-xl transition"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Partial cancel confirm ── */}
+          {step === "partial-confirm" && (
+            <div className="space-y-5">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+                <FiAlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-amber-800 mb-1">Confirm Partial Cancellation</p>
+                  <p className="text-xs text-amber-700">
+                    Cancelling:{" "}
+                    <strong>
+                      {selectedJourney === "return"
+                        ? `↩ Return · ${sectorLabel(returnSegs)}`
+                        : `↗ Onward · ${sectorLabel(onwardSegs)}`}
+                    </strong>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setStep("partial-select")}
+                  className="flex-1 py-2.5 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handlePartialCancel}
+                  className="flex-1 py-2.5 text-sm font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Reissue ── */}
+          {step === "reissue" && (
+            <div className="space-y-5">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
+                <FiInfo size={18} className="text-blue-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-blue-800 mb-1">Reissue Flight</p>
+                  <p className="text-xs text-blue-600">
+                    Select a new travel date. Reissue charges may apply as per fare rules.
+                  </p>
+                  {booking?.flightRequest?.fareSnapshot?.miniFareRules && (
+                    <p className="text-xs text-blue-500 mt-1 font-semibold">
+                      Reissue fee: {
+                        booking.flightRequest.fareSnapshot.miniFareRules
+                          .flat()
+                          .find((r) => r.Type === "Reissue")?.Details || "As per fare rules"
+                      }
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
+                  New Travel Date
+                </p>
+                <input
+                  type="date"
+                  value={reissueDate}
+                  min={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => setReissueDate(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
+                  Remarks (optional)
+                </p>
+                <textarea
+                  className="w-full border border-slate-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  rows={2}
+                  placeholder="Add a note…"
+                  value={remarksText}
+                  onChange={(e) => setRemarksText(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setStep("charges")}
+                  className="flex-1 py-2.5 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleReissue}
+                  disabled={!reissueDate}
+                  className="flex-1 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-xl transition"
+                >
+                  Confirm Reissue
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Legacy Amendment Modals (unchanged)                           */
 /* ─────────────────────────────────────────────────────────────── */
 function AmendmentModal({ type, booking, onClose }) {
   return (
@@ -892,23 +1417,20 @@ function CancelScreen({ booking, onClose }) {
 }
 
 function RescheduleScreen({ booking, onClose }) {
-  const dispatch = useDispatch();
   const [newDate, setNewDate] = useState("");
-  const handleReschedule = async () => { onClose(); };
   return (
     <div className="space-y-4">
       <label className="text-sm font-semibold">Select New Date</label>
       <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2" />
       <div className="flex justify-end gap-3">
         <button onClick={onClose} className="px-4 py-2 text-sm font-semibold bg-slate-100 rounded-lg">Close</button>
-        <button onClick={handleReschedule} className="px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-lg">Confirm Reschedule</button>
+        <button onClick={onClose} className="px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-lg">Confirm Reschedule</button>
       </div>
     </div>
   );
 }
 
 function ModifyTravellerScreen({ booking, onClose }) {
-  const dispatch = useDispatch();
   const traveller = booking.travellers?.[0];
   const [phone, setPhone] = useState(traveller?.phoneWithCode || "");
   return (
@@ -1028,6 +1550,8 @@ export default function BookingDetails() {
   const [downloading, setDownloading] = useState(null);
   const [amendmentType, setAmendmentType] = useState(null);
   const [showPartialCancel, setShowPartialCancel] = useState(false);
+  // ★ NEW state
+  const [showCancellationModal, setShowCancellationModal] = useState(false);
 
   const cancelRequested = sessionStorage.getItem(`cancelRequested_${booking?._id}`) === "true";
   const isCancelled = booking?.executionStatus === "cancelled" || (isEmployee && cancelRequested);
@@ -1042,7 +1566,6 @@ export default function BookingDetails() {
     return () => clearInterval(iv);
   }, [booking?._id, booking?.executionStatus, dispatch]);
 
-  /* ── Loading ── */
   if (loading || !booking) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
@@ -1052,7 +1575,6 @@ export default function BookingDetails() {
     );
   }
 
-  /* ── Data ── */
   const allSegments = booking.flightRequest?.segments || [];
   const travellers = booking.travellers || [];
   const pricingSnap = booking.pricingSnapshot;
@@ -1061,14 +1583,13 @@ export default function BookingDetails() {
   const fareQuoteResults = booking.flightRequest?.fareQuote?.Results || [];
   const bookingResult = booking.bookingResult;
 
-  // Group segments by journeyType
   const journeyMap = {};
   allSegments.forEach((seg) => {
     const jt = seg.journeyType || "onward";
     if (!journeyMap[jt]) journeyMap[jt] = [];
     journeyMap[jt].push(seg);
   });
-  const journeyTypes = Object.keys(journeyMap); // e.g. ["onward", "return"]
+  const journeyTypes = Object.keys(journeyMap);
   const isRoundTrip = journeyTypes.includes("return");
   const isOneWay = !isRoundTrip;
 
@@ -1103,7 +1624,6 @@ export default function BookingDetails() {
   const departureTime = allSegments?.[0]?.departureDateTime;
   const isTravelPassed = departureTime && new Date() > new Date(departureTime);
 
-  // Fare computation
   const seatSelections = ssrSnapshot?.seats || [];
   const mealSelections = ssrSnapshot?.meals || [];
   const totalSeatPrice = seatSelections.reduce((sum, s) => sum + (s?.price || 0), 0);
@@ -1123,49 +1643,14 @@ export default function BookingDetails() {
     refundable = fareSnapshot?.refundable || false;
   }
 
-  const handleCancelBooking = async () => {
-    const result = await Swal.fire({
-      title: "Are you sure?",
-      text: "This will cancel your ticket permanently.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#dc2626",
-      cancelButtonColor: "#64748b",
-      confirmButtonText: "Yes, cancel it!",
-    });
-    if (!result.isConfirmed) return;
-    try {
-      Swal.fire({ title: "Cancelling...", text: "Please wait", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-      const res = await dispatch(fullCancellation({ bookingId: booking._id }));
-      const changeRequestId = res.payload?.data?.Response?.TicketCRInfo?.[0]?.ChangeRequestId;
-      let status = "requested";
-      let attempts = 0;
-      while ((status === "requested" || status === "in_progress") && attempts < 2) {
-        await new Promise((r) => setTimeout(r, 4000));
-        attempts++;
-        const statusRes = await dispatch(fetchChangeStatus({ changeRequestId, bookingId: booking._id }));
-        const apiStatus = statusRes.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus;
-        if (apiStatus === 4) status = "completed";
-        else if ([1, 2, 3].includes(apiStatus)) status = "in_progress";
-        else if (apiStatus === 5) status = "failed";
-      }
-      if (status === "failed") throw new Error("Cancellation failed by airline");
-      
-      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
+  // ★ Show cancellation charges button condition:
+  // ticket is issued, payment done, not cancelled, travel not passed
+  const showCancellationChargesBtn =
+    paymentSuccessful &&
+    executionStatus === "ticketed" &&
+    !isCancelled &&
+    !isTravelPassed;
 
-      if (status !== "completed") {
-        Swal.fire({ icon: "info", title: "Cancellation in Progress", text: "Your request is still being processed. Please check later." });
-        return;
-      }
-      Swal.fire({ icon: "success", title: "Cancelled!", text: "Your booking has been cancelled successfully.", confirmButtonText: "Go to Cancelled Bookings" });
-      navigate("/my-cancelled-bookings");
-    } catch (err) {
-      const supplierMsg = err?.response?.data?.Response?.SupplierErrorMsg || err?.response?.data?.Response?.Error?.ErrorMessage || err.message;
-      Swal.fire({ icon: "error", title: "Cancellation Failed", text: supplierMsg || "Something went wrong" });
-    }
-  };
-
-  /* ── Render ── */
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
       {/* ── Header bar ── */}
@@ -1187,9 +1672,7 @@ export default function BookingDetails() {
 
       <main className="max-w-7xl mx-auto px-5 py-8 pb-24 grid grid-cols-1 md:grid-cols-2 gap-4">
 
-       
-
-        {/* ── 1. Journey Cards — ONE card per journeyType ── */}
+        {/* ── 1. Journey Cards ── */}
         {journeyTypes.map((jt, jIdx) => {
           const segs = journeyMap[jt] || [];
           const isOdd = journeyTypes.length % 2 !== 0;
@@ -1226,105 +1709,69 @@ export default function BookingDetails() {
           </div>
         )}
 
-         <div className="md:col-span-2">
-  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-  
-  {/* ── 2. Passenger Details ── */}
-  <div className="lg:col-span-2">
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-      <CardLabel icon={FiUser} label="Passenger Details" />
+        <div className="md:col-span-2">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* ── 2. Passenger Details ── */}
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                <CardLabel icon={FiUser} label="Passenger Details" />
 
-      {travellers.length === 0 ? (
-        <p className="text-sm text-slate-500">
-          No traveller details available.
-        </p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {travellers.map((trav, idx) => (
-            <div
-              key={trav._id || idx}
-              className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-white transition-all p-4 shadow-sm hover:shadow-md"
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <div>
-                  <p className="text-base font-bold text-slate-900">
-                    {trav.title} {trav.firstName} {trav.lastName}
-                  </p>
-                  {trav.email && (
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {trav.email}
-                    </p>
-                  )}
-                </div>
+                {travellers.length === 0 ? (
+                  <p className="text-sm text-slate-500">No traveller details available.</p>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {travellers.map((trav, idx) => (
+                      <div
+                        key={trav._id || idx}
+                        className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-white transition-all p-4 shadow-sm hover:shadow-md"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div>
+                            <p className="text-base font-bold text-slate-900">
+                              {trav.title} {trav.firstName} {trav.lastName}
+                            </p>
+                            {trav.email && (
+                              <p className="text-xs text-slate-400 mt-0.5">{trav.email}</p>
+                            )}
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
+                            {formatPaxType(trav.paxType)}
+                          </span>
+                        </div>
 
-                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
-                  {formatPaxType(trav.paxType)}
-                </span>
+                        <div className="space-y-1">
+                          {trav.phoneWithCode && <InfoRow label="Phone" value={trav.phoneWithCode} />}
+                          <InfoRow label="Gender" value={trav.gender} />
+                          <InfoRow label="DOB" value={trav.dateOfBirth ? formatDateWithYear(trav.dateOfBirth) : "—"} />
+                          <InfoRow label="Nationality" value={trav.nationality} />
+                          {trav.passportNumber && <InfoRow label="Passport" value={trav.passportNumber} mono />}
+                          {trav.passportExpiry && <InfoRow label="Expiry" value={formatDateWithYear(trav.passportExpiry)} />}
+                          {typeof trav.linkedAdultIndex === "number" && trav.linkedAdultIndex >= 0 && (
+                            <InfoRow label="Linked Adult" value={`Traveller ${trav.linkedAdultIndex + 1}`} />
+                          )}
+                        </div>
+
+                        {trav.isLeadPassenger && (
+                          <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full w-fit">
+                            <FiCheckCircle size={12} />
+                            Lead passenger
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-
-              {/* Info */}
-              <div className="space-y-1">
-                {trav.phoneWithCode && (
-                  <InfoRow label="Phone" value={trav.phoneWithCode} />
-                )}
-                <InfoRow label="Gender" value={trav.gender} />
-                <InfoRow
-                  label="DOB"
-                  value={
-                    trav.dateOfBirth
-                      ? formatDateWithYear(trav.dateOfBirth)
-                      : "—"
-                  }
-                />
-                <InfoRow label="Nationality" value={trav.nationality} />
-
-                {trav.passportNumber && (
-                  <InfoRow
-                    label="Passport"
-                    value={trav.passportNumber}
-                    mono
-                  />
-                )}
-                {trav.passportExpiry && (
-                  <InfoRow
-                    label="Expiry"
-                    value={formatDateWithYear(trav.passportExpiry)}
-                  />
-                )}
-
-                {typeof trav.linkedAdultIndex === "number" &&
-                  trav.linkedAdultIndex >= 0 && (
-                    <InfoRow
-                      label="Linked Adult"
-                      value={`Traveller ${trav.linkedAdultIndex + 1}`}
-                    />
-                  )}
-              </div>
-
-              {/* Footer */}
-              {trav.isLeadPassenger && (
-                <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full w-fit">
-                  <FiCheckCircle size={12} />
-                  Lead passenger
-                </div>
-              )}
             </div>
-          ))}
+
+            {/* ── 3. Booking Summary ── */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sticky top-20">
+                <BookingSummaryCard booking={booking} displayPnr={displayPnr} />
+              </div>
+            </div>
+          </div>
         </div>
-      )}
-    </div>
-  </div>
-
-  {/* ── 3. Booking Summary ── */}
-  <div className="lg:col-span-1">
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sticky top-20">
-      <BookingSummaryCard booking={booking} displayPnr={displayPnr} />
-    </div>
-  </div>
-
-</div>
-</div>
 
         {/* ── 4. SSR Details ── */}
         <SSRSection
@@ -1377,7 +1824,6 @@ export default function BookingDetails() {
         <BentoCard className="md:col-span-2">
           <CardLabel icon={FiCreditCard} label="Payment & Booking Status" />
           <div className="grid grid-cols-3 gap-3">
-            {/* Payment */}
             <div className={`rounded-xl p-4 flex flex-col gap-1.5 border ${paymentSuccessful ? "bg-emerald-50 border-emerald-100" : "bg-amber-50 border-amber-100"}`}>
               <div className="flex items-center gap-2 mb-1">
                 {paymentSuccessful ? <FiCheckCircle size={16} className="text-emerald-500" /> : <FiAlertCircle size={16} className="text-amber-500" />}
@@ -1388,19 +1834,17 @@ export default function BookingDetails() {
               </p>
             </div>
 
-            {/* Ticket */}
-              <div className={`rounded-xl p-4 flex flex-col gap-1.5 border ${executionStatus === "ticketed" ? "bg-emerald-50 border-emerald-100" : executionStatus === "cancelled" ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}>
-                <div className="flex items-center gap-2 mb-1">
-                  {executionStatus === "ticketed" ? <FiCheckCircle size={16} className="text-emerald-500" /> : executionStatus === "cancelled" ? <FiAlertCircle size={16} className="text-red-500" /> : executionStatus === "on_hold" ? <FiAlertCircle size={16} className="text-amber-500" /> : <FiRefreshCw size={16} className="text-amber-500 animate-spin" />}
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${executionStatus === "ticketed" ? "text-emerald-600" : executionStatus === "cancelled" ? "text-red-600" : "text-amber-600"}`}>Ticket Status</span>
-                </div>
-                <p className={`text-lg font-black ${executionStatus === "ticketed" ? "text-emerald-800" : executionStatus === "cancelled" ? "text-red-800" : "text-amber-800"}`}>
-                  {executionStatus === "ticketed" ? "Issued" : executionStatus === "cancelled" ? "Cancelled" : executionStatus === "on_hold" ? "On Hold" : "Issuing…"}
-                </p>
-                {executionStatus === "ticket_pending" && <p className="text-[11px] text-amber-500">Refreshes every 15s</p>}
+            <div className={`rounded-xl p-4 flex flex-col gap-1.5 border ${executionStatus === "ticketed" ? "bg-emerald-50 border-emerald-100" : executionStatus === "cancelled" ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}>
+              <div className="flex items-center gap-2 mb-1">
+                {executionStatus === "ticketed" ? <FiCheckCircle size={16} className="text-emerald-500" /> : executionStatus === "cancelled" ? <FiAlertCircle size={16} className="text-red-500" /> : executionStatus === "on_hold" ? <FiAlertCircle size={16} className="text-amber-500" /> : <FiRefreshCw size={16} className="text-amber-500 animate-spin" />}
+                <span className={`text-[10px] font-black uppercase tracking-widest ${executionStatus === "ticketed" ? "text-emerald-600" : executionStatus === "cancelled" ? "text-red-600" : "text-amber-600"}`}>Ticket Status</span>
               </div>
+              <p className={`text-lg font-black ${executionStatus === "ticketed" ? "text-emerald-800" : executionStatus === "cancelled" ? "text-red-800" : "text-amber-800"}`}>
+                {executionStatus === "ticketed" ? "Issued" : executionStatus === "cancelled" ? "Cancelled" : executionStatus === "on_hold" ? "On Hold" : "Issuing…"}
+              </p>
+              {executionStatus === "ticket_pending" && <p className="text-[11px] text-amber-500">Refreshes every 15s</p>}
+            </div>
 
-            {/* Purpose */}
             <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col gap-1.5">
               <div className="flex items-center gap-2 mb-1">
                 <FiBriefcase size={16} className="text-slate-400" />
@@ -1439,10 +1883,13 @@ export default function BookingDetails() {
             <CardLabel icon={FiRefreshCw} label="Amendment Actions" />
             <div className="flex flex-wrap gap-3">
               <button
-                onClick={() => setAmendmentType("reissue")}
-                className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition"
+                onClick={() => setShowCancellationModal(true)}
+                className="group flex items-center gap-2.5 px-5 py-2.5 bg-white border-2 border-red-200 hover:border-red-400 hover:bg-red-50 text-red-600 rounded-xl text-sm font-bold transition-all duration-200 shadow-sm"
               >
-                Reissue Flight
+                <span className="w-6 h-6 rounded-lg bg-red-50 group-hover:bg-red-100 flex items-center justify-center transition">
+                  <FiXCircle size={13} className="text-red-500" />
+                </span>
+                Cancellation Charges
               </button>
               <button
                 onClick={() => setShowPartialCancel(true)}
@@ -1450,22 +1897,31 @@ export default function BookingDetails() {
               >
                 Partial Cancel
               </button>
-              <button
-                onClick={handleCancelBooking}
-                className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition"
-              >
-                Cancel Ticket
-              </button>
             </div>
           </BentoCard>
         )}
       </main>
 
+      {/* ── Modals ── */}
       {amendmentType && (
         <AmendmentModal type={amendmentType} booking={booking} onClose={() => setAmendmentType(null)} />
       )}
       {showPartialCancel && (
         <PartialCancelModal booking={booking} onClose={() => setShowPartialCancel(false)} />
+      )}
+
+      {/* ★ NEW Cancellation Charges Modal ── */}
+      {showCancellationModal && (
+        <CancellationModal
+          booking={booking}
+          onClose={() => {
+            setShowCancellationModal(false);
+            dispatch(resetAmendmentState());
+          }}
+          onSuccess={() => {
+            setShowCancellationModal(false);
+          }}
+        />
       )}
     </div>
   );

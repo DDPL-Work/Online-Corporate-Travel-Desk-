@@ -28,20 +28,41 @@ const validateTboResponse = (result) => {
 ====================================================== */
 const getTboBookingId = (booking) => {
   const paths = [
-    booking?.bookingResult?.providerResponse?.raw?.Response?.Response
-      ?.BookingId,
+    // ✅ PRIMARY (MOST RELIABLE)
+    booking?.bookingResult?.onwardResponse?.raw?.Response?.Response?.FlightItinerary?.BookingId,
+    booking?.bookingResult?.returnResponse?.raw?.Response?.Response?.FlightItinerary?.BookingId,
+
+    // ✅ FALLBACKS
+    booking?.bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary?.BookingId,
+    booking?.bookingResult?.returnResponse?.Response?.Response?.FlightItinerary?.BookingId,
+
+    booking?.bookingResult?.providerResponse?.raw?.Response?.Response?.BookingId,
     booking?.bookingResult?.providerResponse?.raw?.Response?.BookingId,
     booking?.bookingResult?.providerResponse?.Response?.Response?.BookingId,
+
     booking?.bookingResult?.bookingId,
     booking?.bookingId,
   ];
 
+  console.log("🔍 ALL BOOKING ID PATHS:", paths);
+
   const id = paths.find((val) => val !== undefined && val !== null);
 
-  console.log("🔍 ALL BOOKING ID PATHS:", paths);
-  console.log("✅ SELECTED BOOKING ID:", id);
+  if (!id) {
+    console.error("❌ CRITICAL: TBO BookingId NOT FOUND");
+    return null;
+  }
 
-  return Number(id);
+  const numericId = Number(id);
+
+  if (!numericId || isNaN(numericId)) {
+    console.error("❌ INVALID BookingId:", id);
+    return null;
+  }
+
+  console.log("✅ SELECTED BOOKING ID:", numericId);
+
+  return numericId;
 };
 
 /* ======================================================
@@ -109,6 +130,12 @@ exports.getCancellationCharges = async (req, res) => {
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
     const tboBookingId = getTboBookingId(booking);
+
+    if (!tboBookingId) {
+  return res.status(400).json({
+    message: "Invalid TBO BookingId. Cannot fetch cancellation charges.",
+  });
+}
 
     const result = await amendmentService.getCancellationCharges(tboBookingId);
 
