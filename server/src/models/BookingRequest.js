@@ -56,6 +56,16 @@ const bookingRequestSchema = new mongoose.Schema(
 
     approverComments: String,
 
+    /* ================= PROJECT / APPROVER METADATA ================= */
+    projectCodeId: String,
+    projectId: String,
+    projectName: String,
+    projectClient: String,
+    approverId: String,
+    approverEmail: String,
+    approverName: String,
+    approverRole: String,
+
     /* ================= REQUEST INFO ================= */
 
     purposeOfTravel: {

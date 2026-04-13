@@ -5,6 +5,7 @@ import { jwtDecode } from "jwt-decode";
 
 import { ssoLoginSuccess } from "../../Redux/Slice/authSlice";
 import { fetchDashboardData } from "../../Redux/Slice/dashboardSlice";
+import { ToastWithTimer } from "../../utils/ToastConfirm";
 
 const SSOCallback = () => {
   const dispatch = useDispatch();
@@ -14,14 +15,45 @@ const SSOCallback = () => {
   useEffect(() => {
     const token = params.get("token");
     const error = params.get("error");
+    const admin = params.get("admin");
 
     if (error) {
-      navigate("/unauthorized", { replace: true });
+      const lower = error.toLowerCase();
+      const isInactive =
+        lower.includes("inactive") || lower.includes("disabled");
+      const contactText = admin ? ` (${admin})` : "";
+
+      const msg = isInactive
+        ? `Your account is inactive. Please contact your travel admin${contactText} to reactivate your access.`
+        : error;
+
+      // Persist for pages that mount later (e.g., landing header)
+      try {
+        sessionStorage.setItem("auth_inactive_msg", msg);
+      } catch (_) {}
+
+      ToastWithTimer({
+        message: msg,
+        type: "error",
+        duration: 6000,
+      });
+
+      // Broadcast to show global inactive modal (handled in LandingHeader)
+      window.dispatchEvent(
+        new CustomEvent("auth:inactive", {
+          detail: { message: msg },
+        }),
+      );
+
+      const qs = new URLSearchParams();
+      qs.set("error", error);
+      if (admin) qs.set("admin", admin);
+      navigate(`/platform/flight-booking-info?${qs.toString()}`, { replace: true });
       return;
     }
 
     if (!token) {
-      navigate("/iapindia", { replace: true });
+      navigate("/platform/flight-booking-info", { replace: true });
       return;
     }
 
@@ -48,10 +80,10 @@ const SSOCallback = () => {
       } else if (role === "employee") {
         navigate("/my-bookings", { replace: true });
       } else if (role === "manager") {
-        navigate("/corporate-dashboard", { replace: true });
+        navigate("/manager/total-bookings", { replace: true });
       }
     } catch (err) {
-      navigate("/iapindia", { replace: true });
+      navigate("/platform/flight-booking-info", { replace: true });
     }
   }, [dispatch, navigate, params]);
 

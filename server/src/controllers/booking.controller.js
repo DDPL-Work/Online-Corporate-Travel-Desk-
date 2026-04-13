@@ -89,6 +89,15 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     travellers,
     purposeOfTravel,
     pricingSnapshot,
+    gstDetails,
+    projectCodeId,
+    projectId,
+    projectName,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
   } = req.body;
 
   const corporate = req.corporate;
@@ -123,12 +132,21 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   const leadPassenger =
     travellers.find((t) => t.isLeadPassenger) || travellers[0];
 
-  if (!leadPassenger?.phoneWithCode) {
-    throw new ApiError(400, "Lead passenger phone number is required");
-  }
+  const leadIsChild =
+    (
+      leadPassenger?.paxType ||
+      leadPassenger?.PaxType ||
+      "ADULT"
+    ).toUpperCase() === "CHILD";
 
-  if (!leadPassenger?.email) {
-    throw new ApiError(400, "Lead passenger email is required");
+  if (!leadIsChild) {
+    if (!leadPassenger?.phoneWithCode) {
+      throw new ApiError(400, "Lead passenger phone number is required");
+    }
+
+    if (!leadPassenger?.email) {
+      throw new ApiError(400, "Lead passenger email is required");
+    }
   }
 
   const ageFromDob = (dob) => {
@@ -178,15 +196,33 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
         t.linkedAdultIndex < 0 ||
         t.linkedAdultIndex >= adultCount)
     ) {
-      throw new ApiError(400, "Each infant must be linked to an adult traveler");
+      throw new ApiError(
+        400,
+        "Each infant must be linked to an adult traveler",
+      );
     }
+
+    // PAN required only for adults > 18
+    // if (paxType === "ADULT" && (age == null || age > 18)) {
+    //   if (!t.panCard) {
+    //     throw new ApiError(400, `PAN card is required for adult traveler ${idx + 1}`);
+    //   }
+    // }
   });
 
-  const fareResult = Array.isArray(flightRequest.fareQuote?.Results)
-    ? flightRequest.fareQuote.Results[0]
-    : flightRequest.fareQuote?.Results;
+  const fareResults = Array.isArray(flightRequest.fareQuote?.Results)
+    ? flightRequest.fareQuote.Results
+    : flightRequest.fareQuote?.Response?.Results
+      ? [flightRequest.fareQuote.Response.Results]
+      : flightRequest.fareQuote?.Results
+        ? [flightRequest.fareQuote.Results]
+        : [];
 
-  if (!fareResult?.FareBreakdown || !fareResult.FareBreakdown.length) {
+  const fareResult = fareResults.find(
+    (fr) => fr?.FareBreakdown && fr.FareBreakdown.length,
+  );
+
+  if (!fareResult) {
     throw new ApiError(400, "Valid FareQuote is required");
   }
 
@@ -289,6 +325,15 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     fareQuote: freshFareQuote,
 
     purposeOfTravel,
+    gstDetails,
+    projectCodeId,
+    projectId,
+    projectName,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
     travellers,
     flightRequest:
       bookingType === "flight"
@@ -543,6 +588,10 @@ const hasValidSSR = (ssr) => {
   if (!ssr) return false;
 
   try {
+    const flatSeat = Array.isArray(ssr?.seats) && ssr.seats.length > 0;
+    const flatMeal = Array.isArray(ssr?.meals) && ssr.meals.length > 0;
+    const flatBaggage = Array.isArray(ssr?.baggage) && ssr.baggage.length > 0;
+
     const seat = ssr?.SeatDynamic?.[0]?.SegmentSeat?.some(
       (s) => s.Seat?.length > 0,
     );
@@ -553,7 +602,7 @@ const hasValidSSR = (ssr) => {
 
     const baggage = ssr?.Baggage?.some((b) => b.Weight > 0);
 
-    return seat || meal || baggage;
+    return flatSeat || flatMeal || flatBaggage || seat || meal || baggage;
   } catch {
     return false;
   }
@@ -603,7 +652,8 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
 
     const actual = passengers.reduce(
       (acc, p) => {
-        const type = p.paxType === 2 ? "CHILD" : p.paxType === 3 ? "INFANT" : "ADULT";
+        const type =
+          p.paxType === 2 ? "CHILD" : p.paxType === 3 ? "INFANT" : "ADULT";
         acc[type] = (acc[type] || 0) + 1;
         acc.total += 1;
         return acc;
@@ -651,9 +701,11 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         ? booking.flightRequest.ssrSnapshot
         : undefined;
 
-      const combinedFare = Array.isArray(booking.flightRequest.fareQuote.Results)
-  ? booking.flightRequest.fareQuote.Results[0]
-  : booking.flightRequest.fareQuote.Results;  
+      const combinedFare = Array.isArray(
+        booking.flightRequest.fareQuote.Results,
+      )
+        ? booking.flightRequest.fareQuote.Results[0]
+        : booking.flightRequest.fareQuote.Results;
 
       const ticketResp = await tboService.ticketFlight({
         traceId: booking.flightRequest.traceId,
@@ -758,12 +810,21 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
 
     /* ================= LCC FLOW ================= */
     if (isLCC) {
+      const splitSSR = (snapshot, type) => {
+        if (!snapshot) return null;
+        return {
+          seats: (snapshot.seats || []).filter(s => s.journeyType === type),
+          meals: (snapshot.meals || []).filter(m => m.journeyType === type),
+          baggage: (snapshot.baggage || []).filter(b => b.journeyType === type)
+        };
+      };
+
       const onwardResp = await tboService.ticketFlight({
         traceId: booking.flightRequest.traceId,
         resultIndex: onwardIndex,
         result: booking.flightRequest.fareQuote.Results[0],
         passengers,
-        ssr: booking.flightRequest.ssrSnapshot,
+        ssr: splitSSR(booking.flightRequest.ssrSnapshot, "onward"),
         isLCC: true,
       });
 
@@ -772,7 +833,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         resultIndex: returnIndex,
         result: booking.flightRequest.fareQuote.Results[1],
         passengers,
-        ssr: booking.flightRequest.ssrSnapshot,
+        ssr: splitSSR(booking.flightRequest.ssrSnapshot, "return"),
         isLCC: true,
       });
 
@@ -820,13 +881,22 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
 
     /* ================= NON-LCC (UNCHANGED) ================= */
 
+    const splitSSR = (snapshot, type) => {
+      if (!snapshot) return null;
+      return {
+        seats: (snapshot.seats || []).filter(s => s.journeyType === type),
+        meals: (snapshot.meals || []).filter(m => m.journeyType === type),
+        baggage: (snapshot.baggage || []).filter(b => b.journeyType === type)
+      };
+    };
+
     const onwardResp = await tboService.bookFlight({
       IsLCC: false,
       traceId: booking.flightRequest.traceId,
       resultIndex: onwardIndex,
       result: booking.flightRequest.fareQuote.Results[0],
       passengers,
-      ssr: booking.flightRequest.ssrSnapshot,
+      ssr: splitSSR(booking.flightRequest.ssrSnapshot, "onward"),
     });
 
     const returnResp = await tboService.bookFlight({
@@ -835,7 +905,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       resultIndex: returnIndex,
       result: booking.flightRequest.fareQuote.Results[1],
       passengers,
-      ssr: booking.flightRequest.ssrSnapshot,
+      ssr: splitSSR(booking.flightRequest.ssrSnapshot, "return"),
     });
 
     const onwardPNR =
@@ -920,6 +990,58 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
      ONE WAY (Existing Logic)
   =================================================== */
 
+  // 🔥 FIX: MULTI-SEGMENT LCC (SpiceJet issue)
+  if (isLCC && segments.length > 1) {
+    logger.warn("⚠️ MULTI-SEGMENT LCC DETECTED → USING FRESH FARE");
+
+    const ssrPayload = hasValidSSR(booking.flightRequest.ssrSnapshot)
+      ? booking.flightRequest.ssrSnapshot
+      : undefined;
+
+    // ✅ STEP 1: GET FRESH FARE
+    const freshFare = await tboService.getFareQuote(
+      booking.flightRequest.traceId,
+      rawResultIndex,
+    );
+
+    const latestFare = Array.isArray(freshFare.Response.Results)
+      ? freshFare.Response.Results[0]
+      : freshFare.Response.Results;
+
+    // ✅ STEP 2: DIRECT TICKET (NO HOLD)
+    const ticketResp = await tboService.ticketFlight({
+      traceId: booking.flightRequest.traceId,
+      resultIndex: rawResultIndex,
+      result: latestFare, // 🔥 IMPORTANT CHANGE
+      passengers,
+      ...(ssrPayload && { ssr: ssrPayload }),
+      isLCC: true,
+    });
+
+    const extractedPNR =
+      ticketResp?.Response?.Response?.PNR ||
+      ticketResp?.Response?.Response?.FlightItinerary?.PNR;
+
+    if (!extractedPNR) {
+      throw new ApiError(500, "LCC Multi-segment ticketing failed");
+    }
+
+    booking.bookingResult = {
+      pnr: extractedPNR,
+      providerResponse: ticketResp,
+    };
+
+    booking.executionStatus = "ticketed";
+    await booking.save();
+
+    await paymentService.processBookingPayment({ booking, corporate });
+
+    return {
+      bookingId: booking._id,
+      pnr: extractedPNR,
+    };
+  }
+
   if (isLCC) {
     logLccTicketPayload({
       bookingId: booking._id,
@@ -927,26 +1049,30 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       resultIndex: rawResultIndex,
       passengers,
       ssr: booking.flightRequest.ssrSnapshot,
-      // segmentType: "onward",
     });
 
     const ssrPayload = hasValidSSR(booking.flightRequest.ssrSnapshot)
       ? booking.flightRequest.ssrSnapshot
       : undefined;
 
+    // ✅ STEP 1: ALWAYS FETCH FRESH FARE
+    const freshFare = await tboService.getFareQuote(
+      booking.flightRequest.traceId,
+      rawResultIndex,
+    );
+
+    // ✅ STEP 2: USE FRESH RESULT
+    const latestFare = freshFare.Response.Results;
+
+    // ✅ STEP 3: PASS FRESH FARE TO TICKET
     const ticketResp = await tboService.ticketFlight({
       traceId: booking.flightRequest.traceId,
       resultIndex: rawResultIndex,
-      result: booking.flightRequest.fareQuote.Results[0],
+      result: latestFare, // ✅ FIXED
       passengers,
       ...(ssrPayload && { ssr: ssrPayload }),
       isLCC: true,
     });
-
-    console.log(
-      "🟡 LCC  TICKET RESPONSE:",
-      JSON.stringify(ticketResp, null, 1),
-    );
 
     const extractedPNR =
       ticketResp?.Response?.Response?.PNR ||
@@ -971,7 +1097,6 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: extractedPNR,
     };
   }
-
   /* ================= NON-LCC (UNCHANGED) ================= */
 
   const bookResp = await tboService.bookFlight({
@@ -1133,14 +1258,9 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
     firstName: t.firstName?.trim(),
     lastName: t.lastName?.trim(),
 
-    paxType:
-      t.paxType === "CHILD"
-        ? 2
-        : t.paxType === "INFANT"
-          ? 3
-          : 1,
+    paxType: t.paxType === "CHILD" ? 2 : t.paxType === "INFANT" ? 3 : 1,
     linkedAdultIndex:
-      t.paxType === "INFANT" ? t.linkedAdultIndex ?? 0 : undefined,
+      t.paxType === "INFANT" ? (t.linkedAdultIndex ?? 0) : undefined,
 
     dateOfBirth: t.dateOfBirth,
     gender: t.gender,
@@ -1360,8 +1480,8 @@ exports.downloadTicketPdf = asyncHandler(async (req, res) => {
 
 exports.getMyBookings = asyncHandler(async (req, res) => {
   const {
-    page = 1,
-    limit = 100,
+    // page = 1,
+    // limit = 100,
     bookingType = "flight",
     executionStatus,
     requestStatus,
@@ -1385,7 +1505,7 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
     query.requestStatus = requestStatus;
   }
 
-  const skip = (Number(page) - 1) * Number(limit);
+  // const skip = (Number(page) - 1) * Number(limit);
 
   /* ================= FETCH DATA ================= */
   const [rawBookings, total] = await Promise.all([
@@ -1406,8 +1526,8 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
       `,
       )
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit))
+      // .skip(skip)
+      // .limit(Number(limit))
       .lean(),
 
     BookingRequest.countDocuments(query),
@@ -1458,8 +1578,8 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
         bookings,
         pagination: {
           total,
-          page: Number(page),
-          pages: Math.ceil(total / limit),
+          // page: Number(page),
+          // pages: Math.ceil(total / limit),
         },
       },
       "Flight bookings fetched successfully",
@@ -1589,8 +1709,8 @@ exports.getMyBookingById = asyncHandler(async (req, res) => {
 // @access  Private
 exports.getAllBookings = asyncHandler(async (req, res) => {
   const {
-    page = 1,
-    limit = 10,
+    // page = 1,
+    // limit = 10,
     status,
     bookingType,
     dateFrom,
@@ -1612,12 +1732,12 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
     if (dateTo) query.createdAt.$lte = new Date(dateTo);
   }
 
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+  // const skip = (parseInt(page) - 1) * parseInt(limit);
 
   const bookings = await Booking.find(query)
     .populate("userId", "name email")
-    .skip(skip)
-    .limit(parseInt(limit))
+    // .skip(skip)
+    // .limit(parseInt(limit))
     .sort({ createdAt: -1 });
 
   const total = await Booking.countDocuments(query);
@@ -1629,8 +1749,8 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
         bookings,
         pagination: {
           total,
-          page: parseInt(page),
-          pages: Math.ceil(total / limit),
+          // page: parseInt(page),
+          // pages: Math.ceil(total / limit),
         },
       },
       "Bookings fetched successfully",

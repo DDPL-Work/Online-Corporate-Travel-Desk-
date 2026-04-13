@@ -16,6 +16,8 @@ import {
 import { FaCheck } from "react-icons/fa";
 import L from "leaflet";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { searchHotels } from "../../../../Redux/Actions/hotelThunks";
 
 /* ── Price Marker Icon ── */
 const createPriceIcon = (price, isActive = false) =>
@@ -164,12 +166,17 @@ const HotelListCard = ({
 /* ── Main Modal ── */
 const MapModal = ({ open, onClose, hotels = [] }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { pagination, searchPayload, loading: hotelLoading } = useSelector(
+    (state) => state.hotel,
+  );
   const [hoveredHotel, setHoveredHotel] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMarker, setSearchMarker] = useState(null);
   const [searching, setSearching] = useState(false);
   const mapRef = useRef(null);
   const listRef = useRef(null);
+  const totalHotels = pagination?.total ?? hotels.length;
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "auto";
@@ -246,6 +253,20 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
     setSearchQuery("");
   };
 
+  const handleLoadMore = () => {
+    if (!pagination?.hasMore) return;
+    if (hotelLoading?.search || hotelLoading?.loadMore) return;
+    if (!searchPayload) return;
+
+    dispatch(
+      searchHotels({
+        payload: searchPayload,
+        page: (pagination?.page || 1) + 1,
+        limit: pagination?.limit || 10,
+      }),
+    );
+  };
+
   if (!open) return null;
 
   return createPortal(
@@ -273,7 +294,7 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
                 Hotel Locations
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                {hotels.length} properties on map
+                {totalHotels || 0} properties on map
               </p>
             </div>
           </div>
@@ -315,7 +336,7 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
             {/* List header */}
             <div className="sticky top-0 bg-[#f4f8fd] border-b border-slate-200 px-4 py-3 z-10 flex items-center justify-between">
               <span className="text-xs font-bold text-[#0a2540] uppercase tracking-wider">
-                {hotels.length} Hotels Found
+                {totalHotels || 0} Hotels Found
               </span>
               <span className="text-[10px] text-slate-400">
                 Hover to highlight
@@ -324,28 +345,37 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
 
             <div className="p-3 flex flex-col gap-2.5">
               {transformedHotels.map((hotel) => (
-                <div id={`hotel-${hotel.id}`}>
-                <HotelListCard
-                  key={hotel.id}
-                  hotel={hotel}
-                  onClick={() => {
-                    navigate("/one-hotel-details", {
-                      state: {
-                        hotelCode: hotel.id,
-                      },
-                    });
-                  }}
-                  isActive={hoveredHotel === hotel.id}
-                  onEnter={() => setHoveredHotel(hotel.id)}
-                  onLeave={() => setHoveredHotel(null)}
-                  onPin={() => {
-                    const t = transformedHotels.find((h) => h.id === hotel.id);
-                    if (t && mapRef.current)
-                      mapRef.current.flyTo(t.position, 15, { duration: 1 });
-                  }}
-                />
+                <div key={hotel.id} id={`hotel-${hotel.id}`}>
+                  <HotelListCard
+                    hotel={hotel}
+                    onClick={() => {
+                      navigate("/one-hotel-details", {
+                        state: {
+                          hotelCode: hotel.id,
+                        },
+                      });
+                    }}
+                    isActive={hoveredHotel === hotel.id}
+                    onEnter={() => setHoveredHotel(hotel.id)}
+                    onLeave={() => setHoveredHotel(null)}
+                    onPin={() => {
+                      const t = transformedHotels.find((h) => h.id === hotel.id);
+                      if (t && mapRef.current)
+                        mapRef.current.flyTo(t.position, 15, { duration: 1 });
+                    }}
+                  />
                 </div>
               ))}
+
+              {pagination?.hasMore && (
+                <button
+                  onClick={handleLoadMore}
+                  disabled={hotelLoading?.search || hotelLoading?.loadMore}
+                  className="mt-2 w-full bg-[#0d7fe8] text-white text-sm font-semibold py-2.5 rounded-lg shadow hover:bg-[#0a66c2] transition disabled:opacity-60"
+                >
+                  {hotelLoading?.loadMore ? "Loading..." : "Load More Hotels"}
+                </button>
+              )}
             </div>
           </div>
 

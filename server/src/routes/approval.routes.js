@@ -35,14 +35,14 @@ router.get(
 // ✅ Approve booking request (ADMIN ONLY)
 router.post(
   '/:id/approve',
-  authorizeRoles('travel-admin'),
+  authorizeRoles('travel-admin','manager'),
   approvalController.approveRequest
 );
 
 // ✅ Reject booking request (ADMIN ONLY)
 router.post(
   '/:id/reject',
-  authorizeRoles('travel-admin'),
+  authorizeRoles('travel-admin','manager'),
   approvalController.rejectRequest
 );
 
@@ -62,14 +62,14 @@ router.get(
 // ✅ Approve HOTEL request
 router.post(
   "/hotel/:id/approve",
-  authorizeRoles("travel-admin"),
+  authorizeRoles("travel-admin","manager"),
   approvalController.approveHotelRequest
 );
 
 // ✅ Reject HOTEL request
 router.post(
   "/hotel/:id/reject",
-  authorizeRoles("travel-admin"),
+  authorizeRoles("travel-admin","manager"),
   approvalController.rejectHotelRequest
 );
 

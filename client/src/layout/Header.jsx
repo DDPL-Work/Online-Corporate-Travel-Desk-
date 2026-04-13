@@ -60,7 +60,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
 
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate("/iapindia", { replace: true });
+    navigate("/platform/flight-booking-info", { replace: true });
   };
 
   const handleProfileNavigation = () => {
@@ -74,7 +74,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
         break;
 
       default:
-        navigate("/iapindia");
+        navigate("/platform/flight-booking-info");
     }
   };
 

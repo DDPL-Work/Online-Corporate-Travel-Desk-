@@ -32,13 +32,22 @@ const extractSegmentsFromFareQuote = (fareQuote) => {
 const extractFareFromQuote = (fareQuote, index) => {
   // Per-segment fare is usually SAME for all segments
   // We still map segment-wise for UI clarity
-  if (fareQuote?.Response?.Results?.Fare)
+  if (fareQuote?.Response?.Results?.Fare) {
     return fareQuote.Response.Results.Fare;
+  }
 
-  if (fareQuote?.onward && fareQuote?.return) {
-    return index < fareQuote.onward.Response.Results.Segments.flat().length
-      ? fareQuote.onward.Response.Results.Fare
-      : fareQuote.return.Response.Results.Fare;
+  const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
+  const returnFare = fareQuote?.return?.Response?.Results?.Fare;
+
+  // If only one side is available (international grouped or incomplete fetch), use it
+  if (onwardFare && !returnFare) return onwardFare;
+  if (returnFare && !onwardFare) return returnFare;
+
+  // When both are present, split by onward segment count (with safe default)
+  if (onwardFare && returnFare) {
+    const onwardSegCount =
+      fareQuote?.onward?.Response?.Results?.Segments?.flat?.()?.length || 0;
+    return index < onwardSegCount ? onwardFare : returnFare;
   }
 
   return null;

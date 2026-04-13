@@ -92,12 +92,25 @@ class PaymentService {
 
       await Ledger.create({
         corporateId: corporate._id,
+        userId: booking.userId, // 👈 IMPORTANT
         bookingId: booking._id,
+        bookingReference: booking.bookingReference,
+
         amount,
-        type: "booking", // ✅ valid enum
-        status: "paid", // ✅ valid enum
-        description: "Postpaid booking - agency balance debited",
-        paidDate: new Date(),
+
+        type: "booking",
+        transactionType: "debit", // 👈 THIS IS KEY
+
+        bookingDate: new Date(),
+
+        status: "pending", // 👈 not paid
+
+        description: "Flight booking on credit (postpaid)",
+
+        metadata: {
+          flightNumber: booking.flightNumber,
+          sector: booking.route,
+        },
       });
 
       return { method: "agency" };

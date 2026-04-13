@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { FiChevronDown, FiMapPin, FiBriefcase, FiCalendar, FiTrendingUp, FiUser, FiHome } from "react-icons/fi";
+import { FiChevronDown, FiMapPin, FiBriefcase, FiCalendar, FiTrendingUp, FiUser, FiHome, FiBarChart2 } from "react-icons/fi";
 import { MdOutlineFlight, MdOutlineHotel } from "react-icons/md";
+import { FcApproval } from "react-icons/fc";
 import logo from '../../public/logo-traveamer.svg';
+import AuthModal from "../Pages/Auth/AuthModal";
+import { LuWorkflow } from "react-icons/lu";
 
 /* ── Dropdown Data ── */
 const platformLinks = [
@@ -9,52 +12,46 @@ const platformLinks = [
     icon: <MdOutlineFlight size={18} className="text-[#C9A84C]" />,
     label: "Flight Booking",
     desc: "Search & book flights in under 60 seconds",
-    href: "#",
+    href: "/platform/flight-booking-info",
   },
   {
     icon: <MdOutlineHotel size={18} className="text-[#C9A84C]" />,
     label: "Hotel Booking",
     desc: "Find and book hotels tagged to your client",
-    href: "#",
+    href: "/platform/hotel-booking-info",
   },
   {
-    icon: <FiMapPin size={18} className="text-[#C9A84C]" />,
-    label: "Cab & Local Travel",
-    desc: "Track every cab ride per client",
-    href: "#",
-  },
+  icon: <LuWorkflow size={18} className="text-[#C9A84C]" />,
+  label: "Approval & Workflow",
+  desc: "Manage booking approvals and track request workflows",
+  href: "/platform/approval-and-workflow",
+}
 ];
 
 const whoItsForLinks = [
   {
-    icon: <FiBriefcase size={18} className="text-[#C9A84C]" />,
+    icon: <FiUser size={18} className="text-[#C9A84C]" />,
     label: "Independent Professionals",
-    desc: "CAs, consultants, architects & more",
-    href: "#",
+    desc: "CAs, consultants, architects & freelancers",
+    href: "/who-it's-for/independent",
   },
   {
-    icon: <FiCalendar size={18} className="text-[#C9A84C]" />,
-    label: "Event Managers",
-    desc: "Track travel per event & vendor",
-    href: "#",
+    icon: <FiBriefcase size={18} className="text-[#C9A84C]" />,
+    label: "Small Business",
+    desc: "Manage client meetings and local travel efficiently",
+    href: "/who-it's-for/small-business",
   },
   {
     icon: <FiTrendingUp size={18} className="text-[#C9A84C]" />,
-    label: "Consultants",
-    desc: "Bill travel accurately to each client",
-    href: "#",
+    label: "Growing Business",
+    desc: "Track travel expenses across teams and projects",
+    href: "/who-it's-for/growing-business",
   },
   {
-    icon: <FiUser size={18} className="text-[#C9A84C]" />,
-    label: "Legal Professionals",
-    desc: "Court visits & client meetings tracked",
-    href: "#",
-  },
-  {
-    icon: <FiHome size={18} className="text-[#C9A84C]" />,
-    label: "Architects & Designers",
-    desc: "Site visits & material trips organised",
-    href: "#",
+    icon: <FiBarChart2 size={18} className="text-[#C9A84C]" />,
+    label: "Mid-size Business",
+    desc: "Control travel budgets and client-level billing",
+    href: "/who-it's-for/mid-size-business",
   },
 ];
 
@@ -113,6 +110,12 @@ export default function LandingHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobilePlatformOpen, setMobilePlatformOpen] = useState(false);
   const [mobileWhoOpen, setMobileWhoOpen] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [authStep, setAuthStep] = useState(0); // initial step for AuthModal
+  const [showInactiveModal, setShowInactiveModal] = useState(false);
+  const [inactiveMessage, setInactiveMessage] = useState(
+    "Your account is currently disabled. Please contact your administrator.",
+  );
 
   const platformRef = useRef(null);
   const whoForRef = useRef(null);
@@ -129,6 +132,33 @@ export default function LandingHeader() {
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // Listen for global inactive-account event (optional trigger from auth logic)
+  useEffect(() => {
+    const handler = (e) => {
+      const msg =
+        e?.detail?.message ||
+        "You cannot continue with SSO until your account is reactivated.";
+      setInactiveMessage(msg);
+      setShowInactiveModal(true);
+      setShowAuth(false);
+    };
+    window.addEventListener("auth:inactive", handler);
+    return () => window.removeEventListener("auth:inactive", handler);
+  }, []);
+
+  // On mount, check persisted inactive flag from SSO (in case event fired before header existed)
+  useEffect(() => {
+    try {
+      const msg = sessionStorage.getItem("auth_inactive_msg");
+      if (msg) {
+        setInactiveMessage(msg);
+        setShowInactiveModal(true);
+        setShowAuth(false);
+        sessionStorage.removeItem("auth_inactive_msg");
+      }
+    } catch (_) {}
   }, []);
 
   const toggle = (menu) => setOpenMenu((prev) => (prev === menu ? null : menu));
@@ -167,10 +197,22 @@ export default function LandingHeader() {
 
       {/* CTA Buttons */}
       <div className="hidden md:flex items-center gap-4">
-        <button className="text-black text-sm font-medium font-['Plus_Jakarta_Sans'] hover:text-[#C9A84C] transition-colors">
+        <button
+          onClick={() => {
+            setAuthStep(0); // login flow start
+            setShowAuth(true);
+          }}
+          className="text-black text-sm font-medium font-['Plus_Jakarta_Sans'] hover:text-[#C9A84C] transition-colors"
+        >
           Login
         </button>
-        <button className="h-10 px-5 bg-[#C9A84C] text-black text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-full shadow-[0px_0px_40px_0px_rgba(60,131,246,0.15)] hover:bg-[#b8963d] transition-colors">
+        <button
+          onClick={() => {
+            setAuthStep(1); // start at step 1 for sign up
+            setShowAuth(true);
+          }}
+          className="h-10 px-5 bg-[#C9A84C] text-black text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-full shadow-[0px_0px_40px_0px_rgba(60,131,246,0.15)] hover:bg-[#b8963d] transition-colors"
+        >
           Sign Up
         </button>
       </div>
@@ -236,12 +278,64 @@ export default function LandingHeader() {
 
           <hr className="border-gray-200 my-1" />
 
-          <button className="text-left px-3 py-2.5 text-black text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors">
+          <button
+            onClick={() => {
+              setAuthStep(0);
+              setShowAuth(true);
+              setMobileOpen(false);
+            }}
+            className="text-left px-3 py-2.5 text-black text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
+          >
             Login
           </button>
-          <button className="w-full px-5 py-2.5 bg-[#C9A84C] text-black text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-full hover:bg-[#b8963d] transition-colors">
+          <button
+            onClick={() => {
+              setAuthStep(1);
+              setShowAuth(true);
+              setMobileOpen(false);
+            }}
+            className="w-full px-5 py-2.5 bg-[#C9A84C] text-black text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-full hover:bg-[#b8963d] transition-colors"
+          >
             Sign Up
           </button>
+        </div>
+      )}
+
+      {/* Auth Modal */}
+      {showAuth && <AuthModal initialStep={authStep} onClose={() => setShowAuth(false)} />}
+
+      {/* Inactive account modal */}
+      {showInactiveModal && (
+        <div className="fixed inset-0 z-[99] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-lg font-bold">
+                !
+              </div>
+              <div>
+                <p className="text-lg font-black text-slate-900">
+                  Access Disabled
+                </p>
+                <p className="text-xs text-slate-500">
+                  You cannot continue with SSO until your account is reactivated.
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-700 leading-relaxed">
+              {inactiveMessage}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowInactiveModal(false);
+                  setShowAuth(true);
+                }}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </header>

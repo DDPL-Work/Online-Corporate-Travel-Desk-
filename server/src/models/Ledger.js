@@ -8,58 +8,68 @@ const ledgerSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Corporate',
     required: true,
-    index: true // for faster lookups
+    index: true
   },
-  bookingId: {
+
+  userId: { // 👈 WHO BOOKED
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking'
-  },
-  type: {
-    type: String,
-    enum: ['booking', 'payment', 'refund', 'adjustment', 'credit_note', 'debit_note'],
+    ref: 'User',
     required: true,
     index: true
   },
+
+  bookingId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Booking',
+    index: true
+  },
+
+  bookingReference: String, // 👈 VERY IMPORTANT (PNR / Ref ID)
+
+  type: {
+    type: String,
+    enum: ['booking', 'payment', 'refund', 'adjustment'],
+    required: true,
+    index: true
+  },
+
   amount: {
     type: Number,
     required: true
   },
-  creditUsed: {
-    type: Number,
-    default: 0
+
+  transactionType: { // 👈 DEBIT / CREDIT (CRITICAL)
+    type: String,
+    enum: ['debit', 'credit'],
+    required: true
   },
-  creditBefore: Number,
-  creditAfter: Number,
+
+  bookingDate: Date, // 👈 flight booking date
+
+  travelDate: Date, // optional (good for reports)
+
   description: {
     type: String,
     required: true,
     trim: true
   },
-  invoiceNumber: {
-    type: String,
-    unique: true,
-    sparse: true, // ensures uniqueness but allows nulls
-    trim: true
-  },
-  invoiceUrl: String,
-  dueDate: Date,
-  paidDate: Date,
+
   status: {
     type: String,
-    enum: ['pending', 'paid', 'overdue', 'cancelled'],
+    enum: ['pending', 'billed', 'paid', 'cancelled'],
     default: 'pending',
     index: true
   },
-  paymentReference: String,
-  billingPeriod: {
-    startDate: Date,
-    endDate: Date
-  },
-  createdBy: {
+
+  invoiceId: { // 👈 LINK TO INVOICE (NOT NUMBER)
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'Invoice'
   },
+
+  paymentReference: String,
+
   metadata: mongoose.Schema.Types.Mixed
+
 }, {
   timestamps: true
 });

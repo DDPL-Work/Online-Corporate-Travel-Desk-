@@ -173,8 +173,9 @@ export default function HotelSearchPage() {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [rooms, setRooms] = useState(1);
-  const [adults, setAdults] = useState(2);
-  const [children, setChildren] = useState(0);
+  const [roomConfigs, setRoomConfigs] = useState([
+    { adults: 1, children: 0, childrenAges: [] },
+  ]);
   const [showGuestDropdown, setShowGuestDropdown] = useState(false);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [filteredCities, setFilteredCities] = useState([]);
@@ -263,6 +264,27 @@ export default function HotelSearchPage() {
     setShowCitySuggestions(false);
   };
 
+  // ensure roomConfigs length matches rooms
+  useEffect(() => {
+    setRoomConfigs((prev) => {
+      const next = [...prev];
+      if (rooms > next.length) {
+        for (let i = next.length; i < rooms; i++) {
+          next.push({ adults: 1, children: 0, childrenAges: [] });
+        }
+      } else if (rooms < next.length) {
+        next.length = rooms;
+      }
+      return next;
+    });
+  }, [rooms]);
+
+  const updateRoom = (idx, updater) => {
+    setRoomConfigs((prev) =>
+      prev.map((r, i) => (i === idx ? { ...r, ...updater(r) } : r)),
+    );
+  };
+
   const handleSearch = async () => {
     if (!selectedCityCode || !checkIn || !checkOut) {
       alert("Please select a valid city and fill all required fields");
@@ -278,11 +300,10 @@ export default function HotelSearchPage() {
       CityCode: selectedCityCode, // string is fine
       GuestNationality: country, // 🔥 IMPORTANT
       NoOfRooms: rooms,
-      PaxRooms: Array.from({ length: rooms }, (_, i) => ({
-        Adults: Math.floor(adults / rooms) + (i < adults % rooms ? 1 : 0),
-        Children: Math.floor(children / rooms) + (i < children % rooms ? 1 : 0),
-        ChildrenAges:
-          children > 0 ? Array(Math.floor(children / rooms)).fill(5) : [],
+      PaxRooms: roomConfigs.map((r) => ({
+        Adults: r.adults,
+        Children: r.children,
+        ChildrenAges: (r.childrenAges || []).slice(0, r.children),
       })),
       IsDetailedResponse: true,
       Filters: {
@@ -292,7 +313,9 @@ export default function HotelSearchPage() {
     };
 
     try {
-      const result = await dispatch(searchHotels(payload)).unwrap();
+      const result = await dispatch(
+        searchHotels({ payload, page: 1, limit: 10 }),
+      ).unwrap();
 
       if (result) {
         navigate("/search-hotel-results");
@@ -304,7 +327,11 @@ export default function HotelSearchPage() {
     }
   };
 
-  const guestSummary = `${adults + children} Guest${adults + children > 1 ? "s" : ""}, ${rooms} Room${rooms > 1 ? "s" : ""}`;
+  const totalGuests = roomConfigs.reduce(
+    (sum, r) => sum + r.adults + r.children,
+    0,
+  );
+  const guestSummary = `${totalGuests} Guest${totalGuests !== 1 ? "s" : ""}, ${rooms} Room${rooms > 1 ? "s" : ""}`;
   const today = new Date().toISOString().split("T")[0];
   const nightCount =
     checkIn && checkOut
@@ -319,6 +346,82 @@ export default function HotelSearchPage() {
     POPULAR_BY_COUNTRY[country] || POPULAR_BY_COUNTRY.default;
 
   const selectedCountry = normalizedCountries.find((c) => c.code === country);
+
+  const renderRoomConfig = (room, idx) => {
+    const setAdults = (val) =>
+      updateRoom(idx, () => ({ adults: Math.max(1, Math.min(4, val)) }));
+    const setChildren = (val) =>
+      updateRoom(idx, (r) => {
+        const count = Math.max(0, Math.min(4, val));
+        const ages = Array.from(
+          { length: count },
+          (_, i) => r.childrenAges?.[i] || 5,
+        );
+        return { children: count, childrenAges: ages };
+      });
+
+    const setChildAge = (cIdx, val) =>
+      updateRoom(idx, (r) => {
+        const ages = [...(r.childrenAges || [])];
+        ages[cIdx] = Math.min(12, Math.max(1, Number(val) || 1));
+        return { childrenAges: ages };
+      });
+
+    return (
+      <div
+        key={idx}
+        className="border border-gray-100 rounded-xl p-3 bg-white shadow-sm"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-semibold text-gray-800">
+            Room {idx + 1}
+          </span>
+          <span className="text-xs text-gray-500">
+            {room.adults} Adult{room.adults > 1 ? "s" : ""} • {room.children}{" "}
+            Child{room.children > 1 ? "ren" : ""}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg">
+            <span className="text-sm font-semibold text-gray-700">Adults</span>
+            <Counter val={room.adults} setVal={setAdults} min={1} max={4} />
+          </div>
+
+          <div className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg">
+            <span className="text-sm font-semibold text-gray-700">
+              Children
+            </span>
+            <Counter val={room.children} setVal={setChildren} min={0} max={4} />
+          </div>
+        </div>
+
+        {room.children > 0 && (
+          <div className="mt-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-600">
+              Child Ages (1-12)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {Array.from({ length: room.children }).map((_, cIdx) => (
+                <select
+                  key={cIdx}
+                  value={room.childrenAges?.[cIdx] || 5}
+                  onChange={(e) => setChildAge(cIdx, e.target.value)}
+                  className="border border-gray-300 rounded-lg px-2 py-2 text-sm"
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((age) => (
+                    <option key={age} value={age}>
+                      {age} yrs
+                    </option>
+                  ))}
+                </select>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const Counter = ({ val, setVal, min, max }) => (
     <div className="flex items-center gap-3">
@@ -575,59 +678,29 @@ export default function HotelSearchPage() {
                 </button>
 
                 {showGuestDropdown && (
-                  <div className="absolute top-full right-0 mt-1 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 w-72 p-5">
-                    <h4 className="text-sm font-bold text-gray-700 mb-4">
-                      Select Guests &amp; Rooms
-                    </h4>
-                    {[
-                      {
-                        label: "Rooms",
-                        sub: null,
-                        val: rooms,
-                        setVal: setRooms,
-                        min: 1,
-                        max: 9,
-                      },
-                      {
-                        label: "Adults",
-                        sub: "12+ years",
-                        val: adults,
-                        setVal: setAdults,
-                        min: 1,
-                        max: 30,
-                      },
-                      {
-                        label: "Children",
-                        sub: "0–11 years",
-                        val: children,
-                        setVal: setChildren,
-                        min: 0,
-                        max: 10,
-                      },
-                    ].map(({ label, sub, val, setVal, min, max }) => (
-                      <div
-                        key={label}
-                        className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold text-gray-800">
-                            {label}
-                          </p>
-                          {sub && (
-                            <p className="text-xs text-gray-400">{sub}</p>
-                          )}
-                        </div>
+                  <div className="absolute top-full right-0 mt-1 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 w-[420px] p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-gray-700">
+                        Guests &amp; Rooms
+                      </h4>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">Rooms</span>
                         <Counter
-                          val={val}
-                          setVal={setVal}
-                          min={min}
-                          max={max}
+                          val={rooms}
+                          setVal={setRooms}
+                          min={1}
+                          max={9}
                         />
                       </div>
-                    ))}
+                    </div>
+
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                      {roomConfigs.map((room, idx) => renderRoomConfig(room, idx))}
+                    </div>
+
                     <button
                       onClick={() => setShowGuestDropdown(false)}
-                      className="mt-4 w-full bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold py-2.5 rounded-xl transition"
+                      className="w-full bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold py-2.5 rounded-xl transition"
                     >
                       Apply
                     </button>

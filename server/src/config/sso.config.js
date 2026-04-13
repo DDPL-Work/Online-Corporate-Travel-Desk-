@@ -40,6 +40,12 @@ const ensureEmployeeForUser = async (user, corporateId) => {
   }
 };
 
+const getAdminEmail = (corporate) =>
+  corporate?.primaryContact?.email?.toLowerCase() ||
+  corporate?.secondaryContact?.email?.toLowerCase() ||
+  process.env.TRAVEL_ADMIN_EMAIL ||
+  "";
+
 /**
  * Helper: upsert or update a user safely
  * - Keys on corporateId + email (to avoid cross-tenant collisions)
@@ -251,7 +257,10 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
           // ✅ BLOCK USER LEVEL
           if (!user.isActive) {
-            return done(null, false, { message: "User account disabled" });
+            return done(null, false, {
+              message: "User account disabled",
+              contactEmail: getAdminEmail(corporate),
+            });
           }
 
           // ✅ BLOCK EMPLOYEE IF EMPLOYEE PROFILE INACTIVE
@@ -273,6 +282,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             if (emp.status === "inactive") {
               return done(null, false, {
                 message: "Employee account inactive",
+                contactEmail: getAdminEmail(corporate),
               });
             }
           }
@@ -391,7 +401,10 @@ if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET) {
           // }
 
           if (!user.isActive) {
-            return done(null, false, { message: "User account disabled" });
+            return done(null, false, {
+              message: "User account disabled",
+              contactEmail: getAdminEmail(corporate),
+            });
           }
 
           if (!existingUser && user.role === "employee") {
@@ -399,6 +412,7 @@ if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET) {
             if (emp && emp.status === "inactive") {
               return done(null, false, {
                 message: "Employee account inactive",
+                contactEmail: getAdminEmail(corporate),
               });
             }
           }
@@ -523,7 +537,10 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
           // }
 
           if (!user.isActive) {
-            return done(null, false, { message: "User account disabled" });
+            return done(null, false, {
+              message: "User account disabled",
+              contactEmail: getAdminEmail(corporate),
+            });
           }
 
           if (!existingUser && user.role === "employee") {
@@ -544,6 +561,7 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
             if (emp.status === "inactive") {
               return done(null, false, {
                 message: "Employee account inactive",
+                contactEmail: getAdminEmail(corporate),
               });
             }
           }

@@ -60,7 +60,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
   const snap = raw.bookingSnapshot || {};
   const travelers = raw.travellers || [];
   const roomGuests = raw.hotelRequest?.roomGuests || [];
-  const approver = raw.approvedBy || {};
+  const approver = raw.approvedBy || raw.approverId || {};
   const user = raw.userId || {};
   const amendment = raw.amendment || {};
   const bookRes = raw.bookingResult || {};
@@ -95,6 +95,23 @@ const totalFare = allRooms.reduce((sum, r) => sum + (r.totalFare || 0), 0);
 const totalTax = allRooms.reduce((sum, r) => sum + (r.totalTax || 0), 0);
 const baseFare = totalFare - totalTax;
 const currency = allRooms[0]?.price?.currency || "INR";
+
+  const getDisplayName = (p) => {
+    if (!p) return "";
+    if (typeof p === "string") return p;
+    if (p.name?.firstName) {
+      return `${p.name.firstName} ${p.name.lastName || ""}`.trim();
+    }
+    if (p.firstName) return `${p.firstName} ${p.lastName || ""}`.trim();
+    return p.name || "";
+  };
+
+  const approverName =
+    raw.approverName || getDisplayName(approver) || "—";
+  const approverEmail =
+    raw.approverEmail || approver.email || "—";
+  const approverRole =
+    raw.approverRole || approver.role || "—";
 
   return (
     <div
@@ -168,6 +185,26 @@ const currency = allRooms[0]?.price?.currency || "INR";
             </div>
           </div>
 
+          {/* ── Project & Approver ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+              <SectionLabel icon={<FiInfo size={11} />} title="Project Details" />
+              <div className="mt-2 space-y-2 text-sm">
+                <InfoRow label="Project Name" value={raw.projectName || "—"} />
+                <InfoRow label="Project ID" value={raw.projectId || "—"} />
+                <InfoRow label="Client" value={raw.projectClient || "—"} />
+              </div>
+            </div>
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+              <SectionLabel icon={<FiShield size={11} />} title="Approver" />
+              <div className="mt-2 space-y-2 text-sm">
+                <InfoRow label="Name" value={approverName} />
+                <InfoRow label="Email" value={approverEmail} />
+                <InfoRow label="Role" value={approverRole} />
+              </div>
+            </div>
+          </div>
+
           {/* ── Stay Details ── */}
           <div>
             <SectionLabel icon={<FiCalendar size={11} />} title="Stay Details" />
@@ -236,7 +273,7 @@ const currency = allRooms[0]?.price?.currency || "INR";
                     className="border border-slate-200 rounded-2xl overflow-hidden"
                   >
                     {/* Room header */}
-                    <div className="bg-gradient-to-r from-[#088395]/10 to-slate-50 px-5 py-3 flex items-center justify-between border-b border-slate-200">
+                    <div className="bg-linear-to-r from-[#088395]/10 to-slate-50 px-5 py-3 flex items-center justify-between border-b border-slate-200">
                       <div className="flex items-center gap-2">
                         <span className="w-6 h-6 rounded-full bg-[#088395] text-white text-[11px] font-black flex items-center justify-center shrink-0">
                           {idx + 1}

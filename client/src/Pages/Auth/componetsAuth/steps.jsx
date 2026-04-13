@@ -45,9 +45,9 @@ import {
 // Step 0 — Access (Email + SSO Icons)
 export const Step0 = ({ onNext, onRegister, form, setForm }) => {
   const sso = [
-    { key: "google", icon: <GoogleIcon size={22} /> },
-    { key: "microsoft", icon: <MicrosoftIcon size={22} /> },
-    { key: "zoho", icon: <ZohoIcon size={22} /> },
+    { key: "google", label: "Google Workspace", icon: <GoogleIcon size={22} /> },
+    { key: "microsoft", label: "Microsoft 365 / Azure AD", icon: <MicrosoftIcon size={22} /> },
+    { key: "zoho", label: "Zoho One / Directory", icon: <ZohoIcon size={22} /> },
   ];
 
   const handleEmailContinue = () => {
@@ -113,13 +113,20 @@ export const Step0 = ({ onNext, onRegister, form, setForm }) => {
       {/* SSO Icon Row */}
       <div className="flex items-center justify-center gap-5">
         {sso.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => onNext(s.key)}
-            className="w-14 h-14 rounded-2xl border-2 border-slate-100 bg-white flex items-center justify-center hover:border-blue-300 hover:bg-blue-50 transition-all shadow-sm hover:shadow-md"
-          >
-            {s.icon}
-          </button>
+          <div key={s.key} className="relative group">
+            <button
+              onClick={() => onNext(s.key)}
+              className="w-14 h-14 rounded-2xl border-2 border-slate-100 bg-white flex items-center justify-center hover:border-blue-300 hover:bg-blue-50 transition-all shadow-sm hover:shadow-md"
+            >
+              {s.icon}
+            </button>
+            <div className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute left-1/2 -translate-x-1/2 top-full mt-2 z-20">
+              <div className="bg-slate-900 text-white text-[11px] font-semibold px-3 py-2 rounded-xl shadow-lg border border-slate-800/60 whitespace-nowrap">
+                {s.label}
+                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45 border-l border-t border-slate-800/60" />
+              </div>
+            </div>
+          </div>
         ))}
       </div>
 

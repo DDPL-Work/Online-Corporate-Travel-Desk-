@@ -9,6 +9,7 @@ import corporateAdminReducer from "./Slice/corporateAdminSlice.js";
 import walletReducer from "./Slice/walletSlice.js";
 import walletRechargeLogsReducer from "./Slice/walletRechargeLogsSlice";
 import tboBalanceReducer from "./Slice/tboBalanceSlice";
+import corporateRelatedReducer from "./Slice/corporate.related.slice.js"
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     // ssoAuth: ssoAuthReducer,
     dashboard: dashboardReducer,
     profile: profileReducer,
+    corporateRelated: corporateRelatedReducer,
     corporateList: corporateListReducer,
     corporateOnboarding: corporateOnboardingReducer,
     corporateAdmin: corporateAdminReducer,

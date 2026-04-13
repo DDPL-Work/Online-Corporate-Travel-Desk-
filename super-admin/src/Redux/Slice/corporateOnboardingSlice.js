@@ -11,7 +11,7 @@ export const onboardCorporate = createAsyncThunk(
   async (formData, { rejectWithValue }) => {
     try {
       const response = await axios.post(
-        `${API_URL}/corporate/onboard`,
+        `${API_URL}/corporate-related/onboard`,
         formData,
         {
           headers: {

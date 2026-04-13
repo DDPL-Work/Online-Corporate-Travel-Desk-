@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const corporateController = require("../controllers/corporate.controller");
+const corporateController = require("../controllers/corporate.related.controller");
 
 // Middleware
 const {
@@ -24,6 +24,40 @@ router.post("/onboard", uploadMultiple, corporateController.onboardCorporate);
 // PROTECTED ROUTES
 // --------------------------------------------------
 router.use(verifyToken);
+
+// --------------------------------------------------
+// SUPER ADMIN : BOOKINGS (FLIGHT + HOTEL)
+// --------------------------------------------------
+
+// Get all flight bookings (Super Admin)
+router.get(
+  "/corporate-bookings/flights",
+  authorizeRoles("super-admin"),
+  corporateController.getAllFlightBookings,
+);
+
+// Get all hotel bookings (Super Admin)
+router.get(
+  "/corporate-bookings/hotels",
+  authorizeRoles("super-admin"),
+  corporateController.getAllHotelBookings,
+);
+
+// --------------------------------------------------
+// SUPER ADMIN : CANCELLATIONS
+// --------------------------------------------------
+
+router.get(
+  "/corporate-bookings/flights/cancellations",
+  authorizeRoles("super-admin"),
+  corporateController.getCancelledOrRequestedFlights
+);
+
+router.get(
+  "/corporate-bookings/hotels/cancellations",
+  authorizeRoles("super-admin"),
+  corporateController.getCancelledOrRequestedHotels
+);
 
 // Get All Corporates (Super Admin)
 router.get(

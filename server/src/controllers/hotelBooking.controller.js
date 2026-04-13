@@ -12,8 +12,20 @@ const { generateBookingReference } = require("../utils/helpers");
    CREATE HOTEL BOOKING REQUEST (Approval First)
 ====================================================== */
 exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
-  const { hotelRequest, travellers, purposeOfTravel, pricingSnapshot, gstDetails } =
-    req.body;
+  const {
+    hotelRequest,
+    travellers,
+    purposeOfTravel,
+    pricingSnapshot,
+    gstDetails,
+    projectName,
+    projectId,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
+  } = req.body;
 
   const user = req.user;
   const corporate = req.corporate;
@@ -28,42 +40,104 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
   if (!travellers?.length)
     throw new ApiError(400, "At least one guest required");
 
+  /* ================= APPROVER RESOLUTION ================= */
+  let resolvedApproverId = approverId;
+  let resolvedApproverName = approverName;
+  let resolvedApproverRole = approverRole;
+
+  if (!resolvedApproverId && approverEmail) {
+    const normalizedEmail = approverEmail.trim().toLowerCase();
+    let approverUser = await (await require("../models/User")).findOne({ email: normalizedEmail });
+
+    if (!approverUser) {
+      // bootstrap temp manager user
+      const firstName = normalizedEmail.split("@")[0] || "Manager";
+      approverUser = await (await require("../models/User")).create({
+        corporateId: corporate._id,
+        email: normalizedEmail,
+        name: { firstName, lastName: "" },
+        role: "manager",
+        isTempManager: true,
+        managerRequestStatus: "pending",
+      });
+    }
+
+    resolvedApproverId = approverUser._id;
+    resolvedApproverName =
+      resolvedApproverName ||
+      `${approverUser.name?.firstName || ""} ${approverUser.name?.lastName || ""}`.trim();
+    resolvedApproverRole = resolvedApproverRole || approverUser.role || "manager";
+  }
+
   /* ================= TRANSFORM DATA ================= */
 
   // ✅ STRICT STRING BASED (MATCHES YOUR DB)
 
   const totalAdults = travellers.filter(
-    (t) => t.paxType === "adult" || t.paxType === "lead",
+    (t) =>
+      (t.paxType || t.PaxType || "")
+        .toString()
+        .toLowerCase()
+        .startsWith("adult") ||
+      (t.paxType || t.PaxType || "").toString().toLowerCase() === "lead" ||
+      (t.paxType || t.PaxType || "") === 1,
   ).length;
 
-  const totalChildren = travellers.filter((t) => t.paxType === "child").length;
+  const totalChildren = travellers.filter(
+    (t) =>
+      (t.paxType || t.PaxType || "").toString().toLowerCase() === "child" ||
+      (t.paxType || t.PaxType || "") === 2,
+  ).length;
 
-  const roomsCount =
-  hotelRequest?.allRooms?.length ||
-  hotelRequest.noOfRooms ||
-  1;
+  // const roomsCount =
+  // hotelRequest?.allRooms?.length ||
+  // hotelRequest.noOfRooms ||
+  // 1;
 
   console.log("Travellers:", travellers);
   console.log("Rooms:", hotelRequest.rooms);
 
-  const roomGuests = Array.from({ length: roomsCount }).map((_, index) => ({
-  noOfAdults:
-    Math.floor(totalAdults / roomsCount) +
-    (index < totalAdults % roomsCount ? 1 : 0),
-  noOfChild: 0,
-  childAge: [],
-}));
+  // ✅ ALWAYS TRUST FRONTEND PaxRooms
+  const paxRooms = hotelRequest?.PaxRooms || hotelRequest?.paxRooms || [];
+
+  if (!paxRooms.length) {
+    throw new ApiError(400, "PaxRooms is required from frontend");
+  }
+
+  // ✅ derive correct room count
+  const roomsCount = paxRooms.length;
+
+  // ✅ build exact roomGuests
+  const roomGuests = paxRooms.map((r) => ({
+    noOfAdults: Number(r.Adults || 0),
+    noOfChild: Number(r.Children || 0),
+    childAge: r.ChildrenAges || [],
+  }));
+
+  // build default if missing
+  if (!roomGuests) {
+    roomGuests = Array.from({ length: roomsCount }).map((_, index) => ({
+      noOfAdults:
+        Math.floor(totalAdults / roomsCount) +
+        (index < totalAdults % roomsCount ? 1 : 0),
+      noOfChild:
+        Math.floor(totalChildren / roomsCount) +
+        (index < totalChildren % roomsCount ? 1 : 0),
+      childAge: [],
+    }));
+  }
 
   const transformedHotelRequest = {
     checkInDate: hotelRequest.checkIn,
     checkOutDate: hotelRequest.checkOut,
 
-    noOfRooms: hotelRequest.noOfRooms || 1,
+    noOfRooms: roomsCount,
     noOfNights: hotelRequest?.nights || 1,
 
     guestNationality: hotelRequest.guestNationality || "IN",
 
-   roomGuests: roomGuests,
+    roomGuests,
+    paxRooms,
 
     selectedHotel: {
       hotelCode: hotelRequest.hotelCode,
@@ -143,31 +217,42 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
   /* ================= SAVE ================= */
 
-  const transformedTravellers = travellers.map((t, index) => ({
-    title: t.title,
-    firstName: t.firstName,
-    lastName: t.lastName,
+  const transformedTravellers = travellers.map((t, index) => {
+    const incomingPaxType = (t.paxType || t.PaxType || "")
+      .toString()
+      .toLowerCase();
+    const isChild =
+      incomingPaxType === "child" ||
+      incomingPaxType === "2" ||
+      (t.age != null && Number(t.age) < 12);
+    const paxType = isChild ? "child" : index === 0 ? "lead" : "adult";
 
-    gender: t.gender,
-    dob: t.dob,
-    age: t.age,
+    return {
+      title: t.title,
+      firstName: t.firstName,
+      lastName: t.lastName,
 
-    email: t.email,
-    phoneWithCode: t.phoneWithCode,
+      gender: t.gender,
+      dob: t.dob,
+      age: t.age,
 
-    nationality: t.nationality,
-    countryCode: t.countryCode,
+      email: t.email,
+      phoneWithCode: t.phoneWithCode,
 
-    panCard: t.panCard || "",
-    PassportNo:t. PassportNo || "",
-    	PassportIssueDate:t. 	PassportIssueDate || "",
-    PassportExpDate:t. PassportExpDate || "",
+      nationality: t.nationality,
+      countryCode: t.countryCode,
 
-    isLeadPassenger: index === 0,
-    paxType: index === 0 ? "lead" : "adult",
+      panCard: t.panCard || "",
+      PassportNo: t.PassportNo || "",
+      PassportIssueDate: t.PassportIssueDate || "",
+      PassportExpDate: t.PassportExpDate || "",
 
-    raw: t,
-  }));
+      isLeadPassenger: paxType === "lead",
+      paxType,
+
+      raw: t,
+    };
+  });
 
   const bookingRequest = await HotelBookingRequest.create({
     bookingReference: generateBookingReference(),
@@ -179,6 +264,15 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     requestStatus: "pending_approval",
 
     purposeOfTravel,
+
+    projectName,
+    projectId,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
+
     gstDetails: {
       gstin: gstDetails?.gstin || "",
       legalName: gstDetails?.legalName || "",
@@ -305,6 +399,7 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
 
     const selectedRooms = booking.hotelRequest?.allRooms || [];
 
+    // derive booking codes and room count safely
     const bookingCodes = selectedRooms
       .map((r) => r.bookingCode)
       .filter(Boolean);
@@ -389,83 +484,208 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
 
     // const selectedRooms = booking.hotelRequest?.allRooms || [];
 
-const travellers = booking.travellers || [];
+    const travellers = booking.travellers || [];
 
-const roomsCount = selectedRooms.length;
+    // 🔥 STEP 1: GET LEAD PASSENGER PAN
+    const leadTraveller = travellers.find((t) => t.isLeadPassenger);
 
-// 🔥 AUTO FIX roomGuests
-let roomGuests = booking.hotelRequest?.roomGuests || [];
-
-// 🚨 FIX: If wrong, rebuild it
-if (
-  !roomGuests.length ||
-  roomGuests.length !== roomsCount ||
-  roomGuests.some(r => !r.noOfAdults || r.noOfAdults === 0)
-) {
-  roomGuests = Array.from({ length: roomsCount }).map(() => ({
-    noOfAdults: Math.floor(travellers.length / roomsCount),
-    noOfChild: 0,
-  }));
-
-  // distribute remaining
-  for (let i = 0; i < travellers.length % roomsCount; i++) {
-    roomGuests[i].noOfAdults += 1;
-  }
-}
-
-    let travellerIndex = 0;
-
-   const HotelRoomsDetails = roomGuests.map((room) => {
-  const passengers = [];
-
-  for (let i = 0; i < room.noOfAdults; i++) {
-    const traveller = travellers[travellerIndex];
-
-    if (!traveller) {
-      throw new ApiError(400, "Traveller count mismatch with rooms");
+    if (!leadTraveller || !leadTraveller.panCard) {
+      throw new ApiError(
+        400,
+        "Lead passenger PAN is required to proceed booking",
+      );
     }
 
-    const passenger = {
-      Title: traveller.title,
-      FirstName: traveller.firstName,
-      LastName: traveller.lastName,
-      Email: traveller.email || null,
-      Phoneno: String(traveller.phoneWithCode || "").replace(/\D/g, ""),
+    const leadPhoneRaw = String(leadTraveller?.phoneWithCode || "").replace(
+      /\D/g,
+      "",
+    );
+    const leadPhone = leadPhoneRaw.slice(-10);
 
-      PaxType: 1,
-
-      // ✅ FIX: Lead per room
-      LeadPassenger: i === 0,
-      
-      // 🔥 PAN Card for domestic bookings
-      PAN: traveller.panCard || "",
-      PassportNo: traveller.PassportNo || "",
-      	PassportIssueDate: traveller.	PassportIssueDate || "",
-      	PassportExpDate: traveller.	PassportExpDate || "",
-    };
-
-    // 🔥 ADD AGE IF EXISTS
-    if (traveller.age) {
-      passenger.Age = parseInt(traveller.age);
+    if (!leadTraveller?.email) {
+      throw new ApiError(400, "Lead passenger email is required");
     }
 
-    passengers.push(passenger);
-    travellerIndex++;
-  }
+    if (leadPhone.length !== 10) {
+      throw new ApiError(400, "Lead passenger must have valid 10 digit phone");
+    }
 
-  return {
-    HotelPassenger: passengers,
-  };
-});
+    const bookingPAN = leadTraveller.panCard;
+
+    // derive room count from booking codes (handle comma-combined codes)
+    const countCodes = (codes) =>
+      (codes || []).reduce(
+        (sum, code) => sum + code.split(",").filter(Boolean).length,
+        0,
+      );
+
+    const roomsCount =
+      countCodes(freshBookingCode) ||
+      countCodes(bookingCodes) ||
+      selectedRooms.length ||
+      1;
+
+    // split travellers into adults/children
+    const adultTravellers = travellers.filter((t) => {
+      const pax = (t.paxType || t.PaxType || "").toString().toLowerCase();
+      const age = t.age != null ? Number(t.age) : null;
+      return !(pax === "child" || pax === "2" || (age != null && age < 12));
+    });
+
+    const childTravellers = travellers.filter((t) => {
+      const pax = (t.paxType || t.PaxType || "").toString().toLowerCase();
+      const age = t.age != null ? Number(t.age) : null;
+      return pax === "child" || pax === "2" || (age != null && age < 12);
+    });
+
+    // 🔥 AUTO FIX roomGuests
+    let paxRooms =
+      booking.hotelRequest?.paxRooms || booking.hotelRequest?.PaxRooms || [];
+
+    // ✅ fallback for OLD bookings
+    let roomGuests = booking.hotelRequest?.roomGuests || [];
+
+    // ✅ PRIORITY 1 → use saved correct data
+    if (roomGuests.length === roomsCount) {
+      // perfect → do nothing
+    } else {
+      // fallback ONLY if completely broken
+      console.warn("⚠️ roomGuests invalid → fallback");
+
+      roomGuests = Array.from({ length: roomsCount }).map(() => ({
+        noOfAdults: Math.floor(adultTravellers.length / roomsCount),
+        noOfChild: Math.floor(childTravellers.length / roomsCount),
+        childAge: [],
+      }));
+
+      for (let i = 0; i < adultTravellers.length % roomsCount; i++) {
+        roomGuests[i].noOfAdults += 1;
+      }
+
+      for (let i = 0; i < childTravellers.length % roomsCount; i++) {
+        roomGuests[i].noOfChild += 1;
+      }
+    }
+
+    // const roomGuests = paxRooms.map((r) => ({
+    //   noOfAdults: Number(r.Adults || 0),
+    //   noOfChild: Number(r.Children || 0),
+    //   childAge: r.ChildrenAges || [],
+    // }));
+
+    // ✅ ADD THIS BLOCK HERE (EXACT PLACE)
+
+    // 🔥 VALIDATION (CRITICAL FIX)
+    const totalGuestsFromRooms = roomGuests.reduce(
+      (sum, r) => sum + r.noOfAdults + r.noOfChild,
+      0,
+    );
+
+    const totalTravellers = adultTravellers.length + childTravellers.length;
+
+    if (totalGuestsFromRooms !== totalTravellers) {
+      throw new ApiError(
+        400,
+        `Mismatch: roomGuests=${totalGuestsFromRooms}, travellers=${totalTravellers}`,
+      );
+    }
+    let adultIdx = 0;
+    let childIdx = 0;
+
+    const HotelRoomsDetails = roomGuests.map((room, idx) => {
+      const passengers = [];
+
+      // Adults first
+      for (let i = 0; i < room.noOfAdults; i++) {
+        const traveller = adultTravellers[adultIdx];
+
+        if (!traveller) {
+          throw new ApiError(400, "Adult traveller count mismatch with rooms");
+        }
+
+        const rawPhone = String(traveller.phoneWithCode || "").replace(
+          /\D/g,
+          "",
+        );
+        const phone = rawPhone.slice(-10);
+
+        const passenger = {
+          Title: traveller.title,
+          FirstName: traveller.firstName,
+          MiddleName: traveller.middleName || "",
+          LastName: traveller.lastName,
+          Email: traveller.email || leadTraveller.email,
+          // Phoneno: String(traveller.phoneWithCode || "").replace(/\D/g, ""),
+          Phoneno: phone,
+
+          PaxType: 1,
+
+          // ✅ Lead per room (first passenger)
+          LeadPassenger: passengers.length === 0,
+
+          // 🔥 PAN Card for domestic bookings
+          PAN: traveller.panCard || bookingPAN,
+          PassportNo: traveller.PassportNo || null,
+          PassportIssueDate: traveller.PassportIssueDate || null,
+          PassportExpDate: traveller.PassportExpDate || null,
+        };
+
+        if (traveller.age) passenger.Age = parseInt(traveller.age);
+
+        passengers.push(passenger);
+        adultIdx++;
+      }
+
+      // Children
+      for (let i = 0; i < room.noOfChild; i++) {
+        const traveller = childTravellers[childIdx];
+        if (!traveller) break;
+
+        const passenger = {
+          Title: traveller.title || "Master",
+          FirstName: traveller.firstName,
+          MiddleName: traveller.middleName || "",
+          LastName: traveller.lastName,
+          PaxType: 2,
+          LeadPassenger: false,
+          Email: null,
+          Phoneno: String(leadTraveller.phoneWithCode || "")
+            .replace(/\D/g, "")
+            .slice(-10),
+          PAN: bookingPAN,
+          PassportNo: traveller.PassportNo || null,
+          PassportIssueDate: traveller.PassportIssueDate || null,
+          PassportExpDate: traveller.PassportExpDate || null,
+        };
+
+        const ages = room.childAge || [];
+        if (ages[i]) passenger.Age = parseInt(ages[i]);
+        else if (traveller.age) passenger.Age = parseInt(traveller.age);
+        else passenger.Age = 10; // safe default
+
+        passengers.push(passenger);
+        childIdx++;
+      }
+
+      return {
+        // TBO expects RoomIndex (1-based) alongside passengers
+        RoomIndex: idx + 1,
+        HotelPassenger: passengers,
+      };
+    });
 
     const bookResp = await hotelService.bookHotel({
       BookingCode: freshBookingCode.join(","),
       IsVoucherBooking: true,
       GuestNationality: booking.hotelRequest?.guestNationality || "IN",
       EndUserIp: process.env.TBO_END_USER_IP,
-      RequestedBookingMode: 5,
+      // RequestedBookingMode: 5, // optional; omit to mirror Postman success cases
       NetAmount: netAmount,
       ClientReferenceId: booking.bookingReference,
+      TraceId:
+        preBookResp?.TraceId ||
+        booking.hotelRequest?.traceId ||
+        booking.hotelRequest?.TraceId,
 
       HotelRoomsDetails,
     });
@@ -568,7 +788,7 @@ if (
 // @route   GET /api/v1/hotel-bookings/my
 // @access  Private (Employee)
 exports.getMyHotelBookings = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10 } = req.query;
+  // const { page = 1, limit = 10 } = req.query;
 
   const query = {
     userId: req.user._id,
@@ -576,7 +796,7 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
     executionStatus: { $in: ["voucher_generated"] }, // ✅ FIXED
   };
 
-  const skip = (Number(page) - 1) * Number(limit);
+  // const skip = (Number(page) - 1) * Number(limit);
 
   const [rawBookings, total] = await Promise.all([
     HotelBookingRequest.find(query)
@@ -596,8 +816,8 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
   `,
       )
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit))
+      // .skip(skip)
+      // .limit(Number(limit))
       .lean(),
     HotelBookingRequest.countDocuments(query),
   ]);
@@ -645,18 +865,18 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
     };
   });
 
-  const pagination = {
-    total,
-    page: Number(page),
-    pages: Math.ceil(total / limit),
-  };
+  // const pagination = {
+  //   total,
+  //   // page: Number(page),
+  //   // pages: Math.ceil(total / limit),
+  // };
 
   res.status(200).json({
     success: true,
     message: "Hotel bookings fetched successfully",
     data: {
       bookings,
-      pagination,
+      // pagination,
     },
   });
 });
@@ -733,94 +953,69 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
   const tboRooms = Array.isArray(result?.Rooms) ? result.Rooms : [];
 
   // ✅ DB rooms (rawRoomData can be array or object)
-  const dbRoomsRaw =
-    booking?.hotelRequest?.selectedRoom?.rawRoomData;
+  const dbRoomsRaw = booking?.hotelRequest?.selectedRoom?.rawRoomData;
 
   const dbRooms = Array.isArray(dbRoomsRaw)
     ? dbRoomsRaw
     : dbRoomsRaw
-    ? [dbRoomsRaw]
-    : [];
+      ? [dbRoomsRaw]
+      : [];
 
   // ✅ FINAL ROOMS (TBO priority)
   let rooms = [];
 
-if (tboRooms.length > 0 && dbRooms.length > 0) {
-  // 🔥 MERGE TBO + DB (KEEP ORIGINAL ROOM TYPES)
-  rooms = tboRooms.map((tboRoom, index) => {
-    const dbRoom = dbRooms[index] || {};
+  if (tboRooms.length > 0 && dbRooms.length > 0) {
+    // 🔥 MERGE TBO + DB (KEEP ORIGINAL ROOM TYPES)
+    rooms = tboRooms.map((tboRoom, index) => {
+      const dbRoom = dbRooms[index] || {};
 
-    return {
-      ...tboRoom,
+      return {
+        ...tboRoom,
 
-      // ✅ FIX ROOM NAME FROM DB
-      RoomTypeName:
-        dbRoom?.Name?.[0]?.split(",")[0] ||
-        tboRoom.RoomTypeName,
+        // ✅ FIX ROOM NAME FROM DB
+        RoomTypeName: dbRoom?.Name?.[0]?.split(",")[0] || tboRoom.RoomTypeName,
 
-      // ✅ FIX MEAL
-      Inclusion:
-        dbRoom?.Inclusion || tboRoom.Inclusion,
+        // ✅ FIX MEAL
+        Inclusion: dbRoom?.Inclusion || tboRoom.Inclusion,
 
-      // ✅ FIX REFUNDABLE
-      IsRefundable:
-        dbRoom?.IsRefundable ?? tboRoom.IsRefundable,
-    };
-  });
-} else {
-  rooms = tboRooms.length > 0 ? tboRooms : dbRooms;
-}
+        // ✅ FIX REFUNDABLE
+        IsRefundable: dbRoom?.IsRefundable ?? tboRoom.IsRefundable,
+      };
+    });
+  } else {
+    rooms = tboRooms.length > 0 ? tboRooms : dbRooms;
+  }
 
   /* ================= IMAGES ================= */
 
-  const images = rooms.flatMap(
-    (r) => r?.images || r?.Images || []
-  );
+  const images = rooms.flatMap((r) => r?.images || r?.Images || []);
 
   const heroImage = images[0] || null;
 
   /* ================= GUESTS ================= */
 
   const guests =
-    rooms.flatMap((room) => room?.HotelPassenger || []) ||
-    travellers ||
-    [];
+    rooms.flatMap((room) => room?.HotelPassenger || []) || travellers || [];
 
   /* ================= PRICING ================= */
 
-  const totalFare =
-    result?.InvoiceAmount ||
-    pricingSnapshot?.totalAmount ||
-    0;
+  const totalFare = result?.InvoiceAmount || pricingSnapshot?.totalAmount || 0;
 
-  const currency =
-    result?.Currency ||
-    pricingSnapshot?.currency ||
-    "INR";
+  const currency = result?.Currency || pricingSnapshot?.currency || "INR";
 
   /* ================= DATES ================= */
 
-  const checkIn =
-    result?.CheckInDate ||
-    bookingSnapshot?.checkInDate;
+  const checkIn = result?.CheckInDate || bookingSnapshot?.checkInDate;
 
-  const checkOut =
-    result?.CheckOutDate ||
-    bookingSnapshot?.checkOutDate;
+  const checkOut = result?.CheckOutDate || bookingSnapshot?.checkOutDate;
 
   /* ================= HOTEL INFO ================= */
 
-  const hotelName =
-    result?.HotelName ||
-    bookingSnapshot?.hotelName;
+  const hotelName = result?.HotelName || bookingSnapshot?.hotelName;
 
-  const city =
-    result?.City ||
-    bookingSnapshot?.city;
+  const city = result?.City || bookingSnapshot?.city;
 
-  const status =
-    result?.HotelBookingStatus ||
-    executionStatus;
+  const status = result?.HotelBookingStatus || executionStatus;
 
   /* ================= FINAL RESPONSE ================= */
 
