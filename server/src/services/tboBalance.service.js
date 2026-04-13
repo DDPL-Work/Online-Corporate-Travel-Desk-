@@ -15,13 +15,9 @@ const normalizeTboEnv = (env = process.env.TBO_ENV || process.env.NODE_ENV) => {
     .trim()
     .toLowerCase();
 
-  if (
-    ["production", "prod", "live", "staging", "test", "uat"].includes(envKey)
-  ) {
-    return "live";
-  }
-
-  return "dummy";
+  return ["production", "prod", "live", "staging", "test", "uat"].includes(envKey)
+    ? "live"
+    : "dummy";
 };
 
 const getTboEnvConfig = (env = "dummy") => {
@@ -35,48 +31,9 @@ const getTboEnvConfig = (env = "dummy") => {
   return { envKey, config };
 };
 
-const buildSharedUrl = (envKey, endpointKey, config) =>
-  typeof tboConfig.resolveUrl === "function"
-    ? tboConfig.resolveUrl(envKey, endpointKey)
-    : `${config.sharedBase}${config.endpoints[endpointKey]}`;
-
 // ======================================================
 // AUTHENTICATE WITH TBO
 // ======================================================
-// const authenticateTbo = async (env = "dummy") => {
-//   const config = tboConfig[env];
-
-//   const url = config.sharedBase + config.endpoints.authenticate;
-
-//   const payload = {
-//     ClientId: config.credentials.clientId,
-//     UserName: config.credentials.username,
-//     Password: config.credentials.password,
-//     EndUserIp: config.endUserIp
-//   };
-
-//   try {
-//     const { data } = await axios.post(url, payload, {
-//       timeout: tboConfig.timeout,
-//       headers: { "Content-Type": "application/json" }
-//     });
-
-//     if (data?.Error?.ErrorCode !== 0) {
-//       throw new Error(data?.Error?.ErrorMessage || "TBO Authentication failed");
-//     }
-
-//     // Return tokens if returned by TBO, otherwise fallback to .tokens in config
-//     return {
-//       TokenId: data?.TokenId || config.tokens.tokenId,
-//       TokenAgencyId: data?.TokenAgencyId || config.tokens.agencyId,
-//       TokenMemberId: data?.TokenMemberId || config.tokens.memberId
-//     };
-//   } catch (err) {
-//     console.error("TBO Auth Error:", err.message);
-//     throw new Error("Failed to authenticate with TBO");
-//   }
-// };
-
 const authenticateTbo = async (env = "dummy") => {
   const { envKey, config } = getTboEnvConfig(env);
   const cached = authCache[envKey];
@@ -85,7 +42,8 @@ const authenticateTbo = async (env = "dummy") => {
     return cached.auth;
   }
 
-  const url = buildSharedUrl(envKey, "authenticate", config);
+  // Use URL resolution directly from tbo.config
+  const url = tboConfig.resolveUrl(envKey, "authenticate");
 
   const payload = {
     ClientId: config.credentials.clientId,
@@ -94,31 +52,46 @@ const authenticateTbo = async (env = "dummy") => {
     EndUserIp: config.endUserIp,
   };
 
-  const { data } = await axios.post(url, payload, {
-    timeout: tboConfig.timeout,
-    headers: { "Content-Type": "application/json" },
-  });
+  try {
+    const { data } = await axios.post(url, payload, {
+      timeout: tboConfig.timeout || 500000,
+      headers: { "Content-Type": "application/json" },
+    });
 
-  if (
-    (data?.Error?.ErrorCode != null && data.Error.ErrorCode !== 0) ||
-    (data?.Status != null && data.Status !== 1 && data.Status !== "Success")
-  ) {
-    throw new Error(data?.Error?.ErrorMessage || "TBO Authentication failed");
+    if (
+      (data?.Error?.ErrorCode != null && data.Error.ErrorCode !== 0) ||
+      (data?.Status != null && data.Status !== 1 && data.Status !== "Success")
+    ) {
+      throw new Error(data?.Error?.ErrorMessage || "TBO Authentication API reported failure");
+    }
+
+    const auth = {
+      TokenId: data?.TokenId || data?.Token || config.tokens.tokenId,
+      TokenAgencyId: data?.Member?.AgencyId || data?.TokenAgencyId || config.tokens.agencyId,
+      TokenMemberId: data?.Member?.MemberId || data?.TokenMemberId || config.tokens.memberId,
+    };
+
+    authCache[envKey] = {
+      auth,
+      expiry: Date.now() + AUTH_TTL_MS,
+    };
+
+    return auth;
+  } catch (err) {
+    console.error("TBO Auth Error:", {
+      env: envKey,
+      endpoint: "authenticate",
+      message: err.message,
+      status: err.response?.status,
+      response: err.response?.data,
+    });
+    
+    throw new Error(
+      err.response?.data?.Error?.ErrorMessage ||
+      err.message || 
+      "Failed to authenticate with TBO"
+    );
   }
-
-  const auth = {
-    TokenId: data.TokenId || data.Token || config.tokens.tokenId,
-    TokenAgencyId: data.TokenAgencyId || config.tokens.agencyId,
-    TokenMemberId: data.TokenMemberId || config.tokens.memberId,
-  };
-
-  // Tokens typically last ~15–30 min (adjust if TBO confirms)
-  authCache[envKey] = {
-    auth,
-    expiry: Date.now() + AUTH_TTL_MS,
-  };
-
-  return auth;
 };
 
 // ======================================================
@@ -127,10 +100,9 @@ const authenticateTbo = async (env = "dummy") => {
 const getAgencyBalance = async (env = "dummy") => {
   const { envKey, config } = getTboEnvConfig(env);
 
-  // Step 1: Authenticate (or use static tokens)
   const auth = await authenticateTbo(envKey);
 
-  const url = buildSharedUrl(envKey, "getAgencyBalance", config);
+  const url = tboConfig.resolveUrl(envKey, "getAgencyBalance");
 
   const payload = {
     ClientId: config.credentials.clientId,
@@ -142,17 +114,16 @@ const getAgencyBalance = async (env = "dummy") => {
 
   try {
     const { data } = await axios.post(url, payload, {
-      timeout: tboConfig.timeout,
+      timeout: tboConfig.timeout || 500000,
       headers: { "Content-Type": "application/json" },
     });
 
-    if (data?.Error?.ErrorCode != null && data.Error.ErrorCode !== 0) {
-      throw new Error(
-        data?.Error?.ErrorMessage || "Failed to fetch agency balance"
-      );
+    if (
+      (data?.Error?.ErrorCode != null && data.Error.ErrorCode !== 0) ||
+      (data?.Status != null && data.Status !== 1 && data.Status !== "Success")
+    ) {
+      throw new Error(data?.Error?.ErrorMessage || "TBO Agency Balance API reported failure");
     }
-
-    // return data;
 
     return {
       availableBalance: Number(data.CashBalance || 0),
@@ -161,17 +132,18 @@ const getAgencyBalance = async (env = "dummy") => {
       raw: data,
     };
   } catch (err) {
-    console.error("TBO Agency Balance Error FULL:", {
+    console.error("TBO Agency Balance Error:", {
       env: envKey,
+      endpoint: "getAgencyBalance",
       message: err.message,
-      response: err.response?.data,
       status: err.response?.status,
+      response: err.response?.data,
     });
 
     throw new Error(
       err.response?.data?.Error?.ErrorMessage ||
-        err.message ||
-        "Failed to fetch agency balance"
+      err.message || 
+      "Failed to fetch agency balance"
     );
   }
 };
