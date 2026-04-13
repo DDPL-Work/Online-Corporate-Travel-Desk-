@@ -174,3 +174,92 @@ export const normalizeSSRBySegmentOW = (ssr) => {
     baggage,   // journey-level
   }));
 };
+
+export const mapSSRData = (ssrResponse, selectedFlights) => {
+  const result = {
+    onward: { baggage: [], meals: [], seats: [] },
+    return: { baggage: [], meals: [], seats: [] }
+  };
+
+  if (!ssrResponse) return result;
+
+  let root = ssrResponse.Response || ssrResponse.Results || ssrResponse;
+
+  const allBaggage = root.Baggage?.flat() || [];
+  const allMeals = root.MealDynamic?.flat() || root.Meal?.flat() || [];
+  const allSeats = root.SeatDynamic || root.Seat || [];
+
+  const onwardSegs = selectedFlights?.onward?.Segments?.flat() || [];
+  const returnSegs = selectedFlights?.return?.Segments?.flat() || [];
+
+  const matchItemToLeg = (item, legSegs, expectedWayType) => {
+    if (item.WayType && Number(item.WayType) === expectedWayType) return true;
+
+    const itemAirline = item.AirlineCode;
+    const itemFlightNumber = item.FlightNumber;
+    const itemOrigin = item.Origin;
+    const itemDestination = item.Destination;
+
+    return legSegs.some(seg => {
+      const matchAirline = !itemAirline || seg.Airline?.AirlineCode === itemAirline;
+      const matchFlight = !itemFlightNumber || seg.Airline?.FlightNumber === itemFlightNumber;
+      const matchOrg = !itemOrigin || seg.Origin?.Airport?.AirportCode === itemOrigin;
+      const matchDest = !itemDestination || seg.Destination?.Airport?.AirportCode === itemDestination;
+      return matchAirline && matchFlight && matchOrg && matchDest;
+    });
+  };
+
+  const splitItems = (items) => {
+    const onward = [];
+    const ret = [];
+    items.forEach(item => {
+      if (item.WayType == 1) onward.push(item);
+      else if (item.WayType == 2) ret.push(item);
+      else {
+        if (matchItemToLeg(item, onwardSegs, 1)) onward.push(item);
+        else if (matchItemToLeg(item, returnSegs, 2)) ret.push(item);
+      }
+    });
+    return { onward, ret };
+  };
+
+  const splitBag = splitItems(allBaggage);
+  const splitMeal = splitItems(allMeals);
+
+  result.onward.baggage = splitBag.onward;
+  result.onward.meals = splitMeal.onward;
+  result.return.baggage = splitBag.ret;
+  result.return.meals = splitMeal.ret;
+
+  const extractSeats = (wayType, legSegs) => {
+    const seatsForLeg = [];
+    const seatArray = Array.isArray(allSeats) ? allSeats : [allSeats];
+    
+    seatArray.forEach(seatObj => {
+      const segSeats = seatObj.SegmentSeat || seatObj || [];
+      const segArray = Array.isArray(segSeats) ? segSeats : [segSeats];
+      
+      segArray.forEach(seg => {
+        if (!seg) return;
+        let matches = false;
+        if (seg.WayType) {
+           matches = (Number(seg.WayType) === wayType);
+        } else {
+           matches = matchItemToLeg(seg, legSegs, wayType);
+        }
+        if (matches) seatsForLeg.push(seg);
+      });
+    });
+
+    return seatsForLeg.map(seg => ({
+      seats: Array.isArray(seg.RowSeats) ? seg.RowSeats : [],
+      meals: result[wayType === 1 ? 'onward' : 'return'].meals,
+      baggage: result[wayType === 1 ? 'onward' : 'return'].baggage,
+    }));
+  };
+
+  result.onward.seats = extractSeats(1, onwardSegs);
+  result.return.seats = extractSeats(2, returnSegs);
+
+  return result;
+};

@@ -208,7 +208,7 @@ function FlightHeroCard({ booking }) {
 
   // ── PNR / booking ref
   const pnr = result?.pnr || itinerary?.PNRDetails || booking?.pnr || "";
-  const executionStatus = booking?.executionStatus || "";
+  const executionStatus = "cancelled";
 
   return (
     <div
@@ -665,7 +665,7 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
 
   const paymentSuccessful =
     booking?.payment?.status === "completed" || !!booking?.pnr;
-  const executionStatus = booking?.executionStatus || "";
+  const executionStatus = "cancelled";
   const isConfirmed =
     executionStatus === "ticketed" || executionStatus === "confirmed";
 

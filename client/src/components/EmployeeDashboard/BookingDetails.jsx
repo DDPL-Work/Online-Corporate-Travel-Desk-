@@ -12,6 +12,15 @@ import {
   FiRefreshCw,
   FiPackage,
   FiMapPin,
+  FiTag,
+  FiFileText,
+  FiCalendar,
+  FiClock,
+  FiShield,
+  FiInfo,
+  FiChevronDown,
+  FiChevronUp,
+  FiStar,
 } from "react-icons/fi";
 import {
   downloadTicketPdf,
@@ -38,53 +47,76 @@ import {
 import Swal from "sweetalert2";
 
 /* ─────────────────────────────────────────────────────────────── */
+/*  Utility helpers                                                */
+/* ─────────────────────────────────────────────────────────────── */
+
+function formatPaxType(paxType) {
+  const map = { ADULT: "Adult", CHILD: "Child", INFANT: "Infant" };
+  return map[paxType] || paxType || "Unknown";
+}
+
+function safeGet(obj, ...keys) {
+  return keys.reduce((acc, key) => (acc != null ? acc[key] : undefined), obj);
+}
+
+/** Compute layover minutes between two segments */
+function layoverMinutes(prevSeg, nextSeg) {
+  const arr = new Date(prevSeg.arrivalDateTime);
+  const dep = new Date(nextSeg.departureDateTime);
+  return Math.round((dep - arr) / 60000);
+}
+
+function formatLayoverDuration(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h}h ${m}m layover` : `${m}m layover`;
+}
+
+/* ─────────────────────────────────────────────────────────────── */
 /*  Shared primitives                                              */
 /* ─────────────────────────────────────────────────────────────── */
 
-function StatusPill({ status }) {
+function StatusPill({ status, size = "sm" }) {
   const map = {
     Confirmed: "bg-emerald-400/20 text-emerald-300 ring-1 ring-emerald-400/30",
     Pending: "bg-amber-400/20   text-amber-300   ring-1 ring-amber-400/30",
     Cancelled: "bg-red-400/20     text-red-300     ring-1 ring-red-400/30",
+    ticketed: "bg-emerald-400/20 text-emerald-300 ring-1 ring-emerald-400/30",
+    approved: "bg-blue-400/20 text-blue-300 ring-1 ring-blue-400/30",
+    pending: "bg-amber-400/20   text-amber-300   ring-1 ring-amber-400/30",
+    cancelled: "bg-red-400/20     text-red-300     ring-1 ring-red-400/30",
   };
   const dot = {
     Confirmed: "bg-emerald-400",
     Pending: "bg-amber-400",
     Cancelled: "bg-red-400",
+    ticketed: "bg-emerald-400",
+    approved: "bg-blue-400",
+    pending: "bg-amber-400",
+    cancelled: "bg-red-400",
   };
+  const key = status?.toLowerCase() || "pending";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase ${map[status] || map.Confirmed}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase ${map[key] || map.Pending}`}
     >
-      <span
-        className={`w-1.5 h-1.5 rounded-full ${dot[status] || dot.Confirmed}`}
-      />
+      <span className={`w-1.5 h-1.5 rounded-full ${dot[key] || dot.Pending}`} />
       {status}
     </span>
   );
 }
 
-function InfoRow({ label, value, accent }) {
+function InfoRow({ label, value, accent, mono }) {
   return (
     <div className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
       <span className="text-xs text-slate-400 font-medium">{label}</span>
       <span
-        className={`text-[13px] font-semibold ${accent ? "text-teal-600" : "text-slate-800"}`}
+        className={`text-[13px] font-semibold ${accent ? "text-teal-600" : "text-slate-800"} ${mono ? "font-mono tracking-wide" : ""}`}
       >
-        {value}
+        {value ?? "—"}
       </span>
     </div>
   );
-}
-
-function formatPaxType(paxType) {
-  const map = {
-    ADULT: "Adult",
-    CHILD: "Child",
-    INFANT: "Infant",
-  };
-
-  return map[paxType] || paxType || "Unknown";
 }
 
 function BentoCard({ children, className = "" }) {
@@ -110,9 +142,6 @@ function CardLabel({ icon: Icon, label }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Meta chip (used inside flight card footer)                     */
-/* ─────────────────────────────────────────────────────────────── */
 function MetaChip({ icon: Icon, label, value }) {
   return (
     <div className="flex items-center gap-2 bg-white/[0.07] rounded-xl px-3 py-2.5 border border-white/10">
@@ -122,86 +151,205 @@ function MetaChip({ icon: Icon, label, value }) {
           {label}
         </p>
         <p className="text-[13px] font-semibold text-white leading-none">
-          {value}
+          {value || "—"}
         </p>
       </div>
     </div>
   );
 }
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Dashed airport connector                                       */
-/* ─────────────────────────────────────────────────────────────── */
-function RouteConnector({ duration }) {
+function RouteConnector({ duration, stops = 0 }) {
   return (
     <div className="flex flex-col items-center gap-1 px-2">
       <span className="text-[10px] font-bold tracking-widest text-white/40 uppercase">
         {duration}
       </span>
       <div className="flex items-center gap-0 w-full">
-        {/* left dot */}
         <span className="w-2 h-2 rounded-full border-2 border-white/30 shrink-0" />
-        {/* dashed line with plane */}
         <div className="flex-1 relative flex items-center">
           <div className="w-full border-t border-dashed border-white/20" />
           <span className="absolute left-1/2 -translate-x-1/2 -translate-y-[55%] text-sm select-none">
             ✈
           </span>
         </div>
-        {/* right dot */}
         <span className="w-2 h-2 rounded-full bg-white/30 shrink-0" />
       </div>
       <span className="text-[9px] font-bold tracking-widest text-white/30 uppercase">
-        Non-stop
+        {stops === 0 ? "Non-stop" : `${stops} stop${stops > 1 ? "s" : ""}`}
       </span>
     </div>
   );
 }
 
-function FlightCard({
-  flight,
-  pnrsByJourney,
+/* ─────────────────────────────────────────────────────────────── */
+/*  Layover Banner (shown between segments inside a journey card) */
+/* ─────────────────────────────────────────────────────────────── */
+function LayoverBanner({ prevSeg, nextSeg }) {
+  const mins = layoverMinutes(prevSeg, nextSeg);
+  const airport =
+    prevSeg?.destination?.airportCode || prevSeg?.destination?.city || "—";
+  const city = prevSeg?.destination?.city || "";
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 my-3 rounded-xl bg-white/10 border border-white/15">
+      <FiClock size={13} className="text-amber-300 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] font-black uppercase tracking-widest text-amber-300 mb-0.5">
+          Layover · {airport} {city ? `(${city})` : ""}
+        </p>
+        <div className="flex items-center gap-4 text-[11px] text-white/50">
+          <span>Arrive {formatTime(prevSeg.arrivalDateTime)}</span>
+          <span className="text-white/25">→</span>
+          <span>Depart {formatTime(nextSeg.departureDateTime)}</span>
+          <span className="ml-auto font-semibold text-amber-200">
+            {formatLayoverDuration(mins)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Supplier Fare Class badge                                      */
+/* ─────────────────────────────────────────────────────────────── */
+function FareClassBadge({ label, color }) {
+  const bgStyle = color ? { backgroundColor: color + "33", borderColor: color + "66" } : {};
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black tracking-wide border"
+      style={bgStyle}
+    >
+      <FiStar size={10} style={color ? { color } : {}} className={!color ? "text-teal-400" : ""} />
+      <span style={color ? { color } : { color: "#2dd4bf" }}>{label}</span>
+    </span>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Single-segment row inside journey card                        */
+/* ─────────────────────────────────────────────────────────────── */
+function SegmentRow({ seg, fareClassInfo, isFirst, isLast }) {
+  return (
+    <div className="grid grid-cols-[1fr_160px_1fr] items-center py-5 border-b border-white/10 last:border-0">
+      {/* Origin */}
+      <div className="space-y-1">
+        {isFirst && (
+          <p className="text-[11px] text-white/40 font-bold uppercase tracking-widest">From</p>
+        )}
+        <p className="text-[40px] font-black tracking-tighter leading-none">
+          {seg?.origin?.city}
+        </p>
+        <p className="text-sm text-white/70 font-medium">{seg?.origin?.airportCode}</p>
+        {seg?.origin?.terminal && (
+          <p className="text-[10px] text-white/30">Terminal {seg.origin.terminal}</p>
+        )}
+        <div className="flex items-baseline gap-2 mt-1">
+          <p className="text-xl font-black">{formatTime(seg?.departureDateTime)}</p>
+          <p className="text-xs text-white/40">{formatDate(seg?.departureDateTime)}</p>
+        </div>
+      </div>
+
+      {/* Connector */}
+      <RouteConnector duration={formatDuration(seg?.durationMinutes)} />
+
+      {/* Destination */}
+      <div className="text-right space-y-1">
+        {isFirst && (
+          <p className="text-[11px] text-white/40 font-bold uppercase tracking-widest">To</p>
+        )}
+        <p className="text-[40px] font-black tracking-tighter leading-none">
+          {seg?.destination?.city}
+        </p>
+        <p className="text-sm text-white/70 font-medium">{seg?.destination?.airportCode}</p>
+        {seg?.destination?.terminal && (
+          <p className="text-[10px] text-white/30">Terminal {seg.destination.terminal}</p>
+        )}
+        <div className="flex items-baseline gap-2 justify-end mt-1">
+          <p className="text-xl font-black">{formatTime(seg?.arrivalDateTime)}</p>
+          <p className="text-xs text-white/40">{formatDate(seg?.arrivalDateTime)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Journey card — ONE card per journeyType, multi-segment aware  */
+/* ─────────────────────────────────────────────────────────────── */
+function JourneyCard({
+  journeyType,
+  segments,
+  pnr,
   paymentSuccessful,
   downloading,
   onDownload,
-  index,
-  total,
-  showDownloadPerSegment,
-  seatSelections,
+  showDownload,
+  fareQuoteResults,
+  bookingResult,
 }) {
-  const pnr =
-    flight.journeyType === "return"
-      ? pnrsByJourney.return
-      : pnrsByJourney.onward;
+  const firstSeg = segments[0];
+  const lastSeg = segments[segments.length - 1];
+  const isDownloading = downloading === journeyType;
 
-  const statusLabel =
-    FLIGHT_STATUS_MAP?.[flight?.FlightStatus || "Confirmed"]?.label ||
-    "Confirmed";
+  // Supplier fare class — try bookingResult FlightItinerary first, then fareQuote segments
+  let supplierFareClass = null;
+  let fareClassColor = null;
 
-  const journeyKey = flight.journeyType || "onward";
-  const isDownloading = downloading === journeyKey;
-  const isMulti = total > 1;
+  if (journeyType === "onward") {
+    const fi = safeGet(bookingResult, "onwardResponse", "Response", "Response", "FlightItinerary");
+    supplierFareClass = fi?.SupplierFareClasses || fi?.FareClassification?.split?.("#")?.[0];
+    fareClassColor = fi?.FareClassification?.split?.("#")?.[1];
+  } else if (journeyType === "return") {
+    const fi = safeGet(bookingResult, "returnResponse", "Response", "Response", "FlightItinerary");
+    supplierFareClass = fi?.SupplierFareClasses || fi?.FareClassification?.split?.("#")?.[0];
+    fareClassColor = fi?.FareClassification?.split?.("#")?.[1];
+  }
 
-  const segmentSeat = seatSelections?.find((s) => s.segmentIndex === index);
+  // Fallback to fareQuote segments
+  if (!supplierFareClass && fareQuoteResults?.length) {
+    const idx = journeyType === "return" ? 1 : 0;
+    const result = fareQuoteResults[idx] || fareQuoteResults[0];
+    supplierFareClass =
+      result?.Segments?.[0]?.[0]?.SupplierFareClass ||
+      result?.FareClassification?.Type;
+    fareClassColor = result?.FareClassification?.Color;
+    if (!supplierFareClass) supplierFareClass = result?.Segments?.[0]?.[0]?.FareClassification?.Type;
+  }
 
-  const theme = airlineThemes?.[flight?.airlineCode] || {
+  const theme = airlineThemes?.[firstSeg?.airlineCode] || {
     primary: "#0A2540",
     secondary: "#0c3352",
   };
+  const gradient = `linear-gradient(140deg, ${theme.primary} 0%, ${theme.secondary} 60%, ${theme.primary} 100%)`;
 
-  const gradient = `linear-gradient(
-  140deg,
-  ${theme.primary} 0%,
-  ${theme.secondary} 60%,
-  ${theme.primary} 100%
-)`;
+  const statusLabel =
+    FLIGHT_STATUS_MAP?.["Confirmed"]?.label || "Confirmed";
+
+  // Ticket info from booking result
+  let ticketNumber = null;
+  let issueDate = null;
+  let validatingAirline = null;
+  let invoiceNo = null;
+  let invoiceAmount = null;
+  let invoiceDate = null;
+
+  const responseKey = journeyType === "return" ? "returnResponse" : "onwardResponse";
+  const fi = safeGet(bookingResult, responseKey, "Response", "Response", "FlightItinerary");
+  if (fi) {
+    ticketNumber = fi.Passenger?.[0]?.Ticket?.TicketNumber;
+    issueDate = fi.Passenger?.[0]?.Ticket?.IssueDate;
+    validatingAirline = fi.ValidatingAirlineCode;
+    invoiceNo = fi.InvoiceNo || fi.Invoice?.[0]?.InvoiceNo;
+    invoiceAmount = fi.InvoiceAmount || fi.Invoice?.[0]?.InvoiceAmount;
+    invoiceDate = fi.InvoiceCreatedOn || fi.Invoice?.[0]?.InvoiceCreatedOn;
+  }
 
   return (
     <div
-      className=" rounded-2xl overflow-hidden shadow-2xl text-white relative"
+      className="rounded-2xl overflow-hidden shadow-2xl text-white relative"
       style={{ background: gradient }}
     >
-      {/* Subtle grid texture overlay */}
+      {/* Grid texture */}
       <div
         className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
@@ -211,100 +359,91 @@ function FlightCard({
       />
 
       <div className="relative p-6 grid gap-0">
-        {/* ── ROW 1: Airline + Status ─────────────────────────── */}
+        {/* ── ROW 1: Airline + Journey label + Status ── */}
         <div className="flex items-center gap-3 pb-5 border-b border-white/10">
-          {/* Logo */}
-          {airlineLogo?.(flight?.airlineCode) ? (
+          {airlineLogo?.(firstSeg?.airlineCode) ? (
             <img
-              src={airlineLogo(flight.airlineCode)}
+              src={airlineLogo(firstSeg.airlineCode)}
               alt=""
               className="w-10 h-10 rounded-xl object-contain bg-white/10 p-1.5 shrink-0"
             />
           ) : (
             <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-sm font-black shrink-0">
-              {flight?.airlineCode}
+              {firstSeg?.airlineCode}
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold truncate">{flight?.airlineName}</p>
+            <p className="text-sm font-bold truncate">{firstSeg?.airlineName}</p>
             <p className="text-[11px] text-white/50 mt-0.5">
-              {flight?.airlineCode}&nbsp;{flight?.flightNumber}
+              {segments.map((s) => `${s.airlineCode} ${s.flightNumber}`).join(" → ")}
             </p>
           </div>
-          <StatusPill status={statusLabel} />
-        </div>
 
-        {/* ── ROW 2: Route — 3-column grid ────────────────────── */}
-        <div className="grid grid-cols-[1fr_160px_1fr] items-center py-6 border-b border-white/10">
-          {/* Origin */}
-          <div className="space-y-1">
-            <p className="text-[11px] text-white/40 font-bold uppercase tracking-widest">
-              From
-            </p>
-            <p className="text-[52px] font-black tracking-tighter leading-none">
-              {flight?.origin?.city}
-            </p>
-            <p className="text-sm text-white/70 font-medium">
-              {flight?.origin?.airportCode}
-            </p>
-            <div className="flex items-baseline gap-2 mt-2">
-              <p className="text-2xl font-black">
-                {formatTime(flight?.departureDateTime)}
-              </p>
-              <p className="text-xs text-white/40">
-                {formatDate(flight?.departureDateTime)}
-              </p>
-            </div>
-          </div>
-
-          {/* Connector */}
-          <RouteConnector duration={formatDuration(flight?.durationMinutes)} />
-
-          {/* Destination */}
-          <div className="text-right space-y-1">
-            <p className="text-[11px] text-white/40 font-bold uppercase tracking-widest">
-              To
-            </p>
-            <p className="text-[52px] font-black tracking-tighter leading-none">
-              {flight?.destination?.city}
-            </p>
-            <p className="text-sm text-white/70 font-medium">
-              {flight?.destination?.airportCode}
-            </p>
-            <div className="flex items-baseline gap-2 justify-end mt-2">
-              <p className="text-2xl font-black">
-                {formatTime(flight?.arrivalDateTime)}
-              </p>
-              <p className="text-xs text-white/40">
-                {formatDate(flight?.arrivalDateTime)}
-              </p>
-            </div>
+          <div className="flex flex-col items-end gap-2">
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/30 bg-white/10 px-2.5 py-1 rounded-full">
+              {journeyType === "return" ? "↩ Return" : "↗ Onward"}
+            </span>
+            <StatusPill status={statusLabel} />
           </div>
         </div>
 
-        {/* ── ROW 3: Meta chips grid ───────────────────────────── */}
+        {/* ── Supplier Fare Class ── */}
+        {supplierFareClass && (
+          <div className="py-3 border-b border-white/10 flex items-center gap-2">
+            <FareClassBadge label={supplierFareClass} color={fareClassColor} />
+            <span className="text-[10px] text-white/30 font-medium">Fare Class</span>
+          </div>
+        )}
+
+        {/* ── ROW 2: Segments with layovers ── */}
+        <div className="border-b border-white/10">
+          {segments.map((seg, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && <LayoverBanner prevSeg={segments[i - 1]} nextSeg={seg} />}
+              <SegmentRow
+                seg={seg}
+                isFirst={i === 0}
+                isLast={i === segments.length - 1}
+              />
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* ── ROW 3: Baggage + Terminal meta chips ── */}
         <div className="grid grid-cols-3 gap-2.5 py-4 border-b border-white/10">
           <MetaChip
             icon={FiPackage}
             label="Check-in"
-            value={flight?.baggage?.checkIn || "—"}
+            value={firstSeg?.baggage?.checkIn}
           />
           <MetaChip
             icon={FiPackage}
             label="Cabin bag"
-            value={flight?.baggage?.cabin || "—"}
+            value={firstSeg?.baggage?.cabin}
           />
           <MetaChip
             icon={FiMapPin}
             label="Terminal"
-            value={flight?.origin?.terminal || "N/A"}
+            value={firstSeg?.origin?.terminal || "N/A"}
           />
         </div>
 
-        {/* ── ROW 4: PNR + Download ────────────────────────────── */}
+        {/* ── Ticket Details row ── */}
+        {ticketNumber && (
+          <div className="grid grid-cols-3 gap-2.5 py-4 border-b border-white/10">
+            <MetaChip icon={FiFileText} label="Ticket No." value={ticketNumber} />
+            <MetaChip
+              icon={FiCalendar}
+              label="Issue Date"
+              value={issueDate ? formatDate(issueDate) : "—"}
+            />
+            <MetaChip icon={FiTag} label="Validating Airline" value={validatingAirline} />
+          </div>
+        )}
+
+        {/* ── ROW 4: PNR + Download ── */}
         {paymentSuccessful && (
           <div className="pt-4 flex items-center justify-between gap-4">
-            {/* PNR block */}
             <div>
               <p className="text-[9px] uppercase tracking-widest text-white/35 font-bold mb-1">
                 Booking Reference (PNR)
@@ -315,10 +454,7 @@ function FlightCard({
                 </p>
               ) : (
                 <div className="flex items-center gap-2">
-                  <FiRefreshCw
-                    size={13}
-                    className="text-white/40 animate-spin"
-                  />
+                  <FiRefreshCw size={13} className="text-white/40 animate-spin" />
                   <span className="text-sm text-white/40 font-semibold">
                     Awaiting assignment…
                   </span>
@@ -326,54 +462,19 @@ function FlightCard({
               )}
             </div>
 
-            {/* Download button */}
-            {pnr && showDownloadPerSegment && (
+            {pnr && showDownload && (
               <button
-                onClick={() => onDownload(journeyKey)}
+                onClick={() => onDownload(journeyType)}
                 disabled={isDownloading}
-                className="
-                  flex items-center gap-2
-                  px-5 py-2.5
-                  bg-white text-slate-900
-                  hover:bg-slate-100
-                  rounded-xl text-[13px] font-bold
-                  transition-all duration-150
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  cursor-pointer shrink-0 shadow-md
-                "
+                className="flex items-center gap-2 px-5 py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl text-[13px] font-bold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-md"
               >
                 <FiDownload size={14} />
                 {isDownloading ? "Downloading…" : "Download Ticket"}
               </button>
             )}
-
-            {segmentSeat && (
-              <div className="pt-4 border-b border-white/10 pb-4">
-                <div className="flex items-center justify-between bg-white/10 rounded-xl px-4 py-3 border border-white/15">
-                  <div>
-                    <p className="text-[9px] uppercase tracking-widest text-white/40 font-bold mb-1">
-                      Seat Selected
-                    </p>
-                    <p className="text-sm font-semibold text-white">
-                      {segmentSeat.seatNo}
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-[9px] uppercase tracking-widest text-white/40 font-bold mb-1">
-                      Seat Price
-                    </p>
-                    <p className="text-sm font-semibold text-white">
-                      ₹{segmentSeat.price}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Payment not done — no PNR section */}
         {!paymentSuccessful && (
           <div className="pt-4 flex items-center gap-2 text-white/30">
             <FiAlertCircle size={14} />
@@ -387,6 +488,310 @@ function FlightCard({
   );
 }
 
+/* ─────────────────────────────────────────────────────────────── */
+/*  SSR Section per journey                                        */
+/* ─────────────────────────────────────────────────────────────── */
+function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
+  if (!ssrSnapshot) return null;
+
+  const { seats = [], meals = [], baggage = [] } = ssrSnapshot;
+  if (!seats.length && !meals.length && !baggage.length) return null;
+
+  // Group by traveler
+  const travelerMap = {};
+  travellers.forEach((t, idx) => {
+    travelerMap[idx] = `${t.title} ${t.firstName} ${t.lastName}`;
+  });
+
+  const journeyTypes = [...new Set(segments.map((s) => s.journeyType || "onward"))];
+
+  return (
+    <BentoCard className="md:col-span-2">
+      <CardLabel icon={FiStar} label="SSR — Seats, Meals & Extras" />
+      <div className="grid gap-4 md:grid-cols-2">
+        {journeyTypes.map((jt) => {
+          const jtSeats = seats.filter((s) => s.journeyType === jt);
+          const jtMeals = meals.filter((m) => m.journeyType === jt);
+          const jtBaggage = baggage.filter((b) => b.journeyType === jt);
+          const jtSegs = segments.filter((s) => (s.journeyType || "onward") === jt);
+
+          return (
+            <div key={jt} className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-teal-600 mb-3">
+                {jt === "return" ? "↩ Return" : "↗ Onward"}
+              </p>
+
+              {jtSegs.map((seg, si) => {
+                const segSeats = jtSeats.filter((s) => s.segmentIndex === si);
+                const segMeals = jtMeals.filter((m) => m.segmentIndex === si);
+                const segBag = jtBaggage.filter((b) => b.segmentIndex === si);
+
+                return (
+                  <div key={si} className="mb-4 last:mb-0">
+                    <p className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
+                      {seg.origin?.airportCode} → {seg.destination?.airportCode}
+                    </p>
+
+                    {/* Seats */}
+                    {segSeats.map((seat, i) => (
+                      <div
+                        key={i}
+                        className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0"
+                      >
+                        <div>
+                          <p className="text-xs font-semibold text-slate-700">
+                            Seat: {seat.seatNo}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            {travelerMap[seat.travelerIndex] || `Traveller ${seat.travelerIndex + 1}`}
+                          </p>
+                        </div>
+                        {!isEmployee && seat.price > 0 && (
+                          <span className="text-xs font-bold text-slate-600">₹{seat.price}</span>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Meals */}
+                    {segMeals.map((meal, i) => (
+                      <div
+                        key={i}
+                        className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0"
+                      >
+                        <div>
+                          <p className="text-xs font-semibold text-slate-700">
+                            Meal: {meal.code}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            Qty: {meal.description || 1} ·{" "}
+                            {travelerMap[meal.travelerIndex] || `Traveller ${meal.travelerIndex + 1}`}
+                          </p>
+                        </div>
+                        {!isEmployee && meal.price > 0 && (
+                          <span className="text-xs font-bold text-slate-600">₹{meal.price}</span>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Extra baggage */}
+                    {segBag.map((b, i) => (
+                      <div
+                        key={i}
+                        className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0"
+                      >
+                        <div>
+                          <p className="text-xs font-semibold text-slate-700">
+                            Extra Baggage: {b.weight || b.description || "—"}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            {travelerMap[b.travelerIndex] || `Traveller ${b.travelerIndex + 1}`}
+                          </p>
+                        </div>
+                        {!isEmployee && b.price > 0 && (
+                          <span className="text-xs font-bold text-slate-600">₹{b.price}</span>
+                        )}
+                      </div>
+                    ))}
+
+                    {!segSeats.length && !segMeals.length && !segBag.length && (
+                      <p className="text-[11px] text-slate-300 italic">No SSR for this segment</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </BentoCard>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Booking Summary card                                           */
+/* ─────────────────────────────────────────────────────────────── */
+function BookingSummaryCard({ booking, displayPnr }) {
+  return (
+    <div className="">
+      <CardLabel icon={FiFileText} label="Booking Summary" />
+      <div className="grid grid-cols-1 gap-x-8">
+        {/* <div>
+          <InfoRow
+            label="Booking Reference"
+            value={booking.bookingReference}
+            mono
+            accent
+          />
+          <InfoRow
+            label="PNR"
+            value={displayPnr || "—"}
+            mono
+          />
+          <InfoRow
+            label="Booking Status"
+            value={
+              <StatusPill status={booking.requestStatus} />
+            }
+          />
+          <InfoRow
+            label="Execution Status"
+            value={
+              <StatusPill status={booking.executionStatus} />
+            }
+          />
+          <InfoRow
+            label="Booking Date"
+            value={
+              booking.createdAt
+                ? formatDateWithYear(booking.createdAt)
+                : "—"
+            }
+          />
+          {booking.approvedAt && (
+            <InfoRow
+              label="Approved At"
+              value={formatDateWithYear(booking.approvedAt)}
+            />
+          )}
+        </div> */}
+        <div>
+          <InfoRow label="Project Name" value={booking.projectName} />
+          <InfoRow label="Project Code" value={booking.projectCodeId} />
+          <InfoRow label="Project Client" value={booking.projectClient} />
+          {/* <InfoRow label="Purpose of Travel" value={booking.purposeOfTravel} /> */}
+          <InfoRow label="Approver Email" value={booking.approverEmail} />
+          <InfoRow label="Approver Role" value={booking.approverRole} />
+          {booking.approverComments && (
+            <InfoRow label="Approver Comments" value={booking.approverComments} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Invoice Section (role-gated)                                   */
+/* ─────────────────────────────────────────────────────────────── */
+function InvoiceSection({ bookingResult, isEmployee }) {
+  if (isEmployee) return null;
+
+  const invoices = [];
+
+  const onwardFI = safeGet(
+    bookingResult,
+    "onwardResponse",
+    "Response",
+    "Response",
+    "FlightItinerary",
+  );
+  const returnFI = safeGet(
+    bookingResult,
+    "returnResponse",
+    "Response",
+    "Response",
+    "FlightItinerary",
+  );
+
+  if (onwardFI?.InvoiceNo) {
+    invoices.push({
+      label: "Onward",
+      no: onwardFI.InvoiceNo,
+      amount: onwardFI.InvoiceAmount,
+      date: onwardFI.InvoiceCreatedOn,
+      status: onwardFI.InvoiceStatus,
+    });
+  }
+  if (returnFI?.InvoiceNo) {
+    invoices.push({
+      label: "Return",
+      no: returnFI.InvoiceNo,
+      amount: returnFI.InvoiceAmount,
+      date: returnFI.InvoiceCreatedOn,
+      status: returnFI.InvoiceStatus,
+    });
+  }
+
+  if (!invoices.length) return null;
+
+  return (
+    <BentoCard className="md:col-span-2">
+      <CardLabel icon={FiFileText} label="Invoice Details" />
+      <div className="grid gap-3 md:grid-cols-2">
+        {invoices.map((inv, i) => (
+          <div key={i} className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+            <p className="text-xs font-black uppercase tracking-widest text-teal-600 mb-2">
+              {inv.label} Invoice
+            </p>
+            <InfoRow label="Invoice No." value={inv.no} mono />
+            <InfoRow label="Invoice Date" value={inv.date ? formatDate(inv.date) : "—"} />
+            <InfoRow
+              label="Invoice Amount"
+              value={inv.amount != null ? `₹${inv.amount}` : "—"}
+              accent
+            />
+          </div>
+        ))}
+      </div>
+    </BentoCard>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Fare Rules collapsible                                         */
+/* ─────────────────────────────────────────────────────────────── */
+function FareRulesSection({ bookingResult }) {
+  const [open, setOpen] = useState(false);
+
+  const rules = [];
+  const onwardFI = safeGet(bookingResult, "onwardResponse", "Response", "Response", "FlightItinerary");
+  const returnFI = safeGet(bookingResult, "returnResponse", "Response", "Response", "FlightItinerary");
+
+  if (onwardFI?.FareRules?.length) rules.push({ label: "Onward", rules: onwardFI.FareRules });
+  if (returnFI?.FareRules?.length) rules.push({ label: "Return", rules: returnFI.FareRules });
+
+  if (!rules.length) return null;
+
+  return (
+    <BentoCard className="md:col-span-2">
+      <button
+        className="w-full flex items-center justify-between"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <CardLabel icon={FiShield} label="Fare Rules" />
+        {open ? <FiChevronUp size={16} className="text-slate-400" /> : <FiChevronDown size={16} className="text-slate-400" />}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-4">
+          {rules.map((r, i) => (
+            <div key={i}>
+              <p className="text-xs font-black uppercase tracking-widest text-teal-600 mb-2">
+                {r.label}
+              </p>
+              {r.rules.map((rule, j) => (
+                <div key={j} className="mb-3">
+                  <p className="text-xs font-semibold text-slate-600">
+                    {rule.Origin} → {rule.Destination} · {rule.Airline} · {rule.FareBasisCode}
+                  </p>
+                  {rule.FareRuleDetail && (
+                    <div
+                      className="text-xs text-slate-500 mt-1 prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: rule.FareRuleDetail }}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </BentoCard>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Amendment Modals (unchanged from original)                     */
+/* ─────────────────────────────────────────────────────────────── */
 function AmendmentModal({ type, booking, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
@@ -397,25 +802,11 @@ function AmendmentModal({ type, booking, onClose }) {
             {type === "reschedule" && "Reschedule Flight"}
             {type === "modify" && "Modify Traveller"}
           </h2>
-
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
-          >
-            ✕
-          </button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
         </div>
-
-        {/* Dynamic Content */}
-        {type === "cancel" && (
-          <CancelScreen booking={booking} onClose={onClose} />
-        )}
-        {type === "reschedule" && (
-          <RescheduleScreen booking={booking} onClose={onClose} />
-        )}
-        {type === "modify" && (
-          <ModifyTravellerScreen booking={booking} onClose={onClose} />
-        )}
+        {type === "cancel" && <CancelScreen booking={booking} onClose={onClose} />}
+        {type === "reschedule" && <RescheduleScreen booking={booking} onClose={onClose} />}
+        {type === "modify" && <ModifyTravellerScreen booking={booking} onClose={onClose} />}
       </div>
     </div>
   );
@@ -423,113 +814,76 @@ function AmendmentModal({ type, booking, onClose }) {
 
 function CancelScreen({ booking, onClose }) {
   const dispatch = useDispatch();
-
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [charges, setCharges] = useState(null);
 
-  /* 🔥 STEP 1: Fetch cancellation charges */
   useEffect(() => {
     const fetchCharges = async () => {
       const res = await dispatch(fetchCancellationCharges(booking._id));
-
-      if (res.payload) {
-        setCharges(res.payload);
-      }
+      if (res.payload) setCharges(res.payload);
     };
-
     fetchCharges();
   }, [booking._id, dispatch]);
 
-  /* 🔥 STEP 2: Cancel + Poll status */
   const handleCancel = async () => {
     if (!confirm) return;
-
     try {
       setLoading(true);
-
-      // 1️⃣ Send cancel request
       const res = await dispatch(fullCancellation({ bookingId: booking._id }));
-
       const changeRequestId =
         res.payload?.Response?.ChangeRequestId || res.payload?.ChangeRequestId;
-
       if (!changeRequestId) throw new Error("No ChangeRequestId");
-
-      // 2️⃣ POLLING (CRITICAL)
       let status = "requested";
-
-      while (status === "requested" || status === "in_progress") {
+      let attempts = 0;
+      while ((status === "requested" || status === "in_progress") && attempts < 2) {
+        attempts++;
         await new Promise((r) => setTimeout(r, 4000));
-
-        const statusRes = await dispatch(
-          fetchChangeStatus({
-            changeRequestId,
-            bookingId: booking._id,
-          }),
-        );
-
-        const apiStatus = statusRes.payload?.Response?.Status;
-
-        if (apiStatus === 1) status = "completed";
-        else if (apiStatus === 2) status = "in_progress";
-        else status = "failed";
+        const statusRes = await dispatch(fetchChangeStatus({ changeRequestId, bookingId: booking._id }));
+        const apiStatus = statusRes.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus;
+        if (apiStatus === 4) status = "completed";
+        else if ([1, 2, 3].includes(apiStatus)) status = "in_progress";
+        else if (apiStatus === 5) status = "failed";
+        else status = "unknown";
       }
+      if (status === "failed") throw new Error("Cancellation failed by airline/supplier");
+
+      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
 
       if (status !== "completed") {
-        throw new Error("Cancellation failed");
+        Swal.fire({ icon: "info", title: "Cancellation in Progress", text: "Your cancellation request is being processed. Please check status later." });
+        navigate("/my-cancelled-bookings");
+        onClose();
+        return;
       }
-
-      // 3️⃣ Refresh booking
       await dispatch(fetchMyBookingById(booking._id));
-
+      navigate("/my-cancelled-bookings");
       onClose();
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+      dispatch(fetchMyBookingById(booking._id));
     }
   };
 
   return (
     <div className="space-y-5">
-      {/* Charges UI */}
       {charges && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm space-y-2">
           <p className="font-semibold text-amber-800">Cancellation Charges</p>
-
-          <div className="flex justify-between">
-            <span>Airline Charges</span>
-            <span>₹{charges?.AirlineCharge || 0}</span>
-          </div>
-
-          <div className="flex justify-between">
-            <span>Service Fee</span>
-            <span>₹{charges?.ServiceCharge || 0}</span>
-          </div>
+          <div className="flex justify-between"><span>Airline Charges</span><span>₹{charges?.AirlineCharge || 0}</span></div>
+          <div className="flex justify-between"><span>Service Fee</span><span>₹{charges?.ServiceCharge || 0}</span></div>
         </div>
       )}
-
-      {/* Confirmation */}
       <label className="flex items-start gap-2 text-sm text-slate-600">
-        <input
-          type="checkbox"
-          checked={confirm}
-          onChange={(e) => setConfirm(e.target.checked)}
-        />
+        <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} />
         I confirm cancellation
       </label>
-
       <div className="flex justify-end gap-3">
-        <button onClick={onClose} className="px-4 py-2 bg-slate-100 rounded-lg">
-          Close
-        </button>
-
-        <button
-          onClick={handleCancel}
-          disabled={!confirm || loading}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg"
-        >
+        <button onClick={onClose} className="px-4 py-2 bg-slate-100 rounded-lg">Close</button>
+        <button onClick={handleCancel} disabled={!confirm || loading} className="px-4 py-2 bg-red-600 text-white rounded-lg">
           {loading ? "Processing..." : "Cancel Ticket"}
         </button>
       </div>
@@ -540,255 +894,14 @@ function CancelScreen({ booking, onClose }) {
 function RescheduleScreen({ booking, onClose }) {
   const dispatch = useDispatch();
   const [newDate, setNewDate] = useState("");
-
-  const handleReschedule = async () => {
-    await dispatch(
-      rescheduleBookingThunk({
-        bookingId: booking._id,
-        newDate,
-      }),
-    );
-    onClose();
-  };
-
+  const handleReschedule = async () => { onClose(); };
   return (
     <div className="space-y-4">
       <label className="text-sm font-semibold">Select New Date</label>
-
-      <input
-        type="date"
-        value={newDate}
-        onChange={(e) => setNewDate(e.target.value)}
-        className="w-full border border-slate-200 rounded-lg px-3 py-2"
-      />
-
+      <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2" />
       <div className="flex justify-end gap-3">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-semibold bg-slate-100 rounded-lg"
-        >
-          Close
-        </button>
-
-        <button
-          onClick={handleReschedule}
-          className="px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-lg"
-        >
-          Confirm Reschedule
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PartialCancelModal({ booking, onClose }) {
-  const dispatch = useDispatch();
-  const [selectedJourney, setSelectedJourney] = useState(null);
-  const [remarks, setRemarks] = useState("User requested partial cancellation");
-  const [loading, setLoading] = useState(false);
-
-  const segments = booking?.flightRequest?.segments || [];
-
-  const journeyTypeOf = (seg) => {
-    const jt =
-      (seg?.journeyType ||
-        seg?.segmentType ||
-        seg?.tripIndicator ||
-        seg?.TripIndicator ||
-        "").toString().toLowerCase();
-    if (jt === "return" || jt === "2") return "return";
-    return "onward";
-  };
-
-  const onwardSegments = segments.filter((s) => journeyTypeOf(s) === "onward");
-  const returnSegments = segments.filter((s) => journeyTypeOf(s) === "return");
-
-  const hasReturn = returnSegments.length > 0;
-
-  useEffect(() => {
-    if (!hasReturn) setSelectedJourney("onward");
-  }, [hasReturn]);
-
-  const sectorLabel = (segList) => {
-    if (!segList.length) return "N/A";
-    const first = segList[0];
-    const last = segList[segList.length - 1];
-    const from =
-      first?.origin?.airportCode ||
-      first?.origin?.code ||
-      first?.Origin ||
-      first?.OriginAirportCode ||
-      "-";
-    const to =
-      last?.destination?.airportCode ||
-      last?.destination?.code ||
-      last?.Destination ||
-      last?.DestinationAirportCode ||
-      "-";
-    return `${from} -> ${to}`;
-  };
-
-  const onwardLabel = sectorLabel(onwardSegments);
-  const returnLabel = sectorLabel(returnSegments);
-
-  const onwardPassengers =
-    booking?.bookingResult?.onwardResponse?.raw?.Response?.Response
-      ?.FlightItinerary?.Passenger || [];
-  const returnPassengers =
-    booking?.bookingResult?.returnResponse?.raw?.Response?.Response
-      ?.FlightItinerary?.Passenger || [];
-
-  const passengerSource =
-    selectedJourney === "return" ? returnPassengers : onwardPassengers;
-  const passengerIds = passengerSource
-    .map((p) => p?.Ticket?.TicketId || p?.TicketId || p?.PaxId)
-    .filter(Boolean);
-
-  const onwardBookingId =
-    booking?.bookingResult?.onwardResponse?.raw?.Response?.Response
-      ?.FlightItinerary?.BookingId;
-  const returnBookingId =
-    booking?.bookingResult?.returnResponse?.raw?.Response?.Response
-      ?.FlightItinerary?.BookingId;
-  const tboBookingId =
-    selectedJourney === "return"
-      ? returnBookingId || onwardBookingId || booking?.bookingResult?.bookingId
-      : onwardBookingId || returnBookingId || booking?.bookingResult?.bookingId;
-
-  const buildSectors = () => {
-    const pick =
-      selectedJourney === "return" ? returnSegments : onwardSegments;
-    return pick.map((seg) => ({
-      Origin:
-        seg?.origin?.airportCode ||
-        seg?.Origin ||
-        seg?.origin?.code ||
-        seg?.originCode,
-      Destination:
-        seg?.destination?.airportCode ||
-        seg?.Destination ||
-        seg?.destination?.code ||
-        seg?.destinationCode,
-    }));
-  };
-
-  const handleSubmit = async () => {
-    if (!selectedJourney) return;
-    if (!passengerIds.length) {
-      Swal.fire({
-        icon: "error",
-        title: "Passenger data missing",
-        text: "We could not find ticketed passengers for this booking.",
-      });
-      return;
-    }
-    const sectors = buildSectors().filter(
-      (s) => s.Origin && s.Destination,
-    );
-    if (!sectors.length) return;
-    const payload = {
-      bookingId: tboBookingId || booking?._id,
-      passengerIds,
-      segments: sectors,
-      remarks,
-    };
-    try {
-      setLoading(true);
-      const res = await dispatch(partialCancellation(payload));
-      if (res.error) throw new Error(res.payload || "Partial cancellation failed");
-      await dispatch(fetchMyBookingById(booking._id));
-      Swal.fire({
-        icon: "success",
-        title: "Cancellation request submitted successfully",
-        timer: 2000,
-        showConfirmButton: false,
-      });
-      onClose();
-    } catch (err) {
-      Swal.fire({
-        icon: "error",
-        title: "Failed to submit cancellation",
-        text: err.message,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const disableSubmit = !selectedJourney || loading;
-
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl w-full max-w-xl p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-extrabold">Partial Cancellation</h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <p className="text-xs font-bold uppercase text-slate-400 mb-2">
-              Select Route
-            </p>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="route"
-                  disabled={!onwardSegments.length}
-                  checked={selectedJourney === "onward"}
-                  onChange={() => setSelectedJourney("onward")}
-                />
-                <span>Onward ({onwardLabel})</span>
-              </label>
-              {hasReturn && (
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="route"
-                    checked={selectedJourney === "return"}
-                    onChange={() => setSelectedJourney("return")}
-                  />
-                  <span>Return ({returnLabel})</span>
-                </label>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs font-bold uppercase text-slate-400 mb-2">
-              Remarks (optional)
-            </p>
-            <textarea
-              className="w-full border border-slate-200 rounded-lg p-2 text-sm"
-              rows={3}
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100"
-              disabled={loading}
-            >
-              Close
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={disableSubmit}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
-            >
-              {loading ? "Submitting..." : "Submit Cancellation"}
-            </button>
-          </div>
-        </div>
+        <button onClick={onClose} className="px-4 py-2 text-sm font-semibold bg-slate-100 rounded-lg">Close</button>
+        <button onClick={handleReschedule} className="px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-lg">Confirm Reschedule</button>
       </div>
     </div>
   );
@@ -797,43 +910,103 @@ function PartialCancelModal({ booking, onClose }) {
 function ModifyTravellerScreen({ booking, onClose }) {
   const dispatch = useDispatch();
   const traveller = booking.travellers?.[0];
-
   const [phone, setPhone] = useState(traveller?.phoneWithCode || "");
-
-  const handleUpdate = async () => {
-    await dispatch(
-      updateTravellerThunk({
-        bookingId: booking._id,
-        phone,
-      }),
-    );
-    onClose();
-  };
-
   return (
     <div className="space-y-4">
       <label className="text-sm font-semibold">Update Phone</label>
-
-      <input
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-        className="w-full border border-slate-200 rounded-lg px-3 py-2"
-      />
-
+      <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2" />
       <div className="flex justify-end gap-3">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-semibold bg-slate-100 rounded-lg"
-        >
-          Close
-        </button>
+        <button onClick={onClose} className="px-4 py-2 text-sm font-semibold bg-slate-100 rounded-lg">Close</button>
+        <button className="px-4 py-2 text-sm font-bold bg-indigo-600 text-white rounded-lg">Save Changes</button>
+      </div>
+    </div>
+  );
+}
 
-        <button
-          onClick={handleUpdate}
-          className="px-4 py-2 text-sm font-bold bg-indigo-600 text-white rounded-lg"
-        >
-          Save Changes
-        </button>
+function PartialCancelModal({ booking, onClose }) {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const [selectedJourney, setSelectedJourney] = useState(null);
+  const [remarks, setRemarks] = useState("User requested partial cancellation");
+  const [loading, setLoading] = useState(false);
+
+  const segments = booking?.flightRequest?.segments || [];
+  const journeyTypeOf = (seg) => {
+    const jt = (seg?.journeyType || "").toString().toLowerCase();
+    return jt === "return" ? "return" : "onward";
+  };
+  const onwardSegments = segments.filter((s) => journeyTypeOf(s) === "onward");
+  const returnSegments = segments.filter((s) => journeyTypeOf(s) === "return");
+  const hasReturn = returnSegments.length > 0;
+
+  useEffect(() => { if (!hasReturn) setSelectedJourney("onward"); }, [hasReturn]);
+
+  const sectorLabel = (segList) => {
+    if (!segList.length) return "N/A";
+    const first = segList[0];
+    const last = segList[segList.length - 1];
+    return `${first?.origin?.airportCode || "-"} → ${last?.destination?.airportCode || "-"}`;
+  };
+
+  const buildSectors = () => {
+    const pick = selectedJourney === "return" ? returnSegments : onwardSegments;
+    return pick.map((seg) => ({ Origin: seg?.origin?.airportCode, Destination: seg?.destination?.airportCode }));
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedJourney) return;
+    const sectors = buildSectors().filter((s) => s.Origin && s.Destination);
+    if (!sectors.length) return;
+    try {
+      setLoading(true);
+      const res = await dispatch(partialCancellation({ bookingId: booking._id, segments: sectors, remarks }));
+      if (res.error) throw new Error(res.payload || "Partial cancellation failed");
+      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
+      await dispatch(fetchMyBookingById(booking._id));
+      Swal.fire({ icon: "success", title: "Cancellation request submitted successfully", timer: 2000, showConfirmButton: false });
+      navigate("/my-cancelled-bookings");
+      onClose();
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "Failed to submit cancellation", text: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl w-full max-w-xl p-6 shadow-2xl">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-lg font-extrabold">Partial Cancellation</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-bold uppercase text-slate-400 mb-2">Select Route</p>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="radio" name="route" disabled={!onwardSegments.length} checked={selectedJourney === "onward"} onChange={() => setSelectedJourney("onward")} />
+                <span>Onward ({sectorLabel(onwardSegments)})</span>
+              </label>
+              {hasReturn && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="radio" name="route" checked={selectedJourney === "return"} onChange={() => setSelectedJourney("return")} />
+                  <span>Return ({sectorLabel(returnSegments)})</span>
+                </label>
+              )}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase text-slate-400 mb-2">Remarks (optional)</p>
+            <textarea className="w-full border border-slate-200 rounded-lg p-2 text-sm" rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100" disabled={loading}>Close</button>
+            <button onClick={handleSubmit} disabled={!selectedJourney || loading} className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50">
+              {loading ? "Submitting..." : "Submit Cancellation"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -848,39 +1021,107 @@ export default function BookingDetails() {
   const dispatch = useDispatch();
   const { selected: booking, loading } = useSelector((s) => s.bookings);
 
-  // ── Pull the logged-in user's role from your auth slice ──────
-  // Adjust the selector path to match your actual Redux store shape.
-  // Common patterns:
-  //   s.auth.user.role
-  //   s.user.role
-  //   s.auth.role
   const userRole = useSelector((s) => s.auth?.user?.role);
-  const isEmployee = userRole === "employee";
-  // ─────────────────────────────────────────────────────────────
+  const sessionRole = sessionStorage.getItem("userRole") || sessionStorage.getItem("role");
+  const isEmployee = userRole === "employee" || sessionRole === "employee";
 
   const [downloading, setDownloading] = useState(null);
   const [amendmentType, setAmendmentType] = useState(null);
   const [showPartialCancel, setShowPartialCancel] = useState(false);
-  // values: "cancel" | "reschedule" | "modify" | null
 
-  const isCancelled = booking?.executionStatus === "cancelled";
+  const cancelRequested = sessionStorage.getItem(`cancelRequested_${booking?._id}`) === "true";
+  const isCancelled = booking?.executionStatus === "cancelled" || (isEmployee && cancelRequested);
 
   useEffect(() => {
     if (id) dispatch(fetchMyBookingById(id));
   }, [id, dispatch]);
 
   useEffect(() => {
-    if (
-      !booking?._id ||
-      !["ticket_pending", "on_hold"].includes(booking.executionStatus)
-    )
-      return;
-    const iv = setInterval(
-      () => dispatch(fetchMyBookingById(booking._id)),
-      15000,
-    );
+    if (!booking?._id || !["ticket_pending", "on_hold"].includes(booking.executionStatus)) return;
+    const iv = setInterval(() => dispatch(fetchMyBookingById(booking._id)), 15000);
     return () => clearInterval(iv);
   }, [booking?._id, booking?.executionStatus, dispatch]);
+
+  /* ── Loading ── */
+  if (loading || !booking) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
+        <div className="w-11 h-11 rounded-full border-[3px] border-slate-200 border-t-teal-500 animate-spin" />
+        <p className="text-sm text-slate-400 font-medium">Loading booking details…</p>
+      </div>
+    );
+  }
+
+  /* ── Data ── */
+  const allSegments = booking.flightRequest?.segments || [];
+  const travellers = booking.travellers || [];
+  const pricingSnap = booking.pricingSnapshot;
+  const fareSnapshot = booking.flightRequest?.fareSnapshot;
+  const ssrSnapshot = booking.flightRequest?.ssrSnapshot;
+  const fareQuoteResults = booking.flightRequest?.fareQuote?.Results || [];
+  const bookingResult = booking.bookingResult;
+
+  // Group segments by journeyType
+  const journeyMap = {};
+  allSegments.forEach((seg) => {
+    const jt = seg.journeyType || "onward";
+    if (!journeyMap[jt]) journeyMap[jt] = [];
+    journeyMap[jt].push(seg);
+  });
+  const journeyTypes = Object.keys(journeyMap); // e.g. ["onward", "return"]
+  const isRoundTrip = journeyTypes.includes("return");
+  const isOneWay = !isRoundTrip;
+
+  const isInternationalRT =
+    allSegments.length > 1 &&
+    allSegments.some((f) => f.origin?.country !== "IN" || f.destination?.country !== "IN") &&
+    allSegments.some((f) => f.journeyType === "return");
+
+  const pnrsByJourney = isInternationalRT
+    ? { onward: booking.bookingResult?.pnr || null, return: booking.bookingResult?.pnr || null }
+    : {
+        onward: booking.bookingResult?.onwardPNR || booking.bookingResult?.pnr || null,
+        return: booking.bookingResult?.returnPNR || null,
+      };
+
+  const displayPnr =
+    booking.bookingResult?.pnr ||
+    (pnrsByJourney.onward && pnrsByJourney.return
+      ? `${pnrsByJourney.onward} / ${pnrsByJourney.return}`
+      : pnrsByJourney.onward || null);
+
+  const paymentSuccessful = booking.payment?.status === "completed";
+  const executionStatus = isCancelled ? "cancelled" : booking.executionStatus;
+
+  const handleDownloadTicket = async (journeyType) => {
+    if (!pnrsByJourney[journeyType]) return;
+    setDownloading(journeyType);
+    await dispatch(downloadTicketPdf({ bookingId: booking._id, journeyType }));
+    setDownloading(null);
+  };
+
+  const departureTime = allSegments?.[0]?.departureDateTime;
+  const isTravelPassed = departureTime && new Date() > new Date(departureTime);
+
+  // Fare computation
+  const seatSelections = ssrSnapshot?.seats || [];
+  const mealSelections = ssrSnapshot?.meals || [];
+  const totalSeatPrice = seatSelections.reduce((sum, s) => sum + (s?.price || 0), 0);
+  const totalMealPrice = mealSelections.reduce((sum, m) => sum + (m?.price || 0), 0);
+
+  let baseFare = 0;
+  let tax = 0;
+  let refundable = false;
+
+  if (isRoundTrip && fareSnapshot) {
+    baseFare = (fareSnapshot.onwardFare?.BaseFare || 0) + (fareSnapshot.returnFare?.BaseFare || 0);
+    tax = (fareSnapshot.onwardFare?.Tax || 0) + (fareSnapshot.returnFare?.Tax || 0);
+    refundable = fareSnapshot.onwardFare?.IsRefundable || fareSnapshot.returnFare?.IsRefundable;
+  } else if (fareSnapshot) {
+    baseFare = fareSnapshot?.baseFare || 0;
+    tax = fareSnapshot?.tax || 0;
+    refundable = fareSnapshot?.refundable || false;
+  }
 
   const handleCancelBooking = async () => {
     const result = await Swal.fire({
@@ -892,263 +1133,92 @@ export default function BookingDetails() {
       cancelButtonColor: "#64748b",
       confirmButtonText: "Yes, cancel it!",
     });
-
     if (!result.isConfirmed) return;
-
     try {
-      Swal.fire({
-        title: "Cancelling...",
-        text: "Please wait while we process your request",
-        allowOutsideClick: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
-      });
-
+      Swal.fire({ title: "Cancelling...", text: "Please wait", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
       const res = await dispatch(fullCancellation({ bookingId: booking._id }));
-
-      console.log("Full Cancel Response:", res);
-
-      const changeRequestId =
-        res.payload?.data?.Response?.TicketCRInfo?.[0]?.ChangeRequestId;
-
+      const changeRequestId = res.payload?.data?.Response?.TicketCRInfo?.[0]?.ChangeRequestId;
       let status = "requested";
       let attempts = 0;
-      const maxAttempts = 12;
-
-      while (
-        (status === "requested" || status === "in_progress") &&
-        attempts < maxAttempts
-      ) {
+      while ((status === "requested" || status === "in_progress") && attempts < 2) {
         await new Promise((r) => setTimeout(r, 4000));
         attempts++;
-
-        const statusRes = await dispatch(
-          fetchChangeStatus({
-            changeRequestId,
-            bookingId: booking._id,
-          }),
-        );
-
-        const apiStatus =
-          statusRes.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus;
-
-        console.log("📊 API STATUS:", apiStatus);
-
-        if (apiStatus === 4) {
-          status = "completed";
-        } else if ([1, 2, 3].includes(apiStatus)) {
-          status = "in_progress";
-        } else if (apiStatus === 5) {
-          status = "failed";
-        } else {
-          console.warn("⚠️ Unknown status, retrying...");
-          continue;
-        }
+        const statusRes = await dispatch(fetchChangeStatus({ changeRequestId, bookingId: booking._id }));
+        const apiStatus = statusRes.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus;
+        if (apiStatus === 4) status = "completed";
+        else if ([1, 2, 3].includes(apiStatus)) status = "in_progress";
+        else if (apiStatus === 5) status = "failed";
       }
+      if (status === "failed") throw new Error("Cancellation failed by airline");
+      
+      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
 
       if (status !== "completed") {
-        throw new Error("Cancellation failed");
+        Swal.fire({ icon: "info", title: "Cancellation in Progress", text: "Your request is still being processed. Please check later." });
+        return;
       }
-
-      Swal.close();
-
-      Swal.fire({
-        icon: "success",
-        title: "Cancelled!",
-        text: "Your booking has been cancelled successfully.",
-        confirmButtonText: "Go to Cancelled Bookings",
-      });
+      Swal.fire({ icon: "success", title: "Cancelled!", text: "Your booking has been cancelled successfully.", confirmButtonText: "Go to Cancelled Bookings" });
       navigate("/my-cancelled-bookings");
     } catch (err) {
-      console.error(err);
-
-      Swal.fire({
-        icon: "error",
-        title: "Failed!",
-        text: "Cancellation failed. Please try again.",
-      });
+      const supplierMsg = err?.response?.data?.Response?.SupplierErrorMsg || err?.response?.data?.Response?.Error?.ErrorMessage || err.message;
+      Swal.fire({ icon: "error", title: "Cancellation Failed", text: supplierMsg || "Something went wrong" });
     }
   };
 
-  /* ── Loading ── */
-  if (loading || !booking) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
-        <div className="w-11 h-11 rounded-full border-[3px] border-slate-200 border-t-teal-500 animate-spin" />
-        <p className="text-sm text-slate-400 font-medium">
-          Loading booking details…
-        </p>
-      </div>
-    );
-  }
-
-  /* ── Data ── */
-  const flights = booking.flightRequest?.segments || [];
-  const travellers = booking.travellers || [];
-  const fare = booking.pricingSnapshot;
-
-  const isInternationalRT =
-  flights.length > 1 &&
-  flights.some(
-    (f) =>
-      f.origin?.country !== "IN" || f.destination?.country !== "IN"
-  ) &&
-  flights.some((f) => f.journeyType === "return");
-
-  // const pnrsByJourney = {
-  //   onward:
-  //     booking.bookingResult?.onwardPNR || booking.bookingResult?.pnr || null,
-  //   return: booking.bookingResult?.returnPNR || null,
-  // };
-
-  const pnrsByJourney = isInternationalRT
-  ? {
-      onward: booking.bookingResult?.pnr || null,
-      return: booking.bookingResult?.pnr || null, // SAME PNR
-    }
-  : {
-      onward:
-        booking.bookingResult?.onwardPNR ||
-        booking.bookingResult?.pnr ||
-        null,
-      return: booking.bookingResult?.returnPNR || null,
-    };
-
-  const displayPnr =
-    booking.bookingResult?.pnr ||
-    (pnrsByJourney.onward && pnrsByJourney.return
-      ? `${pnrsByJourney.onward} / ${pnrsByJourney.return}`
-      : pnrsByJourney.onward || null);
-
-  const paymentSuccessful = booking.payment?.status === "completed";
-  const executionStatus = booking.executionStatus;
-
-  const handleDownloadTicket = async (journeyType) => {
-    if (!pnrsByJourney[journeyType]) return;
-    setDownloading(journeyType);
-    await dispatch(downloadTicketPdf({ bookingId: booking._id, journeyType }));
-    setDownloading(null);
-  };
-
-  const fareSnapshot = booking.flightRequest?.fareSnapshot;
-  const departureTime = booking?.flightRequest?.segments?.[0]?.departureDateTime;
-  const isTravelPassed = departureTime && new Date() > new Date(departureTime);
-
-  const allRules = fareSnapshot?.miniFareRules?.flat() || [];
-  const cancellationPolicies = allRules.filter((r) => r.Type === "Cancellation");
-  const reissuePolicies = allRules.filter((r) => r.Type === "Reissue");
-  const getAmount = (str) => Number(str?.replace(/\D/g, "") || 0);
-
-  const minCancelFee = Math.min(
-    ...cancellationPolicies.map((r) => getAmount(r.Details)),
-  );
-  const minReissueFee = Math.min(
-    ...reissuePolicies.map((r) => getAmount(r.Details)),
-  );
-
-  const getPolicyDisplay = (rule) => {
-    const dep = new Date(departureTime);
-    const fromHours = Number(rule.From || 0);
-    const toHours = rule.To ? Number(rule.To) : null;
-    const fromDate = new Date(dep - fromHours * 3600000);
-    const toDate = toHours ? new Date(dep - toHours * 3600000) : null;
-
-    if (!toDate) {
-      return {
-        label: `More than ${fromHours} hrs before departure`,
-        range: `Before ${formatDate(fromDate)} ${formatTime(fromDate)}`,
-      };
-    }
-
-    return {
-      label: `Within ${toHours} hrs of departure`,
-      range: `${formatDate(toDate)} → ${formatDate(fromDate)}`,
-    };
-  };
-
-  const seatSelections = booking.flightRequest?.ssrSnapshot?.seats || [];
-  const mealSelections = booking.flightRequest?.ssrSnapshot?.meals || [];
-
-  const totalSeatPrice = seatSelections.reduce(
-    (sum, seat) => sum + (seat?.price || 0),
-    0,
-  );
-  const totalMealPrice = mealSelections.reduce(
-    (sum, meal) => sum + (meal?.price || 0),
-    0,
-  );
-
-  const journeyTypes = [
-    ...new Set(flights.map((f) => f.journeyType || "onward")),
-  ];
-  const isRoundTrip =
-    journeyTypes.includes("onward") && journeyTypes.includes("return");
-  const isOneWay = !isRoundTrip;
-
-  let baseFare = 0;
-  let tax = 0;
-  let refundable = false;
-
-  if (isRoundTrip) {
-    baseFare =
-      (fareSnapshot.onwardFare?.BaseFare || 0) +
-      (fareSnapshot.returnFare?.BaseFare || 0);
-    tax =
-      (fareSnapshot.onwardFare?.Tax || 0) +
-      (fareSnapshot.returnFare?.Tax || 0);
-    refundable =
-      fareSnapshot.onwardFare?.IsRefundable ||
-      fareSnapshot.returnFare?.IsRefundable;
-  } else {
-    baseFare = fareSnapshot?.baseFare || 0;
-    tax = fareSnapshot?.tax || 0;
-    refundable = fareSnapshot?.refundable || false;
-  }
-
+  /* ── Render ── */
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
-      {/* ── Bento grid ── */}
-      <main className="max-w-7xl mx-auto px-5 py-8 pb-24 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Flight segment cards — each full width */}
-        {flights.map((flight, index) => {
-          const isLast = index === flights.length - 1;
-          const isOdd = flights.length % 2 !== 0;
-          const shouldSpanFull = flights.length === 1 || (isOdd && isLast);
+      {/* ── Header bar ── */}
+      <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-slate-200/80">
+        <div className="max-w-7xl mx-auto px-5 h-14 flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800 transition"
+          >
+            <FiArrowLeft size={16} />
+            Back
+          </button>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono text-slate-400">{booking.bookingReference}</span>
+            <StatusPill status={executionStatus} />
+          </div>
+        </div>
+      </div>
 
+      <main className="max-w-7xl mx-auto px-5 py-8 pb-24 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+       
+
+        {/* ── 1. Journey Cards — ONE card per journeyType ── */}
+        {journeyTypes.map((jt, jIdx) => {
+          const segs = journeyMap[jt] || [];
+          const isOdd = journeyTypes.length % 2 !== 0;
+          const isLast = jIdx === journeyTypes.length - 1;
+          const spanFull = journeyTypes.length === 1 || (isOdd && isLast);
           return (
-            <div key={index} className={shouldSpanFull ? "md:col-span-2" : ""}>
-              <FlightCard
-                flight={flight}
-                index={index}
-                total={flights.length}
-                pnrsByJourney={pnrsByJourney}
+            <div key={jt} className={spanFull ? "md:col-span-2" : ""}>
+              <JourneyCard
+                journeyType={jt}
+                segments={segs}
+                pnr={pnrsByJourney[jt]}
                 paymentSuccessful={paymentSuccessful}
                 downloading={downloading}
                 onDownload={handleDownloadTicket}
-                showDownloadPerSegment={isRoundTrip}
-                seatSelections={seatSelections}
+                showDownload={isRoundTrip}
+                fareQuoteResults={fareQuoteResults}
+                bookingResult={bookingResult}
               />
             </div>
           );
         })}
 
-        {/* Global Download Button (One-Way Only) */}
+        {/* ── Global Download (One-Way) ── */}
         {isOneWay && paymentSuccessful && pnrsByJourney.onward && (
           <div className="md:col-span-2 flex justify-end">
             <button
               onClick={() => handleDownloadTicket("onward")}
               disabled={downloading === "onward"}
-              className="
-                flex items-center gap-2
-                px-6 py-3
-                bg-teal-600 text-white
-                hover:bg-teal-700
-                rounded-xl text-sm font-bold
-                transition-all duration-150
-                disabled:opacity-50 disabled:cursor-not-allowed
-                shadow-lg
-              "
+              className="flex items-center gap-2 px-6 py-3 bg-teal-600 text-white hover:bg-teal-700 rounded-xl text-sm font-bold transition-all duration-150 disabled:opacity-50 shadow-lg"
             >
               <FiDownload size={15} />
               {downloading === "onward" ? "Downloading…" : "Download Ticket"}
@@ -1156,184 +1226,187 @@ export default function BookingDetails() {
           </div>
         )}
 
-        {/* ── Travellers ── */}
-        <BentoCard className="md:col-span-2">
-          <CardLabel icon={FiUser} label="Travellers" />
+         <div className="md:col-span-2">
+  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+  
+  {/* ── 2. Passenger Details ── */}
+  <div className="lg:col-span-2">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+      <CardLabel icon={FiUser} label="Passenger Details" />
 
-          {travellers.length === 0 ? (
-            <p className="text-sm text-slate-500">No traveller details available.</p>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {travellers.map((trav, idx) => (
-                <div
-                  key={trav._id || idx}
-                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-4"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div>
-                      <p className="text-lg font-extrabold text-slate-900 leading-snug">
-                        {trav.title} {trav.firstName} {trav.lastName}
-                      </p>
-                      {trav.email && (
-                        <p className="text-xs text-slate-400 mt-1">{trav.email}</p>
-                      )}
-                    </div>
-                    <span className="text-[11px] font-black uppercase tracking-widest text-teal-600 bg-teal-50 px-3 py-1 rounded-full">
-                      {formatPaxType(trav.paxType)}
-                    </span>
-                  </div>
-
-                  {trav.phoneWithCode && (
-                    <InfoRow label="Phone" value={trav.phoneWithCode} />
-                  )}
-                  <InfoRow label="Gender" value={trav.gender || "N/A"} />
-                  <InfoRow
-                    label="Date of Birth"
-                    value={trav.dateOfBirth ? formatDateWithYear(trav.dateOfBirth) : "N/A"}
-                  />
-                  <InfoRow label="Nationality" value={trav.nationality || "N/A"} />
-                  {typeof trav.linkedAdultIndex === "number" &&
-                    trav.linkedAdultIndex >= 0 && (
-                      <InfoRow
-                        label="Linked Adult"
-                        value={`Traveller ${trav.linkedAdultIndex + 1}`}
-                      />
-                    )}
-
-                  {trav.isLeadPassenger && (
-                    <div className="mt-3 inline-flex items-center gap-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">
-                      <FiCheckCircle size={12} />
-                      Lead passenger
-                    </div>
+      {travellers.length === 0 ? (
+        <p className="text-sm text-slate-500">
+          No traveller details available.
+        </p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {travellers.map((trav, idx) => (
+            <div
+              key={trav._id || idx}
+              className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-white transition-all p-4 shadow-sm hover:shadow-md"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div>
+                  <p className="text-base font-bold text-slate-900">
+                    {trav.title} {trav.firstName} {trav.lastName}
+                  </p>
+                  {trav.email && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {trav.email}
+                    </p>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
-        </BentoCard>
 
-        {/* ── Fare Summary — hidden for employees ── */}
+                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
+                  {formatPaxType(trav.paxType)}
+                </span>
+              </div>
+
+              {/* Info */}
+              <div className="space-y-1">
+                {trav.phoneWithCode && (
+                  <InfoRow label="Phone" value={trav.phoneWithCode} />
+                )}
+                <InfoRow label="Gender" value={trav.gender} />
+                <InfoRow
+                  label="DOB"
+                  value={
+                    trav.dateOfBirth
+                      ? formatDateWithYear(trav.dateOfBirth)
+                      : "—"
+                  }
+                />
+                <InfoRow label="Nationality" value={trav.nationality} />
+
+                {trav.passportNumber && (
+                  <InfoRow
+                    label="Passport"
+                    value={trav.passportNumber}
+                    mono
+                  />
+                )}
+                {trav.passportExpiry && (
+                  <InfoRow
+                    label="Expiry"
+                    value={formatDateWithYear(trav.passportExpiry)}
+                  />
+                )}
+
+                {typeof trav.linkedAdultIndex === "number" &&
+                  trav.linkedAdultIndex >= 0 && (
+                    <InfoRow
+                      label="Linked Adult"
+                      value={`Traveller ${trav.linkedAdultIndex + 1}`}
+                    />
+                  )}
+              </div>
+
+              {/* Footer */}
+              {trav.isLeadPassenger && (
+                <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full w-fit">
+                  <FiCheckCircle size={12} />
+                  Lead passenger
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+
+  {/* ── 3. Booking Summary ── */}
+  <div className="lg:col-span-1">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sticky top-20">
+      <BookingSummaryCard booking={booking} displayPnr={displayPnr} />
+    </div>
+  </div>
+
+</div>
+</div>
+
+        {/* ── 4. SSR Details ── */}
+        <SSRSection
+          ssrSnapshot={ssrSnapshot}
+          travellers={travellers}
+          segments={allSegments}
+          isEmployee={isEmployee}
+        />
+
+        {/* ── 5. Fare Summary (role-gated) ── */}
         {!isEmployee && (
           <BentoCard>
             <CardLabel icon={FiCreditCard} label="Fare Summary" />
-
             <InfoRow label="Base Fare" value={`₹${baseFare}`} />
             <InfoRow label="Tax" value={`₹${tax}`} />
-
-            {totalSeatPrice > 0 && (
-              <InfoRow label="Seat Charges" value={`₹${totalSeatPrice}`} />
-            )}
-
-            {totalMealPrice > 0 && (
-              <InfoRow label="Meal Charges" value={`₹${totalMealPrice}`} />
-            )}
-
-            {isRoundTrip && (
+            {totalSeatPrice > 0 && <InfoRow label="Seat Charges" value={`₹${totalSeatPrice}`} />}
+            {totalMealPrice > 0 && <InfoRow label="Meal Charges" value={`₹${totalMealPrice}`} />}
+            {isRoundTrip && fareSnapshot && (
               <div className="mt-4 space-y-2 text-xs text-slate-500">
                 <p className="font-semibold text-slate-700">Fare Breakdown</p>
-                <div className="flex justify-between">
-                  <span>Onward (Base Fare + Tax)</span>
-                  <span>
-                    ₹{Math.ceil(fareSnapshot.onwardFare.PublishedFare)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Return (Base Fare + Tax)</span>
-                  <span>
-                    ₹{Math.ceil(fareSnapshot.returnFare.PublishedFare)}
-                  </span>
-                </div>
+                {fareSnapshot.onwardFare && (
+                  <div className="flex justify-between">
+                    <span>Onward (Base + Tax)</span>
+                    <span>₹{Math.ceil(fareSnapshot.onwardFare.PublishedFare)}</span>
+                  </div>
+                )}
+                {fareSnapshot.returnFare && (
+                  <div className="flex justify-between">
+                    <span>Return (Base + Tax)</span>
+                    <span>₹{Math.ceil(fareSnapshot.returnFare.PublishedFare)}</span>
+                  </div>
+                )}
               </div>
             )}
-
-            <InfoRow label="Currency" value={fare?.currency} />
-            <InfoRow
-              label="Refundable"
-              value={refundable ? "Yes" : "No"}
-              accent={refundable}
-            />
-
-            <div className="mt-4 bg-linear-to-r from-cyan-50 to-teal-50 rounded-xl px-4 py-4 flex justify-between items-center border border-teal-100">
-              <span className="text-sm text-teal-700 font-semibold">
-                Total Paid Amount
-              </span>
-              <span className="text-2xl font-black text-slate-900">
-                ₹{fare?.totalAmount}
-              </span>
-            </div>
+            <InfoRow label="Currency" value={pricingSnap?.currency || "INR"} />
+            <InfoRow label="Refundable" value={refundable ? "Yes" : "No"} accent={refundable} />
+            {pricingSnap?.totalAmount != null && (
+              <div className="mt-4 bg-gradient-to-r from-cyan-50 to-teal-50 rounded-xl px-4 py-4 flex justify-between items-center border border-teal-100">
+                <span className="text-sm text-teal-700 font-semibold">Total Paid Amount</span>
+                <span className="text-2xl font-black text-slate-900">₹{pricingSnap.totalAmount}</span>
+              </div>
+            )}
           </BentoCard>
         )}
 
-        {/* ── Payment & Status — full width ── */}
+        {/* ── 6. Invoice Details (role-gated) ── */}
+        <InvoiceSection bookingResult={bookingResult} isEmployee={isEmployee} />
+
+        {/* ── 7. Payment & Booking Status ── */}
         <BentoCard className="md:col-span-2">
           <CardLabel icon={FiCreditCard} label="Payment & Booking Status" />
           <div className="grid grid-cols-3 gap-3">
-            {/* Payment tile */}
-            <div
-              className={`rounded-xl p-4 flex flex-col gap-1.5 border ${
-                paymentSuccessful
-                  ? "bg-emerald-50 border-emerald-100"
-                  : "bg-amber-50 border-amber-100"
-              }`}
-            >
+            {/* Payment */}
+            <div className={`rounded-xl p-4 flex flex-col gap-1.5 border ${paymentSuccessful ? "bg-emerald-50 border-emerald-100" : "bg-amber-50 border-amber-100"}`}>
               <div className="flex items-center gap-2 mb-1">
-                {paymentSuccessful ? (
-                  <FiCheckCircle size={16} className="text-emerald-500" />
-                ) : (
-                  <FiAlertCircle size={16} className="text-amber-500" />
-                )}
-                <span
-                  className={`text-[10px] font-black uppercase tracking-widest ${paymentSuccessful ? "text-emerald-600" : "text-amber-600"}`}
-                >
-                  Payment
-                </span>
+                {paymentSuccessful ? <FiCheckCircle size={16} className="text-emerald-500" /> : <FiAlertCircle size={16} className="text-amber-500" />}
+                <span className={`text-[10px] font-black uppercase tracking-widest ${paymentSuccessful ? "text-emerald-600" : "text-amber-600"}`}>Payment</span>
               </div>
-              <p
-                className={`text-lg font-black ${paymentSuccessful ? "text-emerald-800" : "text-amber-800"}`}
-              >
+              <p className={`text-lg font-black ${paymentSuccessful ? "text-emerald-800" : "text-amber-800"}`}>
                 {paymentSuccessful ? "Successful" : "Pending"}
               </p>
             </div>
 
-            {/* Ticket tile */}
-            <div
-              className={`rounded-xl p-4 flex flex-col gap-1.5 border ${
-                executionStatus === "ticketed"
-                  ? "bg-emerald-50 border-emerald-100"
-                  : "bg-amber-50 border-amber-100"
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                {executionStatus === "ticketed" ? (
-                  <FiCheckCircle size={16} className="text-emerald-500" />
-                ) : executionStatus === "on_hold" ? (
-                  <FiAlertCircle size={16} className="text-amber-500" />
-                ) : (
-                  <FiRefreshCw
-                    size={16}
-                    className="text-amber-500 animate-spin"
-                  />
-                )}
-                <span
-                  className={`text-[10px] font-black uppercase tracking-widest ${executionStatus === "ticketed" ? "text-emerald-600" : "text-amber-600"}`}
-                >
-                  Ticket Status
-                </span>
-              </div>
-              <p
-                className={`text-lg font-black ${executionStatus === "ticketed" ? "text-emerald-800" : "text-amber-800"}`}
-              >
-                {executionStatus === "ticketed"
-                  ? "Issued"
-                  : executionStatus === "on_hold"
-                    ? "On Hold (Manual Required)"
-                    : "Issuing…"}
-              </p>
-              {executionStatus === "ticket_pending" && (
-                <p className="text-[11px] text-amber-500">
-                  Refreshes every 15s
+            {/* Ticket */}
+              <div className={`rounded-xl p-4 flex flex-col gap-1.5 border ${executionStatus === "ticketed" ? "bg-emerald-50 border-emerald-100" : executionStatus === "cancelled" ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  {executionStatus === "ticketed" ? <FiCheckCircle size={16} className="text-emerald-500" /> : executionStatus === "cancelled" ? <FiAlertCircle size={16} className="text-red-500" /> : executionStatus === "on_hold" ? <FiAlertCircle size={16} className="text-amber-500" /> : <FiRefreshCw size={16} className="text-amber-500 animate-spin" />}
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${executionStatus === "ticketed" ? "text-emerald-600" : executionStatus === "cancelled" ? "text-red-600" : "text-amber-600"}`}>Ticket Status</span>
+                </div>
+                <p className={`text-lg font-black ${executionStatus === "ticketed" ? "text-emerald-800" : executionStatus === "cancelled" ? "text-red-800" : "text-amber-800"}`}>
+                  {executionStatus === "ticketed" ? "Issued" : executionStatus === "cancelled" ? "Cancelled" : executionStatus === "on_hold" ? "On Hold" : "Issuing…"}
                 </p>
-              )}
+                {executionStatus === "ticket_pending" && <p className="text-[11px] text-amber-500">Refreshes every 15s</p>}
+              </div>
+
+            {/* Purpose */}
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2 mb-1">
+                <FiBriefcase size={16} className="text-slate-400" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Purpose</span>
+              </div>
+              <p className="text-lg font-black text-slate-800">{booking.purposeOfTravel || "—"}</p>
             </div>
 
             {["ticket_pending", "on_hold"].includes(executionStatus) && (
@@ -1342,19 +1415,9 @@ export default function BookingDetails() {
                   onClick={async () => {
                     try {
                       await dispatch(manualTicketNonLcc(booking._id));
-                      Swal.fire({
-                        icon: "info",
-                        title: "Retrying Ticket",
-                        text: "We are attempting ticket issuance again...",
-                        timer: 2000,
-                        showConfirmButton: false,
-                      });
-                    } catch (err) {
-                      Swal.fire({
-                        icon: "error",
-                        title: "Retry Failed",
-                        text: "Please try again later",
-                      });
+                      Swal.fire({ icon: "info", title: "Retrying Ticket", text: "We are attempting ticket issuance again...", timer: 2000, showConfirmButton: false });
+                    } catch {
+                      Swal.fire({ icon: "error", title: "Retry Failed", text: "Please try again later" });
                     }
                   }}
                   className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl text-sm font-bold"
@@ -1364,157 +1427,45 @@ export default function BookingDetails() {
                 </button>
               </div>
             )}
-
-            {/* Purpose tile */}
-            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 mb-1">
-                <FiBriefcase size={16} className="text-slate-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  Purpose
-                </span>
-              </div>
-              <p className="text-lg font-black text-slate-800">
-                {booking.purposeOfTravel || "—"}
-              </p>
-            </div>
           </div>
         </BentoCard>
 
-        {/* ── Cancellation Policy ── */}
-        {cancellationPolicies.length > 0 && (
-          <BentoCard className="md:col-span-2">
-            <CardLabel icon={FiAlertCircle} label="Cancellation Policy" />
-            <p className="text-xs text-slate-400 mb-3">
-              Charges vary depending on how close you are to departure.
-            </p>
-            <div className="space-y-3">
-              {cancellationPolicies.map((rule, index) => {
-                const policy = getPolicyDisplay(rule);
-                const amount = getAmount(rule.Details);
-                const isUrgent = Number(rule.From) <= 24;
-                const isCheapest = amount === minCancelFee;
+        {/* ── 8. Fare Rules (collapsible) ── */}
+        <FareRulesSection bookingResult={bookingResult} />
 
-                return (
-                  <div
-                    key={index}
-                    className={`flex justify-between items-center rounded-xl px-4 py-3 border
-                      ${isUrgent ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"}`}
-                  >
-                    <div>
-                      <p className="text-xs text-slate-400 font-medium">
-                        {policy.range}
-                      </p>
-                      <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                        {policy.label}
-                        {isCheapest && (
-                          <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
-                            Cheapest
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-slate-400">Cancellation Fee</p>
-                      <p className="text-sm font-bold text-red-600">
-                        {rule.Details}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
+        {/* ── 9. Amendment Actions ── */}
+        {paymentSuccessful && executionStatus === "ticketed" && !isTravelPassed && (
+          <BentoCard className="md:col-span-2">
+            <CardLabel icon={FiRefreshCw} label="Amendment Actions" />
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => setAmendmentType("reissue")}
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition"
+              >
+                Reissue Flight
+              </button>
+              <button
+                onClick={() => setShowPartialCancel(true)}
+                className="px-5 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition"
+              >
+                Partial Cancel
+              </button>
+              <button
+                onClick={handleCancelBooking}
+                className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition"
+              >
+                Cancel Ticket
+              </button>
             </div>
           </BentoCard>
         )}
-
-        {/* ── Reissue Policy ── */}
-        {reissuePolicies.length > 0 && (
-          <BentoCard className="md:col-span-2">
-            <CardLabel icon={FiRefreshCw} label="Reschedule / Reissue Policy" />
-            <p className="text-xs text-slate-400 mb-3">
-              Charges depend on how early you reschedule.
-            </p>
-            <div className="space-y-3">
-              {reissuePolicies.map((rule, index) => {
-                const policy = getPolicyDisplay(rule);
-                const amount = getAmount(rule.Details);
-                const isUrgent = Number(rule.From) <= 24;
-                const isCheapest = amount === minReissueFee;
-
-                return (
-                  <div
-                    key={index}
-                    className={`flex justify-between items-center rounded-xl px-4 py-3 border
-                      ${isUrgent ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-200"}`}
-                  >
-                    <div>
-                      <p className="text-xs text-slate-400 font-medium">
-                        {policy.range}
-                      </p>
-                      <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                        {policy.label}
-                        {isCheapest && (
-                          <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
-                            Cheapest
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-slate-400">Reissue Fee</p>
-                      <p className="text-sm font-bold text-blue-600">
-                        {rule.Details}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </BentoCard>
-        )}
-
-        {/* ── Amendment Actions ── */}
-        {paymentSuccessful &&
-          executionStatus === "ticketed" &&
-          !isTravelPassed && (
-            <BentoCard className="md:col-span-2">
-              <CardLabel icon={FiRefreshCw} label="Amendment Actions" />
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => setAmendmentType("reissue")}
-                  className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition"
-                >
-                  Reissue Flight
-                </button>
-                <button
-                  onClick={() => setShowPartialCancel(true)}
-                  className="px-5 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition"
-                >
-                  Partial Cancel
-                </button>
-                <button
-                  onClick={handleCancelBooking}
-                  className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition"
-                >
-                  Cancel Ticket
-                </button>
-              </div>
-            </BentoCard>
-          )}
       </main>
 
       {amendmentType && (
-        <AmendmentModal
-          type={amendmentType}
-          booking={booking}
-          onClose={() => setAmendmentType(null)}
-        />
+        <AmendmentModal type={amendmentType} booking={booking} onClose={() => setAmendmentType(null)} />
       )}
-
       {showPartialCancel && (
-        <PartialCancelModal
-          booking={booking}
-          onClose={() => setShowPartialCancel(false)}
-        />
+        <PartialCancelModal booking={booking} onClose={() => setShowPartialCancel(false)} />
       )}
     </div>
   );

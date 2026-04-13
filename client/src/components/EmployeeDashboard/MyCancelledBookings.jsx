@@ -478,6 +478,10 @@ export default function CancelledFlightsPage() {
 
   const dispatch = useDispatch();
 
+  const userRole = useSelector((s) => s.auth?.user?.role);
+  const sessionRole = sessionStorage.getItem("userRole") || sessionStorage.getItem("role");
+  const isEmployee = userRole === "employee" || sessionRole === "employee";
+
   const { list: flightBookings = [] } = useSelector((s) => s.bookings);
 
   const { completed: bookings = [], loading } = useSelector(
@@ -485,9 +489,11 @@ export default function CancelledFlightsPage() {
   );
 
   const cancelledFlights = flightBookings.filter((b) => {
+    const cancelRequested = sessionStorage.getItem(`cancelRequested_${b._id}`) === "true";
     return (
       b.executionStatus === "cancel_requested" ||
-      b.executionStatus === "cancelled"
+      b.executionStatus === "cancelled" ||
+      (isEmployee && cancelRequested)
     );
   });
 
@@ -506,11 +512,13 @@ export default function CancelledFlightsPage() {
       b?.bookingResult?.providerResponse?.raw?.Response?.Response
         ?.FlightItinerary?.Segments?.[0];
 
+    const cancelRequested = sessionStorage.getItem(`cancelRequested_${b._id}`) === "true";
+
     return {
       id: b._id,
 
       liveStatus: b?.amendment?.changeRequestStatus, // numeric from API
-      executionStatus: b.executionStatus,
+      executionStatus: (isEmployee && cancelRequested) ? "cancelled" : b.executionStatus,
       airline:
         segment?.airlineName || segment?.Airline?.AirlineName || "Airline",
 

@@ -56,6 +56,7 @@ export const airportDatabase = [
   {name: "Gaoqi",city: "Xiamen",country: "China",iata_code: "XMN", },
   {name: "Kastrup", city: "Copenhagen", country: "Denmark", iata_code: "CPH",},
   {name: "Chhatrapati Shivaji Intl", city: "Mumbai", country: "India", iata_code: "BOM",},
+  {name: "Navi Mumbai International Airport", city: "Navi Mumbai", country: "India", iata_code: "NMI",},
   {name: "Arlanda",city: "Stockholm",country: "Sweden",iata_code: "ARN",},
   {name: "Lisboa",city: "Lisbon",country: "Portugal",iata_code: "LIS", },
   {name: "Detroit Metro Wayne Co",city: "Detroit",country: "United States",iata_code: "DTW", },

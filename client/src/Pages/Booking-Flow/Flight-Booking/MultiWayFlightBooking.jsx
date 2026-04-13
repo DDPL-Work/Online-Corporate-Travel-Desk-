@@ -508,7 +508,7 @@ export default function MultiCityFlightBooking() {
           segmentIndex: Number(segmentIndex),
           travelerIndex,
           code: meal.Code,
-          description: meal.Description,
+          description: String(meal.Description || meal.Code || ""),
           price: meal.Price,
         });
       });

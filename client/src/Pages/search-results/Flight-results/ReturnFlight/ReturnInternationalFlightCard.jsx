@@ -17,19 +17,18 @@ import {
   getTotalDuration,
 } from "../../../../utils/formatter";
 
-export default function ReturnInternationalFlightCard({ flight, onContinue }) {
+export default function ReturnInternationalFlightCard({ group, onContinue }) {
   const [openSection, setOpenSection] = useState(null);
-  const navigate = useNavigate();
+  const [selectedResultIndex, setSelectedResultIndex] = useState(group.flightInfo.ResultIndex);
+
+  const flight = group.flightOptionsByResultIndex[selectedResultIndex] || group.flightInfo;
 
   const onward = flight?.Segments?.[0] || [];
   const ret = flight?.Segments?.[1] || [];
   if (!onward.length || !ret.length) return null;
 
-  const totalPrice = flight?.Fare?.PublishedFare ?? 0;
-  const discount = flight?.Fare?.Discount ?? 0;
-  const finalPrice = Math.ceil(flight?.Fare?.PublishedFare) ?? totalPrice;
+  const finalPrice = Math.ceil(flight?.Fare?.PublishedFare ?? 0);
   const refundable = flight?.IsRefundable === true;
-
   const travelClass = getCabinClassLabel(flight?.Fare?.CabinClass ?? 2);
 
   const handleToggle = (key) =>
@@ -43,7 +42,6 @@ export default function ReturnInternationalFlightCard({ flight, onContinue }) {
     const flightNumber = firstSeg?.Airline?.FlightNumber;
     const from = firstSeg?.Origin?.Airport?.CityName;
     const to = lastSeg?.Destination?.Airport?.CityName;
-    const depDate = firstSeg?.Origin?.DepTime;
     const flightStatus =
       firstSeg?.FlightStatus || firstSeg?.Status || "Scheduled";
 
@@ -60,17 +58,14 @@ export default function ReturnInternationalFlightCard({ flight, onContinue }) {
               alt={airline}
               className="w-8 h-8 border border-gray-200 rounded-md object-contain"
             />
-
             <div className="flex flex-col text-left">
               <div className="font-medium text-gray-800">
                 {from} → {to}
               </div>
               <div className="text-xs text-gray-500">
                 {airlineCode}-{flightNumber}
-                {/* • • {formatDate(depDate)} */}
               </div>
             </div>
-
             <span
               className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                 FLIGHT_STATUS_MAP[flightStatus]?.className ||
@@ -80,11 +75,7 @@ export default function ReturnInternationalFlightCard({ flight, onContinue }) {
               {FLIGHT_STATUS_MAP[flightStatus]?.label || "Scheduled"}
             </span>
           </div>
-
           <div className="flex items-center gap-4">
-            {/* <span className="font-semibold text-blue-700 text-sm">
-              ₹{finalPrice.toLocaleString()}
-            </span> */}
             <span className="font-semibold text-blue-700 text-sm">{label}</span>
             {openSection === label ? (
               <FaChevronUp className="text-blue-600" />
@@ -100,13 +91,10 @@ export default function ReturnInternationalFlightCard({ flight, onContinue }) {
             {(() => {
               const firstSeg = segments[0];
               const lastSeg = segments[segments.length - 1];
-
               const from = firstSeg?.Origin?.Airport?.CityName;
               const to = lastSeg?.Destination?.Airport?.CityName;
-
               const dep = firstSeg?.Origin?.DepTime;
               const arr = lastSeg?.Destination?.ArrTime;
-
               const totalDurationMin = getTotalDuration(segments);
               const stopsLabel = getStopsLabel(segments);
 
@@ -134,11 +122,9 @@ export default function ReturnInternationalFlightCard({ flight, onContinue }) {
                           <MdOutlineFlight className="text-blue-600 rotate-90 text-lg" />
                         </div>
                       </div>
-
                       <p className="text-xs font-medium text-slate-600">
                         {formatDuration(totalDurationMin)}
                       </p>
-
                       <p className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-semibold rounded-full border border-emerald-200">
                         {stopsLabel}
                       </p>
@@ -176,9 +162,9 @@ export default function ReturnInternationalFlightCard({ flight, onContinue }) {
                   ✓ Refundable
                 </span>
               )}
-              <button className="inline-flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-100 transition">
-                <BiSolidOffer /> Fare Options
-              </button>
+              <div className="inline-flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 text-blue-600">
+                <BiSolidOffer /> {group.fareOptions?.length || 1} Fare Options
+              </div>
             </div>
           </div>
         )}
@@ -189,14 +175,40 @@ export default function ReturnInternationalFlightCard({ flight, onContinue }) {
   return (
     <div className="max-w-[1060px] bg-white border border-blue-200 rounded-2xl overflow-hidden shadow-sm transition-all duration-300">
       <div className="p-6">
-        {/* ---- Onward ---- */}
         {renderFlightLeg(onward, "Onward")}
-
-        {/* ---- Return ---- */}
         {renderFlightLeg(ret, "Return")}
 
-        {/* ---- Footer ---- */}
-        <div className="flex items-center justify-between mt-6">
+        {/* Fare Options Selector */}
+        {group.fareOptions && group.fareOptions.length > 0 && (
+          <div className="mt-4 border-t border-gray-100 pt-5">
+            <h4 className="text-sm font-semibold text-gray-800 mb-3">Select Fare Option:</h4>
+            <div className="flex flex-wrap gap-3">
+              {group.fareOptions.map((fare, idx) => {
+                const isFareSelected = selectedResultIndex === fare.resultIndex;
+                return (
+                  <button
+                    key={fare.resultIndex || idx}
+                    onClick={() => setSelectedResultIndex(fare.resultIndex)}
+                    className={`flex flex-col px-4 py-2 rounded-xl border transition-all ${
+                      isFareSelected
+                        ? "bg-blue-600 border-blue-600 text-white shadow-md transform scale-[1.02]"
+                        : "bg-white border-blue-200 text-blue-800 hover:border-blue-400 hover:bg-blue-50"
+                    }`}
+                  >
+                    <span className={`text-[11px] font-semibold tracking-wide uppercase ${isFareSelected ? 'text-blue-100' : 'text-blue-600'}`}>
+                      {fare.supplierFareClass}
+                    </span>
+                    <span className="text-lg font-bold mt-0.5">
+                      ₹{Math.ceil(fare.publishedFare).toLocaleString()}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-100">
           <div className="text-left">
             <p className="text-3xl font-bold bg-linear-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
               ₹{finalPrice.toLocaleString()}
@@ -206,10 +218,10 @@ export default function ReturnInternationalFlightCard({ flight, onContinue }) {
             </p>
           </div>
           <button
-            onClick={onContinue}
-            className="relative group px-8 py-3 bg-linear-to-r from-blue-600 to-blue-500 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+            onClick={() => onContinue(flight)}
+            className="relative group px-8 py-3 bg-linear-to-r from-blue-600 to-blue-500 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]"
           >
-            Select
+            Select & Continue
           </button>
         </div>
       </div>

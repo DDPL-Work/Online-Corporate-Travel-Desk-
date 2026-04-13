@@ -26,6 +26,7 @@ import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { CABIN_MAP } from "../../../utils/formatter";
+import { mapSSRData } from "../../../utils/parseReturnFlight";
 import { getMyTravelAdmin } from "../../../Redux/Actions/employee.thunks";
 import api from "../../../API/axios";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
@@ -144,6 +145,9 @@ export default function RoundTripFlightBooking() {
   const [selectedMeals, setSelectedMeals] = useState({});
   const [selectedBaggage, setSelectedBaggage] = useState({});
 
+  const [ssrData, setSSRData] = useState({ onward: {}, return: {} });
+  const [ssrLoading, setSSRLoading] = useState(true);
+
   const [travelerErrors, setTravelerErrors] = useState({});
   const [purposeOfTravel, setPurposeOfTravel] = useState("");
   const [projectApproverData, setProjectApproverData] = useState({
@@ -222,36 +226,13 @@ export default function RoundTripFlightBooking() {
   };
 
   const isRTSeatReady = useMemo(() => {
-    const getSeatStatus = (journeyType, resultIndex) => {
-      if (!resultIndex) return false;
-
-      const key = resultIndex.toString().trim();
-      const journeySSR = ssr?.[journeyType]?.[key];
-
-      if (!journeySSR) return false;
-
-      const root = journeySSR?.Response || journeySSR;
-
-      const seatSource =
-        root?.SeatDynamic?.[0]?.SegmentSeat ||
-        root?.Seat?.[0]?.SegmentSeat ||
-        root?.SeatDynamic ||
-        root?.Seat ||
-        [];
-
-      return (
-        Array.isArray(seatSource) &&
-        seatSource.some(
-          (s) => Array.isArray(s?.RowSeats) && s.RowSeats.length > 0,
-        )
-      );
-    };
+    if (ssrLoading) return { onward: "loading", return: "loading" };
 
     return {
-      onward: getSeatStatus("onward", rawFlightData?.onward?.ResultIndex),
-      return: getSeatStatus("return", rawFlightData?.return?.ResultIndex),
+      onward: ssrData?.onward?.seats?.length > 0 ? true : "none",
+      return: ssrData?.return?.seats?.length > 0 ? true : "none",
     };
-  }, [ssr, rawFlightData]);
+  }, [ssrLoading, ssrData]);
 
   useEffect(() => {
     if (user?.role === "employee") {
@@ -539,73 +520,76 @@ export default function RoundTripFlightBooking() {
       returnResultIndex: rawFlightData.return.ResultIndex,
     });
 
-    dispatch(
-      getRTFareQuote({
-        traceId,
-        resultIndex: rawFlightData.onward.ResultIndex,
-        journeyType: "onward",
-      }),
-    );
+    const onwardIdx = rawFlightData.onward.ResultIndex?.toString().trim();
+    const returnIdx = rawFlightData.return.ResultIndex?.toString().trim();
 
     dispatch(
       getRTFareQuote({
         traceId,
-        resultIndex: rawFlightData.return.ResultIndex,
-        journeyType: "return",
+        resultIndex: onwardIdx,
+        journeyType: "onward",
       }),
     );
+
+    if (onwardIdx !== returnIdx) {
+      dispatch(
+        getRTFareQuote({
+          traceId,
+          resultIndex: returnIdx,
+          journeyType: "return",
+        }),
+      );
+    }
   }, [traceId, rawFlightData, dispatch]);
 
   useEffect(() => {
     if (!traceId || !rawFlightData?.onward || !rawFlightData?.return) return;
 
-    const onwardIdx = rawFlightData.onward.ResultIndex;
-    const returnIdx = rawFlightData.return.ResultIndex;
+    const onwardIdx = rawFlightData.onward.ResultIndex?.toString().trim();
+    const returnIdx = rawFlightData.return.ResultIndex?.toString().trim();
+
+    // Ensure FareQuote has finished to avoid TBO ErrorCode 3 (Invalid ResultIndex)
+    if (!fareQuote?.onward) return;
+    if (onwardIdx !== returnIdx && !fareQuote?.return) return;
 
     dispatch(
-      getRTFareRule({
-        traceId,
-        resultIndex: onwardIdx,
-        journeyType: "onward",
-      }),
+      getRTFareRule({ traceId, resultIndex: onwardIdx, journeyType: "onward" })
     );
 
-    // ALWAYS call onward
     dispatch(
-      getRTSSR({
-        traceId,
-        resultIndex: onwardIdx,
-        journeyType: "onward",
-      }),
+      getRTSSR({ traceId, resultIndex: onwardIdx, journeyType: "onward" })
     );
 
-    // ONLY call return for domestic
-    if (!isInternational) {
+    if (onwardIdx !== returnIdx) {
       dispatch(
-        getRTSSR({
-          traceId,
-          resultIndex: onwardIdx,
-          journeyType: "return",
-        }),
+        getRTFareRule({ traceId, resultIndex: returnIdx, journeyType: "return" })
+      );
+
+      dispatch(
+        getRTSSR({ traceId, resultIndex: returnIdx, journeyType: "return" })
       );
     }
+  }, [traceId, rawFlightData, fareQuote, dispatch]);
 
-    dispatch(
-      getRTFareRule({
-        traceId,
-        resultIndex: returnIdx,
-        journeyType: "return",
-      }),
-    );
+  useEffect(() => {
+    if (!rawFlightData || !ssr) return;
+    
+    setSSRLoading(true);
+    const onwardResultIdx = rawFlightData?.onward?.ResultIndex?.toString().trim();
+    const returnResultIdx = rawFlightData?.return?.ResultIndex?.toString().trim();
 
-    dispatch(
-      getRTSSR({
-        traceId,
-        resultIndex: returnIdx,
-        journeyType: "return",
-      }),
-    );
-  }, [traceId, rawFlightData, dispatch]);
+    const rawSsrResponse = ssr?.onward?.[onwardResultIdx] || ssr?.return?.[returnResultIdx];
+
+    if (rawSsrResponse) {
+      if (rawSsrResponse?.Response?.Error?.ErrorCode === 5) {
+        setSSRLoading(false);
+        return; // do not map empty seats, UI will evaluate to "No ssr available"
+      }
+      const mapped = mapSSRData(rawSsrResponse, rawFlightData);
+      setSSRData(mapped);
+      setSSRLoading(false);
+    }
+  }, [ssr, rawFlightData]);
 
   useEffect(() => {
     logRT("FARE QUOTE REDUX STATE", {
@@ -678,32 +662,9 @@ export default function RoundTripFlightBooking() {
         (parsedFlightData?.onwardSegments?.length || 0) + segmentIndex;
     }
 
-    const journeySSR = ssr?.[ssrJourneyType]?.[ssrResultIndex];
+    const normalizedSSRForJourney = ssrData?.[ssrJourneyType];
 
-    // let root =
-    //   journeySSR?.Response ||
-    //   journeySSR?.Results ||
-    //   Object.values(journeySSR || {})[0]?.Response ||
-    //   Object.values(journeySSR || {})[0]?.Results ||
-    //   journeySSR;
-
-    // const seatData =
-    //   root?.SeatDynamic?.[0]?.SegmentSeat ||
-    //   root?.Seat?.[0]?.SegmentSeat ||
-    //   root?.SeatDynamic ||
-    //   root?.Seat;
-
-    const root =
-      journeySSR?.Response?.Results || journeySSR?.Response || journeySSR;
-
-    const seatData =
-      root?.SeatDynamic?.[0]?.SegmentSeat ||
-      root?.Seat?.[0]?.SegmentSeat ||
-      root?.SeatDynamic ||
-      root?.Seat ||
-      [];
-
-    if (!seatData || seatData.length === 0) {
+    if (!normalizedSSRForJourney || !normalizedSSRForJourney.seats || normalizedSSRForJourney.seats.length === 0) {
       ToastWithTimer({
         type: "info",
         message: "Seat selection not available for this flight.",
@@ -715,10 +676,11 @@ export default function RoundTripFlightBooking() {
       show: true,
       segment,
       segmentIndex: actualSegmentIndex,
+      localSegmentIndex: segmentIndex,
       journeyType, // keep UI context
       resultIndex: ssrResultIndex,
       date: segment?.dt,
-      ssrData: journeySSR, // ✅ important
+      ssrData: normalizedSSRForJourney, // ✅ Passed the pre-mapped SSR data!
     });
   };
 
@@ -909,14 +871,19 @@ export default function RoundTripFlightBooking() {
     const meals = [];
 
     Object.entries(selectedMeals).forEach(([key, mealList]) => {
-      const [, segmentIndex] = key.split("|");
+      const [journeyType, segmentIndex] = key.split("|");
 
-      mealList.forEach((meal, travelerIndex) => {
+      // Handle both cases where mealList might be an array or an object With .list (backward compatibility)
+      const listToIterate = Array.isArray(mealList) ? mealList : mealList.list || [];
+
+      listToIterate.forEach((meal, travelerIndex) => {
         meals.push({
+          journeyType,
           segmentIndex: Number(segmentIndex),
+          travelerIndex,
           travelerId: travelers[travelerIndex]?.id,
           code: meal.Code,
-          description: meal.Description,
+          description: String(meal.Description || meal.Code || ""),
           price: meal.Price,
         });
       });
@@ -997,9 +964,10 @@ export default function RoundTripFlightBooking() {
     Object.entries(selectedBaggage).forEach(([key, bag]) => {
       if (!bag) return;
 
-      const [, segmentIndex] = key.split("|");
+      const [journeyType, segmentIndex] = key.split("|");
 
       baggage.push({
+        journeyType,
         segmentIndex: Number(segmentIndex),
         code: bag.Code,
         weight: bag.Weight,
@@ -1014,7 +982,7 @@ export default function RoundTripFlightBooking() {
     const seats = [];
 
     Object.entries(selectedSeats).forEach(([key, value]) => {
-      const [, segmentIndex] = key.split("|");
+      const [journeyType, segmentIndex] = key.split("|");
 
       value.list.forEach((seatCode, travelerIndex) => {
         // seats.push({
@@ -1024,7 +992,9 @@ export default function RoundTripFlightBooking() {
         //   price: value.priceMap[seatCode] || 0,
         // });
         seats.push({
+          journeyType,
           segmentIndex: Number(segmentIndex),
+          travelerIndex,
           travelerId: travelers[travelerIndex]?.id,
           seatNo: seatCode,
           price: value.priceMap[seatCode] || 0,
@@ -1042,6 +1012,13 @@ export default function RoundTripFlightBooking() {
     }
 
     // ROUND-TRIP → consolidate
+    const onwardIdx = rawFlightData?.onward?.ResultIndex?.toString().trim();
+    const returnIdx = rawFlightData?.return?.ResultIndex?.toString().trim();
+
+    if (onwardIdx === returnIdx && fareQuote?.onward?.Response?.Results) {
+      return fareQuote.onward;
+    }
+
     const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
     const returnFare = fareQuote?.return?.Response?.Results?.Fare;
 

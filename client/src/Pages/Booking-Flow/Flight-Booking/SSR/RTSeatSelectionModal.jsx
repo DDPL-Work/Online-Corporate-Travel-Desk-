@@ -30,7 +30,8 @@ export default function RTSeatSelectionModal({
   onSelectBaggage,
   routes,
   segments,
-  ssrData, // ✅ Accept explicit SSR data
+  ssrData, // ✅ explicitly mapped
+  localSegmentIndex, // ✅ original order per leg
 }) {
   const dispatch = useDispatch();
   const { seatMap, loading } = useSelector((state) => state.flightsRT);
@@ -49,7 +50,24 @@ export default function RTSeatSelectionModal({
 
   // SSR Normalization
   const segmentSSR = useMemo(() => {
-    const normalized = normalizeSSRBySegment(ssr);
+    // If it's already properly mapped from mapSSRData
+    if (ssrData && Array.isArray(ssrData.seats)) {
+      const targetIndex = localSegmentIndex !== undefined ? localSegmentIndex : segmentIndex;
+      const legSSR = ssrData.seats[targetIndex] || {
+        seats: [],
+        meals: [],
+        baggage: [],
+      };
+      // For fallback backward compatibility in component (meals and baggage might be top-level strings in the legacy normalization)
+      return {
+        seats: legSSR.seats,
+        meals: legSSR.meals || ssrData.meals || [],
+        baggage: legSSR.baggage || ssrData.baggage || [],
+      };
+    }
+    
+    // Fallback if not using new mapping
+    const normalized = normalizeSSRBySegment(ssrData || reduxSSR);
     return (
       normalized?.[segmentIndex] || {
         seats: [],
@@ -57,7 +75,7 @@ export default function RTSeatSelectionModal({
         baggage: [],
       }
     );
-  }, [ssr, segmentIndex]);
+  }, [ssrData, reduxSSR, segmentIndex, localSegmentIndex]);
 
   const isWindowSeat = (s) => Number(s.SeatType) === 1;
   const isAisleSeat = (s) => Number(s.SeatType) === 2;

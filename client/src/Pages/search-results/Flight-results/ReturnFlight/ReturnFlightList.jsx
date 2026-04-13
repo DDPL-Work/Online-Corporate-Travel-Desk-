@@ -27,14 +27,18 @@ export default function ReturnFlightList({
 
       {/* Flight Cards */}
       <div className="space-y-3">
-        {flights.map((flight) => (
-          <SelectableFlightCard
-            key={flight.ResultIndex}
-            flight={flight}
-            selected={selectedFlight?.ResultIndex === flight.ResultIndex}
-            onClick={() => onSelect(flight)}
-          />
-        ))}
+        {flights.map((group) => {
+          const isSelected = selectedFlight && group.flightOptionsByResultIndex[selectedFlight.ResultIndex];
+          return (
+            <SelectableFlightCard
+              key={group.flightKey}
+              group={group}
+              selected={isSelected}
+              selectedFlight={selectedFlight}
+              onSelect={onSelect}
+            />
+          );
+        })}
       </div>
     </div>
   );

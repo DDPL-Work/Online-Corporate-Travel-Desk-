@@ -1,9 +1,8 @@
 //src/Pages/search-results/Flight-results/One-wayFlightCard.jsx
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MdAirlineSeatReclineNormal, MdOutlineFlight } from "react-icons/md";
-import { FaSuitcase } from "react-icons/fa";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import {
   airlineLogo,
   FLIGHT_STATUS_MAP,
@@ -11,17 +10,68 @@ import {
   formatTime,
 } from "../../../utils/formatter";
 import { getFareUpsell } from "../../../Redux/Actions/flight.thunks";
-import FareUpsellModal from "../../Booking-Flow/Flight-Booking/FareUpsellModal";
 import { BsSuitcase } from "react-icons/bs";
 import { BiSolidOffer } from "react-icons/bi";
 
-const grayText = "text-slate-500";
-const darkText = "text-slate-900";
-const primaryText = "text-blue-600";
-const primaryBg = "bg-blue-600";
-const primaryHover = "hover:bg-blue-700";
-const successText = "text-emerald-600";
-const successBg = "bg-emerald-50";
+const toFiniteNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const buildFallbackFareOptions = (flightInfo) => {
+  if (!flightInfo) return [];
+
+  const segment = flightInfo?.Segments?.[0]?.[0];
+  const supplierFareClass =
+    `${segment?.SupplierFareClass || ""}`.trim() || "Standard";
+  const publishedFare = toFiniteNumber(
+    flightInfo?.Fare?.PublishedFare ?? flightInfo?.Fare?.OfferedFare,
+    0,
+  );
+
+  return [
+    {
+      supplierFareClass,
+      publishedFare,
+      resultIndex: flightInfo?.ResultIndex,
+    },
+  ];
+};
+
+const normalizeFareOptions = (fareOptions, fallbackFlightInfo) => {
+  const sourceOptions =
+    Array.isArray(fareOptions) && fareOptions.length
+      ? fareOptions
+      : buildFallbackFareOptions(fallbackFlightInfo);
+
+  const optionsByClass = new Map();
+
+  sourceOptions.forEach((option) => {
+    const supplierFareClass =
+      `${option?.supplierFareClass || ""}`.trim() || "Standard";
+    const fareClassKey = supplierFareClass.toLowerCase();
+    const publishedFare = toFiniteNumber(
+      option?.publishedFare ??
+        fallbackFlightInfo?.Fare?.PublishedFare ??
+        fallbackFlightInfo?.Fare?.OfferedFare,
+      0,
+    );
+    const resultIndex = option?.resultIndex ?? fallbackFlightInfo?.ResultIndex;
+
+    const existing = optionsByClass.get(fareClassKey);
+    if (!existing || publishedFare < existing.publishedFare) {
+      optionsByClass.set(fareClassKey, {
+        supplierFareClass,
+        publishedFare,
+        resultIndex,
+      });
+    }
+  });
+
+  return Array.from(optionsByClass.values()).sort(
+    (a, b) => a.publishedFare - b.publishedFare,
+  );
+};
 
 export default function OneWayFlightCard({
   flight,
@@ -33,26 +83,67 @@ export default function OneWayFlightCard({
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  if (!flight || !flight.Segments?.length || !flight.Segments[0]?.length) {
+  const groupedFlight = flight?.flightInfo
+    ? flight
+    : {
+        flightInfo: flight,
+        fareOptions: buildFallbackFareOptions(flight),
+        flightOptionsByResultIndex:
+          flight?.ResultIndex != null ? { [flight.ResultIndex]: flight } : {},
+      };
+
+  const { flightInfo, fareOptions, flightOptionsByResultIndex = {} } =
+    groupedFlight || {};
+
+  const normalizedFareOptions = useMemo(
+    () => normalizeFareOptions(fareOptions, flightInfo),
+    [fareOptions, flightInfo],
+  );
+
+  const [selectedFareResultIndex, setSelectedFareResultIndex] = useState(null);
+
+  const selectedFare = useMemo(() => {
+    if (selectedFareResultIndex == null) {
+      return normalizedFareOptions[0];
+    }
+
+    return (
+      normalizedFareOptions.find(
+        (fare) => fare.resultIndex === selectedFareResultIndex,
+      ) || normalizedFareOptions[0]
+    );
+  }, [normalizedFareOptions, selectedFareResultIndex]);
+  const selectedResultIndex =
+    selectedFare?.resultIndex ?? flightInfo?.ResultIndex;
+  const selectedFlight =
+    (selectedResultIndex != null
+      ? flightOptionsByResultIndex[selectedResultIndex]
+      : null) || flightInfo;
+
+  if (
+    !selectedFlight ||
+    !selectedFlight.Segments?.length ||
+    !selectedFlight.Segments[0]?.length
+  ) {
     return null;
   }
 
   const handleFareOptionsClick = async () => {
+    if (selectedResultIndex == null) return;
+
     const res = await dispatch(
       getFareUpsell({
         traceId,
-        resultIndex: flight.ResultIndex,
+        resultIndex: selectedResultIndex,
       }),
     );
 
-    // Pass fetched data up to parent
-    if (res?.payload) {
+    if (res?.payload && typeof onOpenFareUpsell === "function") {
       onOpenFareUpsell(res.payload);
     }
   };
 
-  // 🔥 CORRECT TBO SEGMENT ACCESS
-  const segments = flight.Segments[0];
+  const segments = selectedFlight.Segments[0];
   const firstSegment = segments[0];
   const flightStatus =
     firstSegment?.FlightStatus || firstSegment?.Status || "Scheduled";
@@ -64,12 +155,10 @@ export default function OneWayFlightCard({
   const flightNumber = firstSegment.Airline?.FlightNumber;
 
   const from = firstSegment.Origin?.Airport?.CityName;
-  const fromCode = firstSegment.Origin?.Airport?.AirportCode;
   const fromCountry = firstSegment.Origin?.Airport?.CountryName;
   const fromAirport = firstSegment.Origin?.Airport?.AirportName;
 
   const to = lastSegment.Destination?.Airport?.CityName;
-  const toCode = lastSegment.Destination?.Airport?.AirportCode;
   const toCountry = lastSegment.Destination?.Airport?.CountryName;
   const toAirport = lastSegment.Destination?.Airport?.AirportName;
 
@@ -80,16 +169,19 @@ export default function OneWayFlightCard({
   const arrTime = lastSegment.Destination?.ArrTime;
 
   const durationMin = segments.reduce((sum, s) => sum + (s.Duration || 0), 0);
-
   const duration = `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`;
 
   const stops =
     segments.length === 1 ? "Non-stop" : `${segments.length - 1} Stop`;
 
-  const baggage = flight.Fare?.Baggage?.iB || "15 Kg";
-
-  const refundable = flight.IsRefundable;
-  const price =  Math.ceil(flight.Fare?.PublishedFare);
+  const baggage = selectedFlight.Fare?.Baggage?.iB || "15 Kg";
+  const refundable = selectedFlight.IsRefundable;
+  const price = Math.ceil(
+    toFiniteNumber(
+      selectedFare?.publishedFare ?? selectedFlight.Fare?.PublishedFare,
+      0,
+    ),
+  );
 
   return (
     <div className="max-w-[1060px] bg-linear-to-br from-white via-blue-50/30 to-white border border-blue-200 rounded-2xl transition-all duration-300 overflow-hidden">
@@ -97,22 +189,8 @@ export default function OneWayFlightCard({
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -z-10"></div>
 
         <div className="p-6">
-          {/* <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
-              <span className="text-sm font-medium text-slate-600">
-                One-Way Journey
-              </span>
-            </div>
-            <div className="px-4 py-1.5 bg-linear-to-r from-blue-600 to-blue-500 text-white text-sm font-semibold rounded-full shadow-md">
-              ₹{price?.toLocaleString()}
-            </div>
-          </div> */}
-
-          {/* FLIGHT SEGMENT */}
           <div className="relative">
             <div className="flex items-center justify-between gap-3 mb-5">
-              {/* Airline Info */}
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <img
@@ -147,20 +225,12 @@ export default function OneWayFlightCard({
                 </div>
               </div>
 
-              {/* Price Info */}
               <div className="flex flex-col text-center sm:text-right bg-gray-200 rounded-xl p-2">
                 <div className="flex items-baseline justify-center sm:justify-start gap-2">
                   <span className="text-3xl font-bold bg-linear-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
-                    ₹{price?.toLocaleString()}
+                    &#8377;{price?.toLocaleString()}
                   </span>
                 </div>
-                {/* <div className="text-xs text-slate-600 mt-1 flex flex-wrap justify-center sm:justify-start items-center gap-1">
-                  <span>Total for 1 Adult</span>
-                  <span className="text-blue-600">•</span>
-                  <span className="text-blue-600 font-medium">
-                    All taxes included
-                  </span>
-                </div> */}
               </div>
             </div>
 
@@ -194,20 +264,61 @@ export default function OneWayFlightCard({
               </div>
 
               <div className="text-right space-y-1">
-                <div className="text-2xl font-bold text-slate-800">
-                  {arrival},
-                </div>
+                <div className="text-2xl font-bold text-slate-800">{arrival}</div>
                 <div className="text-xs font-medium text-blue-600">
                   {formatDate(arrTime)}
                 </div>
                 <div className="text-sm font-semibold text-slate-700 mt-2">
-                  {to},{toCountry}
+                  {to}, {toCountry}
                 </div>
                 <div className="text-xs text-slate-500">({toAirport})</div>
               </div>
             </div>
 
-            {/* Action And Info section */}
+            <div className="mt-5 rounded-xl border border-blue-100 bg-white/70 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Fare options
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {normalizedFareOptions.map((fare, index) => {
+                  const isSelected =
+                    selectedFare?.resultIndex != null
+                      ? selectedFare.resultIndex === fare.resultIndex
+                      : index === 0;
+                  const isLowest = index === 0;
+
+                  return (
+                    <button
+                      key={`${fare.supplierFareClass}-${fare.resultIndex || index}`}
+                      type="button"
+                      onClick={() => setSelectedFareResultIndex(fare.resultIndex)}
+                      className={`rounded-lg border px-3 py-2 text-left transition ${
+                        isSelected
+                          ? "border-blue-500 bg-blue-50 shadow-sm"
+                          : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/40"
+                      }`}
+                    >
+                      <div className="text-xs font-semibold text-slate-600">
+                        {fare.supplierFareClass}
+                      </div>
+                      <div
+                        className={`text-sm font-bold ${
+                          isSelected ? "text-blue-700" : "text-slate-800"
+                        }`}
+                      >
+                        &#8377;{Math.ceil(fare.publishedFare).toLocaleString()}
+                      </div>
+                      {isLowest && (
+                        <div className="text-[10px] font-semibold text-emerald-600">
+                          Lowest fare
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="flex items-center justify-between mt-5">
               <div className="flex flex-wrap gap-3">
                 {travelClass && (
@@ -220,19 +331,18 @@ export default function OneWayFlightCard({
                 </span>
                 {refundable && (
                   <span className="inline-flex items-center px-3 py-1.5 bg-linear-to-r from-emerald-50 to-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200">
-                    ✓ Refundable
+                    Refundable
                   </span>
                 )}
 
                 <button
                   onClick={handleFareOptionsClick}
-                  className="flex items-center gap-1.5 bg-linear-to-r from-blue-50 to-blue-100  px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 text-blue-600 hover:underline  hover:text-blue-700 transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 bg-linear-to-r from-blue-50 to-blue-100 px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 text-blue-600 hover:underline hover:text-blue-700 transition-colors cursor-pointer"
                 >
                   <BiSolidOffer /> Fare Options
                 </button>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
@@ -246,8 +356,8 @@ export default function OneWayFlightCard({
 
                     navigate("/one-way-flight/booking", {
                       state: {
-                        selectedFlight: flight,
-                        rawFlightData: flight,
+                        selectedFlight,
+                        rawFlightData: selectedFlight,
                         searchParams: { traceId, passengers },
                         tripType: "one-way",
                         isInternational,
