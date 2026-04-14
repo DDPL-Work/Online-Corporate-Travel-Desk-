@@ -26,44 +26,53 @@ const validateTboResponse = (result) => {
 /* ======================================================
    🔧 HELPER: EXTRACT TBO BOOKING ID
 ====================================================== */
-const getTboBookingId = (booking) => {
-  const paths = [
-    // ✅ PRIMARY (MOST RELIABLE)
-    booking?.bookingResult?.onwardResponse?.raw?.Response?.Response?.FlightItinerary?.BookingId,
-    booking?.bookingResult?.returnResponse?.raw?.Response?.Response?.FlightItinerary?.BookingId,
+const normalizeBookingId = (value) => {
+  const numericId = Number(value);
+  return Number.isFinite(numericId) && numericId > 0 ? numericId : null;
+};
 
-    // ✅ FALLBACKS
-    booking?.bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary?.BookingId,
-    booking?.bookingResult?.returnResponse?.Response?.Response?.FlightItinerary?.BookingId,
-
-    booking?.bookingResult?.providerResponse?.raw?.Response?.Response?.BookingId,
-    booking?.bookingResult?.providerResponse?.raw?.Response?.BookingId,
-    booking?.bookingResult?.providerResponse?.Response?.Response?.BookingId,
-
-    booking?.bookingResult?.bookingId,
-    booking?.bookingId,
+const extractBookingIdFromSource = (source) => {
+  const candidates = [
+    source?.bookingId,
+    source?.BookingId,
+    source?.raw?.Response?.Response?.FlightItinerary?.BookingId,
+    source?.raw?.Response?.Response?.BookingId,
+    source?.raw?.Response?.FlightItinerary?.BookingId,
+    source?.raw?.Response?.BookingId,
+    source?.Response?.Response?.FlightItinerary?.BookingId,
+    source?.Response?.Response?.BookingId,
+    source?.Response?.FlightItinerary?.BookingId,
+    source?.Response?.BookingId,
   ];
 
-  console.log("🔍 ALL BOOKING ID PATHS:", paths);
-
-  const id = paths.find((val) => val !== undefined && val !== null);
-
-  if (!id) {
-    console.error("❌ CRITICAL: TBO BookingId NOT FOUND");
-    return null;
-  }
-
-  const numericId = Number(id);
-
-  if (!numericId || isNaN(numericId)) {
-    console.error("❌ INVALID BookingId:", id);
-    return null;
-  }
-
-  console.log("✅ SELECTED BOOKING ID:", numericId);
-
-  return numericId;
+  return candidates.map(normalizeBookingId).find(Boolean) || null;
 };
+
+const getAllTboBookingIds = (booking) => {
+  const bookingIds = [
+    extractBookingIdFromSource(booking?.bookingResult?.onwardResponse),
+    extractBookingIdFromSource(booking?.bookingResult?.returnResponse),
+    extractBookingIdFromSource(booking?.bookingResult?.providerResponse),
+    normalizeBookingId(booking?.bookingResult?.bookingId),
+    normalizeBookingId(booking?.bookingResult?.providerBookingId),
+    normalizeBookingId(booking?.bookingId),
+  ].filter(Boolean);
+
+  const ids = [...new Set(bookingIds)];
+
+  if (!ids.length) {
+    console.error("❌ CRITICAL: TBO BookingId NOT FOUND", {
+      bookingId: booking?._id,
+      bookingReference: booking?.bookingReference,
+    });
+  }
+
+  console.log("✅ FINAL BOOKING IDS:", ids);
+
+  return ids;
+};
+
+const getTboBookingId = (booking) => getAllTboBookingIds(booking)[0] || null;
 
 /* ======================================================
    🔎 HELPER: FETCH TICKET IDS FROM TBO IF MISSING
@@ -79,9 +88,8 @@ const fetchTicketIdsFromTbo = async (pnr) => {
       details?.Response?.FlightItinerary?.Passenger ||
       [];
     return (
-      paxArr
-        .map((p) => p?.Ticket?.TicketId || p?.TicketId)
-        .filter(Boolean) || []
+      paxArr.map((p) => p?.Ticket?.TicketId || p?.TicketId).filter(Boolean) ||
+      []
     );
   } catch (err) {
     console.error("TBO fetch ticket IDs failed:", err.message);
@@ -129,17 +137,61 @@ exports.getCancellationCharges = async (req, res) => {
     const booking = await BookingRequest.findById(bookingId);
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-    const tboBookingId = getTboBookingId(booking);
+    const bookingIds = getAllTboBookingIds(booking);
 
-    if (!tboBookingId) {
-  return res.status(400).json({
-    message: "Invalid TBO BookingId. Cannot fetch cancellation charges.",
-  });
-}
+    if (!bookingIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid TBO BookingId. Cannot fetch cancellation charges.",
+      });
+    }
 
-    const result = await amendmentService.getCancellationCharges(tboBookingId);
+    const responses = await Promise.all(
+      bookingIds.map(async (id) => {
+        const result = await amendmentService.getCancellationCharges(id);
+        return {
+          bookingId: id,
+          response: result,
+        };
+      }),
+    );
 
-    return res.json(result);
+    const failedResponses = responses
+      .map((item) => ({
+        ...item,
+        validation: validateTboResponse(item.response),
+      }))
+      .filter((item) => !item.validation.success);
+
+    if (failedResponses.length) {
+      const firstFailure = failedResponses[0];
+
+      return res.status(400).json({
+        success: false,
+        message:
+          failedResponses.length === 1
+            ? firstFailure.validation.message
+            : failedResponses
+                .map(
+                  (item) =>
+                    `Booking ${item.bookingId}: ${item.validation.message}`,
+                )
+                .join("; "),
+        traceId: firstFailure.validation.traceId,
+        data: responses,
+      });
+    }
+
+    const finalResponse =
+      responses.length === 1
+        ? responses[0].response // ✅ backward compatible
+        : {
+            success: true,
+            isRoundTrip: true,
+            data: responses,
+          };
+
+    return res.json(finalResponse);
   } catch (error) {
     console.error("Cancellation Charges Error:", error.message);
     return res.status(500).json({ message: "Failed to fetch charges" });
@@ -295,8 +347,7 @@ exports.partialCancellation = async (req, res) => {
         .map((p) => p?.Ticket?.TicketId || p?.TicketId)
         .filter(Boolean) || [];
 
-    let ticketIds =
-      ticketIdsFromBooking.length > 0 ? ticketIdsFromBooking : [];
+    let ticketIds = ticketIdsFromBooking.length > 0 ? ticketIdsFromBooking : [];
 
     /* Fallback: fetch from TBO booking details using PNR */
     if (!ticketIds.length) {

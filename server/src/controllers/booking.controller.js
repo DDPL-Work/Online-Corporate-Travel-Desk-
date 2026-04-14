@@ -174,9 +174,9 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     const paxType = (t.paxType || "ADULT").toUpperCase();
     const age = ageFromDob(t.dateOfBirth || t.dob);
 
-    if (!t.dateOfBirth && !t.dob) {
-      throw new ApiError(400, `Date of birth missing for traveler ${idx + 1}`);
-    }
+    // if (!t.dateOfBirth && !t.dob) {
+    //   throw new ApiError(400, `Date of birth missing for traveler ${idx + 1}`);
+    // }
 
     if (age != null) {
       if (paxType === "ADULT" && age < 12) {

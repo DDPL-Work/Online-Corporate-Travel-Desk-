@@ -118,7 +118,7 @@ export default function OneFlightBooking() {
     firstName: "",
     middleName: "",
     lastName: "",
-    gender: "",
+    gender: "MALE",
     age: "",
     email: "",
     phoneWithCode: "",
@@ -695,11 +695,11 @@ export default function OneFlightBooking() {
         phoneWithCode: t.phoneWithCode, // ✅ THIS WAS MISSING
 
         gender: t.gender,
-        dateOfBirth: t.dob,
+        dateOfBirth: t.dob || undefined,
 
         passportNumber: t.passportNumber,
-        PassportIssueDate: t.PassportIssueDate,
-        passportExpiry: t.passportExpiry,
+        PassportIssueDate: t.PassportIssueDate || undefined,
+        passportExpiry: t.passportExpiry || undefined,
         nationality: t.nationality,
 
         paxType: (t.type || "ADULT").toUpperCase(),
@@ -740,7 +740,7 @@ export default function OneFlightBooking() {
       if (!t.lastName?.trim()) e.lastName = "Last name is required";
       if (!t.gender?.trim()) e.gender = "Gender is required";
       if (idx === 0 && !t.email?.trim()) e.email = "Email is required";
-      if (!t.dob?.trim()) e.dob = "Date of birth is required";
+ 
       if (idx === 0 && !t.phoneWithCode?.trim())
         e.phoneWithCode = "Phone number is required";
       if (!t.nationality?.trim()) e.nationality = "Nationality is required";
@@ -839,6 +839,14 @@ export default function OneFlightBooking() {
       return;
     }
 
+    if (!gstDetails?.gstin?.trim() || !gstDetails?.legalName?.trim() || !gstDetails?.address?.trim()) {
+      ToastWithTimer({
+        type: "error",
+        message: "Please fill all GST details",
+      });
+      return;
+    }
+
     try {
       const payload = buildBookingRequestPayload();
       await dispatch(
@@ -887,7 +895,7 @@ export default function OneFlightBooking() {
       if (!t.gender) return false;
       if (!t.email?.trim()) return false;
       if (!t.phoneWithCode?.trim()) return false;
-      if (!t.dob) return false;
+
 
       if (t.type === "INFANT") {
         if (
@@ -902,6 +910,8 @@ export default function OneFlightBooking() {
       if (isIntl && !t.passportNumber?.trim()) return false;
     }
 
+    if (!gstDetails?.gstin?.trim() || !gstDetails?.legalName?.trim() || !gstDetails?.address?.trim()) return false;
+
     return true;
   }, [
     purposeOfTravel,
@@ -910,6 +920,7 @@ export default function OneFlightBooking() {
     adultCount,
     travelers,
     parsedFlightData,
+    gstDetails,
   ]);
 
   if (loading) {
