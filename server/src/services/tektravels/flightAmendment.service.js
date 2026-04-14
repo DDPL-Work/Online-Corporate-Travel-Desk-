@@ -73,12 +73,18 @@ class FlightAmendmentService {
   }
 
   /* ================= EXECUTOR ================= */
-  async execute(endpoint, payload) {
+  async execute(endpoint, payload, isRetry = false) {
     const env = this.getEnv();
     const start = Date.now();
 
     try {
       const token = await this.getToken(env);
+
+      const cfg = config[env];
+      const url =
+        typeof config.resolveUrl === "function"
+          ? config.resolveUrl(env, endpoint)
+          : `${cfg.base}${cfg.endpoints[endpoint]}`;
 
       const finalPayload = {
         EndUserIp: config[env].endUserIp,
@@ -88,19 +94,23 @@ class FlightAmendmentService {
 
       logger.info("TBO FLIGHT REQUEST", {
         env,
+        url,
         endpoint,
         payload: finalPayload,
       });
 
-      const cfg = config[env];
-      const url =
-        typeof config.resolveUrl === "function"
-          ? config.resolveUrl(env, endpoint)
-          : `${cfg.base}${cfg.endpoints[endpoint]}`;
-
       const response = await axios.post(url, finalPayload, {
         timeout: config.timeout,
       });
+
+      const responseErrorCode = response?.data?.Response?.Error?.ErrorCode;
+
+      // Handle transparent token expiry/invalidity (HTTP 200, API Error)
+      if (!isRetry && responseErrorCode && [4, 6].includes(responseErrorCode)) {
+        logger.warn(`FLIGHT TOKEN INVALID/EXPIRED (Code ${responseErrorCode}) - REFRESHING`);
+        this.tokens[env] = null;
+        return this.execute(endpoint, payload, true);
+      }
 
       logger.info("TBO FLIGHT RESPONSE", {
         endpoint,
@@ -114,16 +124,10 @@ class FlightAmendmentService {
       const errorCode = err?.response?.data?.Response?.Error?.ErrorCode;
 
       // Token expired handling
-      if (errorCode === 4) {
-        logger.warn("FLIGHT TOKEN EXPIRED - REFRESHING");
-
+      if (!isRetry && errorCode && [4, 6].includes(errorCode)) {
+        logger.warn(`FLIGHT TOKEN INVALID/EXPIRED (Code ${errorCode}) - REFRESHING`);
         this.tokens[env] = null;
-
-        const newToken = await this.getToken(env);
-
-        payload.TokenId = newToken;
-
-        return this.execute(endpoint, payload);
+        return this.execute(endpoint, payload, true);
       }
 
       logger.error("TBO FLIGHT ERROR", {

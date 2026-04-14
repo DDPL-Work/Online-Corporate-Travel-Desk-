@@ -1458,7 +1458,7 @@ export const TravelerForm = ({
         {/* ================= GST DETAILS ================= */}
         <div className="bg-white border-2 border-blue-100 rounded-xl p-6 shadow-sm">
           <h3 className="text-lg font-bold text-blue-900 mb-2">
-            GST Details (Optional)
+            GST Details <span className="text-red-500">*</span>
           </h3>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
@@ -1543,9 +1543,15 @@ export const TravelerForm = ({
                 </label>
                 <select
                   value={traveler.title || "MR"}
-                  onChange={(e) =>
-                    updateTraveler(traveler.id, "title", e.target.value)
-                  }
+                  onChange={(e) => {
+                    const newTitle = e.target.value;
+                    let newGender = traveler.gender;
+                    if (["MR", "MSTR"].includes(newTitle)) newGender = "MALE";
+                    if (["MRS", "MS", "MISS"].includes(newTitle)) newGender = "FEMALE";
+                    
+                    updateTraveler(traveler.id, "title", newTitle);
+                    if (newGender) updateTraveler(traveler.id, "gender", newGender);
+                  }}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
                   required
                 >
@@ -1687,7 +1693,7 @@ export const TravelerForm = ({
                   Gender <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={traveler.gender || ""}
+                  value={traveler.gender || "MALE"}
                   onChange={(e) =>
                     updateTraveler(traveler.id, "gender", e.target.value)
                   }
@@ -1704,7 +1710,7 @@ export const TravelerForm = ({
               {/* DOB */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Date of Birth <span className="text-red-500">*</span>
+                  Date of Birth
                 </label>
                 <input
                   type="date"
@@ -1717,22 +1723,23 @@ export const TravelerForm = ({
                     updateTraveler(traveler.id, "age", age); // derived
                   }}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
-                  required
                 />
               </div>
 
               {/* Calculated Age (Read-only) */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Age (Auto-calculated)
-                </label>
-                <input
-                  type="text"
-                  value={traveler.age || ""}
-                  readOnly
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
-                />
-              </div>
+              {traveler.dob && (
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Age (Auto-calculated)
+                  </label>
+                  <input
+                    type="text"
+                    value={traveler.age || ""}
+                    readOnly
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                  />
+                </div>
+              )}
             </div>
 
             {traveler.type === "INFANT" && adultOptions.length > 0 && (
