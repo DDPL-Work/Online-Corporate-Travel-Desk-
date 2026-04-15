@@ -714,6 +714,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         passengers,
         ...(ssrPayload && { ssr: ssrPayload }),
         isLCC: true,
+        gstDetails: booking.gstDetails,
       });
 
       const extractedPNR =
@@ -749,6 +750,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       result: booking.flightRequest.fareQuote.Results[0],
       passengers,
       ssr: booking.flightRequest.ssrSnapshot,
+      gstDetails: booking.gstDetails,
     });
 
     const tboBookingId = bookResp?.raw?.Response?.Response?.BookingId;
@@ -777,6 +779,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: extractedPNR,
       passengers,
       isLCC: false,
+      gstDetails: booking.gstDetails,
     });
 
     const ticketStatus = ticketResp?.Response?.Response?.TicketStatus;
@@ -826,6 +829,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         passengers,
         ssr: splitSSR(booking.flightRequest.ssrSnapshot, "onward"),
         isLCC: true,
+        gstDetails: booking.gstDetails,
       });
 
       const returnResp = await tboService.ticketFlight({
@@ -835,6 +839,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         passengers,
         ssr: splitSSR(booking.flightRequest.ssrSnapshot, "return"),
         isLCC: true,
+        gstDetails: booking.gstDetails,
       });
 
       console.log(
@@ -897,6 +902,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       result: booking.flightRequest.fareQuote.Results[0],
       passengers,
       ssr: splitSSR(booking.flightRequest.ssrSnapshot, "onward"),
+      gstDetails: booking.gstDetails,
     });
 
     const returnResp = await tboService.bookFlight({
@@ -906,6 +912,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       result: booking.flightRequest.fareQuote.Results[1],
       passengers,
       ssr: splitSSR(booking.flightRequest.ssrSnapshot, "return"),
+      gstDetails: booking.gstDetails,
     });
 
     const onwardPNR =
@@ -944,6 +951,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: onwardPNR,
       passengers,
       isLCC: false,
+      gstDetails: booking.gstDetails,
     });
 
     const returnTicketResp = await tboService.ticketFlight({
@@ -952,6 +960,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: returnPNR,
       passengers,
       isLCC: false,
+      gstDetails: booking.gstDetails,
     });
 
     /* ✅ VALIDATE */
@@ -1016,6 +1025,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       passengers,
       ...(ssrPayload && { ssr: ssrPayload }),
       isLCC: true,
+      gstDetails: booking.gstDetails,
     });
 
     const extractedPNR =
@@ -1072,6 +1082,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       passengers,
       ...(ssrPayload && { ssr: ssrPayload }),
       isLCC: true,
+      gstDetails: booking.gstDetails,
     });
 
     const extractedPNR =
@@ -1106,6 +1117,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     result: booking.flightRequest.fareQuote.Results[0],
     passengers,
     ssr: booking.flightRequest.ssrSnapshot,
+    gstDetails: booking.gstDetails,
   });
 
   /* ✅ EXTRACT BOOKING ID (VERY IMPORTANT) */
@@ -1145,6 +1157,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     pnr: extractedPNR,
     passengers,
     isLCC: false,
+    gstDetails: booking.gstDetails,
   });
 
   /* ✅ VALIDATE TICKET RESPONSE */

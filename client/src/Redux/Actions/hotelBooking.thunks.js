@@ -6,6 +6,21 @@ import api from "../../API/axios";
 
 
 /* ================================
+   PRE BOOK HOTEL
+================================ */
+export const preBookHotel = createAsyncThunk(
+  "hotelBookings/preBookHotel",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const res = await api.post("/hotel-booking/prebook", payload);
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+/* ================================
    CREATE HOTEL BOOKING REQUEST
 ================================ */
 export const createHotelBookingRequest = createAsyncThunk(

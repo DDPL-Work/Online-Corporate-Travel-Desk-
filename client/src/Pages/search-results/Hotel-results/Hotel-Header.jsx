@@ -257,7 +257,7 @@ const Header = () => {
           CheckIn: form.checkIn,
           CheckOut: form.checkOut,
           CityCode: form.cityCode,
-          GuestNationality: form.country,
+          GuestNationality: "IN",
           NoOfRooms: form.rooms,
           PaxRooms: [
             {
@@ -268,7 +268,8 @@ const Header = () => {
             },
           ],
           IsDetailedResponse: true,
-          Filters: { Refundable: false, MealType: "All" },
+          Filters: { Refundable: true, MealType: "All" },
+          ResponseTime: 10,
         },
         page: 1,
         limit: 10,

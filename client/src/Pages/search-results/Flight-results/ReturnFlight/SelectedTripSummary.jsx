@@ -1,10 +1,12 @@
 // SelectedTripSummary.jsx (Enhanced – MakeMyTrip Style)
 import { MdOutlineFlight } from "react-icons/md";
-import { airlineLogo, formatDate, formatTime } from "../../../../utils/formatter";
-
-
-
-
+import {
+  airlineLogo,
+  formatDate,
+  formatTime,
+} from "../../../../utils/formatter";
+import { useDispatch, useSelector } from "react-redux";
+import { getFareUpsell } from "../../../../Redux/Actions/flight.thunks";
 
 const getJourney = (flight) => {
   const segs = flight?.Segments?.[0];
@@ -25,6 +27,8 @@ const getJourney = (flight) => {
 };
 
 export default function SelectedTripSummary({ onward, ret, onContinue }) {
+  const dispatch = useDispatch();
+  const { traceId, journeyType } = useSelector((state) => state.flights);
   if (!onward) return null;
 
   const onwardData = getJourney(onward);
@@ -116,6 +120,72 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                 ₹{totalFare.toLocaleString("en-IN")}
               </div>
             </div>
+
+            <button
+              disabled={!ret}
+              onClick={async () => {
+                console.log("CLICK WORKING");
+                const isDomesticRoundTrip =
+                  onward?.Segments?.[0]?.length === 1 &&
+                  ret?.Segments?.[0]?.length === 1; 
+
+                // ✅ CASE 1: DOMESTIC ROUND TRIP → DUAL API
+                if (isDomesticRoundTrip) {
+                  if (!onward?.ResultIndex || !ret?.ResultIndex) return;
+
+                  const onwardRes = await dispatch(
+                    getFareUpsell({
+                      traceId,
+                      resultIndex: onward.ResultIndex,
+                    }),
+                  );
+
+                  const returnRes = await dispatch(
+                    getFareUpsell({
+                      traceId,
+                      resultIndex: ret.ResultIndex,
+                    }),
+                  );
+
+                  localStorage.setItem(
+                    "fareUpsellPayload",
+                    JSON.stringify({
+                      onward: onwardRes.payload,
+                      return: returnRes.payload,
+                      traceId,
+                      journeyType: 2,
+                      type: "domesticRT", // 🔥 IMPORTANT FLAG
+                    }),
+                  );
+
+                  window.open("/fare-upsell", "_blank");
+                }
+
+                // ✅ CASE 2: ALL OTHER → KEEP OLD FLOW
+                else {
+                  const res = await dispatch(
+                    getFareUpsell({
+                      traceId,
+                      resultIndex: onward.ResultIndex,
+                    }),
+                  );
+
+                  localStorage.setItem(
+                    "fareUpsellPayload",
+                    JSON.stringify({
+                      fareUpsellData: res.payload,
+                      traceId,
+                      journeyType,
+                    }),
+                  );
+
+                  window.open("/fare-upsell", "_blank");
+                }
+              }}
+              className="px-6 py-3 bg-blue-500 text-white font-bold rounded-lg"
+            >
+              More Fares
+            </button>
 
             <button
               disabled={!ret}

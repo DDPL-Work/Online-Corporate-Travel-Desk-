@@ -16,12 +16,23 @@ import {
   getStopsLabel,
   getTotalDuration,
 } from "../../../../utils/formatter";
+import { useDispatch } from "react-redux";
+import { getFareUpsell } from "../../../../Redux/Actions/flight.thunks";
 
-export default function ReturnInternationalFlightCard({ group, onContinue }) {
+export default function ReturnInternationalFlightCard({
+  group,
+  onContinue,
+  traceId,
+  onOpenFareUpsell,
+}) {
+  const dispatch = useDispatch();
   const [openSection, setOpenSection] = useState(null);
-  const [selectedResultIndex, setSelectedResultIndex] = useState(group.flightInfo.ResultIndex);
+  const [selectedResultIndex, setSelectedResultIndex] = useState(
+    group.flightInfo.ResultIndex,
+  );
 
-  const flight = group.flightOptionsByResultIndex[selectedResultIndex] || group.flightInfo;
+  const flight =
+    group.flightOptionsByResultIndex[selectedResultIndex] || group.flightInfo;
 
   const onward = flight?.Segments?.[0] || [];
   const ret = flight?.Segments?.[1] || [];
@@ -33,6 +44,42 @@ export default function ReturnInternationalFlightCard({ group, onContinue }) {
 
   const handleToggle = (key) =>
     setOpenSection(openSection === key ? null : key);
+
+  const handleMoreFaresClick = async () => {
+    if (selectedResultIndex == null) return;
+
+    // ✅ STEP 1: OPEN TAB IMMEDIATELY (IMPORTANT)
+    const newTab = window.open("/fare-upsell", "_blank");
+
+    // ❗ If blocked → stop
+    if (!newTab) {
+      alert("Popup blocked! Please allow popups.");
+      return;
+    }
+
+    // ✅ STEP 2: CALL API
+    const res = await dispatch(
+      getFareUpsell({
+        traceId,
+        resultIndex: selectedResultIndex,
+      }),
+    );
+
+    // ✅ STEP 3: STORE DATA
+    if (res?.payload) {
+      localStorage.setItem(
+        "fareUpsellPayload",
+        JSON.stringify({
+          fareUpsellData: res.payload,
+          traceId,
+          journeyType: 2,
+        }),
+      );
+
+      // ✅ OPTIONAL: refresh tab after data ready
+      newTab.location.reload();
+    }
+  };
 
   const renderFlightLeg = (segments, label) => {
     const firstSeg = segments[0];
@@ -162,9 +209,6 @@ export default function ReturnInternationalFlightCard({ group, onContinue }) {
                   ✓ Refundable
                 </span>
               )}
-              <div className="inline-flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 text-blue-600">
-                <BiSolidOffer /> {group.fareOptions?.length || 1} Fare Options
-              </div>
             </div>
           </div>
         )}
@@ -181,7 +225,9 @@ export default function ReturnInternationalFlightCard({ group, onContinue }) {
         {/* Fare Options Selector */}
         {group.fareOptions && group.fareOptions.length > 0 && (
           <div className="mt-4 border-t border-gray-100 pt-5">
-            <h4 className="text-sm font-semibold text-gray-800 mb-3">Select Fare Option:</h4>
+            <h4 className="text-sm font-semibold text-gray-800 mb-3">
+              Select Fare Option:
+            </h4>
             <div className="flex flex-wrap gap-3">
               {group.fareOptions.map((fare, idx) => {
                 const isFareSelected = selectedResultIndex === fare.resultIndex;
@@ -195,7 +241,9 @@ export default function ReturnInternationalFlightCard({ group, onContinue }) {
                         : "bg-white border-blue-200 text-blue-800 hover:border-blue-400 hover:bg-blue-50"
                     }`}
                   >
-                    <span className={`text-[11px] font-semibold tracking-wide uppercase ${isFareSelected ? 'text-blue-100' : 'text-blue-600'}`}>
+                    <span
+                      className={`text-[11px] font-semibold tracking-wide uppercase ${isFareSelected ? "text-blue-100" : "text-blue-600"}`}
+                    >
                       {fare.supplierFareClass}
                     </span>
                     <span className="text-lg font-bold mt-0.5">
@@ -217,12 +265,24 @@ export default function ReturnInternationalFlightCard({ group, onContinue }) {
               Total (incl. taxes)
             </p>
           </div>
-          <button
-            onClick={() => onContinue(flight)}
-            className="relative group px-8 py-3 bg-linear-to-r from-blue-600 to-blue-500 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]"
-          >
-            Select & Continue
-          </button>
+
+          <div className="flex items-center gap-3">
+            {/* ✅ ONLY ONE MORE FARES BUTTON */}
+            <button
+              onClick={handleMoreFaresClick}
+              className="inline-flex items-center gap-1.5 bg-blue-50 px-4 py-2 text-sm font-semibold rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-100 transition"
+            >
+              <BiSolidOffer /> More Fares
+            </button>
+
+            {/* EXISTING BUTTON */}
+            <button
+              onClick={() => onContinue(flight)}
+              className="relative group px-8 py-3 bg-linear-to-r from-blue-600 to-blue-500 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]"
+            >
+              Select & Continue
+            </button>
+          </div>
         </div>
       </div>
     </div>

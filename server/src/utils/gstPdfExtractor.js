@@ -40,6 +40,53 @@ exports.extractGSTFromPdf = async (filePath) => {
     }
   }
 
+  // ───────── GST EMAIL ─────────
+  let gstEmail = null;
+
+  // Standard email regex (global + case insensitive)
+  const emailRegex = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+
+  // Extract all emails from PDF text
+  const allEmails = text.match(emailRegex);
+
+  if (allEmails && allEmails.length > 0) {
+    // Remove duplicates
+    const uniqueEmails = [...new Set(allEmails)];
+
+    // Try to find email near GST-related keywords
+    const priorityKeywords = [
+      "email",
+      "e-mail",
+      "email address",
+      "contact",
+      "registered email",
+    ];
+
+    let bestMatch = null;
+
+    for (const email of uniqueEmails) {
+      const index = text.indexOf(email);
+
+      // Get nearby context (100 chars before & after)
+      const context = text
+        .substring(Math.max(0, index - 100), index + 100)
+        .toLowerCase();
+
+      // Check if any keyword exists near email
+      const isRelevant = priorityKeywords.some((keyword) =>
+        context.includes(keyword),
+      );
+
+      if (isRelevant) {
+        bestMatch = email;
+        break;
+      }
+    }
+
+    // Final assignment
+    gstEmail = bestMatch || uniqueEmails[0];
+  }
+
   // ───────── ADDRESS (Multiple Patterns) ─────────
   let address = null;
 
@@ -66,5 +113,6 @@ exports.extractGSTFromPdf = async (filePath) => {
     gstin: gstinMatch ? gstinMatch[0] : null,
     legalName,
     address,
+    gstEmail,
   };
 };

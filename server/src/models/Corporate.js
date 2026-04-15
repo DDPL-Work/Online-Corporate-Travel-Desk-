@@ -84,6 +84,7 @@ const corporateSchema = new mongoose.Schema(
       },
       legalName: String,
       address: String,
+      gstEmail: String,
       verified: { type: Boolean, default: false },
       verifiedAt: Date,
     },

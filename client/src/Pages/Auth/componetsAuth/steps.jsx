@@ -904,6 +904,14 @@ export const Step6 = ({ form, setForm, errors, gstAutoFilled, ...props }) => (
         error={errors.gstLegalName}
       />
     </F>
+    <F label="GST Enail" required>
+      <Inp
+        value={form.gstEmail}
+        onChange={(v) => setForm({ ...form, gstEmail: v })}
+        placeholder="ABC Travels Private Limited"
+        error={errors.gstEmail}
+      />
+    </F>
 
     <F label="GST Registered Address">
       <Inp

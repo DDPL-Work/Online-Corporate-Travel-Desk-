@@ -38,6 +38,7 @@ import RoundTripFlightBooking from "../Pages/Booking-Flow/Flight-Booking/RoundTr
 import BookApprovedFlight from "../Pages/Booking-Flow/Flight-Booking/BookApprovedFlight";
 import BookingDetails from "../components/EmployeeDashboard/BookingDetails";
 import MultiCityFlightBooking from "../Pages/Booking-Flow/Flight-Booking/MultiWayFlightBooking";
+import FareUpsellPage from "../Pages/search-results/Flight-results/FareUpsellPage";
 import HotelSearchResults from "../Pages/search-results/Hotel-results/Hotel-Search-Results";
 import HotelDetailsPage from "../Pages/Booking-Flow/Hotel-Booking/HoteldetailsPage";
 import LandingPage from "../Pages/Auth/Landign";
@@ -205,6 +206,7 @@ export const appRouter = createBrowserRouter([
         path: "/multi-city-flight/booking",
         element: <MultiCityFlightBooking />,
       },
+      { path: "/fare-upsell", element: <FareUpsellPage /> },
       { path: "/search-hotel", element: <HotelSearchPage /> },
       { path: "/search-hotel-results", element: <HotelSearchResults /> },
       { path: "/one-hotel-details", element: <HotelDetailsPage /> },

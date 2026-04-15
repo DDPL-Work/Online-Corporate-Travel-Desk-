@@ -218,6 +218,9 @@ const searchHotel = Joi.object({
   GuestNationality: Joi.string().length(2).optional(),
 
   NoOfRooms: Joi.number().min(1).required(),
+  ResponseTime: Joi.number().optional(),
+  IsDetailedResponse: Joi.boolean().optional(),
+  Filters: Joi.any().optional(),
 
   PaxRooms: Joi.array()
     .items(

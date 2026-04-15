@@ -101,12 +101,12 @@ const normalizeFlight = (b = {}) => {
     "Route not available";
 
   const travelDate =
-    b.bookingSnapshot?.travelDate ||
-    segments.find((s) => (s.journeyType || "onward") === "onward")?.departureDateTime ||
-    b.travelDate ||
-    b.date ||
-    b.createdAt ||
-    "";
+  segments.find((s) => (s.journeyType || "onward") === "onward")?.departureDateTime ||
+  b.bookingSnapshot?.travelDate ||
+  b.travelDate ||
+  b.date ||
+  b.createdAt ||
+  "";
 
   const amount =
     Number(

@@ -10,6 +10,7 @@ import {
   executeHotelBooking,
   fetchBookedHotelDetails,
   generateHotelVoucher,
+  preBookHotel,
 } from "../Actions/hotelBooking.thunks";
 
 const initialState = {
@@ -27,6 +28,11 @@ const initialState = {
   voucherLoading: false,
   voucherError: null,
   voucherSuccess: false,
+
+  preBookLoading: false,
+  preBookError: null,
+  preBookSuccess: false,
+  preBookData: null,
 };
 
 const hotelBookingSlice = createSlice({
@@ -45,10 +51,34 @@ const hotelBookingSlice = createSlice({
     clearBookingDetails: (state) => {
       state.selectedBookingDetails = null;
     },
+
+    clearPreBook: (state) => {
+      state.preBookLoading = false;
+      state.preBookError = null;
+      state.preBookSuccess = false;
+      state.preBookData = null;
+    },
   },
 
   extraReducers: (builder) => {
     builder
+
+      /* ================= PRE BOOK ================= */
+      .addCase(preBookHotel.pending, (state) => {
+        state.preBookLoading = true;
+        state.preBookError = null;
+        state.preBookSuccess = false;
+      })
+      .addCase(preBookHotel.fulfilled, (state, action) => {
+        state.preBookLoading = false;
+        state.preBookSuccess = true;
+        state.preBookData = action.payload;
+      })
+      .addCase(preBookHotel.rejected, (state, action) => {
+        state.preBookLoading = false;
+        state.preBookError = action.payload;
+        state.preBookSuccess = false;
+      })
 
       /* ================= CREATE ================= */
       .addCase(createHotelBookingRequest.pending, (state) => {
@@ -159,7 +189,7 @@ const hotelBookingSlice = createSlice({
       .addCase(generateHotelVoucher.rejected, (state, action) => {
         state.voucherLoading = false;
         state.voucherError = action.payload;
-      })
+      });
   },
 });
 
@@ -170,5 +200,6 @@ export const {
   clearSelectedRequest,
   resetHotelBookingState,
   clearBookingDetails,
+  clearPreBook,
 } = hotelBookingSlice.actions;
 export default hotelBookingSlice.reducer;
