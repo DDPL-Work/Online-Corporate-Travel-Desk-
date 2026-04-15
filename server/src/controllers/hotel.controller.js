@@ -157,6 +157,7 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     PaxRooms,
     IsDetailedResponse,
     Filters,
+    ResponseTime,
   } = req.body;
 
   /* ---------------- VALIDATION ---------------- */
@@ -186,6 +187,7 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     PaxRooms,
     IsDetailedResponse,
     Filters,
+    ResponseTime,
   };
 
   const cacheKey = buildCacheKey(cacheKeyPayload);
@@ -234,6 +236,7 @@ exports.searchHotels = asyncHandler(async (req, res) => {
         PaxRooms,
         IsDetailedResponse,
         Filters,
+        ResponseTime
       });
 
       if (!searchResults?.HotelResult?.length) {
@@ -247,6 +250,7 @@ exports.searchHotels = asyncHandler(async (req, res) => {
           PaxRooms,
           IsDetailedResponse,
           Filters: {},
+          ResponseTime,
         });
       }
 

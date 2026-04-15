@@ -288,6 +288,7 @@ exports.getMyGstDetails = async (req, res, next) => {
         corporateName: corporate.corporateName,
         gstin: gst.gstin || "",
         legalName: gst.legalName || "",
+        gstEmail: gst.gstEmail || "",
         address:
           gst.address ||
           [

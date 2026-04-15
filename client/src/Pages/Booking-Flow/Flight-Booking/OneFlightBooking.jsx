@@ -55,6 +55,10 @@ export default function OneFlightBooking() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
+  useEffect(() => {
+  console.log("Navigation State:", location.state);
+}, [location.state]);
+
   const { traceId, fareQuote, fareRule, ssr } = useSelector(
     (state) => state.flights,
   );
@@ -105,6 +109,7 @@ export default function OneFlightBooking() {
     gstin: "",
     legalName: "",
     address: "",
+    gstEmail: "",
   });
   const [projectApproverData, setProjectApproverData] = useState({
     project: null,
@@ -234,6 +239,7 @@ export default function OneFlightBooking() {
             gstin: data.data.gstin || "",
             legalName: data.data.legalName || "",
             address: data.data.address || "",
+            gstEmail: data.data.gstEmail || "",
           }));
         }
       } catch (err) {
@@ -244,18 +250,24 @@ export default function OneFlightBooking() {
   }, []);
 
   useEffect(() => {
-    if (!traceId || !selectedFlight?.ResultIndex) return;
+    const resultIndex = selectedFlight?.ResultIndex;
+    const tId = searchParams?.traceId || traceId;
+
+    console.log("FareQuote Trigger Check:", { resultIndex, tId });
+
+    if (!tId || !resultIndex) return;
 
     dispatch(
       getFareQuote({
-        traceId: searchParams.traceId, // ✅ REDUX traceId
-        resultIndex: selectedFlight.ResultIndex,
+        traceId: tId,
+        resultIndex,
       }),
     );
   }, [
     dispatch,
-    traceId, // ✅ CRITICAL
-    selectedFlight?.ResultIndex,
+    searchParams?.traceId, // ✅ IMPORTANT
+    traceId,
+    selectedFlight, // ✅ FULL OBJECT (NOT nested field)
   ]);
 
   useEffect(() => {
@@ -265,14 +277,14 @@ export default function OneFlightBooking() {
 
     dispatch(
       getFareRule({
-        traceId: searchParams.traceId,
+        traceId: searchParams.traceId || traceId,
         resultIndex: quoteResult.ResultIndex, // 🔑 USE THIS
       }),
     );
 
     dispatch(
       getSSR({
-        traceId: searchParams.traceId,
+        traceId: searchParams.traceId || traceId,
         resultIndex: quoteResult.ResultIndex,
       }),
     );
@@ -740,7 +752,7 @@ export default function OneFlightBooking() {
       if (!t.lastName?.trim()) e.lastName = "Last name is required";
       if (!t.gender?.trim()) e.gender = "Gender is required";
       if (idx === 0 && !t.email?.trim()) e.email = "Email is required";
- 
+
       if (idx === 0 && !t.phoneWithCode?.trim())
         e.phoneWithCode = "Phone number is required";
       if (!t.nationality?.trim()) e.nationality = "Nationality is required";
@@ -839,7 +851,11 @@ export default function OneFlightBooking() {
       return;
     }
 
-    if (!gstDetails?.gstin?.trim() || !gstDetails?.legalName?.trim() || !gstDetails?.address?.trim()) {
+    if (
+      !gstDetails?.gstin?.trim() ||
+      !gstDetails?.legalName?.trim() ||
+      !gstDetails?.address?.trim()
+    ) {
       ToastWithTimer({
         type: "error",
         message: "Please fill all GST details",
@@ -896,7 +912,6 @@ export default function OneFlightBooking() {
       if (!t.email?.trim()) return false;
       if (!t.phoneWithCode?.trim()) return false;
 
-
       if (t.type === "INFANT") {
         if (
           typeof t.linkedAdultIndex !== "number" ||
@@ -910,7 +925,12 @@ export default function OneFlightBooking() {
       if (isIntl && !t.passportNumber?.trim()) return false;
     }
 
-    if (!gstDetails?.gstin?.trim() || !gstDetails?.legalName?.trim() || !gstDetails?.address?.trim()) return false;
+    if (
+      !gstDetails?.gstin?.trim() ||
+      !gstDetails?.legalName?.trim() ||
+      !gstDetails?.address?.trim()
+    )
+      return false;
 
     return true;
   }, [

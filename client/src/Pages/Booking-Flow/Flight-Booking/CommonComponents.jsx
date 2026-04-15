@@ -1389,7 +1389,7 @@ export const TravelerForm = ({
   isInternational: isIntlFromProp,
   onAddTraveler,
   canAddMore = false,
-  gstDetails = { gstin: "", legalName: "", address: "" },
+  gstDetails = { gstin: "", legalName: "", address: "", gstEmail:"", },
   setGstDetails = () => {},
 }) => {
   if (!Array.isArray(travelers)) travelers = [];
@@ -1492,6 +1492,23 @@ export const TravelerForm = ({
                   }))
                 }
                 placeholder="Company legal name"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                GST Email
+              </label>
+              <input
+                type="text"
+                value={gstDetails.gstEmail || ""}
+                onChange={(e) =>
+                  setGstDetails((prev) => ({
+                    ...prev,
+                    gstEmail: e.target.value,
+                  }))
+                }
+                placeholder="GST Email"
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
               />
             </div>

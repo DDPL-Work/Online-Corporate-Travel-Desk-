@@ -339,7 +339,7 @@ export default function OneWayFlightCard({
                   onClick={handleFareOptionsClick}
                   className="flex items-center gap-1.5 bg-linear-to-r from-blue-50 to-blue-100 px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 text-blue-600 hover:underline hover:text-blue-700 transition-colors cursor-pointer"
                 >
-                  <BiSolidOffer /> Fare Options
+                  <BiSolidOffer /> More Fares
                 </button>
               </div>
 

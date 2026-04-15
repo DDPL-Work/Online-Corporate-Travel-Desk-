@@ -19,9 +19,20 @@ const {
   getBookedHotelDetails,
   getMyHotelBookings,
   generateHotelVoucher,
+  preBookHotel,
 } = require("../controllers/hotelBooking.controller");
 
 router.use(verifyToken);
+
+/* ======================================================
+   PRE BOOK HOTEL
+====================================================== */
+router.post(
+  "/prebook",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  corporateContext,
+  preBookHotel
+);
 
 /* ======================================================
    CREATE REQUEST

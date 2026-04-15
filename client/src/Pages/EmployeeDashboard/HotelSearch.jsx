@@ -38,7 +38,7 @@ const NAV_TABS = [
 ];
 
 /* ─── Country Selector ─── */
-const CountrySelector = ({ value, onChange, countries }) => {
+const CountrySelector = ({ value, onChange, countries, label = "Country" }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef(null);
@@ -62,7 +62,7 @@ const CountrySelector = ({ value, onChange, countries }) => {
   return (
     <div className="relative" ref={ref}>
       <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
-        <FaGlobe className="text-blue-600" /> Country
+        <FaGlobe className="text-blue-600" /> {label}
       </label>
       <button
         type="button"
@@ -169,6 +169,7 @@ export default function HotelSearchPage() {
   const navigate = useNavigate();
   const [activePage, setActivePage] = useState("/search-hotel");
   const [country, setCountry] = useState("IN");
+  const [guestNationality, setGuestNationality] = useState("IN");
   const [city, setCity] = useState("");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
@@ -298,7 +299,8 @@ export default function HotelSearchPage() {
       CheckIn: checkIn,
       CheckOut: checkOut,
       CityCode: selectedCityCode, // string is fine
-      GuestNationality: country, // 🔥 IMPORTANT
+      GuestNationality: guestNationality, // 🔥 IMPORTANT
+      ResponseTime: 10,
       NoOfRooms: rooms,
       PaxRooms: roomConfigs.map((r) => ({
         Adults: r.adults,
@@ -307,7 +309,7 @@ export default function HotelSearchPage() {
       })),
       IsDetailedResponse: true,
       Filters: {
-        Refundable: false,
+        Refundable: true,
         MealType: "All",
       },
     };
@@ -349,7 +351,7 @@ export default function HotelSearchPage() {
 
   const renderRoomConfig = (room, idx) => {
     const setAdults = (val) =>
-      updateRoom(idx, () => ({ adults: Math.max(1, Math.min(4, val)) }));
+      updateRoom(idx, () => ({ adults: Math.max(1, Math.min(8, val)) }));
     const setChildren = (val) =>
       updateRoom(idx, (r) => {
         const count = Math.max(0, Math.min(4, val));
@@ -363,7 +365,7 @@ export default function HotelSearchPage() {
     const setChildAge = (cIdx, val) =>
       updateRoom(idx, (r) => {
         const ages = [...(r.childrenAges || [])];
-        ages[cIdx] = Math.min(12, Math.max(1, Number(val) || 1));
+        ages[cIdx] = Math.min(18, Math.max(1, Number(val) || 1));
         return { childrenAges: ages };
       });
 
@@ -385,7 +387,7 @@ export default function HotelSearchPage() {
         <div className="grid grid-cols-2 gap-3">
           <div className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg">
             <span className="text-sm font-semibold text-gray-700">Adults</span>
-            <Counter val={room.adults} setVal={setAdults} min={1} max={4} />
+            <Counter val={room.adults} setVal={setAdults} min={1} max={8} />
           </div>
 
           <div className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg">
@@ -399,7 +401,7 @@ export default function HotelSearchPage() {
         {room.children > 0 && (
           <div className="mt-3 space-y-2">
             <p className="text-xs font-semibold text-gray-600">
-              Child Ages (1-12)
+              Child Ages (0-18)
             </p>
             <div className="grid grid-cols-2 gap-2">
               {Array.from({ length: room.children }).map((_, cIdx) => (
@@ -409,7 +411,7 @@ export default function HotelSearchPage() {
                   onChange={(e) => setChildAge(cIdx, e.target.value)}
                   className="border border-gray-300 rounded-lg px-2 py-2 text-sm"
                 >
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((age) => (
+                  {Array.from({ length: 18 }, (_, i) => i + 1).map((age) => (
                     <option key={age} value={age}>
                       {age} yrs
                     </option>
@@ -520,10 +522,10 @@ export default function HotelSearchPage() {
           </div>
 
           <div className="p-5 md:p-6">
-            {/* Form Grid — 12 cols: Country(2) + City(4) + CheckIn(2) + CheckOut(2) + Guests(2) */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+            {/* Form Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 items-start">
               {/* ── Country ── */}
-              <div className="md:col-span-2">
+              <div className="md:col-span-1 lg:col-span-2">
                 <CountrySelector
                   value={country}
                   onChange={handleCountryChange}
@@ -532,7 +534,10 @@ export default function HotelSearchPage() {
               </div>
 
               {/* ── City / Hotel / Area ── */}
-              <div className="md:col-span-4 relative" ref={cityRef}>
+              <div
+                className="md:col-span-1 lg:col-span-4 relative"
+                ref={cityRef}
+              >
                 <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
                   <FaMapMarkerAlt className="text-blue-600" /> City / Hotel /
                   Area
@@ -592,7 +597,7 @@ export default function HotelSearchPage() {
               </div>
 
               {/* ── Check-in ── */}
-              <div className="md:col-span-2">
+              <div className="md:col-span-1 lg:col-span-2">
                 <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
                   <FaCalendarAlt className="text-blue-600" /> Check-in
                 </label>
@@ -623,7 +628,7 @@ export default function HotelSearchPage() {
               </div>
 
               {/* ── Check-out ── */}
-              <div className="md:col-span-2">
+              <div className="md:col-span-1 lg:col-span-2">
                 <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
                   <FaCalendarAlt className="text-blue-600" /> Check-out
                 </label>
@@ -657,7 +662,10 @@ export default function HotelSearchPage() {
               </div>
 
               {/* ── Guests & Rooms ── */}
-              <div className="md:col-span-2 relative" ref={guestRef}>
+              <div
+                className="md:col-span-2 lg:col-span-2 relative"
+                ref={guestRef}
+              >
                 <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
                   <FaUserFriends className="text-blue-600" /> Guests &amp; Rooms
                 </label>
@@ -678,29 +686,48 @@ export default function HotelSearchPage() {
                 </button>
 
                 {showGuestDropdown && (
-                  <div className="absolute top-full right-0 mt-1 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 w-[420px] p-5 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-bold text-gray-700">
-                        Guests &amp; Rooms
-                      </h4>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">Rooms</span>
-                        <Counter
-                          val={rooms}
-                          setVal={setRooms}
-                          min={1}
-                          max={9}
+                  <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 w-[420px] p-5">
+                    {/* ── Header ── */}
+                    <div className="space-y-3 mb-4">
+                      {/* Row 1 */}
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-gray-800">
+                          Guests & Rooms
+                        </h4>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Rooms</span>
+                          <Counter
+                            val={rooms}
+                            setVal={setRooms}
+                            min={1}
+                            max={6}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Row 2 - Full width */}
+                      <div className="w-full">
+                        <CountrySelector
+                          label="Guest Nationality"
+                          value={guestNationality}
+                          onChange={setGuestNationality}
+                          countries={normalizedCountries}
                         />
                       </div>
                     </div>
 
-                    <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                      {roomConfigs.map((room, idx) => renderRoomConfig(room, idx))}
+                    {/* ── Room Configurations ── */}
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1 border-t pt-3">
+                      {roomConfigs.map((room, idx) =>
+                        renderRoomConfig(room, idx),
+                      )}
                     </div>
 
+                    {/* ── Footer Button ── */}
                     <button
                       onClick={() => setShowGuestDropdown(false)}
-                      className="w-full bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold py-2.5 rounded-xl transition"
+                      className="w-full mt-4 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold py-2.5 rounded-xl transition"
                     >
                       Apply
                     </button>

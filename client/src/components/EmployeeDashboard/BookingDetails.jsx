@@ -886,6 +886,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
   const [remarksText, setRemarksText] = useState("");
   const [successData, setSuccessData] = useState(null);
   const [processingLabel, setProcessingLabel] = useState("Processing…");
+  const [shouldFetchCharges, setShouldFetchCharges] = useState(true);
 
   const segments = booking?.flightRequest?.segments || [];
   const journeyTypeOf = (seg) => {
@@ -905,27 +906,31 @@ function CancellationModal({ booking, onClose, onSuccess }) {
 
   // Fetch charges on mount
   useEffect(() => {
+    const isCancelled = sessionStorage.getItem(
+      `cancelRequested_${booking._id}`,
+    );
+
+    // 🚫 STOP API after cancellation OR manual block
+    if (isCancelled === "true" || !shouldFetchCharges) {
+      return;
+    }
+
     (async () => {
       try {
         const res = await dispatch(fetchCancellationCharges(booking._id));
+
         if (!fetchCancellationCharges.fulfilled.match(res)) {
-          throw new Error(
-            res.payload?.message ||
-              res.payload?.Response?.Error?.ErrorMessage ||
-              "Could not fetch cancellation charges.",
-          );
+          throw new Error("Failed to fetch charges");
         }
 
         setCharges(res.payload);
         setStep("charges");
       } catch (err) {
-        setChargesError(
-          err?.message || "Could not fetch cancellation charges. Please try again.",
-        );
+        setChargesError(err.message);
         setStep("error");
       }
     })();
-  }, [booking._id, dispatch]);
+  }, [booking._id, dispatch, shouldFetchCharges]);
 
   // Extract TicketCRInfo[0] from charges response
   const isMulti = charges?.isRoundTrip;
@@ -1000,6 +1005,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
         throw new Error("Cancellation failed by airline/supplier");
 
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
+      setShouldFetchCharges(false);
       await dispatch(fetchMyBookingById(booking._id));
 
       setSuccessData({
@@ -1048,6 +1054,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
         throw new Error(res.payload || "Partial cancellation failed");
 
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
+      setShouldFetchCharges(false);
       await dispatch(fetchMyBookingById(booking._id));
 
       setSuccessData({
@@ -1669,10 +1676,17 @@ function CancelScreen({ booking, onClose }) {
   const [charges, setCharges] = useState(null);
 
   useEffect(() => {
+    const isCancelled = sessionStorage.getItem(
+      `cancelRequested_${booking._id}`,
+    );
+
+    if (isCancelled === "true") return;
+
     const fetchCharges = async () => {
       const res = await dispatch(fetchCancellationCharges(booking._id));
       if (res.payload) setCharges(res.payload);
     };
+
     fetchCharges();
   }, [booking._id, dispatch]);
 

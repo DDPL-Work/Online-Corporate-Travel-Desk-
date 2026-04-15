@@ -39,6 +39,7 @@ import {
   createHotelBookingRequest,
   fetchHotelRequestById,
   executeHotelBooking,
+  preBookHotel,
 } from "../../../Redux/Actions/hotelBooking.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import Swal from "sweetalert2";
@@ -565,9 +566,8 @@ const HotelReviewBooking = () => {
     (state) => state.hotelBookings,
   );
   const { hotels: searchedHotels } = useSelector((state) => state.hotel);
-  const { selectedRequest, loading, error } = useSelector(
-    (state) => state.hotelBookings,
-  );
+  const { selectedRequest, loading, error, preBookData, preBookLoading } =
+    useSelector((state) => state.hotelBookings);
 
   const { hotel, rooms, searchParams } = location.state || {};
 
@@ -578,6 +578,7 @@ const HotelReviewBooking = () => {
     gstin: "",
     legalName: "",
     address: "",
+    gstEmail: "",
   });
 
   const queryParams = new URLSearchParams(location.search);
@@ -622,6 +623,7 @@ const HotelReviewBooking = () => {
             gstin: data.data.gstin || "",
             legalName: data.data.legalName || "",
             address: data.data.address || "",
+            gstEmail: data.data.gstEmail || "",
           }));
         }
       } catch (err) {
@@ -816,6 +818,17 @@ const HotelReviewBooking = () => {
     displayHotel?.address?.split(",")?.slice(-1)[0]?.trim() ||
     "";
 
+  const preBookRooms = preBookData?.HotelResult?.[0]?.Rooms || [];
+
+  const validation = preBookData?.ValidationInfo || {};
+
+  const requiredFlags = {
+    isPANRequired: validation?.PanMandatory,
+    isPassportRequired: validation?.PassportMandatory,
+    isEmailRequired: true, // fallback (API not giving)
+    isPhoneRequired: true, // fallback
+  };
+
   const getCountryCode = (countryNameOrCode) => {
     if (!countryNameOrCode) return "";
 
@@ -853,6 +866,15 @@ const HotelReviewBooking = () => {
     Price: selectedRoom?.Price || {},
     BookingCode: selectedRoom?.BookingCode || "",
   };
+
+  const bookingCode = selectedRoom?.[0]?.BookingCode;
+  useEffect(() => {
+    if (!bookingCode) return;
+
+    console.log("🔥 PreBook Triggered:", bookingCode);
+
+    dispatch(preBookHotel({ BookingCode: bookingCode }));
+  }, [bookingCode]);
 
   const displaySearchParams = isBookNowMode
     ? {
@@ -1184,7 +1206,7 @@ const HotelReviewBooking = () => {
         />
 
         {/* ── FULL-WIDTH ROOM DETAILS ── */}
-        {selectedRoom.map((room, index) => (
+        {(preBookRooms.length ? preBookRooms : selectedRoom).map((room, index) => (
           <SelectedRoomDetailsCard
             key={index}
             selectedRoom={room}
@@ -1578,109 +1600,112 @@ const HotelReviewBooking = () => {
                                 className="field-input bg-slate-50 text-slate-400 cursor-not-allowed"
                               />
                             </div>
-                            <div className="flex flex-col gap-1">
-                              <label className="field-label">
-                                PAN Card{" "}
-                                {(t.paxType === 2 ||
-                                  (t.age && Number(t.age) <= 18)) && (
-                                  <span className="text-slate-400 font-normal normal-case">
-                                    (Not required)
-                                  </span>
-                                )}
-                              </label>
-                              <input
-                                type="text"
-                                value={t.panCard || ""}
-                                disabled={
-                                  isBookNowMode ||
-                                  t.paxType === 2 ||
-                                  (t.age && Number(t.age) <= 18)
-                                }
-                                onChange={(e) =>
-                                  updateTraveler(
-                                    t.id,
-                                    "panCard",
-                                    e.target.value.toUpperCase(),
-                                  )
-                                }
-                                placeholder="ABCDE1234F"
-                                maxLength={10}
-                                className="field-input font-mono tracking-widest"
-                              />
-                              <p className="text-[10px] text-slate-400">
-                                Required only for adults older than 18.
-                              </p>
-                            </div>
+                            {requiredFlags.isPANRequired && (
+                              <div className="flex flex-col gap-1">
+                                <label className="field-label">
+                                  PAN Card{" "}
+                                  {(t.paxType === 2 ||
+                                    (t.age && Number(t.age) <= 18)) && (
+                                    <span className="text-slate-400 font-normal normal-case">
+                                      (Not required)
+                                    </span>
+                                  )}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={t.panCard || ""}
+                                  disabled={
+                                    isBookNowMode ||
+                                    t.paxType === 2 ||
+                                    (t.age && Number(t.age) <= 18)
+                                  }
+                                  onChange={(e) =>
+                                    updateTraveler(
+                                      t.id,
+                                      "panCard",
+                                      e.target.value.toUpperCase(),
+                                    )
+                                  }
+                                  placeholder="ABCDE1234F"
+                                  maxLength={10}
+                                  className="field-input font-mono tracking-widest"
+                                />
+                                <p className="text-[10px] text-slate-400">
+                                  Required only for adults older than 18.
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </div>
 
                         {/* ── Passport (International only) ── */}
-                        {isInternationalBooking && (
-                          <>
-                            <Divider />
-                            <div>
-                              <SectionHeading
-                                icon={<FiBookOpen size={12} />}
-                                title="Passport Details"
-                                badge="International"
-                              />
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <div className="flex flex-col gap-1">
-                                  <label className="field-label">
-                                    Passport Number <Required />
-                                  </label>
-                                  <input
-                                    type="text"
-                                    placeholder="e.g. A1234567"
-                                    value={t.PassportNo || ""}
-                                    onChange={(e) =>
-                                      updateTraveler(
-                                        t.id,
-                                        "PassportNo",
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="field-input font-mono tracking-widest"
-                                  />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <label className="field-label">
-                                    Issue Date <Required />
-                                  </label>
-                                  <input
-                                    type="date"
-                                    value={t.PassportIssueDate || ""}
-                                    onChange={(e) =>
-                                      updateTraveler(
-                                        t.id,
-                                        "PassportIssueDate",
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="field-input"
-                                  />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <label className="field-label">
-                                    Expiry Date <Required />
-                                  </label>
-                                  <input
-                                    type="date"
-                                    value={t.PassportExpDate || ""}
-                                    onChange={(e) =>
-                                      updateTraveler(
-                                        t.id,
-                                        "PassportExpDate",
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="field-input"
-                                  />
+                        {isInternationalBooking &&
+                          requiredFlags.isPassportRequired && (
+                            <>
+                              <Divider />
+                              <div>
+                                <SectionHeading
+                                  icon={<FiBookOpen size={12} />}
+                                  title="Passport Details"
+                                  badge="International"
+                                />
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                  <div className="flex flex-col gap-1">
+                                    <label className="field-label">
+                                      Passport Number <Required />
+                                    </label>
+                                    <input
+                                      type="text"
+                                      placeholder="e.g. A1234567"
+                                      value={t.PassportNo || ""}
+                                      onChange={(e) =>
+                                        updateTraveler(
+                                          t.id,
+                                          "PassportNo",
+                                          e.target.value,
+                                        )
+                                      }
+                                      className="field-input font-mono tracking-widest"
+                                    />
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <label className="field-label">
+                                      Issue Date <Required />
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={t.PassportIssueDate || ""}
+                                      onChange={(e) =>
+                                        updateTraveler(
+                                          t.id,
+                                          "PassportIssueDate",
+                                          e.target.value,
+                                        )
+                                      }
+                                      className="field-input"
+                                    />
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <label className="field-label">
+                                      Expiry Date <Required />
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={t.PassportExpDate || ""}
+                                      onChange={(e) =>
+                                        updateTraveler(
+                                          t.id,
+                                          "PassportExpDate",
+                                          e.target.value,
+                                        )
+                                      }
+                                      className="field-input"
+                                    />
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </>
-                        )}
+                            </>
+                          )}
                       </div>
                     </div>
                   ))}
@@ -1793,6 +1818,23 @@ const HotelReviewBooking = () => {
                       }))
                     }
                     placeholder="Company legal name"
+                    className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/10 transition bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    GST Email
+                  </label>
+                  <input
+                    type="text"
+                    value={gstDetails.gstEmail || ""}
+                    onChange={(e) =>
+                      setGstDetails((prev) => ({
+                        ...prev,
+                        gstEmail: e.target.value,
+                      }))
+                    }
+                    placeholder="GST Email"
                     className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/10 transition bg-white"
                   />
                 </div>

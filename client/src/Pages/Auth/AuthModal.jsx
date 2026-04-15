@@ -59,6 +59,7 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     gstin: "",
     gstLegalName: "",
     gstAddress: "",
+    gstEmail: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -233,6 +234,7 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
           gstin: data.data.gstin || "",
           gstLegalName: data.data.legalName || "",
           gstAddress: data.data.address || "",
+          gstEmail: data.data.gstEmail || "",
         }));
 
         setGstAutoFilled(true);
@@ -279,6 +281,7 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     fd.append("gstDetails[gstin]", form.gstin);
     fd.append("gstDetails[legalName]", form.gstLegalName);
     fd.append("gstDetails[address]", form.gstAddress);
+    fd.append("gstDetails[gstEmail]", form.gstEmail);
 
     // BILLING
     // fd.append("billingCycle", form.billingCycle);

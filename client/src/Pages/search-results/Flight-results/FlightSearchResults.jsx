@@ -16,7 +16,6 @@ import ReturnFlightList from "./ReturnFlight/ReturnFlightList";
 import { formatDate } from "../../../utils/formatter";
 import { useLocation } from "react-router-dom";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
-import FareUpsellModal from "./FareUpsellModal";
 import ReturnInternationalFlightCard from "./ReturnFlight/ReturnInternationalFlightCard";
 
 const extractRoutes = (flights, journeyType) => {
@@ -114,7 +113,8 @@ const groupFlightsByIdentity = (results = []) => {
 
     const group = groupedMap.get(flightKey);
 
-    const supplierFareClass = `${segment?.SupplierFareClass || ""}`.trim() || "Standard";
+    const supplierFareClass =
+      `${segment?.SupplierFareClass || ""}`.trim() || "Standard";
     const fareClassKey = supplierFareClass.toLowerCase();
     const publishedFare = toFiniteNumber(
       item?.Fare?.PublishedFare ?? item?.Fare?.OfferedFare,
@@ -169,17 +169,19 @@ const groupFlightsByIdentity = (results = []) => {
 const getGroupKey = (item) => {
   if (!item?.Segments || !Array.isArray(item.Segments)) return null;
 
-  return item.Segments.map(leg => {
+  return item.Segments.map((leg) => {
     const legArray = Array.isArray(leg) ? leg : [leg];
-    return legArray.map(seg => {
-      const airlineCode = seg?.Airline?.AirlineCode || "";
-      const flightNumber = seg?.Airline?.FlightNumber || "";
-      const originCode = seg?.Origin?.Airport?.AirportCode || "";
-      const destinationCode = seg?.Destination?.Airport?.AirportCode || "";
-      const depTime = seg?.Origin?.DepTime || "";
-      const arrTime = seg?.Destination?.ArrTime || "";
-      return `${airlineCode}_${flightNumber}_${originCode}_${destinationCode}_${depTime}_${arrTime}`;
-    }).join("|");
+    return legArray
+      .map((seg) => {
+        const airlineCode = seg?.Airline?.AirlineCode || "";
+        const flightNumber = seg?.Airline?.FlightNumber || "";
+        const originCode = seg?.Origin?.Airport?.AirportCode || "";
+        const destinationCode = seg?.Destination?.Airport?.AirportCode || "";
+        const depTime = seg?.Origin?.DepTime || "";
+        const arrTime = seg?.Destination?.ArrTime || "";
+        return `${airlineCode}_${flightNumber}_${originCode}_${destinationCode}_${depTime}_${arrTime}`;
+      })
+      .join("|");
   }).join("||");
 };
 
@@ -207,7 +209,9 @@ const groupFlightsByFareOptions = (results = []) => {
       group.flightOptionsByResultIndex[item.ResultIndex] = item;
     }
 
-    const supplierFareClass = `${item?.Segments?.[0]?.[0]?.SupplierFareClass || ""}`.trim() || "Standard";
+    const supplierFareClass =
+      `${item?.Segments?.[0]?.[0]?.SupplierFareClass || ""}`.trim() ||
+      "Standard";
     const publishedFare = toFiniteNumber(
       item?.Fare?.PublishedFare ?? item?.Fare?.OfferedFare,
       0,
@@ -220,11 +224,12 @@ const groupFlightsByFareOptions = (results = []) => {
       fareDetails: item?.Fare,
       refundable: item?.IsRefundable,
       cabinClass: getCabinClassKey(item?.Segments?.[0]?.[0]?.CabinClass),
-      baggage: item?.Segments?.[0]?.[0]?.Baggage
+      baggage: item?.Segments?.[0]?.[0]?.Baggage,
     };
 
     const existingIndex = group.fareOptions.findIndex(
-      (opt) => opt.supplierFareClass.toLowerCase() === supplierFareClass.toLowerCase()
+      (opt) =>
+        opt.supplierFareClass.toLowerCase() === supplierFareClass.toLowerCase(),
     );
 
     if (existingIndex === -1) {
@@ -312,35 +317,10 @@ export default function FlightSearchResults() {
 
   /* ---------------- FILTER STATES ---------------- */
   const [filteredFlights, setFilteredFlights] = useState([]);
-
-  // const [priceValues, setPriceValues] = useState([1000, 70000]);
-
-  // const [durationValues, setDurationValues] = useState([0, 1440]);
-  // const [selectedMaxDuration, setSelectedMaxDuration] = useState(1440);
-
-  // const [selectedStops, setSelectedStops] = useState([]);
-  // const [selectedTime, setSelectedTime] = useState("");
-  // const [selectedArrivalTime, setSelectedArrivalTime] = useState("");
-
-  // const [selectedAirlines, setSelectedAirlines] = useState([]);
-  // const [selectedFlightNumbers, setSelectedFlightNumbers] = useState([]);
-  // const [selectedFareTypes, setSelectedFareTypes] = useState([]);
-  // const [selectedTerminals, setSelectedTerminals] = useState([]);
-  // const [selectedAirports, setSelectedAirports] = useState([]);
-  // const [selectedLayoverAirports, setSelectedLayoverAirports] = useState([]);
-  // const [lowCO2, setLowCO2] = useState(false);
-
   const [sortKey, setSortKey] = useState("Best");
 
   const PAGE_SIZE = 5;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-
-  // const [popularFilters, setPopularFilters] = useState({
-  //   earlyMorning: false,
-  //   refundable: false,
-  //   directOnly: false,
-  //   shortDuration: false,
-  // });
 
   const [onwardFilters, setOnwardFilters] = useState(initialFilterState);
   const [returnFilters, setReturnFilters] = useState(initialFilterState);
@@ -428,11 +408,6 @@ export default function FlightSearchResults() {
   }, [normalizedFlights]);
 
   // ✅ Auto-update price filter when range changes
-  // useEffect(() => {
-  //   if (priceRange.max > 0) {
-  //     setPriceValues([priceRange.min, priceRange.max]);
-  //   }
-  // }, [priceRange]);
 
   useEffect(() => {
     if (priceRange.max > 0) {
@@ -449,52 +424,6 @@ export default function FlightSearchResults() {
       );
     }
   }, [priceRange]);
-
-  // const activeFilters = useMemo(
-  //   () => ({
-  //     price:
-  //       priceValues[0] !== priceRange?.min ||
-  //       priceValues[1] !== priceRange?.max,
-
-  //     stops: selectedStops.length > 0,
-  //     airlines: selectedAirlines.length > 0,
-  //     fareTypes: selectedFareTypes.length > 0,
-  //     flightNumbers: selectedFlightNumbers.length > 0,
-  //     terminals: selectedTerminals.length > 0,
-  //     airports: selectedAirports.length > 0,
-  //     layovers: selectedLayoverAirports.length > 0,
-
-  //     departureTime: !!selectedTime,
-  //     arrivalTime: !!selectedArrivalTime,
-
-  //     duration:
-  //       durationValues[0] !== 0 || durationValues[1] !== selectedMaxDuration,
-
-  //     popular:
-  //       popularFilters.earlyMorning ||
-  //       popularFilters.refundable ||
-  //       popularFilters.directOnly ||
-  //       popularFilters.shortDuration,
-
-  //     lowCO2,
-  //   }),
-  //   [
-  //     priceValues,
-  //     selectedStops,
-  //     selectedAirlines,
-  //     selectedFareTypes,
-  //     selectedFlightNumbers,
-  //     selectedTerminals,
-  //     selectedAirports,
-  //     selectedLayoverAirports,
-  //     selectedTime,
-  //     selectedArrivalTime,
-  //     durationValues,
-  //     selectedMaxDuration,
-  //     popularFilters,
-  //     lowCO2,
-  //   ],
-  // );
 
   // ================= HEADER FLIGHT (SAFE) =================
 
@@ -928,22 +857,6 @@ export default function FlightSearchResults() {
       setVisibleCount(PAGE_SIZE);
     }
   }, [
-    // normalizedFlights,
-    // priceValues,
-    // durationValues,
-    // selectedStops,
-    // selectedTime,
-    // selectedArrivalTime,
-    // selectedAirlines,
-    // selectedFlightNumbers,
-    // selectedFareTypes,
-    // selectedTerminals,
-    // selectedAirports,
-    // selectedLayoverAirports,
-    // selectedMaxDuration,
-    // popularFilters,
-    // lowCO2,
-    // sortKey,
     normalizedFlights,
     activeFiltersState,
     sortKey,
@@ -951,22 +864,6 @@ export default function FlightSearchResults() {
     journeyType,
     isInternationalReturnGrouped,
   ]);
-
-  // useEffect(() => {
-  //   if (Number(journeyType) === 2 && !isInternationalReturnGrouped) {
-  //     setPriceValues([priceRange.min, priceRange.max]);
-  //     setSelectedStops([]);
-  //     setSelectedAirlines([]);
-  //     setSelectedFlightNumbers([]);
-  //     setSelectedFareTypes([]);
-  //     setSelectedTerminals([]);
-  //     setSelectedAirports([]);
-  //     setSelectedLayoverAirports([]);
-  //     setSelectedTime("");
-  //     setSelectedArrivalTime("");
-  //     setLowCO2(false);
-  //   }
-  // }, [activeTab]);
 
   const renderFlightCard = (flight, idx) => {
     const jt = Number(journeyType);
@@ -986,8 +883,17 @@ export default function FlightSearchResults() {
             }
           }
           onOpenFareUpsell={(fareData) => {
-            setSelectedFareUpsell(fareData);
-            setFareUpsellOpen(true);
+            const payloadData = {
+              fareUpsellData: fareData,
+              searchPayload: searchPayload || location.state?.searchPayload,
+              journeyType: 1,
+              traceId,
+            };
+            localStorage.setItem(
+              "fareUpsellPayload",
+              JSON.stringify(payloadData),
+            );
+            window.open("/fare-upsell", "_blank");
           }}
         />
       );
@@ -1004,8 +910,17 @@ export default function FlightSearchResults() {
           resultIndex={flight.ResultIndex}
           searchPayload={searchPayload}
           onOpenFareUpsell={(fareData) => {
-            setSelectedFareUpsell(fareData);
-            setFareUpsellOpen(true);
+            const payloadData = {
+              fareUpsellData: fareData,
+              searchPayload: searchPayload || location.state?.searchPayload,
+              journeyType: 3,
+              traceId,
+            };
+            localStorage.setItem(
+              "fareUpsellPayload",
+              JSON.stringify(payloadData),
+            );
+            window.open("/fare-upsell", "_blank");
           }}
         />
       );
@@ -1305,28 +1220,46 @@ export default function FlightSearchResults() {
             )}
 
             {Number(journeyType) === 2 && isInternationalReturnGrouped ? (
-              groupFlightsByFareOptions(filteredFlights).map((groupedFlight) => (
-                <ReturnInternationalFlightCard
-                  key={groupedFlight.flightKey}
-                  group={groupedFlight}
-                  onContinue={(selectedVariant) =>
-                    navigate("/round-trip-flight/booking", {
-                      state: {
-                        rawFlightData: selectedVariant, // Pass the specific fare variant
-                        traceId,
-                        journeyType: 2,
-                        isInternational: true,
-                        passengers:
-                          searchPayload?.passengers || {
+              groupFlightsByFareOptions(filteredFlights).map(
+                (groupedFlight) => (
+                  <ReturnInternationalFlightCard
+                    key={groupedFlight.flightKey}
+                    group={groupedFlight}
+                    traceId={traceId} 
+                    onContinue={(selectedVariant) =>
+                      navigate("/round-trip-flight/booking", {
+                        state: {
+                          rawFlightData: selectedVariant, // Pass the specific fare variant
+                          traceId,
+                          journeyType: 2,
+                          isInternational: true,
+                          passengers: searchPayload?.passengers || {
                             adults: searchPayload?.adults || 1,
                             children: searchPayload?.children || 0,
                             infants: searchPayload?.infants || 0,
                           },
-                      },
-                    })
-                  }
-                />
-              ))
+                        },
+                      })
+                    }
+                    onOpenFareUpsell={(fareData) => {
+                      const payloadData = {
+                        fareUpsellData: fareData,
+                        searchPayload:
+                          searchPayload || location.state?.searchPayload,
+                        journeyType: 2, // ✅ IMPORTANT
+                        traceId,
+                      };
+
+                      localStorage.setItem(
+                        "fareUpsellPayload",
+                        JSON.stringify(payloadData),
+                      );
+
+                      window.open("/fare-upsell", "_blank");
+                    }}
+                  />
+                ),
+              )
             ) : Number(journeyType) === 2 ? (
               <>
                 {/* EXISTING DOMESTIC ROUND TRIP FLOW */}
@@ -1401,12 +1334,11 @@ export default function FlightSearchResults() {
                         },
                         traceId,
                         isInternational,
-                        passengers:
-                          searchPayload?.passengers || {
-                            adults: searchPayload?.adults || 1,
-                            children: searchPayload?.children || 0,
-                            infants: searchPayload?.infants || 0,
-                          },
+                        passengers: searchPayload?.passengers || {
+                          adults: searchPayload?.adults || 1,
+                          children: searchPayload?.children || 0,
+                          infants: searchPayload?.infants || 0,
+                        },
                       },
                     });
                   }}
@@ -1424,15 +1356,6 @@ export default function FlightSearchResults() {
           </section>
         </div>
       </div>
-
-      <FareUpsellModal
-        isOpen={fareUpsellOpen}
-        onClose={() => setFareUpsellOpen(false)}
-        fareUpsellData={selectedFareUpsell}
-        searchPayload={searchPayload}
-        journeyType={journeyType}
-        searchTraceId={traceId}
-      />
     </div>
   );
 }
