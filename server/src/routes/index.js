@@ -82,6 +82,7 @@ router.get("/", (req, res) => {
 
       
       superAdmin: "/api/v1/super-admin",
+      corporateRelatedRoutes: "/api/v1/corporate-related",
       employees: "/api/v1/employees",
       corporateAdmin: "/api/v1/corporate-admin",    
       travelAdmin: "api/v1/travel-admin",

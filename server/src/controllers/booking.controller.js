@@ -243,6 +243,25 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
   let bookingSnapshot;
 
+const mapCabinClass = (cabin) => {
+  const mapping = {
+    2: "Economy",
+    3: "Premium Economy",
+    4: "Business",
+    5: "Business", // no premium_business in schema → fallback
+    6: "First Class",
+
+    // string fallback
+    economy: "Economy",
+    "premium economy": "Premium Economy",
+    business: "Business",
+    "premium business": "Business",
+    first: "First Class",
+    first_class: "First Class",
+  };
+
+  return mapping[String(cabin).toLowerCase()] || "Economy";
+};
   if (bookingType === "flight" && Array.isArray(flightRequest?.segments)) {
     const segments = flightRequest.segments;
 
@@ -261,7 +280,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
         airline: [...new Set(segments.map((s) => s.airlineName))].join(", "),
         travelDate: first.departureDateTime,
         returnDate: null,
-        cabinClass: "Economy",
+        cabinClass: mapCabinClass(first.cabinClass),
         amount: pricingSnapshot.totalAmount,
         purposeOfTravel,
         city: last.destination.city,
@@ -280,7 +299,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
         airline: [...new Set(segments.map((s) => s.airlineName))].join(", "),
         travelDate: onward.departureDateTime,
         returnDate: ret.departureDateTime,
-        cabinClass: "Economy",
+        cabinClass: mapCabinClass(onward.cabinClass),
         amount: pricingSnapshot.totalAmount,
         purposeOfTravel,
         city: ret.destination.city,
@@ -478,13 +497,13 @@ const isTraceExpiredError = (err) => {
   );
 };
 
-const cabinClassToCode = (cabin) =>
+const cabinClassToTboCode = (cabin) =>
   ({
-    Economy: 2,
+    "Economy": 2,
     "Premium Economy": 3,
-    Business: 4,
+    "Business": 4,
     "Premium Business": 5,
-    First: 6,
+    "First Class": 6,
   })[cabin] || 2;
 
 const getCorporateAddressForPassenger = async (employeeEmail) => {
@@ -555,7 +574,7 @@ const buildTboRevalidationSearchPayload = (booking, intent) => {
     basePayload.Segments.push({
       Origin: segment.origin.airportCode,
       Destination: segment.destination.airportCode,
-      FlightCabinClass: segment.cabinClass,
+      FlightCabinClass: cabinClassToTboCode(segment.cabinClass),
       PreferredDepartureTime: segment.departureDateTime.slice(0, 19),
     });
 
@@ -816,9 +835,11 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       const splitSSR = (snapshot, type) => {
         if (!snapshot) return null;
         return {
-          seats: (snapshot.seats || []).filter(s => s.journeyType === type),
-          meals: (snapshot.meals || []).filter(m => m.journeyType === type),
-          baggage: (snapshot.baggage || []).filter(b => b.journeyType === type)
+          seats: (snapshot.seats || []).filter((s) => s.journeyType === type),
+          meals: (snapshot.meals || []).filter((m) => m.journeyType === type),
+          baggage: (snapshot.baggage || []).filter(
+            (b) => b.journeyType === type,
+          ),
         };
       };
 
@@ -889,9 +910,9 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     const splitSSR = (snapshot, type) => {
       if (!snapshot) return null;
       return {
-        seats: (snapshot.seats || []).filter(s => s.journeyType === type),
-        meals: (snapshot.meals || []).filter(m => m.journeyType === type),
-        baggage: (snapshot.baggage || []).filter(b => b.journeyType === type)
+        seats: (snapshot.seats || []).filter((s) => s.journeyType === type),
+        meals: (snapshot.meals || []).filter((m) => m.journeyType === type),
+        baggage: (snapshot.baggage || []).filter((b) => b.journeyType === type),
       };
     };
 
@@ -1224,7 +1245,7 @@ const findBestMatchingFlight = ({ searchResp, intent }) => {
       intent.airlineCodes.includes(seg.Airline?.AirlineCode?.trim()) &&
       // seg.CabinClass === cabinClassToCode(intent.cabinClassCode)
 
-      seg.CabinClass === cabinClassToCode(intent.cabinClass) &&
+      seg.CabinClass === cabinClassToTboCode(intent.cabinClass) &&
       r.Fare.PublishedFare <= intent.maxApprovedPrice
     );
   });

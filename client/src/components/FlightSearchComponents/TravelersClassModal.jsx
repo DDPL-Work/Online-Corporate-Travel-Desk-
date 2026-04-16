@@ -156,7 +156,7 @@ export default function TravelersClassModal({
               CHOOSE TRAVEL CLASS
             </p>
             <div className="flex gap-2 flex-wrap">
-              {["Economy", "Premium Economy", "Business", "First Class"].map(
+              {["Economy", "Premium Economy", "Business", "First Class", "Premium Business"].map(
                 (cls) => (
                   <button
                     key={cls}

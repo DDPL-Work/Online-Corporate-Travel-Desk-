@@ -6,6 +6,7 @@ import {
   amendBooking,
   fetchChangeStatus,
   releasePNR,
+  createCancellationQuery,
 } from "../Actions/amendmentThunks";
 
 const initialState = {
@@ -16,6 +17,11 @@ const initialState = {
   amendmentResult: null,
   changeStatus: null,
   releaseResult: null,
+
+   queryLoading: false,
+  queryError: null,
+  querySuccess: false,
+  queryData: null,
 };
 
 const amendmentSlice = createSlice({
@@ -30,6 +36,11 @@ const amendmentSlice = createSlice({
       state.amendmentResult = null;
       state.changeStatus = null;
       state.releaseResult = null;
+
+      state.queryLoading = false;
+      state.queryError = null;
+      state.querySuccess = false;
+      state.queryData = null;
     },
   },
   extraReducers: (builder) => {
@@ -69,6 +80,22 @@ const amendmentSlice = createSlice({
       /* ========= Release ========= */
       .addCase(releasePNR.fulfilled, (state, action) => {
         state.releaseResult = action.payload;
+      })
+
+      .addCase(createCancellationQuery.pending, (state) => {
+        state.queryLoading = true;
+        state.queryError = null;
+        state.querySuccess = false;
+      })
+      .addCase(createCancellationQuery.fulfilled, (state, action) => {
+        state.queryLoading = false;
+        state.querySuccess = true;
+        state.queryData = action.payload;
+      })
+      .addCase(createCancellationQuery.rejected, (state, action) => {
+        state.queryLoading = false;
+        state.queryError = action.payload;
+        state.querySuccess = false;
       });
   },
 });

@@ -66,6 +66,25 @@ router.get(
   corporateController.getAllCorporates,
 );
 
+
+// --------------------------------------------------
+// SUPER ADMIN : CANCELLATION QUERIES
+// --------------------------------------------------
+
+// Get all cancellation queries
+router.get(
+  "/cancellation-queries",
+  authorizeRoles("super-admin"),
+  corporateController.fetchCancellationQueries
+);
+
+// Update cancellation query status
+router.patch(
+  "/cancellation-queries/:id/status",
+  authorizeRoles("super-admin"),
+  corporateController.updateCancellationQueryStatus
+);
+
 // Get Single Corporate
 router.get("/:id", corporateController.getCorporate);
 

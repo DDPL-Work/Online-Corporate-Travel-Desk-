@@ -283,3 +283,47 @@ export const getHotelAmendmentStatus = createAsyncThunk(
     }
   },
 );
+
+
+/* =====================================================
+   🔹 FETCH CANCELLATION QUERIES
+===================================================== */
+export const fetchCancellationQueries = createAsyncThunk(
+  "cancellation/fetchQueries",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { page = 1, limit = 10, status, queryId, bookingReference } = params;
+
+      const res = await api.get(`/corporate-related/cancellation-queries`, {
+        params: { page, limit, status, queryId, bookingReference },
+      });
+
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err?.response?.data || { message: "Fetch failed" }
+      );
+    }
+  }
+);
+
+/* =====================================================
+   🔹 UPDATE STATUS
+===================================================== */
+export const updateCancellationQueryStatus = createAsyncThunk(
+  "cancellation/updateStatus",
+  async ({ id, status, remarks }, { rejectWithValue }) => {
+    try {
+      const res = await api.patch(
+        `/corporate-related/cancellation-queries/${id}/status`,
+        { status, remarks }
+      );
+
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err?.response?.data || { message: "Update failed" }
+      );
+    }
+  }
+);

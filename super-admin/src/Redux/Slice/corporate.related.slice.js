@@ -12,6 +12,8 @@ import {
   getHotelAmendmentStatus,
   partialCancellation,
   sendHotelAmendment,
+  fetchCancellationQueries,
+  updateCancellationQueryStatus,
 } from "../Actions/corporate.related.thunks";
 
 const initialState = {
@@ -64,6 +66,16 @@ const initialState = {
   hotelAmendmentStatus: null,
   hotelAmendmentStatusError: null,
 
+  // 🧾 CANCELLATION QUERIES (NEW)
+  cancellationQueries: [],
+  cancellationPagination: {},
+
+  loadingCancellationQueries: false,
+  cancellationQueryError: null,
+
+  updatingCancellationQuery: false,
+  updateCancellationQueryError: null,
+
   error: null,
 };
 
@@ -106,6 +118,11 @@ const corporateRelatedSlice = createSlice({
       state.changeStatusData = null;
 
       state.cancellationCharges = null;
+    },
+
+    resetCancellationQueries: (state) => {
+      state.cancellationQueries = [];
+      state.cancellationPagination = {};
     },
   },
   extraReducers: (builder) => {
@@ -300,6 +317,52 @@ const corporateRelatedSlice = createSlice({
       .addCase(getHotelAmendmentStatus.rejected, (state, action) => {
         state.hotelAmendmentStatusLoading = false;
         state.hotelAmendmentStatusError = action.payload;
+      })
+
+      /**
+       * 🧾 CANCELLATION QUERIES
+       */
+      .addCase(fetchCancellationQueries.pending, (state) => {
+        state.loadingCancellationQueries = true;
+        state.cancellationQueryError = null;
+      })
+      .addCase(fetchCancellationQueries.fulfilled, (state, action) => {
+        state.loadingCancellationQueries = false;
+
+        const { data, pagination } = action.payload;
+
+        state.cancellationQueries = data || [];
+        state.cancellationPagination = pagination || {};
+      })
+      .addCase(fetchCancellationQueries.rejected, (state, action) => {
+        state.loadingCancellationQueries = false;
+        state.cancellationQueryError = action.payload;
+      })
+
+      /**
+       * 🔄 UPDATE CANCELLATION QUERY STATUS
+       */
+      .addCase(updateCancellationQueryStatus.pending, (state) => {
+        state.updatingCancellationQuery = true;
+        state.updateCancellationQueryError = null;
+      })
+      .addCase(updateCancellationQueryStatus.fulfilled, (state, action) => {
+        state.updatingCancellationQuery = false;
+
+        const updated = action.payload.data;
+
+        // 🔥 Replace updated item in list
+        const index = state.cancellationQueries.findIndex(
+          (q) => q._id === updated._id,
+        );
+
+        if (index !== -1) {
+          state.cancellationQueries[index] = updated;
+        }
+      })
+      .addCase(updateCancellationQueryStatus.rejected, (state, action) => {
+        state.updatingCancellationQuery = false;
+        state.updateCancellationQueryError = action.payload;
       });
   },
 });

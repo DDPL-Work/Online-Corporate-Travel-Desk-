@@ -578,8 +578,8 @@ export default function CancelledFlightsPage() {
     dispatch(
       fetchMyBookings({
         bookingType: "flight",
-        executionStatus: "cancel_requested",
-        limit: 50,
+        executionStatus: ["cancel_requested", "cancelled"],
+        // limit: 50,
       }),
     );
   }, [dispatch]);
