@@ -146,8 +146,9 @@ const AirportSearchInput = ({ value, onChange, placeholder, id, error }) => {
 const CABIN_CLASS_MAP = {
   Economy: "economy",
   Business: "business",
-  First: "first",
-  "Premium Economy": "economy",
+  "First Class": "first_class",
+  "Premium Economy": "premium_economy",
+  "Premium Business": "premium_business",
 };
 
 const NAV_TABS = [

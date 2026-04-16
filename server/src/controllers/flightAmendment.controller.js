@@ -78,6 +78,7 @@ const getTboBookingId = (booking) => getAllTboBookingIds(booking)[0] || null;
    🔎 HELPER: FETCH TICKET IDS FROM TBO IF MISSING
 ====================================================== */
 const tboService = require("../services/tektravels/flight.service");
+const CancellationQuery = require("../models/CancellationQuery");
 
 const fetchTicketIdsFromTbo = async (pnr) => {
   if (!pnr) return [];
@@ -208,53 +209,106 @@ exports.fullCancellation = async (req, res) => {
     const booking = await BookingRequest.findById(bookingId);
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-    const tboBookingId = getTboBookingId(booking);
+    const bookingIds = getAllTboBookingIds(booking);
 
-    const result = await amendmentService.sendChangeRequest({
-      BookingId: tboBookingId,
-      RequestType: 1,
-      CancellationType: 1,
-      Remarks: remarks || "Full cancellation",
-    });
-
-    /* 🔥 VALIDATE RESPONSE */
-    const validation = validateTboResponse(result);
-
-    if (!validation.success) {
-      console.error("❌ FULL CANCEL FAILED:", validation);
-
+    if (!bookingIds.length) {
       return res.status(400).json({
         success: false,
-        message: validation.message,
-        code: validation.code,
-        traceId: validation.traceId,
+        message: "No valid TBO BookingIds found",
       });
     }
 
+    /* 🔥 CALL TBO FOR EACH BOOKING ID */
+    const responses = [];
+
+    for (const id of bookingIds) {
+      const result = await amendmentService.sendChangeRequest({
+        BookingId: id,
+        RequestType: 1,
+        CancellationType: 1,
+        Remarks: remarks || "Full cancellation",
+      });
+
+      const validation = validateTboResponse(result);
+
+      if (!validation.success) {
+        return res.status(400).json({
+          success: false,
+          message: `Booking ${id}: ${validation.message}`,
+          code: validation.code,
+          traceId: validation.traceId,
+        });
+      }
+
+      responses.push({
+        bookingId: id,
+        response: result,
+      });
+    }
+
+
     /* ✅ SUCCESS ONLY */
-    const changeRequestId =
-      result?.Response?.TicketCRInfo?.[0]?.ChangeRequestId || null;
+    const changeRequestIds = responses
+      .map((r) => r.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId)
+      .filter(Boolean);
+
+      const STATUS_MAP = {
+  0: "cancel_requested",
+  1: "cancel_requested",
+  2: "cancel_requested",
+  3: "cancel_requested",
+  4: "cancelled",
+  5: "cancel_failed",
+  6: "cancelled",
+  7: "cancel_requested",
+  8: "cancel_requested",
+};
+
+/* 🔥 DETERMINE FINAL STATUS (MULTI BOOKING SAFE) */
+let finalExecutionStatus = "cancel_requested";
+
+const statuses = responses
+  .map((r) => r.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus)
+  .filter((s) => s !== undefined && s !== null);
+
+/* If ALL are completed → cancelled */
+if (statuses.length && statuses.every((s) => s === 4 || s === 6)) {
+  finalExecutionStatus = "cancelled";
+}
+
+/* If ANY rejected → failed */
+else if (statuses.some((s) => s === 5)) {
+  finalExecutionStatus = "cancel_failed";
+}
+
+/* Else → still in progress */
+else {
+  finalExecutionStatus = "cancel_requested";
+}
 
     await updateBooking(bookingId, {
-      executionStatus: "cancel_requested",
+      executionStatus: finalExecutionStatus,
+
       amendment: {
         type: "FULL_CANCEL",
-        changeRequestId,
+        changeRequestIds, // 🔥 ARRAY now
         status: "requested",
-        response: result,
+        response: responses,
       },
+
       amendmentHistory: {
         type: "FULL_CANCEL",
-        changeRequestId,
+        changeRequestIds,
         status: "requested",
-        response: result,
+        response: responses,
         createdAt: new Date(),
       },
     });
 
     return res.json({
       success: true,
-      data: result,
+      isRoundTrip: bookingIds.length > 1,
+      data: responses,
     });
   } catch (error) {
     console.error("Full Cancellation Error:", error.message);
@@ -624,5 +678,140 @@ exports.releasePNR = async (req, res) => {
   } catch (error) {
     console.error("Release PNR Error:", error.message);
     return res.status(500).json({ message: "Release failed" });
+  }
+};
+
+exports.createCancellationQuery = async (req, res) => {
+  try {
+    let {
+      bookingId,
+      bookingReference,
+      remarks,
+      segments,
+      corporate,
+      bookingSnapshot,
+      passengers,
+    } = req.body;
+
+    /* ─────────────────────────────
+       🔥 VALIDATION
+    ───────────────────────────── */
+    if (!bookingId || !bookingReference) {
+      return res.status(400).json({
+        success: false,
+        message: "bookingId and bookingReference are required",
+      });
+    }
+
+    /* ─────────────────────────────
+       🔥 SAFE PARSE (VERY IMPORTANT)
+    ───────────────────────────── */
+    const safeParse = (val, fallback) => {
+      if (typeof val === "string") {
+        try {
+          return JSON.parse(val); // normal case
+        } catch {
+          try {
+            // 🔥 FIX INVALID JSON (single quotes → double quotes)
+            const fixed = val
+              .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":') // keys
+              .replace(/'/g, '"'); // quotes
+
+            return JSON.parse(fixed);
+          } catch {
+            return fallback;
+          }
+        }
+      }
+      return val ?? fallback;
+    };
+
+    passengers = safeParse(passengers, []);
+    corporate = safeParse(corporate, {});
+    bookingSnapshot = safeParse(bookingSnapshot, {});
+    segments = safeParse(segments, []);
+
+    if (!Array.isArray(passengers)) {
+      console.log("❌ INVALID PASSENGERS:", passengers);
+
+      return res.status(400).json({
+        success: false,
+        message: "Passengers must be a valid array",
+      });
+    }
+
+    console.log("RAW passengers:", req.body.passengers);
+
+    /* ─────────────────────────────
+       🔥 TYPE VALIDATION
+    ───────────────────────────── */
+    if (!Array.isArray(passengers)) {
+      return res.status(400).json({
+        success: false,
+        message: "Passengers must be an array",
+      });
+    }
+
+    if (!Array.isArray(segments)) {
+      return res.status(400).json({
+        success: false,
+        message: "Segments must be an array",
+      });
+    }
+
+    /* ─────────────────────────────
+       🔥 GENERATE QUERY ID
+    ───────────────────────────── */
+    const count = await CancellationQuery.countDocuments();
+
+    const queryId = `CQ-${new Date().getFullYear()}-${String(
+      count + 1,
+    ).padStart(5, "0")}`;
+
+    /* ─────────────────────────────
+       🔥 CREATE QUERY
+    ───────────────────────────── */
+    const query = await CancellationQuery.create({
+      bookingId,
+      bookingReference,
+      queryId,
+      remarks,
+
+      passengers,
+      corporate,
+      bookingSnapshot,
+      segments,
+
+      user: {
+        id: req.user?._id,
+        name: req.user?.name,
+        email: req.user?.email,
+      },
+
+      logs: [
+        {
+          action: "CREATED",
+          by: "USER",
+          message: "Cancellation query created",
+        },
+      ],
+    });
+
+    /* ─────────────────────────────
+       ✅ SUCCESS RESPONSE
+    ───────────────────────────── */
+    return res.status(201).json({
+      success: true,
+      message: "Cancellation query created successfully",
+      data: query,
+    });
+  } catch (error) {
+    console.error("❌ createCancellationQuery:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create cancellation query",
+      error: error.message,
+    });
   }
 };

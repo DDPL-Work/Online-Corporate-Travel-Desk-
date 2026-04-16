@@ -39,4 +39,10 @@ router.post("/cancellation/status", controller.getChangeStatus);
  */
 router.post("/release-pnr", controller.releasePNR);
 
+/**
+ * 7️⃣ Create Cancellation Query
+ */
+router.post("/create-query", controller.createCancellationQuery);
+
+
 module.exports = router;

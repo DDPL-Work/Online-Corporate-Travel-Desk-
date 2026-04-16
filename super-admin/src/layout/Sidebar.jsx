@@ -17,7 +17,7 @@ import {
   FaUser,
   FaBars,
 } from "react-icons/fa";
-import { MdOutlineCancel } from "react-icons/md";
+import { MdCancelScheduleSend, MdOutlineCancel } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCorporateAdmin } from "../Redux/Slice/corporateAdminSlice";
 
@@ -66,6 +66,11 @@ export default function Sidebar({ isOpen, onClose }) {
       to: "/cancellation-summary",
       label: "Cancellation Summary",
       icon: <MdOutlineCancel />,
+    },
+    {
+      to: "/cancellation-query",
+      label: "Cancellation Query",
+      icon: <MdCancelScheduleSend />,
     },
     {
       to: "/corporate-revenue",

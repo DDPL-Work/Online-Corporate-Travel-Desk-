@@ -39,6 +39,7 @@ import {
   partialCancellation,
   amendBooking,
   fetchChangeStatus,
+  createCancellationQuery,
 } from "../../Redux/Actions/amendmentThunks";
 import { resetAmendmentState } from "../../Redux/Slice/amendmentSlice";
 import {
@@ -888,6 +889,10 @@ function CancellationModal({ booking, onClose, onSuccess }) {
   const [processingLabel, setProcessingLabel] = useState("Processing…");
   const [shouldFetchCharges, setShouldFetchCharges] = useState(true);
 
+  const [showQueryModal, setShowQueryModal] = useState(false);
+  const [queryPriority, setQueryPriority] = useState("MEDIUM");
+  const [queryRemarks, setQueryRemarks] = useState("");
+
   const segments = booking?.flightRequest?.segments || [];
   const journeyTypeOf = (seg) => {
     const jt = (seg?.journeyType || "").toString().toLowerCase();
@@ -926,8 +931,11 @@ function CancellationModal({ booking, onClose, onSuccess }) {
         setCharges(res.payload);
         setStep("charges");
       } catch (err) {
+        console.warn("Charges API failed → allowing actions");
+
         setChargesError(err.message);
-        setStep("error");
+        setCharges(null); // important
+        setStep("charges"); // ✅ fallback instead of blocking UI
       }
     })();
   }, [booking._id, dispatch, shouldFetchCharges]);
@@ -968,12 +976,26 @@ function CancellationModal({ booking, onClose, onSuccess }) {
           remarks: remarksText || undefined,
         }),
       );
-      const changeRequestId =
-        res.payload?.Response?.ChangeRequestId ||
-        res.payload?.data?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
-        res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId;
+      let changeRequestIds = [];
 
-      if (!changeRequestId) throw new Error("No ChangeRequestId returned");
+      if (res.payload?.isRoundTrip) {
+        changeRequestIds = res.payload.data
+          ?.map(
+            (item) =>
+              item?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId,
+          )
+          .filter(Boolean);
+      } else {
+        const singleId =
+          res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
+          res.payload?.Response?.ChangeRequestId;
+
+        if (singleId) changeRequestIds = [singleId];
+      }
+
+      if (!changeRequestIds.length) {
+        throw new Error("No ChangeRequestId returned");
+      }
 
       setProcessingLabel("Waiting for airline confirmation…");
       let status = "requested";
@@ -986,19 +1008,32 @@ function CancellationModal({ booking, onClose, onSuccess }) {
       ) {
         attempts++;
         await new Promise((r) => setTimeout(r, 4000));
-        const statusRes = await dispatch(
-          fetchChangeStatus({ changeRequestId, bookingId: booking._id }),
+        const statusResponses = await Promise.all(
+          changeRequestIds.map((id) =>
+            dispatch(
+              fetchChangeStatus({
+                changeRequestId: id,
+                bookingId: booking._id,
+              }),
+            ),
+          ),
         );
-        const crInfo =
-          statusRes.payload?.Response?.TicketCRInfo?.[0] ||
-          statusRes.payload?.Response;
-        const apiStatus = crInfo?.ChangeRequestStatus;
-        finalInfo = crInfo;
+        let allCompleted = true;
 
-        if (apiStatus === 4) status = "completed";
-        else if ([1, 2, 3].includes(apiStatus)) status = "in_progress";
-        else if (apiStatus === 5) status = "failed";
-        else status = "unknown";
+        for (const resItem of statusResponses) {
+          const crInfo =
+            resItem.payload?.Response?.TicketCRInfo?.[0] ||
+            resItem.payload?.Response;
+
+          const apiStatus = crInfo?.ChangeRequestStatus;
+          finalInfo = crInfo;
+
+          if (apiStatus !== 4) {
+            allCompleted = false;
+          }
+        }
+
+        status = allCompleted ? "completed" : "in_progress";
       }
 
       if (status === "failed")
@@ -1006,6 +1041,9 @@ function CancellationModal({ booking, onClose, onSuccess }) {
 
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
       setShouldFetchCharges(false);
+
+      // 🔥 CLOSE MODAL IMMEDIATELY
+      onClose();
       await dispatch(fetchMyBookingById(booking._id));
 
       setSuccessData({
@@ -1055,6 +1093,10 @@ function CancellationModal({ booking, onClose, onSuccess }) {
 
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
       setShouldFetchCharges(false);
+
+      // 🔥 CLOSE MODAL IMMEDIATELY
+      onClose();
+
       await dispatch(fetchMyBookingById(booking._id));
 
       setSuccessData({
@@ -1098,6 +1140,97 @@ function CancellationModal({ booking, onClose, onSuccess }) {
     onClose();
     if (successData?.type === "full" || successData?.type === "partial") {
       navigate("/my-cancelled-bookings");
+    }
+  };
+
+  const handleRaiseQuery = async () => {
+    try {
+      setShowQueryModal(false);
+      setStep("processing");
+      setProcessingLabel("Creating cancellation query...");
+
+      const payload = {
+        bookingId: booking._id,
+        bookingReference: booking.bookingReference,
+        priority: queryPriority,
+        remarks:
+          queryRemarks || "User requested cancellation but charges API failed",
+
+        /* ✅ CORPORATE */
+        corporate: {
+          companyId: booking?.companyId,
+          companyName: booking?.companyName,
+          employeeId: booking?.employeeId,
+          employeeName: booking?.user?.name,
+          employeeEmail: booking?.user?.email,
+        },
+
+        /* ✅ BOOKING SNAPSHOT */
+        bookingSnapshot: {
+          journeyType: booking?.tripType,
+          travelDate: booking?.travelDate,
+          returnDate: booking?.returnDate,
+
+          totalFare: booking?.fare?.totalFare,
+          baseFare: booking?.fare?.baseFare,
+          taxes: booking?.fare?.taxes,
+          serviceFee: booking?.fare?.serviceFee,
+
+          airline: booking?.airline,
+          pnr: booking?.pnr,
+
+          sectors:
+            booking?.flightRequest?.segments?.map((seg) => ({
+              origin: seg?.origin?.airportCode,
+              destination: seg?.destination?.airportCode,
+              departureTime: seg?.departureDateTime,
+              arrivalTime: seg?.arrivalDateTime,
+              airline: seg?.airlineCode,
+              flightNumber: seg?.flightNumber,
+            })) || [],
+        },
+
+        /* ✅ PASSENGERS */
+        passengers:
+          booking?.travellers?.map((pax) => ({
+            name: `${pax.title} ${pax.firstName} ${pax.lastName}`,
+            type: pax.paxType,
+            ticketNumber: pax.ticketNumber,
+          })) || [],
+
+        /* ✅ USER */
+        user: {
+          id: booking?.user?._id,
+          name: booking?.user?.name,
+          email: booking?.user?.email,
+          phone: booking?.user?.phone,
+        },
+
+        /* ✅ LOGS */
+        logs: [
+          {
+            action: "CREATED",
+            by: "USER",
+            message: "Cancellation query created from UI",
+          },
+        ],
+      };
+
+      const res = await dispatch(createCancellationQuery(payload));
+
+      if (!createCancellationQuery.fulfilled.match(res)) {
+        throw new Error(res.payload || "Failed to create query");
+      }
+
+      setSuccessData({
+        type: "query",
+        queryId: res.payload?.queryId,
+      });
+
+      setStep("success");
+    } catch (err) {
+      setChargesError(err?.message || "Failed to create query");
+      setStep("error");
     }
   };
 
@@ -1180,7 +1313,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                 >
                   Close
                 </button>
-                <button
+                {/* <button
                   onClick={() => {
                     setStep("loading");
                     setChargesError(null);
@@ -1188,7 +1321,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                   className="px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl transition"
                 >
                   Retry
-                </button>
+                </button> */}
               </div>
             </div>
           )}
@@ -1206,6 +1339,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                     "Partial Cancellation Submitted"}
                   {successData.type === "reissue" &&
                     "Reissue Request Submitted"}
+                  {successData.type === "query" && "Request Submitted"}
                 </p>
                 <p className="text-xs text-slate-400">
                   {successData.type === "full" &&
@@ -1215,7 +1349,11 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                       ? "Your ticket has been cancelled successfully."
                       : successData.type === "partial"
                         ? `Route ${successData.route} cancellation submitted.`
-                        : `Reissue for ${successData.newDate} submitted.`}
+                        : successData.type === "reissue"
+                          ? `Reissue for ${successData.newDate} submitted.`
+                          : successData.type === "query"
+                            ? "Your cancellation request has been raised successfully. Our support team will process it shortly."
+                            : ""}
                 </p>
               </div>
 
@@ -1302,10 +1440,11 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                     </span>
                   </div>
                 )}
-                {parsedCharges.length === 0 && (
+                {(parsedCharges.length === 0 || chargesError) && (
                   <p className="text-xs text-amber-600 italic">
-                    Contact support for exact charges. Charges may apply as per
-                    fare rules.
+                    {chargesError
+                      ? "Unable to fetch charges. You can still proceed with cancellation. Final charges will be applied as per airline rules."
+                      : "Charges not available. They will be applied as per fare rules."}
                   </p>
                 )}
               </div>
@@ -1344,6 +1483,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                   <FiXCircle size={15} />
                   Full Cancellation
                 </button>
+
                 {hasReturn && (
                   <button
                     onClick={() => setStep("partial-select")}
@@ -1353,6 +1493,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                     Partial Cancellation
                   </button>
                 )}
+
                 <button
                   onClick={() => setStep("reissue")}
                   className="w-full py-3 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 transition flex items-center justify-center gap-2"
@@ -1360,6 +1501,17 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                   <FiCalendar size={15} />
                   Reissue Flight
                 </button>
+
+                {/* ✅ NEW BUTTON (ONLY WHEN API FAILS) */}
+                {(chargesError || parsedCharges.length === 0) && (
+                  <button
+                    onClick={() => setShowQueryModal(true)}
+                    className="w-full py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition flex items-center justify-center gap-2"
+                  >
+                    <FiFileText size={15} />
+                    Raise Cancellation Request
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1630,6 +1782,63 @@ function CancellationModal({ booking, onClose, onSuccess }) {
           )}
         </div>
       </div>
+
+      {showQueryModal && (
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl w-full max-w-md p-5 shadow-xl">
+            <h3 className="text-sm font-bold mb-4 text-slate-800">
+              Raise Cancellation Query
+            </h3>
+
+            {/* Priority */}
+            <div className="mb-3">
+              <p className="text-xs font-semibold text-slate-500 mb-1">
+                Priority
+              </p>
+              <select
+                value={queryPriority}
+                onChange={(e) => setQueryPriority(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+              </select>
+            </div>
+
+            {/* Remarks */}
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-slate-500 mb-1">
+                Remarks
+              </p>
+              <textarea
+                rows={3}
+                value={queryRemarks}
+                onChange={(e) => setQueryRemarks(e.target.value)}
+                placeholder="Describe your issue..."
+                className="w-full border border-slate-200 rounded-lg p-2 text-sm"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowQueryModal(false)}
+                className="flex-1 py-2 bg-slate-100 text-sm rounded-lg"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleRaiseQuery}
+                className="flex-1 py-2 bg-slate-900 text-white text-sm rounded-lg"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1695,9 +1904,26 @@ function CancelScreen({ booking, onClose }) {
     try {
       setLoading(true);
       const res = await dispatch(fullCancellation({ bookingId: booking._id }));
-      const changeRequestId =
-        res.payload?.Response?.ChangeRequestId || res.payload?.ChangeRequestId;
-      if (!changeRequestId) throw new Error("No ChangeRequestId");
+      let changeRequestIds = [];
+
+      if (res.payload?.isRoundTrip) {
+        changeRequestIds = res.payload.data
+          ?.map(
+            (item) =>
+              item?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId,
+          )
+          .filter(Boolean);
+      } else {
+        const singleId =
+          res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
+          res.payload?.Response?.ChangeRequestId;
+
+        if (singleId) changeRequestIds = [singleId];
+      }
+
+      if (!changeRequestIds.length) {
+        throw new Error("No ChangeRequestId");
+      }
       let status = "requested";
       let attempts = 0;
       while (
@@ -1706,15 +1932,28 @@ function CancelScreen({ booking, onClose }) {
       ) {
         attempts++;
         await new Promise((r) => setTimeout(r, 4000));
-        const statusRes = await dispatch(
-          fetchChangeStatus({ changeRequestId, bookingId: booking._id }),
+        const statusResponses = await Promise.all(
+          changeRequestIds.map((id) =>
+            dispatch(
+              fetchChangeStatus({
+                changeRequestId: id,
+                bookingId: booking._id,
+              }),
+            ),
+          ),
         );
-        const apiStatus =
-          statusRes.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus;
-        if (apiStatus === 4) status = "completed";
-        else if ([1, 2, 3].includes(apiStatus)) status = "in_progress";
-        else if (apiStatus === 5) status = "failed";
-        else status = "unknown";
+        let allCompleted = true;
+
+        for (const resItem of statusResponses) {
+          const apiStatus =
+            resItem.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus;
+
+          if (apiStatus !== 4) {
+            allCompleted = false;
+          }
+        }
+
+        status = allCompleted ? "completed" : "in_progress";
       }
       if (status === "failed")
         throw new Error("Cancellation failed by airline/supplier");
@@ -1887,6 +2126,8 @@ function PartialCancelModal({ booking, onClose }) {
       if (res.error)
         throw new Error(res.payload || "Partial cancellation failed");
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
+      // 🔥 CLOSE MODAL IMMEDIATELY
+      onClose();
       await dispatch(fetchMyBookingById(booking._id));
       Swal.fire({
         icon: "success",

@@ -3,6 +3,7 @@
 const Corporate = require("../models/Corporate");
 const User = require("../models/User");
 const BookingRequest = require("../models/BookingRequest");
+const CancellationQuery = require("../models/CancellationQuery");
 const HotelBookingRequest = require("../models/hotelBookingRequest.model");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
@@ -657,6 +658,265 @@ exports.getCancelledOrRequestedHotels = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch cancelled hotel bookings",
+    });
+  }
+};
+
+
+// Get cancellation queries
+exports.fetchCancellationQueries = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      bookingReference,
+      queryId,
+    } = req.query;
+
+    const query = {};
+
+    if (status) query.status = status;
+
+    if (bookingReference) {
+      query.bookingReference = { $regex: bookingReference, $options: "i" };
+    }
+
+    if (queryId) {
+      query.queryId = { $regex: queryId, $options: "i" };
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [queries, total] = await Promise.all([
+      CancellationQuery.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+
+      CancellationQuery.countDocuments(query),
+    ]);
+
+    /* ─────────────────────────────
+       🔥 FETCH BOOKINGS
+    ───────────────────────────── */
+    const bookingIds = queries.map((q) => q.bookingId).filter(Boolean);
+
+    const bookings = await BookingRequest.find({
+      _id: { $in: bookingIds },
+    }).lean();
+
+    const bookingMap = {};
+    bookings.forEach((b) => {
+      bookingMap[b._id.toString()] = b;
+    });
+
+    /* ─────────────────────────────
+       🔥 NORMALIZE DATA
+    ───────────────────────────── */
+    const enrichedData = queries.map((q) => {
+      const b = bookingMap[q.bookingId?.toString()] || {};
+
+      const itinerary =
+        b?.bookingResult?.providerResponse?.Response?.Response
+          ?.FlightItinerary || {};
+
+      const segments =
+        itinerary?.Segments || b?.flightRequest?.segments || [];
+
+      const firstSegment = Array.isArray(segments)
+        ? segments[0]
+        : segments?.[0]?.[0] || {};
+
+      const fare = itinerary?.Fare || {};
+      const pricing = b?.pricingSnapshot || {};
+
+      return {
+        ...q,
+
+        bookingSnapshot: {
+          // 🔥 CORE
+          airline:
+            itinerary?.AirlineCode ||
+            firstSegment?.Airline?.AirlineName ||
+            b?.flightRequest?.segments?.[0]?.airlineName ||
+            "—",
+
+          pnr: itinerary?.PNR || b?.bookingResult?.pnr || "—",
+
+          travelDate:
+            firstSegment?.Origin?.DepTime ||
+            b?.flightRequest?.segments?.[0]?.departureDateTime ||
+            b?.bookingSnapshot?.travelDate,
+
+          returnDate: b?.bookingSnapshot?.returnDate || null,
+
+          // 🔥 SECTORS
+          sectors:
+            segments?.map((s) => {
+              const seg = s?.[0] || s; // handle nested array
+              return {
+                origin:
+                  seg?.Origin?.Airport?.AirportCode ||
+                  seg?.origin?.airportCode,
+
+                destination:
+                  seg?.Destination?.Airport?.AirportCode ||
+                  seg?.destination?.airportCode,
+
+                airline:
+                  seg?.Airline?.AirlineName || seg?.airlineName,
+
+                flightNumber:
+                  seg?.Airline?.FlightNumber || seg?.flightNumber,
+
+                departureTime:
+                  seg?.Origin?.DepTime || seg?.departureDateTime,
+              };
+            }) || [],
+
+          // 🔥 FARE
+          totalFare:
+            pricing?.totalAmount ||
+            fare?.PublishedFare ||
+            b?.bookingSnapshot?.amount,
+
+          baseFare: fare?.BaseFare,
+          taxes: fare?.Tax,
+          serviceFee: fare?.ServiceFee || 0,
+
+          city: b?.bookingSnapshot?.city,
+          cabinClass: b?.bookingSnapshot?.cabinClass,
+        },
+
+        // 🔥 CORPORATE + USER
+        corporate: {
+          companyName: b?.corporateId || "—",
+          employeeName:
+            b?.travellers?.[0]?.firstName +
+              " " +
+              b?.travellers?.[0]?.lastName || "—",
+          employeeEmail: b?.travellers?.[0]?.email || "—",
+          employeeId: b?.userId || "—",
+        },
+
+        passengers:
+          b?.travellers?.map((t) => ({
+            name: `${t.firstName} ${t.lastName}`,
+            type: t.paxType,
+            ticketNumber:
+              itinerary?.Passenger?.[0]?.Ticket?.TicketNumber || "—",
+          })) || [],
+      };
+    });
+
+    /* ─────────────────────────────
+       ✅ RESPONSE
+    ───────────────────────────── */
+    return res.status(200).json({
+      success: true,
+      message: "Cancellation queries fetched successfully",
+      data: enrichedData,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("❌ fetchCancellationQueries:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch cancellation queries",
+      error: error.message,
+    });
+  }
+};
+
+
+// PATCH /api/cancellation-queries/:id/status
+exports.updateCancellationQueryStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, remarks } = req.body;
+
+    /* ─────────────────────────────
+       🔥 VALIDATION
+    ───────────────────────────── */
+    const allowedStatus = ["PENDING", "APPROVED", "REJECTED"];
+
+    if (!status || !allowedStatus.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Allowed: ${allowedStatus.join(", ")}`,
+      });
+    }
+
+    /* ─────────────────────────────
+       🔍 FIND QUERY
+    ───────────────────────────── */
+    const query = await CancellationQuery.findById(id);
+
+    if (!query) {
+      return res.status(404).json({
+        success: false,
+        message: "Cancellation query not found",
+      });
+    }
+
+    /* ─────────────────────────────
+       🚫 PREVENT DUPLICATE UPDATE
+    ───────────────────────────── */
+    if (query.status === status) {
+      return res.status(400).json({
+        success: false,
+        message: `Query is already ${status}`,
+      });
+    }
+
+    /* ─────────────────────────────
+       ✏️ UPDATE STATUS
+    ───────────────────────────── */
+    const previousStatus = query.status;
+
+    query.status = status;
+
+    if (remarks) {
+      query.remarks = remarks;
+    }
+
+    /* ─────────────────────────────
+       🧾 LOG ENTRY
+    ───────────────────────────── */
+    query.logs.push({
+      action: "STATUS_UPDATED",
+      by: req.user?.role === "admin" ? "ADMIN" : "USER",
+      message: `Status changed from ${previousStatus} to ${status}`,
+      meta: {
+        remarks: remarks || null,
+      },
+    });
+
+    await query.save();
+
+    /* ─────────────────────────────
+       ✅ RESPONSE
+    ───────────────────────────── */
+    return res.status(200).json({
+      success: true,
+      message: "Cancellation query status updated successfully",
+      data: query,
+    });
+  } catch (error) {
+    console.error("❌ updateCancellationQueryStatus:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update status",
+      error: error.message,
     });
   }
 };

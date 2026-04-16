@@ -814,7 +814,7 @@ export const PendingFlightDetailsModal = ({
     3: "Premium Economy",
     4: "Business",
     5: "Premium Business",
-    6: "First",
+    6: "First Class",
   };
 
   const baseFare = fareSnapshot.baseFare ?? fareQuoteResult.Fare?.BaseFare ?? 0;

@@ -356,14 +356,13 @@ class FlightService {
     const cfg = config[env];
     const token = await this.getToken(env);
 
-    // const cabinMap = { economy: 2, business: 4, first: 6 };
     const cabinMap = {
       all: 1,
       economy: 2,
-      "premium economy": 3,
+      premium_economy: 3,
       business: 4,
-      "premium business": 5,
-      first: 6,
+      premium_business: 5,
+      first_class: 6,
     };
 
     const resolveCabinClass = (value) => {
@@ -455,6 +454,9 @@ class FlightService {
       clientId: cfg.credentials?.clientId,
       endUserIp: cfg.endUserIp,
       journeyType: params.journeyType,
+    });
+    logger.info("TBO FLIGHT SEARCH PAYLOAD", {
+      payload
     });
 
     const doSearch = async () =>

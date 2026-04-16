@@ -112,3 +112,18 @@ export const releasePNR = createAsyncThunk(
     }
   },
 );
+
+
+export const createCancellationQuery = createAsyncThunk(
+  "cancellationQuery/create",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const res = await flightApi.post("/amendments/create-query", payload);
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to create query"
+      );
+    }
+  }
+);

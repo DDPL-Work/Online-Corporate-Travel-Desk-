@@ -1,4 +1,4 @@
-//HotelReviewBooking.jsx  — Redesigned Layout
+//HotelReviewBooking.jsx  — Full Updated (PreBook fields: Promotions, Inclusions, MealType, CancelPolicy, RateConditions, Amenities)
 
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -32,6 +32,12 @@ import {
   FiInfo,
   FiBookOpen,
   FiX,
+  FiChevronDown,
+  FiChevronUp,
+  FiGift,
+  FiShield as FiShieldIcon,
+  FiList,
+  FiAlertCircle,
 } from "react-icons/fi";
 import { FaUserPlus, FaHotel } from "react-icons/fa";
 import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
@@ -49,6 +55,52 @@ import { Country } from "country-state-city";
 import api from "../../../API/axios";
 import { ProjectApproverBlock } from "./components/ProjectApproverBlock";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Utility: calculateNights                                       */
+/* ─────────────────────────────────────────────────────────────── */
+const calculateNights = (checkIn, checkOut) => {
+  if (!checkIn || !checkOut) return 1;
+  const inDate = new Date(checkIn);
+  const outDate = new Date(checkOut);
+  const diffTime = outDate - inDate;
+  const nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return nights > 0 ? nights : 1;
+};
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Utility: sanitize HTML entities + tags from API strings       */
+/* ─────────────────────────────────────────────────────────────── */
+function sanitizeHtml(str = "") {
+  return str
+    .replace(/&amp;lt;/g, "<")
+    .replace(/&amp;gt;/g, ">")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Shared tiny helpers                                            */
+/* ─────────────────────────────────────────────────────────────── */
+const Required = () => <span className="text-red-400">*</span>;
+const Divider = () => <hr className="border-slate-100" />;
+const SectionHeading = ({ icon, title, badge }) => (
+  <div className="flex items-center gap-2 mb-3">
+    <span className="text-[#0A4D68]">{icon}</span>
+    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+      {title}
+    </p>
+    {badge && (
+      <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+        {badge}
+      </span>
+    )}
+  </div>
+);
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Room Image Gallery                                             */
@@ -99,7 +151,11 @@ function RoomImageGallery({ images = [] }) {
             <button
               key={i}
               onClick={() => setActive(i)}
-              className={`shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${active === i ? "border-[#0A4D68] scale-105" : "border-transparent hover:border-slate-300"}`}
+              className={`shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                active === i
+                  ? "border-[#0A4D68] scale-105"
+                  : "border-transparent hover:border-slate-300"
+              }`}
             >
               <img
                 src={img}
@@ -130,11 +186,13 @@ function RoomImageGallery({ images = [] }) {
 /* ─────────────────────────────────────────────────────────────── */
 function CancelPolicyTable({ policies = [] }) {
   if (!policies.length) return null;
+
   const typeLabel = (type) => {
     if (type === "Fixed" || type === 1) return "Fixed (₹)";
     if (type === "Percentage" || type === 2) return "Percentage (%)";
     return String(type);
   };
+
   const formatCharge = (charge, type) => {
     if (charge === 0)
       return <span className="text-emerald-600 font-bold">Free</span>;
@@ -146,6 +204,7 @@ function CancelPolicyTable({ policies = [] }) {
       </span>
     );
   };
+
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200">
       <table className="w-full text-sm">
@@ -190,6 +249,199 @@ function CancelPolicyTable({ policies = [] }) {
 }
 
 /* ─────────────────────────────────────────────────────────────── */
+/*  NEW ▶ Room Promotions Panel                                    */
+/* ─────────────────────────────────────────────────────────────── */
+function RoomPromotions({ promotions = [] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const cleaned = promotions.map(sanitizeHtml).filter(Boolean);
+  if (!cleaned.length) return null;
+
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 cursor-pointer border-none bg-transparent text-left"
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full bg-amber-400/20 flex items-center justify-center">
+            <FiGift size={12} className="text-amber-600" />
+          </div>
+          <span className="text-[12px] font-bold text-amber-800">
+            {cleaned.length} Room Promotion{cleaned.length !== 1 ? "s" : ""}{" "}
+            Available
+          </span>
+        </div>
+        {expanded ? (
+          <FiChevronUp size={14} className="text-amber-600" />
+        ) : (
+          <FiChevronDown size={14} className="text-amber-600" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-amber-200">
+          {cleaned.map((promo, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-lg border border-amber-100 px-3 py-2.5"
+            >
+              <p className="text-[12px] text-slate-700 leading-relaxed">
+                {promo}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  NEW ▶ Inclusions Badges                                        */
+/* ─────────────────────────────────────────────────────────────── */
+function InclusionBadges({ inclusion }) {
+  if (!inclusion) return null;
+  const items = Array.isArray(inclusion)
+    ? inclusion
+    : inclusion
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+  if (!items.length) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((item, i) => (
+        <span
+          key={i}
+          className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full font-medium"
+        >
+          <MdCheckCircle size={11} /> {item}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  NEW ▶ Amenities Grid                                           */
+/* ─────────────────────────────────────────────────────────────── */
+function AmenitiesGrid({ amenities = [] }) {
+  const [showAll, setShowAll] = useState(false);
+  if (!amenities.length) return null;
+
+  const visible = showAll ? amenities : amenities.slice(0, 12);
+
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
+        <FiStar size={11} className="text-[#0A4D68]" /> Room Amenities
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {visible.map((item, i) => (
+          <span
+            key={i}
+            className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full"
+          >
+            <MdCheckCircle size={11} className="text-[#0A4D68] shrink-0" />
+            {item}
+          </span>
+        ))}
+        {!showAll && amenities.length > 12 && (
+          <button
+            onClick={() => setShowAll(true)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0A4D68] bg-[#0A4D68]/10 border border-[#0A4D68]/20 px-2.5 py-1 rounded-full hover:bg-[#0A4D68]/15 transition cursor-pointer"
+          >
+            +{amenities.length - 12} more
+          </button>
+        )}
+        {showAll && amenities.length > 12 && (
+          <button
+            onClick={() => setShowAll(false)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full hover:bg-slate-200 transition cursor-pointer"
+          >
+            Show less
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  NEW ▶ Rate Conditions Panel                                    */
+/* ─────────────────────────────────────────────────────────────── */
+function RateConditions({ conditions = [] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const cleaned = conditions.map(sanitizeHtml).filter(Boolean);
+  if (!cleaned.length) return null;
+
+  // Always show check-in/out/age conditions; collapse the rest
+  const keyConditions = cleaned.filter((c) =>
+    /check.?in|check.?out|minimum|age/i.test(c),
+  );
+  const otherConditions = cleaned.filter(
+    (c) => !/check.?in|check.?out|minimum|age/i.test(c),
+  );
+
+  return (
+    <div className="rounded-xl border border-blue-200 bg-blue-50/50 overflow-hidden">
+      {keyConditions.length > 0 && (
+        <div className="px-4 pt-3 pb-2 space-y-1.5">
+          {keyConditions.map((cond, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <FiClock size={12} className="text-blue-500 mt-0.5 shrink-0" />
+              <p className="text-[12px] text-blue-800 font-medium leading-snug">
+                {cond}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {otherConditions.length > 0 && (
+        <>
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 cursor-pointer border-none bg-transparent text-left border-t border-blue-100"
+          >
+            <div className="flex items-center gap-2">
+              <FiList size={12} className="text-blue-500" />
+              <span className="text-[11px] font-bold text-blue-700">
+                {expanded ? "Hide" : "View"} {otherConditions.length} more
+                condition{otherConditions.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            {expanded ? (
+              <FiChevronUp size={13} className="text-blue-500" />
+            ) : (
+              <FiChevronDown size={13} className="text-blue-500" />
+            )}
+          </button>
+          {expanded && (
+            <div className="px-4 pb-4 space-y-2 border-t border-blue-100">
+              {otherConditions.map((cond, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <FiAlertCircle
+                    size={12}
+                    className="text-blue-400 mt-0.5 shrink-0"
+                  />
+                  <p className="text-[12px] text-slate-600 leading-relaxed">
+                    {cond}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
 /*  Full-Width Hotel Hero Banner                                   */
 /* ─────────────────────────────────────────────────────────────── */
 function HotelHeroBanner({
@@ -213,10 +465,8 @@ function HotelHeroBanner({
           alt={displayHotel?.name}
           className="w-full h-full object-cover"
         />
-        {/* Dark overlay gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-        {/* Star rating badge */}
         {displayHotel?.rating > 0 && (
           <div className="absolute top-4 left-4 flex items-center gap-1 bg-black/40 backdrop-blur-sm border border-white/20 px-3 py-1.5 rounded-full">
             {Array.from({ length: displayHotel.rating }).map((_, i) => (
@@ -235,7 +485,6 @@ function HotelHeroBanner({
           </div>
         )}
 
-        {/* Hotel name + location overlaid at bottom */}
         <div className="absolute bottom-0 left-0 right-0 px-6 py-4">
           <h2 className="text-xl sm:text-2xl font-extrabold text-white leading-tight mb-1 drop-shadow">
             {displayHotel?.name}
@@ -247,9 +496,8 @@ function HotelHeroBanner({
         </div>
       </div>
 
-      {/* Check-in / out / room strip — full width */}
+      {/* Check-in / out / room strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100 border-t border-slate-100">
-        {/* Check-in */}
         <div className="px-5 py-4 flex flex-col gap-0.5">
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
             Check-in
@@ -272,8 +520,7 @@ function HotelHeroBanner({
           </p>
         </div>
 
-        {/* Nights */}
-        <div className="px-5 py-4 flex flex-col items-center justify-center gap-0.5 bg-[#0A4D68]/3">
+        <div className="px-5 py-4 flex flex-col items-center justify-center gap-0.5 bg-[#0A4D68]/5">
           <div className="w-8 h-8 rounded-full bg-[#0A4D68]/10 flex items-center justify-center mb-1">
             <FiClock size={14} className="text-[#0A4D68]" />
           </div>
@@ -283,7 +530,6 @@ function HotelHeroBanner({
           </span>
         </div>
 
-        {/* Check-out */}
         <div className="px-5 py-4 flex flex-col gap-0.5">
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
             Check-out
@@ -306,7 +552,6 @@ function HotelHeroBanner({
           </p>
         </div>
 
-        {/* Room & Guests */}
         <div className="px-5 py-4 flex flex-col gap-0.5">
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
             Room & Guests
@@ -329,45 +574,47 @@ function HotelHeroBanner({
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Selected Room Details Card (full-width redesign)              */
+/*  Selected Room Details Card — FULLY UPDATED with PreBook data  */
 /* ─────────────────────────────────────────────────────────────── */
 function SelectedRoomDetailsCard({
   selectedRoom,
   displayRoom,
   displaySearchParams,
+  rateConditions = [],
 }) {
-  const images =
-    selectedRoom?.images || selectedRoom?.rawRoomData?.images || [];
-  const roomNames = selectedRoom?.Name || selectedRoom?.name || [];
+  const room = selectedRoom || displayRoom || {};
+
+  const images = room?.images || room?.rawRoomData?.images || [];
+  const roomNames = room?.Name || room?.name || [];
   const roomNameDisplay = Array.isArray(roomNames)
     ? [...new Set(roomNames)].join(", ")
     : roomNames || displayRoom?.RoomTypeName || "Room";
 
-  const price = selectedRoom?.Price || {};
-  const totalFare =
-    selectedRoom?.TotalFare || selectedRoom?.Price?.TotalFare || 0;
-  const totalTax = selectedRoom?.TotalTax || selectedRoom?.Price?.Tax || 0;
+  const totalFare = room?.TotalFare || room?.Price?.TotalFare || 0;
+  const totalTax = room?.TotalTax || room?.Price?.Tax || 0;
   const baseFare = totalFare - totalTax;
+
   const cancelPolicies =
-    selectedRoom?.CancelPolicies || displayRoom?.CancelPolicies || [];
+    room?.CancelPolicies || displayRoom?.CancelPolicies || [];
   const freeCancelUntil = cancelPolicies.find(
     (p) => p.CancellationCharge === 0,
   )?.FromDate;
   const paidCancelFrom = cancelPolicies.find(
     (p) => p.CancellationCharge > 0,
   )?.FromDate;
+  const lastCancelDeadline = room?.LastCancellationDeadline;
+
   const mealType =
-    selectedRoom?.MealType ||
-    selectedRoom?.mealType ||
-    displayRoom?.MealType ||
-    "—";
+    room?.MealType || room?.mealType || displayRoom?.MealType || null;
   const isRefundable =
-    selectedRoom?.IsRefundable ??
-    selectedRoom?.isRefundable ??
+    room?.IsRefundable ??
+    room?.isRefundable ??
     displayRoom?.IsRefundable ??
     false;
-  const inclusion = selectedRoom?.Inclusion || displayRoom?.Inclusion || "";
-  const dayRates = selectedRoom?.DayRates || displayRoom?.DayRates || [];
+  const inclusion = room?.Inclusion || displayRoom?.Inclusion || null;
+  const amenities = room?.Amenities || displayRoom?.Amenities || [];
+  const promotions = room?.RoomPromotion || room?.roomPromotion || [];
+  const dayRates = room?.DayRates || displayRoom?.DayRates || [];
   const nights = calculateNights(
     displaySearchParams?.checkIn,
     displaySearchParams?.checkOut,
@@ -390,22 +637,37 @@ function SelectedRoomDetailsCard({
         </div>
       </div>
 
-      <div className="p-6">
-        {/* Two-column layout: image left, details right */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Left: Gallery + name + badges */}
+      <div className="p-6 space-y-6">
+        {/* ── Top two-column section ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* LEFT: Image + name + badges + inclusions + promotions */}
           <div>
             {images.length > 0 && <RoomImageGallery images={images} />}
             <h4 className="text-base font-extrabold text-slate-800 leading-snug mb-3">
               {roomNameDisplay}
             </h4>
-            <div className="flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
-                <FiCoffee size={11} />
-                {mealType.replace(/_/g, " ")}
-              </span>
+
+            {/* Badges */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {/* Meal type */}
+              {mealType ? (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+                  <FiCoffee size={11} />
+                  {mealType.replace(/_/g, " ")}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">
+                  <FiCoffee size={11} /> Meal info unavailable
+                </span>
+              )}
+
+              {/* Refundable */}
               <span
-                className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${isRefundable ? "text-teal-700 bg-teal-50 border-teal-100" : "text-red-600 bg-red-50 border-red-100"}`}
+                className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
+                  isRefundable
+                    ? "text-teal-700 bg-teal-50 border-teal-100"
+                    : "text-red-600 bg-red-50 border-red-100"
+                }`}
               >
                 {isRefundable ? (
                   <>
@@ -417,42 +679,68 @@ function SelectedRoomDetailsCard({
                   </>
                 )}
               </span>
+
+              {/* Nights */}
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">
                 🌙 {nights} Night{nights !== 1 ? "s" : ""}
               </span>
             </div>
 
             {/* Inclusions */}
-            {inclusion && (
-              <div className="mt-4">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-                  Inclusions
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {(Array.isArray(inclusion) ? inclusion : inclusion.split(","))
-                    .filter(Boolean)
-                    .map((item, i) => (
-                      <span
-                        key={i}
-                        className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full font-medium"
-                      >
-                        <MdCheckCircle size={11} /> {item.trim()}
-                      </span>
-                    ))}
-                </div>
+            <div className="mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                Inclusions
+              </p>
+              {inclusion ? (
+                <InclusionBadges inclusion={inclusion} />
+              ) : (
+                <span className="text-[11px] text-slate-400 italic">
+                  No inclusions listed
+                </span>
+              )}
+            </div>
+
+            {/* Room Promotions */}
+            {promotions.length > 0 ? (
+              <RoomPromotions promotions={promotions} />
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 flex items-center gap-2">
+                <FiGift size={13} className="text-slate-300" />
+                <span className="text-[11px] text-slate-400">
+                  No promotions available for this room
+                </span>
               </div>
             )}
           </div>
 
-          {/* Right: Fare breakdown + cancellation */}
+          {/* RIGHT: Fare breakdown + Cancellation policy */}
           <div className="flex flex-col gap-5">
-            {/* Fare breakdown */}
+            {/* Fare Breakdown */}
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">
                 Fare Breakdown
               </p>
               <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
                 <div className="divide-y divide-slate-100">
+                  {/* Per-night rates from DayRates */}
+                  {dayRates?.[0]?.length > 0 && (
+                    <div className="px-4 py-2 bg-slate-100/60">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        Per-Night Rates
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {dayRates[0].map((d, i) => (
+                          <span
+                            key={i}
+                            className="text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-full"
+                          >
+                            Night {i + 1}: ₹
+                            {Number(d.BasePrice).toLocaleString("en-IN")}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="flex justify-between px-4 py-2.5">
                     <span className="text-[13px] text-slate-500">
                       Base Fare
@@ -481,72 +769,109 @@ function SelectedRoomDetailsCard({
               </div>
             </div>
 
-            {/* Cancellation policy */}
-            {cancelPolicies.length > 0 && (
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-                  Cancellation Policy
-                </p>
-                {freeCancelUntil && (
-                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5 mb-2">
-                    <FiCheckCircle
-                      size={14}
-                      className="text-emerald-500 shrink-0"
-                    />
-                    <p className="text-[12px] text-emerald-700 font-semibold">
-                      Free cancellation until <strong>{freeCancelUntil}</strong>
-                    </p>
-                  </div>
-                )}
-                {paidCancelFrom && (
-                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 mb-2">
-                    <MdInfo size={14} className="text-amber-500 shrink-0" />
-                    <p className="text-[12px] text-amber-700 font-semibold">
-                      Charges apply from <strong>{paidCancelFrom}</strong>
-                    </p>
-                  </div>
-                )}
-                <CancelPolicyTable policies={cancelPolicies} />
-              </div>
-            )}
+            {/* Cancellation Policy */}
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                Cancellation Policy
+              </p>
+              {cancelPolicies.length > 0 ? (
+                <>
+                  {freeCancelUntil && (
+                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5 mb-2">
+                      <FiCheckCircle
+                        size={14}
+                        className="text-emerald-500 shrink-0"
+                      />
+                      <p className="text-[12px] text-emerald-700 font-semibold">
+                        Free cancellation until{" "}
+                        <strong>{freeCancelUntil}</strong>
+                      </p>
+                    </div>
+                  )}
+                  {paidCancelFrom && (
+                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 mb-2">
+                      <MdInfo size={14} className="text-amber-500 shrink-0" />
+                      <p className="text-[12px] text-amber-700 font-semibold">
+                        Charges apply from <strong>{paidCancelFrom}</strong>
+                      </p>
+                    </div>
+                  )}
+                  {lastCancelDeadline && (
+                    <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 mb-2">
+                      <FiClock size={14} className="text-red-500 shrink-0" />
+                      <p className="text-[12px] text-red-700 font-semibold">
+                        Last cancellation deadline:{" "}
+                        <strong>{lastCancelDeadline}</strong>
+                      </p>
+                    </div>
+                  )}
+                  <CancelPolicyTable policies={cancelPolicies} />
+                </>
+              ) : (
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
+                  <FiShieldIcon size={13} className="text-slate-400 shrink-0" />
+                  <p className="text-[12px] text-slate-500">
+                    Cancellation policy not available
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* ── Divider ── */}
+        <hr className="border-slate-100" />
+
+        {/* ── Amenities (full width) ── */}
+        {amenities.length > 0 ? (
+          <AmenitiesGrid amenities={amenities} />
+        ) : (
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+              Room Amenities
+            </p>
+            <span className="text-[11px] text-slate-400 italic">
+              No amenities listed for this room
+            </span>
+          </div>
+        )}
+
+        {/* ── Rate Conditions (full width, from HotelResult level) ── */}
+        {rateConditions.length > 0 && (
+          <>
+            <hr className="border-slate-100" />
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
+                <FiInfo size={11} className="text-[#0A4D68]" /> Rate Conditions
+                & Check-in Info
+              </p>
+              <RateConditions conditions={rateConditions} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-const calculateNights = (checkIn, checkOut) => {
-  if (!checkIn || !checkOut) return 1;
-
-  const inDate = new Date(checkIn);
-  const outDate = new Date(checkOut);
-
-  const diffTime = outDate - inDate;
-  const nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  return nights > 0 ? nights : 1;
-};
-
-// Add these above your main component
-
-const Required = () => <span className="text-red-400">*</span>;
-
-const Divider = () => <hr className="border-slate-100" />;
-
-const SectionHeading = ({ icon, title, badge }) => (
-  <div className="flex items-center gap-2 mb-3">
-    <span className="text-[#0A4D68]">{icon}</span>
-    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-      {title}
-    </p>
-    {badge && (
-      <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
-        {badge}
+/* ─────────────────────────────────────────────────────────────── */
+/*  InfoCell (used in BookNow approved-guest view)                 */
+/* ─────────────────────────────────────────────────────────────── */
+function InfoCell({ icon: Icon, label, value }) {
+  return (
+    <div className="px-4 py-3 flex flex-col gap-0.5 bg-white">
+      <div className="flex items-center gap-2.5 mb-0.5">
+        <Icon size={15} className="text-slate-400" />
+        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+          {label}
+        </span>
+      </div>
+      <span className="text-sm font-medium text-slate-700 truncate">
+        {value || "—"}
       </span>
-    )}
-  </div>
-);
+    </div>
+  );
+}
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Main Component                                                 */
@@ -561,6 +886,7 @@ const HotelReviewBooking = () => {
     project: null,
     approver: null,
   });
+
   const { user } = useSelector((state) => state.auth);
   const { loading: actionLoading } = useSelector(
     (state) => state.hotelBookings,
@@ -603,16 +929,12 @@ const HotelReviewBooking = () => {
     ) || 0;
   const totalGuestsFromSearch = totalAdultsFromSearch + totalChildrenFromSearch;
 
-  // const totalChildrenFromSearch =
-  //   (searchParams?.rooms || []).reduce(
-  //     (sum, r) => sum + (r.Children || r.children || 0),
-  //     0,
-  //   ) || 0;
-
+  // ── Fetch booking by id ──
   useEffect(() => {
     if (id) dispatch(fetchHotelRequestById(id));
   }, [dispatch, id]);
 
+  // ── Fetch GST details ──
   useEffect(() => {
     const fetchGst = async () => {
       try {
@@ -633,6 +955,7 @@ const HotelReviewBooking = () => {
     fetchGst();
   }, []);
 
+  // ── Populate from selectedRequest (BookNow mode) ──
   useEffect(() => {
     if (selectedRequest) {
       setBookingRequest(selectedRequest);
@@ -641,10 +964,10 @@ const HotelReviewBooking = () => {
     }
   }, [selectedRequest]);
 
+  // ── Generate traveler list from search params (non-BookNow mode) ──
   useEffect(() => {
     if (!isBookNowMode && travelers.length === 0 && user) {
       const generatedTravelers = [];
-
       const roomsFromSearch = searchParams?.rooms || [];
 
       roomsFromSearch.forEach((room, roomIdx) => {
@@ -724,6 +1047,7 @@ const HotelReviewBooking = () => {
     searchParams,
   ]);
 
+  // ── Guest management ──
   const handleAddGuest = (paxType = 1) => {
     const limit = totalGuestsFromSearch || totalAdultsFromSearch;
     if (travelers.length >= limit) {
@@ -766,7 +1090,6 @@ const HotelReviewBooking = () => {
       });
       return;
     }
-
     setTravelers((prev) => {
       const updated = prev.filter((t) => t.id !== id);
       if (!updated.some((t) => t.leadPassenger) && updated.length > 0)
@@ -780,6 +1103,7 @@ const HotelReviewBooking = () => {
       prev.map((t) => (t.id === id ? { ...t, [field]: value } : t)),
     );
 
+  // ── Derived state ──
   const isApproved = bookingRequest?.requestStatus === "approved";
   const approvedBy = bookingRequest?.approvedBy;
 
@@ -818,33 +1142,30 @@ const HotelReviewBooking = () => {
     displayHotel?.address?.split(",")?.slice(-1)[0]?.trim() ||
     "";
 
+  // ── PreBook data ──
   const preBookRooms = preBookData?.HotelResult?.[0]?.Rooms || [];
-
+  const preBookRateConditions =
+    preBookData?.HotelResult?.[0]?.RateConditions || []; // ← NEW
   const validation = preBookData?.ValidationInfo || {};
 
   const requiredFlags = {
     isPANRequired: validation?.PanMandatory,
     isPassportRequired: validation?.PassportMandatory,
-    isEmailRequired: true, // fallback (API not giving)
-    isPhoneRequired: true, // fallback
+    isEmailRequired: true,
+    isPhoneRequired: true,
   };
 
   const getCountryCode = (countryNameOrCode) => {
     if (!countryNameOrCode) return "";
-
-    // If already code like "IN"
     if (countryNameOrCode.length === 2) return countryNameOrCode;
-
     const found = Country.getAllCountries().find(
       (c) => c.name.toLowerCase() === countryNameOrCode.toLowerCase(),
     );
-
     return found?.isoCode || "";
   };
 
   const hotelCountryCode = getCountryCode(hotelCountry);
 
-  // 🔥 THIS IS YOUR MAIN FLAG
   const isInternationalBooking = travelers.some((t) => {
     const travelerCountryCode = getCountryCode(t.nationality || t.countryCode);
     if (!travelerCountryCode || !hotelCountryCode) return false;
@@ -870,9 +1191,7 @@ const HotelReviewBooking = () => {
   const bookingCode = selectedRoom?.[0]?.BookingCode;
   useEffect(() => {
     if (!bookingCode) return;
-
     console.log("🔥 PreBook Triggered:", bookingCode);
-
     dispatch(preBookHotel({ BookingCode: bookingCode }));
   }, [bookingCode]);
 
@@ -890,7 +1209,6 @@ const HotelReviewBooking = () => {
   );
   const countries = Country.getAllCountries();
   const selectedRooms = rooms || [];
-  const price = displayRoom?.Price || displayRoom || {};
   const totalFare = selectedRooms.reduce(
     (sum, r) => sum + (r.TotalFare || r.Price?.TotalFare || 0),
     0,
@@ -899,11 +1217,50 @@ const HotelReviewBooking = () => {
     (sum, r) => sum + (r.TotalTax || r.Price?.Tax || 0),
     0,
   );
+  const price = displayRoom?.Price || displayRoom || {};
   let baseFare = price.BaseFare;
   let tax = price.Tax || displayRoom?.Price?.Tax || 0;
   if (!baseFare && totalFare) baseFare = totalFare - tax;
   const search = searchParams;
 
+  const validateTravellers = (travellers) => {
+    const errors = [];
+
+    const nameRegex = /^[A-Za-z]{3,30}$/;
+    const allowedTitles = ["Mr", "Ms", "Mrs", "Miss", "Master"];
+
+    const nameSet = new Set();
+
+    travellers.forEach((t, index) => {
+      const fullName = `${t.firstName}-${t.lastName}`.toLowerCase();
+
+      // TITLE
+      if (!allowedTitles.includes(t.title)) {
+        errors.push(`Invalid title for guest ${index + 1}`);
+      }
+
+      // FIRST NAME
+      if (!nameRegex.test(t.firstName)) {
+        errors.push(`Invalid first name for guest ${index + 1}`);
+      }
+
+      // LAST NAME
+      if (!nameRegex.test(t.lastName)) {
+        errors.push(`Invalid last name for guest ${index + 1}`);
+      }
+
+      // DUPLICATE
+      if (nameSet.has(fullName)) {
+        errors.push(`Duplicate guest name: ${t.firstName} ${t.lastName}`);
+      } else {
+        nameSet.add(fullName);
+      }
+    });
+
+    return errors;
+  };
+
+  // ── Submit: Request for Approval ──
   const handleRequestApproval = async () => {
     if (travelers.length !== totalGuestsFromSearch) {
       ToastWithTimer({
@@ -928,23 +1285,14 @@ const HotelReviewBooking = () => {
         });
         return;
       }
-      if (!isChild) {
-        if (!t.email || !t.phoneWithCode) {
-          ToastWithTimer({
-            type: "error",
-            message: "Email and phone required for adults",
-          });
-          return;
-        }
+      if (!isChild && (!t.email || !t.phoneWithCode)) {
+        ToastWithTimer({
+          type: "error",
+          message: "Email and phone required for adults",
+        });
+        return;
       }
     }
-    const resolvedBookingCode =
-      displayRoom?.BookingCode ||
-      displayRoom?.RoomTypeCode ||
-      displayRoom?.RatePlanCode ||
-      displayRoom?.roomTypeCode ||
-      displayRoom?.ratePlanCode ||
-      null;
     if (!selectedRoom.length) {
       ToastWithTimer({
         type: "error",
@@ -953,11 +1301,10 @@ const HotelReviewBooking = () => {
       return;
     }
 
-    const totalAdults = travelers.length;
+    const totalAdultsPax = travelers.length;
     const totalRooms = selectedRoom.length;
-
-    const adultsPerRoom = Math.floor(totalAdults / totalRooms);
-    const extra = totalAdults % totalRooms;
+    const adultsPerRoom = Math.floor(totalAdultsPax / totalRooms);
+    const extra = totalAdultsPax % totalRooms;
 
     const roomGuests = selectedRoom.map((_, i) => ({
       noOfAdults: adultsPerRoom + (i < extra ? 1 : 0),
@@ -965,14 +1312,13 @@ const HotelReviewBooking = () => {
       childAge: [],
     }));
 
-    const buildPaxRooms = (rooms) => {
-      return rooms.map((room) => ({
+    const buildPaxRooms = (rooms) =>
+      rooms.map((room) => ({
         Adults: Number(room.Adults || room.adults || 0),
         Children: Number(room.Children || room.children || 0),
         ChildrenAges:
           room.ChildrenAges || room.childAges || room.ChildAge || [],
       }));
-    };
 
     const payload = {
       bookingType: "hotel",
@@ -1025,17 +1371,13 @@ const HotelReviewBooking = () => {
             noOfChild: r.Children || r.children || 0,
             childAge: r.ChildrenAges || r.ChildAge || r.childAges || [],
           })) || roomGuests,
-        // bookingCode: selectedRoom?.BookingCode || selectedRoom?.RoomTypeCode || selectedRoom?.RatePlanCode,
-        // price: selectedRoom?.Price, guestNationality: "IN",
         rooms: selectedRoom.map((room) => ({
           bookingCode:
             room.BookingCode || room.RoomTypeCode || room.RatePlanCode,
-
           price: room.Price,
           totalFare: room.TotalFare,
           totalTax: room.TotalTax,
           roomIndex: room.RoomIndex,
-
           name: room.Name,
           mealType: room.MealType,
           isRefundable: room.IsRefundable,
@@ -1080,8 +1422,8 @@ const HotelReviewBooking = () => {
         currency: displayRoom?.Currency || "INR",
       },
     };
+
     try {
-      // ✅ STEP 1: CALL MANAGER API FIRST
       await dispatch(
         selectManager({
           approverId: projectApproverData.approver?.id,
@@ -1092,14 +1434,22 @@ const HotelReviewBooking = () => {
         }),
       ).unwrap();
 
-      // ✅ STEP 2: THEN CREATE BOOKING
+      const errors = validateTravellers(travelers);
+
+      if (errors.length) {
+        ToastWithTimer({
+          type: "error",
+          message: errors[0],
+        });
+        return;
+      }
+
       await dispatch(createHotelBookingRequest(payload)).unwrap();
 
       ToastWithTimer({
         type: "success",
         message: "Booking request submitted successfully",
       });
-
       navigate("/my-pending-approvals");
     } catch (err) {
       ToastWithTimer({
@@ -1109,6 +1459,7 @@ const HotelReviewBooking = () => {
     }
   };
 
+  // ── Submit: Book Now (approved mode) ──
   const handleBookNow = async () => {
     try {
       const result = await Swal.fire({
@@ -1129,6 +1480,7 @@ const HotelReviewBooking = () => {
         },
         allowOutsideClick: () => !Swal.isLoading(),
       });
+
       if (result.isConfirmed) {
         ToastWithTimer({
           type: "success",
@@ -1144,6 +1496,7 @@ const HotelReviewBooking = () => {
   const handleAction = () =>
     isBookNowMode ? handleBookNow() : handleRequestApproval();
 
+  // ── Guards ──
   if (!isBookNowMode && (!hotel || !rooms || !searchParams)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1166,6 +1519,7 @@ const HotelReviewBooking = () => {
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
 
+  /* ──────────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <EmployeeHeader />
@@ -1174,9 +1528,7 @@ const HotelReviewBooking = () => {
       <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
-            onClick={() => {
-              navigate(-1);
-            }}
+            onClick={() => navigate(-1)}
             className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#0A4D68] transition font-medium"
           >
             <MdArrowBack size={18} />
@@ -1205,20 +1557,24 @@ const HotelReviewBooking = () => {
           totalAdults={totalAdults}
         />
 
-        {/* ── FULL-WIDTH ROOM DETAILS ── */}
-        {(preBookRooms.length ? preBookRooms : selectedRoom).map((room, index) => (
-          <SelectedRoomDetailsCard
-            key={index}
-            selectedRoom={room}
-            displayRoom={room}
-            displaySearchParams={displaySearchParams}
-          />
-        ))}
+        {/* ── FULL-WIDTH ROOM DETAILS (with all PreBook fields) ── */}
+        {(preBookRooms.length ? preBookRooms : selectedRoom).map(
+          (room, index) => (
+            <SelectedRoomDetailsCard
+              key={index}
+              selectedRoom={room}
+              displayRoom={room}
+              displaySearchParams={displaySearchParams}
+              rateConditions={index === 0 ? preBookRateConditions : []}
+            />
+          ),
+        )}
 
-        {/* ── BOTTOM SECTION: Guest details (left) + Price summary (right) ── */}
+        {/* ── BOTTOM: Guest details (left 2/3) + Price summary (right 1/3) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* ── LEFT: Guest Details ── */}
           <div className="lg:col-span-2 space-y-6">
+            {/* BookNow mode: read-only approved guests */}
             {isBookNowMode ? (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="bg-gradient-to-r from-green-600 to-emerald-500 px-6 py-4 flex items-center justify-between">
@@ -1316,6 +1672,7 @@ const HotelReviewBooking = () => {
                 </div>
               </div>
             ) : (
+              /* Non-BookNow mode: editable guest form */
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
@@ -1331,15 +1688,14 @@ const HotelReviewBooking = () => {
                       </p>
                     </div>
                   </div>
-                  {!isBookNowMode && (
-                    <button
-                      onClick={handleAddGuest}
-                      className="flex items-center gap-1.5 text-xs font-medium text-[#0A4D68] border border-[#0A4D68]/30 bg-[#0A4D68]/5 hover:bg-[#0A4D68]/10 px-3 py-1.5 rounded-lg transition"
-                    >
-                      <FaUserPlus size={12} /> Add Guest
-                    </button>
-                  )}
+                  <button
+                    onClick={handleAddGuest}
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#0A4D68] border border-[#0A4D68]/30 bg-[#0A4D68]/5 hover:bg-[#0A4D68]/10 px-3 py-1.5 rounded-lg transition"
+                  >
+                    <FaUserPlus size={12} /> Add Guest
+                  </button>
                 </div>
+
                 <div className="p-6 space-y-5">
                   {travelers.map((t, index) => (
                     <div
@@ -1362,7 +1718,7 @@ const HotelReviewBooking = () => {
                             </span>
                           )}
                         </div>
-                        {travelers.length > 1 && !isBookNowMode && (
+                        {travelers.length > 1 && (
                           <button
                             onClick={() => handleRemoveGuest(t.id)}
                             className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50 transition"
@@ -1373,13 +1729,11 @@ const HotelReviewBooking = () => {
                       </div>
 
                       <div className="p-5 space-y-6 bg-white">
-                        {/* ── Full Name ── */}
+                        {/* Full Name */}
                         <div>
                           <SectionHeading
                             icon={<FiUser size={12} />}
-                            title={`${
-                              t.paxType === 2 ? "Child" : "Adult"
-                            } Details`}
+                            title={`${t.paxType === 2 ? "Child" : "Adult"} Details`}
                           />
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div className="flex flex-col gap-1">
@@ -1395,6 +1749,8 @@ const HotelReviewBooking = () => {
                                 <option>Mr</option>
                                 <option>Mrs</option>
                                 <option>Ms</option>
+                                <option>Miss</option>
+                                <option>Master</option>
                               </select>
                             </div>
                             <div className="flex flex-col gap-1">
@@ -1462,7 +1818,7 @@ const HotelReviewBooking = () => {
 
                         <Divider />
 
-                        {/* ── Contact Details (hide for children) ── */}
+                        {/* Contact Details (adults only) */}
                         {t.paxType !== 2 && (
                           <div>
                             <SectionHeading
@@ -1476,7 +1832,7 @@ const HotelReviewBooking = () => {
                                 </label>
                                 <div className="relative">
                                   <FiMail
-                                    className="absolute right-3  top-1/2 -translate-y-1/2 text-slate-400"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
                                     size={14}
                                   />
                                   <input
@@ -1527,7 +1883,7 @@ const HotelReviewBooking = () => {
 
                         <Divider />
 
-                        {/* ── Additional Info ── */}
+                        {/* Personal Details */}
                         <div>
                           <SectionHeading
                             icon={<FiInfo size={12} />}
@@ -1638,7 +1994,7 @@ const HotelReviewBooking = () => {
                           </div>
                         </div>
 
-                        {/* ── Passport (International only) ── */}
+                        {/* Passport (International only) */}
                         {isInternationalBooking &&
                           requiredFlags.isPassportRequired && (
                             <>
@@ -1712,33 +2068,20 @@ const HotelReviewBooking = () => {
 
                   <style>{`
                     .field-label {
-                      font-size: 11px;
-                      font-weight: 600;
-                      color: #64748b;
-                      text-transform: uppercase;
-                      letter-spacing: 0.05em;
+                      font-size: 11px; font-weight: 600; color: #64748b;
+                      text-transform: uppercase; letter-spacing: 0.05em;
                     }
                     .field-input {
-                      height: 40px;
-                      width: 100%;
-                      padding: 0 12px;
-                      font-size: 14px;
-                      color: #334155;
-                      background: white;
-                      border: 1px solid #e2e8f0;
-                      border-radius: 8px;
-                      outline: none;
-                      transition: border-color 0.15s, box-shadow 0.15s;
+                      height: 40px; width: 100%; padding: 0 12px;
+                      font-size: 14px; color: #334155; background: white;
+                      border: 1px solid #e2e8f0; border-radius: 8px;
+                      outline: none; transition: border-color 0.15s, box-shadow 0.15s;
                     }
                     .field-input:focus {
                       border-color: #0A4D68;
                       box-shadow: 0 0 0 3px rgba(10,77,104,0.08);
                     }
-                    .field-input:disabled {
-                      background: #f8fafc;
-                      color: #94a3b8;
-                      cursor: not-allowed;
-                    }
+                    .field-input:disabled { background: #f8fafc; color: #94a3b8; cursor: not-allowed; }
                     .field-input::placeholder { color: #cbd5e1; }
                   `}</style>
                 </div>
@@ -1761,14 +2104,13 @@ const HotelReviewBooking = () => {
                 </div>
               </div>
               <textarea
-                // value={purposeOfTravel}
                 onChange={(e) => setPurposeOfTravel(e.target.value)}
                 placeholder="Describe the reason for this booking…"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 focus:bg-white min-h-[100px] transition resize-none"
               />
             </div>
 
-            {/* ── GST Details ── */}
+            {/* GST Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
               <div className="flex items-center gap-2.5 mb-4">
                 <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 text-green-600">
@@ -1787,74 +2129,49 @@ const HotelReviewBooking = () => {
                 </div>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    GSTIN
-                  </label>
-                  <input
-                    type="text"
-                    value={gstDetails.gstin || ""}
-                    onChange={(e) =>
-                      setGstDetails((prev) => ({
-                        ...prev,
-                        gstin: e.target.value.toUpperCase(),
-                      }))
-                    }
-                    placeholder="27ABCDE1234F2Z5"
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/10 transition bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Legal Name
-                  </label>
-                  <input
-                    type="text"
-                    value={gstDetails.legalName || ""}
-                    onChange={(e) =>
-                      setGstDetails((prev) => ({
-                        ...prev,
-                        legalName: e.target.value,
-                      }))
-                    }
-                    placeholder="Company legal name"
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/10 transition bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    GST Email
-                  </label>
-                  <input
-                    type="text"
-                    value={gstDetails.gstEmail || ""}
-                    onChange={(e) =>
-                      setGstDetails((prev) => ({
-                        ...prev,
-                        gstEmail: e.target.value,
-                      }))
-                    }
-                    placeholder="GST Email"
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/10 transition bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Billing Address
-                  </label>
-                  <input
-                    type="text"
-                    value={gstDetails.address || ""}
-                    onChange={(e) =>
-                      setGstDetails((prev) => ({
-                        ...prev,
-                        address: e.target.value,
-                      }))
-                    }
-                    placeholder="Street, City, State, PIN"
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/10 transition bg-white"
-                  />
-                </div>
+                {[
+                  {
+                    label: "GSTIN",
+                    key: "gstin",
+                    placeholder: "27ABCDE1234F2Z5",
+                    transform: (v) => v.toUpperCase(),
+                  },
+                  {
+                    label: "Legal Name",
+                    key: "legalName",
+                    placeholder: "Company legal name",
+                  },
+                  {
+                    label: "GST Email",
+                    key: "gstEmail",
+                    placeholder: "GST Email",
+                  },
+                  {
+                    label: "Billing Address",
+                    key: "address",
+                    placeholder: "Street, City, State, PIN",
+                  },
+                ].map(({ label, key, placeholder, transform }) => (
+                  <div key={key}>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      {label}
+                    </label>
+                    <input
+                      type="text"
+                      value={gstDetails[key] || ""}
+                      onChange={(e) =>
+                        setGstDetails((prev) => ({
+                          ...prev,
+                          [key]: transform
+                            ? transform(e.target.value)
+                            : e.target.value,
+                        }))
+                      }
+                      placeholder={placeholder}
+                      className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/10 transition bg-white"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -1863,6 +2180,7 @@ const HotelReviewBooking = () => {
           <div className="lg:col-span-1">
             <div className="sticky top-20 space-y-4">
               <ProjectApproverBlock onChange={setProjectApproverData} />
+
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="bg-gradient-to-r from-[#0A4D68] to-[#088395] px-5 py-4">
                   <h3 className="text-sm font-bold text-white mb-0.5">
@@ -1913,7 +2231,7 @@ const HotelReviewBooking = () => {
                 >
                   {actionLoading ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />{" "}
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       Processing…
                     </>
                   ) : isBookNowMode ? (
@@ -1930,22 +2248,5 @@ const HotelReviewBooking = () => {
     </div>
   );
 };
-
-/* ── Approved info cell ── */
-function InfoCell({ icon: Icon, label, value }) {
-  return (
-    <div className="px-4 py-3 flex flex-col gap-0.5 bg-white">
-      <div className="flex items-center gap-2.5 mb-0.5">
-        <Icon size={15} className="text-slate-400" />
-        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-          {label}
-        </span>
-      </div>
-      <span className="text-sm font-medium text-slate-700 truncate">
-        {value || "—"}
-      </span>
-    </div>
-  );
-}
 
 export default HotelReviewBooking;

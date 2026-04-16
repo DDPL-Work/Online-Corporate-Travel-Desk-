@@ -194,7 +194,7 @@ const searchFlights = Joi.object({
   infants: Joi.number().min(0).default(0),
 
   cabinClass: Joi.string()
-    .valid("economy", "business", "first")
+    .valid("economy", "premium_economy", "business", "premium_business", "first_class")
     .default("economy"),
 
   directFlight: Joi.boolean().default(false),
