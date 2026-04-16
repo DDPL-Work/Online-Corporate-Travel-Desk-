@@ -445,6 +445,10 @@ class FlightService {
       Sources: null,
     };
 
+    logger.info("TBO FLIGHT SEARCH PAYLOAD", {
+      payload
+    });
+
     const searchUrl = buildUrl(env, "flightSearch");
 
     logger.info("TBO FLIGHT SEARCH CALL", {
