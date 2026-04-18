@@ -67,6 +67,7 @@ import UpcomingTripsForManager from "../components/CorporateManagerTabs/Upcoming
 import EmployeeManagement from "../components/TravelAdminTabs/EmployeeManagement";
 import MidSizeBusiness from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 import ApprovalWorkflow from "../Pages/Landing/Platform/ApprovalWorkflow";
+import CompanyLandingPage from "../Pages/Landing/CompanySpecific/ComapanyLandignPage";
 // import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 
 export const appRouter = createBrowserRouter([
@@ -222,6 +223,10 @@ export const appRouter = createBrowserRouter([
       { path: "/platform/flight-booking-info", element: <FlightBookingInfo /> },
       { path: "/platform/hotel-booking-info", element: <HotelBookingInfo /> },
       { path: "/platform/approval-and-workflow", element: <ApprovalWorkflow /> },
+
+
+
+      { path: "/company-landing-page", element: <CompanyLandingPage /> },
       {
         path: "*",
         element: <FlightBookingInfo />,

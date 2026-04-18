@@ -41,6 +41,10 @@ import {
   Toggle,
   ZohoIcon,
 } from "./components";
+import PhoneInput from 'react-phone-input-2';
+import 'react-phone-input-2/lib/style.css';
+import { Country, State, City } from 'country-state-city';
+
 
 // Step 0 — Access (Email + SSO Icons)
 export const Step0 = ({ onNext, onRegister, form, setForm }) => {
@@ -202,7 +206,7 @@ export const Step1 = ({ form, setForm, errors }) => (
           ]}
         />
       </F> */}
-      <F label="Default Approver" required>
+      {/* <F label="Default Approver" required>
         <RichSelect
           value={form.defaultApprover}
           onChange={(v) => setForm({ ...form, defaultApprover: v })}
@@ -211,7 +215,7 @@ export const Step1 = ({ form, setForm, errors }) => (
             { value: "manager", label: "Line Manager" },
           ]}
         />
-      </F>
+      </F> */}
     </Grid>
 
     {/* {form.classification === "prepaid" && (
@@ -269,14 +273,15 @@ export const Step2 = ({ form, setForm, errors }) => (
               />
             </F>
             <F label="Mobile" required>
-              <Inp
-                icon={<MdPhone />}
+              <PhoneInput
+                country={'in'}
                 value={form.primaryMobile}
-                onChange={(v) => setForm({ ...form, primaryMobile: v })}
-                placeholder="+91 98765 43210"
-                type="tel"
-                error={errors.primaryMobile}
+                onChange={(phone) => setForm({ ...form, primaryMobile: phone })}
+                inputStyle={{width: '100%', border: errors.primaryMobile ? '1px solid #f87171' : '1px solid #e2e8f0', borderRadius: '0.75rem', paddingLeft: '3rem', height: '46px', fontSize: '0.875rem'}}
+                buttonStyle={{border: errors.primaryMobile ? '1px solid #f87171' : '1px solid #e2e8f0', borderRadius: '0.75rem 0 0 0.75rem', backgroundColor: errors.primaryMobile ? '#fef2f2' : '#ffffff'}}
+                containerStyle={{marginTop: '0.25rem'}}
               />
+              {errors.primaryMobile && <p className="text-xs text-red-500 mt-1 font-medium">{errors.primaryMobile}</p>}
             </F>
           </Grid>
         </div>
@@ -326,7 +331,7 @@ export const Step2 = ({ form, setForm, errors }) => (
 
     <ContactGroup
       color="bg-gradient-to-r from-orange-500 to-orange-600"
-      title="Billing Department"
+      title="Billing Department (Optional)"
       fields={
         <div className="space-y-3">
           <F label="Contact Name">
@@ -350,14 +355,15 @@ export const Step2 = ({ form, setForm, errors }) => (
               />
             </F>
             <F label="Mobile">
-              <Inp
-                icon={<MdPhone />}
+              <PhoneInput
+                country={'in'}
                 value={form.billingMobile}
-                onChange={(v) => setForm({ ...form, billingMobile: v })}
-                placeholder="+91 98765 43212"
-                type="tel"
-                error={errors.billingMobile}
+                onChange={(phone) => setForm({ ...form, billingMobile: phone })}
+                inputStyle={{width: '100%', border: errors.billingMobile ? '1px solid #f87171' : '1px solid #e2e8f0', borderRadius: '0.75rem', paddingLeft: '3rem', height: '46px', fontSize: '0.875rem'}}
+                buttonStyle={{border: errors.billingMobile ? '1px solid #f87171' : '1px solid #e2e8f0', borderRadius: '0.75rem 0 0 0.75rem', backgroundColor: errors.billingMobile ? '#fef2f2' : '#ffffff'}}
+                containerStyle={{marginTop: '0.25rem'}}
               />
+              {errors.billingMobile && <p className="text-xs text-red-500 mt-1 font-medium">{errors.billingMobile}</p>}
             </F>
           </Grid>
         </div>
@@ -366,8 +372,16 @@ export const Step2 = ({ form, setForm, errors }) => (
   </div>
 );
 
-// Step 3 — Address
-export const Step3 = ({ form, setForm, errors }) => (
+export const Step3 = ({ form, setForm, errors }) => {
+  const countries = Country.getAllCountries();
+  
+  // Find selected country details and state details
+  const selectedCountry = countries.find(c => c.name === form.country) || countries.find(c => c.isoCode === 'IN');
+  const states = selectedCountry ? State.getStatesOfCountry(selectedCountry.isoCode) : [];
+  const selectedState = states.find(s => s.name === form.state);
+  const cities = selectedState ? City.getCitiesOfState(selectedCountry.isoCode, selectedState.isoCode) : [];
+
+  return (
   <div className="space-y-4">
     <F label="Street Address / Building">
       <Inp
@@ -379,38 +393,47 @@ export const Step3 = ({ form, setForm, errors }) => (
       />
     </F>
     <Grid>
-      <F label="City">
-        <Inp
-          value={form.city}
-          onChange={(v) => setForm({ ...form, city: v })}
-          placeholder="Gurugram"
-          error={errors.city}
+      <F label="Country">
+        <RichSelect
+          value={form.country || "India"}
+          onChange={(v) => setForm({ ...form, country: v, state: "", city: "" })}
+          options={countries.map(c => ({ value: c.name, label: c.name }))}
         />
+        {errors.country && <p className="text-xs text-red-500 mt-1 font-medium">{errors.country}</p>}
       </F>
       <F label="State">
-        <Inp
+        <RichSelect
           value={form.state}
-          onChange={(v) => setForm({ ...form, state: v })}
-          placeholder="Haryana"
-          error={errors.state}
+          onChange={(v) => setForm({ ...form, state: v, city: "" })}
+          options={states.map(s => ({ value: s.name, label: s.name }))}
         />
+        {errors.state && <p className="text-xs text-red-500 mt-1 font-medium">{errors.state}</p>}
       </F>
     </Grid>
     <Grid>
+      <F label="City">
+        {cities.length > 0 ? (
+          <RichSelect
+            value={form.city}
+            onChange={(v) => setForm({ ...form, city: v })}
+            options={cities.map(c => ({ value: c.name, label: c.name }))}
+          />
+        ) : (
+          <Inp
+            value={form.city}
+            onChange={(v) => setForm({ ...form, city: v })}
+            placeholder="Gurugram"
+            error={errors.city}
+          />
+        )}
+        {errors.city && <p className="text-xs text-red-500 mt-1 font-medium">{errors.city}</p>}
+      </F>
       <F label="Pincode">
         <Inp
           value={form.pincode}
           onChange={(v) => setForm({ ...form, pincode: v })}
           placeholder="122001"
           error={errors.pincode}
-        />
-      </F>
-      <F label="Country">
-        <Inp
-          value={form.country}
-          onChange={(v) => setForm({ ...form, country: v })}
-          placeholder="India"
-          error={errors.country}
         />
       </F>
     </Grid>
@@ -452,6 +475,7 @@ export const Step3 = ({ form, setForm, errors }) => (
     </div>
   </div>
 );
+};
 
 // Step 4 — SSO Config
 export const Step4 = ({ form, setForm, errors }) => {
@@ -575,6 +599,7 @@ export const Step4 = ({ form, setForm, errors }) => {
 };
 
 // Step 5 — Billing
+
 // const Step5 = ({ form, setForm, errors }) => {
 //   // 🟢 PREPAID FLOW
 //   if (form.classification === "prepaid") {
@@ -647,115 +672,117 @@ export const Step4 = ({ form, setForm, errors }) => {
 // };
 
 // Step 6 — Travel Policy
-export const Step5 = ({ form, setForm, errors }) => (
-  <div className="space-y-4">
-    <F
-      label="Allowed Cabin Classes"
-      required
-      hint="Employees can only book selected classes"
-    >
-      <div className="grid grid-cols-2 gap-2 mt-0.5">
-        {["Economy", "Premium Economy", "Business", "First"].map((opt) => {
-          const on = form.allowedCabinClass.includes(opt);
-          return (
-            <button
-              key={opt}
-              type="button"
-              onClick={() =>
-                setForm({
-                  ...form,
-                  allowedCabinClass: on
-                    ? form.allowedCabinClass.filter((v) => v !== opt)
-                    : [...form.allowedCabinClass, opt],
-                })
-              }
-              className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 text-sm font-bold transition-all ${on ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-100 bg-white text-slate-400 hover:border-slate-200"}`}
-            >
-              <div
-                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${on ? "border-blue-500 bg-blue-500" : "border-slate-200"}`}
-              >
-                {on && <BsCheckLg className="text-white text-xs" />}
-              </div>
-              {opt}
-            </button>
-          );
-        })}
-      </div>
-    </F>
+// export const Step5 = ({ form, setForm, errors }) => (
+//   <div className="space-y-4">
+//     <F
+//       label="Allowed Cabin Classes"
+//       required
+//       hint="Employees can only book selected classes"
+//     >
+//       <div className="grid grid-cols-2 gap-2 mt-0.5">
+//         {["Economy", "Premium Economy", "Business", "First"].map((opt) => {
+//           const on = form.allowedCabinClass.includes(opt);
+//           return (
+//             <button
+//               key={opt}
+//               type="button"
+//               onClick={() =>
+//                 setForm({
+//                   ...form,
+//                   allowedCabinClass: on
+//                     ? form.allowedCabinClass.filter((v) => v !== opt)
+//                     : [...form.allowedCabinClass, opt],
+//                 })
+//               }
+//               className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 text-sm font-bold transition-all ${on ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-100 bg-white text-slate-400 hover:border-slate-200"}`}
+//             >
+//               <div
+//                 className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${on ? "border-blue-500 bg-blue-500" : "border-slate-200"}`}
+//               >
+//                 {on && <BsCheckLg className="text-white text-xs" />}
+//               </div>
+//               {opt}
+//             </button>
+//           );
+//         })}
+//       </div>
+//     </F>
 
-    <Grid>
-      <F label="Max Booking Amount (₹)" hint="0 = unlimited">
-        <Inp
-          icon={<MdAttachMoney />}
-          value={form.maxBookingAmount}
-          onChange={(v) => setForm({ ...form, maxBookingAmount: v })}
-          placeholder="0"
-          type="number"
-        />
-      </F>
-      <F label="Advance Booking (Days)" hint="Min. days before travel">
-        <Inp
-          icon={<MdPolicy />}
-          value={form.advanceBookingDays}
-          onChange={(v) => setForm({ ...form, advanceBookingDays: v })}
-          placeholder="0"
-          type="number"
-        />
-      </F>
-    </Grid>
+//     <Grid>
+//       <F label="Max Booking Amount (₹)" hint="0 = unlimited">
+//         <Inp
+//           icon={<MdAttachMoney />}
+//           value={form.maxBookingAmount}
+//           onChange={(v) => setForm({ ...form, maxBookingAmount: v })}
+//           placeholder="0"
+//           type="number"
+//         />
+//       </F>
+//       <F label="Advance Booking (Days)" hint="Min. days before travel">
+//         <Inp
+//           icon={<MdPolicy />}
+//           value={form.advanceBookingDays}
+//           onChange={(v) => setForm({ ...form, advanceBookingDays: v })}
+//           placeholder="0"
+//           type="number"
+//         />
+//       </F>
+//     </Grid>
 
-    <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-      <Toggle
-        checked={form.allowAncillaryServices}
-        onChange={(v) => setForm({ ...form, allowAncillaryServices: v })}
-        label="Allow seat selection, extra baggage & in-flight meals"
-      />
-    </div>
+//     <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+//       <Toggle
+//         checked={form.allowAncillaryServices}
+//         onChange={(v) => setForm({ ...form, allowAncillaryServices: v })}
+//         label="Allow seat selection, extra baggage & in-flight meals"
+//       />
+//     </div>
 
-    {/* Live preview */}
-    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
-      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2.5">
-        📋 Policy Preview
-      </p>
-      <div className="space-y-1.5">
-        {[
-          {
-            l: "Cabins",
-            v: form.allowedCabinClass.join(", ") || "None selected",
-          },
-          {
-            l: "Max amount",
-            v:
-              +form.maxBookingAmount > 0
-                ? `₹${(+form.maxBookingAmount).toLocaleString()}`
-                : "Unlimited",
-          },
-          {
-            l: "Advance booking",
-            v:
-              +form.advanceBookingDays > 0
-                ? `${form.advanceBookingDays} days minimum`
-                : "No restriction",
-          },
-          {
-            l: "Ancillaries",
-            v: form.allowAncillaryServices ? "Allowed" : "Not allowed",
-          },
-        ].map((row) => (
-          <div
-            key={row.l}
-            className="flex items-center justify-between text-xs"
-          >
-            <span className="text-emerald-600/70">{row.l}</span>
-            <span className="font-bold text-emerald-800">{row.v}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-);
+//     {/* Live preview */}
+//     <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+//       <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2.5">
+//         📋 Policy Preview
+//       </p>
+//       <div className="space-y-1.5">
+//         {[
+//           {
+//             l: "Cabins",
+//             v: form.allowedCabinClass.join(", ") || "None selected",
+//           },
+//           {
+//             l: "Max amount",
+//             v:
+//               +form.maxBookingAmount > 0
+//                 ? `₹${(+form.maxBookingAmount).toLocaleString()}`
+//                 : "Unlimited",
+//           },
+//           {
+//             l: "Advance booking",
+//             v:
+//               +form.advanceBookingDays > 0
+//                 ? `${form.advanceBookingDays} days minimum`
+//                 : "No restriction",
+//           },
+//           {
+//             l: "Ancillaries",
+//             v: form.allowAncillaryServices ? "Allowed" : "Not allowed",
+//           },
+//         ].map((row) => (
+//           <div
+//             key={row.l}
+//             className="flex items-center justify-between text-xs"
+//           >
+//             <span className="text-emerald-600/70">{row.l}</span>
+//             <span className="font-bold text-emerald-800">{row.v}</span>
+//           </div>
+//         ))}
+//       </div>
+//     </div>
+//   </div>
+// );
 
-// Step 7 — Documents
+
+
+// Step 5 — Documents
 export const DocUpload = ({
   title,
   icon,
@@ -852,7 +879,7 @@ export const DocUpload = ({
   </div>
 );
 
-export const Step6 = ({ form, setForm, errors, gstAutoFilled, ...props }) => (
+export const Step5 = ({ form, setForm, errors, gstAutoFilled, ...props }) => (
   <div className="space-y-4">
     <p className="text-sm text-slate-500 leading-relaxed">
       Upload your company documents or share secure links. Our compliance team
@@ -904,7 +931,7 @@ export const Step6 = ({ form, setForm, errors, gstAutoFilled, ...props }) => (
         error={errors.gstLegalName}
       />
     </F>
-    <F label="GST Enail" required>
+    <F label="GST Email" required>
       <Inp
         value={form.gstEmail}
         onChange={(v) => setForm({ ...form, gstEmail: v })}
@@ -930,8 +957,8 @@ export const Step6 = ({ form, setForm, errors, gstAutoFilled, ...props }) => (
   </div>
 );
 
-// Step 8 — Done
-export const Step7 = ({ form }) => (
+// Step 6 — Done
+export const Step6 = ({ form }) => (
   <div className="text-center py-2">
     <div className="relative inline-flex mb-6">
       <div className="w-24 h-24 rounded-full bg-linear-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-2xl shadow-emerald-300/40">
@@ -982,11 +1009,18 @@ export const Step7 = ({ form }) => (
           },
           {
             num: "3",
-            label: "Dedicated Manager Assigned",
-            desc: "Your travel desk point of contact",
-            time: "~24 hrs",
-            color: "bg-emerald-600",
+            label: "Welcome Aboard",
+            desc: "Your account is now active",
+            time: "~4 hrs",
+            color: "bg-green-600",
           },
+          // {
+          //   num: "3",
+          //   label: "Dedicated Manager Assigned",
+          //   desc: "Your travel desk point of contact",
+          //   time: "~24 hrs",
+          //   color: "bg-emerald-600",
+          // },
         ].map((s) => (
           <div key={s.num} className="flex items-center gap-4">
             <div

@@ -35,24 +35,7 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
   const ssoConfig = req.body.ssoConfig || {};
   const gstDetails = req.body.gstDetails || {};
 
-  const travelPolicy = {
-    allowedCabinClass: Array.isArray(
-      req.body["travelPolicy[allowedCabinClass][]"],
-    )
-      ? req.body["travelPolicy[allowedCabinClass][]"]
-      : req.body["travelPolicy[allowedCabinClass][]"]
-        ? [req.body["travelPolicy[allowedCabinClass][]"]]
-        : ["Economy"],
-
-    allowAncillaryServices:
-      req.body["travelPolicy[allowAncillaryServices]"] === "true",
-
-    advanceBookingDays: Number(
-      req.body["travelPolicy[advanceBookingDays]"] || 0,
-    ),
-
-    maxBookingAmount: Number(req.body["travelPolicy[maxBookingAmount]"] || 0),
-  };
+  // Removed travel policy logic
 
   // --------------------------------------------------
   // VALIDATIONS (UNCHANGED)
@@ -79,6 +62,16 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
   });
 
   if (existingDomain) throw new ApiError(400, "Domain already registered");
+
+  // Phone number uniqueness validation
+  const existingPhone = await Corporate.findOne({
+    "primaryContact.mobile": primaryContact.mobile,
+  });
+
+  if (existingPhone) throw new ApiError(400, "Phone number already exists");
+
+  // GST Email Preference: 1. Accounts (Billing), 2. Travel-admin (Primary)
+  gstDetails.gstEmail = gstDetails.gstEmail || billingDepartment?.email || primaryContact?.email || "";
 
   // --------------------------------------------------
   // 🟢 CLOUDINARY UPLOAD SECTION (NEW)
@@ -153,7 +146,6 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
     panCard,
 
     classification,
-    travelPolicy,
 
     defaultApprover,
     status: "pending",

@@ -5,6 +5,7 @@ import { MdOutlineFlight, MdAirlineSeatReclineNormal } from "react-icons/md";
 import { BsSuitcase } from "react-icons/bs";
 import { BiSolidOffer } from "react-icons/bi";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { FlightDetailsDropdown } from "../One-wayFlightCard";
 import {
   airlineLogo,
   FLIGHT_STATUS_MAP,
@@ -26,7 +27,7 @@ export default function ReturnInternationalFlightCard({
   onOpenFareUpsell,
 }) {
   const dispatch = useDispatch();
-  const [openSection, setOpenSection] = useState(null);
+  const [showFareDetails, setShowFareDetails] = useState(false);
   const [selectedResultIndex, setSelectedResultIndex] = useState(
     group.flightInfo.ResultIndex,
   );
@@ -93,125 +94,41 @@ export default function ReturnInternationalFlightCard({
       firstSeg?.FlightStatus || firstSeg?.Status || "Scheduled";
 
     return (
-      <div className="border border-blue-100 rounded-xl mb-4">
-        {/* ---------- Collapsible Header ---------- */}
-        <button
-          onClick={() => handleToggle(label)}
-          className="flex justify-between w-full items-center px-4 py-1.5 bg-blue-50/40 hover:bg-blue-100/40 rounded-t-xl transition-colors cursor-pointer"
-        >
+      <div className="border border-blue-100 rounded-xl mb-3">
+        {/* ---------- Basic Flight Info Header ---------- */}
+        <div className="flex justify-between w-full items-center px-4 py-3 bg-blue-50/20 rounded-xl">
           <div className="flex items-center gap-3">
             <img
               src={airlineLogo(airlineCode)}
               alt={airline}
-              className="w-8 h-8 border border-gray-200 rounded-md object-contain"
+              className="w-10 h-10 border border-gray-200 rounded-lg object-contain bg-white p-1"
             />
             <div className="flex flex-col text-left">
-              <div className="font-medium text-gray-800">
+              <div className="font-bold text-gray-800 text-sm">
                 {from} → {to}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-gray-500 font-medium">
                 {airlineCode}-{flightNumber}
               </div>
             </div>
-            <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                FLIGHT_STATUS_MAP[flightStatus]?.className ||
-                FLIGHT_STATUS_MAP.Scheduled.className
-              }`}
-            >
-              {FLIGHT_STATUS_MAP[flightStatus]?.label || "Scheduled"}
-            </span>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="font-semibold text-blue-700 text-sm">{label}</span>
-            {openSection === label ? (
-              <FaChevronUp className="text-blue-600" />
-            ) : (
-              <FaChevronDown className="text-blue-600" />
-            )}
+          <div className="flex flex-col items-center gap-1">
+             <div className="text-xs font-semibold text-slate-600 whitespace-nowrap">
+                {formatDuration(getTotalDuration(segments))}
+             </div>
+             <p className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200 uppercase tracking-wide">
+                {getStopsLabel(segments)}
+             </p>
           </div>
-        </button>
-
-        {/* ---------- Expanded Flight Details ---------- */}
-        {openSection === label && (
-          <div className="p-4 bg-white rounded-b-xl space-y-6">
-            {(() => {
-              const firstSeg = segments[0];
-              const lastSeg = segments[segments.length - 1];
-              const from = firstSeg?.Origin?.Airport?.CityName;
-              const to = lastSeg?.Destination?.Airport?.CityName;
-              const dep = firstSeg?.Origin?.DepTime;
-              const arr = lastSeg?.Destination?.ArrTime;
-              const totalDurationMin = getTotalDuration(segments);
-              const stopsLabel = getStopsLabel(segments);
-
-              return (
-                <div className="border-b border-gray-100 pb-4 last:border-none">
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6">
-                    {/* Departure */}
-                    <div className="text-left">
-                      <div className="text-lg font-bold text-slate-800">
-                        {formatTime(dep)}
-                      </div>
-                      <div className="text-xs font-medium text-blue-600">
-                        {formatDate(dep)}
-                      </div>
-                      <div className="text-sm font-semibold text-slate-700 mt-2">
-                        {from}
-                      </div>
-                    </div>
-
-                    {/* Middle */}
-                    <div className="flex flex-col items-center gap-1">
-                      <div className="relative w-full mb-2">
-                        <div className="h-0.5 bg-linear-to-r from-blue-200 via-blue-400 to-blue-200 w-32"></div>
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-1 rounded-full shadow-md border border-blue-200">
-                          <MdOutlineFlight className="text-blue-600 rotate-90 text-lg" />
-                        </div>
-                      </div>
-                      <p className="text-xs font-medium text-slate-600">
-                        {formatDuration(totalDurationMin)}
-                      </p>
-                      <p className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-semibold rounded-full border border-emerald-200">
-                        {stopsLabel}
-                      </p>
-                    </div>
-
-                    {/* Arrival */}
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-slate-800">
-                        {formatTime(arr)}
-                      </div>
-                      <div className="text-xs font-medium text-blue-600">
-                        {formatDate(arr)}
-                      </div>
-                      <div className="text-sm font-semibold text-slate-700 mt-2">
-                        {to}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* ---------- Tags ---------- */}
-            <div className="flex flex-wrap gap-2 mt-3">
-              {travelClass && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg border border-blue-200 uppercase">
-                  <MdAirlineSeatReclineNormal /> {travelClass}
-                </span>
-              )}
-              <span className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200">
-                <BsSuitcase /> {segments[0]?.Baggage || "15 Kg"}
-              </span>
-              {refundable && (
-                <span className="inline-flex items-center px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200">
-                  ✓ Refundable
-                </span>
-              )}
-            </div>
+          <div className="text-right">
+             <div className="text-sm font-bold text-slate-800">
+                {formatTime(segments[0]?.Origin?.DepTime)} - {formatTime(segments[segments.length - 1]?.Destination?.ArrTime)}
+             </div>
+             <div className="text-xs font-semibold text-blue-600">
+                <span className="bg-blue-100/50 px-2 py-0.5 rounded-full">{label}</span>
+             </div>
           </div>
-        )}
+        </div>
       </div>
     );
   };
@@ -256,17 +173,34 @@ export default function ReturnInternationalFlightCard({
           </div>
         )}
 
-        <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-100">
+        <div className="flex items-center justify-between mt-6 pt-5 border-t border-gray-100">
           <div className="text-left">
-            <p className="text-3xl font-bold bg-linear-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
+            <p className="text-2xl md:text-3xl font-bold bg-linear-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent leading-none">
               ₹{finalPrice.toLocaleString()}
             </p>
-            <p className="text-xs text-slate-600 mt-1 font-medium">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-1">
               Total (incl. taxes)
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3 flex-wrap justify-end">
+            {/* ✅ VIEW FARE DETAILS EXPLICITLY */}
+            <button
+              onClick={() => setShowFareDetails((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors ${
+                showFareDetails
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-blue-600 border-blue-300 hover:bg-blue-50"
+              }`}
+            >
+              View Fare Details
+              {showFareDetails ? (
+                <FaChevronUp className="text-[10px]" />
+              ) : (
+                <FaChevronDown className="text-[10px]" />
+              )}
+            </button>
+
             {/* ✅ ONLY ONE MORE FARES BUTTON */}
             <button
               onClick={handleMoreFaresClick}
@@ -278,13 +212,20 @@ export default function ReturnInternationalFlightCard({
             {/* EXISTING BUTTON */}
             <button
               onClick={() => onContinue(flight)}
-              className="relative group px-8 py-3 bg-linear-to-r from-blue-600 to-blue-500 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]"
+              className="relative group px-6 md:px-8 py-2 md:py-[9px] bg-linear-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]"
             >
               Select & Continue
             </button>
           </div>
         </div>
       </div>
+      
+      {/* Expanded Fare Details via Generic Dropdown */}
+      {showFareDetails && (
+        <div className="border-t border-blue-200">
+          <FlightDetailsDropdown selectedFlight={flight} />
+        </div>
+      )}
     </div>
   );
 }

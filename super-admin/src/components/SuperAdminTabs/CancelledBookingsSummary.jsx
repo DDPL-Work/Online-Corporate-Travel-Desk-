@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   FiSearch,
   FiDownload,
@@ -232,12 +232,21 @@ export default function CancellationDashboard() {
   }, [activeTab]);
 
   useEffect(() => {
+    if (activeTab === "Flight") setFlightPage(1);
+    else setHotelPage(1);
+  }, [search, startDate, endDate, activeTab]);
+
+  useEffect(() => {
+    const params = { limit: 10 };
+    if (startDate) params.fromDate = startDate;
+    if (endDate) params.toDate = endDate;
+
     if (activeTab === "Flight") {
-      dispatch(fetchFlightCancellations({ page: flightPage, limit: 10 }));
+      dispatch(fetchFlightCancellations({ ...params, page: flightPage }));
     } else {
-      dispatch(fetchHotelCancellations({ page: hotelPage, limit: 10 }));
+      dispatch(fetchHotelCancellations({ ...params, page: hotelPage }));
     }
-  }, [activeTab, flightPage, hotelPage, dispatch]);
+  }, [activeTab, flightPage, hotelPage, startDate, endDate, dispatch]);
 
   const flights = useMemo(
     () =>
@@ -282,12 +291,11 @@ export default function CancellationDashboard() {
       specificDateMatch = (b.checkIn || "").slice(0, 10) === checkIn;
     }
 
-    const startOk =
-      !startDate ||
-      new Date(b.cancelDate || b.date || b.checkIn || 0) >= new Date(startDate);
-    const endOk =
-      !endDate ||
-      new Date(b.cancelDate || b.date || b.checkIn || 0) <= new Date(endDate);
+    const dStart = b.cancelDate || b.date || b.checkIn;
+    const startOk = !startDate || (dStart && new Date(dStart) >= new Date(startDate));
+
+    const dEnd = b.cancelDate || b.date || b.checkIn;
+    const endOk = !endDate || (dEnd && new Date(dEnd) <= new Date(endDate));
 
     return (
       typeMatch &&

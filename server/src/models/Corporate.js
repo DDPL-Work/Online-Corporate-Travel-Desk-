@@ -143,18 +143,6 @@ const corporateSchema = new mongoose.Schema(
       min: 0,
     },
 
-    // ───── TRAVEL POLICY ─────
-    travelPolicy: {
-      allowedCabinClass: {
-        type: [String],
-        enum: ["Economy", "Premium Economy", "Business", "First"],
-        default: ["Economy"],
-      },
-      allowAncillaryServices: { type: Boolean, default: true },
-      advanceBookingDays: { type: Number, default: 0 },
-      maxBookingAmount: { type: Number, default: 0 },
-    },
-
     // ───── SYSTEM FIELDS ─────
     status: {
       type: String,

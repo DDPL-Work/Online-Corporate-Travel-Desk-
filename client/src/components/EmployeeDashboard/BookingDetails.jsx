@@ -835,8 +835,8 @@ function FareRulesSection({ bookingResult }) {
           {rules.map((r, i) => (
             <div key={i}>
               <p className="text-xs font-black uppercase tracking-widest text-teal-600 mb-2">
-                {r.label}
-              </p>
+                   {r.label}
+                 </p>
               {r.rules.map((rule, j) => (
                 <div key={j} className="mb-3">
                   <p className="text-xs font-semibold text-slate-600">
@@ -849,7 +849,7 @@ function FareRulesSection({ bookingResult }) {
                       dangerouslySetInnerHTML={{ __html: rule.FareRuleDetail }}
                     />
                   )}
-                </div>
+               </div>
               ))}
             </div>
           ))}

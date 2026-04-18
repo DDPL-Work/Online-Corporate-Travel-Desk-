@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   FiEye,
   FiDownload,
@@ -248,14 +248,26 @@ export default function GlobalBookingsDashboard() {
   const [endDate, setEndDate] = useState("");
   const [startDate, setStartDate] = useState("");
 
-  // Fetch based on active tab + page
   useEffect(() => {
     if (activeTab === "Flight") {
-      dispatch(fetchFlightBookings({ page: flightPage, limit: DEFAULT_LIMIT }));
+      setFlightPage(1);
     } else {
-      dispatch(fetchHotelBookings({ page: hotelPage, limit: DEFAULT_LIMIT }));
+      setHotelPage(1);
     }
-  }, [activeTab, flightPage, hotelPage, dispatch]);
+  }, [search, startDate, endDate, activeTab]);
+
+  // Fetch based on active tab + page + filters
+  useEffect(() => {
+    const params = { limit: DEFAULT_LIMIT };
+    if (startDate) params.fromDate = startDate;
+    if (endDate) params.toDate = endDate;
+
+    if (activeTab === "Flight") {
+      dispatch(fetchFlightBookings({ ...params, page: flightPage }));
+    } else {
+      dispatch(fetchHotelBookings({ ...params, page: hotelPage }));
+    }
+  }, [activeTab, flightPage, hotelPage, startDate, endDate, dispatch]);
 
   // Reset page on tab switch
   useEffect(() => {
@@ -284,9 +296,8 @@ export default function GlobalBookingsDashboard() {
   );
 
   const corporates = useMemo(() => {
-    const names = new Set(
-      [...flights, ...hotels].map((b) => b.corporate).filter(Boolean),
-    );
+    const validBookings = [...flights, ...hotels].filter(b => !isBlockedStatus(b.status));
+    const names = new Set(validBookings.map((b) => b.corporate).filter(Boolean));
     return ["All", ...names];
   }, [flights, hotels]);
 
@@ -317,10 +328,11 @@ export default function GlobalBookingsDashboard() {
         dateMatch = cinMatch && coutMatch;
       }
 
-      const startOk =
-        !startDate || new Date(b.date || b.checkIn || 0) >= new Date(startDate);
-      const endOk =
-        !endDate || new Date(b.date || b.checkOut || 0) <= new Date(endDate);
+      const dStart = b.date || b.checkIn;
+      const startOk = !startDate || (dStart && new Date(dStart) >= new Date(startDate));
+
+      const dEnd = b.date || b.checkOut;
+      const endOk = !endDate || (dEnd && new Date(dEnd) <= new Date(endDate));
 
       return corpMatch && typeMatch && searchMatch && dateMatch && startOk && endOk;
     });

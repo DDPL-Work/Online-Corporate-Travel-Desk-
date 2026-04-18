@@ -20,6 +20,7 @@ import ApiConfigurations from "../components/SuperAdminTabs/ApiConfigurations";
 import SystemLogs from "../components/SuperAdminTabs/SystemLogs";
 import CancellationDashboard from "../components/SuperAdminTabs/CancelledBookingsSummary";
 import CancellationQueries from "../components/SuperAdminTabs/CancellationQueries";
+import PendingCorporates from "../components/SuperAdminTabs/PendingCorporates";
 
 export const appRouter = createBrowserRouter([
   // -------------------------------
@@ -51,7 +52,8 @@ export const appRouter = createBrowserRouter([
           { path: "/corporate-revenue", element: <CorporateRevenue /> },
           { path: "/credit-status", element: <CreditStatusAlerts /> },
           { path: "/wallet-recharge-logs", element: <WalletRechargeLogs /> },
-          { path: "/corporate-management", element: <CorporateAccessControl /> },
+          { path: "/active-corporates", element: <CorporateAccessControl /> },
+          { path: "/pending-corporates", element: <PendingCorporates /> },
           { path: "/pending-amendments", element: <PendingAmendments /> },
           { path: "/commission-settings", element: <CommissionSettings /> },
           { path: "/api-configurations", element: <ApiConfigurations /> },

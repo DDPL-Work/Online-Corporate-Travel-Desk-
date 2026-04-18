@@ -32,45 +32,6 @@ import api from "../../../API/axios";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
 
-// ✅ NORMALIZE FULL FARE RULE API RESPONSE (FareRule API)
-const normalizeFareRules = (fareRule) => {
-  // TBO sometimes returns {Response:{FareRules:[...]}} and sometimes flat {FareRules:[...]}
-  const list =
-    fareRule?.Response?.FareRules ||
-    fareRule?.FareRules ||
-    fareRule?.data?.Response?.FareRules ||
-    [];
-
-  if (!Array.isArray(list) || list.length === 0) return null;
-
-  const hasCategory = list.some((r) => r?.Category);
-
-  const cancellation = hasCategory
-    ? list.filter((r) => r.Category === "CANCELLATION")
-    : [];
-  const dateChange = hasCategory
-    ? list.filter((r) => r.Category === "DATECHANGE")
-    : [];
-  const baggage = hasCategory
-    ? list.filter((r) => r.Category === "BAGGAGE")
-    : [];
-
-  // For responses without Category (common in intl round-trip), fall back to FareRuleDetail strings
-  let important = hasCategory
-    ? list.filter((r) => r.Category === "IMPORTANT")
-    : [];
-
-  if (important.length === 0) {
-    const details = list
-      .map((r) => r?.FareRuleDetail)
-      .filter((x) => typeof x === "string" && x.trim().length > 0);
-    if (details.length > 0) {
-      important = details;
-    }
-  }
-
-  return { cancellation, dateChange, baggage, important };
-};
 
 export default function RoundTripFlightBooking() {
   const location = useLocation();
@@ -1520,9 +1481,6 @@ export default function RoundTripFlightBooking() {
                     <h2 className="text-xl font-bold text-slate-900">
                       Round Trip Flight Details
                     </h2>
-                    <p className="text-sm text-slate-600">
-                      Complete journey information
-                    </p>
                   </div>
                 </div>
 
@@ -1532,10 +1490,12 @@ export default function RoundTripFlightBooking() {
                     label="Onward Journey"
                     value={
                       <>
-                        <div className="font-semibold">
-                          {onwardRoute?.from} → {onwardRoute?.to}
+                        <div className="font-semibold space-y-1">
+                          <div>
+                            {onwardRoute?.from} → {onwardRoute?.to}
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-500 mt-1">
                           {formatDateTime(onwardRoute?.dateTime)}
                         </div>
                       </>
@@ -1547,10 +1507,12 @@ export default function RoundTripFlightBooking() {
                     label="Return Journey"
                     value={
                       <>
-                        <div className="font-semibold">
-                          {returnRoute?.from} → {returnRoute?.to}
+                        <div className="font-semibold space-y-1">
+                          <div>
+                            {returnRoute?.from} → {returnRoute?.to}
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-500 mt-1">
                           {formatDateTime(returnRoute?.dateTime)}
                         </div>
                       </>
@@ -1757,7 +1719,6 @@ export default function RoundTripFlightBooking() {
                 <FareDetailsModal
                   fareQuote={fareQuote}
                   fareRule={fareRule}
-                  normalizeFareRules={normalizeFareRules}
                 />
               </div>
             </div>

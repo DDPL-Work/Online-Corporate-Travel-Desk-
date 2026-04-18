@@ -558,8 +558,16 @@ function CancellationQueryTab() {
   const [selectedQuery, setSelectedQuery] = useState(null);
 
   useEffect(() => {
-    dispatch(fetchCancellationQueries({ page, limit: 10 }));
-  }, [page, dispatch]);
+    setPage(1);
+  }, [statusFilter, search]);
+
+  useEffect(() => {
+    const params = { page, limit: 10 };
+    if (statusFilter !== "ALL") params.status = statusFilter;
+    if (search) params.bookingReference = search; // API allows bookingReference
+
+    dispatch(fetchCancellationQueries(params));
+  }, [page, statusFilter, search, dispatch]);
 
   const queries = useMemo(
     () => cancellationQueries || [],

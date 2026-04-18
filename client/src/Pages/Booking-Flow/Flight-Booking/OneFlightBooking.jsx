@@ -33,22 +33,7 @@ import api from "../../../API/axios";
 import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
 import Swal from "sweetalert2";
 
-const normalizeFareRules = (fareRule) => {
-  const rules = fareRule?.Response?.FareRules;
-  if (!rules || !rules.length) return null;
 
-  return {
-    cancellation: rules.filter((r) => r.Category === "CANCELLATION"),
-    dateChange: rules.filter((r) => r.Category === "DATECHANGE"),
-    baggage: rules.filter((r) => r.Category === "BAGGAGE"),
-
-    // ✅ IMPORTANT FIX
-    important: rules.map((r) => r.FareRuleDetail).filter(Boolean),
-
-    // ✅ ADD THIS (fallback support)
-    raw: rules,
-  };
-};
 
 export default function OneFlightBooking() {
   const location = useLocation();
@@ -1013,16 +998,21 @@ export default function OneFlightBooking() {
               <div className="p-6 bg-linear-to-br from-blue-50 to-blue-100 shadow-lg">
                 <div className="flex justify-between items-start mb-5">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900">
+                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3">
                       Flight Details
+                      <span className="px-3 py-1 text-xs font-bold rounded-full bg-blue-100 text-blue-800 uppercase tracking-wide">
+                        {tripType}
+                      </span>
                     </h2>
-                    <p className="text-sm text-slate-600">
-                      Review your journey information
-                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-slate-200 text-slate-700 uppercase tracking-widest border border-slate-300">
+                        Class: {CABIN_MAP[selectedFlight?.Segments?.[0]?.[0]?.CabinClass] || "Economy"}
+                      </span>
+                      <span className="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-emerald-100 text-emerald-800 uppercase tracking-widest border border-emerald-200">
+                        Fare: {selectedFlight?.Segments?.[0]?.[0]?.SupplierFareClass || "Standard"}
+                      </span>
+                    </div>
                   </div>
-                  <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-600 text-white">
-                    {tripType.toUpperCase()}
-                  </span>
                 </div>
 
                 <div className="grid sm:grid-cols-3 gap-4">
@@ -1145,7 +1135,6 @@ export default function OneFlightBooking() {
                 <FareDetailsModal
                   fareQuote={fareQuote}
                   fareRule={fareRule}
-                  normalizeFareRules={normalizeFareRules}
                 />
               </div>
             </div>

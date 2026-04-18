@@ -12,6 +12,7 @@ import {
 import { getFareUpsell } from "../../../Redux/Actions/flight.thunks";
 import { BsSuitcase } from "react-icons/bs";
 import { BiSolidOffer } from "react-icons/bi";
+import { FaChevronDown, FaChevronUp, FaPlane } from "react-icons/fa";
 
 const toFiniteNumber = (value, fallback = 0) => {
   const parsed = Number(value);
@@ -73,6 +74,380 @@ const normalizeFareOptions = (fareOptions, fallbackFlightInfo) => {
   );
 };
 
+// ─── Flight Details Dropdown ────────────────────────────────────────────────
+
+export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
+  const [activeTab, setActiveTab] = useState("flight");
+
+  const segmentsArrays = selectedFlight?.Segments || [];
+  const fare = selectedFlight?.Fare;
+  const fareBreakdown = selectedFlight?.FareBreakdown?.[0];
+  const miniFareRules = selectedFlight?.MiniFareRules?.[0] || [];
+  const fareInclusions = selectedFlight?.FareInclusionsNew || [];
+
+  if (segmentsArrays.length === 0) return null;
+
+  const baseFare = toFiniteNumber(fare?.BaseFare, 0);
+  const tax = toFiniteNumber(fare?.Tax, 0);
+  const otherCharges = toFiniteNumber(fare?.OtherCharges, 0);
+  const publishedFare = Math.ceil(toFiniteNumber(fare?.PublishedFare, 0));
+  const offeredFare = Math.ceil(toFiniteNumber(fare?.OfferedFare, 0));
+
+  const tabs = [
+    { id: "flight", label: "Flight Details" },
+    { id: "fare", label: "Fare Summary" },
+    { id: "cancellation", label: "Cancellation" },
+    { id: "datechange", label: "Date Change" },
+  ];
+
+  const cancellationRules = miniFareRules.filter(
+    (r) => r.Type === "Cancellation",
+  );
+  const reissueRules = miniFareRules.filter((r) => r.Type === "Reissue");
+
+  return (
+    <div className="border-t border-blue-100 bg-white/80">
+      {/* Tabs */}
+      <div className="flex border-b border-blue-100 bg-white">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-5 py-3 text-xs font-semibold transition-colors border-b-2 ${
+              activeTab === tab.id
+                ? "border-blue-600 text-blue-600 bg-blue-50/60"
+                : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Flight Details Tab ── */}
+      {activeTab === "flight" && (
+        <div className="divide-y divide-blue-100">
+          {segmentsArrays.map((segments, sIdx) => {
+            const firstSegment = segments[0];
+            const lastSegment = segments[segments.length - 1];
+
+            const airlineCode = firstSegment.Airline?.AirlineCode;
+            const fareClass =
+              firstSegment?.SupplierFareClass ||
+              firstSegment?.FareClassification?.Type ||
+              "Standard";
+
+            const from = firstSegment.Origin?.Airport?.CityName;
+            const fromCountry = firstSegment.Origin?.Airport?.CountryName;
+            const fromTerminal = firstSegment.Origin?.Airport?.Terminal;
+            const to = lastSegment.Destination?.Airport?.CityName;
+            const toCountry = lastSegment.Destination?.Airport?.CountryName;
+            const toTerminal = lastSegment.Destination?.Airport?.Terminal;
+
+            const departure = formatTime(firstSegment.Origin?.DepTime);
+            const arrival = formatTime(lastSegment.Destination?.ArrTime);
+            const depDate = formatDate(firstSegment.Origin?.DepTime);
+            const arrDate = formatDate(lastSegment.Destination?.ArrTime);
+
+            const durationMin = segments.reduce((sum, s) => sum + (s.Duration || 0), 0);
+            const duration = `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`;
+            const stops = segments.length === 1 ? "Non-stop" : `${segments.length - 1} Stop`;
+
+            const checkinBaggage =
+              fareBreakdown?.SegmentDetails?.[sIdx]?.CheckedInBaggage?.FreeText ||
+              firstSegment?.Baggage ||
+              "15 Kg";
+            const cabinBaggage =
+              fareBreakdown?.SegmentDetails?.[sIdx]?.CabinBaggage?.FreeText ||
+              firstSegment?.CabinBaggage ||
+              "7 Kg";
+
+            return (
+              <div key={sIdx} className="p-5">
+                {segmentsArrays.length > 1 && (
+                  <p className="text-xs font-bold uppercase tracking-wider text-blue-600 mb-4 bg-blue-50 px-3 py-1.5 rounded-lg inline-block">
+                    {sIdx === 0 ? "Onward Journey" : "Return Journey"}
+                  </p>
+                )}
+                {/* Timeline Row */}
+                <div className="flex items-center justify-between gap-4 items-start">
+                  {/* Departure */}
+                  <div>
+                    <p className="text-xl font-bold text-slate-800">{departure}</p>
+                    <p className="text-xs text-blue-600 font-medium mt-0.5">
+                      {depDate}
+                    </p>
+                    {fromTerminal && (
+                      <p className="text-xs text-slate-600 font-medium mt-2">
+                        Terminal {fromTerminal}
+                      </p>
+                    )}
+                    <p className="text-xs text-slate-500">
+                      {from}, {fromCountry}
+                    </p>
+                  </div>
+
+                  {fareClass && (
+                    <span className="ml-2 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-semibold border border-blue-200">
+                      {fareClass}
+                    </span>
+                  )}
+
+                  {/* Arrival */}
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-slate-800">{arrival}</p>
+                    <p className="text-xs text-blue-600 font-medium mt-0.5">
+                      {arrDate}
+                    </p>
+                    {toTerminal && (
+                      <p className="text-xs text-slate-600 font-medium mt-2">
+                        Terminal {toTerminal}
+                      </p>
+                    )}
+                    <p className="text-xs text-slate-500">
+                      {to}, {toCountry}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Baggage Grid */}
+                <div className="mt-5 grid grid-cols-3 gap-3">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                      Baggage (Adult)
+                    </p>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {checkinBaggage}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Check-in</p>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                      Cabin (Adult)
+                    </p>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {cabinBaggage}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Hand baggage
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                      Aircraft
+                    </p>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {firstSegment?.Craft || "—"}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Aircraft type
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+        </div>
+      )}
+
+      {/* Fare Inclusions (Moved outside mapping) */}
+      {fareInclusions.length > 0 && activeTab === "flight" && (
+        <div className="mt-2 mb-4 px-5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+            Fare Inclusions
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {fareInclusions.map((item, i) => {
+              const isIncluded =
+                item.Value?.toLowerCase() !== "excluded" &&
+                item.Value?.toLowerCase() !== "no";
+              return (
+                <span
+                  key={i}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg font-medium border ${
+                    isIncluded
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : "bg-slate-100 text-slate-500 border-slate-200 line-through"
+                  }`}
+                >
+                  {item.Key?.split(" ")
+                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                    .join(" ")}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Fare Summary Tab ── */}
+      {activeTab === "fare" && (
+        <div className="p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-3">
+            Fare Breakdown
+          </p>
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="divide-y divide-slate-100">
+              <div className="flex justify-between items-center px-4 py-3">
+                <span className="text-sm text-slate-600">Base Fare</span>
+                <span className="text-sm font-semibold text-slate-800">
+                  ₹{baseFare.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center px-4 py-3">
+                <span className="text-sm text-slate-600">Taxes &amp; Fees</span>
+                <span className="text-sm font-semibold text-slate-800">
+                  ₹{tax.toLocaleString()}
+                </span>
+              </div>
+              {otherCharges > 0 && (
+                <div className="flex justify-between items-center px-4 py-3">
+                  <span className="text-sm text-slate-600">Other Charges</span>
+                  <span className="text-sm font-semibold text-slate-800">
+                    ₹{otherCharges.toFixed(2)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between items-center px-4 py-3 bg-blue-50">
+                <span className="text-sm font-bold text-blue-700">
+                  Total Payable
+                </span>
+                <span className="text-base font-bold text-blue-700">
+                  ₹{publishedFare.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Refundable status */}
+          <div className="mt-3 flex items-center gap-2">
+            <span
+              className={`text-xs font-semibold px-3 py-1.5 rounded-lg border ${
+                selectedFlight?.IsRefundable
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-red-50 text-red-600 border-red-200"
+              }`}
+            >
+              {selectedFlight?.IsRefundable ? "Refundable" : "Non-Refundable"}
+            </span>
+            {selectedFlight?.IsLCC && (
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-lg border bg-amber-50 text-amber-700 border-amber-200">
+                LCC
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancellation Tab ── */}
+      {activeTab === "cancellation" && (
+        <div className="p-5">
+          {cancellationRules.length > 0 ? (
+            <>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-3">
+                Cancellation Charges
+              </p>
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        Time Before Departure
+                      </th>
+                      <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        Cancellation Fee
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {cancellationRules.map((rule, i) => (
+                      <tr key={i}>
+                        <td className="px-4 py-3 text-slate-700">
+                          {rule.From && rule.To
+                            ? `${rule.From}–${rule.To} ${rule.Unit?.toLowerCase()}`
+                            : rule.From
+                              ? `More than ${rule.From} ${rule.Unit?.toLowerCase()}`
+                              : `Up to ${rule.To} ${rule.Unit?.toLowerCase()}`}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                          {rule.Details}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-3">
+                * Charges are per passenger. Airline charges may vary. Please
+                check the airline's website for final details.
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500">
+              Cancellation details not available.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── Date Change Tab ── */}
+      {activeTab === "datechange" && (
+        <div className="p-5">
+          {reissueRules.length > 0 ? (
+            <>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-3">
+                Date Change Charges
+              </p>
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        Time Before Departure
+                      </th>
+                      <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        Reissue Fee
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {reissueRules.map((rule, i) => (
+                      <tr key={i}>
+                        <td className="px-4 py-3 text-slate-700">
+                          {rule.From && rule.To
+                            ? `${rule.From}–${rule.To} ${rule.Unit?.toLowerCase()}`
+                            : rule.From
+                              ? `More than ${rule.From} ${rule.Unit?.toLowerCase()}`
+                              : `Up to ${rule.To} ${rule.Unit?.toLowerCase()}`}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                          {rule.Details}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-3">
+                * Charges are per passenger. Airline charges may vary. Please
+                check the airline's website for final details.
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500">
+              Date change details not available.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Card ───────────────────────────────────────────────────────────────
+
 export default function OneWayFlightCard({
   flight,
   traceId,
@@ -83,6 +458,8 @@ export default function OneWayFlightCard({
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
+  const [showFlightDetails, setShowFlightDetails] = useState(false);
+
   const groupedFlight = flight?.flightInfo
     ? flight
     : {
@@ -92,8 +469,11 @@ export default function OneWayFlightCard({
           flight?.ResultIndex != null ? { [flight.ResultIndex]: flight } : {},
       };
 
-  const { flightInfo, fareOptions, flightOptionsByResultIndex = {} } =
-    groupedFlight || {};
+  const {
+    flightInfo,
+    fareOptions,
+    flightOptionsByResultIndex = {},
+  } = groupedFlight || {};
 
   const normalizedFareOptions = useMemo(
     () => normalizeFareOptions(fareOptions, flightInfo),
@@ -106,13 +486,13 @@ export default function OneWayFlightCard({
     if (selectedFareResultIndex == null) {
       return normalizedFareOptions[0];
     }
-
     return (
       normalizedFareOptions.find(
         (fare) => fare.resultIndex === selectedFareResultIndex,
       ) || normalizedFareOptions[0]
     );
   }, [normalizedFareOptions, selectedFareResultIndex]);
+
   const selectedResultIndex =
     selectedFare?.resultIndex ?? flightInfo?.ResultIndex;
   const selectedFlight =
@@ -130,14 +510,12 @@ export default function OneWayFlightCard({
 
   const handleFareOptionsClick = async () => {
     if (selectedResultIndex == null) return;
-
     const res = await dispatch(
       getFareUpsell({
         traceId,
         resultIndex: selectedResultIndex,
       }),
     );
-
     if (res?.payload && typeof onOpenFareUpsell === "function") {
       onOpenFareUpsell(res.payload);
     }
@@ -147,7 +525,6 @@ export default function OneWayFlightCard({
   const firstSegment = segments[0];
   const flightStatus =
     firstSegment?.FlightStatus || firstSegment?.Status || "Scheduled";
-
   const lastSegment = segments[segments.length - 1];
 
   const airline = firstSegment.Airline?.AirlineName;
@@ -190,6 +567,7 @@ export default function OneWayFlightCard({
 
         <div className="p-6">
           <div className="relative">
+            {/* ── Header Row ── */}
             <div className="flex items-center justify-between gap-3 mb-5">
               <div className="flex items-center gap-3">
                 <div className="relative">
@@ -206,7 +584,6 @@ export default function OneWayFlightCard({
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="font-bold text-slate-800">{airline}</div>
-
                     {flightStatus && (
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
@@ -218,22 +595,28 @@ export default function OneWayFlightCard({
                       </span>
                     )}
                   </div>
-
                   <div className="text-xs text-slate-500 font-medium">
                     {airlineCode}-{flightNumber}
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col text-center sm:text-right bg-gray-200 rounded-xl p-2">
+               {travelClass && (
+                  <span className="mb-1 inline-flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg border border-blue-200 uppercase">
+                    <MdAirlineSeatReclineNormal /> {travelClass}
+                  </span>
+                )}
+
+              {/* <div className="flex flex-col text-center sm:text-right bg-gray-200 rounded-xl p-2">
                 <div className="flex items-baseline justify-center sm:justify-start gap-2">
                   <span className="text-3xl font-bold bg-linear-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
                     &#8377;{price?.toLocaleString()}
                   </span>
                 </div>
-              </div>
+              </div> */}
             </div>
 
+            {/* ── Flight Timeline ── */}
             <div className="grid grid-cols-[1fr_auto_1fr] gap-6 items-center">
               <div className="text-left space-y-1">
                 <div className="text-2xl font-bold text-slate-800">
@@ -249,6 +632,7 @@ export default function OneWayFlightCard({
               </div>
 
               <div className="flex flex-col items-center gap-2 px-6">
+               
                 <div className="relative w-full mb-3">
                   <div className="h-0.5 bg-linear-to-r from-blue-200 via-blue-400 to-blue-200 w-32"></div>
                   <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-2 rounded-full shadow-md border border-blue-200">
@@ -264,7 +648,9 @@ export default function OneWayFlightCard({
               </div>
 
               <div className="text-right space-y-1">
-                <div className="text-2xl font-bold text-slate-800">{arrival}</div>
+                <div className="text-2xl font-bold text-slate-800">
+                  {arrival}
+                </div>
                 <div className="text-xs font-medium text-blue-600">
                   {formatDate(arrTime)}
                 </div>
@@ -275,7 +661,8 @@ export default function OneWayFlightCard({
               </div>
             </div>
 
-            <div className="mt-5 rounded-xl border border-blue-100 bg-white/70 p-3">
+            {/* ── Fare Options ── */}
+            <div className="mt-5 rounded-xl border border-blue-100  p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 Fare options
               </p>
@@ -291,7 +678,9 @@ export default function OneWayFlightCard({
                     <button
                       key={`${fare.supplierFareClass}-${fare.resultIndex || index}`}
                       type="button"
-                      onClick={() => setSelectedFareResultIndex(fare.resultIndex)}
+                      onClick={() =>
+                        setSelectedFareResultIndex(fare.resultIndex)
+                      }
                       className={`rounded-lg border px-3 py-2 text-left transition ${
                         isSelected
                           ? "border-blue-500 bg-blue-50 shadow-sm"
@@ -319,21 +708,35 @@ export default function OneWayFlightCard({
               </div>
             </div>
 
-            <div className="flex items-center justify-between mt-5">
+            {/* ── Bottom Action Row ── */}
+            <div className="flex items-center justify-between mt-1">
               <div className="flex flex-wrap gap-3">
-                {travelClass && (
-                  <span className="inline-flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg border border-blue-200 uppercase">
-                    <MdAirlineSeatReclineNormal /> {travelClass}
-                  </span>
-                )}
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200">
+                {/* <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200">
                   <BsSuitcase /> {baggage}
-                </span>
-                {refundable && (
+                </span> */}
+                {/* {refundable && (
                   <span className="inline-flex items-center px-3 py-1.5 bg-linear-to-r from-emerald-50 to-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200">
                     Refundable
                   </span>
-                )}
+                )} */}
+
+                {/* ── Flight Details Toggle Button ── */}
+                <button
+                  type="button"
+                  onClick={() => setShowFlightDetails((prev) => !prev)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
+                    showFlightDetails
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-blue-600 border-blue-300 hover:bg-blue-50"
+                  }`}
+                >
+                  Flight Details
+                  {showFlightDetails ? (
+                    <FaChevronUp className="text-[10px]" />
+                  ) : (
+                    <FaChevronDown className="text-[10px]" />
+                  )}
+                </button>
 
                 <button
                   onClick={handleFareOptionsClick}
@@ -353,7 +756,6 @@ export default function OneWayFlightCard({
                         s.Origin.Airport.CountryCode !==
                           s.Destination.Airport.CountryCode,
                     );
-
                     navigate("/one-way-flight/booking", {
                       state: {
                         selectedFlight,
@@ -364,7 +766,7 @@ export default function OneWayFlightCard({
                       },
                     });
                   }}
-                  className="relative group px-8 py-3.5 bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+                  className="relative group px-5 py-1.5 bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
                 >
                   <span className="relative z-10">Book Now</span>
                   <div className="absolute inset-0 bg-white/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -374,6 +776,14 @@ export default function OneWayFlightCard({
           </div>
         </div>
       </div>
+
+      {/* ── Flight Details Dropdown (animated) ── */}
+      {showFlightDetails && (
+        <FlightDetailsDropdown
+          selectedFlight={selectedFlight}
+          selectedFare={selectedFare}
+        />
+      )}
     </div>
   );
 }

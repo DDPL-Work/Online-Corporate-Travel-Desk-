@@ -36,7 +36,7 @@ const colors = {
   dark: "#1E293B",
 };
 
-export default function CorporateAccessControl() {
+export default function PendingCorporates() {
   const dispatch = useDispatch();
 
   const {
@@ -53,7 +53,7 @@ export default function CorporateAccessControl() {
 
   // Filter states
   const [corporateFilter, setCorporateFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("pending");
   const [searchTerm, setSearchTerm] = useState("");
 
   /* ---------------- FETCH ---------------- */
@@ -64,18 +64,16 @@ export default function CorporateAccessControl() {
   }, [dispatch]);
 
   /* ---------------- FILTER LOGIC ---------------- */
-  const baseCorporates = corporates.filter(c => c.status !== "pending");
+  const baseCorporates = corporates.filter(c => c.status === "pending");
 
   const corporatesList = [
     "All",
     ...new Set(baseCorporates.map((x) => x.corporateName)),
   ];
-  const statuses = ["All", "active", "inactive"];
 
   const filtered = baseCorporates.filter((c) => {    
     const corpMatch =
       corporateFilter === "All" || c.corporateName === corporateFilter;
-    const statusMatch = statusFilter === "All" || c.status === statusFilter;
     const searchMatch =
       !searchTerm ||
       c.corporateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -83,13 +81,13 @@ export default function CorporateAccessControl() {
         ?.toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
       c.primaryContact?.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    return corpMatch  && statusMatch && searchMatch;
+    return corpMatch  && searchMatch;
   });
 
   // Stats
   const totalCorporates = filtered.length;
-  const activeCount = filtered.filter((c) => c.status === "active").length;
-  // const pendingCount = filtered.filter((c) => c.status === "pending").length;
+//   const activeCount = filtered.filter((c) => c.status === "active").length;
+  const pendingCount = filtered.filter((c) => c.status === "pending").length;
   const inactiveCount = filtered.filter((c) => c.status === "inactive").length;
   const totalCredit = filtered.reduce(
     (sum, c) => sum + (c.classification === "postpaid" ? c.creditLimit : 0),
@@ -142,10 +140,10 @@ export default function CorporateAccessControl() {
           </div>
           <div className="text-left">
             <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase leading-none">
-              Corporate Access Control
+              Pending Corporates
             </h1>
             <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-widest">
-              Manage corporate profiles & permissions
+              Manage pending corporate profiles for approval
             </p>
           </div>
         </div>
@@ -160,22 +158,22 @@ export default function CorporateAccessControl() {
             iconBgCls="bg-[#0A4D68]/10"
             iconColorCls="text-[#0A4D68]"
           />
-          <StatCard
+          {/* <StatCard
             label="Active"
             value={activeCount}
             Icon={FiActivity}
             borderCls="border-emerald-500"
             iconBgCls="bg-emerald-50"
             iconColorCls="text-emerald-600"
-          />
-          {/* <StatCard
+          /> */}
+          <StatCard
             label="Pending"
             value={pendingCount}
             Icon={FiClock}
             borderCls="border-amber-500"
             iconBgCls="bg-amber-50"
             iconColorCls="text-amber-600"
-          /> */}
+          />
           <StatCard
             label="Inactive"
             value={inactiveCount}
@@ -215,19 +213,19 @@ export default function CorporateAccessControl() {
                 ))}
               </select>
             </LabeledInput>
-            <LabeledInput label="Status">
+            {/* <LabeledInput label="Status">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full uppercase px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
+                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
               >
                 {statuses.map((s) => (
-                  <option  key={s} value={s}>
+                  <option key={s} value={s}>
                     {s === "All" ? "All Statuses" : s}
                   </option>
                 ))}
               </select>
-            </LabeledInput>
+            </LabeledInput> */}
           </div>
         </div>
 
@@ -361,7 +359,7 @@ export default function CorporateAccessControl() {
                 {!loading && filtered.length === 0 && (
                   <tr>
                     <td colSpan="6" className="py-8 text-center text-slate-500">
-                      No corporates match the filters.
+                      No pending corporates found
                     </td>
                   </tr>
                 )}

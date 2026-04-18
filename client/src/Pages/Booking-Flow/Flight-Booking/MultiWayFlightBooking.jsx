@@ -28,17 +28,6 @@ import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { FareDetailsModal } from "./FareDetailsModal";
 
-const normalizeFareRules = (fareRule) => {
-  const rules = fareRule?.Response?.FareRules;
-  if (!rules || !rules.length) return null;
-
-  return {
-    cancellation: [],
-    dateChange: [],
-    baggage: [],
-    important: rules.map((r) => r.FareRuleDetail).filter(Boolean),
-  };
-};
 
 export default function MultiCityFlightBooking() {
   const location = useLocation();
@@ -1046,7 +1035,6 @@ export default function MultiCityFlightBooking() {
                 <FareDetailsModal
                   fareQuote={fareQuote}
                   fareRule={fareRule}
-                  normalizeFareRules={normalizeFareRules}
                 />
               </div>
             </div>

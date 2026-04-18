@@ -24,6 +24,7 @@ import {
 } from "react-icons/fa";
 import { MdCancel } from "react-icons/md";
 import { GrUserManager } from "react-icons/gr";
+import { SiHomepage } from "react-icons/si";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCorporateAdmin } from "../Redux/Slice/corporateAdminSlice";
 
@@ -121,6 +122,11 @@ export default function Sidebar({ isOpen, onClose }) {
         to: "/travel-profile-settings",
         label: "Corporate Profile",
         icon: <FaBuilding />,
+      },
+     {
+        to: "/corporate-landing-page",
+        label: "Corporate Landing Page",
+        icon: <SiHomepage />,
       },
     );
     return menu;

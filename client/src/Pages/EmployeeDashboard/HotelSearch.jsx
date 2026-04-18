@@ -300,7 +300,7 @@ export default function HotelSearchPage() {
       CheckOut: checkOut,
       CityCode: selectedCityCode, // string is fine
       GuestNationality: guestNationality, // 🔥 IMPORTANT
-      ResponseTime: 10,
+      ResponseTime: 23,
       NoOfRooms: rooms,
       PaxRooms: roomConfigs.map((r) => ({
         Adults: r.adults,
@@ -319,9 +319,11 @@ export default function HotelSearchPage() {
         searchHotels({ payload, page: 1, limit: 10 }),
       ).unwrap();
 
-      if (result) {
-        navigate("/search-hotel-results");
-      }
+     if (result?.hotels?.length > 0) {
+  navigate("/search-hotel-results");
+} else {
+  setNoResults(true);
+}
     } catch (error) {
       console.error("Search failed:", error);
     } finally {
