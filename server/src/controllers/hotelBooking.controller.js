@@ -8,6 +8,70 @@ const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const { generateBookingReference } = require("../utils/helpers");
 
+// @desc    PreBook Hotel (TBO)
+// @route   POST /api/v1/hotel-bookings/prebook
+// @access  Private
+
+exports.preBookHotel = asyncHandler(async (req, res) => {
+  const { BookingCode } = req.body;
+
+  /* ================= VALIDATION ================= */
+  if (!BookingCode) {
+    throw new ApiError(400, "BookingCode is required");
+  }
+
+  /* ================= BUILD PAYLOAD ================= */
+  const payload = {
+    BookingCode: Array.isArray(BookingCode)
+      ? BookingCode.join(",")
+      : BookingCode,
+    EndUserIp: process.env.TBO_END_USER_IP,
+  };
+
+  console.log("PREBOOK PAYLOAD:", payload);
+
+  /* ================= CALL SERVICE ================= */
+  const preBookResp = await hotelService.preBookHotel(payload);
+
+  console.log("PREBOOK RESPONSE:", JSON.stringify(preBookResp, null, 2));
+
+  /* ================= VALIDATION ================= */
+  const result = preBookResp?.HotelResult?.[0];
+
+  if (!result) {
+    throw new ApiError(500, "Invalid PreBook response");
+  }
+
+  const isPriceChanged = result?.IsPriceChanged;
+  const isPolicyChanged = result?.IsCancellationPolicyChanged;
+
+  /* ================= EDGE CASES ================= */
+
+  if (isPriceChanged) {
+    return res.status(200).json({
+      success: false,
+      message: "Price changed",
+      data: preBookResp,
+    });
+  }
+
+  if (isPolicyChanged) {
+    return res.status(200).json({
+      success: false,
+      message: "Cancellation policy changed",
+      data: preBookResp,
+    });
+  }
+
+  /* ================= SUCCESS ================= */
+
+  return res.status(200).json({
+    success: true,
+    message: "PreBook successful",
+    data: preBookResp,
+  });
+});
+
 /* ======================================================
    CREATE HOTEL BOOKING REQUEST (Approval First)
 ====================================================== */
@@ -254,6 +318,24 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     };
   });
 
+  /* ================= SSR POLICY: AUTO-APPROVE CHECK ================= */
+  const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
+
+  let requestStatus = "pending_approval"; // default
+
+  try {
+    const ssrPolicy = await EmployeeSsrPolicy.findOne({
+      corporateId: corporate._id,
+      employeeEmail: user.email?.toLowerCase().trim(),
+    }).lean();
+
+    if (ssrPolicy && ssrPolicy.approvalRequired === false) {
+      requestStatus = "approved";
+    }
+  } catch (policyErr) {
+    // Safe fallback — keep pending_approval
+  }
+
   const bookingRequest = await HotelBookingRequest.create({
     bookingReference: generateBookingReference(),
     corporateId: corporate._id,
@@ -261,7 +343,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
     bookingType: "hotel",
 
-    requestStatus: "pending_approval",
+    requestStatus,
 
     purposeOfTravel,
 
@@ -277,6 +359,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
       gstin: gstDetails?.gstin || "",
       legalName: gstDetails?.legalName || "",
       address: gstDetails?.address || "",
+      gstEmail: gstDetails?.gstEmail ||"",
     },
     travellers: transformedTravellers,
 
@@ -288,14 +371,19 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     bookingSnapshot,
   });
 
+  const isAutoApproved = requestStatus === "approved";
+
   return res.status(201).json({
     success: true,
     data: {
       bookingRequestId: bookingRequest._id,
       bookingReference: bookingRequest.bookingReference,
       requestStatus: bookingRequest.requestStatus,
+      autoApproved: isAutoApproved,
     },
-    message: "Hotel booking request submitted for approval",
+    message: isAutoApproved
+      ? "Hotel booking request auto-approved (no approval required per policy)"
+      : "Hotel booking request submitted for approval",
   });
 });
 
@@ -461,38 +549,29 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
       );
     }
 
-    /* ================= STEP 3: HANDLE PRICE / POLICY CHANGE ================= */
-
-    // if (preBookResult?.IsPriceChanged) {
-    //   throw new ApiError(400, "Price changed. Please refresh booking.");
-    // }
-
-    // if (preBookResult?.IsCancellationPolicyChanged) {
-    //   throw new ApiError(400, "Cancellation policy changed. Please review.");
-    // }
-
-    /* ================= STEP 4: GET FRESH BOOKING CODE ================= */
-
-    // const freshBookingCode = preBookResult?.BookingCode || bookingCodes;
 
     console.log("FRESH BOOKING CODE:", freshBookingCode);
 
     /* ================= STEP 5: BOOK ================= */
 
-    // const selectedRooms = booking.hotelRequest?.allRooms || [];
-    // const travellers = booking.travellers || [];
-
-    // const selectedRooms = booking.hotelRequest?.allRooms || [];
 
     const travellers = booking.travellers || [];
 
     // 🔥 STEP 1: GET LEAD PASSENGER PAN
     const leadTraveller = travellers.find((t) => t.isLeadPassenger);
 
-    if (!leadTraveller || !leadTraveller.panCard) {
+    const guestNationality = booking.hotelRequest?.guestNationality || "IN";
+    const hotelCountryInfo = booking.hotelRequest?.selectedHotel?.country || "IN";
+    
+    // TBO considers booking international if the hotel's country does not match the guest's nationality
+    const isInternationalBooking = 
+      guestNationality.toLowerCase() !== hotelCountryInfo.toLowerCase() && 
+      !(guestNationality.toLowerCase() === "in" && hotelCountryInfo.toLowerCase() === "india");
+
+    if (isInternationalBooking && (!leadTraveller || !leadTraveller.panCard)) {
       throw new ApiError(
         400,
-        "Lead passenger PAN is required to proceed booking",
+        "Lead passenger PAN is required to proceed with international booking",
       );
     }
 
@@ -567,11 +646,6 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
       }
     }
 
-    // const roomGuests = paxRooms.map((r) => ({
-    //   noOfAdults: Number(r.Adults || 0),
-    //   noOfChild: Number(r.Children || 0),
-    //   childAge: r.ChildrenAges || [],
-    // }));
 
     // ✅ ADD THIS BLOCK HERE (EXACT PLACE)
 
@@ -688,6 +762,15 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
         booking.hotelRequest?.TraceId,
 
       HotelRoomsDetails,
+
+      ...(booking.gstDetails?.gstin && {
+        GSTCompanyInformation: {
+          GSTNumber: booking.gstDetails.gstin || "",
+          GSTCompanyName: booking.gstDetails.legalName || "NA",
+          GSTCompanyAddress: booking.gstDetails.address || "NA",
+          GSTCompanyEmail: booking.gstDetails.gstEmail || leadTraveller?.email || "info@domain.com"
+        }
+      }),
     });
 
     console.log("BOOK RESPONSE:", JSON.stringify(bookResp, null, 2));

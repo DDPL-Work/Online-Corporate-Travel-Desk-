@@ -106,7 +106,8 @@ const uploadMultiple = upload.fields([
   { name: "gstCertificate", maxCount: 1 },
   { name: "panCard", maxCount: 1 },
   { name: "profilePicture", maxCount: 1 },
-  { name: 'travelDocument', maxCount: 1 }
+  { name: "travelDocument", maxCount: 1 },
+  { name: "companyLogo", maxCount: 1 },
 ]);
 
 module.exports = {

@@ -363,7 +363,7 @@ export default function TravelAdminProfile() {
         </SectionCard>
 
         {/* Travel Policy */}
-        <SectionCard title="Travel Policy" icon={FiAward}>
+        {/* <SectionCard title="Travel Policy" icon={FiAward}>
           {isEditing ? (
             <>
               <EditableField label="Allowed Cabin Classes" value={formData.travelPolicy?.allowedCabinClass?.join(", ")} onChange={(v) => handleFieldChange("travelPolicy.allowedCabinClass", v.split(",").map(s => s.trim()))} />
@@ -379,14 +379,9 @@ export default function TravelAdminProfile() {
               <InfoRow label="Ancillary Services" value={corporate.travelPolicy?.allowAncillaryServices ? "Allowed" : "Not Allowed"} />
             </>
           )}
-        </SectionCard>
+        </SectionCard> */}
 
-        {/* Usage Metadata (read-only, not editable) */}
-        <SectionCard title="Usage Metadata" icon={FiTrendingUp}>
-          <InfoRow label="Total Bookings" value={corporate.metadata?.totalBookings} />
-          <InfoRow label="Total Revenue" value={`₹ ${corporate.metadata?.totalRevenue?.toLocaleString()}`} />
-          <InfoRow label="Last Booking Date" value={corporate.metadata?.lastBookingDate?.slice(0, 10)} />
-        </SectionCard>
+       
       </div>
     </div>
   );

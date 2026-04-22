@@ -24,6 +24,8 @@ import {
 } from "react-icons/fa";
 import { MdCancel } from "react-icons/md";
 import { GrUserManager } from "react-icons/gr";
+import { SiHomepage } from "react-icons/si";
+import { MdAirlineSeatReclineNormal } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCorporateAdmin } from "../Redux/Slice/corporateAdminSlice";
 
@@ -85,6 +87,11 @@ export default function Sidebar({ isOpen, onClose }) {
     }
     menu.push(
       {
+        to: "/ssr-management",
+        label: "SSR Management",
+        icon: <MdAirlineSeatReclineNormal />,
+      },
+      {
         label: "Company Bookings",
         icon: <FaClipboardList />,
         children: [
@@ -121,6 +128,11 @@ export default function Sidebar({ isOpen, onClose }) {
         to: "/travel-profile-settings",
         label: "Corporate Profile",
         icon: <FaBuilding />,
+      },
+      {
+        to: "/branding-settings",
+        label: "Branding & Landing Page",
+        icon: <SiHomepage />,
       },
     );
     return menu;
@@ -175,31 +187,37 @@ export default function Sidebar({ isOpen, onClose }) {
     { to: "/system-logs", label: "System Logs", icon: <FaFileAlt /> },
   ];
 
-  const employeeMenu = [
-    { to: "/my-bookings", label: "Booked Trips", icon: <FaClipboardList /> },
-    { to: "/my-upcoming-trips", label: "Upcoming Trips", icon: <FaClock /> },
-    { to: "/my-past-trips", label: "Past Trips", icon: <FaListAlt /> },
+  const employeeSection = [
     {
-      to: "/my-pending-approvals",
-      label: "Pending Approvals",
-      icon: <FaClock />,
+      label: "My Travel",
+      icon: <FaClipboardList />,
+      children: [
+        { to: "/my-bookings", label: "My Bookings", icon: <FaClipboardList /> },
+        { to: "/my-upcoming-trips", label: "Upcoming Trips", icon: <FaClock /> },
+        { to: "/my-past-trips", label: "Past Trips", icon: <FaListAlt /> },
+        {
+          to: "/my-pending-approvals",
+          label: "Pending Approvals",
+          icon: <FaClock />,
+        },
+        {
+          to: "/my-rejected-requests",
+          label: "Rejected Requests",
+          icon: <FaTimes />,
+        },
+        {
+          to: "/my-cancelled-bookings",
+          label: "Cancelled Bookings",
+          icon: <MdCancel />,
+        },
+        { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
+        { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },
+      ],
     },
-    {
-      to: "/my-rejected-requests",
-      label: "Rejected Requests",
-      icon: <FaTimes />,
-    },
-    {
-      to: "/my-cancelled-bookings",
-      label: "Cancelled Bookings",
-      icon: <MdCancel />,
-    },
-    { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
-    { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },
   ];
 
-  const manager = useMemo(() => {
-    const menu = [
+  const managerMenu = useMemo(() => {
+    return [
       {
         label: "Company Bookings",
         icon: <FaClipboardList />,
@@ -247,14 +265,36 @@ export default function Sidebar({ isOpen, onClose }) {
         icon: <FaUsers />,
       },
     ];
-    return menu;
-  }, [classification]);
+  }, []);
+
+  const employeeMenu = [
+    { to: "/my-bookings", label: "My Bookings", icon: <FaClipboardList /> },
+    { to: "/my-upcoming-trips", label: "Upcoming Trips", icon: <FaClock /> },
+    { to: "/my-past-trips", label: "Past Trips", icon: <FaListAlt /> },
+    {
+      to: "/my-pending-approvals",
+      label: "Pending Approvals",
+      icon: <FaClock />,
+    },
+    {
+      to: "/my-rejected-requests",
+      label: "Rejected Requests",
+      icon: <FaTimes />,
+    },
+    {
+      to: "/my-cancelled-bookings",
+      label: "Cancelled Bookings",
+      icon: <MdCancel />,
+    },
+    { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
+    { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },
+  ];
 
   const menus = {
     "super-admin": travelCompanyMenu,
-    "travel-admin": travelAdminMenu,
+    "travel-admin": [...travelAdminMenu, ...employeeSection],
+    manager: [...managerMenu, ...employeeSection],
     employee: employeeMenu,
-    manager: manager,
   };
   const activeMenu = menus[role] || [];
   const [openGroups, setOpenGroups] = useState({});

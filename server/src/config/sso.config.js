@@ -42,7 +42,6 @@ const ensureEmployeeForUser = async (user, corporateId) => {
 
 const getAdminEmail = (corporate) =>
   corporate?.primaryContact?.email?.toLowerCase() ||
-  corporate?.secondaryContact?.email?.toLowerCase() ||
   process.env.TRAVEL_ADMIN_EMAIL ||
   "";
 
@@ -524,7 +523,7 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
           // 🔥 Ensure role stays correct
           let expectedRole = "employee";
           if (corporate.primaryContact?.email?.toLowerCase() === email) {
-            expectedRole = "corporate-super-admin";
+            expectedRole = "travel-admin";
           } else if (
             corporate.secondaryContact?.email?.toLowerCase() === email
           ) {

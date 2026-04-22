@@ -263,33 +263,22 @@ const RoomCard = ({ room, count, onAdd, onRemove }) => {
           {/* CTA Button - Responsive */}
           <div className="w-full sm:w-auto lg:w-full">
             <div className="w-full flex items-center justify-center gap-2">
-  {count > 0 ? (
-    <>
-      <button
-        onClick={onRemove}
-        className="w-8 h-8 bg-gray-300 rounded text-lg font-bold"
-      >
-        -
-      </button>
-
-      <span className="font-bold text-lg">{count}</span>
-
-      <button
-        onClick={onAdd}
-        className="w-8 h-8 bg-[#0A4D68] text-white rounded text-lg font-bold"
-      >
-        +
-      </button>
-    </>
-  ) : (
-    <button
-      onClick={onAdd}
-      className="w-full bg-[#0A4D68] text-white py-2 rounded-lg font-semibold"
-    >
-      ADD
-    </button>
-  )}
-</div>
+              {count > 0 ? (
+                <button
+                  onClick={onRemove}
+                  className="w-full bg-green-700 text-white py-2 rounded-lg font-semibold flex items-center justify-center gap-2 cursor-pointer border-none"
+                >
+                  <MdCheckCircle /> SELECTED
+                </button>
+              ) : (
+                <button
+                  onClick={onAdd}
+                  className="w-full bg-[#0A4D68] text-white py-2 rounded-lg font-semibold cursor-pointer border-none"
+                >
+                  ADD
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

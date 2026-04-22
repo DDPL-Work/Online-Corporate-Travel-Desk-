@@ -174,9 +174,9 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     const paxType = (t.paxType || "ADULT").toUpperCase();
     const age = ageFromDob(t.dateOfBirth || t.dob);
 
-    if (!t.dateOfBirth && !t.dob) {
-      throw new ApiError(400, `Date of birth missing for traveler ${idx + 1}`);
-    }
+    // if (!t.dateOfBirth && !t.dob) {
+    //   throw new ApiError(400, `Date of birth missing for traveler ${idx + 1}`);
+    // }
 
     if (age != null) {
       if (paxType === "ADULT" && age < 12) {
@@ -243,6 +243,25 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
   let bookingSnapshot;
 
+  const mapCabinClass = (cabin) => {
+    const mapping = {
+      2: "Economy",
+      3: "Premium Economy",
+      4: "Business",
+      5: "Business", // no premium_business in schema → fallback
+      6: "First Class",
+
+      // string fallback
+      economy: "Economy",
+      "premium economy": "Premium Economy",
+      business: "Business",
+      "premium business": "Business",
+      first: "First Class",
+      first_class: "First Class",
+    };
+
+    return mapping[String(cabin).toLowerCase()] || "Economy";
+  };
   if (bookingType === "flight" && Array.isArray(flightRequest?.segments)) {
     const segments = flightRequest.segments;
 
@@ -261,7 +280,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
         airline: [...new Set(segments.map((s) => s.airlineName))].join(", "),
         travelDate: first.departureDateTime,
         returnDate: null,
-        cabinClass: "Economy",
+        cabinClass: mapCabinClass(first.cabinClass),
         amount: pricingSnapshot.totalAmount,
         purposeOfTravel,
         city: last.destination.city,
@@ -280,7 +299,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
         airline: [...new Set(segments.map((s) => s.airlineName))].join(", "),
         travelDate: onward.departureDateTime,
         returnDate: ret.departureDateTime,
-        cabinClass: "Economy",
+        cabinClass: mapCabinClass(onward.cabinClass),
         amount: pricingSnapshot.totalAmount,
         purposeOfTravel,
         city: ret.destination.city,
@@ -313,13 +332,39 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     );
   }
 
+  /* ================= SSR POLICY: AUTO-APPROVE CHECK ================= */
+  const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
+
+  let requestStatus = "pending_approval"; // default
+
+  try {
+    const ssrPolicy = await EmployeeSsrPolicy.findOne({
+      corporateId: corporate._id,
+      employeeEmail: user.email?.toLowerCase().trim(),
+    }).lean();
+
+    // If policy exists and approvalRequired is false → auto-approve
+    if (ssrPolicy && ssrPolicy.approvalRequired === false) {
+      requestStatus = "approved";
+      logger.info("✅ SSR Policy: Auto-approving booking for employee", {
+        email: user.email,
+        corporateId: corporate._id,
+      });
+    }
+  } catch (policyErr) {
+    // If policy lookup fails, fall back to pending_approval (safe default)
+    logger.warn("⚠️ SSR Policy lookup failed, defaulting to pending_approval", {
+      error: policyErr.message,
+    });
+  }
+
   const bookingRequest = await BookingRequest.create({
     bookingReference: generateBookingReference(),
     bookingType,
     corporateId: corporate._id,
     userId: user._id,
 
-    requestStatus: "pending_approval",
+    requestStatus,
     executionStatus: "not_started",
 
     fareQuote: freshFareQuote,
@@ -356,13 +401,73 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
   /* ================= NOTIFICATION ================= */
 
-  await notificationService.sendApprovalNotifications({
-    bookingReference: bookingRequest.bookingReference,
-    requester: user,
-    corporateId: corporate._id,
-  });
+  // Only send approval notifications if still pending
+  if (requestStatus === "pending_approval") {
+    await notificationService.sendApprovalNotifications({
+      bookingReference: bookingRequest.bookingReference,
+      requester: user,
+      corporateId: corporate._id,
+    });
+  }
+
+  /* ================= AUTO-APPROVAL: CREATE BOOKING INTENT ================= */
+  if (requestStatus === "approved" && bookingType === "flight") {
+    try {
+      const isRoundTrip =
+        bookingSnapshot.sectors && bookingSnapshot.sectors.length === 2;
+      const [origin, destination] = bookingSnapshot.sectors[0].split("-");
+
+      const travelDate = new Date(bookingSnapshot.travelDate);
+      const now = new Date();
+      const validUntil = new Date(
+        Math.min(
+          travelDate.getTime() - 24 * 60 * 60 * 1000,
+          now.getTime() + 24 * 60 * 60 * 1000,
+        ),
+      );
+
+      const airlineCodes = [
+        ...new Set(flightRequest.segments.map((s) => s.airlineCode)),
+      ];
+
+      const fareResult = freshFareQuote?.Results?.[0];
+      const maxApprovedPrice = isRoundTrip
+        ? pricingSnapshot.totalAmount
+        : (Array.isArray(fareResult)
+            ? fareResult[0]?.Fare?.PublishedFare
+            : fareResult?.Fare?.PublishedFare) || pricingSnapshot.totalAmount;
+
+      await BookingIntent.create({
+        bookingRequestId: bookingRequest._id,
+        corporateId: bookingRequest.corporateId,
+        userId: bookingRequest.userId,
+        origin,
+        destination,
+        travelDate: bookingSnapshot.travelDate,
+        returnDate: bookingSnapshot.returnDate,
+        journeyType: isRoundTrip ? "RT" : "OW",
+        cabinClass: bookingSnapshot.cabinClass,
+        airlineCodes,
+        maxApprovedPrice,
+        approvedAt: new Date(),
+        validUntil,
+        approvalStatus: "approved",
+      });
+
+      logger.info("✅ BookingIntent created for auto-approved request", {
+        bookingRequestId: bookingRequest._id,
+      });
+    } catch (intentErr) {
+      logger.error("❌ Failed to create BookingIntent for auto-approval", {
+        error: intentErr.message,
+        bookingRequestId: bookingRequest._id,
+      });
+    }
+  }
 
   /* ================= RESPONSE ================= */
+
+  const isAutoApproved = requestStatus === "approved";
 
   res.status(201).json(
     new ApiResponse(
@@ -371,8 +476,11 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
         bookingRequestId: bookingRequest._id,
         bookingReference: bookingRequest.bookingReference,
         requestStatus: bookingRequest.requestStatus,
+        autoApproved: isAutoApproved,
       },
-      "Booking request submitted for approval",
+      isAutoApproved
+        ? "Booking request auto-approved (no approval required per policy)"
+        : "Booking request submitted for approval",
     ),
   );
 });
@@ -478,13 +586,13 @@ const isTraceExpiredError = (err) => {
   );
 };
 
-const cabinClassToCode = (cabin) =>
+const cabinClassToTboCode = (cabin) =>
   ({
     Economy: 2,
     "Premium Economy": 3,
     Business: 4,
     "Premium Business": 5,
-    First: 6,
+    "First Class": 6,
   })[cabin] || 2;
 
 const getCorporateAddressForPassenger = async (employeeEmail) => {
@@ -555,7 +663,7 @@ const buildTboRevalidationSearchPayload = (booking, intent) => {
     basePayload.Segments.push({
       Origin: segment.origin.airportCode,
       Destination: segment.destination.airportCode,
-      FlightCabinClass: segment.cabinClass,
+      FlightCabinClass: cabinClassToTboCode(segment.cabinClass),
       PreferredDepartureTime: segment.departureDateTime.slice(0, 19),
     });
 
@@ -714,6 +822,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         passengers,
         ...(ssrPayload && { ssr: ssrPayload }),
         isLCC: true,
+        gstDetails: booking.gstDetails,
       });
 
       const extractedPNR =
@@ -749,6 +858,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       result: booking.flightRequest.fareQuote.Results[0],
       passengers,
       ssr: booking.flightRequest.ssrSnapshot,
+      gstDetails: booking.gstDetails,
     });
 
     const tboBookingId = bookResp?.raw?.Response?.Response?.BookingId;
@@ -777,6 +887,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: extractedPNR,
       passengers,
       isLCC: false,
+      gstDetails: booking.gstDetails,
     });
 
     const ticketStatus = ticketResp?.Response?.Response?.TicketStatus;
@@ -813,9 +924,11 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       const splitSSR = (snapshot, type) => {
         if (!snapshot) return null;
         return {
-          seats: (snapshot.seats || []).filter(s => s.journeyType === type),
-          meals: (snapshot.meals || []).filter(m => m.journeyType === type),
-          baggage: (snapshot.baggage || []).filter(b => b.journeyType === type)
+          seats: (snapshot.seats || []).filter((s) => s.journeyType === type),
+          meals: (snapshot.meals || []).filter((m) => m.journeyType === type),
+          baggage: (snapshot.baggage || []).filter(
+            (b) => b.journeyType === type,
+          ),
         };
       };
 
@@ -826,6 +939,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         passengers,
         ssr: splitSSR(booking.flightRequest.ssrSnapshot, "onward"),
         isLCC: true,
+        gstDetails: booking.gstDetails,
       });
 
       const returnResp = await tboService.ticketFlight({
@@ -835,6 +949,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         passengers,
         ssr: splitSSR(booking.flightRequest.ssrSnapshot, "return"),
         isLCC: true,
+        gstDetails: booking.gstDetails,
       });
 
       console.log(
@@ -884,9 +999,9 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     const splitSSR = (snapshot, type) => {
       if (!snapshot) return null;
       return {
-        seats: (snapshot.seats || []).filter(s => s.journeyType === type),
-        meals: (snapshot.meals || []).filter(m => m.journeyType === type),
-        baggage: (snapshot.baggage || []).filter(b => b.journeyType === type)
+        seats: (snapshot.seats || []).filter((s) => s.journeyType === type),
+        meals: (snapshot.meals || []).filter((m) => m.journeyType === type),
+        baggage: (snapshot.baggage || []).filter((b) => b.journeyType === type),
       };
     };
 
@@ -897,6 +1012,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       result: booking.flightRequest.fareQuote.Results[0],
       passengers,
       ssr: splitSSR(booking.flightRequest.ssrSnapshot, "onward"),
+      gstDetails: booking.gstDetails,
     });
 
     const returnResp = await tboService.bookFlight({
@@ -906,6 +1022,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       result: booking.flightRequest.fareQuote.Results[1],
       passengers,
       ssr: splitSSR(booking.flightRequest.ssrSnapshot, "return"),
+      gstDetails: booking.gstDetails,
     });
 
     const onwardPNR =
@@ -944,6 +1061,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: onwardPNR,
       passengers,
       isLCC: false,
+      gstDetails: booking.gstDetails,
     });
 
     const returnTicketResp = await tboService.ticketFlight({
@@ -952,6 +1070,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: returnPNR,
       passengers,
       isLCC: false,
+      gstDetails: booking.gstDetails,
     });
 
     /* ✅ VALIDATE */
@@ -1016,6 +1135,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       passengers,
       ...(ssrPayload && { ssr: ssrPayload }),
       isLCC: true,
+      gstDetails: booking.gstDetails,
     });
 
     const extractedPNR =
@@ -1072,6 +1192,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       passengers,
       ...(ssrPayload && { ssr: ssrPayload }),
       isLCC: true,
+      gstDetails: booking.gstDetails,
     });
 
     const extractedPNR =
@@ -1106,6 +1227,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     result: booking.flightRequest.fareQuote.Results[0],
     passengers,
     ssr: booking.flightRequest.ssrSnapshot,
+    gstDetails: booking.gstDetails,
   });
 
   /* ✅ EXTRACT BOOKING ID (VERY IMPORTANT) */
@@ -1145,6 +1267,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     pnr: extractedPNR,
     passengers,
     isLCC: false,
+    gstDetails: booking.gstDetails,
   });
 
   /* ✅ VALIDATE TICKET RESPONSE */
@@ -1211,7 +1334,7 @@ const findBestMatchingFlight = ({ searchResp, intent }) => {
       intent.airlineCodes.includes(seg.Airline?.AirlineCode?.trim()) &&
       // seg.CabinClass === cabinClassToCode(intent.cabinClassCode)
 
-      seg.CabinClass === cabinClassToCode(intent.cabinClass) &&
+      seg.CabinClass === cabinClassToTboCode(intent.cabinClass) &&
       r.Fare.PublishedFare <= intent.maxApprovedPrice
     );
   });
@@ -1671,23 +1794,28 @@ exports.getMyBookingById = asyncHandler(async (req, res) => {
 
   // POSTPAID
   else if (corporate?.classification === "postpaid") {
-    const ledgerEntry = await Ledger.findOne({
-      bookingId: booking._id,
-      type: "booking",
-      status: "paid",
-    })
-      .sort({ createdAt: -1 })
-      .select("_id amount paidDate");
+    // 🔥 Check if we already have it marked in the document
+    if (booking.payment?.status === "completed") {
+      // already good
+    } else {
+      const ledgerEntry = await Ledger.findOne({
+        bookingId: booking._id,
+        type: "booking",
+        status: { $in: ["paid", "billed"] }, // ✅ Recognize billed status
+      })
+        .sort({ createdAt: -1 })
+        .select("_id amount paidDate");
 
-    booking.payment = ledgerEntry
-      ? {
-          status: "completed",
-          method: "agency",
-          amount: ledgerEntry.amount,
-          paidAt: ledgerEntry.paidDate,
-          transactionId: ledgerEntry._id,
-        }
-      : { status: "pending" };
+      booking.payment = ledgerEntry
+        ? {
+            status: "completed",
+            method: "agency",
+            amount: ledgerEntry.amount,
+            paidAt: ledgerEntry.paidDate || ledgerEntry.createdAt,
+            transactionId: ledgerEntry._id,
+          }
+        : { status: "pending" };
+    }
   }
 
   // FALLBACK

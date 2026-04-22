@@ -232,11 +232,11 @@ const RequestCard = ({ req, onApprove, onReject, loading }) => {
             >
               {status === "approved" ? (
                 <>
-                  <MdVerifiedUser size={13} /> Role Granted
+                  <MdVerifiedUser size={13} /> Verified Approver
                 </>
               ) : (
                 <>
-                  <FiXCircle size={13} /> Role Denied
+                  <FiXCircle size={13} /> Verification Denied
                 </>
               )}
             </div>
@@ -400,8 +400,8 @@ const ManagerRequestsPage = () => {
 
   const handleApprove = async (requestId) => {
     const result = await Swal.fire({
-      title: "Approve Manager Role?",
-      text: "This will grant the employee manager/approver permissions for this booking.",
+      title: "Verify Manager?",
+      text: "This will officially verify this person as a corporate approver, allowing them to approve or reject travel requests.",
       icon: "question",
       showCancelButton: true,
       confirmButtonColor: "#0A4D68",

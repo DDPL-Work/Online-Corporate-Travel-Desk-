@@ -59,7 +59,7 @@ exports.getEmployeeDashboard = asyncHandler(async (req, res) => {
 });
 
 /* =========================================================
-   TRAVEL ADMIN + CORPORATE SUPER ADMIN DASHBOARD
+   TRAVEL ADMIN DASHBOARD
 ========================================================= */
 exports.getCorporateDashboard = asyncHandler(async (req, res) => {
   const corporateId = req.user.corporateId;
@@ -117,14 +117,9 @@ exports.getCorporateDashboard = asyncHandler(async (req, res) => {
     role: "employee",
   });
 
-  const corporateSuperAdminCount = await User.countDocuments({
-    corporateId,
-    role: "corporate-super-admin",
-  });
-
   const travelAdminCount = await User.countDocuments({
     corporateId,
-    role: { $in: ["travel-admin", "corporate-super-admin"] }, // include both
+    role: "travel-admin",
   });
 
   const activeUsers = await User.countDocuments({
@@ -169,7 +164,6 @@ exports.getCorporateDashboard = asyncHandler(async (req, res) => {
           totalBookings,
           pendingApprovals,
           employeeCount,
-          corporateSuperAdminCount,
           travelAdminCount,
           activeUsers,
           monthlySpend,

@@ -25,12 +25,12 @@ const deduplicateHotels = (hotels = []) => {
   const unique = [];
 
   hotels.forEach((hotel) => {
-    const hotelCodeKey = hotel?.HotelCode
-      ? String(hotel.HotelCode).trim()
-      : "";
-    const compositeKey = `${(hotel.HotelName || "")
-      .trim()
-      .toLowerCase()}|${(hotel.CityName || hotel.City || "")
+    const hotelCodeKey = hotel?.HotelCode ? String(hotel.HotelCode).trim() : "";
+    const compositeKey = `${(hotel.HotelName || "").trim().toLowerCase()}|${(
+      hotel.CityName ||
+      hotel.City ||
+      ""
+    )
       .trim()
       .toLowerCase()}|${(hotel.Address || "").trim().toLowerCase()}`;
 
@@ -157,6 +157,7 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     PaxRooms,
     IsDetailedResponse,
     Filters,
+    ResponseTime,
   } = req.body;
 
   /* ---------------- VALIDATION ---------------- */
@@ -186,6 +187,7 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     PaxRooms,
     IsDetailedResponse,
     Filters,
+    ResponseTime,
   };
 
   const cacheKey = buildCacheKey(cacheKeyPayload);
@@ -200,9 +202,7 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     const cached = await redis.get(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached);
-      const cachedHotels = Array.isArray(parsed)
-        ? parsed
-        : parsed?.hotels;
+      const cachedHotels = Array.isArray(parsed) ? parsed : parsed?.hotels;
       if (Array.isArray(cachedHotels)) {
         indexedHotels = addIndex(cachedHotels);
         traceId = parsed?.traceId || null;
@@ -213,8 +213,8 @@ exports.searchHotels = asyncHandler(async (req, res) => {
   }
 
   /* =====================================================
-     CACHE MISS → CALL TBO
-  ===================================================== */
+   CACHE MISS → CALL TBO (PARALLEL CHUNKED SEARCH)
+===================================================== */
   if (!indexedHotels) {
     const hotelCodeResponse = await tboService.getTBOHotelCodeList(CityCode);
 
@@ -222,71 +222,125 @@ exports.searchHotels = asyncHandler(async (req, res) => {
       console.log("[hotel-search] no hotel codes found for city", CityCode);
       indexedHotels = [];
     } else {
-      const hotelCodesArray = hotelCodeResponse.Hotels.slice(0, 200);
-      const hotelCodes = hotelCodesArray.map((h) => h.HotelCode).join(",");
+      const hotelCodesArray = hotelCodeResponse.Hotels;
 
-      let searchResults = await tboService.searchHotels({
-        CheckIn,
-        CheckOut,
-        HotelCodes: hotelCodes,
-        GuestNationality,
-        NoOfRooms,
-        PaxRooms,
-        IsDetailedResponse,
-        Filters,
-      });
+      /* ---------------- CHUNKING LOGIC ---------------- */
+      const chunkSize = 100;
+      const chunks = [];
 
-      if (!searchResults?.HotelResult?.length) {
-        console.log("[hotel-search] empty search result, retrying with defaults");
-        searchResults = await tboService.searchHotels({
-          CheckIn,
-          CheckOut,
-          HotelCodes: hotelCodes,
-          GuestNationality: "IN",
-          NoOfRooms,
-          PaxRooms,
-          IsDetailedResponse,
-          Filters: {},
-        });
+      for (let i = 0; i < hotelCodesArray.length; i += chunkSize) {
+        const chunk = hotelCodesArray
+          .slice(i, i + chunkSize)
+          .map((h) => h.HotelCode)
+          .join(",");
+
+        chunks.push(chunk);
       }
 
-      traceId = searchResults?.TraceId || null;
-
-      const detailsResponse = await tboService.getStaticHotelDetails(
-        hotelCodes,
+      console.log(
+        `[hotel-search] total hotels: ${hotelCodesArray.length}, chunks: ${chunks.length}`,
       );
 
-      const detailsList =
-        detailsResponse?.HotelDetails ||
-        detailsResponse?.HotelDetails?.HotelDetails ||
-        [];
+      /* ---------------- PARALLEL SEARCH ---------------- */
+      const searchPromises = chunks.map((hotelCodesChunk, index) =>
+        tboService
+          .searchHotels({
+            CheckIn,
+            CheckOut,
+            HotelCodes: hotelCodesChunk,
+            GuestNationality,
+            NoOfRooms,
+            PaxRooms,
+            IsDetailedResponse,
+            Filters,
+            ResponseTime,
+          })
+          .then((res) => {
+            console.log(`[hotel-search] chunk ${index + 1} success: ${res?.HotelResult?.length || 0} hotels`);
+            return res;
+          })
+          .catch((err) => {
+            console.error(`[hotel-search] chunk ${index + 1} failed`, err?.message);
+            return null;
+          }),
+      );
 
-      const detailsMap = {};
-      detailsList.forEach((hotel) => {
-        detailsMap[hotel.HotelCode] = hotel;
-      });
+      const searchResponses = await Promise.all(searchPromises);
 
-      const mergedHotels = (searchResults?.HotelResult || []).map((hotel) => {
-        const details = detailsMap[hotel.HotelCode];
+      /* ---------------- MERGE SEARCH RESULTS ---------------- */
+      const allSearchResults = searchResponses.flatMap(
+        (res) => res?.HotelResult || [],
+      );
 
-        return {
-          ...hotel,
-          HotelName: details?.HotelName || hotel.HotelName || "Hotel",
-          Address: details?.Address || hotel.Address || "",
-          CityName: details?.CityName || hotel.CityName || "",
-          CountryName: details?.CountryName || hotel.CountryName || "",
-          StarRating: details?.HotelRating || hotel.StarRating || 0,
-          Description: details?.Description || hotel.Description || "",
-          Images: details?.Images || hotel.Images || [],
-          Amenities: details?.HotelFacilities || hotel.Amenities || [],
-          Map: details?.Map || hotel.Map,
-        };
-      });
+      /* ---------------- TRACE ID ---------------- */
+      traceId = searchResponses.find((r) => r?.TraceId)?.TraceId || null;
 
-      const dedupedHotels = deduplicateHotels(mergedHotels);
-      indexedHotels = addIndex(dedupedHotels);
+      if (allSearchResults.length === 0) {
+        indexedHotels = [];
+      } else {
+        /* ---------------- STATIC DETAILS (ONLY FOR AVAILABLE) ---------------- */
+        const availableCodes = allSearchResults.map((h) => h.HotelCode);
+        const detailChunks = [];
+        for (let i = 0; i < availableCodes.length; i += chunkSize) {
+          detailChunks.push(availableCodes.slice(i, i + chunkSize).join(","));
+        }
+
+        console.log(
+          `[hotel-details] fetching details for ${availableCodes.length} available hotels in ${detailChunks.length} chunks`,
+        );
+
+        const detailsPromises = detailChunks.map((chunk, index) =>
+          tboService
+            .getStaticHotelDetails(chunk)
+            .then((res) => {
+              console.log(`[hotel-details] chunk ${index + 1} success`);
+              return res;
+            })
+            .catch((err) => {
+              console.error(`[hotel-details] chunk ${index + 1} failed`, err?.message);
+              return null;
+            }),
+        );
+
+        const detailResponses = await Promise.all(detailsPromises);
+        const detailsMap = {};
+
+        detailResponses.forEach((res) => {
+          const detailsList =
+            res?.HotelDetails ||
+            res?.HotelDetails?.HotelDetails ||
+            [];
+          if (Array.isArray(detailsList)) {
+            detailsList.forEach((hotel) => {
+              detailsMap[hotel.HotelCode] = hotel;
+            });
+          }
+        });
+
+        /* ---------------- MERGE DETAILS ---------------- */
+        const mergedHotels = allSearchResults.map((hotel) => {
+          const details = detailsMap[hotel.HotelCode];
+
+          return {
+            ...hotel,
+            HotelName: details?.HotelName || hotel.HotelName || "Hotel",
+            Address: details?.Address || hotel.Address || "",
+            CityName: details?.CityName || hotel.CityName || "",
+            CountryName: details?.CountryName || hotel.CountryName || "",
+            StarRating: details?.HotelRating || hotel.StarRating || 0,
+            Description: details?.Description || hotel.Description || "",
+            Images: details?.Images || hotel.Images || [],
+            Amenities: details?.HotelFacilities || hotel.Amenities || [],
+            Map: details?.Map || hotel.Map,
+          };
+        });
+
+        const dedupedHotels = deduplicateHotels(mergedHotels);
+        indexedHotels = addIndex(dedupedHotels);
+      }
     }
 
+    /* ---------------- CACHE ---------------- */
     try {
       await redis.set(
         cacheKey,

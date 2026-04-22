@@ -91,6 +91,7 @@ const bookingSchema = new mongoose.Schema({
     gstin: String,
     legalName: String,
     address: String,
+    gstEmail: String,
   },
 
   pricing: {

@@ -44,7 +44,21 @@ const Login = () => {
 
           switch (role) {
             case "super-admin":
-              navigate("/corporate-management");
+              navigate("/active-corporates");
+              break;
+
+            case "ops-member":
+              // Dynamic redirect based on permissions
+              const perms = data.user?.permissions || [];
+              let target = "/bookings-summary"; // fallback
+              
+              if (perms.includes("Manage Corporates")) target = "/pending-corporates";
+              else if (perms.includes("View Bookings")) target = "/bookings-summary";
+              else if (perms.includes("Manage Cancellations")) target = "/cancellation-summary";
+              else if (perms.includes("View Finance")) target = "/corporate-revenue";
+              
+              if (perms.length === 0) target = "/unauthorized";
+              navigate(target);
               break;
 
             default:

@@ -159,9 +159,11 @@ exports.handleManagerSelection = async (req, res) => {
     // 🔥 STEP 5: CREATE REQUEST (WITH EMPLOYEE SNAPSHOT)
     // ============================================================
 
-    managerUser.isTempManager = true;
-    managerUser.managerRequestStatus = "pending";
-    await managerUser.save();
+    if (managerUser.managerRequestStatus !== "approved") {
+      managerUser.isTempManager = true;
+      managerUser.managerRequestStatus = "pending";
+      await managerUser.save();
+    }
 
     await ManagerRequest.create({
       employeeId: employee._id,

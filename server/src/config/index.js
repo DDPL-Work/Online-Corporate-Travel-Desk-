@@ -38,7 +38,7 @@ module.exports = {
   upload: {
     maxSize: parseInt(process.env.MAX_FILE_SIZE, 10) || 5242880,
     path: process.env.UPLOAD_PATH || "./uploads",
-    allowedTypes: (process.env.ALLOWED_FILE_TYPES || "image/jpeg,image/png,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel").split(",")
+    allowedTypes: (process.env.ALLOWED_FILE_TYPES || "image/jpeg,image/png,image/webp,image/svg+xml,image/gif,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel").split(",")
   },
 
   rateLimit: {

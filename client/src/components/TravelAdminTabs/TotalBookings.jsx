@@ -92,9 +92,7 @@ function FlightSection() {
       "-";
 
     const amount =
-      b.pricingSnapshot?.totalAmount ??
-      b.bookingSnapshot?.amount ??
-      0;
+      b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
 
     return {
       ...b,
@@ -505,9 +503,7 @@ function HotelSection() {
     const providerBookingId = bookResult.BookingId || "-";
 
     const amount =
-      b.pricingSnapshot?.totalAmount ??
-      b.bookingSnapshot?.amount ??
-      0;
+      b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
 
     return {
       ...b,
@@ -941,4 +937,3 @@ export default function BookingsDashboard() {
     </div>
   );
 }
-

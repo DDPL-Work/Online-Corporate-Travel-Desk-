@@ -9,6 +9,7 @@ import { BaggageTable } from "./BaggageSelection";
 import { MealSelectionCards } from "./MealsSelection";
 import { normalizeSSRList } from "../CommonComponents";
 import { FaConciergeBell } from "react-icons/fa";
+import { fetchMySSRPolicy } from "../../../../Redux/Actions/ssrPolicy.thunks";
 
 export default function RTSeatSelectionModal({
   isOpen,
@@ -42,6 +43,20 @@ export default function RTSeatSelectionModal({
   );
 
   const ssr = ssrData || reduxSSR;
+
+  // ── SSR Policy ────────────────────────────────────────────────────────────
+  const ssrPolicy = useSelector((s) => s.ssrPolicy?.myPolicy);
+
+  useEffect(() => {
+    dispatch(fetchMySSRPolicy());
+  }, [dispatch]);
+
+  const policyAllowSeat    = ssrPolicy?.allowSeat    ?? true;
+  const policyAllowMeal    = ssrPolicy?.allowMeal    ?? true;
+  const policyAllowBaggage = ssrPolicy?.allowBaggage ?? true;
+  const seatPriceRange     = ssrPolicy?.seatPriceRange    || { min: 0, max: 99999 };
+  const mealPriceRange     = ssrPolicy?.mealPriceRange    || { min: 0, max: 99999 };
+  const baggagePriceRange  = ssrPolicy?.baggagePriceRange || { min: 0, max: 99999 };
 
   const [seatsFlat, setSeatsFlat] = useState([]);
   const [seatModalOpen, setSeatModalOpen] = useState(true);
@@ -77,14 +92,10 @@ export default function RTSeatSelectionModal({
     );
   }, [ssrData, reduxSSR, segmentIndex, localSegmentIndex]);
 
-  const isWindowSeat = (s) => Number(s.SeatType) === 1;
-  const isAisleSeat = (s) => Number(s.SeatType) === 2;
-  const isMiddleSeat = (s) => Number(s.SeatType) === 3;
+  const isWindowSeat = (s) => [1, 4, 6, 7].includes(Number(s.SeatType));
+  const isAisleSeat = (s) => [2, 10, 12, 13].includes(Number(s.SeatType));
+  const isMiddleSeat = (s) => [3, 16, 18, 19].includes(Number(s.SeatType));
 
-  // Extra Leg Room / Exit Row types
-  const isExtraLegroomSeat = (s) =>
-    s.Text?.toLowerCase().includes("extra leg") ||
-    [6, 12, 18].includes(Number(s.SeatType));
 
   // Flatten seat map
   useEffect(() => {
@@ -99,6 +110,11 @@ export default function RTSeatSelectionModal({
       if (!Array.isArray(row.Seats)) return;
       row.Seats.forEach((s) => {
         if (!s?.Code || s.Code === "NoSeat") return;
+        const isEmergencySeat = (s) => [6, 12, 18].includes(Number(s.SeatType));
+        const isExtraLegroomSeat = (s) =>
+          s.Text?.toLowerCase().includes("extra leg") ||
+          [6, 12, 18, 4, 10, 16].includes(Number(s.SeatType));
+
         flat.push({
           seatNo: s.Code,
           row: Number(s.RowNo || rowIndex + 1),
@@ -109,6 +125,7 @@ export default function RTSeatSelectionModal({
           isAisle: isAisleSeat(s),
           isMiddle: isMiddleSeat(s),
           isExtraLegroom: isExtraLegroomSeat(s),
+          isEmergency: isEmergencySeat(s),
           raw: s,
         });
       });
@@ -158,7 +175,7 @@ export default function RTSeatSelectionModal({
     const rows = new Set();
 
     seatsFlat.forEach((seat) => {
-      if (seat.isExtraLegroom) {
+      if (seat.isEmergency) {
         rows.add(seat.row);
       }
     });
@@ -168,6 +185,20 @@ export default function RTSeatSelectionModal({
 
   // Tab Switcher
   const handleSSR = (type) => {
+    // ── Policy gate ──────────────────────────────────────────
+    if (type === "seat" && !policyAllowSeat) {
+      ToastWithTimer({ type: "error", message: "Seat selection is restricted for your account. Contact Admin." });
+      return;
+    }
+    if (type === "meal" && !policyAllowMeal) {
+      ToastWithTimer({ type: "error", message: "Meal selection is not allowed for your account." });
+      return;
+    }
+    if (type === "baggage" && !policyAllowBaggage) {
+      ToastWithTimer({ type: "error", message: "Baggage selection is restricted for your account. Contact Admin." });
+      return;
+    }
+    // ──────────────────────────────────────────────────────────
     setSeatModalOpen(false);
     setMealModalOpen(false);
     setBaggageModalOpen(false);
@@ -177,16 +208,28 @@ export default function RTSeatSelectionModal({
   };
 
   // Meal/Baggage normalization
-  const normalizedMeals = useMemo(
-    () => normalizeSSRList(segmentSSR.meals),
-    [segmentSSR.meals],
-  );
+  const normalizedMeals = useMemo(() => {
+    const allMeals = segmentSSR.meals || [];
+    const flatMeals = Array.isArray(allMeals[0]) ? allMeals.flat() : allMeals;
+    const filteredMeals = flatMeals.filter(
+      (m) =>
+        !m.AirlineCode ||
+        !m.FlightNumber ||
+        (m.AirlineCode === segment?.fD?.aI?.code &&
+          String(m.FlightNumber).trim() === String(segment?.fD?.fN).trim())
+    );
+    return normalizeSSRList(filteredMeals);
+  }, [segmentSSR.meals, segment]);
 
-  const normalizeBaggage = (list = []) =>
-    list.map((b) => ({
-      ...b,
-      Code: b.Code || `BAG_${b.Weight}`,
-    }));
+  const normalizeBaggage = (list = []) => {
+    const flatList = Array.isArray(list[0]) ? list.flat() : list;
+    return flatList
+      .filter((b) => !b.AirlineCode || !b.FlightNumber || (b.AirlineCode === segment?.fD?.aI?.code && String(b.FlightNumber).trim() === String(segment?.fD?.fN).trim()))
+      .map((b) => ({
+        ...b,
+        Code: b.Code || `BAG_${b.Weight}`,
+      }));
+  };
 
   const normalizedBaggage = useMemo(
     () => normalizeBaggage(segmentSSR.baggage),
@@ -203,6 +246,21 @@ export default function RTSeatSelectionModal({
 
   const tryToggle = (seat) => {
     if (!seat || seat.occupied) return;
+
+    // ── Policy: seat allowed? ────────────────────────────────
+    if (!policyAllowSeat) {
+      ToastWithTimer({ type: "error", message: "Seat selection is restricted for your account." });
+      return;
+    }
+    // ── Policy: price range ──────────────────────────────────
+    if (seat.price < seatPriceRange.min || seat.price > seatPriceRange.max) {
+      ToastWithTimer({
+        type: "error",
+        message: `Selected seat price ₹${seat.price} exceeds your allowed range (₹${seatPriceRange.min}–₹${seatPriceRange.max}).`,
+      });
+      return;
+    }
+    // ────────────────────────────────────────────────────────
     const key = `${journeyType}|${segmentIndex}`;
     const seatObj = selectedSeats[key] || { list: [], priceMap: {} };
     const list = Array.isArray(seatObj.list) ? seatObj.list : [];
@@ -351,14 +409,16 @@ export default function RTSeatSelectionModal({
     const leftAisleIndex = aisleIndexes[0];
     const rightAisleIndex = aisleIndexes[1];
 
+    const isExitRowsGroup = exitRows.has(rowNumber);
+
     return (
       <div
         key={rowNumber}
-        className="flex items-center justify-center"
+        className="flex items-center justify-center relative w-full mb-1"
         style={{ columnGap: "clamp(8px, 1vw, 14px)" }}
       >
         {/* Left row number */}
-        <div className="w-6 text-center text-xs font-semibold text-gray-500">
+        <div className="w-6 text-center text-xs font-semibold text-gray-500 z-10">
           {rowNumber}
         </div>
 
@@ -384,7 +444,7 @@ export default function RTSeatSelectionModal({
         </div>
 
         {/* Right row number */}
-        <div className="w-6 text-center text-xs font-semibold text-gray-500">
+        <div className="w-6 text-center text-xs font-semibold text-gray-500 z-10">
           {rowNumber}
         </div>
       </div>
@@ -462,22 +522,30 @@ export default function RTSeatSelectionModal({
         {/* TABS */}
         <div className="flex items-center justify-center gap-3 bg-blue-50 py-2 border-b border-blue-100">
           {[
-            { key: "seat", label: "Seats", icon: MdEventSeat },
-            { key: "meal", label: "Meals", icon: MdRestaurant },
-            { key: "baggage", label: "Baggage", icon: BsLuggage },
-          ].map(({ key, label, icon: Icon }) => (
+            { key: "seat",    label: "Seats",   icon: MdEventSeat,  allowed: policyAllowSeat },
+            { key: "meal",    label: "Meals",   icon: MdRestaurant, allowed: policyAllowMeal },
+            { key: "baggage", label: "Baggage", icon: BsLuggage,    allowed: policyAllowBaggage },
+          ].map(({ key, label, icon: Icon, allowed }) => (
             <button
               key={key}
               onClick={() => handleSSR(key)}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-medium text-sm transition-all ${
-                (key === "seat" && seatModalOpen) ||
-                (key === "meal" && mealModalOpen) ||
-                (key === "baggage" && baggageModalOpen)
+              title={!allowed ? "Restricted by company policy" : undefined}
+              className={`relative flex items-center gap-2 px-4 py-1.5 rounded-full font-medium text-sm transition-all ${
+                !allowed
+                  ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-70"
+                  : (key === "seat" && seatModalOpen) ||
+                    (key === "meal" && mealModalOpen) ||
+                    (key === "baggage" && baggageModalOpen)
                   ? "bg-blue-600 text-white shadow-sm"
                   : "bg-white text-blue-600 border border-blue-200 hover:bg-blue-100"
               }`}
             >
               <Icon className="text-base" /> {label}
+              {!allowed && (
+                <span className="absolute -top-2.5 -right-1.5 text-[8px] font-black bg-red-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+                  Locked
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -547,24 +615,34 @@ export default function RTSeatSelectionModal({
                         const isExit = exitRows.has(rowNum);
 
                         return (
-                          <React.Fragment key={rowNum}>
-                            {/* Extra gap before exit/extra legroom row */}
-                            {/* {isExit && (
-                              <div
-                                className="w-full"
-                                style={{ height: "clamp(36px, 5vh, 60px)" }}
-                              />
-                            )} */}
+                            <React.Fragment key={rowNum}>
+                              {isExit && (
+                                <div className="w-full relative flex items-center justify-center mt-3 mb-3 z-0" style={{ height: "24px" }}>
+                                  {/* Left external glow & arrow box */}
+                                  <div className="absolute -left-[24px] flex items-center z-10">
+                                      <div className="w-8 h-12 bg-orange-400 blur-xl opacity-40 absolute -left-4 pointer-events-none"></div>
+                                      <div className="w-3.5 h-4 bg-red-600 rounded-[2px] flex items-center justify-center shadow-md">
+                                          <span className="text-white text-[9px] font-bold leading-none">{"<"}</span>
+                                      </div>
+                                  </div>
 
-                            {renderSeatRow(rowNum)}
+                                  {/* Center badge */}
+                                  <div className="bg-red-600 text-white text-[10px] font-semibold px-3 py-0.5 rounded-[3px] shadow-sm z-10 border border-red-700">
+                                      Emergency Door
+                                  </div>
 
-                            {/* Extra gap after exit/extra legroom row */}
-                            {/* {isExit && (
-                              <div
-                                style={{ height: "clamp(28px, 4.2vh, 50px)" }}
-                              />
-                            )} */}
-                          </React.Fragment>
+                                  {/* Right external glow & arrow box */}
+                                  <div className="absolute -right-[24px] flex items-center justify-end z-10">
+                                      <div className="w-8 h-12 bg-orange-400 blur-xl opacity-40 absolute -right-4 pointer-events-none"></div>
+                                      <div className="w-3.5 h-4 bg-red-600 rounded-[2px] flex items-center justify-center shadow-md">
+                                          <span className="text-white text-[9px] font-bold leading-none">{">"}</span>
+                                      </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {renderSeatRow(rowNum)}
+                            </React.Fragment>
                         );
                       })}
                   </div>

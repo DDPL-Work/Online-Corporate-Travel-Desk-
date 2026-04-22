@@ -19,6 +19,7 @@ import UserManagement from "../components/TravelAdminTabs/UserManagement";
 import TravelAdminProfile from "../components/TravelAdminTabs/TravelAdminProfile";
 import CreditUtilizationPostpaid from "../components/TravelAdminTabs/CreditUtilizationPostpaid";
 import CorporateWallet from "../components/TravelAdminTabs/CorporateWalletStatusPrepaid";
+import BrandingSettings from "../components/TravelAdminTabs/BrandingSettings";
 
 // Employee
 import MyBookings from "../components/EmployeeDashboard/MyBookings";
@@ -38,6 +39,7 @@ import RoundTripFlightBooking from "../Pages/Booking-Flow/Flight-Booking/RoundTr
 import BookApprovedFlight from "../Pages/Booking-Flow/Flight-Booking/BookApprovedFlight";
 import BookingDetails from "../components/EmployeeDashboard/BookingDetails";
 import MultiCityFlightBooking from "../Pages/Booking-Flow/Flight-Booking/MultiWayFlightBooking";
+import FareUpsellPage from "../Pages/search-results/Flight-results/FareUpsellPage";
 import HotelSearchResults from "../Pages/search-results/Hotel-results/Hotel-Search-Results";
 import HotelDetailsPage from "../Pages/Booking-Flow/Hotel-Booking/HoteldetailsPage";
 import LandingPage from "../Pages/Auth/Landign";
@@ -65,6 +67,8 @@ import CancelledBookingsForManager from "../components/CorporateManagerTabs/Canc
 import UpcomingTripsForManager from "../components/CorporateManagerTabs/UpcomingTrips";
 import EmployeeManagement from "../components/TravelAdminTabs/EmployeeManagement";
 import MidSizeBusiness from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
+import InternalTravelDeskLanding from "../Pages/Landing/CompanySpecific/InternalTravelDeskLanding";
+import SsrManagement from "../components/TravelAdminTabs/SsrManagement";
 import ApprovalWorkflow from "../Pages/Landing/Platform/ApprovalWorkflow";
 // import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 
@@ -117,29 +121,75 @@ export const appRouter = createBrowserRouter([
                 element: <TravelAdminProfile />,
               },
               { path: "/corporate-wallet", element: <CorporateWallet /> },
-              {
-                path: "/credit-utilization",
-                element: <CreditUtilizationPostpaid />,
-              },
+              { path: "/credit-utilization", element: <CreditUtilizationPostpaid /> },
+              { path: "/ssr-management", element: <SsrManagement /> },
+              { path: "/branding-settings", element: <BrandingSettings /> },
             ],
           },
         ],
       },
 
-      // EMPLOYEE PROTECTED ROUTES
+      // CORPORATE MANAGER PROTECTED ROUTES
       {
-        element: <ProtectedRoute allowedRoles={["employee"]} />,
+        element: <ProtectedRoute allowedRoles={["manager"]} />,
+        children: [
+          {
+            path: "/",
+            element: <Layout />,
+            children: [
+              {
+                path: "/manager/total-bookings",
+                element: <BookingsDashboardForManager />,
+              },
+              {
+                path: "/manager/total-cancelled-bookings",
+                element: <CancelledBookingsForManager />,
+              },
+              {
+                path: "/manager/pending-requests",
+                element: <PendingTravelRequestsForManager />,
+              },
+              {
+                path: "/manager/approved-requests",
+                element: <ApprovedTravelRequestsForManager />,
+              },
+              {
+                path: "/manager/rejected-requests",
+                element: <RejectedTravelRequestsForManager />,
+              },
+              {
+                path: "/manager/upcoming-trips",
+                element: <UpcomingTripsForManager />,
+              },
+              { path: "/manager/past-trips", element: <PastTripsForManager /> },
+              { path: "/manager/team-management", element: <MyTeam /> },
+            ],
+          },
+        ],
+      },
+
+      // SHARED CORPORATE ROUTES (Admin, Manager, Employee)
+      {
+        element: (
+          <ProtectedRoute
+            allowedRoles={["travel-admin", "manager", "employee"]}
+          />
+        ),
         children: [
           {
             path: "/",
             element: <Layout />,
             children: [
               { path: "/my-bookings", element: <MyBookings /> },
+              { path: "/my-bookings/:id", element: <BookingDetails /> },
+              {
+                path: "/my-hotel-booking/:id",
+                element: <HotelBookingDetails />,
+              },
               {
                 path: "/my-cancelled-bookings",
                 element: <CancelledFlightsPage />,
               },
-              { path: "/my-bookings/:id", element: <BookingDetails /> },
               { path: "/my-upcoming-trips", element: <MyUpcomingTrips /> },
               { path: "/my-past-trips", element: <MyPastTrips /> },
               {
@@ -153,48 +203,15 @@ export const appRouter = createBrowserRouter([
               { path: "/my-profile", element: <MyProfile /> },
               { path: "/travel-documents", element: <TravelDocuments /> },
               { path: "/bookings/:id/book", element: <BookApprovedFlight /> },
-              {
-                path: "/my-hotel-booking/:id",
-                element: <HotelBookingDetails />,
-              },
+              { path: "/update-profile", element: <ProfileSettings /> },
+              { path: "/search-flight", element: <FlightSearch /> },
+              { path: "/search-hotel", element: <HotelSearchPage /> },
             ],
           },
         ],
       },
 
-      // CORPORATE MANAGER ROUTES
-      {
-        element: <ProtectedRoute allowedRoles={["manager"]} />,
-        children: [
-          {
-            path: "/",
-            element: <Layout />,
-            children: [
-              { path: "/manager/update-profile", element: <ProfileSettings /> },
-              { path: "/manager/total-bookings", element: <BookingsDashboardForManager /> },
-              {
-                path: "/manager/total-cancelled-bookings",
-                element: <CancelledBookingsForManager />,
-              },
-              { path: "/manager/pending-requests", element: <PendingTravelRequestsForManager /> },
-              {
-                path: "/manager/approved-requests",
-                element: <ApprovedTravelRequestsForManager />,
-              },
-              {
-                path: "/manager/rejected-requests",
-                element: <RejectedTravelRequestsForManager />,
-              },
-              { path: "/manager/upcoming-trips", element: <UpcomingTripsForManager /> },
-              { path: "/manager/past-trips", element: <PastTripsForManager /> },
-              { path: "/manager/team-management", element: <MyTeam /> },
-            ],
-          },
-        ],
-      },
-
-      // SHARED ROUTES
-      { path: "/search-flight", element: <FlightSearch /> },
+      // SHARED SEARCH & BOOKING RESULTS
       { path: "/search-flight-results", element: <FlightSearchResults /> },
       { path: "/one-way-flight/booking", element: <OneFlightBooking /> },
       {
@@ -205,7 +222,7 @@ export const appRouter = createBrowserRouter([
         path: "/multi-city-flight/booking",
         element: <MultiCityFlightBooking />,
       },
-      { path: "/search-hotel", element: <HotelSearchPage /> },
+      { path: "/fare-upsell", element: <FareUpsellPage /> },
       { path: "/search-hotel-results", element: <HotelSearchResults /> },
       { path: "/one-hotel-details", element: <HotelDetailsPage /> },
       { path: "/hotel-review-booking", element: <HotelReviewBooking /> },
@@ -220,6 +237,10 @@ export const appRouter = createBrowserRouter([
       { path: "/platform/flight-booking-info", element: <FlightBookingInfo /> },
       { path: "/platform/hotel-booking-info", element: <HotelBookingInfo /> },
       { path: "/platform/approval-and-workflow", element: <ApprovalWorkflow /> },
+
+
+
+      { path: "/travel", element: <InternalTravelDeskLanding /> },
       {
         path: "*",
         element: <FlightBookingInfo />,

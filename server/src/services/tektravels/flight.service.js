@@ -356,14 +356,13 @@ class FlightService {
     const cfg = config[env];
     const token = await this.getToken(env);
 
-    // const cabinMap = { economy: 2, business: 4, first: 6 };
     const cabinMap = {
       all: 1,
       economy: 2,
-      "premium economy": 3,
+      premium_economy: 3,
       business: 4,
-      "premium business": 5,
-      first: 6,
+      premium_business: 5,
+      first_class: 6,
     };
 
     const resolveCabinClass = (value) => {
@@ -455,6 +454,9 @@ class FlightService {
       clientId: cfg.credentials?.clientId,
       endUserIp: cfg.endUserIp,
       journeyType: params.journeyType,
+    });
+    logger.info("TBO FLIGHT SEARCH PAYLOAD", {
+      payload
     });
 
     const doSearch = async () =>
@@ -580,7 +582,7 @@ class FlightService {
   }
 
   /* ---------------- BOOK (NON-LCC) ---------------- */
-  async bookFlight({ traceId, resultIndex, result, passengers, ssr }) {
+  async bookFlight({ traceId, resultIndex, result, passengers, ssr, gstDetails }) {
     if (!result) {
       throw new ApiError(400, "Selected flight result is required");
     }
@@ -651,6 +653,14 @@ class FlightService {
               Seat: ssr.seats || [],
             }
           : null,
+      ...(gstDetails?.gstin && {
+        GSTCompanyInformation: {
+          GSTNumber: gstDetails.gstin || "",
+          GSTCompanyName: gstDetails.legalName || "NA",
+          GSTCompanyAddress: gstDetails.address || "NA",
+          GSTCompanyEmail: gstDetails.gstEmail || passengers[0]?.email || "info@domain.com"
+        }
+      }),
     };
 
     logger.info("TBO BOOK PAYLOAD", JSON.stringify(payload, null, 2));
@@ -728,6 +738,7 @@ class FlightService {
     result,
     ssr,
     isLCC,
+    gstDetails,
   }) {
     const env = this.getEnv();
 
@@ -838,6 +849,14 @@ class FlightService {
             .filter((b) => b.travelerIndex === pIndex)
             .map(({ travelerIndex, ...rest }) => rest),
         })),
+        ...(gstDetails?.gstin && {
+          GSTCompanyInformation: {
+            GSTNumber: gstDetails.gstin || "",
+            GSTCompanyName: gstDetails.legalName || "NA",
+            GSTCompanyAddress: gstDetails.address || "NA",
+            GSTCompanyEmail: gstDetails.gstEmail || passengers[0]?.email || "info@domain.com"
+          }
+        }),
       };
     } else {
       /* ================= NON-LCC ================= */

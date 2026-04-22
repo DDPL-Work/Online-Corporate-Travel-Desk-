@@ -1,6 +1,7 @@
 // server/src/models/SuperAdmin.model.js
 
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
 const SuperAdminSchema = new mongoose.Schema(
   {
@@ -12,6 +13,22 @@ const SuperAdminSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Hash password before saving
+SuperAdminSchema.pre("save", function () {
+  if (!this.isModified("password")) return Promise.resolve();
+
+  return bcrypt.genSalt(12)
+    .then(salt => bcrypt.hash(this.password, salt))
+    .then(hash => {
+      this.password = hash;
+    });
+});
+
+// Compare password method
+SuperAdminSchema.methods.comparePassword = async function (candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
 
 SuperAdminSchema.index({ email: 1 }, { unique: true });
 

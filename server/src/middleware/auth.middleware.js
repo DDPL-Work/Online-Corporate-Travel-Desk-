@@ -50,6 +50,32 @@ exports.verifyToken = async (req, res, next) => {
       return next(); // ✅ IMPORTANT: STOP HERE
     }
 
+    // ✅ ✅ HANDLE OPS MEMBER
+    if (decoded.role === "ops-member") {
+      const OpsMember = require("../models/OpsMember");
+      account = await OpsMember.findById(decoded.id);
+
+      if (!account || account.status !== "Active" || account.isDeleted) {
+        return res.status(401).json({
+          success: false,
+          message: "OPS Member not found, inactive, or suspended",
+        });
+      }
+
+      req.user = {
+        _id: account._id,
+        id: account._id.toString(),
+        role: "ops-member",
+        specificRole: account.role,
+        department: account.department,
+        permissions: account.permissions,
+        email: account.email,
+        name: account.name,
+      };
+
+      return next();
+    }
+
     // ✅ ✅ NORMAL USER FLOW (Travel Admin / Employee)
     const user = await User.findById(decoded.id);
 
@@ -66,6 +92,7 @@ exports.verifyToken = async (req, res, next) => {
       role: user.role,
       roles: [user.role],
       corporateId: user.corporateId ? user.corporateId.toString() : null,
+      managerRequestStatus: user.managerRequestStatus || "none",
       email: user.email,
       name: user.name,
     };

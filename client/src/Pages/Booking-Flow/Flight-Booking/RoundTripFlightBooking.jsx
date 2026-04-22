@@ -16,7 +16,7 @@ import {
   parseRoundTripBooking,
   TravelerForm,
 } from "./CommonComponents";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import {
   getRTFareQuote,
   getRTFareRule,
@@ -24,6 +24,7 @@ import {
 } from "../../../Redux/Actions/flight.thunks.RT";
 import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { mapSSRData } from "../../../utils/parseReturnFlight";
@@ -32,45 +33,6 @@ import api from "../../../API/axios";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
 
-// ✅ NORMALIZE FULL FARE RULE API RESPONSE (FareRule API)
-const normalizeFareRules = (fareRule) => {
-  // TBO sometimes returns {Response:{FareRules:[...]}} and sometimes flat {FareRules:[...]}
-  const list =
-    fareRule?.Response?.FareRules ||
-    fareRule?.FareRules ||
-    fareRule?.data?.Response?.FareRules ||
-    [];
-
-  if (!Array.isArray(list) || list.length === 0) return null;
-
-  const hasCategory = list.some((r) => r?.Category);
-
-  const cancellation = hasCategory
-    ? list.filter((r) => r.Category === "CANCELLATION")
-    : [];
-  const dateChange = hasCategory
-    ? list.filter((r) => r.Category === "DATECHANGE")
-    : [];
-  const baggage = hasCategory
-    ? list.filter((r) => r.Category === "BAGGAGE")
-    : [];
-
-  // For responses without Category (common in intl round-trip), fall back to FareRuleDetail strings
-  let important = hasCategory
-    ? list.filter((r) => r.Category === "IMPORTANT")
-    : [];
-
-  if (important.length === 0) {
-    const details = list
-      .map((r) => r?.FareRuleDetail)
-      .filter((x) => typeof x === "string" && x.trim().length > 0);
-    if (details.length > 0) {
-      important = details;
-    }
-  }
-
-  return { cancellation, dateChange, baggage, important };
-};
 
 export default function RoundTripFlightBooking() {
   const location = useLocation();
@@ -115,7 +77,7 @@ export default function RoundTripFlightBooking() {
     firstName: "",
     middleName: "",
     lastName: "",
-    gender: "",
+    gender: "MALE",
     age: "",
     email: "",
     phoneWithCode: "",
@@ -158,6 +120,7 @@ export default function RoundTripFlightBooking() {
     gstin: "",
     legalName: "",
     address: "",
+    gstEmail: "",
   });
  const { actionLoading } = useSelector((state) => state.bookings);
   const fareQuote = useSelector((state) => state.flightsRT.fareQuoteRT);
@@ -171,6 +134,9 @@ export default function RoundTripFlightBooking() {
     loading: approverLoading,
     error: approverError,
   } = useSelector((state) => state.employee);
+
+  const { myPolicy } = useSelector((state) => state.ssrPolicy);
+  const approvalRequired = myPolicy?.approvalRequired !== false;
 
   const traceId = location.state?.traceId || reduxTraceId || null;
 
@@ -250,6 +216,7 @@ export default function RoundTripFlightBooking() {
             gstin: data.data.gstin || "",
             legalName: data.data.legalName || "",
             address: data.data.address || "",
+            gstEmail: data.data.gstEmail || "",
           }));
         }
       } catch (err) {
@@ -1159,11 +1126,11 @@ export default function RoundTripFlightBooking() {
         phoneWithCode: t.phoneWithCode, // ✅ THIS WAS MISSING
 
         gender: t.gender,
-        dateOfBirth: t.dob,
+        dateOfBirth: t.dob || undefined,
 
         passportNumber: t.passportNumber,
-        PassportIssueDate: t.PassportIssueDate,
-        passportExpiry: t.passportExpiry,
+        PassportIssueDate: t.PassportIssueDate || undefined,
+        passportExpiry: t.passportExpiry || undefined,
         nationality: t.nationality,
 
         paxType: (t.type || "ADULT").toUpperCase(),
@@ -1244,7 +1211,7 @@ export default function RoundTripFlightBooking() {
       if (!t.lastName?.trim()) e.lastName = "Last name is required";
       if (!t.gender?.trim()) e.gender = "Gender is required";
       if (idx === 0 && !t.email?.trim()) e.email = "Email is required";
-      if (!t.dob?.trim()) e.dob = "Date of birth is required";
+
       if (idx === 0 && !t.phoneWithCode?.trim())
         e.phoneWithCode = "Phone number is required";
       if (!t.nationality?.trim()) e.nationality = "Nationality is required";
@@ -1313,7 +1280,7 @@ export default function RoundTripFlightBooking() {
       return;
     }
 
-    if (!projectApproverData.project || !projectApproverData.approver) {
+    if (approvalRequired && (!projectApproverData.project || !projectApproverData.approver)) {
       ToastWithTimer({
         type: "error",
         message: "Please select a project and approver",
@@ -1330,17 +1297,27 @@ export default function RoundTripFlightBooking() {
       return;
     }
 
+    if (!gstDetails?.gstin?.trim() || !gstDetails?.legalName?.trim() || !gstDetails?.address?.trim()) {
+      ToastWithTimer({
+        type: "error",
+        message: "Please fill all GST details",
+      });
+      return;
+    }
+
     try {
       const payload = buildBookingRequestPayload();
-      await dispatch(
-        selectManager({
-          approverId: projectApproverData.approver?.id,
-          approverEmail: projectApproverData.approver?.email,
-          projectCodeId: projectApproverData.project?.id,
-          projectName: projectApproverData.project?.name,
-          projectClient: projectApproverData.project?.client,
-        }),
-      ).unwrap();
+      if (approvalRequired) {
+        await dispatch(
+          selectManager({
+            approverId: projectApproverData.approver?.id,
+            approverEmail: projectApproverData.approver?.email,
+            projectCodeId: projectApproverData.project?.id,
+            projectName: projectApproverData.project?.name,
+            projectClient: projectApproverData.project?.client,
+          }),
+        ).unwrap();
+      }
 
       await dispatch(createBookingRequest(payload)).unwrap();
 
@@ -1371,7 +1348,7 @@ export default function RoundTripFlightBooking() {
   // Readiness check for submit button (must stay before any early returns)
   const isFormReady = useMemo(() => {
     if (!purposeOfTravel?.trim()) return false;
-    if (!projectApproverData.project || !projectApproverData.approver) return false;
+    if (approvalRequired && (!projectApproverData.project || !projectApproverData.approver)) return false;
     if (infantCount > adultCount) return false;
 
     const isIntl = Boolean(
@@ -1389,7 +1366,7 @@ export default function RoundTripFlightBooking() {
       if (!t.gender) return false;
       if (!t.email?.trim()) return false;
       if (!t.phoneWithCode?.trim()) return false;
-      if (!t.dob) return false;
+
 
       if (t.type === "INFANT") {
         if (
@@ -1404,6 +1381,8 @@ export default function RoundTripFlightBooking() {
       if (isIntl && !t.passportNumber?.trim()) return false;
     }
 
+    if (!gstDetails?.gstin?.trim() || !gstDetails?.legalName?.trim() || !gstDetails?.address?.trim()) return false;
+
     return true;
   }, [
     purposeOfTravel,
@@ -1412,6 +1391,7 @@ export default function RoundTripFlightBooking() {
     adultCount,
     travelers,
     parsedFlightData,
+    gstDetails,
   ]);
 
   if (loading) {
@@ -1456,8 +1436,8 @@ export default function RoundTripFlightBooking() {
 
   // Readiness check for submit button
   return (
-    <div className="min-h-screen bg-slate-50 font-[DM Sans]">
-      <EmployeeHeader />
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <CorporateNavbar />
       <RTSeatSelectionModal
         isOpen={showSeatModal.show}
         onClose={closeSeatModal}
@@ -1507,9 +1487,6 @@ export default function RoundTripFlightBooking() {
                     <h2 className="text-xl font-bold text-slate-900">
                       Round Trip Flight Details
                     </h2>
-                    <p className="text-sm text-slate-600">
-                      Complete journey information
-                    </p>
                   </div>
                 </div>
 
@@ -1519,10 +1496,12 @@ export default function RoundTripFlightBooking() {
                     label="Onward Journey"
                     value={
                       <>
-                        <div className="font-semibold">
-                          {onwardRoute?.from} → {onwardRoute?.to}
+                        <div className="font-semibold space-y-1">
+                          <div>
+                            {onwardRoute?.from} → {onwardRoute?.to}
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-500 mt-1">
                           {formatDateTime(onwardRoute?.dateTime)}
                         </div>
                       </>
@@ -1534,10 +1513,12 @@ export default function RoundTripFlightBooking() {
                     label="Return Journey"
                     value={
                       <>
-                        <div className="font-semibold">
-                          {returnRoute?.from} → {returnRoute?.to}
+                        <div className="font-semibold space-y-1">
+                          <div>
+                            {returnRoute?.from} → {returnRoute?.to}
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-500 mt-1">
                           {formatDateTime(returnRoute?.dateTime)}
                         </div>
                       </>
@@ -1744,7 +1725,6 @@ export default function RoundTripFlightBooking() {
                 <FareDetailsModal
                   fareQuote={fareQuote}
                   fareRule={fareRule}
-                  normalizeFareRules={normalizeFareRules}
                 />
               </div>
             </div>

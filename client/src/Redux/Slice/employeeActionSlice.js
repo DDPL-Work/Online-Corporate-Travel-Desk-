@@ -149,6 +149,21 @@ export const demoteEmployee = createAsyncThunk(
   },
 );
 
+// 🔹 Get available managers for approver selection
+export const fetchManagers = createAsyncThunk(
+  "employee/fetchManagers",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.get("/employees/managers");
+      return res.data.managers;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to load managers",
+      );
+    }
+  },
+);
+
 // ===============================
 // SLICE
 // ===============================
@@ -158,6 +173,7 @@ const employeeActionSlice = createSlice({
     myProfile: null,
     employees: [],
     selectedEmployee: null,
+    managers: [],
     loading: false,
     error: null,
     updating: false,
@@ -262,6 +278,12 @@ const employeeActionSlice = createSlice({
             ? { ...emp, role: action.payload.role }
             : emp,
         );
+      })
+      // -------------------------
+      // FETCH MANAGERS
+      // -------------------------
+      .addCase(fetchManagers.fulfilled, (state, action) => {
+        state.managers = action.payload;
       });
   },
 });

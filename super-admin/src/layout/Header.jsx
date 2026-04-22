@@ -18,9 +18,9 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
   const { user, role } = useSelector((state) => state.auth);
 
   // ✅ SAFE USER DATA
-  const firstName = user?.name?.firstName || "";
-  const lastName = user?.name?.lastName || "";
-  const fullName = firstName || lastName ? `${firstName} ${lastName}` : "User";
+  const fullName = typeof user?.name === "string" 
+    ? user.name 
+    : (user?.name?.firstName || user?.name?.lastName ? `${user?.name?.firstName || ""} ${user?.name?.lastName || ""}` : "User");
 
   const email = user?.email || "-";
   const userRole = role || "user";
@@ -51,6 +51,8 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
     switch (userRole) {
       case "super-admin":
         return "Super Admin Dashboard";
+      case "ops-member":
+        return "OPS Team Dashboard";
       case "travel-admin":
         return "Travel Admin Dashboard";
       case "employee":
@@ -66,22 +68,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
   };
 
   const handleProfileNavigation = () => {
-    switch (userRole) {
-      case "travel-admin":
-        navigate("/travel-profile-settings");
-        break;
-
-      case "employee":
-        navigate("/employee-profile-settings");
-        break;
-
-      case "super-admin":
-        navigate("/super-admin-profile-settings");
-        break;
-
-      default:
-        navigate("/login");
-    }
+    navigate("/profile");
   };
 
   return (

@@ -15,7 +15,7 @@ import {
   CTABox,
   TravelerForm,
 } from "./CommonComponents";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import { useDispatch, useSelector } from "react-redux";
 import {
   getFareQuote,
@@ -24,6 +24,7 @@ import {
 } from "../../../Redux/Actions/flight.thunks";
 import SeatSelectionModal from "./SSR/SeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { FareDetailsModal } from "./FareDetailsModal";
@@ -33,27 +34,16 @@ import api from "../../../API/axios";
 import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
 import Swal from "sweetalert2";
 
-const normalizeFareRules = (fareRule) => {
-  const rules = fareRule?.Response?.FareRules;
-  if (!rules || !rules.length) return null;
 
-  return {
-    cancellation: rules.filter((r) => r.Category === "CANCELLATION"),
-    dateChange: rules.filter((r) => r.Category === "DATECHANGE"),
-    baggage: rules.filter((r) => r.Category === "BAGGAGE"),
-
-    // ✅ IMPORTANT FIX
-    important: rules.map((r) => r.FareRuleDetail).filter(Boolean),
-
-    // ✅ ADD THIS (fallback support)
-    raw: rules,
-  };
-};
 
 export default function OneFlightBooking() {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
+  useEffect(() => {
+  console.log("Navigation State:", location.state);
+}, [location.state]);
 
   const { traceId, fareQuote, fareRule, ssr } = useSelector(
     (state) => state.flights,
@@ -67,6 +57,9 @@ export default function OneFlightBooking() {
     loading: approverLoading,
     error: approverError,
   } = useSelector((state) => state.employee);
+
+  const { myPolicy } = useSelector((state) => state.ssrPolicy);
+  const approvalRequired = myPolicy?.approvalRequired !== false; // default true
 
   const isSSRError = ssr?.Response?.ResponseStatus === 2;
 
@@ -105,6 +98,7 @@ export default function OneFlightBooking() {
     gstin: "",
     legalName: "",
     address: "",
+    gstEmail: "",
   });
   const [projectApproverData, setProjectApproverData] = useState({
     project: null,
@@ -118,7 +112,7 @@ export default function OneFlightBooking() {
     firstName: "",
     middleName: "",
     lastName: "",
-    gender: "",
+    gender: "MALE",
     age: "",
     email: "",
     phoneWithCode: "",
@@ -221,6 +215,7 @@ export default function OneFlightBooking() {
   useEffect(() => {
     if (user?.role === "employee") {
       dispatch(getMyTravelAdmin());
+      dispatch(fetchMySSRPolicy());
     }
   }, [dispatch, user]);
 
@@ -234,6 +229,7 @@ export default function OneFlightBooking() {
             gstin: data.data.gstin || "",
             legalName: data.data.legalName || "",
             address: data.data.address || "",
+            gstEmail: data.data.gstEmail || "",
           }));
         }
       } catch (err) {
@@ -244,18 +240,24 @@ export default function OneFlightBooking() {
   }, []);
 
   useEffect(() => {
-    if (!traceId || !selectedFlight?.ResultIndex) return;
+    const resultIndex = selectedFlight?.ResultIndex;
+    const tId = searchParams?.traceId || traceId;
+
+    console.log("FareQuote Trigger Check:", { resultIndex, tId });
+
+    if (!tId || !resultIndex) return;
 
     dispatch(
       getFareQuote({
-        traceId: searchParams.traceId, // ✅ REDUX traceId
-        resultIndex: selectedFlight.ResultIndex,
+        traceId: tId,
+        resultIndex,
       }),
     );
   }, [
     dispatch,
-    traceId, // ✅ CRITICAL
-    selectedFlight?.ResultIndex,
+    searchParams?.traceId, // ✅ IMPORTANT
+    traceId,
+    selectedFlight, // ✅ FULL OBJECT (NOT nested field)
   ]);
 
   useEffect(() => {
@@ -265,14 +267,14 @@ export default function OneFlightBooking() {
 
     dispatch(
       getFareRule({
-        traceId: searchParams.traceId,
+        traceId: searchParams.traceId || traceId,
         resultIndex: quoteResult.ResultIndex, // 🔑 USE THIS
       }),
     );
 
     dispatch(
       getSSR({
-        traceId: searchParams.traceId,
+        traceId: searchParams.traceId || traceId,
         resultIndex: quoteResult.ResultIndex,
       }),
     );
@@ -695,11 +697,11 @@ export default function OneFlightBooking() {
         phoneWithCode: t.phoneWithCode, // ✅ THIS WAS MISSING
 
         gender: t.gender,
-        dateOfBirth: t.dob,
+        dateOfBirth: t.dob || undefined,
 
         passportNumber: t.passportNumber,
-        PassportIssueDate: t.PassportIssueDate,
-        passportExpiry: t.passportExpiry,
+        PassportIssueDate: t.PassportIssueDate || undefined,
+        passportExpiry: t.passportExpiry || undefined,
         nationality: t.nationality,
 
         paxType: (t.type || "ADULT").toUpperCase(),
@@ -740,7 +742,7 @@ export default function OneFlightBooking() {
       if (!t.lastName?.trim()) e.lastName = "Last name is required";
       if (!t.gender?.trim()) e.gender = "Gender is required";
       if (idx === 0 && !t.email?.trim()) e.email = "Email is required";
-      if (!t.dob?.trim()) e.dob = "Date of birth is required";
+
       if (idx === 0 && !t.phoneWithCode?.trim())
         e.phoneWithCode = "Phone number is required";
       if (!t.nationality?.trim()) e.nationality = "Nationality is required";
@@ -822,7 +824,7 @@ export default function OneFlightBooking() {
       return;
     }
 
-    if (!projectApproverData.project || !projectApproverData.approver) {
+    if (approvalRequired && (!projectApproverData.project || !projectApproverData.approver)) {
       ToastWithTimer({
         type: "error",
         message: "Please select a project and approver",
@@ -839,17 +841,31 @@ export default function OneFlightBooking() {
       return;
     }
 
+    if (
+      !gstDetails?.gstin?.trim() ||
+      !gstDetails?.legalName?.trim() ||
+      !gstDetails?.address?.trim()
+    ) {
+      ToastWithTimer({
+        type: "error",
+        message: "Please fill all GST details",
+      });
+      return;
+    }
+
     try {
       const payload = buildBookingRequestPayload();
-      await dispatch(
-        selectManager({
-          approverId: projectApproverData.approver?.id,
-          approverEmail: projectApproverData.approver?.email,
-          projectCodeId: projectApproverData.project?.id,
-          projectName: projectApproverData.project?.name,
-          projectClient: projectApproverData.project?.client,
-        }),
-      ).unwrap();
+      if (approvalRequired) {
+        await dispatch(
+          selectManager({
+            approverId: projectApproverData.approver?.id,
+            approverEmail: projectApproverData.approver?.email,
+            projectCodeId: projectApproverData.project?.id,
+            projectName: projectApproverData.project?.name,
+            projectClient: projectApproverData.project?.client,
+          }),
+        ).unwrap();
+      }
 
       await dispatch(createBookingRequest(payload)).unwrap();
 
@@ -868,7 +884,7 @@ export default function OneFlightBooking() {
   // Lightweight readiness check to control submit disable state
   const isFormReady = useMemo(() => {
     if (!purposeOfTravel?.trim()) return false;
-    if (!projectApproverData.project || !projectApproverData.approver)
+    if (approvalRequired && (!projectApproverData.project || !projectApproverData.approver))
       return false;
     if (infantCount > adultCount) return false;
 
@@ -887,7 +903,6 @@ export default function OneFlightBooking() {
       if (!t.gender) return false;
       if (!t.email?.trim()) return false;
       if (!t.phoneWithCode?.trim()) return false;
-      if (!t.dob) return false;
 
       if (t.type === "INFANT") {
         if (
@@ -902,6 +917,13 @@ export default function OneFlightBooking() {
       if (isIntl && !t.passportNumber?.trim()) return false;
     }
 
+    if (
+      !gstDetails?.gstin?.trim() ||
+      !gstDetails?.legalName?.trim() ||
+      !gstDetails?.address?.trim()
+    )
+      return false;
+
     return true;
   }, [
     purposeOfTravel,
@@ -910,6 +932,7 @@ export default function OneFlightBooking() {
     adultCount,
     travelers,
     parsedFlightData,
+    gstDetails,
   ]);
 
   if (loading) {
@@ -956,8 +979,8 @@ export default function OneFlightBooking() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 font-[DM Sans]">
-      <EmployeeHeader />
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <CorporateNavbar />
 
       {/* Top Bar */}
       <div className="bg-white border-b border-slate-200">
@@ -982,16 +1005,21 @@ export default function OneFlightBooking() {
               <div className="p-6 bg-linear-to-br from-blue-50 to-blue-100 shadow-lg">
                 <div className="flex justify-between items-start mb-5">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900">
+                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3">
                       Flight Details
+                      <span className="px-3 py-1 text-xs font-bold rounded-full bg-blue-100 text-blue-800 uppercase tracking-wide">
+                        {tripType}
+                      </span>
                     </h2>
-                    <p className="text-sm text-slate-600">
-                      Review your journey information
-                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-slate-200 text-slate-700 uppercase tracking-widest border border-slate-300">
+                        Class: {CABIN_MAP[selectedFlight?.Segments?.[0]?.[0]?.CabinClass] || "Economy"}
+                      </span>
+                      <span className="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-emerald-100 text-emerald-800 uppercase tracking-widest border border-emerald-200">
+                        Fare: {selectedFlight?.Segments?.[0]?.[0]?.SupplierFareClass || "Standard"}
+                      </span>
+                    </div>
                   </div>
-                  <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-600 text-white">
-                    {tripType.toUpperCase()}
-                  </span>
                 </div>
 
                 <div className="grid sm:grid-cols-3 gap-4">
@@ -1114,7 +1142,6 @@ export default function OneFlightBooking() {
                 <FareDetailsModal
                   fareQuote={fareQuote}
                   fareRule={fareRule}
-                  normalizeFareRules={normalizeFareRules}
                 />
               </div>
             </div>

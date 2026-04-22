@@ -27,6 +27,9 @@ const hotelAmendment = require("./hotelAmendment.routes");
 const gestRoutes = require("./gst.routes");
 const hotelBooking = require('./hotelBooking.routes');
 const project = require('./project.routes');
+const opsRoutes = require("./ops.routes");
+const ssrPolicyRoutes = require("./ssrPolicy.routes");
+const landingPageRoutes = require("./landingPage.routes");
 
 // ------------------ ✅ IMPORTANT FIX ------------------
 // ✅ SSO MUST BE MOUNTED BEFORE /auth (to avoid JWT blocking)
@@ -59,7 +62,11 @@ router.use("/postpaid", postPaidCorporate);
 router.use("/flights/amendments", flightAmendment);
 router.use("/hotels/amendments", hotelAmendment);
 router.use("/onboarding/gst", gestRoutes);
-router.use("/hotel-booking", hotelBooking)
+router.use("/hotel-booking", hotelBooking);
+router.use("/ops", opsRoutes);
+router.use("/ssr-policies", ssrPolicyRoutes);
+
+router.use("/landing-page", landingPageRoutes);
 
 // ------------------ API Info ------------------
 router.get("/", (req, res) => {
@@ -82,6 +89,7 @@ router.get("/", (req, res) => {
 
       
       superAdmin: "/api/v1/super-admin",
+      corporateRelatedRoutes: "/api/v1/corporate-related",
       employees: "/api/v1/employees",
       corporateAdmin: "/api/v1/corporate-admin",    
       travelAdmin: "api/v1/travel-admin",
@@ -98,6 +106,8 @@ router.get("/", (req, res) => {
       hotelAmendment: "api/v1/hotels/amendments",
 
       gestRoutes: "api/v1/onboarding/gst",
+
+      landingPageRoutes: "api/v1/landing-page",
     },
   });
 });

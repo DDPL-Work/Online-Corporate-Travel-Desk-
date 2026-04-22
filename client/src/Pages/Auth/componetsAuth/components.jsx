@@ -141,18 +141,18 @@ export const LEFT_PANEL_CONTENT = [
   //       { v: "Net-30", l: "Terms" },
   //     ],
   //   },
+  // {
+  //   tag: "Step 5 of 6",
+  //   title: "Define your travel policy",
+  //   sub: "Control what your employees can book — cabin class, budget, advance days.",
+  //   stats: [
+  //     { v: "100%", l: "Compliance" },
+  //     { v: "Auto", l: "Enforcement" },
+  //     { v: "0", l: "Exceptions" },
+  //   ],
+  // },
   {
     tag: "Step 5 of 6",
-    title: "Define your travel policy",
-    sub: "Control what your employees can book — cabin class, budget, advance days.",
-    stats: [
-      { v: "100%", l: "Compliance" },
-      { v: "Auto", l: "Enforcement" },
-      { v: "0", l: "Exceptions" },
-    ],
-  },
-  {
-    tag: "Step 6 of 6",
     title: "Final step — documents",
     sub: "Upload GST & PAN for verification. Takes less than 2 minutes.",
     stats: [
@@ -162,9 +162,9 @@ export const LEFT_PANEL_CONTENT = [
     ],
   },
   {
-    tag: "All Done!",
-    title: "Your account is being activated",
-    sub: "Sit back — our team will have you booking in under 24 hours.",
+    tag: "Step 6 of 6",
+    title: "All Done!",
+    sub: "Your account is being activated",
     stats: [
       { v: "<24h", l: "Activation" },
       { v: "Dedicated", l: "Manager" },
@@ -181,9 +181,9 @@ export const STEPS = [
   { id: 3, label: "Address", icon: <MdLocationOn /> },
   { id: 4, label: "SSO", icon: <MdShield /> },
   // { id: 5, label: "Billing", icon: <MdCreditCard /> },
-  { id: 5, label: "Policy", icon: <MdPolicy /> },
-  { id: 6, label: "Docs", icon: <MdUploadFile /> },
-  { id: 7, label: "Done", icon: <MdDone /> },
+  // { id: 5, label: "Policy", icon: <MdPolicy /> },
+  { id: 5, label: "Docs", icon: <MdUploadFile /> },
+  { id: 6, label: "Done", icon: <MdDone /> },
 ];
 
 // ── Tiny UI atoms ─────────────────────────────────────────────────────────────
@@ -269,7 +269,7 @@ export const RichSelect = ({ value, onChange, options, icon }) => {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute z-50 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
+        <div className="absolute z-50 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl overflow-y-auto max-h-60 animate-in fade-in zoom-in-95">
           {options.map((o) => {
             const val = o.value || o;
             const label = o.label || o;

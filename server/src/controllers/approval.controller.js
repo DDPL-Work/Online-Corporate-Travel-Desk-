@@ -3,6 +3,7 @@ const Booking = require("../models/Booking");
 const HotelBookingRequest = require("../models/hotelBookingRequest.model");
 const BookingIntent = require("../models/BookingIntent");
 const BookingRequest = require("../models/BookingRequest");
+const Corporate = require("../models/Corporate");
 const User = require("../models/User");
 const notificationService = require("../services/notification.service");
 const ApiError = require("../utils/ApiError");
@@ -129,6 +130,11 @@ exports.approveRequest = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Only admin/manager can approve requests");
   }
 
+  // 🔹 NEW: Block pending managers
+  if (req.user.role === "manager" && req.user.managerRequestStatus !== "approved") {
+    throw new ApiError(403, "Your manager account is pending travel-admin verification. You cannot approve bookings yet.");
+  }
+
   const bookingRequest = await BookingRequest.findOne({
     _id: req.params.id,
     corporateId: req.user.corporateId,
@@ -138,6 +144,31 @@ exports.approveRequest = asyncHandler(async (req, res) => {
   if (!bookingRequest) {
     throw new ApiError(404, "Booking request not found or already processed");
   }
+
+  /* ================= BALANCE / CREDIT VALIDATION ================= */
+  const corporate = await Corporate.findById(req.user.corporateId);
+  if (!corporate) {
+    throw new ApiError(404, "Corporate account not found");
+  }
+
+  const snapshot = bookingRequest.bookingSnapshot;
+  const isRoundTrip = snapshot.sectors && snapshot.sectors.length === 2;
+  const fareResult = bookingRequest.flightRequest?.fareQuote?.Results?.[0];
+
+  const requiredAmount = isRoundTrip
+    ? (bookingRequest.pricingSnapshot?.totalAmount || 0)
+    : (fareResult?.Fare?.PublishedFare || bookingRequest.pricingSnapshot?.totalAmount || 0);
+
+  if (corporate.classification === "prepaid") {
+    if (corporate.walletBalance < requiredAmount) {
+      throw new ApiError(400, "Insufficient wallet balance to approve this flight request.");
+    }
+  } else if (corporate.classification === "postpaid") {
+    if (corporate.currentCredit + requiredAmount > corporate.creditLimit) {
+      throw new ApiError(400, "Credit limit exceeded. Cannot approve this flight request.");
+    }
+  }
+  /* ========================================================================= */
 
   bookingRequest.$locals.previousStatus = bookingRequest.requestStatus;
 
@@ -150,12 +181,7 @@ exports.approveRequest = asyncHandler(async (req, res) => {
 
   /* ================= CREATE BOOKING INTENT ================= */
 
-  const snapshot = bookingRequest.bookingSnapshot;
-
   // ONE-WAY handling
-  // const [origin, destination] = snapshot.sectors[0].split("-");
-  const isRoundTrip = snapshot.sectors.length === 2;
-
   const [origin, destination] = snapshot.sectors[0].split("-");
   const [, returnDestination] = isRoundTrip
     ? snapshot.sectors[1].split("-")
@@ -173,7 +199,7 @@ exports.approveRequest = asyncHandler(async (req, res) => {
 
   const approvedSegment = bookingRequest.flightRequest.segments[0];
 
-  const fareResult = bookingRequest.flightRequest.fareQuote.Results[0];
+  // fareResult is already defined above
 
   // FIRST LEG, FIRST SEGMENT (OW / RT safe)
   const providerSegment = fareResult.Segments[0][0];
@@ -235,6 +261,11 @@ exports.rejectRequest = asyncHandler(async (req, res) => {
 
   if (!["travel-admin", "manager"].includes(req.user.role)) {
     throw new ApiError(403, "Only admin/manager can approve requests");
+  }
+
+  // 🔹 NEW: Block pending managers
+  if (req.user.role === "manager" && req.user.managerRequestStatus !== "approved") {
+    throw new ApiError(403, "Your manager account is pending travel-admin verification. You cannot reject bookings yet.");
   }
 
   const bookingRequest = await BookingRequest.findOne({
@@ -315,6 +346,11 @@ exports.approveHotelRequest = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Only admin/manager can approve requests");
   }
 
+  // 🔹 NEW: Block pending managers
+  if (req.user.role === "manager" && req.user.managerRequestStatus !== "approved") {
+    throw new ApiError(403, "Your manager account is pending travel-admin verification. You cannot approve hotel bookings yet.");
+  }
+
   const bookingRequest = await HotelBookingRequest.findOne({
     _id: req.params.id,
     corporateId: req.user.corporateId,
@@ -324,6 +360,25 @@ exports.approveHotelRequest = asyncHandler(async (req, res) => {
   if (!bookingRequest) {
     throw new ApiError(404, "Hotel request not found or already processed");
   }
+
+  /* ================= BALANCE / CREDIT VALIDATION ================= */
+  const corporate = await Corporate.findById(req.user.corporateId);
+  if (!corporate) {
+    throw new ApiError(404, "Corporate account not found");
+  }
+
+  const requiredAmount = bookingRequest.pricingSnapshot?.totalAmount || bookingRequest.bookingSnapshot?.amount || 0;
+
+  if (corporate.classification === "prepaid") {
+    if (corporate.walletBalance < requiredAmount) {
+      throw new ApiError(400, "Insufficient wallet balance to approve this hotel request.");
+    }
+  } else if (corporate.classification === "postpaid") {
+    if (corporate.currentCredit + requiredAmount > corporate.creditLimit) {
+      throw new ApiError(400, "Credit limit exceeded. Cannot approve this hotel request.");
+    }
+  }
+  /* ========================================================================= */
 
   bookingRequest.requestStatus = "approved";
   bookingRequest.approvedAt = new Date();
@@ -355,6 +410,11 @@ exports.rejectHotelRequest = asyncHandler(async (req, res) => {
 
   if (!["travel-admin", "manager"].includes(req.user.role)) {
     throw new ApiError(403, "Only admin/manager can approve requests");
+  }
+
+  // 🔹 NEW: Block pending managers
+  if (req.user.role === "manager" && req.user.managerRequestStatus !== "approved") {
+    throw new ApiError(403, "Your manager account is pending travel-admin verification. You cannot reject hotel bookings yet.");
   }
 
   const bookingRequest = await HotelBookingRequest.findOne({

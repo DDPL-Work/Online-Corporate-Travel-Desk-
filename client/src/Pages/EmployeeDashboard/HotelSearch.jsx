@@ -15,7 +15,7 @@ import {
   FaGlobe,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import EmployeeHeader from "./Employee-Header";
+import { CorporateNavbar } from "../../layout/CorporateNavbar";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchCities,
@@ -38,137 +38,15 @@ const NAV_TABS = [
 ];
 
 /* ─── Country Selector ─── */
-const CountrySelector = ({ value, onChange, countries }) => {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const filtered = countries.filter(
-    (c) =>
-      c.name?.toLowerCase().includes(search.toLowerCase()) ||
-      c.code?.toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const selected = countries.find((c) => c.code === value);
-
-  return (
-    <div className="relative" ref={ref}>
-      <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
-        <FaGlobe className="text-blue-600" /> Country
-      </label>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={`w-full flex items-center justify-between border-2 rounded-xl px-3 py-3 bg-white transition-all hover:border-blue-400 text-left
-          ${open ? "border-blue-600 shadow-sm" : value ? "border-blue-300" : "border-gray-200"}`}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          {selected ? (
-            <>
-              <span className="text-lg leading-none">{selected.flag}</span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-800 truncate">
-                  {selected.name}
-                </p>
-                {/* <p className="text-xs text-blue-600 font-bold">
-                  {selected.code}
-                </p> */}
-              </div>
-            </>
-          ) : (
-            <>
-              <FaGlobe className="text-gray-400 shrink-0" />
-              <span className="text-sm text-gray-400 font-medium">Select</span>
-            </>
-          )}
-        </div>
-        <FaChevronDown
-          className={`text-gray-400 text-xs shrink-0 ml-1 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-
-      {open && (
-        <div className="absolute top-full left-0 w-64 mt-1 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
-          {/* Search box */}
-          <div className="p-2 border-b border-gray-100 bg-white sticky top-0">
-            <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-2.5 py-1.5">
-              <FaSearch className="text-gray-400 text-xs" />
-              <input
-                autoFocus
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search country..."
-                className="text-xs font-medium text-gray-700 outline-none bg-transparent w-full placeholder-gray-400"
-              />
-            </div>
-          </div>
-
-          <div className="max-h-56 overflow-y-auto">
-            {value && (
-              <div
-                onMouseDown={() => {
-                  onChange("");
-                  setOpen(false);
-                  setSearch("");
-                }}
-                className="flex items-center gap-2 px-4 py-2.5 hover:bg-red-50 cursor-pointer border-b border-gray-100"
-              >
-                <span className="text-xs text-red-500 font-semibold">
-                  ✕ Clear selection
-                </span>
-              </div>
-            )}
-            {filtered.map((country) => (
-              <div
-                key={country.code}
-                onMouseDown={() => {
-                  onChange(country.code);
-                  setOpen(false);
-                  setSearch("");
-                }}
-                className={`flex items-center justify-between px-4 py-3 hover:bg-blue-50 cursor-pointer transition group border-b border-gray-50 last:border-0
-                  ${value === country.code ? "bg-blue-50" : ""}`}
-              >
-                <div className="flex items-center gap-3">
-                  {/* <span className="text-xl">{country.flag}</span> */}
-                  <p
-                    className={`text-sm font-semibold group-hover:text-blue-700 ${value === country.code ? "text-blue-700" : "text-gray-800"}`}
-                  >
-                    {country.name}
-                  </p>
-                </div>
-                <span
-                  className={`text-xs font-bold px-2 py-0.5 rounded-lg ${value === country.code ? "bg-blue-700 text-white" : "bg-gray-100 text-gray-500"}`}
-                >
-                  {country.code}
-                </span>
-              </div>
-            ))}
-            {filtered.length === 0 && (
-              <p className="text-xs text-gray-400 text-center py-6">
-                No countries found
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+import { CountrySelector } from "../../components/hotel-search/HotelSearchSubComponents";
+import HotelGuestSelection from "../../components/hotel-search/HotelGuestSelection";
 
 /* ─── Main Page ─── */
 export default function HotelSearchPage() {
   const navigate = useNavigate();
   const [activePage, setActivePage] = useState("/search-hotel");
   const [country, setCountry] = useState("IN");
+  const [guestNationality, setGuestNationality] = useState("IN");
   const [city, setCity] = useState("");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
@@ -186,7 +64,7 @@ export default function HotelSearchPage() {
   const cityRef = useRef(null);
 
   const dispatch = useDispatch();
-  const { countries, citiesByCountry, loading } = useSelector(
+  const { countries, citiesByCountry } = useSelector(
     (state) => state.hotel,
   );
 
@@ -200,10 +78,6 @@ export default function HotelSearchPage() {
         String.fromCodePoint(127397 + char.charCodeAt()),
       );
   };
-
-  useEffect(() => {
-    console.log("Redux countries:", countries);
-  }, [countries]);
 
   const countryArray =
     countries?.data?.CountryList || countries?.data || countries || [];
@@ -222,7 +96,7 @@ export default function HotelSearchPage() {
   const handleCountryChange = (code) => {
     setCountry(code);
     setCity("");
-    setSelectedCityCode(null); // 🔥 IMPORTANT
+    setSelectedCityCode(null);
     setFilteredCities([]);
   };
 
@@ -249,22 +123,19 @@ export default function HotelSearchPage() {
 
   const handleCityChange = (val) => {
     setCity(val);
-
     const filtered = currentCities.filter((c) =>
       c.Name?.toLowerCase().includes(val.toLowerCase()),
     );
-
     setFilteredCities(filtered);
     setShowCitySuggestions(true);
   };
 
   const handleCitySelect = (cityObj) => {
-    setCity(cityObj.Name); // for UI
-    setSelectedCityCode(cityObj.Code); // ✅ CORRECT PROPERTY
+    setCity(cityObj.Name);
+    setSelectedCityCode(cityObj.Code);
     setShowCitySuggestions(false);
   };
 
-  // ensure roomConfigs length matches rooms
   useEffect(() => {
     setRoomConfigs((prev) => {
       const next = [...prev];
@@ -279,12 +150,6 @@ export default function HotelSearchPage() {
     });
   }, [rooms]);
 
-  const updateRoom = (idx, updater) => {
-    setRoomConfigs((prev) =>
-      prev.map((r, i) => (i === idx ? { ...r, ...updater(r) } : r)),
-    );
-  };
-
   const handleSearch = async () => {
     if (!selectedCityCode || !checkIn || !checkOut) {
       alert("Please select a valid city and fill all required fields");
@@ -292,13 +157,14 @@ export default function HotelSearchPage() {
     }
 
     setIsSearching(true);
-    setNoResults(true);
+    setNoResults(false);
 
     const payload = {
       CheckIn: checkIn,
       CheckOut: checkOut,
-      CityCode: selectedCityCode, // string is fine
-      GuestNationality: country, // 🔥 IMPORTANT
+      CityCode: selectedCityCode,
+      GuestNationality: guestNationality,
+      ResponseTime: 23,
       NoOfRooms: rooms,
       PaxRooms: roomConfigs.map((r) => ({
         Adults: r.adults,
@@ -307,7 +173,7 @@ export default function HotelSearchPage() {
       })),
       IsDetailedResponse: true,
       Filters: {
-        Refundable: false,
+        Refundable: true,
         MealType: "All",
       },
     };
@@ -317,8 +183,10 @@ export default function HotelSearchPage() {
         searchHotels({ payload, page: 1, limit: 10 }),
       ).unwrap();
 
-      if (result) {
+      if (result?.hotels?.length > 0) {
         navigate("/search-hotel-results");
+      } else {
+        setNoResults(true);
       }
     } catch (error) {
       console.error("Search failed:", error);
@@ -342,114 +210,14 @@ export default function HotelSearchPage() {
           ),
         )
       : null;
-  const popularCities =
-    POPULAR_BY_COUNTRY[country] || POPULAR_BY_COUNTRY.default;
 
   const selectedCountry = normalizedCountries.find((c) => c.code === country);
 
-  const renderRoomConfig = (room, idx) => {
-    const setAdults = (val) =>
-      updateRoom(idx, () => ({ adults: Math.max(1, Math.min(4, val)) }));
-    const setChildren = (val) =>
-      updateRoom(idx, (r) => {
-        const count = Math.max(0, Math.min(4, val));
-        const ages = Array.from(
-          { length: count },
-          (_, i) => r.childrenAges?.[i] || 5,
-        );
-        return { children: count, childrenAges: ages };
-      });
-
-    const setChildAge = (cIdx, val) =>
-      updateRoom(idx, (r) => {
-        const ages = [...(r.childrenAges || [])];
-        ages[cIdx] = Math.min(12, Math.max(1, Number(val) || 1));
-        return { childrenAges: ages };
-      });
-
-    return (
-      <div
-        key={idx}
-        className="border border-gray-100 rounded-xl p-3 bg-white shadow-sm"
-      >
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-semibold text-gray-800">
-            Room {idx + 1}
-          </span>
-          <span className="text-xs text-gray-500">
-            {room.adults} Adult{room.adults > 1 ? "s" : ""} • {room.children}{" "}
-            Child{room.children > 1 ? "ren" : ""}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg">
-            <span className="text-sm font-semibold text-gray-700">Adults</span>
-            <Counter val={room.adults} setVal={setAdults} min={1} max={4} />
-          </div>
-
-          <div className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg">
-            <span className="text-sm font-semibold text-gray-700">
-              Children
-            </span>
-            <Counter val={room.children} setVal={setChildren} min={0} max={4} />
-          </div>
-        </div>
-
-        {room.children > 0 && (
-          <div className="mt-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-600">
-              Child Ages (1-12)
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {Array.from({ length: room.children }).map((_, cIdx) => (
-                <select
-                  key={cIdx}
-                  value={room.childrenAges?.[cIdx] || 5}
-                  onChange={(e) => setChildAge(cIdx, e.target.value)}
-                  className="border border-gray-300 rounded-lg px-2 py-2 text-sm"
-                >
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((age) => (
-                    <option key={age} value={age}>
-                      {age} yrs
-                    </option>
-                  ))}
-                </select>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const Counter = ({ val, setVal, min, max }) => (
-    <div className="flex items-center gap-3">
-      <button
-        onClick={() => setVal(Math.max(min, val - 1))}
-        disabled={val <= min}
-        className="w-8 h-8 rounded-full border-2 border-blue-700 flex items-center justify-center text-blue-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-blue-50 transition"
-      >
-        <FaMinus size={10} />
-      </button>
-      <span className="w-5 text-center font-bold text-gray-800 text-base">
-        {val}
-      </span>
-      <button
-        onClick={() => setVal(Math.min(max, val + 1))}
-        disabled={val >= max}
-        className="w-8 h-8 rounded-full border-2 border-blue-700 flex items-center justify-center text-blue-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-blue-50 transition"
-      >
-        <FaPlus size={10} />
-      </button>
-    </div>
-  );
-
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 font-sans">
       {/* Navbar */}
-      <div className="bg-white shadow-md sticky top-0 z-50">
-        <EmployeeHeader />
+      <div className="sticky top-0 z-50">
+        <CorporateNavbar />
       </div>
 
       {/* Hero */}
@@ -520,10 +288,10 @@ export default function HotelSearchPage() {
           </div>
 
           <div className="p-5 md:p-6">
-            {/* Form Grid — 12 cols: Country(2) + City(4) + CheckIn(2) + CheckOut(2) + Guests(2) */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+            {/* Form Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 items-start">
               {/* ── Country ── */}
-              <div className="md:col-span-2">
+              <div className="md:col-span-1 lg:col-span-2">
                 <CountrySelector
                   value={country}
                   onChange={handleCountryChange}
@@ -532,7 +300,10 @@ export default function HotelSearchPage() {
               </div>
 
               {/* ── City / Hotel / Area ── */}
-              <div className="md:col-span-4 relative" ref={cityRef}>
+              <div
+                className="md:col-span-1 lg:col-span-4 relative"
+                ref={cityRef}
+              >
                 <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
                   <FaMapMarkerAlt className="text-blue-600" /> City / Hotel /
                   Area
@@ -592,7 +363,7 @@ export default function HotelSearchPage() {
               </div>
 
               {/* ── Check-in ── */}
-              <div className="md:col-span-2">
+              <div className="md:col-span-1 lg:col-span-2">
                 <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
                   <FaCalendarAlt className="text-blue-600" /> Check-in
                 </label>
@@ -623,7 +394,7 @@ export default function HotelSearchPage() {
               </div>
 
               {/* ── Check-out ── */}
-              <div className="md:col-span-2">
+              <div className="md:col-span-1 lg:col-span-2">
                 <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
                   <FaCalendarAlt className="text-blue-600" /> Check-out
                 </label>
@@ -657,7 +428,10 @@ export default function HotelSearchPage() {
               </div>
 
               {/* ── Guests & Rooms ── */}
-              <div className="md:col-span-2 relative" ref={guestRef}>
+              <div
+                className="md:col-span-2 lg:col-span-2 relative"
+                ref={guestRef}
+              >
                 <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
                   <FaUserFriends className="text-blue-600" /> Guests &amp; Rooms
                 </label>
@@ -678,33 +452,17 @@ export default function HotelSearchPage() {
                 </button>
 
                 {showGuestDropdown && (
-                  <div className="absolute top-full right-0 mt-1 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 w-[420px] p-5 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-bold text-gray-700">
-                        Guests &amp; Rooms
-                      </h4>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">Rooms</span>
-                        <Counter
-                          val={rooms}
-                          setVal={setRooms}
-                          min={1}
-                          max={9}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                      {roomConfigs.map((room, idx) => renderRoomConfig(room, idx))}
-                    </div>
-
-                    <button
-                      onClick={() => setShowGuestDropdown(false)}
-                      className="w-full bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold py-2.5 rounded-xl transition"
-                    >
-                      Apply
-                    </button>
-                  </div>
+                  <HotelGuestSelection
+                    rooms={rooms}
+                    setRooms={setRooms}
+                    guestNationality={guestNationality}
+                    setGuestNationality={setGuestNationality}
+                    roomConfigs={roomConfigs}
+                    setRoomConfigs={setRoomConfigs}
+                    normalizedCountries={normalizedCountries}
+                    onApply={() => setShowGuestDropdown(false)}
+                    CountrySelector={CountrySelector}
+                  />
                 )}
               </div>
             </div>

@@ -1,11 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 
 const MAX_TRAVELERS = 9;
+const GOLD = "#C9A240";
+const NAVY = "#000D26";
 
 export default function TravelersClassModal({
   onClose,
   onApply,
-  modalPosition,
+  className = "",
+  style = {},
   initialData = {
     passengers: { adults: 1, children: 0, infants: 0 },
     travelClass: "Economy",
@@ -83,18 +86,18 @@ export default function TravelersClassModal({
         <button
           type="button"
           onClick={onDec}
-          className="w-8 h-8 rounded-full border border-gray-300 text-gray-700 flex items-center justify-center hover:border-blue-500"
+          className="w-7 h-7 rounded-full border border-slate-300 text-slate-500 flex items-center justify-center hover:border-gold hover:text-gold transition-all bg-white shadow-sm"
           disabled={value <= 0}
         >
           -
         </button>
-        <span className="w-6 text-center font-semibold text-gray-800">
+        <span className="w-5 text-center font-bold text-slate-800 text-sm">
           {value}
         </span>
         <button
           type="button"
           onClick={onInc}
-          className="w-8 h-8 rounded-full border border-gray-300 text-gray-700 flex items-center justify-center hover:border-blue-500 disabled:opacity-50"
+          className="w-7 h-7 rounded-full border border-slate-300 text-slate-500 flex items-center justify-center hover:border-gold hover:text-gold transition-all bg-white shadow-sm disabled:opacity-20"
           disabled={disableInc}
         >
           +
@@ -105,21 +108,24 @@ export default function TravelersClassModal({
 
   return (
     <div
-      className="absolute z-50"
-      style={{
-        top: modalPosition.top,
-        left: modalPosition.left,
-        width: modalPosition.width,
-      }}
+      ref={modalRef}
+      className={`${className} bg-white rounded-t-[2.5rem] sm:rounded-2xl shadow-[0_-12px_40px_rgba(0,0,0,0.15)] sm:shadow-2xl border-t sm:border border-slate-100 overflow-hidden flex flex-col w-full`}
+      style={style}
     >
-      <div
-        ref={modalRef}
-        className="bg-white rounded-xl shadow-2xl border border-gray-200"
-      >
-        <div className="p-6">
-          {/* TRAVELER COUNTS */}
-          <div className="mb-4 space-y-2">
-            <p className="font-medium text-gray-800 text-sm">TRAVELERS</p>
+      {/* Mobile Drag Handle */}
+      <div className="sm:hidden flex justify-center pt-3 pb-1">
+        <div className="w-10 h-1 bg-slate-200 rounded-full" />
+      </div>
+
+      <div className="p-5 sm:p-6 overflow-y-auto max-h-[75vh] sm:max-h-none">
+        {/* TRAVELER SELECTION */}
+        <div className="mb-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: GOLD }} />
+            <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Traveler Selection</h4>
+          </div>
+
+          <div className="space-y-0.5">
             <Counter
               label="Adults"
               sub="12+ years"
@@ -128,6 +134,7 @@ export default function TravelersClassModal({
               onInc={() => updateCount("adults", 1)}
               disableInc={total >= MAX_TRAVELERS}
             />
+            <div className="h-px bg-slate-50 mx-1" />
             <Counter
               label="Children"
               sub="2–11 years"
@@ -136,57 +143,78 @@ export default function TravelersClassModal({
               onInc={() => updateCount("children", 1)}
               disableInc={total >= MAX_TRAVELERS}
             />
+            <div className="h-px bg-slate-50 mx-1" />
             <Counter
               label="Infants"
-              sub="0–2 years · one infant per adult"
+              sub="0–2 years"
               value={counts.infants}
               onDec={() => updateCount("infants", -1)}
               onInc={() => updateCount("infants", 1)}
               disableInc={total >= MAX_TRAVELERS}
             />
-            {error && <p className="text-xs text-red-500">{error}</p>}
-            <p className="text-xs text-gray-500">
-              Max {MAX_TRAVELERS} travelers. Infants cannot exceed adult count.
-            </p>
+          </div>
+          
+          {error && <p className="text-[10px] text-red-600 font-bold mt-3 px-1">{error}</p>}
+          <p className="text-[9px] text-slate-400 mt-4 leading-relaxed font-medium px-1 italic">
+            Max {MAX_TRAVELERS} travelers allowed. Infants count must not exceed adults.
+          </p>
+        </div>
+
+        <div className="h-px bg-slate-100 my-5" />
+
+        {/* CABIN CLASS */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: GOLD }} />
+            <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Cabin Class</h4>
           </div>
 
-          {/* CABIN CLASS */}
-          <div className="mb-4">
-            <p className="font-medium text-gray-800 mb-1.5 text-sm">
-              CHOOSE TRAVEL CLASS
-            </p>
-            <div className="flex gap-2 flex-wrap">
-              {["Economy", "Premium Economy", "Business", "First Class"].map(
-                (cls) => (
-                  <button
-                    key={cls}
-                    onClick={() => setTravelClass(cls)}
-                    className={`px-3 py-1 rounded-lg border text-xs
-                    ${
-                      travelClass === cls
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white text-gray-700 hover:bg-blue-50"
-                    }
-                  `}
-                  >
-                    {cls}
-                  </button>
-                ),
-              )}
-            </div>
-          </div>
-
-          {/* APPLY */}
-          <div className="flex justify-end">
-            <button
-              onClick={handleApply}
-              className="px-5 py-1 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-700"
-            >
-              APPLY
-            </button>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: "Economy", label: "Economy" },
+              { id: "Premium Economy", label: "Premium Eco" },
+              { id: "Business", label: "Business" },
+              { id: "Premium Business", label: "Prem. Business" },
+              { id: "First Class", label: "First Class" }
+            ].map((cls) => (
+              <button
+                key={cls.id}
+                type="button"
+                onClick={() => setTravelClass(cls.id)}
+                className={`flex items-center justify-center h-10 rounded-xl border text-[10px] font-black transition-all uppercase tracking-wider
+                  ${
+                    travelClass === cls.id
+                      ? "text-white border-transparent shadow-md transform scale-[1.02]"
+                      : "bg-white text-slate-500 border-slate-200 hover:border-gold hover:text-gold"
+                  }
+                `}
+                style={{
+                   background: travelClass === cls.id ? NAVY : 'white',
+                   borderColor: travelClass === cls.id ? NAVY : ''
+                }}
+              >
+                {cls.label}
+              </button>
+            ))}
           </div>
         </div>
+
+        {/* APPLY BUTTON */}
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={handleApply}
+            className="w-full py-4 text-white rounded-2xl font-black text-[13px] shadow-xl active:scale-[0.97] transition-all uppercase tracking-[0.15em]"
+            style={{ background: NAVY, boxShadow: `0 10px 25px -5px rgba(0,13,38,0.35)` }}
+          >
+            Apply Selection
+          </button>
+        </div>
       </div>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .hover\\:text-gold:hover { color: #C9A240 !important; }
+        .hover\\:border-gold:hover { border-color: #C9A240 !important; }
+      `}} />
     </div>
   );
 }

@@ -63,6 +63,7 @@ export const PendingHotelDetailsModal = ({
   onClose,
   onApprove,
   onReject,
+  isVerified = true,
 }) => {
   if (!booking) return null;
 
@@ -690,13 +691,17 @@ export const PendingHotelDetailsModal = ({
           <div className="flex gap-3">
             <button
               onClick={() => onReject(booking._id, "hotel", "reject")}
-              className="px-6 py-2.5 border border-red-200 text-red-600 font-bold text-xs rounded-xl hover:bg-red-50 transition-all"
+              disabled={!isVerified}
+              className={`px-6 py-2.5 border border-red-200 text-red-600 font-bold text-xs rounded-xl transition-all ${!isVerified ? "opacity-50 cursor-not-allowed bg-slate-100" : "hover:bg-red-50"}`}
+              title={!isVerified ? "Account pending verification" : ""}
             >
               Reject Request
             </button>
             <button
               onClick={() => onApprove(booking._id, "hotel", "approve")}
-              className="px-6 py-2.5 bg-[#22C55E] text-white font-bold text-xs rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all"
+              disabled={!isVerified}
+              className={`px-6 py-2.5 text-white font-bold text-xs rounded-xl shadow-lg transition-all ${!isVerified ? "bg-slate-400 cursor-not-allowed shadow-none" : "bg-[#22C55E] hover:bg-emerald-600 shadow-emerald-100"}`}
+              title={!isVerified ? "Account pending verification" : ""}
             >
               Approve & Proceed
             </button>
@@ -716,6 +721,7 @@ export const PendingFlightDetailsModal = ({
   onClose,
   onApprove,
   onReject,
+  isVerified = true,
 }) => {
   if (!booking) return null;
 
@@ -1462,13 +1468,17 @@ export const PendingFlightDetailsModal = ({
           <div className="flex gap-3">
             <button
               onClick={() => onReject(booking._id, "flight", "reject")}
-              className="px-6 py-2.5 border border-red-200 text-red-600 font-bold text-xs rounded-xl hover:bg-red-50 transition-all"
+              disabled={!isVerified}
+              className={`px-6 py-2.5 border border-red-200 text-red-600 font-bold text-xs rounded-xl transition-all ${!isVerified ? "opacity-50 cursor-not-allowed bg-slate-100" : "hover:bg-red-50"}`}
+              title={!isVerified ? "Account pending verification" : ""}
             >
               Reject Request
             </button>
             <button
               onClick={() => onApprove(booking._id, "flight", "approve")}
-              className="px-6 py-2.5 bg-[#22C55E] text-white font-bold text-xs rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all"
+              disabled={!isVerified}
+              className={`px-6 py-2.5 text-white font-bold text-xs rounded-xl shadow-lg transition-all ${!isVerified ? "bg-slate-400 cursor-not-allowed shadow-none" : "bg-[#22C55E] hover:bg-emerald-600 shadow-emerald-100"}`}
+              title={!isVerified ? "Account pending verification" : ""}
             >
               Approve & Proceed
             </button>
