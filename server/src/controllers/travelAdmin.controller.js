@@ -1,9 +1,14 @@
-const { default: mongoose } = require("mongoose");
+const mongoose = require("mongoose");
 const BookingRequest = require("../models/BookingRequest");
-const HotelBooking = require("../models/hotelBookingRequest.model"); // if separate model exists
+const HotelBooking = require("../models/hotelBookingRequest.model");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
 const ManagerRequest = require("../models/ManagerRequest");
+const Corporate = require("../models/Corporate");
+const ApiError = require("../utils/ApiError");
+const ApiResponse = require("../utils/ApiResponse");
+const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
 
 /**
  * ============================================================
@@ -408,9 +413,11 @@ exports.updateEmployee = async (req, res, next) => {
       "status",
     ];
     const updates = {};
-    allowed.forEach((f) => {
-      if (req.body[f] !== undefined) updates[f] = req.body[f];
-    });
+    if (req.body) {
+      allowed.forEach((f) => {
+        if (req.body[f] !== undefined) updates[f] = req.body[f];
+      });
+    }
 
     if (!Object.keys(updates).length)
       return next(new ApiError(400, "No valid fields to update"));
@@ -682,5 +689,6 @@ exports.reviewManagerRequest = async (req, res) => {
     });
   }
 };
+
 
 

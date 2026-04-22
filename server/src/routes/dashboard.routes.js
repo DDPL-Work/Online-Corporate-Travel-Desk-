@@ -22,11 +22,11 @@ router.get(
 
 /* ==========================================
    CORPORATE DASHBOARD
-   (Travel Admin + Corporate Super Admin)
+   (Travel Admin)
 ========================================== */
 router.get(
   "/corporate",
-  authorizeRoles("travel-admin", "corporate-super-admin"),
+  authorizeRoles("travel-admin"),
   dashboardController.getCorporateDashboard,
 );
 
@@ -45,7 +45,7 @@ router.get(
 ========================================== */
 router.get(
   "/super-admin",
-  authorizeRoles("super-admin"),
+  authorizeRoles("super-admin", "ops-member"),
   dashboardController.getSuperAdminDashboard,
 );
 

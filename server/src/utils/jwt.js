@@ -20,6 +20,7 @@ exports.signAccessToken = (user) => {
     role: user.role,
     email: user.email,
     name: user.name || {},
+    managerRequestStatus: user.managerRequestStatus || "none",
   };
   return jwt.sign(payload, SECRET, { expiresIn: ACCESS_EXP });
 };
@@ -30,7 +31,7 @@ exports.signAccessToken = (user) => {
  * @param {Request} req
  * @param {Response} res
  */
-exports.generateSSOToken = (req, res) => {
+exports.generateSSOToken = async (req, res) => {
   try {
     const user = req.user;
 
@@ -41,12 +42,24 @@ exports.generateSSOToken = (req, res) => {
       });
     }
 
+    let corporateSlug = null;
+    if (user.corporateId) {
+      const Corporate = require("../models/Corporate");
+      const corp = await Corporate.findById(user.corporateId).select("corporateName limit"); // avoid any big fields
+      if (corp && corp.corporateName) {
+        // match what frontend does (regex removes spaces/hyphens so '-' is fine)
+        corporateSlug = corp.corporateName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      }
+    }
+
     const payload = {
       id: user._id.toString(),
       corporateId: user.corporateId ? user.corporateId.toString() : null,
+      corporateSlug,
       role: user.role,
       email: user.email,
       name: user.name || {},
+      managerRequestStatus: user.managerRequestStatus || "none",
     };
 
     const token = jwt.sign(payload, SECRET, {

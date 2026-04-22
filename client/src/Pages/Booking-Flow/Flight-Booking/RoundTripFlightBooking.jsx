@@ -16,7 +16,7 @@ import {
   parseRoundTripBooking,
   TravelerForm,
 } from "./CommonComponents";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import {
   getRTFareQuote,
   getRTFareRule,
@@ -24,6 +24,7 @@ import {
 } from "../../../Redux/Actions/flight.thunks.RT";
 import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { mapSSRData } from "../../../utils/parseReturnFlight";
@@ -32,45 +33,6 @@ import api from "../../../API/axios";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
 
-// ✅ NORMALIZE FULL FARE RULE API RESPONSE (FareRule API)
-const normalizeFareRules = (fareRule) => {
-  // TBO sometimes returns {Response:{FareRules:[...]}} and sometimes flat {FareRules:[...]}
-  const list =
-    fareRule?.Response?.FareRules ||
-    fareRule?.FareRules ||
-    fareRule?.data?.Response?.FareRules ||
-    [];
-
-  if (!Array.isArray(list) || list.length === 0) return null;
-
-  const hasCategory = list.some((r) => r?.Category);
-
-  const cancellation = hasCategory
-    ? list.filter((r) => r.Category === "CANCELLATION")
-    : [];
-  const dateChange = hasCategory
-    ? list.filter((r) => r.Category === "DATECHANGE")
-    : [];
-  const baggage = hasCategory
-    ? list.filter((r) => r.Category === "BAGGAGE")
-    : [];
-
-  // For responses without Category (common in intl round-trip), fall back to FareRuleDetail strings
-  let important = hasCategory
-    ? list.filter((r) => r.Category === "IMPORTANT")
-    : [];
-
-  if (important.length === 0) {
-    const details = list
-      .map((r) => r?.FareRuleDetail)
-      .filter((x) => typeof x === "string" && x.trim().length > 0);
-    if (details.length > 0) {
-      important = details;
-    }
-  }
-
-  return { cancellation, dateChange, baggage, important };
-};
 
 export default function RoundTripFlightBooking() {
   const location = useLocation();
@@ -172,6 +134,9 @@ export default function RoundTripFlightBooking() {
     loading: approverLoading,
     error: approverError,
   } = useSelector((state) => state.employee);
+
+  const { myPolicy } = useSelector((state) => state.ssrPolicy);
+  const approvalRequired = myPolicy?.approvalRequired !== false;
 
   const traceId = location.state?.traceId || reduxTraceId || null;
 
@@ -1315,7 +1280,7 @@ export default function RoundTripFlightBooking() {
       return;
     }
 
-    if (!projectApproverData.project || !projectApproverData.approver) {
+    if (approvalRequired && (!projectApproverData.project || !projectApproverData.approver)) {
       ToastWithTimer({
         type: "error",
         message: "Please select a project and approver",
@@ -1342,15 +1307,17 @@ export default function RoundTripFlightBooking() {
 
     try {
       const payload = buildBookingRequestPayload();
-      await dispatch(
-        selectManager({
-          approverId: projectApproverData.approver?.id,
-          approverEmail: projectApproverData.approver?.email,
-          projectCodeId: projectApproverData.project?.id,
-          projectName: projectApproverData.project?.name,
-          projectClient: projectApproverData.project?.client,
-        }),
-      ).unwrap();
+      if (approvalRequired) {
+        await dispatch(
+          selectManager({
+            approverId: projectApproverData.approver?.id,
+            approverEmail: projectApproverData.approver?.email,
+            projectCodeId: projectApproverData.project?.id,
+            projectName: projectApproverData.project?.name,
+            projectClient: projectApproverData.project?.client,
+          }),
+        ).unwrap();
+      }
 
       await dispatch(createBookingRequest(payload)).unwrap();
 
@@ -1381,7 +1348,7 @@ export default function RoundTripFlightBooking() {
   // Readiness check for submit button (must stay before any early returns)
   const isFormReady = useMemo(() => {
     if (!purposeOfTravel?.trim()) return false;
-    if (!projectApproverData.project || !projectApproverData.approver) return false;
+    if (approvalRequired && (!projectApproverData.project || !projectApproverData.approver)) return false;
     if (infantCount > adultCount) return false;
 
     const isIntl = Boolean(
@@ -1469,8 +1436,8 @@ export default function RoundTripFlightBooking() {
 
   // Readiness check for submit button
   return (
-    <div className="min-h-screen bg-slate-50 font-[DM Sans]">
-      <EmployeeHeader />
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <CorporateNavbar />
       <RTSeatSelectionModal
         isOpen={showSeatModal.show}
         onClose={closeSeatModal}
@@ -1520,9 +1487,6 @@ export default function RoundTripFlightBooking() {
                     <h2 className="text-xl font-bold text-slate-900">
                       Round Trip Flight Details
                     </h2>
-                    <p className="text-sm text-slate-600">
-                      Complete journey information
-                    </p>
                   </div>
                 </div>
 
@@ -1532,10 +1496,12 @@ export default function RoundTripFlightBooking() {
                     label="Onward Journey"
                     value={
                       <>
-                        <div className="font-semibold">
-                          {onwardRoute?.from} → {onwardRoute?.to}
+                        <div className="font-semibold space-y-1">
+                          <div>
+                            {onwardRoute?.from} → {onwardRoute?.to}
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-500 mt-1">
                           {formatDateTime(onwardRoute?.dateTime)}
                         </div>
                       </>
@@ -1547,10 +1513,12 @@ export default function RoundTripFlightBooking() {
                     label="Return Journey"
                     value={
                       <>
-                        <div className="font-semibold">
-                          {returnRoute?.from} → {returnRoute?.to}
+                        <div className="font-semibold space-y-1">
+                          <div>
+                            {returnRoute?.from} → {returnRoute?.to}
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-500 mt-1">
                           {formatDateTime(returnRoute?.dateTime)}
                         </div>
                       </>
@@ -1757,7 +1725,6 @@ export default function RoundTripFlightBooking() {
                 <FareDetailsModal
                   fareQuote={fareQuote}
                   fareRule={fareRule}
-                  normalizeFareRules={normalizeFareRules}
                 />
               </div>
             </div>

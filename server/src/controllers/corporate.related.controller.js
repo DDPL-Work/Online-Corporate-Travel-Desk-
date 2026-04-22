@@ -35,24 +35,7 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
   const ssoConfig = req.body.ssoConfig || {};
   const gstDetails = req.body.gstDetails || {};
 
-  const travelPolicy = {
-    allowedCabinClass: Array.isArray(
-      req.body["travelPolicy[allowedCabinClass][]"],
-    )
-      ? req.body["travelPolicy[allowedCabinClass][]"]
-      : req.body["travelPolicy[allowedCabinClass][]"]
-        ? [req.body["travelPolicy[allowedCabinClass][]"]]
-        : ["Economy"],
-
-    allowAncillaryServices:
-      req.body["travelPolicy[allowAncillaryServices]"] === "true",
-
-    advanceBookingDays: Number(
-      req.body["travelPolicy[advanceBookingDays]"] || 0,
-    ),
-
-    maxBookingAmount: Number(req.body["travelPolicy[maxBookingAmount]"] || 0),
-  };
+  // Removed travel policy logic
 
   // --------------------------------------------------
   // VALIDATIONS (UNCHANGED)
@@ -79,6 +62,16 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
   });
 
   if (existingDomain) throw new ApiError(400, "Domain already registered");
+
+  // Phone number uniqueness validation
+  const existingPhone = await Corporate.findOne({
+    "primaryContact.mobile": primaryContact.mobile,
+  });
+
+  if (existingPhone) throw new ApiError(400, "Phone number already exists");
+
+  // GST Email Preference: 1. Accounts (Billing), 2. Travel-admin (Primary)
+  gstDetails.gstEmail = gstDetails.gstEmail || billingDepartment?.email || primaryContact?.email || "";
 
   // --------------------------------------------------
   // 🟢 CLOUDINARY UPLOAD SECTION (NEW)
@@ -153,7 +146,6 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
     panCard,
 
     classification,
-    travelPolicy,
 
     defaultApprover,
     status: "pending",
@@ -171,6 +163,8 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
       ),
     );
 });
+
+
 
 // -----------------------------------------------------
 // APPROVE CORPORATE (SUPER ADMIN ONLY)
@@ -241,7 +235,7 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
   corporate.ssoConfig.verified = true;
   corporate.ssoConfig.verifiedAt = new Date();
 
-  corporate.primaryContact.role = "corporate-super-admin";
+  corporate.primaryContact.role = "travel-admin";
 
   // if (corporate.secondaryContact?.email) {
   //   corporate.secondaryContact.role = "travel-admin";
@@ -389,7 +383,7 @@ exports.getAllFlightBookings = async (req, res) => {
   try {
     const {
       page = 1,
-      limit = 10,
+      limit = 500,
       search,
       status,
       corporateId,
@@ -461,8 +455,8 @@ exports.getAllFlightBookings = async (req, res) => {
 exports.getAllHotelBookings = async (req, res) => {
   try {
     const {
-      page = 1,
-      limit = 10,
+      // page = 1,
+      // limit = 500,
       search,
       status,
       corporateId,
@@ -491,13 +485,13 @@ exports.getAllHotelBookings = async (req, res) => {
       if (toDate) query.createdAt.$lte = new Date(toDate);
     }
 
-    const skip = (page - 1) * limit;
+    // const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
       HotelBookingRequest.find(query)
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
+        // .skip(skip)
+        // .limit(Number(limit))
         .populate({ path: "corporateId", select: "corporateName" })
         .lean(),
 
@@ -510,9 +504,9 @@ exports.getAllHotelBookings = async (req, res) => {
       data,
       pagination: {
         total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(total / limit),
+        // page: Number(page),
+        // limit: Number(limit),
+        // totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
@@ -528,8 +522,8 @@ exports.getAllHotelBookings = async (req, res) => {
 exports.getCancelledOrRequestedFlights = async (req, res) => {
   try {
     const {
-      page = 1,
-      limit = 10,
+      // page = 1,
+      // limit = 500,
       search,
       corporateId,
       fromDate,
@@ -555,13 +549,13 @@ exports.getCancelledOrRequestedFlights = async (req, res) => {
       if (toDate) query.createdAt.$lte = new Date(toDate);
     }
 
-    const skip = (page - 1) * limit;
+    // const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
       BookingRequest.find(query)
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
+        // .skip(skip)
+        // .limit(Number(limit))
         .populate({ path: "corporateId", select: "corporateName" })
         .lean(),
 
@@ -574,9 +568,9 @@ exports.getCancelledOrRequestedFlights = async (req, res) => {
       data,
       pagination: {
         total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(total / limit),
+        // page: Number(page),
+        // limit: Number(limit),
+        // totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
@@ -591,8 +585,8 @@ exports.getCancelledOrRequestedFlights = async (req, res) => {
 exports.getCancelledOrRequestedHotels = async (req, res) => {
   try {
     const {
-      page = 1,
-      limit = 10,
+      // page = 1,
+      // limit = 500,
       search,
       corporateId,
       fromDate,
@@ -629,13 +623,13 @@ exports.getCancelledOrRequestedHotels = async (req, res) => {
       if (toDate) query.createdAt.$lte = new Date(toDate);
     }
 
-    const skip = (page - 1) * limit;
+    // const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
       HotelBookingRequest.find(query)
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
+        // .skip(skip)
+        // .limit(Number(limit))
         .populate({ path: "corporateId", select: "corporateName" })
         .lean(),
 
@@ -648,9 +642,9 @@ exports.getCancelledOrRequestedHotels = async (req, res) => {
       data,
       pagination: {
         total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(total / limit),
+        // page: Number(page),
+        // limit: Number(limit),
+        // totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
@@ -667,8 +661,8 @@ exports.getCancelledOrRequestedHotels = async (req, res) => {
 exports.fetchCancellationQueries = async (req, res) => {
   try {
     const {
-      page = 1,
-      limit = 10,
+      // page = 1,
+      // limit = 500,
       status,
       bookingReference,
       queryId,
@@ -686,13 +680,13 @@ exports.fetchCancellationQueries = async (req, res) => {
       query.queryId = { $regex: queryId, $options: "i" };
     }
 
-    const skip = (page - 1) * limit;
+    // const skip = (page - 1) * limit;
 
     const [queries, total] = await Promise.all([
       CancellationQuery.find(query)
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
+        // .skip(skip)
+        // .limit(Number(limit))
         .lean(),
 
       CancellationQuery.countDocuments(query),
@@ -820,9 +814,9 @@ exports.fetchCancellationQueries = async (req, res) => {
       data: enrichedData,
       pagination: {
         total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(total / limit),
+        // page: Number(page),
+        // limit: Number(limit),
+        // totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {

@@ -318,6 +318,24 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     };
   });
 
+  /* ================= SSR POLICY: AUTO-APPROVE CHECK ================= */
+  const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
+
+  let requestStatus = "pending_approval"; // default
+
+  try {
+    const ssrPolicy = await EmployeeSsrPolicy.findOne({
+      corporateId: corporate._id,
+      employeeEmail: user.email?.toLowerCase().trim(),
+    }).lean();
+
+    if (ssrPolicy && ssrPolicy.approvalRequired === false) {
+      requestStatus = "approved";
+    }
+  } catch (policyErr) {
+    // Safe fallback — keep pending_approval
+  }
+
   const bookingRequest = await HotelBookingRequest.create({
     bookingReference: generateBookingReference(),
     corporateId: corporate._id,
@@ -325,7 +343,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
     bookingType: "hotel",
 
-    requestStatus: "pending_approval",
+    requestStatus,
 
     purposeOfTravel,
 
@@ -353,14 +371,19 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     bookingSnapshot,
   });
 
+  const isAutoApproved = requestStatus === "approved";
+
   return res.status(201).json({
     success: true,
     data: {
       bookingRequestId: bookingRequest._id,
       bookingReference: bookingRequest.bookingReference,
       requestStatus: bookingRequest.requestStatus,
+      autoApproved: isAutoApproved,
     },
-    message: "Hotel booking request submitted for approval",
+    message: isAutoApproved
+      ? "Hotel booking request auto-approved (no approval required per policy)"
+      : "Hotel booking request submitted for approval",
   });
 });
 

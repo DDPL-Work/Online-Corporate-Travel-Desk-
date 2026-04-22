@@ -396,7 +396,7 @@ class HotelService {
         },
       );
 
-      // logger.info("[HOTEL SEARCH RESPONSE]", data);
+      logger.info("[HOTEL SEARCH RESPONSE]", data);
 
       return data;
     } catch (err) {

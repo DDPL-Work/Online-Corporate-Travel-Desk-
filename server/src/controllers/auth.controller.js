@@ -7,6 +7,7 @@ const SuperAdmin = require("../models/SuperAdmin.model");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
 const Corporate = require("../models/Corporate");
+const OpsMember = require("../models/OpsMember");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
@@ -16,6 +17,7 @@ const { default: mongoose } = require("mongoose");
 // Map collections to roles
 const USER_TYPES = [
   { model: SuperAdmin, role: "super-admin" },
+  { model: OpsMember, role: "ops-member" },
   { model: User, role: "travel-admin" },
   { model: User, role: "manager" },
   { model: Employee, role: "employee" },
@@ -118,26 +120,37 @@ exports.login = asyncHandler(async (req, res) => {
   const passwordMatch = await bcrypt.compare(password, foundUser.user.password);
   if (!passwordMatch) throw new ApiError(401, "Invalid password");
 
-  const token = jwt.sign(
-    {
-      id: foundUser.user._id,
-      role: foundUser.role,
-      name: foundUser.user.name,
-      email: foundUser.user.email,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "1d" }
-  );
+  const tokenPayload = {
+    id: foundUser.user._id,
+    role: foundUser.role,
+    name: foundUser.user.name || "User",
+    email: foundUser.user.email,
+  };
+
+  if (foundUser.role === "ops-member") {
+    tokenPayload.permissions = foundUser.user.permissions;
+    tokenPayload.department = foundUser.user.department;
+  }
+
+  const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: "1d" });
+
+  const userResponse = {
+    id: foundUser.user._id,
+    email: foundUser.user.email,
+    name: foundUser.user.name || "User",
+    managerRequestStatus: foundUser.user.managerRequestStatus || "none",
+  };
+
+  if (foundUser.role === "ops-member") {
+    userResponse.permissions = foundUser.user.permissions;
+    userResponse.department = foundUser.user.department;
+  }
 
   res.status(200).json({
     success: true,
     token,
     role: foundUser.role,
-    user: {
-      id: foundUser.user._id,
-      email: foundUser.user.email,
-      name: foundUser.user.name || "User",
-    },
+    user: userResponse,
   });
 });
 
@@ -156,24 +169,48 @@ exports.getProfile = asyncHandler(async (req, res) => {
 // UPDATE PROFILE
 // ----------------------
 exports.updateProfile = asyncHandler(async (req, res) => {
-  const { name, mobile } = req.body;
+  const { name, mobile, newPassword, currentPassword } = req.body;
 
   let model;
   if (req.user.role === "super-admin") model = SuperAdmin;
+  else if (req.user.role === "ops-member") {
+     model = require("../models/OpsMember");
+  }
   else if (req.user.role === "travel-admin") model = User;
   else if (req.user.role === "manager") model = User;
   else if (req.user.role === "employee") model = Employee;
   else throw new ApiError(400, "Invalid user role");
 
-  const updated = await model.findByIdAndUpdate(
-    req.user.id,
-    { name, mobile },
-    { new: true }
-  );
+  const user = await model.findById(req.user.id).select("+password");
+  if (!user) throw new ApiError(404, "User not found");
+
+  // Update name if provided
+  if (name) user.name = name;
+
+  // Update mobile/phone
+  if (req.user.role === "ops-member") {
+    if (req.body.phone || mobile) user.phone = req.body.phone || mobile;
+  } else {
+    if (mobile) user.mobile = mobile;
+  }
+
+  // Handle Password Update
+  if (newPassword) {
+    if (!currentPassword) {
+      throw new ApiError(400, "Current password is required to change password");
+    }
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      throw new ApiError(401, "Current password incorrect");
+    }
+    user.password = newPassword; // Hooks will hash this
+  }
+
+  const updated = await user.save();
 
   res.status(200).json({
     success: true,
-    message: "Profile updated",
+    message: "Profile updated successfully",
     user: updated,
   });
 });

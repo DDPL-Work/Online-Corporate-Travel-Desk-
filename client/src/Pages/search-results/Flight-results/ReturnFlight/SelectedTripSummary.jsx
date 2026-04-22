@@ -4,6 +4,7 @@ import {
   airlineLogo,
   formatDate,
   formatTime,
+  CABIN_MAP,
 } from "../../../../utils/formatter";
 import { useDispatch, useSelector } from "react-redux";
 import { getFareUpsell } from "../../../../Redux/Actions/flight.thunks";
@@ -23,6 +24,8 @@ const getJourney = (flight) => {
     toCode: last.Destination.Airport.AirportCode,
     depTime: first.Origin.DepTime,
     arrTime: last.Destination.ArrTime,
+    supplierFareClass: first.SupplierFareClass || "Standard",
+    cabinClass: CABIN_MAP?.[first.CabinClass] || "Economy",
   };
 };
 
@@ -69,6 +72,15 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                     {formatTime(onwardData.depTime)} –{" "}
                     {formatTime(onwardData.arrTime)}
                   </div>
+
+                  <div className="flex gap-2 mt-1.5">
+                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
+                      CLASS: {onwardData.cabinClass}
+                    </span>
+                    <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-bold uppercase rounded border border-blue-200">
+                      FARE: {onwardData.supplierFareClass}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -102,6 +114,15 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                     {formatDate(returnData.depTime)} ·{" "}
                     {formatTime(returnData.depTime)} –{" "}
                     {formatTime(returnData.arrTime)}
+                  </div>
+
+                  <div className="flex gap-2 mt-1.5">
+                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
+                      CLASS: {returnData.cabinClass}
+                    </span>
+                    <span className="px-1.5 py-0.5 bg-green-50 text-green-700 text-[9px] font-bold uppercase rounded border border-green-200">
+                      FARE: {returnData.supplierFareClass}
+                    </span>
                   </div>
                 </div>
               </div>

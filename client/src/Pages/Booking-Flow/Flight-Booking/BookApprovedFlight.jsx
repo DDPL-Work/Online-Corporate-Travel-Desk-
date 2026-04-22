@@ -15,7 +15,7 @@ import {
   fetchMyBookingRequestById,
   executeApprovedFlightBooking,
 } from "../../../Redux/Actions/booking.thunks";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import {
   formatDateWithYear,
   formatDateTime,
@@ -351,8 +351,8 @@ export default function BookApprovedFlight() {
   const statusInfo = getStatusInfo();
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-10">
-      {/* <EmployeeHeader /> */}
+    <div className="min-h-screen bg-[#F8FAFC] pb-10 font-sans">
+      <CorporateNavbar />
 
       {/* 🔙 BACK BUTTON */}
       <div className="max-w-7xl mx-auto mt-4 px-4">

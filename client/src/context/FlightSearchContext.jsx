@@ -70,11 +70,16 @@ export const FlightSearchProvider = ({ children }) => {
   const openDropdown = (event) => {
     if (!event?.currentTarget) return;
 
+    if (isModalOpen) {
+      setIsModalOpen(false);
+      return;
+    }
+
     const rect = event.currentTarget.getBoundingClientRect();
 
     setModalPosition({
-      top: rect.bottom + window.scrollY + 6,
-      left: rect.left + window.scrollX,
+      top: rect.bottom + 6,
+      left: rect.left,
       width: rect.width,
     });
 

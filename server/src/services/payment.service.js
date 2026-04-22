@@ -73,9 +73,29 @@ class PaymentService {
         amount,
         balanceBefore,
         balanceAfter: corporate.walletBalance,
-        description: "Wallet debited for flight booking",
+        description: "Wallet debited for booking",
         status: "completed",
       });
+
+      // Update booking document (robustly)
+      if (booking.payment !== undefined) {
+        booking.payment = {
+           ...booking.payment,
+           method: "wallet",
+           status: "completed",
+           paidAt: new Date()
+        };
+      } 
+      
+      if (booking.paymentDetails !== undefined) {
+        booking.paymentDetails = {
+           ...booking.paymentDetails,
+           method: "wallet",
+           paymentStatus: "completed",
+           paidAt: new Date()
+        };
+      }
+      await booking.save();
 
       return { method: "wallet" };
     }
@@ -103,15 +123,38 @@ class PaymentService {
 
         bookingDate: new Date(),
 
-        status: "pending", // 👈 not paid
+        status: "billed", // 👈 officially recorded as debt
 
-        description: "Flight booking on credit (postpaid)",
+        description: `${booking.bookingType === "hotel" ? "Hotel" : "Flight"} booking on credit (postpaid)`,
 
         metadata: {
+          bookingType: booking.bookingType,
           flightNumber: booking.flightNumber,
           sector: booking.route,
+          hotelName: booking.hotelRequest?.HotelName || booking.hotelRequest?.hotelName,
+          city: booking.hotelRequest?.CityName || booking.hotelRequest?.city,
         },
       });
+
+      // Update booking document (robustly)
+      if (booking.payment !== undefined) {
+        booking.payment = {
+           ...booking.payment,
+           method: "postpaid",
+           status: "completed",
+           paidAt: new Date()
+        };
+      } 
+      
+      if (booking.paymentDetails !== undefined) {
+        booking.paymentDetails = {
+           ...booking.paymentDetails,
+           method: "postpaid",
+           paymentStatus: "completed",
+           paidAt: new Date()
+        };
+      }
+      await booking.save();
 
       return { method: "agency" };
     }

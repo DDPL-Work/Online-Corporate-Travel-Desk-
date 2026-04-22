@@ -11,7 +11,7 @@ import {
   Step4,
   Step5,
   Step6,
-  Step7,
+  // Step7,
 } from "./componetsAuth/steps";
 import { LeftPanel, STEPS, StepTracker } from "./componetsAuth/components";
 
@@ -52,10 +52,6 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     // creditLimit: 0,
     // currentOutstanding: 0,
     creditTermsNotes: "",
-    allowedCabinClass: ["Economy"],
-    allowAncillaryServices: true,
-    advanceBookingDays: 0,
-    maxBookingAmount: 0,
     gstin: "",
     gstLegalName: "",
     gstAddress: "",
@@ -100,9 +96,9 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "" : "Invalid email format",
 
     mobile: (v) =>
-      /^[6-9]\d{9}$/.test(v.replace(/\D/g, ""))
+      v?.replace(/\D/g, "").length >= 10
         ? ""
-        : "Enter valid 10-digit mobile",
+        : "Enter valid mobile",
 
     gstin: (v) =>
       /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(v)
@@ -135,6 +131,23 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
         newErrors.primaryMobile =
           validators.required(form.primaryMobile) ||
           validators.mobile(form.primaryMobile);
+
+        if (form.billingEmail) {
+          const billingEmailErr = validators.email(form.billingEmail);
+          if (billingEmailErr) {
+            newErrors.billingEmail = billingEmailErr;
+          } else {
+            const primaryDomain = form.primaryEmail?.split('@')[1];
+            const billingDomain = form.billingEmail?.split('@')[1];
+            if (primaryDomain && billingDomain && primaryDomain !== billingDomain) {
+              newErrors.billingEmail = "Domain must match primary email";
+              ToastWithTimer({
+                message: "Billing email domain must match primary email domain",
+                type: "error",
+              });
+            }
+          }
+        }
         break;
 
       case 3:
@@ -147,18 +160,25 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
         newErrors.ssoDomain =
           validators.required(form.ssoDomain) ||
           validators.domain(form.ssoDomain);
+
+        if (!newErrors.ssoDomain && form.primaryEmail) {
+          const primaryDomain = form.primaryEmail.split('@')[1]?.toLowerCase();
+          const ssoDomain = form.ssoDomain.toLowerCase();
+          
+          if (primaryDomain && ssoDomain !== primaryDomain) {
+            newErrors.ssoDomain = "Domain must match primary email domain";
+            ToastWithTimer({
+              message: "Please align SSO domain with the primary email domain",
+              type: "error",
+            });
+          }
+        }
         break;
 
       case 5:
-        if (form.allowedCabinClass.length === 0)
-          newErrors.allowedCabinClass = "Select at least one cabin class";
-        break;
-
-      case 6:
-        if (!gstFile && !gstUrl)
+        if (!gstFile && !gstUrl && !form.gstin) {
           newErrors.gstCertificate = "GST certificate required";
-
-        // if (!panFile && !panUrl) newErrors.panCard = "PAN card required";
+        }
 
         newErrors.gstin =
           validators.required(form.gstin) || validators.gstin(form.gstin);
@@ -199,7 +219,7 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
       return;
     }
 
-    if (step === 6) {
+    if (step === 5) {
       submitOnboarding();
       return;
     }
@@ -281,7 +301,10 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     fd.append("gstDetails[gstin]", form.gstin);
     fd.append("gstDetails[legalName]", form.gstLegalName);
     fd.append("gstDetails[address]", form.gstAddress);
-    fd.append("gstDetails[gstEmail]", form.gstEmail);
+    
+    // GST Email preference: Accounts (Billing) > Travel-admin (Primary)
+    const finalGstEmail = form.gstEmail || form.billingEmail || form.primaryEmail || "";
+    fd.append("gstDetails[gstEmail]", finalGstEmail);
 
     // BILLING
     // fd.append("billingCycle", form.billingCycle);
@@ -301,24 +324,13 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     // fd.append("walletBalance", form.walletBalance);
 
     // DEFAULT APPROVER
-    fd.append("defaultApprover", form.defaultApprover);
+    // fd.append("defaultApprover", form.defaultApprover);
 
     // NOTES
     // fd.append("creditTermsNotes", form.creditTermsNotes);
 
     // ADMIN EMAIL (from Step0)
     fd.append("email", form.email);
-
-    // TRAVEL POLICY
-    form.allowedCabinClass.forEach((c) =>
-      fd.append("travelPolicy[allowedCabinClass][]", c),
-    );
-    fd.append(
-      "travelPolicy[allowAncillaryServices]",
-      form.allowAncillaryServices,
-    );
-    fd.append("travelPolicy[advanceBookingDays]", form.advanceBookingDays);
-    fd.append("travelPolicy[maxBookingAmount]", form.maxBookingAmount);
 
     // DOCUMENTS
     if (gstMode === "file" && gstFile) {
@@ -342,17 +354,21 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
         type: "success",
         duration: 4000,
       });
-      setStep(8); // Move to Done step
+      setStep(6); // Move to Done step
     } catch (err) {
       console.error("Onboarding failed:", err);
 
-      if (err?.response?.data?.errors) {
-        setErrors(err.response.data.errors);
+      if (typeof err === "string") {
+        ToastWithTimer({
+          message: err,
+          type: "error",
+        });
+      } else if (err && typeof err === "object") {
+        // If it's a validation field error object returned from backend
+        setErrors(err);
       } else {
         ToastWithTimer({
-          message:
-            err?.response?.data?.message ||
-            "Something went wrong. Please try again.",
+          message: "Something went wrong. Please try again.",
           type: "error",
         });
       }
@@ -394,11 +410,11 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
         return <Step4 form={form} setForm={setForm} errors={errors} />;
       // case 5:
       //   return <Step5 form={form} setForm={setForm} errors={errors} />;
+      // case 5:
+      //   return <Step5 form={form} setForm={setForm} errors={errors} />;
       case 5:
-        return <Step5 form={form} setForm={setForm} errors={errors} />;
-      case 6:
         return (
-          <Step6
+          <Step5
             form={form}
             setForm={setForm}
             gstMode={gstMode}
@@ -417,8 +433,8 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
             errors={errors}
           />
         );
-      case 7:
-        return <Step7 form={form} />;
+      case 6:
+        return <Step6 form={form} />;
       default:
         return null;
     }
@@ -476,9 +492,9 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
                           : // : step === 5
                             //   ? "Billing & Credit"
                             step === 5
-                            ? "Travel Policy"
+                            ? "Upload Documents"
                             : step === 6
-                              ? "Upload Documents"
+                              ? ""
                               : "All Set! 🎉"}
               </p>
             </div>

@@ -12,6 +12,7 @@ import {
   formatDate,
   formatTime,
 } from "../../../utils/formatter";
+import { FlightDetailsDropdown } from "./One-wayFlightCard";
 import { getFareUpsell } from "../../../Redux/Actions/flight.thunks";
 
 export default function MultiCityFlightCard({
@@ -24,6 +25,7 @@ export default function MultiCityFlightCard({
   searchPayload,
 }) {
   const [openIndex, setOpenIndex] = useState(-1);
+  const [showDetails, setShowDetails] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -213,6 +215,25 @@ export default function MultiCityFlightCard({
             </div>
           );
         })}
+
+        {/* --- Global Details Section --- */}
+        <div className="mt-4 flex flex-col gap-4">
+           <div className="flex justify-between items-center bg-blue-50/20 px-4 py-2 rounded-xl border border-blue-100">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pricing & Policy Center</span>
+              <button
+                onClick={() => setShowDetails(!showDetails)}
+                className="text-xs font-black text-blue-600 hover:text-blue-800 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-blue-200 shadow-sm transition-all"
+              >
+                {showDetails ? "Hide Fare Details ▲" : "View Fare Details ▼"}
+              </button>
+           </div>
+           
+           {showDetails && (
+              <div className="border border-blue-200 rounded-2xl overflow-hidden bg-white shadow-lg animate-in fade-in slide-in-from-top-2 duration-300">
+                 <FlightDetailsDropdown selectedFlight={{ Segments: legs, Fare: fare, ...segments[0] }} />
+              </div>
+           )}
+        </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between mt-6">

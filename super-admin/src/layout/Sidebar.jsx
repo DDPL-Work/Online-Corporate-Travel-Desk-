@@ -17,7 +17,7 @@ import {
   FaUser,
   FaBars,
 } from "react-icons/fa";
-import { MdCancelScheduleSend, MdOutlineCancel } from "react-icons/md";
+import { MdCancelScheduleSend, MdOutlineCancel, MdPending } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCorporateAdmin } from "../Redux/Slice/corporateAdminSlice";
 
@@ -53,66 +53,91 @@ export default function Sidebar({ isOpen, onClose }) {
     //   icon: <FaBuilding />,
     // },
     {
-      to: "/corporate-management",
-      label: "Corporate Access Control",
+      to: "/pending-corporates",
+      label: "Pending Corporates",
+      icon: <MdPending />,
+      permission: "Manage Corporates",
+    },
+    {
+      to: "/active-corporates",
+      label: "Active Corporates",
       icon: <FaShieldAlt />,
+      permission: "Manage Corporates",
     },
     {
       to: "/bookings-summary",
       label: "Bookings Summary",
       icon: <FaClipboardList />,
+      permission: "View Bookings",
     },
     {
       to: "/cancellation-summary",
       label: "Cancellation Summary",
       icon: <MdOutlineCancel />,
+      permission: "Manage Cancellations",
     },
     {
       to: "/cancellation-query",
       label: "Cancellation Query",
       icon: <MdCancelScheduleSend />,
+      permission: "Manage Cancellations",
     },
     {
       to: "/corporate-revenue",
       label: "Corporate Revenue",
       icon: <FaMoneyBillWave />,
+      permission: "View Finance",
     },
     {
       to: "/credit-status",
       label: "Credit Status & Alerts",
       icon: <FaCreditCard />,
+      permission: "View Finance",
     },
     {
       to: "/wallet-recharge-logs",
       label: "Wallet Recharge Logs",
       icon: <FaWallet />,
+      permission: "View Finance",
     },
-    
-    // {
-    //   to: "/pending-amendments",
-    //   label: "Pending Amendments",
-    //   icon: <FaExchangeAlt />,
-    // },
-    // {
-    //   to: "/commission-settings",
-    //   label: "Commission Settings",
-    //   icon: <FaCog />,
-    // },
     {
       to: "/api-configurations",
       label: "API Configurations",
       icon: <FaListAlt />,
+      permission: "Super Admin Only",
+    },
+    {
+      to: "/ops-management",
+      label: "OPS Team Management",
+      icon: <FaShieldAlt />,
+      permission: "Super Admin Only",
     },
     // { to: "/system-logs", label: "System Logs", icon: <FaFileAlt /> },
   ];
 
   const menus = {
     "super-admin": travelCompanyMenu,
+    "ops-member": travelCompanyMenu.filter((m) => {
+      // Get permissions from token or session
+      let permissions = [];
+      try {
+        const userRaw = sessionStorage.getItem("user");
+        if (userRaw) {
+          const user = JSON.parse(userRaw);
+          permissions = user.permissions || [];
+        }
+      } catch (err) {
+        console.error("Error parsing user permissions", err);
+      }
+      
+      return permissions.includes(m.permission);
+    }),
   };
   const activeMenu = menus[role] || [];
 
   const roleLabels = {
     "super-admin": "Super Admin",
+    "ops-member": "OPS Team Member",
   };
 
   // ========================= UI =========================

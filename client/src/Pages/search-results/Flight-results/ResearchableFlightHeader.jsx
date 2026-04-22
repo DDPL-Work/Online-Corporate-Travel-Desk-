@@ -1,454 +1,278 @@
-// ResearchableFlightHeader.jsx  — Premium redesign
-// Drop-in replacement for the sticky header in FlightSearchResults.jsx
-// Usage identical to previous version — same props API, zero other changes needed.
+// ResearchableFlightHeader.jsx
+// MMT-style inline header with read/edit toggle (Tailwind CSS)
+// Default: read-only view with "Modify Search" button
+// On click: inputs become editable, button becomes "Search"
 
 import React, { useState, useRef, useEffect } from "react";
-import { BsCalendar4, BsChevronDown, BsChevronUp, BsSearch, BsArrowRight } from "react-icons/bs";
-import { BiTrendingDown } from "react-icons/bi";
-import { IoIosAirplane } from "react-icons/io";
-import { MdArrowBack, MdSwapHoriz, MdAdd, MdClose, MdPerson } from "react-icons/md";
-import { formatDate } from "../../../utils/formatter";
+import { FaExchangeAlt, FaPlane } from "react-icons/fa";
+import {
+  MdFlightTakeoff,
+  MdFlightLand,
+  MdArrowBack,
+  MdPerson,
+  MdKeyboardArrowDown,
+  MdEdit,
+} from "react-icons/md";
+import { BsCalendar3, BsSearch, BsChevronDown } from "react-icons/bs";
+import { airportDatabase } from "../../../data/airportDatabase";
+import TravelersClassModal from "../../../components/FlightSearchComponents/TravelersClassModal";
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+/* ─── cabin ──────────────────────────────────────────────────────────────────── */
+const CABIN_OPTIONS = [
+  { label: "Economy",         value: "economy"         },
+  { label: "Premium Economy", value: "premium_economy" },
+  { label: "Business",        value: "business"        },
+  { label: "First Class",     value: "first_class"     },
+  { label: "Premium Business",     value: "premium_business"     }, 
+];
+const CABIN_TBO = { 2: "economy", 3: "premium_economy", 4: "business", 6: "first_class", 7: "premium_business" };
+const TBO_CABIN = { economy: 2, premium_economy: 3, business: 4, first_class: 6, premium_business: 7 };
+const cabinLabel = (v) => CABIN_OPTIONS.find((o) => o.value === v)?.label || "Economy";
 
-const toISODate = (dateStr) => {
-  if (!dateStr) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-  if (dateStr.includes("T")) return dateStr.split("T")[0];
-  if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
-    const [dd, mm, yyyy] = dateStr.split("-");
-    return `${yyyy}-${mm}-${dd}`;
-  }
-  try {
-    const d = new Date(dateStr);
-    if (!isNaN(d)) return d.toISOString().split("T")[0];
-  } catch (_) {}
+/* ─── helpers ────────────────────────────────────────────────────────────────── */
+const toISO = (s) => {
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (s.includes("T")) return s.split("T")[0];
+  try { const d = new Date(s); if (!isNaN(d)) return d.toISOString().split("T")[0]; } catch (_) {}
   return "";
 };
 
-const CABIN_OPTIONS = [
-  { label: "Economy",         short: "Economy",   value: 2 },
-  { label: "Premium Economy", short: "Prem. Eco", value: 3 },
-  { label: "Business",        short: "Business",  value: 4 },
-  { label: "First Class",     short: "First",     value: 6 },
-];
+const fmtDate = (iso) => {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "2-digit" });
+  } catch (_) { return iso; }
+};
 
-const CABIN_LABEL = (v) =>
-  CABIN_OPTIONS.find((o) => o.value === Number(v))?.short || "Economy";
+const getAirport  = (code) => airportDatabase.find((a) => a.iata_code === code);
+const airportDisp = (code) => { const a = getAirport(code); return a ? `${a.city}, ${a.country}` : code || "—"; };
+const airportSub  = (code) => { const a = getAirport(code); return a ? `${code} · ${a.name?.slice(0, 28)}` : ""; };
 
-// ─── primitive UI pieces ──────────────────────────────────────────────────────
+const SORT_TABS = ["Best", "Cheapest", "Early depart", "Late depart"];
 
-function AirportInput({ value, placeholder, onChange }) {
-  return (
-    <input
-      type="text"
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        width: "100%", background: "transparent", border: "none", outline: "none",
-        color: "white", fontSize: 15, fontWeight: 600,
-        fontFamily: "'DM Sans', sans-serif",
-      }}
-      className="placeholder-white/30"
-    />
-  );
-}
+/* ─── derive / build payload ─────────────────────────────────────────────────── */
+const derive = (payload, journeyType) => {
+  const jt = Number(journeyType) || 1;
+  const adults   = payload?.AdultCount  ?? payload?.adults   ?? payload?.passengers?.adults   ?? 1;
+  const children = payload?.ChildCount  ?? payload?.children ?? payload?.passengers?.children ?? 0;
+  const infants  = payload?.InfantCount ?? payload?.infants  ?? payload?.passengers?.infants  ?? 0;
+  const cabRaw   = payload?.Segments?.[0]?.FlightCabinClass ?? payload?.cabinClass ?? "economy";
+  const cabin    = typeof cabRaw === "number" ? (CABIN_TBO[cabRaw] || "economy") : cabRaw;
+  const origin      = payload?.Segments?.[0]?.Origin      || payload?.origin      || "";
+  const destination = payload?.Segments?.[0]?.Destination || payload?.destination || "";
+  const dep = toISO(payload?.Segments?.[0]?.PreferredDepartureTime || payload?.departureDate);
+  const ret = toISO(payload?.Segments?.[1]?.PreferredDepartureTime || payload?.returnDate || payload?.ReturnDate);
 
-function DateInput({ value, min, onChange, label }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      {label && (
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
-          color: "rgba(255,255,255,0.35)", textTransform: "uppercase",
-        }}>
-          {label}
-        </span>
-      )}
-      <input
-        type="date"
-        value={value}
-        min={min || new Date().toISOString().split("T")[0]}
-        onChange={(e) => onChange(e.target.value)}
-        style={{
-          background: "transparent", border: "none", outline: "none",
-          color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer",
-          fontFamily: "'DM Sans', sans-serif", colorScheme: "dark",
-        }}
-      />
-    </div>
-  );
-}
+  if (jt === 3) {
+    return { journeyType: 3, passengers: { adults, children, infants }, cabin,
+      segments: (payload?.Segments || payload?.segments || []).map((s) => ({
+        origin:        s.Origin      || s.origin      || "",
+        destination:   s.Destination || s.destination || "",
+        departureDate: toISO(s.PreferredDepartureTime || s.departureDate || ""),
+      })) };
+  }
+  return { journeyType: jt, passengers: { adults, children, infants }, cabin, origin, destination, departureDate: dep, returnDate: ret };
+};
 
-function GlassField({ children, style = {} }) {
-  return (
-    <div style={{
-      background: "rgba(255,255,255,0.07)",
-      border: "1px solid rgba(255,255,255,0.12)",
-      borderRadius: 12, padding: "10px 14px",
-      ...style,
-    }}>
-      {children}
-    </div>
-  );
-}
+const buildPayload = (draft, original) => {
+  const jt = Number(draft.journeyType);
+  const counts = { AdultCount: draft.passengers.adults, ChildCount: draft.passengers.children, InfantCount: draft.passengers.infants };
+  const cc = TBO_CABIN[draft.cabin] || 2;
+  if (jt === 1) return { ...original, ...counts, JourneyType: 1,
+    Segments: [{ ...(original?.Segments?.[0] || {}), Origin: draft.origin, Destination: draft.destination, FlightCabinClass: cc, PreferredDepartureTime: draft.departureDate ? `${draft.departureDate}T00:00:00` : "" }] };
+  if (jt === 2) return { ...original, ...counts, JourneyType: 2,
+    Segments: [
+      { ...(original?.Segments?.[0] || {}), Origin: draft.origin, Destination: draft.destination, FlightCabinClass: cc, PreferredDepartureTime: draft.departureDate ? `${draft.departureDate}T00:00:00` : "" },
+      { ...(original?.Segments?.[1] || {}), Origin: draft.destination, Destination: draft.origin, FlightCabinClass: cc, PreferredDepartureTime: draft.returnDate ? `${draft.returnDate}T00:00:00` : "" },
+    ] };
+  if (jt === 3) return { ...original, ...counts, JourneyType: 3,
+    Segments: (draft.segments || []).map((s, i) => ({ ...(original?.Segments?.[i] || {}), Origin: s.origin, Destination: s.destination, FlightCabinClass: cc, PreferredDepartureTime: s.departureDate ? `${s.departureDate}T00:00:00` : "" })) };
+  return original;
+};
 
-function FieldLabel({ children }) {
-  return (
-    <div style={{
-      fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
-      color: "rgba(255,255,255,0.35)", textTransform: "uppercase", marginBottom: 3,
-    }}>
-      {children}
-    </div>
-  );
-}
+/* ─── Vertical divider ───────────────────────────────────────────────────────── */
+const Div = ({ editMode }) => (
+  <div className={`w-px h-11 shrink-0 self-center ${editMode ? "bg-blue-200" : "bg-gray-200"}`} />
+);
 
-function SwapBtn({ onClick }) {
-  const [hover, setHover] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-        background: hover ? "rgba(99,179,255,0.22)" : "rgba(255,255,255,0.08)",
-        border: "1px solid rgba(255,255,255,0.15)",
-        color: "white", cursor: "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        transition: "background 0.2s",
-      }}
-    >
-      <MdSwapHoriz style={{ fontSize: 20 }} />
-    </button>
-  );
-}
-
-// ─── Passenger & Cabin Picker ────────────────────────────────────────────────
-
-function PassengerCabinPicker({ passengers, cabinClass, onChange }) {
+/* ─── Airport Autocomplete ───────────────────────────────────────────────────── */
+function AirportAutocomplete({ value, onChange, placeholder }) {
+  const [q, setQ]       = useState("");
+  const [hits, setHits] = useState([]);
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const inputRef = useRef(null);
+  const dropRef  = useRef(null);
 
   useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    if (value) {
+      const a = getAirport(value);
+      setQ(a ? `${a.city}, ${a.country}` : value);
+    } else {
+      setQ("");
+    }
+  }, [value]);
+
+  useEffect(() => {
+    const h = (e) => {
+      if (dropRef.current && !dropRef.current.contains(e.target) && inputRef.current && !inputRef.current.contains(e.target))
+        setOpen(false);
+    };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const total = (passengers.adults || 1) + (passengers.children || 0) + (passengers.infants || 0);
+  const handleChange = (e) => {
+    const v = e.target.value;
+    setQ(v);
+    if (v.length > 1) {
+      const s = v.toLowerCase();
+      setHits(airportDatabase.filter((a) =>
+        a.city.toLowerCase().includes(s) || a.iata_code.toLowerCase().includes(s) ||
+        a.name.toLowerCase().includes(s) || (a.country && a.country.toLowerCase().includes(s))
+      ).slice(0, 8));
+      setOpen(true);
+    } else { setHits([]); setOpen(false); }
+  };
 
-  const adjust = (key, delta) => {
-    const next = { ...passengers, [key]: Math.max(key === "adults" ? 1 : 0, (passengers[key] || 0) + delta) };
-    if (next.infants > next.adults) next.infants = next.adults;
-    onChange({ passengers: next, cabinClass });
+  const select = (a) => {
+    onChange({ code: a.iata_code, city: a.city, country: a.country, ...a });
+    setOpen(false);
   };
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button
-        onClick={() => setOpen((p) => !p)}
-        style={{
-          display: "flex", alignItems: "center", gap: 8,
-          background: "rgba(255,255,255,0.07)",
-          border: "1px solid rgba(255,255,255,0.12)",
-          borderRadius: 10, padding: "8px 14px",
-          color: "white", cursor: "pointer", fontSize: 13, fontWeight: 600,
-          fontFamily: "'DM Sans', sans-serif",
-        }}
-      >
-        <MdPerson style={{ fontSize: 16, color: "#63b3ff" }} />
-        {total} Traveller{total !== 1 ? "s" : ""}
-        <span style={{ color: "rgba(255,255,255,0.38)", fontSize: 12 }}>
-          · {CABIN_LABEL(cabinClass)}
-        </span>
-        {open
-          ? <BsChevronUp style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }} />
-          : <BsChevronDown style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }} />
-        }
-      </button>
+    <div className="relative flex-1 min-w-0">
+      <div className="flex items-center gap-1.5 w-full">
+        <input
+          ref={inputRef}
+          type="text"
+          value={q}
+          onChange={handleChange}
+          onFocus={() => q.length > 1 && setOpen(true)}
+          placeholder={placeholder}
+          autoComplete="off"
+          className="w-full border-none outline-none bg-transparent text-[14px] font-extrabold text-gray-900 font-inter placeholder:text-gray-400 placeholder:font-semibold"
+        />
+      </div>
 
-      {open && (
-        <div style={{
-          position: "absolute", top: 48, left: 0, zIndex: 100,
-          background: "#0d1a2e",
-          border: "1px solid rgba(99,179,255,0.18)",
-          borderRadius: 16, boxShadow: "0 24px 60px rgba(0,0,0,0.65)",
-          padding: 20, width: 300, fontFamily: "'DM Sans', sans-serif",
-        }}>
-          {[
-            { key: "adults",   label: "Adults",   sub: "12+ yrs" },
-            { key: "children", label: "Children", sub: "2–11 yrs" },
-            { key: "infants",  label: "Infants",  sub: "Under 2 yrs" },
-          ].map(({ key, label, sub }) => (
-            <div key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "white" }}>{label}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.32)" }}>{sub}</div>
+      {open && hits.length > 0 && (
+        <div ref={dropRef} className="absolute top-[calc(100%+8px)] -left-2 w-[300px] z-[200] bg-white border border-gray-200 rounded-xl shadow-2xl max-h-[280px] overflow-y-auto">
+          <div className="px-3.5 py-1.5 bg-gray-50 border-b border-gray-100 text-[9px] font-bold tracking-widest text-gray-400 uppercase sticky top-0">Airports</div>
+          {hits.map((a, i) => (
+            <div key={i} onClick={() => select(a)}
+              className="flex items-center justify-between px-3.5 py-2.5 cursor-pointer border-b border-gray-50 hover:bg-blue-50 transition-colors">
+              <div className="flex items-center gap-2.5">
+                <div className="w-[30px] h-[30px] rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                  <FaPlane className="text-[11px] text-[#2F80B7]" />
+                </div>
+                <div>
+                  <div className="text-[13px] font-semibold text-gray-800">{a.city}, {a.country}</div>
+                  <div className="text-[11px] text-gray-400">{a.name?.slice(0, 34)}</div>
+                </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <button onClick={() => adjust(key, -1)} style={{
-                  width: 30, height: 30, borderRadius: "50%",
-                  border: "1px solid rgba(255,255,255,0.18)",
-                  background: "rgba(255,255,255,0.05)",
-                  color: "white", cursor: "pointer", fontSize: 20, lineHeight: 1,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>−</button>
-                <span style={{ fontSize: 15, fontWeight: 800, color: "white", minWidth: 16, textAlign: "center" }}>
-                  {passengers[key] || 0}
-                </span>
-                <button onClick={() => adjust(key, 1)} style={{
-                  width: 30, height: 30, borderRadius: "50%",
-                  border: "1px solid rgba(99,179,255,0.4)",
-                  background: "rgba(99,179,255,0.1)",
-                  color: "#63b3ff", cursor: "pointer", fontSize: 20, lineHeight: 1,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>+</button>
-              </div>
+              <span className="text-[12px] font-bold text-[#2F80B7] bg-blue-50 px-2 py-0.5 rounded-md">{a.iata_code}</span>
             </div>
           ))}
-
-          <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "4px 0 16px" }} />
-
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.32)", textTransform: "uppercase", marginBottom: 10 }}>
-            Cabin class
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            {CABIN_OPTIONS.map((opt) => {
-              const active = Number(cabinClass) === opt.value;
-              return (
-                <button key={opt.value} onClick={() => onChange({ passengers, cabinClass: opt.value })} style={{
-                  padding: "9px 0", borderRadius: 10, cursor: "pointer",
-                  border: active ? "1px solid #63b3ff" : "1px solid rgba(255,255,255,0.09)",
-                  background: active ? "rgba(99,179,255,0.16)" : "rgba(255,255,255,0.03)",
-                  color: active ? "#63b3ff" : "rgba(255,255,255,0.55)",
-                  fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif",
-                }}>
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <button onClick={() => setOpen(false)} style={{
-            marginTop: 16, width: "100%", padding: "10px 0", borderRadius: 10, border: "none",
-            background: "linear-gradient(135deg, #2563eb, #1e40af)",
-            color: "white", fontSize: 13, fontWeight: 800, cursor: "pointer",
-            fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.03em",
-          }}>
-            Done
-          </button>
         </div>
       )}
     </div>
   );
 }
 
-// ─── Journey forms ───────────────────────────────────────────────────────────
+/* ─── Passenger & Cabin picker ───────────────────────────────────────────────── */
+function PaxCabin({ passengers, cabin, onChange, editMode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
 
-function OneWayForm({ payload, onChange }) {
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-      <GlassField style={{ flex: 1, minWidth: 130 }}>
-        <FieldLabel>From</FieldLabel>
-        <AirportInput value={payload.origin || ""} placeholder="City or airport"
-          onChange={(v) => onChange({ ...payload, origin: v })} />
-      </GlassField>
-      <SwapBtn onClick={() => onChange({ ...payload, origin: payload.destination, destination: payload.origin })} />
-      <GlassField style={{ flex: 1, minWidth: 130 }}>
-        <FieldLabel>To</FieldLabel>
-        <AirportInput value={payload.destination || ""} placeholder="City or airport"
-          onChange={(v) => onChange({ ...payload, destination: v })} />
-      </GlassField>
-      <GlassField style={{ minWidth: 148 }}>
-        <DateInput label="Departure" value={toISODate(payload.departureDate)}
-          onChange={(v) => onChange({ ...payload, departureDate: v })} />
-      </GlassField>
-    </div>
-  );
-}
-
-function RoundTripForm({ payload, onChange }) {
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-      <GlassField style={{ flex: 1, minWidth: 130 }}>
-        <FieldLabel>From</FieldLabel>
-        <AirportInput value={payload.origin || ""} placeholder="City or airport"
-          onChange={(v) => onChange({ ...payload, origin: v })} />
-      </GlassField>
-      <SwapBtn onClick={() => onChange({ ...payload, origin: payload.destination, destination: payload.origin })} />
-      <GlassField style={{ flex: 1, minWidth: 130 }}>
-        <FieldLabel>To</FieldLabel>
-        <AirportInput value={payload.destination || ""} placeholder="City or airport"
-          onChange={(v) => onChange({ ...payload, destination: v })} />
-      </GlassField>
-      <GlassField style={{ minWidth: 148 }}>
-        <DateInput label="Departure" value={toISODate(payload.departureDate)}
-          onChange={(v) => onChange({ ...payload, departureDate: v })} />
-      </GlassField>
-      <GlassField style={{ minWidth: 148 }}>
-        <DateInput label="Return" value={toISODate(payload.returnDate)}
-          min={toISODate(payload.departureDate)}
-          onChange={(v) => onChange({ ...payload, returnDate: v })} />
-      </GlassField>
-    </div>
-  );
-}
-
-const EMPTY_SEG = { origin: "", destination: "", departureDate: "" };
-
-function MultiCityForm({ payload, onChange }) {
-  const segments = payload.segments?.length ? payload.segments : [EMPTY_SEG, EMPTY_SEG];
-
-  const updateSeg = (idx, field, value) => {
-    onChange({ ...payload, segments: segments.map((s, i) => (i === idx ? { ...s, [field]: value } : s)) });
-  };
+  const total = (passengers.adults || 1) + (passengers.children || 0) + (passengers.infants || 0);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {segments.map((seg, idx) => (
-        <div key={idx} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-          <div style={{
-            fontSize: 10, fontWeight: 800, letterSpacing: "0.1em",
-            color: "rgba(99,179,255,0.65)", textTransform: "uppercase", width: 46, flexShrink: 0,
-          }}>
-            Leg {idx + 1}
-          </div>
-          <GlassField style={{ flex: 1, minWidth: 110 }}>
-            <FieldLabel>From</FieldLabel>
-            <AirportInput value={seg.origin} placeholder="City"
-              onChange={(v) => updateSeg(idx, "origin", v)} />
-          </GlassField>
-          <GlassField style={{ flex: 1, minWidth: 110 }}>
-            <FieldLabel>To</FieldLabel>
-            <AirportInput value={seg.destination} placeholder="City"
-              onChange={(v) => updateSeg(idx, "destination", v)} />
-          </GlassField>
-          <GlassField style={{ minWidth: 148 }}>
-            <DateInput label="Date" value={toISODate(seg.departureDate)}
-              min={idx > 0 ? toISODate(segments[idx - 1]?.departureDate) : undefined}
-              onChange={(v) => updateSeg(idx, "departureDate", v)} />
-          </GlassField>
-          {segments.length > 2 && (
-            <button
-              onClick={() => onChange({ ...payload, segments: segments.filter((_, i) => i !== idx) })}
-              style={{
-                width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
-                background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.22)",
-                color: "rgba(239,68,68,0.7)", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-            >
-              <MdClose style={{ fontSize: 14 }} />
-            </button>
-          )}
-        </div>
-      ))}
+    <div ref={ref} className={`relative ${editMode ? "cursor-pointer" : "cursor-default"}`}>
+      <div
+        onClick={() => editMode && setOpen(!open)}
+        className="flex items-center gap-1.5 h-full w-full"
+      >
+        <span className="text-[14px] font-extrabold text-gray-900 whitespace-nowrap">
+          {total} Adult{total !== 1 ? "s" : ""}, {cabinLabel(cabin).slice(0, 8)}
+        </span>
+        {editMode && <BsChevronDown className="text-gray-500 text-[10px] ml-auto" />}
+      </div>
 
-      {segments.length < 6 && (
-        <button
-          onClick={() => onChange({ ...payload, segments: [...segments, { ...EMPTY_SEG }] })}
-          style={{
-            alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6,
-            fontSize: 12, fontWeight: 700, color: "#63b3ff",
-            background: "rgba(99,179,255,0.07)",
-            border: "1px dashed rgba(99,179,255,0.28)",
-            borderRadius: 8, padding: "6px 12px", cursor: "pointer",
-            fontFamily: "'DM Sans', sans-serif", marginTop: 2,
+      {open && editMode && (
+        <TravelersClassModal
+          onClose={() => setOpen(false)}
+          onApply={(data) => {
+            const selectedOpt = CABIN_OPTIONS.find(o => o.label === data.travelClass);
+            onChange({
+              passengers: { adults: data.adults, children: data.children, infants: data.infants },
+              cabin: selectedOpt ? selectedOpt.value : "economy"
+            });
           }}
-        >
-          <MdAdd style={{ fontSize: 15 }} /> Add another city
-        </button>
+          modalPosition={{ top: "calc(100% + 12px)", left: "auto", right: 0, width: 320 }}
+          initialData={{
+            passengers,
+            travelClass: cabinLabel(cabin),
+          }}
+        />
       )}
     </div>
   );
 }
 
-// ─── payload utilities ────────────────────────────────────────────────────────
 
-const buildSearchPayload = (draft, originalPayload) => {
-  const jt = Number(draft.journeyType);
-  const counts = {
-    AdultCount:  draft.passengers?.adults   ?? originalPayload?.AdultCount  ?? 1,
-    ChildCount:  draft.passengers?.children ?? originalPayload?.ChildCount  ?? 0,
-    InfantCount: draft.passengers?.infants  ?? originalPayload?.InfantCount ?? 0,
+
+/* ─── Trip Type Dropdown ─────────────────────────────────────────────────────── */
+function TripTypeDropdown({ value, onChange, editMode, journeyLabel }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  const labels = {
+    1: "One Way",
+    2: "Round Trip",
+    3: "Multi City"
   };
 
-  if (jt === 1) return {
-    ...originalPayload, ...counts, JourneyType: 1,
-    Segments: [{
-      ...(originalPayload?.Segments?.[0] || {}),
-      Origin: draft.origin, Destination: draft.destination,
-      FlightCabinClass: draft.cabinClass || 2,
-      PreferredDepartureTime: draft.departureDate ? `${draft.departureDate}T00:00:00` : "",
-    }],
-  };
+  useEffect(() => {
+    const h = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
 
-  if (jt === 2) return {
-    ...originalPayload, ...counts, JourneyType: 2,
-    Segments: [
-      { ...(originalPayload?.Segments?.[0] || {}), Origin: draft.origin, Destination: draft.destination, FlightCabinClass: draft.cabinClass || 2, PreferredDepartureTime: draft.departureDate ? `${draft.departureDate}T00:00:00` : "" },
-      { ...(originalPayload?.Segments?.[1] || {}), Origin: draft.destination, Destination: draft.origin, FlightCabinClass: draft.cabinClass || 2, PreferredDepartureTime: draft.returnDate ? `${draft.returnDate}T00:00:00` : "" },
-    ],
-  };
+  return (
+    <div ref={ref} className={`relative flex flex-col flex-shrink-0 min-w-[130px] bg-white border ${editMode ? 'border-[#2F80B7] bg-blue-50 cursor-pointer shadow-md z-[100]' : 'border-gray-300 cursor-default shadow-sm'} rounded-[8px] px-3.5 py-2 transition-colors`}
+      onClick={() => editMode && setOpen(!open)}
+    >
+      <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase flex items-center gap-1.5 mb-[2px]">
+        Trip Type {editMode && <BsChevronDown className="text-[#2F80B7] text-[10px] font-extrabold ml-auto" />}
+      </div>
+      <div className="text-[14px] font-extrabold text-gray-900">{editMode ? labels[value] : journeyLabel}</div>
 
-  if (jt === 3) return {
-    ...originalPayload, ...counts, JourneyType: 3,
-    Segments: (draft.segments || []).map((seg, i) => ({
-      ...(originalPayload?.Segments?.[i] || {}),
-      Origin: seg.origin, Destination: seg.destination,
-      FlightCabinClass: draft.cabinClass || 2,
-      PreferredDepartureTime: seg.departureDate ? `${seg.departureDate}T00:00:00` : "",
-    })),
-  };
+      {open && editMode && (
+        <div className="absolute top-[calc(100%+8px)] left-0 w-full min-w-[140px] z-[200] bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+          {[
+            { label: "One Way", val: 1 },
+            { label: "Round Trip", val: 2 },
+            { label: "Multi City", val: 3 },
+          ].map(opt => (
+            <div 
+              key={opt.val}
+              onClick={(e) => { e.stopPropagation(); onChange(opt.val); setOpen(false); }}
+              className={`px-4 py-2.5 text-[13px] font-bold cursor-pointer transition-colors border-b border-gray-50 last:border-b-0 ${value === opt.val ? 'bg-blue-50 text-[#2F80B7]' : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-  return originalPayload;
-};
-
-const deriveDraft = (searchPayload, journeyType) => {
-  const jt = Number(journeyType);
-  const passengers = {
-    adults:   searchPayload?.AdultCount  ?? searchPayload?.passengers?.adults   ?? 1,
-    children: searchPayload?.ChildCount  ?? searchPayload?.passengers?.children ?? 0,
-    infants:  searchPayload?.InfantCount ?? searchPayload?.passengers?.infants  ?? 0,
-  };
-  const cabinClass = searchPayload?.Segments?.[0]?.FlightCabinClass ?? searchPayload?.cabinClass ?? 2;
-
-  if (jt === 1) return {
-    journeyType: 1, passengers, cabinClass,
-    origin:      searchPayload?.Segments?.[0]?.Origin      || "",
-    destination: searchPayload?.Segments?.[0]?.Destination || "",
-    departureDate: toISODate(searchPayload?.Segments?.[0]?.PreferredDepartureTime || searchPayload?.departureDate),
-  };
-  if (jt === 2) return {
-    journeyType: 2, passengers, cabinClass,
-    origin:      searchPayload?.Segments?.[0]?.Origin      || "",
-    destination: searchPayload?.Segments?.[0]?.Destination || "",
-    departureDate: toISODate(searchPayload?.Segments?.[0]?.PreferredDepartureTime || searchPayload?.departureDate),
-    returnDate:    toISODate(searchPayload?.Segments?.[1]?.PreferredDepartureTime || searchPayload?.ReturnDate || searchPayload?.returnDate),
-  };
-  if (jt === 3) return {
-    journeyType: 3, passengers, cabinClass,
-    segments: (searchPayload?.Segments || searchPayload?.segments || []).map((s) => ({
-      origin:       s.Origin || s.origin || "",
-      destination:  s.Destination || s.destination || "",
-      departureDate: toISODate(s.PreferredDepartureTime || s.departureDate || ""),
-    })),
-  };
-  return { journeyType: jt, passengers, cabinClass };
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// MAIN EXPORT
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const BG = "linear-gradient(135deg, #0b1628 0%, #0f2044 55%, #0c1a36 100%)";
-const BORDER = "1px solid rgba(99,179,255,0.1)";
-const FONT = "'DM Sans', sans-serif";
-const SORT_TABS = ["Best", "Cheapest", "Early depart", "Late depart"];
-
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MAIN EXPORT
+═══════════════════════════════════════════════════════════════════════════════ */
 export default function ResearchableFlightHeader({
   routeHeader = [],
   headerStats = {},
@@ -462,251 +286,319 @@ export default function ResearchableFlightHeader({
   onBack = () => {},
 }) {
   const [editMode, setEditMode] = useState(false);
-  const [draft, setDraft] = useState(() => deriveDraft(searchPayload, journeyType));
+  const [draft, setDraft]       = useState(() => derive(searchPayload, journeyType));
+  const [loading, setLoading]   = useState(false);
 
+  const jt = Number(editMode ? draft?.journeyType : journeyType) || 1;
+  const staticJtLabel = Number(journeyType) === 2 ? "Round Trip" : Number(journeyType) === 3 ? "Multi City" : "One Way";
+  const journeyLabel = editMode ? (jt === 2 ? "Round Trip" : jt === 3 ? "Multi City" : "One Way") : staticJtLabel;
+
+  // Reset draft to latest payload when exiting edit or payload changes
   useEffect(() => {
-    if (!editMode) setDraft(deriveDraft(searchPayload, journeyType));
-  }, [searchPayload, journeyType]);
+    if (!editMode) setDraft(derive(searchPayload, journeyType));
+  }, [searchPayload, journeyType, editMode]);
 
-  const handleSearch = () => {
-    onSearch(buildSearchPayload(draft, searchPayload));
+  // Ensure default segments for multi-city exist when switching
+  useEffect(() => {
+    if (jt === 3 && (!draft.segments || draft.segments.length === 0)) {
+      setDraft(d => ({
+        ...d,
+        segments: [
+          { origin: d.origin, destination: d.destination, departureDate: d.departureDate },
+          { origin: d.destination, destination: "", departureDate: d.returnDate || d.departureDate }
+        ]
+      }));
+    }
+  }, [jt]);
+
+  const handleSearch = async () => {
+    setLoading(true);
+    try {
+      await onSearch(buildPayload(draft, searchPayload));
+      setEditMode(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    setDraft(derive(searchPayload, journeyType));
     setEditMode(false);
   };
 
-  const wrapStyle = {
-    position: "sticky", top: 0, zIndex: 40,
-    background: BG,
-    borderBottom: BORDER,
-    boxShadow: "0 4px 40px rgba(0,0,0,0.45)",
-    fontFamily: FONT,
-  };
+  /* ── ONE-WAY / ROUND-TRIP row ── */
+  const renderMainRow = () => (
+    <div className="flex items-stretch gap-2 py-3 w-full animate-fadeIn transition-colors duration-200 flex-wrap">
+      
+      {/* TRIP TYPE */}
+      <TripTypeDropdown value={jt} onChange={(v) => setDraft({ ...draft, journeyType: v })} editMode={editMode} journeyLabel={staticJtLabel} />
 
-  const inner = {
-    maxWidth: "100%", margin: "0 40px",
-    padding: "12px 0 0",
-  };
-
-  // ── COLLAPSED ─────────────────────────────────────────────────────────────
-  if (!editMode) {
-    return (
-      <div style={wrapStyle}>
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet" />
-
-        <div style={inner}>
-          {/* top row */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-
-            {/* Back */}
-            <button onClick={onBack} style={{
-              display: "flex", alignItems: "center", gap: 6,
-              background: "none", border: "none",
-              color: "rgba(255,255,255,0.45)", cursor: "pointer",
-              fontSize: 13, fontWeight: 600, fontFamily: FONT, transition: "color 0.2s",
-            }}
-              onMouseEnter={(e) => e.currentTarget.style.color = "#63b3ff"}
-              onMouseLeave={(e) => e.currentTarget.style.color = "rgba(255,255,255,0.45)"}
-            >
-              <MdArrowBack style={{ fontSize: 18 }} />
-              Back to search
-            </button>
-
-            {/* Route pills + modify */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-                {routeHeader.map((r, idx) => (
-                  <React.Fragment key={idx}>
-                    <div style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      background: "rgba(255,255,255,0.05)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 12, padding: "8px 16px",
-                    }}>
-                      <div style={{ lineHeight: 1.2 }}>
-                        <div style={{
-                          fontSize: 15, fontWeight: 700, color: "white",
-                          display: "flex", alignItems: "center", gap: 6,
-                          fontFamily: "'DM Serif Display', serif",
-                        }}>
-                          {r.fromCity}
-                          <IoIosAirplane style={{ color: "#63b3ff", fontSize: 15 }} />
-                          {r.toCity}
-                        </div>
-                        <div style={{
-                          fontSize: 11, color: "rgba(255,255,255,0.38)", fontWeight: 500,
-                          display: "flex", alignItems: "center", gap: 4, marginTop: 3,
-                        }}>
-                          <BsCalendar4 style={{ color: "#63b3ff", fontSize: 10 }} />
-                          {formatDate(r.depDate)}
-                        </div>
-                      </div>
-                    </div>
-                    {idx < routeHeader.length - 1 && (
-                      <BsArrowRight style={{ color: "rgba(99,179,255,0.4)", fontSize: 13 }} />
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-
-              {/* Modify pill */}
-              <button
-                onClick={() => setEditMode(true)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  background: "rgba(99,179,255,0.09)",
-                  border: "1px solid rgba(99,179,255,0.28)",
-                  borderRadius: 20, padding: "5px 14px",
-                  color: "#63b3ff", fontSize: 11, fontWeight: 700,
-                  cursor: "pointer", letterSpacing: "0.05em",
-                  fontFamily: FONT, transition: "background 0.2s",
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(99,179,255,0.18)"}
-                onMouseLeave={(e) => e.currentTarget.style.background = "rgba(99,179,255,0.09)"}
-              >
-                <BsSearch style={{ fontSize: 10 }} />
-                MODIFY SEARCH
-              </button>
-            </div>
-
-            {/* Cheapest badge */}
-            <div style={{
-              background: "rgba(34,197,94,0.08)",
-              border: "1px solid rgba(34,197,94,0.18)",
-              borderRadius: 12, padding: "8px 14px",
-              display: "flex", alignItems: "center", gap: 10,
-            }}>
-              <BiTrendingDown style={{ color: "#4ade80", fontSize: 20 }} />
-              <div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                  Cheapest
-                </div>
-                <div style={{ fontSize: 17, fontWeight: 800, color: "#4ade80", lineHeight: 1.1 }}>
-                  {headerStats.minPrice ? `₹${headerStats.minPrice.toLocaleString()}` : "—"}
-                </div>
-              </div>
-            </div>
+      {/* FROM */}
+      <div className={`flex flex-col flex-[1.4] min-w-0 px-3.5 py-2 border rounded-[8px] transition-colors shadow-sm
+        ${editMode ? "border-[#2F80B7] bg-blue-50" : "border-gray-300 bg-white hover:border-[#2F80B7]"}
+      `}>
+        <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">From</div>
+        {editMode ? (
+          <AirportAutocomplete
+            value={draft.origin}
+            onChange={(a) => setDraft((d) => ({ ...d, origin: a.code }))}
+            placeholder="City or airport"
+          />
+        ) : (
+          <div className="text-[14px] font-extrabold text-gray-900 truncate">
+            {airportDisp(draft.origin)}
           </div>
+        )}
+      </div>
 
-          {/* sort + count row */}
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            borderTop: "1px solid rgba(255,255,255,0.06)", padding: "8px 0",
-          }}>
-            <div style={{ display: "flex", gap: 4 }}>
-              {SORT_TABS.map((tab) => {
-                const active = sortKey === tab;
-                return (
-                  <button key={tab} onClick={() => setSortKey(tab)} style={{
-                    padding: "6px 16px", borderRadius: 20, fontSize: 12, fontWeight: 700,
-                    fontFamily: FONT, cursor: "pointer", transition: "all 0.15s",
-                    border: active ? "1px solid rgba(37,99,235,0.7)" : "1px solid rgba(255,255,255,0.09)",
-                    background: active ? "linear-gradient(135deg, #2563eb, #1d4ed8)" : "rgba(255,255,255,0.04)",
-                    color: active ? "white" : "rgba(255,255,255,0.45)",
-                    letterSpacing: "0.02em",
-                  }}>
-                    {tab}
-                  </button>
-                );
-              })}
+      {/* SWAP ICON */}
+      <div className="flex items-center justify-center shrink-0 w-6">
+        <FaExchangeAlt 
+          onClick={() => editMode && setDraft((d) => ({ ...d, origin: d.destination, destination: d.origin }))}
+          className={`text-[15px] transition-colors ${editMode ? 'text-[#2F80B7] hover:text-blue-800 cursor-pointer' : 'text-[#8eb5ce]'}`} 
+        />
+      </div>
+
+      {/* TO */}
+      <div className={`flex flex-col flex-[1.4] min-w-0 px-3.5 py-2 border rounded-[8px] transition-colors shadow-sm
+        ${editMode ? "border-[#2F80B7] bg-blue-50" : "border-gray-300 bg-white hover:border-[#2F80B7]"}
+      `}>
+        <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">To</div>
+        {editMode ? (
+          <AirportAutocomplete
+            value={draft.destination}
+            onChange={(a) => setDraft((d) => ({ ...d, destination: a.code }))}
+            placeholder="City or airport"
+          />
+        ) : (
+          <div className="text-[14px] font-extrabold text-gray-900 truncate">
+            {airportDisp(draft.destination)}
+          </div>
+        )}
+      </div>
+
+      {/* DEPART */}
+      <div className={`flex flex-col shrink-0 min-w-[135px] px-3.5 py-2 border rounded-[8px] transition-colors shadow-sm
+        ${editMode ? "border-[#2F80B7] bg-blue-50" : "border-gray-300 bg-white hover:border-[#2F80B7]"}
+      `}>
+        <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">Depart</div>
+        {editMode ? (
+          <input
+            type="date"
+            value={draft.departureDate}
+            min={new Date().toISOString().split("T")[0]}
+            onChange={(e) => setDraft((d) => ({ ...d, departureDate: e.target.value }))}
+            className="border-none outline-none bg-transparent text-[14px] font-extrabold text-gray-900 cursor-pointer font-inter w-full"
+          />
+        ) : (
+          <div className="text-[14px] font-extrabold text-gray-900">
+            {fmtDate(draft.departureDate)}
+          </div>
+        )}
+      </div>
+
+      {/* RETURN */}
+      <div className={`flex flex-col shrink-0 min-w-[135px] px-3.5 py-2 border rounded-[8px] transition-colors shadow-sm
+        ${editMode && jt === 2 ? "border-[#2F80B7] bg-blue-50" : "border-gray-300 bg-white hover:border-[#2F80B7]"}
+        ${jt === 1 ? "opacity-50 pointer-events-none bg-gray-50 hover:border-gray-300" : ""}
+      `}>
+        <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">Return</div>
+        {editMode && jt === 2 ? (
+          <input
+            type="date"
+            value={draft.returnDate || ""}
+            min={draft.departureDate}
+            onChange={(e) => setDraft((d) => ({ ...d, returnDate: e.target.value }))}
+            className="border-none outline-none bg-transparent text-[14px] font-extrabold text-gray-900 cursor-pointer font-inter w-full"
+          />
+        ) : (
+          <div className={`text-[14px] font-extrabold ${jt === 1 ? "text-gray-400" : "text-gray-900"}`}>
+            {jt === 1 ? "Select Return" : fmtDate(draft.returnDate)}
+          </div>
+        )}
+      </div>
+
+      {/* PASSENGER & CLASS */}
+      <div className={`flex flex-col shrink-0 min-w-[155px] px-3.5 py-2 border rounded-[8px] transition-colors shadow-sm
+        ${editMode ? "border-[#2F80B7] bg-blue-50" : "border-gray-300 bg-white hover:border-[#2F80B7]"}
+      `}>
+        <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">Passenger &amp; Class</div>
+        <PaxCabin
+          passengers={draft.passengers}
+          cabin={draft.cabin}
+          onChange={({ passengers, cabin }) => setDraft((d) => ({ ...d, passengers, cabin }))}
+          editMode={editMode}
+        />
+      </div>
+
+      {/* CTA ACTIONS */}
+      <div className="flex items-center gap-2 pl-1 shrink-0">
+        {editMode ? (
+          <>
+            <button
+              onClick={cancelEdit}
+              className="px-4 h-[44px] rounded-[8px] border border-gray-300 bg-white text-gray-500 text-[13px] font-bold font-inter cursor-pointer shadow-sm hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSearch}
+              disabled={loading}
+              className={`flex items-center justify-center gap-1.5 pl-6 pr-6 h-[44px] rounded-[8px] border-none text-white text-[14px] font-bold font-inter uppercase transition-transform shadow-md min-w-[130px]
+                ${loading ? "bg-blue-300 cursor-not-allowed" : "bg-[#67A6E4] hover:bg-[#5b95cd] cursor-pointer"}
+              `}
+            >
+              {loading ? "..." : "SEARCH"}
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setEditMode(true)}
+            className="flex items-center justify-center gap-1.5 px-6 h-[44px] rounded-[8px] border-none bg-gradient-to-r from-[#87CAFE] to-[#71ACFE] text-white text-[14px] font-bold font-inter uppercase cursor-pointer shadow-md min-w-[130px] transition-opacity hover:opacity-90"
+          >
+            MODIFY
+          </button>
+        )}
+      </div>
+
+    </div>
+  );
+
+  /* ── MULTI-CITY row ── */
+  const renderMultiCity = () => (
+    <div className={`p-4 px-5 transition-colors duration-200 flex flex-col gap-3 ${editMode ? "bg-[#f0f8ff]" : "bg-white"}`}>
+      {/* TRIP TYPE TOGGLE FOR MULTI-CITY (Only needed in edit mode to swap back, but fits nice as headers) */}
+      <div className="flex w-full items-center">
+         <TripTypeDropdown value={jt} onChange={(v) => setDraft({ ...draft, journeyType: v })} editMode={editMode} journeyLabel={staticJtLabel} />
+      </div>
+
+      <div className="border border-gray-100 bg-white rounded-xl overflow-hidden shadow-sm">
+        {(draft.segments || []).map((seg, idx) => {
+        const fromA = getAirport(seg.origin);
+        const toA   = getAirport(seg.destination);
+        const isNotLast = idx < draft.segments.length - 1;
+        
+        return (
+          <div key={idx} className={`flex items-center gap-0 ${isNotLast ? "border-b border-gray-100 pb-2.5 mb-2.5" : ""}`}>
+            <div className="text-[10px] font-extrabold text-[#2F80B7] uppercase tracking-[0.08em] mr-3 w-7 shrink-0">#{idx + 1}</div>
+
+            {/* From */}
+            <div className="flex-1 min-w-0 pr-3.5">
+              <div className="text-[9px] font-bold tracking-widest text-gray-500 uppercase mb-[3px]">From</div>
+              {editMode
+                ? <AirportAutocomplete value={seg.origin} onChange={(a) => { const s = [...draft.segments]; s[idx] = { ...s[idx], origin: a.code }; setDraft((d) => ({ ...d, segments: s })); }} placeholder="City" icon={<MdFlightTakeoff />} />
+                : <div className="text-[14px] font-bold text-gray-900">{fromA ? `${fromA.city}, ${fromA.country}` : seg.origin || "—"}</div>
+              }
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "rgba(255,255,255,0.38)", fontWeight: 600 }}>
-              <span>
-                <span style={{ color: "white", fontWeight: 800, fontSize: 16 }}>{flightsCount}</span> flights found
-              </span>
-              {showBestTimeBadge && (
-                <span style={{
-                  background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.22)",
-                  borderRadius: 20, padding: "3px 10px", color: "#4ade80", fontSize: 11, fontWeight: 700,
-                }}>
-                  Best time to book
-                </span>
+            <Div editMode={editMode} />
+
+            {/* To */}
+            <div className="flex-1 min-w-0 px-3.5">
+              <div className="text-[9px] font-bold tracking-widest text-gray-500 uppercase mb-[3px]">To</div>
+              {editMode
+                ? <AirportAutocomplete value={seg.destination} onChange={(a) => { const s = [...draft.segments]; s[idx] = { ...s[idx], destination: a.code }; setDraft((d) => ({ ...d, segments: s })); }} placeholder="City" icon={<MdFlightLand />} />
+                : <div className="text-[14px] font-bold text-gray-900">{toA ? `${toA.city}, ${toA.country}` : seg.destination || "—"}</div>
+              }
+            </div>
+
+            <Div editMode={editMode} />
+
+            {/* Date */}
+            <div className="shrink-0 px-3.5">
+              <div className="text-[9px] font-bold tracking-widest text-gray-500 uppercase mb-[3px]">Date</div>
+              {editMode ? (
+                <div className="flex items-center gap-1.5">
+                  <BsCalendar3 className="text-[#2F80B7] text-[13px]" />
+                  <input type="date" value={seg.departureDate}
+                    min={idx > 0 ? draft.segments[idx - 1]?.departureDate : new Date().toISOString().split("T")[0]}
+                    onChange={(e) => { const s = [...draft.segments]; s[idx] = { ...s[idx], departureDate: e.target.value }; setDraft((d) => ({ ...d, segments: s })); }}
+                    className="border-none outline-none bg-transparent text-[14px] font-bold text-gray-900 cursor-pointer" />
+                </div>
+              ) : (
+                <div className="text-[14px] font-bold text-gray-900">{fmtDate(seg.departureDate)}</div>
               )}
             </div>
           </div>
+        );
+      })}
+
+      </div>
+
+      {/* Pax + CTA */}
+      <div className="flex items-center justify-between pt-3 mt-1">
+        <div>
+          <div className="text-[9px] font-bold tracking-widest text-gray-500 uppercase mb-[3px]">Passenger &amp; Class</div>
+          <PaxCabin passengers={draft.passengers} cabin={draft.cabin}
+            onChange={({ passengers, cabin }) => setDraft((d) => ({ ...d, passengers, cabin }))} editMode={editMode} />
+        </div>
+        <div className="flex gap-2">
+          {editMode ? (
+            <>
+              <button onClick={cancelEdit} className="px-4 py-[9px] rounded-lg border-[1.5px] border-gray-200 bg-white text-gray-500 text-[13px] font-bold cursor-pointer">Cancel</button>
+              <button onClick={handleSearch} disabled={loading}
+                className="flex items-center gap-1.5 px-6 py-[9px] rounded-lg border-none bg-gradient-to-b from-[#2F80B7] to-[#1F8DB7] text-white text-[13px] font-extrabold cursor-pointer shadow-[0_4px_16px_rgba(47,128,183,0.4)] uppercase">
+                <BsSearch className="text-[12px]" /> {loading ? "Searching…" : "Search"}
+              </button>
+            </>
+          ) : (
+            <button onClick={() => setEditMode(true)}
+              className="flex items-center gap-1.5 px-5 py-[9px] rounded-lg border-[1.5px] border-[#2F80B7] bg-white text-[#2F80B7] text-[13px] font-bold cursor-pointer hover:bg-blue-50 transition-colors">
+              <MdEdit className="text-[14px]" /> Modify Search
+            </button>
+          )}
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // ── EXPANDED (EDIT) ───────────────────────────────────────────────────────
+  /* ══ RENDER ══ */
   return (
-    <div style={wrapStyle}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+    <div className="sticky top-0 z-40 font-inter">
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
-      <div style={{ ...inner, padding: "14px 0" }}>
-        {/* journey switcher + passengers row */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
-          <div style={{
-            display: "flex", gap: 2,
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.09)",
-            borderRadius: 10, padding: 3,
-          }}>
-            {[{ label: "One Way", value: 1 }, { label: "Round Trip", value: 2 }, { label: "Multi City", value: 3 }].map(({ label, value }) => {
-              const active = Number(draft.journeyType) === value;
-              return (
-                <button key={value} onClick={() => setDraft((d) => ({ ...d, journeyType: value }))} style={{
-                  padding: "7px 18px", borderRadius: 8, border: "none", cursor: "pointer",
-                  background: active ? "linear-gradient(135deg, #2563eb, #1d4ed8)" : "transparent",
-                  color: active ? "white" : "rgba(255,255,255,0.4)",
-                  fontSize: 12, fontWeight: 700, fontFamily: FONT,
-                  letterSpacing: "0.02em", transition: "all 0.15s",
-                }}>
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-
-          <PassengerCabinPicker
-            passengers={draft.passengers}
-            cabinClass={draft.cabinClass}
-            onChange={({ passengers, cabinClass }) => setDraft((d) => ({ ...d, passengers, cabinClass }))}
-          />
+      {/* ── Dark brand top strip ── */}
+      <div className="bg-gradient-to-r from-[#1a3a5c] to-[#1F4D7B] py-[7px] px-10 flex items-center justify-between">
+        <button onClick={onBack}
+          className="flex items-center gap-1.5 bg-transparent border-none text-white/65 cursor-pointer text-[12px] font-semibold p-0 hover:text-white transition-colors">
+          <MdArrowBack className="text-[16px]" /> Back to search
+        </button>
+        <div className="flex items-center gap-3.5 text-[12px] text-white/50">
+          <span className="bg-[#2f80b7]/30 border border-[#2f80b7]/50 rounded-full px-2.5 py-0.5 text-white/85 font-bold text-[11px] tracking-[0.04em]">
+            {journeyLabel}
+          </span>
+          <span className="font-medium">{flightsCount} flights found</span>
         </div>
+      </div>
 
-        {/* route form */}
-        <div style={{
-          background: "rgba(255,255,255,0.03)",
-          border: "1px solid rgba(255,255,255,0.07)",
-          borderRadius: 16, padding: 14, marginBottom: 14,
-        }}>
-          {Number(draft.journeyType) === 1 && <OneWayForm payload={draft} onChange={setDraft} />}
-          {Number(draft.journeyType) === 2 && <RoundTripForm payload={draft} onChange={setDraft} />}
-          {Number(draft.journeyType) === 3 && <MultiCityForm payload={draft} onChange={setDraft} />}
+      {/* ── White search bar ── */}
+      <div className="bg-white border-b border-gray-200 shadow-[0_2px_12px_rgba(0,0,0,0.06)] relative z-10 w-full">
+        <div className="px-6 lg:px-10 max-w-full">
+          {(jt === 1 || jt === 2) && renderMainRow()}
+          {jt === 3 && renderMultiCity()}
         </div>
+      </div>
 
-        {/* actions */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
-          <button
-            onClick={() => { setDraft(deriveDraft(searchPayload, journeyType)); setEditMode(false); }}
-            style={{
-              padding: "9px 20px", borderRadius: 10,
-              border: "1px solid rgba(255,255,255,0.09)",
-              background: "transparent", color: "rgba(255,255,255,0.45)",
-              fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-            }}
-          >
-            Cancel
-          </button>
-
-          <button
-            onClick={handleSearch}
-            style={{
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "9px 26px", borderRadius: 10, border: "none",
-              background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
-              color: "white", fontSize: 13, fontWeight: 800, cursor: "pointer",
-              fontFamily: FONT, letterSpacing: "0.03em",
-              boxShadow: "0 4px 20px rgba(37,99,235,0.4)",
-              transition: "transform 0.15s, box-shadow 0.15s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 28px rgba(37,99,235,0.6)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(37,99,235,0.4)"; }}
-          >
-            <BsSearch style={{ fontSize: 13 }} />
-            Search Flights
-          </button>
+      {/* ── Sort + count bar ── */}
+      <div className="bg-slate-50 border-b border-gray-200 py-[7px] px-10 flex items-center justify-between">
+        <div className="flex gap-1.5">
+          {SORT_TABS.map((tab) => {
+            const active = sortKey === tab;
+            return (
+              <button key={tab} onClick={() => setSortKey(tab)}
+                className={`px-4 py-1.5 rounded-full text-[12px] font-bold cursor-pointer transition-all duration-150 font-inter 
+                  ${active 
+                    ? "border-[1.5px] border-[#2F80B7] bg-gradient-to-b from-[#2F80B7] to-[#1F8DB7] text-white shadow-[0_2px_8px_rgba(47,128,183,0.25)]" 
+                    : "border-[1.5px] border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+                  }
+                `}>
+                {tab}
+              </button>
+            );
+          })}
+        </div>
+        <div className="text-[13px] text-gray-500 font-medium">
+          <span className="font-extrabold text-[16px] text-gray-900 mr-1">{flightsCount}</span>flights found
         </div>
       </div>
     </div>

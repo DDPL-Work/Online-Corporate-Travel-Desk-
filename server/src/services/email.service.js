@@ -201,6 +201,31 @@ class EmailService {
       html
     });
   }
+
+  // -----------------------------------------------------
+  // OPS TEAM WELCOME EMAIL
+  // -----------------------------------------------------
+  async sendOpsWelcomeEmail(opsMember, password) {
+    const subject = "Welcome to the OPS Team";
+    const html = `
+      <div style="font-family: Arial; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0;">
+        <h2 style="color: #0A4D68;">Welcome, ${opsMember.name}!</h2>
+        <p>You have been added as a <strong>${opsMember.role}</strong> to the OPS Team.</p>
+
+        <div style="background: #f9f9f9; padding: 15px; margin: 20px 0; border-radius: 8px;">
+          <h3>Your Login Credentials</h3>
+          <p><strong>Email:</strong> ${opsMember.email}</p>
+          <p><strong>Password:</strong> ${password}</p>
+          <p><strong>Department:</strong> ${opsMember.department}</p>
+        </div>
+
+        <p>Please log in to the admin panel to get started.</p>
+        <p style="color: #666; font-size: 12px;">For security, please change your password after your first login.</p>
+      </div>
+    `;
+
+    return await this.sendEmail({ to: opsMember.email, subject, html });
+  }
 }
 
 module.exports = new EmailService();

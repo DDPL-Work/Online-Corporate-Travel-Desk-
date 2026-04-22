@@ -547,526 +547,184 @@ export const normalizeSSRList = (list = []) => {
   return Array.from(map.values());
 };
 
-export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
-  const [open, setOpen] = useState({
-    cancellation: true,
-    dateChange: true,
-    important: false,
-  });
 
-  const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+const airlineNames = {
+  IX: "Air India Express",
+  "6E": "IndiGo",
+  AI: "Air India",
+  SG: "SpiceJet",
+  UK: "Vistara",
+  QP: "Akasa Air",
+};
 
-  // 🔒 LOGIC UNCHANGED
-  if (fareRulesStatus === "loading") {
-    return (
-      <div className="flex flex-col items-center justify-center bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-        <div className="loader mb-3"></div>
-        <p className="text-gray-600 text-sm">Loading fare rules...</p>
-      </div>
-    );
-  }
 
-  if (!fareRules) {
-    return (
-      <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-500 text-sm">
-        Fare rules not available for this fare.
-      </div>
-    );
-  }
 
-  const results = fareRules?.Response?.Results || fareRules;
-  const miniFareRules = Array.isArray(results?.MiniFareRules)
-    ? results.MiniFareRules.flat()
-    : [];
+// ─── Single Rule Card ────────────────────────────────────────────────────────
+const RuleCard = ({ fareRule, theme }) => {
+  const [open, setOpen] = useState(true);
+  const { origin, destination, fareBasisCode, baggage, mealAndSeat, cancellation, reissue, notes } = fareRule;
 
-  const cancellationRules = miniFareRules.filter(
-    (rule) => rule.Type === "Cancellation",
-  );
-  const reissueRules = miniFareRules.filter((rule) => rule.Type === "Reissue");
-
-  const fareBasisCode = results?.FareRules?.[0]?.FareBasisCode || "";
-  const airlineRemark = results?.AirlineRemark || "";
-  const isRefundable = results?.IsRefundable;
-
-  const formatTimeRange = (from, to, unit) => {
-    if (!from && !to) return "Anytime";
-    if (from && !to)
-      return `More than ${from} ${unit.toLowerCase()} before departure`;
-    if (!from && to) return `Within ${to} ${unit.toLowerCase()} of departure`;
-    return `${from}-${to} ${unit.toLowerCase()} before departure`;
-  };
-
-  const sections = [
-    {
-      key: "cancellation",
-      title: "Cancellation Charges",
-      icon: <MdCancel size={20} />,
-      color: "text-red-600",
-      data: cancellationRules,
-      hasData: cancellationRules.length > 0,
-    },
-    {
-      key: "dateChange",
-      title: "Date Change Charges",
-      icon: <MdDateRange size={20} />,
-      color: "text-orange-600",
-      data: reissueRules,
-      hasData: reissueRules.length > 0,
-    },
-    {
-      key: "important",
-      title: "Important Information",
-      icon: <AiOutlineInfoCircle size={20} />,
-      color: "text-blue-600",
-      data: { fareBasisCode, airlineRemark, isRefundable },
-      hasData: !!(fareBasisCode || airlineRemark || isRefundable !== undefined),
-    },
-  ];
-
-  // 🔒 RENDER LOGIC UNCHANGED — only classes & structure polished
   return (
-    <div className="space-y-5">
-      {sections.map(
-        (sec) =>
-          sec.hasData && (
-            <div
-              key={sec.key}
-              className="border border-gray-200 bg-white rounded-xl shadow-sm overflow-hidden transition-all hover:shadow-md"
-            >
-              {/* Header */}
-              <button
-                onClick={() => toggle(sec.key)}
-                className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 hover:bg-gray-100 transition"
-              >
-                <div className="flex items-center gap-3">
-                  <span className={sec.color}>{sec.icon}</span>
-                  <span className="font-semibold text-gray-800 text-sm md:text-base">
-                    {sec.title}
-                  </span>
-                </div>
-                {open[sec.key] ? (
-                  <IoChevronUp className="text-gray-500" size={18} />
-                ) : (
-                  <IoChevronDown className="text-gray-500" size={18} />
-                )}
-              </button>
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-xs hover:shadow-md transition-shadow duration-300 overflow-hidden mb-5">
+      {/* Card Header */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`w-full flex items-center justify-between px-6 py-5 bg-gradient-to-r ${theme?.gradient || "from-blue-600 to-indigo-700"} text-white group`}
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-[10px] font-black uppercase tracking-wider shrink-0 transition-transform group-hover:scale-105">
+            {origin || "?"}
+          </div>
+          <div className="text-left flex flex-col justify-center">
+            <p className="font-bold text-sm tracking-wide text-white drop-shadow-sm">
+              {origin} → {destination}
+            </p>
+            {fareBasisCode && (
+              <p className="text-[11px] font-medium text-white/80 mt-1 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-white/60"></span>
+                Fare basis: {fareBasisCode}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 group-hover:bg-white/20 transition-colors">
+          {open ? <IoChevronUp size={16} /> : <IoChevronDown size={16} />}
+        </div>
+      </button>
 
-              {/* Body */}
-              {open[sec.key] && (
-                <div className="px-6 py-4 bg-white border-t border-gray-100 animate-fadeIn space-y-3">
-                  {/* Cancellation */}
-                  {sec.key === "cancellation" &&
-                    sec.data.map((rule, i) => (
-                      <div
-                        key={i}
-                        className="flex justify-between items-start py-2 border-b last:border-0 border-gray-100"
-                      >
-                        <div className="flex-1 pr-4">
-                          <p className="font-medium text-gray-800 text-sm">
-                            {formatTimeRange(rule.From, rule.To, rule.Unit)}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {rule.JourneyPoints}
-                          </p>
-                        </div>
-                        <p className="text-right font-semibold text-gray-900 text-sm">
-                          {rule.Details}
-                        </p>
-                      </div>
-                    ))}
-
-                  {/* Date Change */}
-                  {sec.key === "dateChange" &&
-                    sec.data.map((rule, i) => (
-                      <div
-                        key={i}
-                        className="flex justify-between items-start py-2 border-b last:border-0 border-gray-100"
-                      >
-                        <div className="flex-1 pr-4">
-                          <p className="font-medium text-gray-800 text-sm">
-                            {formatTimeRange(rule.From, rule.To, rule.Unit)}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {rule.JourneyPoints}
-                          </p>
-                        </div>
-                        <p className="text-right font-semibold text-gray-900 text-sm">
-                          {rule.Details}
-                        </p>
-                      </div>
-                    ))}
-
-                  {/* Important */}
-                  {sec.key === "important" && (
-                    <div className="space-y-3">
-                      {sec.data.fareBasisCode && (
-                        <div className="p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
-                          <p className="text-xs text-gray-600 font-medium uppercase">
-                            Fare Basis Code
-                          </p>
-                          <p className="font-semibold text-blue-900 text-sm">
-                            {sec.data.fareBasisCode}
-                          </p>
-                        </div>
-                      )}
-                      {sec.data.isRefundable !== undefined && (
-                        <div
-                          className={`p-3 border-l-4 rounded ${
-                            sec.data.isRefundable
-                              ? "bg-green-50 border-green-500"
-                              : "bg-red-50 border-red-500"
-                          }`}
-                        >
-                          <p className="text-xs text-gray-600 font-medium uppercase">
-                            Refund Policy
-                          </p>
-                          <p
-                            className={`font-semibold text-sm ${
-                              sec.data.isRefundable
-                                ? "text-green-800"
-                                : "text-red-800"
-                            }`}
-                          >
-                            {sec.data.isRefundable
-                              ? "Refundable"
-                              : "Non-Refundable"}
-                          </p>
-                        </div>
-                      )}
-                      {sec.data.airlineRemark && (
-                        <div className="p-3 bg-gray-50 border-l-4 border-gray-400 rounded">
-                          <p className="text-xs text-gray-600 font-medium uppercase">
-                            Airline Remark
-                          </p>
-                          <p className="text-xs text-gray-700 mt-1 leading-relaxed">
-                            {sec.data.airlineRemark.split(".")[0]}.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+      {open && (
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50">
+          
+          {/* Baggage */}
+          <div className="rounded-xl border border-blue-100 bg-white shadow-xs overflow-hidden transition-all hover:border-blue-300 hover:shadow-sm">
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-blue-50 bg-gradient-to-r from-blue-50/50 to-transparent">
+               <span className="text-lg">🧳</span><span className="text-xs font-bold uppercase tracking-widest text-blue-800">Baggage Details</span>
             </div>
-          ),
+            <div className="px-1 py-1">
+               <div className="flex justify-between px-4 py-2.5 items-center group">
+                 <span className="text-[12px] font-medium text-slate-500 group-hover:text-slate-700 transition-colors">Check-in</span>
+                 <span className="text-[12px] font-bold px-3 py-1 rounded-md bg-slate-100 text-slate-800 border border-slate-200">{baggage?.checkIn}</span>
+               </div>
+               <div className="flex justify-between px-4 py-2.5 items-center group">
+                 <span className="text-[12px] font-medium text-slate-500 group-hover:text-slate-700 transition-colors">Cabin / Hand</span>
+                 <span className="text-[12px] font-bold px-3 py-1 rounded-md bg-slate-100 text-slate-800 border border-slate-200">{baggage?.cabin}</span>
+               </div>
+            </div>
+          </div>
+
+          {/* Cancellation */}
+          <div className="rounded-xl border border-red-100 bg-white shadow-xs overflow-hidden transition-all hover:border-red-300 hover:shadow-sm">
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-red-50 bg-gradient-to-r from-red-50/50 to-transparent">
+               <span className="text-lg">❌</span><span className="text-xs font-bold uppercase tracking-widest text-red-800">Cancellation Policy</span>
+            </div>
+            <div className="px-1 py-1 divide-y divide-slate-50">
+               {cancellation?.map((c, i) => {
+                  const isNotAllowed = c.fee && (c.fee.toLowerCase().includes("not allowed") || c.fee.toLowerCase().includes("strictly not permitted"));
+                  return <div key={i} className="flex flex-col gap-2 px-4 py-3 group">
+                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide group-hover:text-slate-700 transition-colors">{c.timeRange}</span>
+                    <span className={`text-[12px] font-semibold leading-relaxed ${isNotAllowed ? 'text-red-600' : 'text-slate-800'}`}>{c.fee}</span>
+                  </div>;
+               })}
+            </div>
+          </div>
+
+          {/* Reissue */}
+          <div className="rounded-xl border border-orange-100 bg-white shadow-xs overflow-hidden transition-all hover:border-orange-300 hover:shadow-sm">
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-orange-50 bg-gradient-to-r from-orange-50/50 to-transparent">
+               <span className="text-lg">🔄</span><span className="text-xs font-bold uppercase tracking-widest text-orange-800">Date Change Policy</span>
+            </div>
+            <div className="px-1 py-1 divide-y divide-slate-50">
+               {reissue?.map((c, i) => {
+                  const isNotAllowed = c.fee && (c.fee.toLowerCase().includes("not allowed") || c.fee.toLowerCase().includes("strictly not permitted"));
+                  return <div key={i} className="flex flex-col gap-2 px-4 py-3 group">
+                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide group-hover:text-slate-700 transition-colors">{c.timeRange}</span>
+                    <span className={`text-[12px] font-semibold leading-relaxed ${isNotAllowed ? 'text-orange-600' : 'text-slate-800'}`}>{c.fee}</span>
+                  </div>;
+               })}
+            </div>
+          </div>
+
+          {/* Meal & Seat */}
+          <div className="rounded-xl border border-amber-100 bg-white shadow-xs overflow-hidden transition-all hover:border-amber-300 hover:shadow-sm">
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-amber-50 bg-gradient-to-r from-amber-50/50 to-transparent">
+               <span className="text-lg">🍽️</span><span className="text-xs font-bold uppercase tracking-widest text-amber-800">Meals & Seats</span>
+            </div>
+            <div className="px-1 py-1">
+               <div className="flex flex-col gap-1.5 px-4 py-2.5">
+                 <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Meal Service</span>
+                 <span className="text-[12px] font-medium text-slate-700 leading-relaxed">{mealAndSeat?.meal}</span>
+               </div>
+               <div className="flex flex-col gap-1.5 px-4 py-2.5 border-t border-slate-50">
+                 <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Seat Selection</span>
+                 <span className="text-[12px] font-medium text-slate-700 leading-relaxed">{mealAndSeat?.seat}</span>
+               </div>
+            </div>
+          </div>
+
+          {/* Notes Full Width */}
+          {notes && notes.length > 0 && (
+            <div className="md:col-span-2 pt-2">
+               <div className="flex items-center gap-2 mb-3">
+                 <span className="w-1 h-3 bg-indigo-500 rounded-full"></span>
+                 <p className="text-[11px] font-bold text-slate-600 uppercase tracking-widest">Important Provisions</p>
+               </div>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                 {notes.map((note, i) => {
+                    if(!note) return null;
+                    const isWarning = note.toUpperCase().includes("GST") || note.toUpperCase().includes("EXTRA") || note.toUpperCase().includes("NOT PERMITTED");
+                    return (
+                      <div key={i} className={`flex items-start gap-3 text-sm px-4 py-3.5 rounded-xl border transition-all hover:shadow-sm ${isWarning ? "bg-gradient-to-br from-amber-50 to-white border-amber-200" : "bg-gradient-to-br from-indigo-50/50 to-white border-indigo-100"}`}>
+                        <span className="mt-0.5 text-[16px] shrink-0">{isWarning ? "⚠️" : "📌"}</span>
+                        <span className={`text-[12.5px] leading-relaxed font-medium ${isWarning ? 'text-amber-900' : 'text-slate-700'}`}>{note}</span>
+                      </div>
+                    );
+                 })}
+               </div>
+            </div>
+          )}
+
+        </div>
       )}
     </div>
   );
 };
 
-export const FareRulesAccordion = ({
-  fareRules = null,
-  fareRulesStatus = "idle",
-}) => {
-  const [open, setOpen] = useState(true);
-
-  // ✅ Extract airline data dynamically from API
-  // ✅ Extract airline + routing details dynamically and safely
-  const airlineInfo =
-    fareRules?.data?.Response?.FareRules?.[0] ||
-    fareRules?.Response?.FareRules?.[0] ||
-    fareRules?.FareRules?.[0] ||
-    null;
-
-  // ✅ Normalize airline code (handles SG / 6E / AI / uk etc.)
-  const normalizeAirlineCode = (code = "") =>
-    code
-      .toString()
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "");
-
-  const airlineCode = normalizeAirlineCode(
-    airlineInfo?.AirlineCode || airlineInfo?.Airline || "",
-  );
-
-  // ✅ Dynamic airline name fallback
-  const airlineName =
-    airlineInfo?.AirlineName ||
-    airlineInfo?.Airline ||
-    airlineCode ||
-    "Unknown Airline";
-
-  const origin = airlineInfo?.Origin || "";
-  const destination = airlineInfo?.Destination || "";
-
-  // ✅ Theme gradient (dynamic from airlineThemes map)
-  const gradient =
-    airlineThemes?.[airlineCode]?.gradient ||
-    airlineThemes?.DEFAULT?.gradient ||
-    "from-gray-400 to-gray-600"; // fallback gradient
-
-  // 🔒 Original Logic (Unchanged)
-  const rules =
-    fareRules?.FareRules ||
-    fareRules?.Response?.FareRules ||
-    fareRules?.data?.Response?.FareRules ||
-    [];
-
-  const parseFareRuleDetail = (detail) => {
-    if (!detail) return null;
-    const fareBasisMatch = detail.match(/The FareBasisCode is:\s*(\w+)/i);
-    const fareBasisCode = fareBasisMatch ? fareBasisMatch[1] : null;
-    const domesticMatch = detail.match(
-      /Domestic([\s\S]*?)(?=International|$)/i,
-    );
-    const internationalMatch = detail.match(/International([\s\S]*?)(?=\*|$)/i);
-    const importantNotes = detail.match(/\*[^\r\n]+/g) || [];
-    return {
-      fareBasisCode,
-      domestic: domesticMatch ? domesticMatch[1].trim() : null,
-      international: internationalMatch ? internationalMatch[1].trim() : null,
-      importantNotes: importantNotes.map((note) =>
-        note.replace(/^\*\s*/, "").trim(),
-      ),
-    };
-  };
-
-  const parseBaggageTable = (text) => {
-    if (!text) return [];
-    const lines = text.split(/\r\n/).filter((l) => l.trim());
-    const baggageLines = lines.filter(
-      (l) => l.includes("Ex ") && l.includes("Kgs"),
-    );
-    return baggageLines
-      .map((line) => {
-        const parts = line.split(/\s+(\d+\s*Kgs?)/i);
-        if (parts.length >= 2) {
-          return { sector: parts[0].trim(), allowance: parts[1].trim() };
-        }
-        return null;
-      })
-      .filter(Boolean);
-  };
-
-  // 🔒 Data formatting preserved, UI enhanced
-  const formatFareRuleContent = (detail) => {
-    const parsed = parseFareRuleDetail(detail);
-    if (!parsed) return null;
-
-    const domesticBaggage = parsed.domestic
-      ? parseBaggageTable(parsed.domestic)
-      : [];
-    const internationalBaggage = parsed.international
-      ? parseBaggageTable(parsed.international)
-      : [];
-
+export const FareRulesAccordion = ({ parsedRules = [], title = "" }) => {
+  if (!parsedRules || parsedRules.length === 0) {
     return (
-      <div className="space-y-8">
-        {/* Fare Basis Highlight */}
-        {parsed.fareBasisCode && (
-          <div
-            className={`flex items-center justify-between bg-linear-to-r ${gradient} text-white rounded-xl shadow p-4`}
-          >
-            <div>
-              <p className="text-xs opacity-90 uppercase tracking-wide">
-                Fare Basis Code
-              </p>
-              <h3 className="text-lg font-bold tracking-wider">
-                {parsed.fareBasisCode}
-              </h3>
-            </div>
-            <div className="bg-white/20 text-white px-3 py-1 rounded-md text-sm font-medium">
-              Airline Rule Info
-            </div>
-          </div>
-        )}
-
-        {/* Domestic Fare Section */}
-        {parsed.domestic && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 bg-blue-50 border-b border-gray-200">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">✈️</span>
-                <h3 className="text-sm font-semibold text-gray-800">
-                  Domestic Fare Rules
-                </h3>
-              </div>
-              {domesticBaggage.length > 0 && (
-                <div className="bg-green-100 text-green-800 px-3 py-1 rounded-md text-xs font-semibold">
-                  Free Baggage: {domesticBaggage[0]?.allowance}
-                </div>
-              )}
-            </div>
-            <div className="p-5 text-sm text-gray-700 leading-relaxed">
-              <p>{parsed.domestic.split(/(?=Free baggage)/i)[0].trim()}</p>
-            </div>
-          </div>
-        )}
-
-        {/* International Fare Section */}
-        {parsed.international && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 bg-indigo-50 border-b border-gray-200">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🌍</span>
-                <h3 className="text-sm font-semibold text-gray-800">
-                  International Fare Rules
-                </h3>
-              </div>
-            </div>
-
-            <div className="p-5 text-sm text-gray-700 leading-relaxed">
-              <p>{parsed.international.split(/(?=Free baggage)/i)[0].trim()}</p>
-
-              {internationalBaggage.length > 0 && (
-                <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
-                    🧳 Free Baggage Allowance by Sector
-                  </h4>
-                  <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {internationalBaggage.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex justify-between items-center px-3 py-2 bg-white rounded-md border border-gray-200 hover:border-blue-400 shadow-sm"
-                      >
-                        <span className="text-xs text-gray-700 font-medium">
-                          {item.sector}
-                        </span>
-                        <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
-                          {item.allowance}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Important Notes */}
-        {parsed.importantNotes.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-gray-800">
-              Important Notes
-            </h4>
-            {parsed.importantNotes.map((note, idx) => {
-              const isGst =
-                note.toUpperCase().includes("GST") ||
-                note.toUpperCase().includes("EXTRA");
-              const isTime = note.toUpperCase().includes("HOURS BEFORE");
-              return (
-                <div
-                  key={idx}
-                  className={`flex items-start gap-3 p-4 rounded-lg border text-sm shadow-sm ${
-                    isGst
-                      ? "bg-amber-50 border-amber-300 text-amber-800"
-                      : isTime
-                        ? "bg-yellow-50 border-yellow-300 text-yellow-800"
-                        : "bg-blue-50 border-blue-200 text-blue-800"
-                  }`}
-                >
-                  <span className="text-lg leading-none">
-                    {isGst ? "⚠️" : isTime ? "🕐" : "ℹ️"}
-                  </span>
-                  <p className="flex-1 leading-relaxed">{note}</p>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // 🔒 Core logic preserved
-  if (fareRulesStatus === "loading") {
-    return (
-      <div className="border border-gray-200 bg-white rounded-xl p-8 text-center">
-        <div className="loader mx-auto mb-3"></div>
-        <p className="text-gray-600 text-sm">Loading fare rules...</p>
+      <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-400 text-sm">
+        Fare rules not available.
       </div>
     );
   }
 
-  let fareRuleDetails = null;
-  if (fareRules?.important?.length) fareRuleDetails = fareRules.important;
-  else if (fareRules?.data?.Response?.FareRules?.length)
-    fareRuleDetails = fareRules.data.Response.FareRules.map(
-      (r) => r.FareRuleDetail,
-    ).filter(Boolean);
-  else if (fareRules?.Response?.FareRules?.length)
-    fareRuleDetails = fareRules.Response.FareRules.map(
-      (r) => r.FareRuleDetail,
-    ).filter(Boolean);
-  else if (fareRules?.FareRules?.length)
-    fareRuleDetails = fareRules.FareRules.map((r) => r.FareRuleDetail).filter(
-      Boolean,
-    );
-  else if (Array.isArray(fareRules))
-    fareRuleDetails = fareRules
-      .map((r) =>
-        typeof r === "string" ? r : r.FareRuleDetail || r.important?.[0],
-      )
-      .filter(Boolean);
-  else if (fareRules?.FareRuleDetail)
-    fareRuleDetails = [fareRules.FareRuleDetail];
-
-  if (!fareRuleDetails || fareRuleDetails.length === 0) {
-    return (
-      <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500 text-sm">
-        Fare rules not available for this fare.
-      </div>
-    );
-  }
+  // Derive airline from first rule
+  const airlineCode = (parsedRules[0]?.airline || "").toUpperCase();
+  const theme = airlineThemes[airlineCode] || airlineThemes.DEFAULT;
+  const name = airlineNames[airlineCode] || airlineCode;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
-      {/* Accordion Header */}
-      <button
-        onClick={() => setOpen(!open)}
-        className={`w-full flex items-center justify-between px-6 py-4 bg-linear-to-r ${gradient} text-white font-semibold tracking-wide hover:brightness-110 transition`}
-      >
-        <div className="flex items-center gap-3">
-          <img
-            src={airlineLogo(airlineCode)}
-            alt={airlineName}
-            className="w-8 h-8 rounded-full bg-white p-1"
-          />
-          <div className="flex flex-col text-left">
-            <span className="text-sm font-medium">{airlineName}</span>
-            {origin && destination && (
-              <span className="text-xs opacity-80">
-                {origin} → {destination}
-              </span>
-            )}
-          </div>
+    <div className="space-y-3">
+      {title && <h3 className="font-bold text-lg text-gray-800 mb-2">{title}</h3>}
+      {/* Airline Header Banner */}
+      <div className={`flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r ${theme?.gradient || "from-blue-600 to-indigo-600"} text-white shadow`}>
+        <img
+          src={airlineLogo(airlineCode)}
+          alt={name}
+          className="w-9 h-9 rounded-full bg-white p-0.5 object-contain"
+          onError={(e) => { e.target.style.display = "none"; }}
+        />
+        <div>
+          <p className="font-semibold text-sm">{name}</p>
+          <p className="text-xs opacity-75">
+            {parsedRules.map((r) => `${r.origin} → ${r.destination}`).join("  ·  ")}
+          </p>
         </div>
-        {open ? (
-          <IoChevronUp className="text-white" size={20} />
-        ) : (
-          <IoChevronDown className="text-white" size={20} />
-        )}
-      </button>
+      </div>
 
-      {/* Accordion Content */}
-      {open && (
-        <div className="bg-gray-50 px-6 py-6 animate-fadeIn space-y-10">
-          {fareRuleDetails.map((detail, i) => (
-            <div key={i}>{formatFareRuleContent(detail)}</div>
-          ))}
-        </div>
-      )}
-
-      {/* Animations */}
-      <style>{`
-        .loader {
-          width: 24px;
-          height: 24px;
-          border: 3px solid #3b82f6;
-          border-top-color: transparent;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(6px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn { animation: fadeIn 0.3s ease-in-out; }
-      `}</style>
+      {parsedRules.map((rule, i) => (
+        <RuleCard key={i} fareRule={rule} theme={theme} />
+      ))}
     </div>
   );
 };
@@ -1257,29 +915,38 @@ export const ImportantInformation = ({
   fareRules = null,
   fareRulesStatus = "idle",
 }) => {
+  const fareRuleContent = [];
+  if (fareRulesStatus === "loading") {
+    fareRuleContent.push("Fetching fare rules...");
+  } else if (!fareRules || fareRules.length === 0) {
+    fareRuleContent.push("No fare rules available for this fare.");
+  } else {
+    const firstRule = Array.isArray(fareRules) ? fareRules[0] : fareRules;
+    fareRuleContent.push(
+      "Cancellation Policy:",
+      ...(firstRule?.cancellation || []).map((x) => `• ${x.timeRange}: ${x.fee}`),
+      "",
+      "Date Change Policy:",
+      ...(firstRule?.reissue || []).map((x) => `• ${x.timeRange}: ${x.fee}`),
+      "",
+      "Baggage Rules:",
+      `• Check-in: ${firstRule?.baggage?.checkIn || "N/A"}`,
+      `• Cabin: ${firstRule?.baggage?.cabin || "N/A"}`,
+      ""
+    );
+    if (firstRule?.notes?.length > 0) {
+      fareRuleContent.push("Important Information:");
+      fareRuleContent.push(
+        ...firstRule.notes.slice(0, 5).map((x) => `• ${x}`)
+      );
+    }
+  }
+
   const sections = [
     {
       key: "fareRules",
       title: "Fare Rules",
-      content: fareRules
-        ? [
-            "Cancellation Policy:",
-            ...fareRules.cancellation.map((x) => "• " + x),
-            "",
-            "Date Change Policy:",
-            ...fareRules.dateChange.map((x) => "• " + x),
-            "",
-            "Baggage Rules:",
-            ...fareRules.baggage.map((x) => "• " + x),
-            "",
-            "Important Information:",
-            ...fareRules.important.map((x) => "• " + x),
-          ]
-        : [
-            fareRulesStatus === "loading"
-              ? "Fetching fare rules..."
-              : "No fare rules available for this fare.",
-          ],
+      content: fareRuleContent,
     },
     {
       key: "checkIn",
@@ -1945,6 +1612,189 @@ export const Amenities = () => {
           Power
         </span>
       </div>
+    </div>
+  );
+};
+
+// ─── Fare Options ────────────────────────────────────────────────────────
+export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
+  const [open, setOpen] = useState({
+    cancellation: true,
+    dateChange: true,
+    important: false,
+  });
+  const toggle = (key) => setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  if (fareRulesStatus === "loading") {
+    return (
+      <div className="flex flex-col items-center justify-center bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <div className="loader mb-3"></div>
+        <p className="text-gray-600 text-sm">Loading fare rules...</p>
+      </div>
+    );
+  }
+
+  if (!fareRules) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-500 text-sm">
+         Fare rules not available for this fare.
+      </div>
+    );
+  }
+
+  const results = fareRules?.Response?.Results || fareRules;
+  const miniFareRules = Array.isArray(results?.MiniFareRules)
+    ? results.MiniFareRules.flat()
+    : [];
+
+  const cancellationRules = miniFareRules.filter(
+    (rule) => rule.Type === "Cancellation",
+  );
+  const reissueRules = miniFareRules.filter((rule) => rule.Type === "Reissue");
+
+  const fareBasisCode = results?.FareRules?.[0]?.FareBasisCode || "";
+  const airlineRemark = results?.AirlineRemark || "";
+  const isRefundable = results?.IsRefundable;
+
+  const formatTimeRange = (from, to, unit) => {
+    if (!from && !to) return "Anytime";
+    if (from && !to)
+      return `More than ${from} ${unit.toLowerCase()} before departure`;
+    if (!from && to) return `Within ${to} ${unit.toLowerCase()} of departure`;
+    return `${from}-${to} ${unit.toLowerCase()} before departure`;
+  };
+
+  const sections = [
+    {
+      key: "cancellation",
+      title: "Cancellation Charges",
+      icon: <span className="text-xl">❌</span>,
+      color: "text-red-600",
+      data: cancellationRules,
+      hasData: cancellationRules.length > 0,
+    },
+    {
+      key: "dateChange",
+      title: "Date Change Charges",
+      icon: <span className="text-xl">🔄</span>,
+      color: "text-orange-600",
+      data: reissueRules,
+      hasData: reissueRules.length > 0,
+    },
+    {
+      key: "important",
+      title: "Important Information",
+      icon: <span className="text-xl">ℹ️</span>,
+      color: "text-blue-600",
+      data: { fareBasisCode, airlineRemark, isRefundable },
+      hasData: !!(fareBasisCode || airlineRemark || isRefundable !== undefined),
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {sections.map(
+        (sec) =>
+          sec.hasData && (
+            <div
+              key={sec.key}
+              className="border border-gray-200 bg-white rounded-xl shadow-sm overflow-hidden transition-all hover:shadow-md"
+            >
+              <button
+                onClick={() => toggle(sec.key)}
+                className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 hover:bg-gray-100 transition"
+              >
+                <div className="flex items-center gap-3">
+                  <span className={sec.color}>{sec.icon}</span>
+                  <span className="font-semibold text-gray-800 text-sm md:text-base">
+                    {sec.title}
+                  </span>
+                </div>
+                {open[sec.key] ? (
+                  <span className="text-gray-500 text-sm">▲</span>
+                ) : (
+                  <span className="text-gray-500 text-sm">▼</span>
+                )}
+              </button>
+              {open[sec.key] && (
+                <div className="px-6 py-4 bg-white border-t border-gray-100 animate-fadeIn space-y-3">
+                  {sec.key === "cancellation" &&
+                    sec.data.map((rule, i) => (
+                      <div
+                        key={i}
+                        className="flex justify-between items-start py-2 border-b last:border-0 border-gray-100"
+                      >
+                        <div className="flex-1 pr-4">
+                          <p className="font-medium text-gray-800 text-sm">
+                            {formatTimeRange(rule.From, rule.To, rule.Unit)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {rule.JourneyPoints}
+                          </p>
+                        </div>
+                        <p className="text-right font-semibold text-gray-900 text-sm">
+                          {rule.Details}
+                        </p>
+                      </div>
+                    ))}
+                  {sec.key === "dateChange" &&
+                    sec.data.map((rule, i) => (
+                      <div
+                        key={i}
+                        className="flex justify-between items-start py-2 border-b last:border-0 border-gray-100"
+                      >
+                        <div className="flex-1 pr-4">
+                          <p className="font-medium text-gray-800 text-sm">
+                            {formatTimeRange(rule.From, rule.To, rule.Unit)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {rule.JourneyPoints}
+                          </p>
+                        </div>
+                        <p className="text-right font-semibold text-gray-900 text-sm">
+                          {rule.Details}
+                        </p>
+                      </div>
+                    ))}
+                  {sec.key === "important" && (
+                    <div className="space-y-3 text-sm text-gray-700">
+                      {sec.data.fareBasisCode && (
+                        <div className="flex items-center justify-between py-1">
+                          <span className="text-gray-500">Fare Basis</span>
+                          <span className="font-bold uppercase tracking-wider text-gray-900 bg-gray-100 px-2 py-0.5 rounded">
+                            {sec.data.fareBasisCode}
+                          </span>
+                        </div>
+                      )}
+                      {sec.data.isRefundable !== undefined && (
+                        <div className="flex items-center justify-between py-1 border-t border-gray-50 pt-3">
+                          <span className="text-gray-500">Refund Type</span>
+                          <span
+                            className={`font-semibold px-2 py-0.5 rounded ${
+                              sec.data.isRefundable
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {sec.data.isRefundable ? "Refundable" : "Non-Refundable"}
+                          </span>
+                        </div>
+                      )}
+                      {sec.data.airlineRemark && (
+                        <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs leading-relaxed text-blue-800">
+                          <span className="font-bold uppercase tracking-wider text-[10px] text-blue-500 block mb-1">
+                            Airline Remark
+                          </span>
+                          {sec.data.airlineRemark}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+      )}
     </div>
   );
 };

@@ -5,8 +5,8 @@ export default function ProtectedRoute({ allowedRoles }) {
   // const { token, role } = useSelector((state) => state.auth);
   const auth = useSelector((state) => state.auth);
 
-  const token = auth.token || localStorage.getItem("token");
-  const role = auth.role;
+  const token = auth.token || sessionStorage.getItem("token");
+  const role = auth.role || sessionStorage.getItem("role");
 
   if (!token) return <Navigate to="/login" replace />;
 

@@ -23,7 +23,6 @@ import {
   FiCheckCircle,
   FiAlertCircle,
 } from "react-icons/fi";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
 import {
   fetchHotelRequestById,
   executeHotelBooking,
@@ -31,6 +30,7 @@ import {
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import Swal from "sweetalert2";
 import { Country } from "country-state-city";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 
 /* ─── Helpers ─── */
 const countries = Country.getAllCountries();
@@ -138,9 +138,9 @@ const HotelBookNow = () => {
   const pricing = bookingRequest?.pricingSnapshot || {};
 
   const selectedHotel = hotelReq.selectedHotel || {};
- const selectedRooms = Array.isArray(hotelReq.allRooms)
-  ? hotelReq.allRooms
-  : [];
+  const selectedRooms = Array.isArray(hotelReq.allRooms)
+    ? hotelReq.allRooms
+    : [];
   // const rawRoom = selectedRooms.rawRoomData || {};
 
   const hotel = {
@@ -204,7 +204,7 @@ const HotelBookNow = () => {
         try {
           return await dispatch(executeHotelBooking(id)).unwrap();
         } catch (e) {
-          Swal.showValidationMessage(`Booking failed: ${e}`);
+          Swal.showValidationMessage(e);
         }
       },
       allowOutsideClick: () => !Swal.isLoading(),
@@ -322,7 +322,7 @@ const HotelBookNow = () => {
   if (fetching)
     return (
       <div className="min-h-screen bg-slate-100">
-        <EmployeeHeader />
+        <CorporateNavbar />
         <div className="h-64 bg-slate-200 animate-pulse" />
         <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3 space-y-4">
@@ -340,7 +340,7 @@ const HotelBookNow = () => {
   if (loadError || !bookingRequest)
     return (
       <div className="min-h-screen bg-slate-50">
-        <EmployeeHeader />
+        <CorporateNavbar />
         <div className="max-w-6xl mx-auto px-4 py-24 flex flex-col items-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
             <FiAlertCircle size={26} className="text-red-400" />
@@ -361,7 +361,7 @@ const HotelBookNow = () => {
   /* ── Main ── */
   return (
     <div className="min-h-screen bg-slate-100 font-sans">
-      <EmployeeHeader />
+      <CorporateNavbar />
 
       {/* ══════════════════════════════════
           DARK HERO BAND

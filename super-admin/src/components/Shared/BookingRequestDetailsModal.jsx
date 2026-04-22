@@ -9,7 +9,7 @@ import {
   fetchChangeStatus,
 } from "../../Redux/Actions/corporate.related.thunks";
 import { resetAmendmentState } from "../../Redux/Slice/corporate.related.slice";
-import { FaPlane } from "react-icons/fa";
+import { FaHotel, FaPlane } from "react-icons/fa";
 import {
   FiX,
   FiCheckCircle,
@@ -34,6 +34,8 @@ import {
   FiStar,
   FiTrendingUp,
   FiBriefcase,
+  FiHome,
+  FiKey,
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -405,8 +407,6 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                 value={raw.executionStatus}
                 color="text-emerald-700"
               />
-              <StatTile label="Request Status" value={raw.requestStatus} />
-              <StatTile label="Purpose of Travel" value={raw.purposeOfTravel} />
               <StatTile
                 label="Travel Date"
                 value={fmt(correctTravelDate)}
@@ -485,41 +485,9 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                     )}
                   </div>
                 </div>
-                {/* Trace + Result Index */}
-                <div className="mt-4 pt-3 border-t border-[#1e3a5f]/10 grid grid-cols-1 gap-2">
-                  <KV label="Trace ID" value={flightReq.traceId} mono />
-                  <KV label="Fare Expiry" value={fmtDT(flightReq.fareExpiry)} />
-                  {typeof flightReq.resultIndex === "string" && (
-                    <KV
-                      label="Result Index"
-                      value={flightReq.resultIndex?.slice(0, 40) + "..."}
-                      mono
-                    />
-                  )}
-                  {typeof flightReq.resultIndex === "object" &&
-                    flightReq.resultIndex !== null && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <KV
-                          label="Onward Result Index"
-                          value={
-                            (flightReq.resultIndex.onward || "").slice(0, 40) +
-                            "..."
-                          }
-                          mono
-                        />
-                        <KV
-                          label="Return Result Index"
-                          value={
-                            (flightReq.resultIndex.return || "").slice(0, 40) +
-                            "..."
-                          }
-                          mono
-                        />
-                      </div>
-                    )}
-                </div>
-              </div>
-            </Section>
+              {/* </div> */}
+            </div>
+          </Section>
           )}
 
           {/* ══ 3. FLIGHT SEGMENTS (from flightRequest) ══ */}
@@ -635,19 +603,12 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                       minimumFractionDigits: 2,
                     })}
                   </p>
-                  <p className="text-[10px] opacity-40 mt-1">
-                    Captured: {fmtDT(pricing.capturedAt)}
-                  </p>
-                  <p className="text-[10px] opacity-40 mt-0.5">
-                    Snapshot Amount: {inr(snap.amount)}
-                  </p>
                 </div>
                 <div className="flex flex-wrap gap-6">
                   {[
                     ["Base Fare", fareSnap.baseFare],
                     ["Tax", fareSnap.tax],
                     ["Published Fare", fareSnap.publishedFare],
-                    ["Offered Fare", fareSnap.offeredFare],
                   ].map(([l, v]) => (
                     <div key={l}>
                       <p className="text-[10px] uppercase opacity-50">{l}</p>
@@ -1288,11 +1249,6 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                     mono
                   />
                   <KV
-                    label="TBO Conf. No."
-                    value={onwardItin.TBOConfNo || singleItin.TBOConfNo}
-                    mono
-                  />
-                  <KV
                     label="Booking ID"
                     value={onwardItin.BookingId || singleItin.BookingId}
                     mono
@@ -1314,168 +1270,6 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                     value={
                       onwardItin.ValidatingAirlineCode ||
                       singleItin.ValidatingAirlineCode
-                    }
-                  />
-                  <KV
-                    label="Issuance PCC"
-                    value={onwardItin.IssuancePcc || singleItin.IssuancePcc}
-                  />
-                  <KV
-                    label="Journey Type"
-                    value={onwardItin.JourneyType || singleItin.JourneyType}
-                  />
-                  <KV
-                    label="Source"
-                    value={onwardItin.Source || singleItin.Source}
-                  />
-                  <KV
-                    label="Fare Type"
-                    value={onwardItin.FareType || singleItin.FareType}
-                  />
-                  <KV
-                    label="Fare Classification"
-                    value={
-                      onwardItin.FareClassification ||
-                      singleItin.FareClassification
-                    }
-                  />
-                  <KV
-                    label="Non-Refundable"
-                    value={
-                      (onwardItin.NonRefundable ?? singleItin.NonRefundable)
-                        ? "Yes"
-                        : "No"
-                    }
-                  />
-                  <KV
-                    label="Is LCC"
-                    value={
-                      (onwardItin.IsLCC ?? singleItin.IsLCC) ? "Yes" : "No"
-                    }
-                  />
-                  <KV
-                    label="Last Ticket Date"
-                    value={fmt(
-                      onwardItin.LastTicketDate || singleItin.LastTicketDate,
-                    )}
-                  />
-                  <KV
-                    label="Domestic"
-                    value={
-                      (onwardItin.IsDomestic ?? singleItin.IsDomestic)
-                        ? "Yes"
-                        : "No"
-                    }
-                  />
-                  <KV
-                    label="Invoice Amount"
-                    value={inr(
-                      onwardItin.InvoiceAmount || singleItin.InvoiceAmount,
-                    )}
-                  />
-                  <KV
-                    label="Invoice No."
-                    value={onwardItin.InvoiceNo || singleItin.InvoiceNo}
-                    mono
-                  />
-                  <KV
-                    label="Invoice Created"
-                    value={fmtDT(
-                      onwardItin.InvoiceCreatedOn ||
-                        singleItin.InvoiceCreatedOn,
-                    )}
-                  />
-                  <KV
-                    label="Ticket Status"
-                    value={onwardResp.TicketStatus ?? singleResp.TicketStatus}
-                  />
-                  <KV
-                    label="Booking Status"
-                    value={onwardResp.Status ?? singleResp.Status}
-                  />
-                  <KV
-                    label="SSR Denied"
-                    value={
-                      (onwardResp.SSRDenied ?? singleResp.SSRDenied)
-                        ? "Yes"
-                        : "No"
-                    }
-                  />
-                  <KV
-                    label="Airline Remark"
-                    value={
-                      (
-                        onwardItin.AirlineRemark ||
-                        singleItin.AirlineRemark ||
-                        ""
-                      ).slice(0, 80) +
-                      ((
-                        onwardItin.AirlineRemark ||
-                        singleItin.AirlineRemark ||
-                        ""
-                      ).length > 80
-                        ? "..."
-                        : "")
-                    }
-                  />
-                  {(onwardItin.AirlineTollFreeNo ||
-                    singleItin.AirlineTollFreeNo) && (
-                    <KV
-                      label="Airline Toll-Free"
-                      value={
-                        onwardItin.AirlineTollFreeNo ||
-                        singleItin.AirlineTollFreeNo
-                      }
-                      icon={<FiPhone size={10} />}
-                    />
-                  )}
-                  <KV
-                    label="Result Fare Type"
-                    value={
-                      onwardItin.ResultFareType || singleItin.ResultFareType
-                    }
-                  />
-                  <KV
-                    label="Coupon Applicable"
-                    value={
-                      (onwardItin.IsCouponAppilcable ??
-                      singleItin.IsCouponAppilcable)
-                        ? "Yes"
-                        : "No"
-                    }
-                  />
-                  <KV
-                    label="Auto Reissuance"
-                    value={
-                      (onwardItin.IsAutoReissuanceAllowed ??
-                      singleItin.IsAutoReissuanceAllowed)
-                        ? "Yes"
-                        : "No"
-                    }
-                  />
-                  <KV
-                    label="Partial Void"
-                    value={
-                      (onwardItin.IsPartialVoidAllowed ??
-                      singleItin.IsPartialVoidAllowed)
-                        ? "Yes"
-                        : "No"
-                    }
-                  />
-                  <KV
-                    label="Web Check-in"
-                    value={
-                      (onwardItin.IsWebCheckInAllowed ??
-                      singleItin.IsWebCheckInAllowed)
-                        ? "Yes"
-                        : "No"
-                    }
-                  />
-                  <KV
-                    label="Supplier Fare Classes"
-                    value={
-                      onwardItin.SupplierFareClasses ||
-                      singleItin.SupplierFareClasses
                     }
                   />
                 </div>
@@ -1577,49 +1371,13 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
               <div className="bg-purple-50 border border-purple-100 rounded-xl p-4">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                   <KV label="PNR" value={returnItin.PNR} mono />
-                  <KV label="TBO Conf. No." value={returnItin.TBOConfNo} mono />
                   <KV label="Booking ID" value={returnItin.BookingId} mono />
-                  <KV
-                    label="Parent Booking ID"
-                    value={returnItin.ParentBookingId}
-                    mono
-                  />
                   <KV label="Origin" value={returnItin.Origin} />
                   <KV label="Destination" value={returnItin.Destination} />
                   <KV label="Airline Code" value={returnItin.AirlineCode} />
                   <KV
                     label="Validating Airline"
                     value={returnItin.ValidatingAirlineCode}
-                  />
-                  <KV label="Issuance PCC" value={returnItin.IssuancePcc} />
-                  <KV label="Fare Type" value={returnItin.FareType} />
-                  <KV
-                    label="Non-Refundable"
-                    value={returnItin.NonRefundable ? "Yes" : "No"}
-                  />
-                  <KV label="Is LCC" value={returnItin.IsLCC ? "Yes" : "No"} />
-                  <KV
-                    label="Last Ticket Date"
-                    value={fmt(returnItin.LastTicketDate)}
-                  />
-                  <KV
-                    label="Invoice Amount"
-                    value={inr(returnItin.InvoiceAmount)}
-                  />
-                  <KV label="Invoice No." value={returnItin.InvoiceNo} mono />
-                  <KV label="Status" value={returnResp.Status} />
-                  <KV label="Ticket Status" value={returnResp.TicketStatus} />
-                  <KV
-                    label="Result Fare Type"
-                    value={returnItin.ResultFareType}
-                  />
-                  <KV
-                    label="Supplier Fare Classes"
-                    value={returnItin.SupplierFareClasses}
-                  />
-                  <KV
-                    label="Auto Reissuance"
-                    value={returnItin.IsAutoReissuanceAllowed ? "Yes" : "No"}
                   />
                 </div>
 
@@ -1795,175 +1553,9 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
             </Section>
           )}
 
-          {/* ══ 13. BOOKING RESULT FARE (from provider) ══ */}
-          {(onwardItin.Fare || singleItin.Fare) && (
-            <Section
-              title="Provider Fare Details"
-              icon={<FiTrendingUp size={11} />}
-            >
-              {[
-                { label: "Onward", fare: onwardItin.Fare },
-                { label: "Return", fare: returnItin.Fare },
-                { label: "Single", fare: singleItin.Fare },
-              ]
-                .filter(({ fare }) => fare)
-                .map(({ label, fare }, idx) => (
-                  <div
-                    key={idx}
-                    className={`border border-gray-100 rounded-xl p-4 ${idx > 0 ? "mt-3" : ""}`}
-                  >
-                    {label !== "Single" && (
-                      <p className="text-xs font-semibold text-gray-500 mb-3">
-                        {label} Leg
-                      </p>
-                    )}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {[
-                        ["Base Fare", fare.BaseFare],
-                        ["Tax", fare.Tax],
-                        ["YQ Tax", fare.YQTax],
-                        ["Published Fare", fare.PublishedFare],
-                        ["Offered Fare", fare.OfferedFare],
-                        ["Other Charges", fare.OtherCharges],
-                        ["Commission Earned", fare.CommissionEarned],
-                        ["PLB Earned", fare.PLBEarned],
-                        ["Incentive Earned", fare.IncentiveEarned],
-                        ["TDS on Commission", fare.TdsOnCommission],
-                        ["TDS on PLB", fare.TdsOnPLB],
-                        ["TDS on Incentive", fare.TdsOnIncentive],
-                        ["Total Baggage Charges", fare.TotalBaggageCharges],
-                        ["Total Meal Charges", fare.TotalMealCharges],
-                        ["Total Seat Charges", fare.TotalSeatCharges],
-                        ["Service Fee", fare.ServiceFee],
-                        ["PG Charge", fare.PGCharge],
-                        ["Discount", fare.Discount],
-                      ].map(([l, v]) => (
-                        <KV key={l} label={l} value={inr(v)} />
-                      ))}
-                    </div>
-                    {/* Tax Breakup from provider fare */}
-                    {(fare.TaxBreakup || []).length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">
-                          Tax Breakup
-                        </p>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-gray-50 rounded-lg p-3">
-                          {fare.TaxBreakup.map((t, ti) => (
-                            <TaxRow key={ti} label={t.key} value={t.value} />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-            </Section>
-          )}
 
-          {/* ══ 14. QUOTE METADATA ══ */}
-          {fareQuoteResults[0] && (
-            <Section title="Fare Quote Metadata" icon={<FiStar size={11} />}>
-              <div className="border border-gray-100 rounded-xl p-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <KV label="Source" value={fareQuoteResults[0].Source} />
-                  <KV
-                    label="Is LCC"
-                    value={fareQuoteResults[0].IsLCC ? "Yes" : "No"}
-                  />
-                  <KV
-                    label="Is Refundable"
-                    value={fareQuoteResults[0].IsRefundable ? "Yes" : "No"}
-                  />
-                  <KV
-                    label="Fare Type"
-                    value={fareQuoteResults[0].ResultFareType}
-                  />
-                  <KV
-                    label="Issuance Type"
-                    value={fareQuoteResults[0].IssuanceType}
-                  />
-                  <KV
-                    label="Is Hold Allowed"
-                    value={fareQuoteResults[0].IsHoldAllowed ? "Yes" : "No"}
-                  />
-                  <KV
-                    label="GST Allowed"
-                    value={fareQuoteResults[0].GSTAllowed ? "Yes" : "No"}
-                  />
-                  <KV
-                    label="Is GST Mandatory"
-                    value={fareQuoteResults[0].IsGSTMandatory ? "Yes" : "No"}
-                  />
-                  <KV
-                    label="Coupon Applicable"
-                    value={
-                      fareQuoteResults[0].IsCouponAppilcable ? "Yes" : "No"
-                    }
-                  />
-                  <KV
-                    label="PAN Required (Book)"
-                    value={
-                      fareQuoteResults[0].IsPanRequiredAtBook ? "Yes" : "No"
-                    }
-                  />
-                  <KV
-                    label="PAN Required (Ticket)"
-                    value={
-                      fareQuoteResults[0].IsPanRequiredAtTicket ? "Yes" : "No"
-                    }
-                  />
-                  <KV
-                    label="Passport Required (Book)"
-                    value={
-                      fareQuoteResults[0].IsPassportRequiredAtBook
-                        ? "Yes"
-                        : "No"
-                    }
-                  />
-                  <KV
-                    label="Passport Required (Ticket)"
-                    value={
-                      fareQuoteResults[0].IsPassportRequiredAtTicket
-                        ? "Yes"
-                        : "No"
-                    }
-                  />
-                  <KV
-                    label="Exclusive Fare"
-                    value={fareQuoteResults[0].IsExclusiveFare ? "Yes" : "No"}
-                  />
-                  <KV
-                    label="Free Meal"
-                    value={
-                      fareQuoteResults[0].IsFreeMealAvailable ? "Yes" : "No"
-                    }
-                  />
-                  <KV
-                    label="Bookable If Seat N/A"
-                    value={
-                      fareQuoteResults[0].IsBookableIfSeatNotAvailable
-                        ? "Yes"
-                        : "No"
-                    }
-                  />
-                </div>
-                {fareQuoteResults[0].FareClassification && (
-                  <div className="flex gap-2 flex-wrap">
-                    <Chip color="blue">
-                      {fareQuoteResults[0].FareClassification.Type}
-                    </Chip>
-                    <span
-                      className="w-4 h-4 rounded inline-block border border-gray-200"
-                      style={{
-                        background:
-                          fareQuoteResults[0].FareClassification.Color,
-                      }}
-                      title={fareQuoteResults[0].FareClassification.Color}
-                    />
-                  </div>
-                )}
-              </div>
-            </Section>
-          )}
+
+
 
           {/* ══ 15. AMENDMENT HISTORY ══ */}
           {amendHist.length > 0 && (
@@ -2030,70 +1622,7 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
             </Section>
           )}
 
-          {/* ══ 17. BOOKING META ══ */}
-          <Section title="Booking Meta" icon={<FiBriefcase size={11} />}>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-gray-50 border border-gray-100 rounded-xl p-4">
-              <KV label="Booking ID" value={raw._id} mono />
-              <KV label="User ID" value={raw.userId} mono />
-              <KV
-                label="Corporate"
-                value={corporateId?.corporateName || raw.corporateId}
-              />
-              <KV label="Corporate ID" value={corporateId?._id} mono />
-              <KV label="Purpose of Travel" value={raw.purposeOfTravel} />
-              {raw.projectName && (
-                <KV label="Project Name" value={raw.projectName} />
-              )}
-              {raw.projectId && (
-                <KV label="Project ID" value={raw.projectId} mono />
-              )}
-              {raw.projectClient && (
-                <KV label="Project Client" value={raw.projectClient} />
-              )}
-              {raw.approverName && (
-                <KV label="Approver Name" value={raw.approverName} />
-              )}
-              {raw.approverEmail && (
-                <KV
-                  label="Approver Email"
-                  value={raw.approverEmail}
-                  icon={<FiMail size={10} />}
-                />
-              )}
-              {raw.approverRole && (
-                <KV label="Approver Role" value={raw.approverRole} />
-              )}
-              {raw.approvedAt && (
-                <KV label="Approved At" value={fmtDT(raw.approvedAt)} />
-              )}
-              {raw.approvedBy && (
-                <KV label="Approved By" value={raw.approvedBy} mono />
-              )}
-              {raw.approverComments && raw.approverComments !== "true" && (
-                <KV label="Approver Comments" value={raw.approverComments} />
-              )}
-              {flightReq.traceId && (
-                <KV label="Trace ID" value={flightReq.traceId} mono />
-              )}
-              <KV label="Created At" value={fmtDT(raw.createdAt)} />
-              <KV label="Updated At" value={fmtDT(raw.updatedAt)} />
-              <KV label="Schema Version" value={raw.__v} />
-            </div>
 
-            {/* GST Details if present */}
-            {raw.gstDetails?.gstin && (
-              <div className="mt-3 bg-gray-50 border border-gray-100 rounded-xl p-4">
-                <p className="text-[11px] font-medium text-gray-400 uppercase tracking-widest mb-3">
-                  GST Details
-                </p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <KV label="GSTIN" value={raw.gstDetails.gstin} mono />
-                  <KV label="Legal Name" value={raw.gstDetails.legalName} />
-                  <KV label="GST Address" value={raw.gstDetails.address} />
-                </div>
-              </div>
-            )}
-          </Section>
 
           {/* ══ 18. AMENDMENT & CANCELLATION ACTIONS ══ */}
           {bookRes && (pnr || onwardPNR || returnPNR) &&
@@ -2876,12 +2405,12 @@ export const HotelBookingModal = ({ booking: rawProp, onClose }) => {
               <StatTile
                 label="Check-in"
                 value={fmt(raw.hotelRequest?.checkInDate)}
-                sub={weekday(raw.hotelRequest?.checkInDate)}
+                sub={raw.hotelRequest?.checkInDate ? new Date(raw.hotelRequest.checkInDate).toLocaleDateString("en-IN", { weekday: "long" }) : ""}
               />
               <StatTile
                 label="Check-out"
                 value={fmt(raw.hotelRequest?.checkOutDate)}
-                sub={weekday(raw.hotelRequest?.checkOutDate)}
+                sub={raw.hotelRequest?.checkOutDate ? new Date(raw.hotelRequest.checkOutDate).toLocaleDateString("en-IN", { weekday: "long" }) : ""}
               />
               <StatTile
                 label="Nights"

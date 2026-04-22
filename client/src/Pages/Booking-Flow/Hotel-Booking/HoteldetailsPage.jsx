@@ -9,12 +9,18 @@ import HotelImageGallery from "./components/HotelImageGallery";
 import HotelInfo from "./components/HotelInfo";
 import Amenities from "./components/Amenities";
 import RoomTypesList from "./components/RoomTypesList";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import Attractions from "./components/Attractions";
 import HotelDetailsSkeleton from "./components/HotelDetailsSkeleton";
-import { FiPhone, FiMail, FiGlobe } from "react-icons/fi";
+import { FiPhone, FiMail, FiGlobe, FiCalendar } from "react-icons/fi";
+import { MdCheckCircle } from "react-icons/md";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
+
+const fmtDate = (d, opts = { day: "2-digit", month: "short", year: "numeric" }) => {
+  if (!d) return "";
+  return new Date(d).toLocaleDateString("en-IN", opts);
+};
 
 const HotelDetailsPage = () => {
   const navigate = useNavigate();
@@ -27,6 +33,7 @@ const HotelDetailsPage = () => {
   const { hotels, hotelDetailsById, searchPayload, loading } = useSelector(
     (state) => state.hotel,
   );
+  const { publicBranding } = useSelector((s) => s.landingPage);
   const requiredRooms = searchPayload?.PaxRooms?.length || 1;
 
   const hotelFromSearch = useMemo(
@@ -208,48 +215,19 @@ const HotelDetailsPage = () => {
       room.BookingCode || room.RoomTypeCode || room.RatePlanCode;
 
     setSelectedRooms((prev) => {
-      const current = prev[bookingCode]?.count || 0;
-
-      // total selected count
-      const totalSelected = Object.values(prev).reduce(
-        (sum, r) => sum + r.count,
-        0,
-      );
-
-      // ➕ INCREMENT
+      // ✅ TBO Style: Selection is exclusive and satisfies ALL required rooms
       if (type === "add") {
-        if (totalSelected >= requiredRooms) {
-          ToastWithTimer({
-            type: "warning",
-            message: `You can select only ${requiredRooms} rooms`,
-          });
-          return prev;
-        }
-
         return {
-          ...prev,
           [bookingCode]: {
             room,
-            count: current + 1,
+            count: requiredRooms,
           },
         };
       }
 
-      // ➖ DECREMENT
+      // ✅ Remove selection (toggle off)
       if (type === "remove") {
-        if (current <= 1) {
-          const updated = { ...prev };
-          delete updated[bookingCode];
-          return updated;
-        }
-
-        return {
-          ...prev,
-          [bookingCode]: {
-            room,
-            count: current - 1,
-          },
-        };
+        return {};
       }
 
       return prev;
@@ -274,7 +252,11 @@ const HotelDetailsPage = () => {
         <div className="text-center">
           <p className="text-slate-500 mb-4">Hotel not found</p>
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              const slug = publicBranding?.companySlug;
+              if (slug) navigate(`/travel`);
+              else navigate(-1);
+            }}
             className="px-4 py-2 bg-[#0A4D68] text-white text-sm rounded-lg hover:bg-[#083d52] transition"
           >
             Go Back
@@ -294,8 +276,8 @@ const HotelDetailsPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <EmployeeHeader />
+    <div className="min-h-screen bg-slate-100 font-sans">
+      <CorporateNavbar />
 
       {/* ── Hotel Header ── */}
       <div className="bg-white border-b border-slate-200">
@@ -328,10 +310,13 @@ const HotelDetailsPage = () => {
           />
 
           <div className="mb-4 text-sm font-semibold text-[#0A4D68]">
-            Select {requiredRooms} Room{requiredRooms > 1 ? "s" : ""}
-            <span className="ml-2 text-slate-500 font-normal">
-              ({selectedRooms.length} selected)
-            </span>
+            {Object.keys(selectedRooms).length > 0 ? (
+              <span className="flex items-center gap-2">
+                <MdCheckCircle className="text-emerald-500" /> All {requiredRooms} rooms selected
+              </span>
+            ) : (
+              <span>Select this room type for all {requiredRooms} rooms</span>
+            )}
           </div>
         </div>
 
@@ -359,122 +344,172 @@ const HotelDetailsPage = () => {
 
           {/* ── Right: sticky summary sidebar ── */}
           <div className="lg:col-span-1">
-            <div className="sticky top-6 space-y-4">
-              {/* Quick-info card */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="h-1.5 bg-linear-to-r from-[#0A4D68] to-[#088395]" />
-                <div className="p-5 space-y-4">
-                  <h3 className="text-sm font-semibold text-slate-700">
-                    Hotel Summary
-                  </h3>
+               {/* ── Hotel Summary Sidebar ── */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
+                <div className="h-2 bg-gradient-to-r from-[#0A4D68] to-[#088395]" />
+                <div className="p-6 space-y-6">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                      <FiGlobe className="text-[#0A4D68]" />
+                      Booking Summary
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wider mt-1">
+                      {mergedHotel.cityName}, {mergedHotel.countryName}
+                    </p>
+                  </div>
 
-                  {/* Check-in / Check-out */}
-                  {/* <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-slate-50 rounded-xl p-3">
-                      <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">
+                  {/* Dates Section */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-50/80 rounded-2xl p-3.5 border border-slate-100">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                        <FiCalendar size={10} className="text-[#0A4D68]" />
                         Check-in
                       </p>
-                      <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                        <FiClock size={13} className="text-[#0A4D68]" />
+                      <p className="text-sm font-bold text-slate-700">
+                        {fmtDate(searchPayload?.CheckIn) || "—"}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
                         {mergedHotel.checkIn}
-                      </div>
+                      </p>
                     </div>
-                    <div className="bg-slate-50 rounded-xl p-3">
-                      <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">
+                    <div className="bg-slate-50/80 rounded-2xl p-3.5 border border-slate-100">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                        <FiCalendar size={10} className="text-[#088395]" />
                         Check-out
                       </p>
-                      <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                        <FiClock size={13} className="text-[#088395]" />
+                      <p className="text-sm font-bold text-slate-700">
+                        {fmtDate(searchPayload?.CheckOut) || "—"}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
                         {mergedHotel.checkOut}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Price Section — Dynamic */}
+                  {(() => {
+                    const isSelected = Object.keys(selectedRooms).length > 0;
+                    const selectedRoom = isSelected
+                      ? Object.values(selectedRooms)[0]
+                      : null;
+                    const displayRoom = selectedRoom
+                      ? selectedRoom.room
+                      : cheapestRoom;
+                    const totalPrice = isSelected
+                      ? Object.values(selectedRooms).reduce(
+                          (sum, r) =>
+                            sum +
+                            r.count *
+                              (r.room.TotalFare || r.room.Price?.TotalFare || 0),
+                          0,
+                        )
+                      : cheapestRoom?.Price?.TotalFare ||
+                        cheapestRoom?.TotalFare ||
+                        0;
+
+                    return (
+                      <div
+                        className={`rounded-2xl p-5 border transition-all duration-300 ${isSelected ? "bg-[#0A4D68] border-[#0A4D68] shadow-lg shadow-[#0A4D68]/20" : "bg-slate-50 border-slate-100"}`}
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <p
+                              className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isSelected ? "text-white/60" : "text-slate-400"}`}
+                            >
+                              {isSelected ? "Total Amount" : "Starting from"}
+                            </p>
+                            <div className="flex items-baseline gap-1">
+                              <span
+                                className={`text-sm font-bold ${isSelected ? "text-white" : "text-slate-700"}`}
+                              >
+                                ₹
+                              </span>
+                              <span
+                                className={`text-3xl font-black ${isSelected ? "text-white" : "text-[#0A4D68]"}`}
+                              >
+                                {totalPrice.toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <div className="bg-white/20 backdrop-blur-md rounded-lg p-2 text-white">
+                              <MdCheckCircle size={20} />
+                            </div>
+                          )}
+                        </div>
+
+                        <div
+                          className={`text-[11px] font-medium ${isSelected ? "text-white/80" : "text-slate-500"}`}
+                        >
+                          {isSelected ? (
+                            <div className="space-y-1">
+                              <p className="font-bold line-clamp-1">
+                                {selectedRoom.room.RoomTypeName || "Selected Room"}
+                              </p>
+                              <p>Includes {requiredRooms} rooms for full stay</p>
+                            </div>
+                          ) : (
+                            <p>Inclusive of all taxes</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </div> */}
+                    );
+                  })()}
 
-                  {/* Cheapest room price */}
-                  {cheapestRoom && (
-                    <div className="bg-[#0A4D68]/5 border border-[#0A4D68]/15 rounded-xl p-3">
-                      <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">
-                        Starting from
-                      </p>
-                      <p className="text-xl font-bold text-[#0A4D68]">
-                        ₹
-                        {(
-                          cheapestRoom.Price?.TotalFare ||
-                          cheapestRoom.TotalFare ||
-                          0
-                        ).toLocaleString("en-IN")}
-                        <span className="text-xs font-normal text-slate-400 ml-1">
-                          ( incl. all taxes )
-                        </span>
-                      </p>
-                    </div>
-                  )}
-
+                  {/* Selected Rooms List / Info */}
                   {Object.keys(selectedRooms).length > 0 && (
-                    <div className="max-w-7xl mx-auto flex items-center justify-between">
-                      {/* LEFT */}
-                      <div>
-                        <p className="text-sm font-semibold text-[#0A4D68]">
-                          {Object.values(selectedRooms).reduce(
-                            (sum, r) => sum + r.count,
-                            0,
-                          )}{" "}
-                          / {requiredRooms} Rooms
-                        </p>
-
-                        <p className="text-xs text-gray-500">
-                          ₹
-                          {Object.values(selectedRooms)
-                            .reduce(
-                              (sum, r) =>
-                                sum +
-                                r.count *
-                                  (r.room.TotalFare ||
-                                    r.room.Price?.TotalFare ||
-                                    0),
-                              0,
-                            )
-                            .toLocaleString()}
-                        </p>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-slate-400 px-1">
+                        <div className="flex-1 h-px bg-slate-100" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">
+                          Next Step
+                        </span>
+                        <div className="flex-1 h-px bg-slate-100" />
                       </div>
 
-                      {/* RIGHT */}
                       <button
                         onClick={handleContinue}
-                        className="bg-[#0A4D68] text-white px-6 py-2 rounded-lg font-semibold"
+                        className="w-full bg-[#0A4D68] hover:bg-[#083d52] text-white py-4 rounded-2xl font-black text-sm tracking-widest uppercase shadow-xl shadow-[#0A4D68]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-3 cursor-pointer border-none"
                       >
-                        Continue
+                        Proceed to Booking
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                          <polyline points="12 5 19 12 12 19" />
+                        </svg>
                       </button>
                     </div>
                   )}
 
-                  {/* Contact */}
-                  <div className="space-y-2 pt-1 border-t border-slate-100">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                      Contact
+                  {/* Contact info simplified */}
+                  <div className="pt-6 border-t border-slate-100 space-y-3">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                      Support Contact
                     </p>
-                    {mergedHotel.contact.phone && (
-                      <ContactRow
-                        icon={FiPhone}
-                        value={mergedHotel.contact.phone}
-                        href={`tel:${mergedHotel.contact.phone}`}
-                      />
-                    )}
-                    {mergedHotel.contact.email && (
-                      <ContactRow
-                        icon={FiMail}
-                        value={mergedHotel.contact.email}
-                        href={`mailto:${mergedHotel.contact.email}`}
-                      />
-                    )}
-                    {mergedHotel.contact.website && (
-                      <ContactRow
-                        icon={FiGlobe}
-                        value="Visit Website"
-                        href={mergedHotel.contact.website}
-                        external
-                      />
-                    )}
+                    <div className="flex flex-wrap gap-3">
+                      {mergedHotel.contact.phone && (
+                        <ContactRow
+                          icon={FiPhone}
+                          value={mergedHotel.contact.phone}
+                          href={`tel:${mergedHotel.contact.phone}`}
+                        />
+                      )}
+                      {mergedHotel.contact.email && (
+                        <ContactRow
+                          icon={FiMail}
+                          value="Email Support"
+                          href={`mailto:${mergedHotel.contact.email}`}
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -550,20 +585,18 @@ const HotelDetailsPage = () => {
                     </div>
                   </div>
                 )}
-            </div>
-          </div>
-        </div>
+        <MapModal
+          open={mapModalOpen}
+          onClose={() => setMapModalOpen(false)}
+          lat={mergedHotel?.latitude}
+          lng={mergedHotel?.longitude}
+          name={mergedHotel?.name}
+          address={mergedHotel?.address}
+        />
       </div>
-      {/* Map Modal */}
-      <MapModal
-        open={mapModalOpen}
-        onClose={() => setMapModalOpen(false)}
-        lat={mergedHotel?.latitude}
-        lng={mergedHotel?.longitude}
-        name={mergedHotel?.name}
-        address={mergedHotel?.address}
-      />
     </div>
+  </div>
+</div>
   );
 };
 

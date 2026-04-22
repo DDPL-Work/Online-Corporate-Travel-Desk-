@@ -1,6 +1,3 @@
-//employee.routes.js
-
-
 const express = require("express");
 const router = express.Router();
 const employeeCtrl = require("../controllers/employee.controller");
@@ -14,16 +11,15 @@ const {
 } = require("../middleware/upload.middleware");
 
 // -------------------------
-// Self Profile (any logged-in employee)
+// All routes below require login
 // -------------------------
 router.use(verifyToken);
 
-router.get("/profile", employeeCtrl.getProfile); // get own profile
-router.patch("/profile", employeeCtrl.updateProfile); // update own profile
+router.get("/profile", employeeCtrl.getProfile); // Get own profile
+router.patch("/profile", employeeCtrl.updateProfile); // Update own profile (ManagerRequest workflow)
 
 router.post(
   "/documents",
-  verifyToken,
   authorizeRoles("employee", "travel-admin"),
   uploadMultiple,
   processImage,
@@ -32,32 +28,28 @@ router.post(
 
 router.delete(
   "/documents/:id",
-  verifyToken,
   authorizeRoles("employee", "travel-admin"),
   employeeCtrl.deleteTravelDocument,
 );
 
 router.get(
   "/documents",
-  verifyToken,
   authorizeRoles("employee", "travel-admin"),
   employeeCtrl.getMyDocuments,
 );
 
 router.get(
   "/me",
-  verifyToken,
   authorizeRoles("employee"),
   employeeCtrl.getMyTravelAdmin,
 );
 
 router.get(
   "/gst",
-  verifyToken,
   authorizeRoles("employee", "travel-admin"),
   employeeCtrl.getMyGstDetails,
 );
 
-
+router.get("/managers", employeeCtrl.getManagers);
 
 module.exports = router;

@@ -136,6 +136,51 @@ function CancelledFlightCard({ flight, onViewDetails }) {
 
   const badge = getBadge();
 
+  const renderRoute = (route, label) => {
+    if (!route) return null;
+    return (
+      <div className="mb-4 last:mb-0">
+        {label && (
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[9px] font-black uppercase tracking-wider bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">
+              {label}
+            </span>
+            <div className="flex-1 border-t border-slate-100" />
+          </div>
+        )}
+        <div className="flex items-center gap-3 mb-1">
+          <span className="text-slate-400">
+            <MdFlightTakeoff size={14} />
+          </span>
+          <span className="text-[15px] font-bold text-slate-800">
+            {route.from}
+          </span>
+          <div className="flex-1 flex items-center gap-1">
+            <div className="flex-1 border-t border-dashed border-slate-200" />
+            <span className="text-[10px] text-slate-400 font-medium px-1">
+              {route.duration || "—"}
+            </span>
+            <div className="flex-1 border-t border-dashed border-slate-200" />
+          </div>
+          <span className="text-[15px] font-bold text-slate-800">
+            {route.to}
+          </span>
+          <span className="text-slate-400">
+            <MdFlightLand size={14} />
+          </span>
+        </div>
+        <div className="flex justify-between text-[11px] text-slate-400">
+          <span>
+            {route.fromCity} · {route.departureTime}
+          </span>
+          <span>
+            {route.toCity} · {route.arrivalTime}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
       <div className="h-[5px] bg-red-500" />
@@ -144,16 +189,16 @@ function CancelledFlightCard({ flight, onViewDetails }) {
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div
-              className={`w-10 h-10 rounded-xl ${flight.airlineBg} flex items-center justify-center`}
+              className={`w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center`}
             >
-              <MdFlightTakeoff size={18} className={flight.airlineColor} />
+              <MdFlightTakeoff size={18} className="text-blue-600" />
             </div>
             <div>
               <p className="text-[14px] font-semibold text-slate-800 leading-tight">
-                {flight.airline}
+                {flight.onward?.airline || flight.airline}
               </p>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                {flight.airlineCode}
+                PNR: {flight.pnr || "—"}
               </p>
             </div>
           </div>
@@ -165,45 +210,21 @@ function CancelledFlightCard({ flight, onViewDetails }) {
           </div>
         </div>
 
-        {/* Route */}
-        <div className="flex items-center gap-3 mb-1">
-          <span className="text-slate-400">
-            <MdFlightTakeoff size={14} />
-          </span>
-          <span className="text-[15px] font-bold text-slate-800">
-            {flight.from}
-          </span>
-          <div className="flex-1 flex items-center gap-1">
-            <div className="flex-1 border-t border-dashed border-slate-200" />
-            <span className="text-[10px] text-slate-400 font-medium px-1">
-              {flight.duration}
-            </span>
-            <div className="flex-1 border-t border-dashed border-slate-200" />
-          </div>
-          <span className="text-[15px] font-bold text-slate-800">
-            {flight.to}
-          </span>
-          <span className="text-slate-400">
-            <MdFlightLand size={14} />
-          </span>
-        </div>
-        <div className="flex justify-between text-[11px] text-slate-400 mb-4">
-          <span>
-            {flight.fromCity} · {flight.departureTime}
-          </span>
-          <span>
-            {flight.toCity} · {flight.arrivalTime}
-          </span>
+        {/* Routes */}
+        <div className="space-y-4 mb-4">
+          {renderRoute(flight.onward, flight.journeyType === 2 ? "Onward" : null)}
+          {renderRoute(flight.return, "Return")}
         </div>
 
         {/* Meta */}
-        <div className="space-y-1.5 mb-4">
+        <div className="space-y-1.5 mb-4 border-t border-slate-50 pt-4">
           <div className="flex items-center gap-2 text-[12px] text-slate-500">
             <FiCalendar size={12} className="text-slate-400 shrink-0" />
             <span>
               Flight date:{" "}
               <span className="font-medium text-slate-700">
-                {flight.flightDate}
+                {flight.onward?.flightDate}
+                {flight.return && ` - ${flight.return.flightDate}`}
               </span>
             </span>
           </div>
@@ -505,68 +526,82 @@ export default function CancelledFlightsPage() {
   });
 
   const mappedFlights = cancelledFlights.map((b) => {
-    const segment =
-      b?.flightRequest?.segments?.[0] ||
-      b?.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary
-        ?.Segments?.[0] ||
-      b?.bookingResult?.providerResponse?.raw?.Response?.Response
-        ?.FlightItinerary?.Segments?.[0];
+    const br = b?.bookingResult || {};
 
+    // 1. Get Itineraries (Supporting single providerResponse OR separate onward/return)
+    const onwardItinerary =
+      br.onwardResponse?.Response?.Response?.FlightItinerary ||
+      br.providerResponse?.Response?.Response?.FlightItinerary ||
+      br.providerResponse?.raw?.Response?.Response?.FlightItinerary;
+
+    const returnItinerary =
+      br.returnResponse?.Response?.Response?.FlightItinerary;
+
+    // 2. Collect Segments
+    let onwardSegments = onwardItinerary?.Segments || b?.flightRequest?.segments || [];
+    let returnSegments = returnItinerary?.Segments || [];
+
+    // If journey is in a single providerResponse, split by TripIndicator
+    if (onwardSegments.length > 0 && returnSegments.length === 0) {
+      const allSegments = onwardSegments;
+      onwardSegments = allSegments.filter((s) => (s?.TripIndicator || s?.tripIndicator || 1) === 1);
+      returnSegments = allSegments.filter((s) => (s?.TripIndicator || s?.tripIndicator) === 2);
+    }
+
+    const firstOn = onwardSegments[0];
+    const lastOn = onwardSegments[onwardSegments.length - 1];
+    const firstRet = returnSegments[0];
+    const lastRet = returnSegments[returnSegments.length - 1];
+
+    const journeyType = br.returnPNR || returnSegments.length > 0 ? 2 : 1;
     const cancelRequested = sessionStorage.getItem(`cancelRequested_${b._id}`) === "true";
+
+    // Snapshot Fallbacks
+    const snapshotFrom = b.bookingSnapshot?.sectors?.[0]?.split("-")?.[0];
+    const snapshotTo = b.bookingSnapshot?.sectors?.[0]?.split("-")?.[1];
+
+    const travelDate = b.bookingSnapshot?.travelDate || firstOn?.Origin?.DepTime || firstOn?.departureDateTime;
+    const returnDate = b.bookingSnapshot?.returnDate || firstRet?.Origin?.DepTime || firstRet?.departureDateTime;
 
     return {
       id: b._id,
+      liveStatus: b?.amendment?.changeRequestStatus,
+      executionStatus: isEmployee && cancelRequested ? "cancelled" : b.executionStatus,
+      journeyType,
 
-      liveStatus: b?.amendment?.changeRequestStatus, // numeric from API
-      executionStatus: (isEmployee && cancelRequested) ? "cancelled" : b.executionStatus,
-      airline:
-        segment?.airlineName || segment?.Airline?.AirlineName || "Airline",
+      onward: (onwardSegments.length > 0 || snapshotFrom) ? {
+        airline: firstOn?.Airline?.AirlineName || firstOn?.airlineName || b.bookingSnapshot?.airline || "Airline",
+        airlineCode: firstOn?.Airline?.AirlineCode || firstOn?.airlineCode,
+        from: firstOn?.Origin?.Airport?.AirportCode || firstOn?.origin?.airportCode || snapshotFrom || "—",
+        to: lastOn?.Destination?.Airport?.AirportCode || lastOn?.destination?.airportCode || snapshotTo || "—",
+        fromCity: firstOn?.Origin?.Airport?.CityName || firstOn?.origin?.city || b.bookingSnapshot?.originCity || "",
+        toCity: lastOn?.Destination?.Airport?.CityName || lastOn?.destination?.city || b.bookingSnapshot?.city || "",
+        departureTime: (firstOn?.Origin?.DepTime || firstOn?.departureDateTime)?.split("T")[1]?.slice(0, 5) || "",
+        arrivalTime: (lastOn?.Destination?.ArrTime || lastOn?.arrivalDateTime)?.split("T")[1]?.slice(0, 5) || "",
+        flightDate: travelDate ? new Date(travelDate).toLocaleDateString("en-IN") : "—",
+        duration: onwardItinerary?.Duration || "—",
+      } : null,
 
-      airlineCode: segment?.flightNumber || segment?.Airline?.FlightNumber,
+      return: (returnSegments.length > 0 || (journeyType === 2 && snapshotTo)) ? {
+        airline: firstRet?.Airline?.AirlineName || firstRet?.airlineName || b.bookingSnapshot?.airline || "Airline",
+        from: firstRet?.Origin?.Airport?.AirportCode || firstRet?.origin?.airportCode || (journeyType === 2 ? snapshotTo : ""),
+        to: lastRet?.Destination?.Airport?.AirportCode || lastRet?.destination?.airportCode || (journeyType === 2 ? snapshotFrom : ""),
+        fromCity: firstRet?.Origin?.Airport?.CityName || firstRet?.origin?.city || "",
+        toCity: lastRet?.Destination?.Airport?.CityName || lastRet?.destination?.city || b.bookingSnapshot?.originCity || "",
+        departureTime: (firstRet?.Origin?.DepTime || firstRet?.departureDateTime)?.split("T")[1]?.slice(0, 5) || "",
+        arrivalTime: (lastRet?.Destination?.ArrTime || lastRet?.arrivalDateTime)?.split("T")[1]?.slice(0, 5) || "",
+        flightDate: returnDate ? new Date(returnDate).toLocaleDateString("en-IN") : "—",
+      } : null,
 
-      from:
-        segment?.origin?.airportCode || segment?.Origin?.Airport?.AirportCode,
-
-      to:
-        segment?.destination?.airportCode ||
-        segment?.Destination?.Airport?.AirportCode,
-
-      fromCity: segment?.origin?.city || segment?.Origin?.Airport?.CityName,
-
-      toCity:
-        segment?.destination?.city || segment?.Destination?.Airport?.CityName,
-
-      departureTime:
-        segment?.departureDateTime?.split("T")[1]?.slice(0, 5) ||
-        segment?.Origin?.DepTime?.split("T")[1]?.slice(0, 5),
-
-      arrivalTime:
-        segment?.arrivalDateTime?.split("T")[1]?.slice(0, 5) ||
-        segment?.Destination?.ArrTime?.split("T")[1]?.slice(0, 5),
-
-      duration: segment?.durationMinutes
-        ? `${Math.floor(segment.durationMinutes / 60)}h ${
-            segment.durationMinutes % 60
-          }m`
-        : "—",
-
-      flightDate: new Date(
-        segment?.departureDateTime || segment?.Origin?.DepTime,
-      ).toLocaleDateString("en-IN"),
-
+      airline: firstOn?.Airline?.AirlineName || firstOn?.airlineName || b.bookingSnapshot?.airline || "Airline",
       bookedOn: new Date(b.createdAt).toLocaleDateString("en-IN"),
-
       cancelledOn: new Date(b.updatedAt).toLocaleDateString("en-IN"),
-
       cancelReason: "User requested",
       cancelType: "user",
-
       originalFare: b?.pricingSnapshot?.totalAmount || 0,
       refundAmount: 0,
       refundStatus: "pending",
-
-      class: "Economy",
-      pnr: b?.bookingResult?.pnr,
+      pnr: br.pnr || b.pnr,
     };
   });
 
@@ -574,14 +609,10 @@ export default function CancelledFlightsPage() {
 
   useEffect(() => {
     dispatch(fetchMyHotelBookings());
-
-    dispatch(
-      fetchMyBookings({
-        bookingType: "flight",
-        executionStatus: ["cancel_requested", "cancelled"],
-        // limit: 50,
-      }),
-    );
+    dispatch(fetchMyBookings({
+      bookingType: "flight",
+      executionStatus: ["cancel_requested", "cancelled"],
+    }));
   }, [dispatch]);
 
   const filtered = currentData.filter((item) => {

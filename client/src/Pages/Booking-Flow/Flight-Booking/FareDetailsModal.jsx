@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { IoClose } from "react-icons/io5";
 import { AiOutlineInfoCircle } from "react-icons/ai";
-import { FareOptions, FareRulesAccordion } from "./CommonComponents";
+import { FareRulesAccordion, FareOptions } from "./CommonComponents";
+import { processFareRulesData } from "../../../utils/fareRulesParser";
 import "./Fares.css";
 
 /* ===========================
@@ -31,7 +32,6 @@ const extractSegmentsFromFareQuote = (fareQuote) => {
 
 const extractFareFromQuote = (fareQuote, index) => {
   // Per-segment fare is usually SAME for all segments
-  // We still map segment-wise for UI clarity
   if (fareQuote?.Response?.Results?.Fare) {
     return fareQuote.Response.Results.Fare;
   }
@@ -39,11 +39,9 @@ const extractFareFromQuote = (fareQuote, index) => {
   const onwardFare = fareQuote?.onward?.Response?.Results?.Fare;
   const returnFare = fareQuote?.return?.Response?.Results?.Fare;
 
-  // If only one side is available (international grouped or incomplete fetch), use it
   if (onwardFare && !returnFare) return onwardFare;
   if (returnFare && !onwardFare) return returnFare;
 
-  // When both are present, split by onward segment count (with safe default)
   if (onwardFare && returnFare) {
     const onwardSegCount =
       fareQuote?.onward?.Response?.Results?.Segments?.flat?.()?.length || 0;
@@ -60,10 +58,9 @@ const extractFareFromQuote = (fareQuote, index) => {
 export const FareDetailsModal = ({
   fareQuote,
   fareRule,
-  normalizeFareRules,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("summary");
+  const [activeTab, setActiveTab] = useState("rules");
 
   const toggleModal = () => setIsOpen((v) => !v);
 
@@ -104,10 +101,21 @@ export const FareDetailsModal = ({
   }, [fareQuote, segmentColumns]);
 
   /* ===========================
-     RULES DATA (shared logic)
+     RULES DATA
   =========================== */
 
-  const resolvedFareRule = isRoundTrip ? fareRule?.onward : fareRule;
+  const onwardFareData = useMemo(() => {
+     let rules = fareRule?.onward?.Response?.FareRules || fareRule?.Response?.FareRules || [];
+     let quote = fareQuote?.onward?.Response?.Results || fareQuote?.Response?.Results || [];
+     return processFareRulesData(rules, quote);
+  }, [fareRule, fareQuote]);
+
+  const returnFareData = useMemo(() => {
+     if (!isRoundTrip) return [];
+     let rules = fareRule?.return?.Response?.FareRules || [];
+     let quote = fareQuote?.return?.Response?.Results || [];
+     return processFareRulesData(rules, quote);
+  }, [fareRule, fareQuote, isRoundTrip]);
 
   return (
     <>
@@ -137,8 +145,8 @@ export const FareDetailsModal = ({
             <div className="flex border-b">
               {[
                 { id: "summary", label: "Fare Summary" },
-                { id: "rules", label: "Fare Rules" },
-                { id: "options", label: "Charges & Policies" },
+                { id: "rules", label: "Fare Rules & Policies" },
+                { id: "options", label: "Fare Options" },
               ].map((t) => (
                 <button
                   key={t.id}
@@ -156,9 +164,7 @@ export const FareDetailsModal = ({
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-              {/* =======================
-                 FARE SUMMARY TABLE
-              ======================= */}
+              {/* FARE SUMMARY TABLE */}
               {activeTab === "summary" && (
                 <div className="overflow-x-auto bg-white rounded-xl border">
                   <table className="w-full text-sm">
@@ -206,27 +212,24 @@ export const FareDetailsModal = ({
                 </div>
               )}
 
-              {/* =======================
-                 FARE RULES
-              ======================= */}
+              {/* FARE RULES & POLICIES */}
               {activeTab === "rules" && (
-                <FareRulesAccordion
-                  fareRules={normalizeFareRules(resolvedFareRule)}
-                  fareRulesStatus={resolvedFareRule ? "succeeded" : "loading"}
-                />
+                <div className="space-y-6">
+                   <FareRulesAccordion parsedRules={onwardFareData} title={isRoundTrip ? "Onward Flight Fare Rules" : ""} />
+                   {isRoundTrip && <FareRulesAccordion parsedRules={returnFareData} title="Return Flight Fare Rules" />}
+                </div>
               )}
 
-              {/* =======================
-                 OPTIONS
-              ======================= */}
+              {/* FARE OPTIONS */}
               {activeTab === "options" && (
-                <FareOptions
-                  fareRules={
-                    fareQuote?.Response?.Results ||
-                    fareQuote?.onward?.Response?.Results
-                  }
-                  fareRulesStatus="succeeded"
-                />
+                <div className="space-y-6">
+                  <FareOptions
+                    fareRules={fareQuote?.Response?.Results || fareQuote?.onward?.Response?.Results}
+                    fareRulesStatus={
+                      fareQuote?.Response?.Results || fareQuote?.onward?.Response?.Results ? "succeeded" : "loading"
+                    }
+                  />
+                </div>
               )}
             </div>
 

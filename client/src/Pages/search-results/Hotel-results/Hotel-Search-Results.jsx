@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import Header from "./Hotel-Header";
 import FilterSidebar from "./Filter-Sidebar";
 import HotelCard from "./Hotel-Card";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import { useDispatch, useSelector } from "react-redux";
 import { searchHotels } from "../../../Redux/Actions/hotelThunks";
 
@@ -83,9 +83,12 @@ function HotelSearchResults() {
   );
 
   const filteredHotels = transformedHotels?.filter((hotel) => {
+    const searchLoc = filters.location?.toLowerCase() || "";
     const locationMatch =
-      !filters.location ||
-      hotel.address?.toLowerCase().includes(filters.location.toLowerCase());
+      !searchLoc ||
+      hotel.address?.toLowerCase().includes(searchLoc) ||
+      hotel.name?.toLowerCase().includes(searchLoc);
+    
     const priceMatch =
       hotel.price >= filters.minPrice && hotel.price <= filters.maxPrice;
 
@@ -146,7 +149,7 @@ function HotelSearchResults() {
 
   return (
     <div className="bg-gray-100 min-h-screen flex flex-col">
-      <EmployeeHeader />
+      <CorporateNavbar />
       <Header />
 
       <div className="w-full px-3 sm:px-4 lg:px-6 py-4">
@@ -161,6 +164,7 @@ function HotelSearchResults() {
             >
               <FilterSidebar
                 hotels={transformedHotels}
+                filteredHotels={filteredHotels}
                 filters={filters}
                 setFilters={setFilters}
                 searchText={searchText}

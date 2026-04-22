@@ -64,13 +64,15 @@ export default function CorporateAccessControl() {
   }, [dispatch]);
 
   /* ---------------- FILTER LOGIC ---------------- */
+  const baseCorporates = corporates.filter(c => c.status !== "pending");
+
   const corporatesList = [
     "All",
-    ...new Set(corporates.map((x) => x.corporateName)),
+    ...new Set(baseCorporates.map((x) => x.corporateName)),
   ];
-  const statuses = ["All", "active", "pending", "inactive"];
+  const statuses = ["All", "active", "inactive"];
 
-  const filtered = corporates.filter((c) => {
+  const filtered = baseCorporates.filter((c) => {    
     const corpMatch =
       corporateFilter === "All" || c.corporateName === corporateFilter;
     const statusMatch = statusFilter === "All" || c.status === statusFilter;
@@ -87,7 +89,7 @@ export default function CorporateAccessControl() {
   // Stats
   const totalCorporates = filtered.length;
   const activeCount = filtered.filter((c) => c.status === "active").length;
-  const pendingCount = filtered.filter((c) => c.status === "pending").length;
+  // const pendingCount = filtered.filter((c) => c.status === "pending").length;
   const inactiveCount = filtered.filter((c) => c.status === "inactive").length;
   const totalCredit = filtered.reduce(
     (sum, c) => sum + (c.classification === "postpaid" ? c.creditLimit : 0),
@@ -166,14 +168,14 @@ export default function CorporateAccessControl() {
             iconBgCls="bg-emerald-50"
             iconColorCls="text-emerald-600"
           />
-          <StatCard
+          {/* <StatCard
             label="Pending"
             value={pendingCount}
             Icon={FiClock}
             borderCls="border-amber-500"
             iconBgCls="bg-amber-50"
             iconColorCls="text-amber-600"
-          />
+          /> */}
           <StatCard
             label="Inactive"
             value={inactiveCount}
@@ -217,10 +219,10 @@ export default function CorporateAccessControl() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
+                className="w-full uppercase px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
               >
                 {statuses.map((s) => (
-                  <option key={s} value={s}>
+                  <option  key={s} value={s}>
                     {s === "All" ? "All Statuses" : s}
                   </option>
                 ))}

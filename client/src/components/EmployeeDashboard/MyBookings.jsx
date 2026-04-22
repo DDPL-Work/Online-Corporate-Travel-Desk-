@@ -230,26 +230,26 @@ function HotelBookingCard({ b, navigate }) {
   const selectedRoom = hotelReq.selectedRoom || {};
   // const rawRoom = selectedRoom.rawRoomData || {};
   const rawRooms = Array.isArray(selectedRoom.rawRoomData)
-  ? selectedRoom.rawRoomData
-  : selectedRoom.rawRoomData
-  ? [selectedRoom.rawRoomData]
-  : [];
+    ? selectedRoom.rawRoomData
+    : selectedRoom.rawRoomData
+      ? [selectedRoom.rawRoomData]
+      : [];
 
-// ✅ FINAL CORRECT PRICE (MULTI ROOM SAFE)
-const finalPrice = rawRooms.reduce((total, room) => {
-  if (room.TotalFare) return total + room.TotalFare;
+  // ✅ FINAL CORRECT PRICE (MULTI ROOM SAFE)
+  const finalPrice = rawRooms.reduce((total, room) => {
+    if (room.TotalFare) return total + room.TotalFare;
 
-  if (room.Price?.totalFare) return total + room.Price.totalFare;
+    if (room.Price?.totalFare) return total + room.Price.totalFare;
 
-  if (Array.isArray(room.DayRates)) {
-    const roomTotal = room.DayRates.reduce((sum, days) => {
-      return sum + days.reduce((dSum, d) => dSum + (d.BasePrice || 0), 0);
-    }, 0);
-    return total + roomTotal;
-  }
+    if (Array.isArray(room.DayRates)) {
+      const roomTotal = room.DayRates.reduce((sum, days) => {
+        return sum + days.reduce((dSum, d) => dSum + (d.BasePrice || 0), 0);
+      }, 0);
+      return total + roomTotal;
+    }
 
-  return total;
-}, 0);
+    return total;
+  }, 0);
 
   const hotelName = snapshot.hotelName || selectedHotel.hotelName || "Hotel";
   const city = selectedHotel.city || snapshot.city || "";
@@ -395,10 +395,7 @@ const finalPrice = rawRooms.reduce((total, room) => {
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-100">
           <span className="text-lg font-black text-[#0A4D68]">
-            ₹
-            {Number(finalPrice || 0).toLocaleString(
-              "en-IN",
-            )}
+            ₹{Number(finalPrice || 0).toLocaleString("en-IN")}
           </span>
           <button
             onClick={() => navigate(`/my-hotel-booking/${b._id}`)}
@@ -510,33 +507,33 @@ export default function MyBookings() {
   }, [bookings, statusFilter, searchTerm, startDate, endDate, activeTab]);
 
   const filteredFlightCount = useMemo(() => {
-  return flightBookings.filter((b) => {
-    const status = b.executionStatus?.toLowerCase();
+    return flightBookings.filter((b) => {
+      const status = b.executionStatus?.toLowerCase();
 
-    if (
-      status === "failed" ||
-      status === "cancelled" ||
-      status === "cancel_requested" ||
-      status === "not_started"
-    ) {
-      return false;
-    }
+      if (
+        status === "failed" ||
+        status === "cancelled" ||
+        status === "cancel_requested" ||
+        status === "not_started"
+      ) {
+        return false;
+      }
 
-    return true;
-  }).length;
-}, [flightBookings]);
+      return true;
+    }).length;
+  }, [flightBookings]);
 
-const filteredHotelCount = useMemo(() => {
-  return hotelBookings.filter((b) => {
-    const amendmentStatus = b?.amendment?.status;
+  const filteredHotelCount = useMemo(() => {
+    return hotelBookings.filter((b) => {
+      const amendmentStatus = b?.amendment?.status;
 
-    if (amendmentStatus && amendmentStatus !== "not_requested") {
-      return false;
-    }
+      if (amendmentStatus && amendmentStatus !== "not_requested") {
+        return false;
+      }
 
-    return true;
-  }).length;
-}, [hotelBookings]);
+      return true;
+    }).length;
+  }, [hotelBookings]);
 
   const statusOptions =
     activeTab === "flight"
@@ -572,9 +569,9 @@ const filteredHotelCount = useMemo(() => {
             </div>
             <button
               onClick={() =>
-                navigate(
-                  activeTab === "flight" ? "/search-flight" : "/search-hotel",
-                )
+                navigate("/travel", {
+                    state: { activeTab: activeTab === "flight" ? "flight" : "hotel" },
+                })
               }
               className="flex items-center gap-2 bg-linear-to-r from-[#0A4D68] to-[#088395] text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:from-[#083d52] hover:to-[#066876] transition-all active:scale-95 shadow-md shadow-[#0A4D68]/20"
             >
@@ -775,9 +772,9 @@ const filteredHotelCount = useMemo(() => {
             {bookings.length === 0 && (
               <button
                 onClick={() =>
-                  navigate(
-                    activeTab === "flight" ? "/search-flight" : "/search-hotel",
-                  )
+                  navigate("/travel", {
+                    state: { activeTab: activeTab === "flight" ? "flight" : "hotel" },
+                  })
                 }
                 className="text-sm font-bold text-white bg-[#0A4D68] px-6 py-2.5 rounded-xl hover:bg-[#083d52] transition"
               >

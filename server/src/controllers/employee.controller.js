@@ -1,6 +1,5 @@
 // employee.controller.js
 
-
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const Employee = require("../models/Employee");
@@ -18,12 +17,89 @@ const fs = require("fs");
 // ===============================
 exports.getProfile = async (req, res, next) => {
   try {
-    const employee = await Employee.findOne({ userId: req.user.id }).select(
-      "-__v",
-    );
+    let employee = await Employee.findOne({ userId: req.user.id })
+      .populate("managerId", "name email designation phone")
+      .populate(
+        "corporateId",
+        "corporateName primaryContact secondaryContact defaultApprover",
+      )
+      .select("-__v");
+
+    const user = await User.findById(req.user.id).populate("corporateId");
+
+    // FALLBACK: If travel-admin or manager doesn't have an Employee doc, synthesize one from User doc
+    if (!employee && ["travel-admin", "manager"].includes(user?.role)) {
+      employee = {
+        userId: user._id,
+        name: `${user.name?.firstName || ""} ${user.name?.lastName || ""}`.trim() || user.username,
+        email: user.email,
+        corporateId: user.corporateId,
+        designation: user.role,
+        department: "Administration",
+        mobile: user.phone || "",
+        employeeCode: "ADMIN",
+      };
+    }
+
     if (!employee) return next(new ApiError(404, "Employee profile not found"));
 
-    const user = await User.findById(req.user.id);
+    // Check for all "Manager Selection" requests for this employee (including project-specific)
+    const ManagerRequest = require("../models/ManagerRequest");
+    const managerRequests = await ManagerRequest.find({
+      employeeId: employee._id,
+    }).sort({ createdAt: -1 });
+
+    // Determine the Travel Admin by searching users with the role 'travel-admin' for this corporate
+    const travelAdminUser = await User.findOne({
+      corporateId: employee.corporateId,
+      role: "travel-admin",
+      isActive: true,
+    }).select("name email role");
+
+    let travelAdmin = null;
+    if (travelAdminUser) {
+      travelAdmin = {
+        name:
+          `${travelAdminUser.name?.firstName || ""} ${travelAdminUser.name?.lastName || ""}`.trim() ||
+          travelAdminUser.email,
+        email: travelAdminUser.email,
+        role: "Reviewing Authority (Travel Admin)",
+      };
+    } else {
+      // Fallback to corporate contact if no travel-admin user found
+      const corporate = employee.corporateId;
+      const contact = corporate?.secondaryContact || corporate?.primaryContact;
+      if (contact) {
+        travelAdmin = {
+          name: contact.name,
+          email: contact.email,
+          role: "Reviewing Authority (Travel Admin)",
+        };
+      }
+    }
+
+    // Build a list of approvers including project-specific ones
+    const projectApprovers = managerRequests.map((req) => ({
+      name: req.managerName,
+      email: req.managerEmail,
+      designation: req.managerRole,
+      projectName: req.projectName || "General/Default",
+      projectCode: req.projectCodeId,
+      status: req.status === "pending" ? "Pending Review" : "Active",
+      isProjectSpecific: !!req.projectName,
+    }));
+
+    // If no specific requests, use the default manager from Employee model
+    if (projectApprovers.length === 0 && employee.managerId) {
+      projectApprovers.push({
+        name: employee.managerId.name,
+        email: employee.managerId.email,
+        designation: employee.managerId.designation,
+        projectName: "General/Default",
+        status: "Active",
+        isProjectSpecific: false,
+      });
+    }
 
     res.json({
       success: true,
@@ -31,9 +107,17 @@ exports.getProfile = async (req, res, next) => {
         name: employee.name,
         email: user?.email,
         phone: employee.mobile,
-        employeeId: employee.employeeCode,
+        employeeCode: employee.employeeCode,
         department: employee.department,
         designation: employee.designation,
+        projectApprovers, // <--- New field for list
+        travelAdmin: travelAdmin
+          ? {
+              name: travelAdmin.name,
+              email: travelAdmin.email,
+              role: "Reviewing Authority (Travel Admin)",
+            }
+          : null,
       },
     });
   } catch (err) {
@@ -57,7 +141,7 @@ exports.updateProfile = async (req, res, next) => {
     if (req.body.employeeId !== undefined)
       updates.employeeCode = req.body.employeeId;
 
-    if (!Object.keys(updates).length)
+    if (!Object.keys(updates).length && !req.body.managerId && !req.body.email)
       return next(new ApiError(400, "No valid fields to update"));
 
     if (req.body.email !== undefined) {
@@ -70,30 +154,163 @@ exports.updateProfile = async (req, res, next) => {
       { userId: req.user.id },
       { $set: updates },
       { new: true, runValidators: true },
-    ).select("-__v");
+    )
+      .populate("managerId", "name email designation phone")
+      .select("-__v");
 
-    if (!emp) return next(new ApiError(404, "Employee profile not found"));
+    // If no Employee doc but user is admin/manager, we can allow basic User updates
+    if (!emp) {
+        const user = await User.findById(req.user.id);
+        if (["travel-admin", "manager"].includes(user?.role)) {
+            // Updated User name if provided
+            if (updates.name) {
+                const parts = updates.name.split(" ");
+                await User.findByIdAndUpdate(req.user.id, {
+                    "name.firstName": parts[0],
+                    "name.lastName": parts.slice(1).join(" "),
+                    phone: updates.mobile
+                });
+            }
+            return res.json({ success: true, message: "Profile updated" });
+        }
+        return next(new ApiError(404, "Employee profile not found"));
+    }
+
+    // Handle Manager Selection via ManagerRequest
+    if (req.body.managerId) {
+      const ManagerRequest = require("../models/ManagerRequest");
+      const Project = require("../models/Project.model");
+      const managerUser = await Employee.findOne({ _id: req.body.managerId });
+
+      let projectName = "General/Global";
+      let projectCodeId = null;
+      let projectClient = null;
+
+      if (req.body.projectId) {
+        const project = await Project.findById(req.body.projectId);
+        if (project) {
+          projectName = project.projectName;
+          projectCodeId = project.projectCodeId;
+          projectClient = project.clientName;
+        }
+      }
+
+      if (managerUser) {
+        await ManagerRequest.findOneAndUpdate(
+          { employeeId: emp._id, projectName, status: "pending" },
+          {
+            employeeId: emp._id,
+            managerId: managerUser.userId,
+            managerEmail: managerUser.email,
+            managerName: managerUser.name,
+            managerRole: managerUser.designation,
+            corporateId: emp.corporateId,
+            projectName,
+            projectCodeId,
+            projectClient,
+            status: "pending",
+          },
+          { upsert: true, new: true },
+        );
+      }
+    }
 
     const user = await User.findById(req.user.id);
 
+    // Determine the Travel Admin by searching users with the role 'travel-admin' for this corporate
+    const travelAdminUser = await User.findOne({
+      corporateId: emp.corporateId,
+      role: "travel-admin",
+      isActive: true,
+    }).select("name email role");
+
+    let travelAdmin = null;
+    if (travelAdminUser) {
+      travelAdmin = {
+        name:
+          `${travelAdminUser.name?.firstName || ""} ${travelAdminUser.name?.lastName || ""}`.trim() ||
+          travelAdminUser.email,
+        email: travelAdminUser.email,
+        role: "Reviewing Authority (Travel Admin)",
+        status: "Reviewer",
+      };
+    } else {
+      const corporate = await Corporate.findById(emp.corporateId);
+      const contact = corporate?.secondaryContact || corporate?.primaryContact;
+      if (contact) {
+        travelAdmin = {
+          name: contact.name,
+          email: contact.email,
+          role: "Reviewing Authority (Travel Admin)",
+          status: "Reviewer",
+        };
+      }
+    }
+
+    // Refresh manager info from ManagerRequest for pending status
+    const ManagerRequest = require("../models/ManagerRequest");
+    const latestReq = await ManagerRequest.findOne({
+      employeeId: emp._id,
+      status: "pending",
+    }).sort({ createdAt: -1 });
+
+    let finalManager = emp.managerId
+      ? {
+          name: emp.managerId.name,
+          email: emp.managerId.email,
+          designation: emp.managerId.designation,
+          role: "Primary Approver (Manager)",
+          status: "Active",
+        }
+      : null;
+
+    if (latestReq) {
+      finalManager = {
+        name: latestReq.managerName,
+        email: latestReq.managerEmail,
+        designation: latestReq.managerRole,
+        role: "Primary Approver (Manager)",
+        status: "Pending Review",
+      };
+    }
+
     res.json({
       success: true,
-      message: "Profile updated successfully",
+      message: latestReq
+        ? "Profile updated and manager request sent for review"
+        : "Profile updated successfully",
       employee: {
         name: emp.name,
         email: user?.email,
         phone: emp.mobile,
-        employeeId: emp.employeeCode,
+        employeeCode: emp.employeeCode,
         department: emp.department,
         designation: emp.designation,
+        manager: finalManager,
+        approvalChain: {
+          level1: finalManager,
+          level2: travelAdmin
+            ? {
+                name: travelAdmin.name,
+                email: travelAdmin.email,
+                role: "Reviewing Authority (Travel Admin)",
+                status: "Reviewer",
+              }
+            : null,
+        },
+        travelAdmin: travelAdmin
+          ? {
+              name: travelAdmin.name,
+              email: travelAdmin.email,
+              role: "Reviewing Authority (Travel Admin)",
+            }
+          : null,
       },
     });
   } catch (err) {
     next(err);
   }
 };
-
-
 
 exports.uploadTravelDocument = async (req, res, next) => {
   try {
@@ -202,7 +419,6 @@ exports.getMyDocuments = async (req, res, next) => {
   }
 };
 
-
 /**
  * GET /api/travel-admin/me
  * Fetch approver based on same email domain
@@ -302,6 +518,33 @@ exports.getMyGstDetails = async (req, res, next) => {
             .join(", "),
         verified: gst.verified || false,
       },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ===============================
+// GET MANAGERS IN CORPORATE
+// ===============================
+exports.getManagers = async (req, res, next) => {
+  try {
+    let employee = await Employee.findOne({ userId: req.user.id });
+    const user = await User.findById(req.user.id);
+
+    const corporateId = employee?.corporateId || user?.corporateId;
+
+    if (!corporateId) return next(new ApiError(404, "Corporate association not found"));
+
+    const managers = await Employee.find({
+      corporateId: corporateId,
+      status: "active",
+      userId: { $ne: req.user.id }, // exclude self
+    }).select("name email designation role");
+
+    res.json({
+      success: true,
+      managers,
     });
   } catch (err) {
     next(err);

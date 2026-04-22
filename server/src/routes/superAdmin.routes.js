@@ -2,7 +2,7 @@
 
 const router = require("express").Router();
 const superAdminCtrl = require("../controllers/superAdmin.controller.js");
-const auth = require("../middleware/auth.middleware.js");
+const { verifyToken, verifySuperAdmin, authorizeRoles } = require("../middleware/auth.middleware.js");
 
 // ---------------------
 // PUBLIC ROUTES
@@ -11,12 +11,12 @@ router.post("/register", superAdminCtrl.registerSuperAdmin);
 router.post("/login", superAdminCtrl.loginSuperAdmin);
 
 // ---------------------
-// TBO (SUPER ADMIN ONLY)
+// TBO (SUPER ADMIN + OPS)
 // ---------------------
 router.post(
   "/tbo/agency-balance",
-  auth.verifyToken,
-  auth.verifySuperAdmin,
+  verifyToken,
+  authorizeRoles("super-admin", "ops-member"),
   superAdminCtrl.getTboAgencyBalance
 );
 
@@ -25,36 +25,36 @@ router.post(
 // ---------------------
 router.get(
   "/profile",
-  auth.verifyToken,
-  auth.verifySuperAdmin,
+  verifyToken,
+  authorizeRoles("super-admin", "ops-member"),
   superAdminCtrl.getProfile
 );
 
 router.patch(
   "/update",
-  auth.verifyToken,
-  auth.verifySuperAdmin,
+  verifyToken,
+  authorizeRoles("super-admin", "ops-member"),
   superAdminCtrl.updateProfile
 );
 
 router.patch(
   "/:id/deactivate",
-  auth.verifyToken,
-  auth.verifySuperAdmin,
+  verifyToken,
+  verifySuperAdmin,
   superAdminCtrl.deactivateCorporateAdmin
 );
 
 router.patch(
   "/:id/activate",
-  auth.verifyToken,
-  auth.verifySuperAdmin,
+  verifyToken,
+  verifySuperAdmin,
   superAdminCtrl.activateCorporateAdmin
 );
 
 router.delete(
   "/:id",
-  auth.verifyToken,
-  auth.verifySuperAdmin,
+  verifyToken,
+  verifySuperAdmin,
   superAdminCtrl.removeCorporateAdmin
 );
 

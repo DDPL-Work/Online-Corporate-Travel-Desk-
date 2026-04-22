@@ -7,7 +7,7 @@ const walletController = require('../controllers/wallet.controller');
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
 
 router.use(verifyToken);
-router.use(authorizeRoles('travel-admin', 'super-admin'));
+router.use(authorizeRoles('travel-admin', 'super-admin', 'ops-member'));
 
 router.get('/balance', walletController.getWalletBalance);
 router.get('/transactions', walletController.getWalletTransactions);

@@ -47,6 +47,24 @@ const PRIORITY_STYLES = {
 };
 
 // ─────────────────────────────────────────────
+// DUMMY HOTEL CANCELLATION QUERIES
+// ─────────────────────────────────────────────
+const DUMMY_HOTEL_QUERIES = [
+  { _id: "h001", queryId: "HCQ-001", status: "OPEN",        priority: "HIGH",   requestedAt: "2026-04-10T09:30:00Z", corporate: { companyName: "Acme Corp", employeeName: "Ravi Kumar",   employeeEmail: "ravi@acme.com"   }, bookingSnapshot: { hotelName: "The Leela Palace",    checkInDate: "2026-04-15", checkOutDate: "2026-04-18", totalFare: 42000, roomType: "Deluxe Suite"   }, remarks: "Urgent cancellation due to client meeting cancelled." },
+  { _id: "h002", queryId: "HCQ-002", status: "IN_PROGRESS", priority: "MEDIUM", requestedAt: "2026-04-11T11:00:00Z", corporate: { companyName: "TechStar Pvt", employeeName: "Priya Sharma",  employeeEmail: "priya@ts.com"    }, bookingSnapshot: { hotelName: "Taj Mahal Hotel",      checkInDate: "2026-04-20", checkOutDate: "2026-04-22", totalFare: 28000, roomType: "Executive Room" }, remarks: "Guest unable to travel — visa issue." },
+  { _id: "h003", queryId: "HCQ-003", status: "RESOLVED",   priority: "LOW",    requestedAt: "2026-04-08T14:15:00Z", corporate: { companyName: "GlobalLink",   employeeName: "Anjali Verma",   employeeEmail: "anjali@gl.com"   }, bookingSnapshot: { hotelName: "ITC Grand Bharat",    checkInDate: "2026-04-12", checkOutDate: "2026-04-14", totalFare: 19500, roomType: "Superior Room"  }, remarks: "Refund processed successfully." },
+  { _id: "h004", queryId: "HCQ-004", status: "OPEN",        priority: "HIGH",   requestedAt: "2026-04-12T08:00:00Z", corporate: { companyName: "Synergy Ltd",  employeeName: "Mohan Das",      employeeEmail: "mohan@synergy.com" }, bookingSnapshot: { hotelName: "Oberoi Trident",      checkInDate: "2026-04-25", checkOutDate: "2026-04-27", totalFare: 35000, roomType: "Ocean View Suite"}, remarks: "Flight cancelled, need hotel refund." },
+  { _id: "h005", queryId: "HCQ-005", status: "REJECTED",   priority: "LOW",    requestedAt: "2026-04-07T16:45:00Z", corporate: { companyName: "BrightPath",   employeeName: "Sunita Patel",   employeeEmail: "sunita@bp.com"   }, bookingSnapshot: { hotelName: "Hyatt Regency",       checkInDate: "2026-04-10", checkOutDate: "2026-04-11", totalFare: 8500,  roomType: "Standard Room"  }, remarks: "Cancellation requested after check-in." },
+  { _id: "h006", queryId: "HCQ-006", status: "IN_PROGRESS", priority: "HIGH",   requestedAt: "2026-04-13T10:30:00Z", corporate: { companyName: "NovaTech",     employeeName: "Karan Mehta",    employeeEmail: "karan@nova.com"  }, bookingSnapshot: { hotelName: "Marriott Mumbai",     checkInDate: "2026-04-28", checkOutDate: "2026-05-01", totalFare: 55000, roomType: "Presidential"   }, remarks: "Conference event postponed." },
+  { _id: "h007", queryId: "HCQ-007", status: "OPEN",        priority: "MEDIUM", requestedAt: "2026-04-14T07:20:00Z", corporate: { companyName: "Acme Corp",    employeeName: "Deepak Raj",     employeeEmail: "deepak@acme.com" }, bookingSnapshot: { hotelName: "Sheraton Grand",      checkInDate: "2026-04-30", checkOutDate: "2026-05-02", totalFare: 22000, roomType: "Club Room"      }, remarks: "Internal policy change." },
+  { _id: "h008", queryId: "HCQ-008", status: "RESOLVED",   priority: "MEDIUM", requestedAt: "2026-04-09T13:00:00Z", corporate: { companyName: "PearlGate",    employeeName: "Nisha Jain",     employeeEmail: "nisha@pg.com"    }, bookingSnapshot: { hotelName: "Radisson Blu",        checkInDate: "2026-04-17", checkOutDate: "2026-04-19", totalFare: 16000, roomType: "Business Room"  }, remarks: "Credit note issued." },
+  { _id: "h009", queryId: "HCQ-009", status: "OPEN",        priority: "LOW",    requestedAt: "2026-04-15T09:00:00Z", corporate: { companyName: "SkyLane",      employeeName: "Arjun Singh",    employeeEmail: "arjun@sl.com"    }, bookingSnapshot: { hotelName: "Crowne Plaza",        checkInDate: "2026-05-05", checkOutDate: "2026-05-07", totalFare: 13000, roomType: "Deluxe Room"    }, remarks: "Medical emergency." },
+  { _id: "h010", queryId: "HCQ-010", status: "IN_PROGRESS", priority: "HIGH",   requestedAt: "2026-04-16T11:45:00Z", corporate: { companyName: "CoreEdge",     employeeName: "Meena Bose",     employeeEmail: "meena@ce.com"    }, bookingSnapshot: { hotelName: "Four Seasons Delhi",  checkInDate: "2026-05-10", checkOutDate: "2026-05-12", totalFare: 48000, roomType: "Luxury Suite"   }, remarks: "Budget freeze by management." },
+  { _id: "h011", queryId: "HCQ-011", status: "OPEN",        priority: "MEDIUM", requestedAt: "2026-04-17T08:30:00Z", corporate: { companyName: "DataAxis",     employeeName: "Rahul Gupta",    employeeEmail: "rahul@da.com"    }, bookingSnapshot: { hotelName: "JW Marriott Pune",    checkInDate: "2026-05-15", checkOutDate: "2026-05-17", totalFare: 31000, roomType: "Superior Suite"  }, remarks: "Project site changed." },
+  { _id: "h012", queryId: "HCQ-012", status: "REJECTED",   priority: "LOW",    requestedAt: "2026-04-06T15:00:00Z", corporate: { companyName: "FinServe",     employeeName: "Pooja Iyer",     employeeEmail: "pooja@fs.com"    }, bookingSnapshot: { hotelName: "Novotel Hyderabad",   checkInDate: "2026-04-09", checkOutDate: "2026-04-10", totalFare: 7200,  roomType: "Standard Room"  }, remarks: "Late cancellation — charges applied." },
+];
+
+// ─────────────────────────────────────────────
 // NORMALIZERS
 // ─────────────────────────────────────────────
 
@@ -547,19 +565,27 @@ function CancellationQueryTab() {
   const dispatch = useDispatch();
   const {
     cancellationQueries,
-    cancellationQueryPagination,
     loadingCancellationQueries,
   } = useSelector((state) => state.corporateRelated);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [requestedDate, setRequestedDate] = useState("");
   const [page, setPage] = useState(1);
   const [selectedQuery, setSelectedQuery] = useState(null);
 
+  // Reset to page 1 when filters change
   useEffect(() => {
-    dispatch(fetchCancellationQueries({ page, limit: 10 }));
-  }, [page, dispatch]);
+    setPage(1);
+  }, [statusFilter, search, fromDate, toDate, requestedDate]);
+
+  // Fetch all data at once (no API pagination)
+  useEffect(() => {
+    dispatch(fetchCancellationQueries());
+  }, [dispatch]);
 
   const queries = useMemo(
     () => cancellationQueries || [],
@@ -586,27 +612,35 @@ function CancellationQueryTab() {
           (q.corporate?.companyName || "")
             .toLowerCase()
             .includes(search.toLowerCase());
-        return matchStatus && matchPriority && matchSearch;
+
+        // Date filters — based on requestedAt field
+        const reqAt = q.requestedAt ? new Date(q.requestedAt) : null;
+        const matchFrom = !fromDate || (reqAt && reqAt >= new Date(fromDate));
+        const matchTo   = !toDate   || (reqAt && reqAt <= new Date(toDate + "T23:59:59"));
+        const matchRequested =
+          !requestedDate ||
+          (q.requestedAt || "").slice(0, 10) === requestedDate;
+
+        return matchStatus && matchPriority && matchSearch && matchFrom && matchTo && matchRequested;
       }),
-    [queries, statusFilter, priorityFilter, search],
+    [queries, statusFilter, priorityFilter, search, fromDate, toDate, requestedDate],
   );
 
-  const totalPages =
-    cancellationQueryPagination?.totalPages ||
-    Math.max(
-      1,
-      Math.ceil(
-        (cancellationQueryPagination?.total || filtered.length || 0) / 10,
-      ),
-    );
-  const currentPage = cancellationQueryPagination?.page || page;
+  // Frontend pagination
+  const currentPage = page;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / 10));
+
+  const paginatedQueries = useMemo(
+    () => filtered.slice((page - 1) * 10, page * 10),
+    [filtered, page],
+  );
 
   const handleStatusChange = useCallback(
     async (id, payload) => {
       await dispatch(updateCancellationQueryStatus({ id, ...payload }));
-      dispatch(fetchCancellationQueries({ page, limit: 10 }));
+      dispatch(fetchCancellationQueries());
     },
-    [dispatch, page],
+    [dispatch],
   );
 
   const statusCounts = useMemo(() => {
@@ -666,7 +700,7 @@ function CancellationQueryTab() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <LabeledInput label="Search">
             <div className="relative">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -706,6 +740,30 @@ function CancellationQueryTab() {
                 </option>
               ))}
             </select>
+          </LabeledInput>
+          <LabeledInput label="From Date">
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+            />
+          </LabeledInput>
+          <LabeledInput label="To Date">
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+            />
+          </LabeledInput>
+          <LabeledInput label="Requested Date">
+            <input
+              type="date"
+              value={requestedDate}
+              onChange={(e) => setRequestedDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+            />
           </LabeledInput>
         </div>
       </div>
@@ -756,7 +814,7 @@ function CancellationQueryTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {filtered.map((q) => (
+                {paginatedQueries.map((q) => (
                   <QueryRow
                     key={q._id || q.queryId}
                     query={q}
@@ -891,6 +949,223 @@ function QueryRow({ query, fmt, onView, onStatusChange }) {
 // MAIN DASHBOARD
 // ─────────────────────────────────────────────
 
+// ─────────────────────────────────────────────
+// HOTEL CANCELLATION QUERY TAB (dummy data)
+// ─────────────────────────────────────────────
+
+function HotelCancellationQueryTab() {
+  const [search, setSearch]               = useState("");
+  const [statusFilter, setStatusFilter]   = useState("ALL");
+  const [priorityFilter, setPriorityFilter] = useState("ALL");
+  const [fromDate, setFromDate]           = useState("");
+  const [toDate, setToDate]               = useState("");
+  const [requestedDate, setRequestedDate] = useState("");
+  const [page, setPage]                   = useState(1);
+  const [selectedQuery, setSelectedQuery] = useState(null);
+
+  useEffect(() => { setPage(1); }, [statusFilter, search, fromDate, toDate, requestedDate]);
+
+  const fmt = (d) =>
+    d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+
+  const filtered = useMemo(() =>
+    DUMMY_HOTEL_QUERIES.filter((q) => {
+      const matchStatus   = statusFilter   === "ALL" || q.status   === statusFilter;
+      const matchPriority = priorityFilter === "ALL" || q.priority === priorityFilter;
+      const matchSearch   =
+        !search ||
+        (q.queryId || "").toLowerCase().includes(search.toLowerCase()) ||
+        (q.corporate?.companyName  || "").toLowerCase().includes(search.toLowerCase()) ||
+        (q.corporate?.employeeName || "").toLowerCase().includes(search.toLowerCase()) ||
+        (q.bookingSnapshot?.hotelName || "").toLowerCase().includes(search.toLowerCase());
+      const reqAt = q.requestedAt ? new Date(q.requestedAt) : null;
+      const matchFrom      = !fromDate      || (reqAt && reqAt >= new Date(fromDate));
+      const matchTo        = !toDate        || (reqAt && reqAt <= new Date(toDate + "T23:59:59"));
+      const matchRequested = !requestedDate || (q.requestedAt || "").slice(0, 10) === requestedDate;
+      return matchStatus && matchPriority && matchSearch && matchFrom && matchTo && matchRequested;
+    }),
+    [search, statusFilter, priorityFilter, fromDate, toDate, requestedDate],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / 10));
+  const paginatedQueries = useMemo(
+    () => filtered.slice((page - 1) * 10, page * 10),
+    [filtered, page],
+  );
+
+  const statusCounts = useMemo(() => {
+    const counts = { OPEN: 0, IN_PROGRESS: 0, RESOLVED: 0, REJECTED: 0 };
+    DUMMY_HOTEL_QUERIES.forEach((q) => { if (counts[q.status] !== undefined) counts[q.status]++; });
+    return counts;
+  }, []);
+
+  return (
+    <div className="space-y-5">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Open"        value={statusCounts.OPEN}        Icon={FiAlertCircle}  borderCls="border-blue-500"    iconBgCls="bg-blue-50"    iconColorCls="text-blue-600" />
+        <StatCard label="In Progress" value={statusCounts.IN_PROGRESS} Icon={FiClock}        borderCls="border-amber-500"   iconBgCls="bg-amber-50"   iconColorCls="text-amber-600" />
+        <StatCard label="Resolved"    value={statusCounts.RESOLVED}    Icon={FiCheckCircle}  borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Rejected"    value={statusCounts.REJECTED}    Icon={FiXCircle}      borderCls="border-rose-500"    iconBgCls="bg-rose-50"    iconColorCls="text-rose-600" />
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <LabeledInput label="Search">
+            <div className="relative">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input type="text" placeholder="Hotel / Company / ID..." value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50" />
+            </div>
+          </LabeledInput>
+          <LabeledInput label="Status">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer">
+              <option value="ALL">All Statuses</option>
+              {QUERY_STATUSES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+            </select>
+          </LabeledInput>
+          <LabeledInput label="Priority">
+            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer">
+              <option value="ALL">All Priorities</option>
+              {QUERY_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </LabeledInput>
+          <LabeledInput label="From Date">
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50" />
+          </LabeledInput>
+          <LabeledInput label="To Date">
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50" />
+          </LabeledInput>
+          <LabeledInput label="Requested Date">
+            <input type="date" value={requestedDate} onChange={(e) => setRequestedDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50" />
+          </LabeledInput>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg flex items-center gap-2">
+            <FiMessageSquare size={18} className="text-teal-600" />
+            Hotel Query List
+          </h2>
+          <button className="flex items-center gap-2 px-4 py-2 bg-teal-700 text-white rounded-lg text-xs font-bold shadow-md uppercase">
+            <FiDownload /> Export Queries
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          {filtered.length === 0 ? (
+            <div className="p-10 text-center text-sm text-slate-400">No hotel cancellation queries found.</div>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-teal-800">
+                  {["Query ID", "Corporate / Employee", "Hotel Name", "Check-In", "Check-Out", "Room Type", "Total Fare", "Priority", "Status", "Requested On", "Actions"].map((h) => (
+                    <th key={h} className="px-5 py-4 text-[11px] font-bold text-teal-100 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {paginatedQueries.map((q) => (
+                  <tr key={q._id} className="hover:bg-teal-50/20 transition-all bg-white">
+                    <td className="px-5 py-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">{q.queryId}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-800 text-[13px]">{q.corporate?.companyName || "—"}</span>
+                        <span className="text-[11px] text-slate-400">{q.corporate?.employeeName || "—"}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 font-semibold text-slate-700 text-[12px] whitespace-nowrap">{q.bookingSnapshot?.hotelName || "—"}</td>
+                    <td className="px-5 py-4 text-[12px] text-slate-600 whitespace-nowrap">{fmt(q.bookingSnapshot?.checkInDate)}</td>
+                    <td className="px-5 py-4 text-[12px] text-slate-600 whitespace-nowrap">{fmt(q.bookingSnapshot?.checkOutDate)}</td>
+                    <td className="px-5 py-4 text-[11px] text-slate-500">{q.bookingSnapshot?.roomType || "—"}</td>
+                    <td className="px-5 py-4 font-bold text-slate-800 text-[12px] whitespace-nowrap">
+                      {q.bookingSnapshot?.totalFare != null ? `₹${Number(q.bookingSnapshot.totalFare).toLocaleString()}` : "—"}
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase border ${PRIORITY_STYLES[q.priority] || PRIORITY_STYLES.MEDIUM}`}>
+                        {q.priority || "MEDIUM"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase border ${STATUS_STYLES[q.status] || STATUS_STYLES.OPEN}`}>
+                        {(q.status || "OPEN").replace("_", " ")}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-[11px] text-slate-500 whitespace-nowrap">{fmt(q.requestedAt)}</td>
+                    <td className="px-5 py-4">
+                      <button onClick={() => setSelectedQuery(q)}
+                        className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-700 transition-colors" title="View Details">
+                        <FiEye size={15} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-white">
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            Page {page} of {totalPages}
+          </div>
+          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} showFirstLast />
+        </div>
+      </div>
+
+      {/* Detail Modal (reuse QueryDetailModal in view-only mode) */}
+      {selectedQuery && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setSelectedQuery(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Hotel Cancellation Query</p>
+                <h2 className="text-lg font-black text-slate-900 leading-none">{selectedQuery.queryId}</h2>
+              </div>
+              <button onClick={() => setSelectedQuery(null)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-500">
+                <FiX size={18} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <InfoCell label="Hotel"      value={selectedQuery.bookingSnapshot?.hotelName} />
+                <InfoCell label="Room Type"  value={selectedQuery.bookingSnapshot?.roomType} />
+                <InfoCell label="Check-In"   value={fmt(selectedQuery.bookingSnapshot?.checkInDate)} />
+                <InfoCell label="Check-Out"  value={fmt(selectedQuery.bookingSnapshot?.checkOutDate)} />
+                <InfoCell label="Total Fare" value={selectedQuery.bookingSnapshot?.totalFare != null ? `₹${Number(selectedQuery.bookingSnapshot.totalFare).toLocaleString()}` : "—"} />
+                <InfoCell label="Requested"  value={fmt(selectedQuery.requestedAt)} />
+                <InfoCell label="Company"    value={selectedQuery.corporate?.companyName} />
+                <InfoCell label="Employee"   value={selectedQuery.corporate?.employeeName} />
+                <InfoCell label="Email"      value={selectedQuery.corporate?.employeeEmail} />
+                <InfoCell label="Priority"   value={selectedQuery.priority} />
+              </div>
+              {selectedQuery.remarks && (
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Remarks</p>
+                  <p className="text-sm text-slate-700 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">{selectedQuery.remarks}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// MAIN DASHBOARD
+// ─────────────────────────────────────────────
+
 export default function CancellationQueries() {
   const [activeTab, setActiveTab] = useState("Flight");
 
@@ -942,6 +1217,7 @@ export default function CancellationQueries() {
 
         {/* Query Tab */}
         {activeTab === "Flight" && <CancellationQueryTab />}
+        {activeTab === "Hotel"  && <HotelCancellationQueryTab />}
       </div>
     </div>
   );
