@@ -25,7 +25,7 @@ import {
   MdUpdate,
 } from "react-icons/md";
 import { BsStarFill } from "react-icons/bs";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n) => "₹" + Math.round(n).toLocaleString("en-IN");
@@ -942,8 +942,8 @@ export default function FareUpsellPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <EmployeeHeader />
+    <div className="min-h-screen bg-slate-100 font-sans">
+      <CorporateNavbar />
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Back */}

@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
+import api from "../../../API/axios";
+import { toast } from "react-toastify";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import {
   FiHome,
@@ -18,7 +20,37 @@ import {
   FiKey,
   FiStar,
   FiLayers,
+  FiRefreshCcw,
+  FiEdit,
+  FiSearch,
+  FiAlertTriangle,
+  FiFileText,
+  FiZapOff,
+  FiActivity,
+  FiExternalLink
 } from "react-icons/fi";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  resetAmendmentState as resetFlightAmendment,
+} from "../../../Redux/Slice/amendmentSlice";
+import {
+  resetAmendmentState as resetHotelAmendment,
+  resetAmendmentStatus as resetHotelStatus,
+} from "../../../Redux/Slice/hotelAmendment.slice";
+
+import {
+  fetchCancellationCharges as fetchChargesThunk,
+  fullCancellation as fullCancelThunk,
+  partialCancellation as partialCancelThunk,
+  amendBooking as amendThunk,
+  fetchChangeStatus as fetchStatusThunk,
+  createCancellationQuery as createQueryThunk
+} from "../../../Redux/Actions/amendmentThunks";
+import {
+  sendHotelAmendment,
+  getHotelAmendmentStatus
+} from "../../../Redux/Actions/hotelAmendment.thunks";
+
 import {
   formatDate,
   formatDateTime,
@@ -33,6 +65,7 @@ import {
   SectionLabel,
   TraceTimer,
 } from "../Shared/CommonComponents";
+import { useEffect } from "react";
 
 const getPaxCategory = (pax) => {
   const t = (pax?.paxType || "").toString().toLowerCase();
@@ -42,10 +75,410 @@ const getPaxCategory = (pax) => {
   return "Adult";
 };
 
+/**
+ * 🎨 PREMIUM CANCELLATION CHARGES DISPLAY
+ */
+const CancellationChargesDisplay = ({ data }) => {
+  if (!data || !data.Response) return null;
+  const res = data.Response;
+
+  return (
+    <div className="bg-white border border-blue-100 rounded-2xl overflow-hidden shadow-sm animate-in fade-in zoom-in-95 duration-300">
+      <div className="bg-blue-600 px-4 py-3 text-white flex justify-between items-center">
+        <h4 className="text-[11px] font-black uppercase tracking-widest">
+          Cancellation Estimate
+        </h4>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-mono">
+            {res.TraceId?.slice(-8)}
+          </span>
+        </div>
+      </div>
+
+      <div className="p-5">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-4 bg-green-50 border border-green-100 rounded-xl">
+            <p className="text-[10px] font-bold text-green-600 uppercase mb-1">
+              Estimated Refund
+            </p>
+            <p className="text-xl font-black text-green-900">
+              {res.Currency} {res.RefundAmount?.toLocaleString()}
+            </p>
+          </div>
+          <div className="p-4 bg-red-50 border border-red-100 rounded-xl">
+            <p className="text-[10px] font-bold text-red-600 uppercase mb-1">
+              Cancellation Fees
+            </p>
+            <p className="text-xl font-black text-red-900">
+              {res.Currency} {res.CancellationCharge?.toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        {res.GST && (
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <div className="flex justify-between items-center mb-3">
+              <p className="text-xs font-bold text-slate-700">Tax Breakdown (GST)</p>
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 rounded text-slate-500">
+                {res.GST.IGSTRate || res.GST.CGSTRate * 2}% Rate
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                <p className="text-[8px] text-slate-400 uppercase font-black">IGST</p>
+                <p className="text-xs font-bold text-slate-700">
+                  {res.Currency} {res.GST.IGSTAmount || 0}
+                </p>
+              </div>
+              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                <p className="text-[8px] text-slate-400 uppercase font-black">CGST</p>
+                <p className="text-xs font-bold text-slate-700">
+                  {res.Currency} {res.GST.CGSTAmount || 0}
+                </p>
+              </div>
+              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                <p className="text-[8px] text-slate-400 uppercase font-black">SGST</p>
+                <p className="text-xs font-bold text-slate-700">
+                  {res.Currency} {res.GST.SGSTAmount || 0}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-2">
+        <FiShield className="text-slate-400" size={10} />
+        <p className="text-[9px] text-slate-400 italic">
+          Values are provided by the supplier and include all applicable taxes and convenience fees.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🛠️ AMENDMENT ACTIONS PANEL
+// ─────────────────────────────────────────────────────────────────────────────
+const AmendmentActionsPanel = ({ booking, type, onClose }) => {
+  const dispatch = useDispatch();
+  const flightState = useSelector((state) => state.amendment);
+  const hotelState = useSelector((state) => state.hotelAmendment);
+  
+  const loading = type === "flight" 
+    ? (flightState.loading || flightState.queryLoading)
+    : (activeTab === "status" ? hotelState.statusLoading : hotelState.loading);
+  const charges = type === "flight" ? flightState.charges : null;
+  const changeStatus = type === "flight" ? flightState.changeStatus : hotelState.statusData;
+
+  const [activeTab, setActiveTab] = useState(type === "flight" ? "charges" : "full");
+  const [remarks, setRemarks] = useState("");
+  const [selectedPaxes, setSelectedPaxes] = useState([]);
+
+  useEffect(() => {
+    return () => {
+      dispatch(resetFlightAmendment());
+      dispatch(resetHotelAmendment());
+      dispatch(resetHotelStatus());
+    };
+  }, [dispatch]);
+
+  const handleFetchCharges = async () => {
+    const result = await dispatch(fetchChargesThunk(booking._id));
+    if (result.meta.requestStatus === "fulfilled") {
+        toast.success("Cancellation charges fetched");
+    } else {
+        toast.error(result.payload?.message || "Failed to fetch charges");
+    }
+  };
+
+  const handleSubmission = async (actionType) => {
+    if (!remarks.trim())
+      return toast.error("Please provide remarks for this action");
+
+    let result;
+    if (type === "flight") {
+      if (actionType === "full") {
+        result = await dispatch(
+          fullCancelThunk({ bookingId: booking._id, remarks }),
+        );
+      } else if (actionType === "partial") {
+        result = await dispatch(
+          partialCancelThunk({
+            bookingId: booking._id,
+            passengerIds: selectedPaxes,
+            segments: booking.flightRequest?.segments || [],
+            remarks,
+          }),
+        );
+      } else if (actionType === "reissue") {
+        result = await dispatch(
+          amendThunk({
+            bookingId: booking._id,
+            segments: booking.flightRequest?.segments || [],
+            remarks,
+          }),
+        );
+      } else if (actionType === "offline") {
+        const payload = {
+          bookingId: booking._id,
+          bookingReference: booking.bookingReference,
+          remarks: remarks,
+          segments: booking.flightRequest?.segments || [],
+          corporate: { id: booking.corporateId },
+          bookingSnapshot: booking.bookingSnapshot || {},
+          passengers: booking.travellers || [],
+        };
+        result = await dispatch(createQueryThunk(payload));
+      } else if (actionType === "status") {
+        result = await dispatch(fetchStatusThunk({ bookingId: booking._id }));
+      }
+    } else {
+      // Hotel Actions
+      if (actionType === "full" || actionType === "offline") {
+        result = await dispatch(
+          sendHotelAmendment({ bookingId: booking._id, remarks }),
+        );
+      } else if (actionType === "status") {
+        result = await dispatch(
+          getHotelAmendmentStatus({ bookingId: booking._id }),
+        );
+      }
+    }
+
+    if (result?.meta.requestStatus === "fulfilled") {
+      toast.success(result.payload?.message || "Action processed successfully");
+      if (actionType !== "status" && actionType !== "charges") onClose();
+    } else if (result?.payload) {
+      toast.error(result.payload.message || "Action failed");
+    }
+  };
+
+  const tabs = type === "flight"
+    ? [
+        { id: "charges", label: "Cancellation charges", sub: "Preview penalties", icon: <FiDollarSign size={16}/> },
+        { id: "full", label: "Full cancel", sub: "Cancel entire booking", icon: <FiX size={16}/> },
+        { id: "partial", label: "Partial cancel", sub: "Select passengers", icon: <FiUser size={16}/> },
+        { id: "reissue", label: "Reissue", sub: "Request modification", icon: <FiRefreshCcw size={16}/> },
+        { id: "offline", label: "Offline cancel", sub: "Manual system update", icon: <FiZapOff size={16}/> },
+        { id: "status", label: "Check status", sub: "Amendment status", icon: <FiSearch size={16}/> },
+      ]
+    : [
+        { id: "full", label: "Full cancel / Amend", sub: "Initiate request", icon: <FiX size={16}/> },
+        { id: "offline", label: "Offline cancel", sub: "Manual system update", icon: <FiZapOff size={16}/> },
+        { id: "status", label: "Check status", sub: "Amendment status", icon: <FiSearch size={16}/> },
+      ];
+
+  return (
+    <div className="mx-6 mb-8 border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-slate-50/50 px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+        <FiActivity className="text-slate-400" size={14} />
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+          Amendment & Cancellation Actions
+        </span>
+      </div>
+
+      <div className="flex border-b border-slate-100 bg-slate-50/30 overflow-x-auto scrollbar-hide">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 min-w-[140px] px-4 py-3 text-left transition-all relative ${
+              activeTab === tab.id
+                ? "bg-white border-b-2 border-blue-600"
+                : "hover:bg-slate-100/50"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className={activeTab === tab.id ? "text-blue-600" : "text-slate-400"}>
+                {tab.icon}
+              </span>
+              <div>
+                <p className={`text-[11px] font-bold ${activeTab === tab.id ? "text-blue-700" : "text-slate-700"}`}>
+                  {tab.label}
+                </p>
+                <p className="text-[9px] text-slate-400 font-medium">
+                  {tab.sub}
+                </p>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <div className="p-6">
+        {activeTab === "charges" && (
+          <div className="space-y-4">
+            <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex gap-3 items-start">
+              <FiInfo className="text-blue-500 mt-0.5 shrink-0" size={16} />
+              <p className="text-xs text-blue-700 leading-relaxed">
+                Fetch live cancellation charges from the provider before proceeding. Charges reflect current fare rules and booking status.
+              </p>
+            </div>
+            
+            {charges && <CancellationChargesDisplay data={charges} />}
+
+            <button
+              disabled={loading}
+              onClick={handleFetchCharges}
+              className="px-6 py-2.5 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <FiDollarSign size={14}/>
+              {loading ? "Fetching..." : "Fetch cancellation charges"}
+            </button>
+          </div>
+        )}
+
+        {["full", "reissue", "offline"].includes(activeTab) && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                Action Remarks
+              </label>
+              <textarea
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder={`Enter reason for ${activeTab.replace("_", " ")}...`}
+                className="w-full text-sm border-slate-200 focus:ring-blue-500 focus:border-blue-500 rounded-xl p-4 min-h-[120px] bg-slate-50/50"
+              />
+            </div>
+            
+            <div className="flex justify-end items-center gap-4">
+               <p className="text-[10px] text-slate-400 italic">
+                 * This action will be processed {activeTab === "offline" ? "internally" : "with the provider"}
+               </p>
+               <button
+                disabled={loading}
+                onClick={() => handleSubmission(activeTab)}
+                className={`px-8 py-3 text-white text-xs font-bold rounded-xl transition-all disabled:opacity-50 ${
+                  activeTab === "offline" ? "bg-slate-800 hover:bg-slate-900" : 
+                  activeTab === "full" ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                {loading ? "Processing..." : `Confirm ${activeTab.replace("_", " ")}`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "partial" && (
+           <div className="space-y-4">
+             <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl flex gap-3 items-start">
+              <FiAlertTriangle className="text-amber-500 mt-0.5 shrink-0" size={16} />
+              <p className="text-xs text-amber-700 leading-relaxed">
+                Select specific passengers to cancel. This generates a partial cancellation request with the provider.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {booking.travellers?.map((t, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    const id = t.TicketNumber || t._id || idx;
+                    setSelectedPaxes(prev => 
+                      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+                    );
+                  }}
+                  className={`p-3 border rounded-xl text-left transition-all flex items-center justify-between ${
+                    selectedPaxes.includes(t.TicketNumber || t._id || idx) 
+                    ? "border-blue-500 bg-blue-50" : "border-slate-100 hover:bg-slate-50"
+                  }`}
+                >
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">{t.FirstName} {t.LastName}</p>
+                    <p className="text-[10px] text-slate-500 font-mono">{t.TicketNumber || "Ticket Pending"}</p>
+                  </div>
+                  {selectedPaxes.includes(t.TicketNumber || t._id || idx) && <FiCheckCircle className="text-blue-600" size={14}/>}
+                </button>
+              ))}
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                Partial Cancellation Remarks
+              </label>
+              <textarea
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Why are these specific passengers being cancelled?"
+                className="w-full text-sm border-slate-200 focus:ring-blue-500 focus:border-blue-500 rounded-xl p-4 min-h-[100px] bg-slate-50/50"
+              />
+            </div>
+
+            <button
+              disabled={loading || selectedPaxes.length === 0}
+              onClick={() => handleSubmission("partial")}
+              className="w-full py-3 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all disabled:opacity-50"
+            >
+              {loading ? "Processing..." : `Cancel ${selectedPaxes.length} Selected Passenger(s)`}
+            </button>
+           </div>
+        )}
+
+        {activeTab === "status" && (
+           <div className="space-y-4">
+             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center">
+               <FiActivity className="mx-auto text-slate-300 mb-2" size={24}/>
+               <p className="text-xs text-slate-500">
+                 Check current status of ongoing change requests from TBO.
+               </p>
+               
+               {changeStatus && (
+                 <div className="mt-4">
+                    {changeStatus.Response ? (
+                      <CancellationChargesDisplay data={changeStatus} />
+                    ) : (
+                      <div className="bg-white border border-slate-100 rounded-lg p-3 text-left font-mono text-[10px] overflow-auto max-h-[200px] shadow-sm">
+                        <pre>{JSON.stringify(changeStatus, null, 2)}</pre>
+                      </div>
+                    )}
+                 </div>
+               )}
+
+               <button
+                disabled={loading}
+                onClick={() => handleSubmission("status")}
+                className="mt-4 px-6 py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-900"
+               >
+                 {loading ? "Checking..." : "Refresh Status"}
+               </button>
+             </div>
+           </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // HOTEL BOOKING MODAL — full details (multi-room fixed)
 // ─────────────────────────────────────────────────────────────────────────────
 export const HotelBookingModal = ({ booking: raw, onClose }) => {
+  const [remarks, setRemarks] = useState("");
+  const [showAmend, setShowAmend] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleAmendSubmit = async () => {
+    if (!remarks.trim())
+      return toast.error("Please provide a reason for amendment");
+    setLoading(true);
+    try {
+      const resp = await api.post("/hotels/amendments/request", {
+        bookingId: raw._id,
+        remarks: remarks,
+      });
+      if (resp.data.success) {
+        toast.success("Amendment request submitted successfully");
+        onClose?.();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to submit amendment");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!raw) return null;
 
   const hotel = raw.hotelRequest?.selectedHotel || {};
@@ -699,16 +1132,31 @@ const currency = allRooms[0]?.price?.currency || "INR";
             </p>
             <p className="text-sm text-amber-900 italic">"{raw.purposeOfTravel}"</p>
           </div>
+          {/* ── Amendment UI ── */}
+          {showAmend && (
+            <AmendmentActionsPanel booking={raw} type="hotel" onClose={() => setShowAmend(false)} />
+          )}
         </div>
 
         {/* ── Footer ── */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
-          <p className="text-xs text-slate-400">
-            Ref:{" "}
-            <span className="font-mono font-bold text-slate-600">
-              {raw.bookingReference}
-            </span>
-          </p>
+          <div className="flex items-center gap-4">
+            <p className="text-xs text-slate-400">
+              Ref:{" "}
+              <span className="font-mono font-bold text-slate-600">
+                {raw.bookingReference}
+              </span>
+            </p>
+            {raw.executionStatus === "voucher_generated" && !showAmend && (
+              <button
+                onClick={() => setShowAmend(true)}
+                className="px-4 py-2 bg-orange-100 text-orange-700 text-xs font-bold rounded-lg hover:bg-orange-200 transition-all flex items-center gap-2"
+              >
+                <FiEdit size={12}/>
+                Manage Booking
+              </button>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="px-6 py-2.5 bg-slate-800 text-white font-bold text-xs rounded-xl hover:bg-slate-700 transition-all"
@@ -721,11 +1169,36 @@ const currency = allRooms[0]?.price?.currency || "INR";
   );
 };
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // FLIGHT BOOKING MODAL — full details
 // ─────────────────────────────────────────────────────────────────────────────
 export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
+  const [remarks, setRemarks] = useState("");
+  const [showAmend, setShowAmend] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleCancelSubmit = async () => {
+    if (!remarks.trim())
+      return toast.error("Please provide a reason for cancellation");
+    setLoading(true);
+    try {
+      const resp = await api.post("/flights/amendments/cancellation/full", {
+        bookingId: raw._id,
+        remarks: remarks,
+      });
+      if (resp.data.success) {
+        toast.success("Cancellation request submitted successfully");
+        onClose?.();
+      }
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message || "Failed to submit cancellation",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!raw) return null;
   const timer = traceTimers?.[raw._id];
   const segments = raw.flightRequest?.segments || [];
@@ -1537,15 +2010,30 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
               "{raw.purposeOfTravel}"
             </p>
           </div>
+          {/* ── Cancellation UI ── */}
+          {showAmend && (
+            <AmendmentActionsPanel booking={raw} type="flight" onClose={() => setShowAmend(false)} />
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
-          <p className="text-xs text-slate-400">
-            Ref:{" "}
-            <span className="font-mono font-bold text-slate-600">
-              {raw.bookingReference}
-            </span>
-          </p>
+          <div className="flex items-center gap-4">
+            <p className="text-xs text-slate-400">
+              Ref:{" "}
+              <span className="font-mono font-bold text-slate-600">
+                {raw.bookingReference}
+              </span>
+            </p>
+            {raw.executionStatus === "ticketed" && !showAmend && (
+              <button
+                onClick={() => setShowAmend(true)}
+                className="px-4 py-2 bg-red-100 text-red-700 text-xs font-bold rounded-lg hover:bg-red-200 transition-all flex items-center gap-2"
+              >
+                <FiEdit size={12}/>
+                Manage Booking
+              </button>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="px-6 py-2.5 bg-slate-800 text-white font-bold text-xs rounded-xl hover:bg-slate-700 transition-all"

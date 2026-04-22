@@ -44,7 +44,7 @@ module.exports = {
       countryList: "/TBOHolidays_HotelAPI/CountryList",
       cityLIst: "/TBOHolidays_HotelAPI/CityList",
       hotelCodeList: "/TBOHolidays_HotelAPI/TBOHotelCodeList",
-      hotelDetails: "/TBOHolidays_HotelAPI/Hoteldetails",
+      hotelDetails: "/HotelAPI/Hoteldetails",
 
       /* Hotel Search */
       hotelSearch: "/HotelAPI/Search",
@@ -95,7 +95,7 @@ module.exports = {
       countryList: "/TBOHolidays_HotelAPI/CountryList",
       cityLIst: "/TBOHolidays_HotelAPI/CityList",
       hotelCodeList: "/TBOHolidays_HotelAPI/TBOHotelCodeList",
-      hotelDetails: "/TBOHolidays_HotelAPI/Hoteldetails",
+      hotelDetails: "/HotelAPI/Hoteldetails",
 
       /* Hotel Search */
       hotelSearch: "/HotelAPI/Search",

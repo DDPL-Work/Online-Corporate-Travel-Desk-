@@ -31,8 +31,8 @@ exports.toggleUserStatus = asyncHandler(async (req, res) => {
 
   if (!user) throw new ApiError(404, "User not found");
 
-  if (user.role === 'corporate-super-admin')
-    throw new ApiError(403, "Cannot deactivate corporate super admin");
+  if (user.role === 'travel-admin')
+    throw new ApiError(403, "Cannot deactivate travel admin");
 
   user.isActive = !user.isActive;
   await user.save();

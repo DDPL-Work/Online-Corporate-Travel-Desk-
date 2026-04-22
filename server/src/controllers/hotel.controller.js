@@ -256,48 +256,16 @@ exports.searchHotels = asyncHandler(async (req, res) => {
             ResponseTime,
           })
           .then((res) => {
-            console.log(`[hotel-search] chunk ${index + 1} success`);
+            console.log(`[hotel-search] chunk ${index + 1} success: ${res?.HotelResult?.length || 0} hotels`);
             return res;
           })
           .catch((err) => {
-            console.error(
-              `[hotel-search] chunk ${index + 1} failed`,
-              err?.message,
-            );
-            return null; // prevent Promise.all failure
+            console.error(`[hotel-search] chunk ${index + 1} failed`, err?.message);
+            return null;
           }),
       );
 
-      // const searchResponses = await Promise.all(searchPromises);
-      const searchResponses = [];
-
-for (let i = 0; i < chunks.length; i++) {
-  try {
-    const res = await tboService.searchHotels({
-      CheckIn,
-      CheckOut,
-      HotelCodes: chunks[i],
-      GuestNationality,
-      NoOfRooms,
-      PaxRooms,
-      IsDetailedResponse,
-      Filters,
-      ResponseTime,
-    });
-
-    console.log(`[hotel-search][RESPONSE] chunk ${i + 1}`, {
-      status: res?.Status?.Code,
-      message: res?.Status?.Description,
-      hotelsReturned: res?.HotelResult?.length || 0,
-    });
-
-    console.log(`[hotel-search] chunk ${i + 1} success`);
-    searchResponses.push(res);
-  } catch (err) {
-    console.error(`[hotel-search] chunk ${i + 1} failed`, err?.message);
-    searchResponses.push(null);
-  }
-}
+      const searchResponses = await Promise.all(searchPromises);
 
       /* ---------------- MERGE SEARCH RESULTS ---------------- */
       const allSearchResults = searchResponses.flatMap(
@@ -307,58 +275,69 @@ for (let i = 0; i < chunks.length; i++) {
       /* ---------------- TRACE ID ---------------- */
       traceId = searchResponses.find((r) => r?.TraceId)?.TraceId || null;
 
-      /* ---------------- STATIC DETAILS (ONCE) ---------------- */
-      const allHotelCodes = hotelCodesArray.map((h) => h.HotelCode).join(",");
+      if (allSearchResults.length === 0) {
+        indexedHotels = [];
+      } else {
+        /* ---------------- STATIC DETAILS (ONLY FOR AVAILABLE) ---------------- */
+        const availableCodes = allSearchResults.map((h) => h.HotelCode);
+        const detailChunks = [];
+        for (let i = 0; i < availableCodes.length; i += chunkSize) {
+          detailChunks.push(availableCodes.slice(i, i + chunkSize).join(","));
+        }
 
-      const detailsResponse =
-        await tboService.getStaticHotelDetails(allHotelCodes);
+        console.log(
+          `[hotel-details] fetching details for ${availableCodes.length} available hotels in ${detailChunks.length} chunks`,
+        );
 
-      const detailsList =
-        detailsResponse?.HotelDetails ||
-        detailsResponse?.HotelDetails?.HotelDetails ||
-        [];
+        const detailsPromises = detailChunks.map((chunk, index) =>
+          tboService
+            .getStaticHotelDetails(chunk)
+            .then((res) => {
+              console.log(`[hotel-details] chunk ${index + 1} success`);
+              return res;
+            })
+            .catch((err) => {
+              console.error(`[hotel-details] chunk ${index + 1} failed`, err?.message);
+              return null;
+            }),
+        );
 
-      const detailsMap = {};
+        const detailResponses = await Promise.all(detailsPromises);
+        const detailsMap = {};
 
-for (let i = 0; i < chunks.length; i++) {
-  try {
-    const detailsResponse = await tboService.getStaticHotelDetails(chunks[i]);
+        detailResponses.forEach((res) => {
+          const detailsList =
+            res?.HotelDetails ||
+            res?.HotelDetails?.HotelDetails ||
+            [];
+          if (Array.isArray(detailsList)) {
+            detailsList.forEach((hotel) => {
+              detailsMap[hotel.HotelCode] = hotel;
+            });
+          }
+        });
 
-    const detailsList =
-      detailsResponse?.HotelDetails ||
-      detailsResponse?.HotelDetails?.HotelDetails ||
-      [];
+        /* ---------------- MERGE DETAILS ---------------- */
+        const mergedHotels = allSearchResults.map((hotel) => {
+          const details = detailsMap[hotel.HotelCode];
 
-    detailsList.forEach((hotel) => {
-      detailsMap[hotel.HotelCode] = hotel;
-    });
+          return {
+            ...hotel,
+            HotelName: details?.HotelName || hotel.HotelName || "Hotel",
+            Address: details?.Address || hotel.Address || "",
+            CityName: details?.CityName || hotel.CityName || "",
+            CountryName: details?.CountryName || hotel.CountryName || "",
+            StarRating: details?.HotelRating || hotel.StarRating || 0,
+            Description: details?.Description || hotel.Description || "",
+            Images: details?.Images || hotel.Images || [],
+            Amenities: details?.HotelFacilities || hotel.Amenities || [],
+            Map: details?.Map || hotel.Map,
+          };
+        });
 
-    console.log(`[hotel-details] chunk ${i + 1} success`);
-  } catch (err) {
-    console.error(`[hotel-details] chunk ${i + 1} failed`, err?.message);
-  }
-}
-
-      /* ---------------- MERGE DETAILS ---------------- */
-      const mergedHotels = allSearchResults.map((hotel) => {
-        const details = detailsMap[hotel.HotelCode];
-
-        return {
-          ...hotel,
-          HotelName: details?.HotelName || hotel.HotelName || "Hotel",
-          Address: details?.Address || hotel.Address || "",
-          CityName: details?.CityName || hotel.CityName || "",
-          CountryName: details?.CountryName || hotel.CountryName || "",
-          StarRating: details?.HotelRating || hotel.StarRating || 0,
-          Description: details?.Description || hotel.Description || "",
-          Images: details?.Images || hotel.Images || [],
-          Amenities: details?.HotelFacilities || hotel.Amenities || [],
-          Map: details?.Map || hotel.Map,
-        };
-      });
-
-      const dedupedHotels = deduplicateHotels(mergedHotels);
-      indexedHotels = addIndex(dedupedHotels);
+        const dedupedHotels = deduplicateHotels(mergedHotels);
+        indexedHotels = addIndex(dedupedHotels);
+      }
     }
 
     /* ---------------- CACHE ---------------- */

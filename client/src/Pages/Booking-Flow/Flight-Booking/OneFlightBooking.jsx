@@ -15,7 +15,7 @@ import {
   CTABox,
   TravelerForm,
 } from "./CommonComponents";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import { useDispatch, useSelector } from "react-redux";
 import {
   getFareQuote,
@@ -24,6 +24,7 @@ import {
 } from "../../../Redux/Actions/flight.thunks";
 import SeatSelectionModal from "./SSR/SeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { FareDetailsModal } from "./FareDetailsModal";
@@ -56,6 +57,9 @@ export default function OneFlightBooking() {
     loading: approverLoading,
     error: approverError,
   } = useSelector((state) => state.employee);
+
+  const { myPolicy } = useSelector((state) => state.ssrPolicy);
+  const approvalRequired = myPolicy?.approvalRequired !== false; // default true
 
   const isSSRError = ssr?.Response?.ResponseStatus === 2;
 
@@ -211,6 +215,7 @@ export default function OneFlightBooking() {
   useEffect(() => {
     if (user?.role === "employee") {
       dispatch(getMyTravelAdmin());
+      dispatch(fetchMySSRPolicy());
     }
   }, [dispatch, user]);
 
@@ -819,7 +824,7 @@ export default function OneFlightBooking() {
       return;
     }
 
-    if (!projectApproverData.project || !projectApproverData.approver) {
+    if (approvalRequired && (!projectApproverData.project || !projectApproverData.approver)) {
       ToastWithTimer({
         type: "error",
         message: "Please select a project and approver",
@@ -850,15 +855,17 @@ export default function OneFlightBooking() {
 
     try {
       const payload = buildBookingRequestPayload();
-      await dispatch(
-        selectManager({
-          approverId: projectApproverData.approver?.id,
-          approverEmail: projectApproverData.approver?.email,
-          projectCodeId: projectApproverData.project?.id,
-          projectName: projectApproverData.project?.name,
-          projectClient: projectApproverData.project?.client,
-        }),
-      ).unwrap();
+      if (approvalRequired) {
+        await dispatch(
+          selectManager({
+            approverId: projectApproverData.approver?.id,
+            approverEmail: projectApproverData.approver?.email,
+            projectCodeId: projectApproverData.project?.id,
+            projectName: projectApproverData.project?.name,
+            projectClient: projectApproverData.project?.client,
+          }),
+        ).unwrap();
+      }
 
       await dispatch(createBookingRequest(payload)).unwrap();
 
@@ -877,7 +884,7 @@ export default function OneFlightBooking() {
   // Lightweight readiness check to control submit disable state
   const isFormReady = useMemo(() => {
     if (!purposeOfTravel?.trim()) return false;
-    if (!projectApproverData.project || !projectApproverData.approver)
+    if (approvalRequired && (!projectApproverData.project || !projectApproverData.approver))
       return false;
     if (infantCount > adultCount) return false;
 
@@ -972,8 +979,8 @@ export default function OneFlightBooking() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 font-[DM Sans]">
-      <EmployeeHeader />
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <CorporateNavbar />
 
       {/* Top Bar */}
       <div className="bg-white border-b border-slate-200">

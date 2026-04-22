@@ -14,7 +14,7 @@ import {
   TravelerForm,
   MultiCityFlightTimeline,
 } from "./CommonComponents";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import { useDispatch, useSelector } from "react-redux";
 import {
   getFareQuote,
@@ -828,8 +828,8 @@ export default function MultiCityFlightBooking() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 font-[DM Sans]">
-      <EmployeeHeader />
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <CorporateNavbar />
 
       {/* Top Bar */}
       <div className="bg-white border-b border-slate-200">

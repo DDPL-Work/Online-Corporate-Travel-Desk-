@@ -135,3 +135,11 @@ body {
     background-position-x: 16px;
   }
 }
+
+.modal-input {
+  @apply w-full px-3 py-2 border border-gray-100 rounded-lg text-sm bg-slate-50/50 outline-hidden transition-all focus:bg-white focus:border-[#0A4D68]/30 focus:ring-4 focus:ring-[#0A4D68]/5;
+}
+
+.modal-input:disabled {
+  @apply opacity-50 cursor-not-allowed bg-gray-100;
+}

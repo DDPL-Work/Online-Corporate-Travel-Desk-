@@ -2,21 +2,18 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { BsCalendar4 } from "react-icons/bs";
-import { BiTrendingDown } from "react-icons/bi";
-import { IoIosAirplane } from "react-icons/io";
-import { MdArrowBack } from "react-icons/md";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import FlightFilterSidebar from "./Filter-Sidebar";
 import OneWayFlightCard from "./One-wayFlightCard";
 import MultiCityFlightCard from "./Multi-cityFlightCard";
 import SelectedTripSummary from "./ReturnFlight/SelectedTripSummary";
 import OnwardFlightList from "./ReturnFlight/OnwardFlightList";
 import ReturnFlightList from "./ReturnFlight/ReturnFlightList";
-import { formatDate } from "../../../utils/formatter";
 import { useLocation } from "react-router-dom";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
+import { searchFlightsMC } from "../../../Redux/Actions/flight.thunks.MC";
 import ReturnInternationalFlightCard from "./ReturnFlight/ReturnInternationalFlightCard";
+import ResearchableFlightHeader from "./ResearchableFlightHeader";
 
 const extractRoutes = (flights, journeyType) => {
   if (!Array.isArray(flights) || flights.length === 0) return [];
@@ -274,8 +271,12 @@ export default function FlightSearchResults() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const location = useLocation();
+  const { publicBranding } = useSelector((s) => s.landingPage);
 
   const searchPayload = location.state?.searchPayload;
+
+  // Live search payload — updated when user re-searches from the header
+  const [currentSearchPayload, setCurrentSearchPayload] = useState(searchPayload);
 
   const onwardSearchDate = normalizeSearchDate(
     searchPayload?.Segments?.[0]?.PreferredDepartureTime ||
@@ -299,12 +300,11 @@ export default function FlightSearchResults() {
     selectedMaxDuration: 1440,
     selectedStops: [],
     selectedTime: "",
-    selectedArrivalTime: "",
     selectedAirlines: [],
-    selectedFlightNumbers: [],
     selectedFareTypes: [],
     selectedTerminals: [],
     selectedAirports: [],
+    selectedDestinationAirports: [],
     selectedLayoverAirports: [],
     lowCO2: false,
     popularFilters: {
@@ -591,6 +591,57 @@ export default function FlightSearchResults() {
     }
   }, []);
 
+  // ── Re-search handler called by ResearchableFlightHeader ──────────────────
+  const handleReSearch = async (tboStylePayload) => {
+    // Convert TBO-style payload (Segments, JourneyType) back to app format
+    const jt = Number(tboStylePayload.JourneyType ?? tboStylePayload.journeyType);
+    const adults   = tboStylePayload.AdultCount  ?? tboStylePayload.passengers?.adults   ?? 1;
+    const children = tboStylePayload.ChildCount  ?? tboStylePayload.passengers?.children ?? 0;
+    const infants  = tboStylePayload.InfantCount ?? tboStylePayload.passengers?.infants  ?? 0;
+    const CABIN_MAP = { 2: "economy", 3: "premium_economy", 4: "business", 6: "first_class" };
+    const cabinClassVal = tboStylePayload.Segments?.[0]?.FlightCabinClass ?? tboStylePayload.cabinClass ?? 2;
+    const cabinClassStr = CABIN_MAP[Number(cabinClassVal)] || "economy";
+
+    let appPayload;
+    if (jt === 3) {
+      // Multi-city
+      appPayload = {
+        journeyType: 3,
+        adults, children, infants,
+        cabinClass: cabinClassStr,
+        segments: (tboStylePayload.Segments || []).map((s) => ({
+          origin:        s.Origin || s.origin,
+          destination:   s.Destination || s.destination,
+          departureDate: (s.PreferredDepartureTime || s.departureDate || "").split("T")[0],
+        })),
+      };
+      await dispatch(searchFlightsMC(appPayload));
+    } else {
+      const seg0 = tboStylePayload.Segments?.[0] || {};
+      const seg1 = tboStylePayload.Segments?.[1] || {};
+      appPayload = {
+        journeyType: jt,
+        adults, children, infants,
+        cabinClass: cabinClassStr,
+        origin:        seg0.Origin      || seg0.origin      || "",
+        destination:   seg0.Destination || seg0.destination || "",
+        departureDate: (seg0.PreferredDepartureTime || seg0.departureDate || "").split("T")[0],
+        ...(jt === 2 ? {
+          returnDate: (seg1.PreferredDepartureTime || seg1.departureDate || "").split("T")[0],
+        } : {}),
+      };
+      await dispatch(searchFlights(appPayload));
+    }
+
+    setCurrentSearchPayload(appPayload);
+    // Reset selections & filters on re-search
+    setSelectedOnward(null);
+    setSelectedReturn(null);
+    setActiveTab("onward");
+    setOnwardFilters(initialFilterState);
+    setReturnFilters(initialFilterState);
+  };
+
   /* ---------------- FILTER LOGIC ---------------- */
   useEffect(() => {
     const {
@@ -599,14 +650,12 @@ export default function FlightSearchResults() {
       selectedMaxDuration,
       selectedStops,
       selectedTime,
-      selectedArrivalTime,
       selectedAirlines,
-      selectedFlightNumbers,
       selectedFareTypes,
       selectedTerminals,
       selectedAirports,
+      selectedDestinationAirports,
       selectedLayoverAirports,
-      lowCO2,
       popularFilters,
     } = activeFiltersState;
 
@@ -717,46 +766,7 @@ export default function FlightSearchResults() {
       );
     }
 
-    /* ---------------- FLIGHT NUMBERS ---------------- */
-    if (selectedFlightNumbers.length) {
-      result = result.filter((f) =>
-        getSegments(f).some((s) =>
-          selectedFlightNumbers.includes(
-            `${s?.Airline?.AirlineCode}-${s?.Airline?.FlightNumber}`,
-          ),
-        ),
-      );
-    }
-
-    /* ---------------- DEPARTURE TIME ---------------- */
-    if (selectedTime) {
-      result = result.filter((f) => {
-        const dep = new Date(getSegments(f)[0]?.Origin?.DepTime).getHours();
-
-        if (selectedTime === "Morning") return dep >= 6 && dep < 12;
-        if (selectedTime === "Afternoon") return dep >= 12 && dep < 18;
-        if (selectedTime === "Evening") return dep >= 18 && dep < 24;
-        if (selectedTime === "Night") return dep < 6;
-
-        return true;
-      });
-    }
-
-    /* ---------------- ARRIVAL TIME ---------------- */
-    if (selectedArrivalTime) {
-      result = result.filter((f) => {
-        const segs = getSegments(f);
-        const lastSeg = segs[segs.length - 1];
-        const arr = new Date(lastSeg?.Destination?.ArrTime).getHours();
-
-        if (selectedArrivalTime === "Morning") return arr >= 6 && arr < 12;
-        if (selectedArrivalTime === "Afternoon") return arr >= 12 && arr < 18;
-        if (selectedArrivalTime === "Evening") return arr >= 18 && arr < 24;
-        if (selectedArrivalTime === "Night") return arr < 6;
-
-        return true;
-      });
-    }
+    /* ---------------- ARRIVAL TIME REMOVED ---------------- */
 
     /* ---------------- DURATION ---------------- */
 
@@ -765,17 +775,11 @@ export default function FlightSearchResults() {
       return duration <= selectedMaxDuration;
     });
 
-    /* ---------------- TERMINALS ---------------- */
+    /* ---------------- TERMINALS (Departure Only) ---------------- */
     if (selectedTerminals.length) {
       result = result.filter((f) =>
-        getSegments(f).some(
-          (s) =>
-            selectedTerminals.includes(
-              `Dep: ${s?.Origin?.Airport?.Terminal}`,
-            ) ||
-            selectedTerminals.includes(
-              `Arr: ${s?.Destination?.Airport?.Terminal}`,
-            ),
+        getSegments(f).some((s) =>
+          selectedTerminals.includes(s?.Origin?.Airport?.Terminal),
         ),
       );
     }
@@ -783,10 +787,16 @@ export default function FlightSearchResults() {
     /* ---------------- AIRPORTS ---------------- */
     if (selectedAirports.length) {
       result = result.filter((f) =>
-        getSegments(f).some(
-          (s) =>
-            selectedAirports.includes(s?.Origin?.Airport?.AirportCode) ||
-            selectedAirports.includes(s?.Destination?.Airport?.AirportCode),
+        getSegments(f).some((s) =>
+          selectedAirports.includes(s?.Origin?.Airport?.AirportCode),
+        ),
+      );
+    }
+
+    if (selectedDestinationAirports.length) {
+      result = result.filter((f) =>
+        getSegments(f).some((s) =>
+          selectedDestinationAirports.includes(s?.Destination?.Airport?.AirportCode),
         ),
       );
     }
@@ -805,10 +815,7 @@ export default function FlightSearchResults() {
       });
     }
 
-    /* ---------------- CO2 ---------------- */
-    if (lowCO2) {
-      result = result.filter((f) => f?.CO2Emission && f.CO2Emission < 100);
-    }
+    /* ---------------- CO2 REMOVED ---------------- */
 
     /* ---------------- SORTING ---------------- */
     switch (sortKey) {
@@ -948,142 +955,34 @@ export default function FlightSearchResults() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <EmployeeHeader />
+    <div className="min-h-screen bg-gray-50 font-sans">
+      <CorporateNavbar />
 
-      {/* ================= STICKY HEADER ================= */}
-      <div className="sticky top-0 z-40 bg-blue-50 shadow-md">
-        <div className="max-w-full mx-10 py-3">
-          {/* Route Header */}
-          <div className="flex items-start justify-between mb-4">
-            {/* Back Button */}
-            <button
-              onClick={() => navigate("/search-flight", { replace: true })}
-              className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800"
-            >
-              <MdArrowBack className="text-lg" />
-              Back to search
-            </button>
-
-            {/* ==================== ROUTES HEADER ==================== */}
-            <div className="flex flex-col">
-              <div className="flex items-center flex-wrap gap-3">
-                {routeHeader.map((r, idx) => (
-                  <React.Fragment key={idx}>
-                    {/* Each Route Leg */}
-                    <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-2 shadow-sm hover:shadow-md transition-all duration-200">
-                      <div className="flex flex-col leading-tight">
-                        <h2 className="text-lg font-semibold flex items-center text-gray-900">
-                          {r.fromCity}
-                          <span className="mx-1 text-blue-600">
-                            <IoIosAirplane />{" "}
-                          </span>
-                          {r.toCity}
-                        </h2>
-
-                        <div className="flex items-center text-gray-500 text-xs font-medium mt-1">
-                          <BsCalendar4 className="mr-1.5 text-blue-500" />
-                          {formatDate(r.depDate)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Visual Connector (Between legs) */}
-                    {idx < routeHeader.length - 1 && (
-                      <div className="flex items-center justify-center text-gray-400 mx-1">
-                        <span className="text-lg">+</span>
-                      </div>
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-            </div>
-
-            {/* Cheapest */}
-            <div className="flex items-center gap-3 text-sm">
-              <div className="flex items-center gap-2 ml-4">
-                <BiTrendingDown className="text-green-600" />
-                <span className="text-gray-600">Cheapest:</span>
-                <span className="font-bold text-gray-900">
-                  {headerStats.minPrice
-                    ? `₹${headerStats.minPrice.toLocaleString()}`
-                    : "--"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Sort Tabs */}
-          <div className="flex items-center justify-between border-t border-gray-200 pt-3">
-            <div className="flex gap-2">
-              {["Best", "Cheapest", "Early depart", "Late depart"].map(
-                (tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setSortKey(tab)}
-                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                      sortKey === tab
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ),
-              )}
-            </div>
-
-            <div className="text-sm text-gray-600">
-              {flightsCount} flights found
-              {showBestTimeBadge && (
-                <span className="ml-2 px-2 py-1 rounded-full bg-green-50 text-green-700 text-xs font-semibold">
-                  Best time to book
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* ================= RE-SEARCH STICKY HEADER ================= */}
+      <ResearchableFlightHeader
+        routeHeader={routeHeader}
+        headerStats={headerStats}
+        showBestTimeBadge={false}
+        flightsCount={flightsCount}
+        sortKey={sortKey}
+        setSortKey={setSortKey}
+        journeyType={journeyType}
+        searchPayload={currentSearchPayload || searchPayload}
+        onSearch={handleReSearch}
+        onBack={() => {
+          const slug = location.state?.companySlug || publicBranding?.companySlug;
+          if (slug) navigate(`/travel`);
+          else window.history.back();
+        }}
+      />
 
       {/* ================= BODY ================= */}
       <div className="max-w-full mx-10  py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* FILTER SIDEBAR */}
           <aside className="lg:col-span-3">
-            <div className="sticky top-[120px] h-[calc(100vh-120px)] overflow-y-auto pr-2">
+            <div className="sticky top-[165px] h-[calc(100vh-165px)] overflow-y-auto pr-2">
               <FlightFilterSidebar
-                // flights={normalizedFlights}
-                // // selectedMaxPrice={selectedMaxPrice}
-                // // setSelectedMaxPrice={setSelectedMaxPrice}
-                // selectedStops={selectedStops}
-                // setSelectedStops={setSelectedStops}
-                // selectedTime={selectedTime}
-                // setSelectedTime={setSelectedTime}
-                // selectedArrivalTime={selectedArrivalTime}
-                // setSelectedArrivalTime={setSelectedArrivalTime}
-                // selectedAirlines={selectedAirlines}
-                // setSelectedAirlines={setSelectedAirlines}
-                // selectedFlightNumbers={selectedFlightNumbers}
-                // setSelectedFlightNumbers={setSelectedFlightNumbers}
-                // selectedFareTypes={selectedFareTypes}
-                // setSelectedFareTypes={setSelectedFareTypes}
-                // selectedTerminals={selectedTerminals}
-                // setSelectedTerminals={setSelectedTerminals}
-                // selectedAirports={selectedAirports}
-                // setSelectedAirports={setSelectedAirports}
-                // selectedLayoverAirports={selectedLayoverAirports}
-                // setSelectedLayoverAirports={setSelectedLayoverAirports}
-                // lowCO2={lowCO2}
-                // setLowCO2={setLowCO2}
-                // popularFilters={popularFilters}
-                // setPopularFilters={setPopularFilters}
-                // priceValues={priceValues}
-                // setPriceValues={setPriceValues}
-                // durationValues={durationValues}
-                // setDurationValues={setDurationValues}
-                // selectedMaxDuration={selectedMaxDuration}
-                // setSelectedMaxDuration={setSelectedMaxDuration}
-
                 flights={normalizedFlights}
                 selectedStops={activeFiltersState.selectedStops}
                 setSelectedStops={(val) =>
@@ -1093,25 +992,11 @@ export default function FlightSearchResults() {
                 setSelectedTime={(val) =>
                   setActiveFilters((prev) => ({ ...prev, selectedTime: val }))
                 }
-                selectedArrivalTime={activeFiltersState.selectedArrivalTime}
-                setSelectedArrivalTime={(val) =>
-                  setActiveFilters((prev) => ({
-                    ...prev,
-                    selectedArrivalTime: val,
-                  }))
-                }
                 selectedAirlines={activeFiltersState.selectedAirlines}
                 setSelectedAirlines={(val) =>
                   setActiveFilters((prev) => ({
                     ...prev,
                     selectedAirlines: val,
-                  }))
-                }
-                selectedFlightNumbers={activeFiltersState.selectedFlightNumbers}
-                setSelectedFlightNumbers={(val) =>
-                  setActiveFilters((prev) => ({
-                    ...prev,
-                    selectedFlightNumbers: val,
                   }))
                 }
                 selectedFareTypes={activeFiltersState.selectedFareTypes}
@@ -1133,6 +1018,13 @@ export default function FlightSearchResults() {
                   setActiveFilters((prev) => ({
                     ...prev,
                     selectedAirports: val,
+                  }))
+                }
+                selectedDestinationAirports={activeFiltersState.selectedDestinationAirports}
+                setSelectedDestinationAirports={(val) =>
+                  setActiveFilters((prev) => ({
+                    ...prev,
+                    selectedDestinationAirports: val,
                   }))
                 }
                 selectedLayoverAirports={
@@ -1187,7 +1079,7 @@ export default function FlightSearchResults() {
 
             {/* Return Flight Tabs */}
             {Number(journeyType) === 2 && !isInternationalReturnGrouped && (
-              <div className="sticky top-[119px] z-30 bg-gray-300 border-b border-gray-200 rounded-lg shadow-sm">
+              <div className="sticky top-[165px] z-30 bg-gray-300 border-b border-gray-200 rounded-lg shadow-sm">
                 <div className="flex gap-1 p-2">
                   {/* ONWARD ROUTE */}
                   <button

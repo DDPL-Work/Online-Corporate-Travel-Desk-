@@ -59,7 +59,19 @@ export default function Layout() {
   // =============================
   if (location.pathname === "/") {
     if (role === "super-admin")
-      return <Navigate to="/total-bookings" replace />;
+      return <Navigate to="/pending-corporates" replace />;
+    
+    if (role === "ops-member") {
+      const perms = user?.permissions || [];
+      let target = "/bookings-summary"; // fallback
+      
+      if (perms.includes("Manage Corporates")) target = "/pending-corporates";
+      else if (perms.includes("View Bookings")) target = "/bookings-summary";
+      else if (perms.includes("Manage Cancellations")) target = "/cancellation-summary";
+      else if (perms.includes("View Finance")) target = "/corporate-revenue";
+      
+      return <Navigate to={target} replace />;
+    }
   }
 
   // =============================
@@ -91,7 +103,7 @@ export default function Layout() {
           </header>
 
           {/* ===== SCROLLABLE CONTENT ===== */}
-          <main className="flex-1 overflow-y-auto px-4 md:px-6 py-6">
+          <main className="flex-1 overflow-y-auto px-2 py-2">
             <div className="max-w-7xl mx-auto">
               <Outlet />
             </div>

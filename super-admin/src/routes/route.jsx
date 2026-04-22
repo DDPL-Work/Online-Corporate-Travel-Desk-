@@ -21,6 +21,8 @@ import SystemLogs from "../components/SuperAdminTabs/SystemLogs";
 import CancellationDashboard from "../components/SuperAdminTabs/CancelledBookingsSummary";
 import CancellationQueries from "../components/SuperAdminTabs/CancellationQueries";
 import PendingCorporates from "../components/SuperAdminTabs/PendingCorporates";
+import OpsTeamManagement from "../components/SuperAdminTabs/OpsTeamManagement";
+import ProfileSettings from "../Pages/Auth/ProfileSettings";
 
 export const appRouter = createBrowserRouter([
   // -------------------------------
@@ -39,7 +41,7 @@ export const appRouter = createBrowserRouter([
   // SUPER ADMIN PROTECTED ROUTES
   // -------------------------------
   {
-    element: <ProtectedRoute allowedRoles={["super-admin"]} />,
+    element: <ProtectedRoute allowedRoles={["super-admin", "ops-member"]} />,
     children: [
       {
         path: "/",
@@ -58,6 +60,8 @@ export const appRouter = createBrowserRouter([
           { path: "/commission-settings", element: <CommissionSettings /> },
           { path: "/api-configurations", element: <ApiConfigurations /> },
           { path: "/system-logs", element: <SystemLogs /> },
+          { path: "/ops-management", element: <OpsTeamManagement /> },
+          { path: "/profile", element: <ProfileSettings /> },
         ],
       },
     ],

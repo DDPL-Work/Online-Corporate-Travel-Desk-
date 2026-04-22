@@ -96,8 +96,7 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
   const tabs = [
     { id: "flight", label: "Flight Details" },
     { id: "fare", label: "Fare Summary" },
-    { id: "cancellation", label: "Cancellation" },
-    { id: "datechange", label: "Date Change" },
+    { id: "rules", label: "Fare Rules" },
   ];
 
   const cancellationRules = miniFareRules.filter(
@@ -114,7 +113,7 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`px-5 py-3 text-xs font-semibold transition-colors border-b-2 ${
+            className={`px-5 py-3 text-xs font-bold transition-colors border-b-2 uppercase tracking-wider ${
               activeTab === tab.id
                 ? "border-blue-600 text-blue-600 bg-blue-50/60"
                 : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
@@ -252,36 +251,6 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
         </div>
       )}
 
-      {/* Fare Inclusions (Moved outside mapping) */}
-      {fareInclusions.length > 0 && activeTab === "flight" && (
-        <div className="mt-2 mb-4 px-5">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
-            Fare Inclusions
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {fareInclusions.map((item, i) => {
-              const isIncluded =
-                item.Value?.toLowerCase() !== "excluded" &&
-                item.Value?.toLowerCase() !== "no";
-              return (
-                <span
-                  key={i}
-                  className={`text-[11px] px-2.5 py-1 rounded-lg font-medium border ${
-                    isIncluded
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : "bg-slate-100 text-slate-500 border-slate-200 line-through"
-                  }`}
-                >
-                  {item.Key?.split(" ")
-                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                    .join(" ")}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* ── Fare Summary Tab ── */}
       {activeTab === "fare" && (
         <div className="p-5">
@@ -341,105 +310,178 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
         </div>
       )}
 
-      {/* ── Cancellation Tab ── */}
-      {activeTab === "cancellation" && (
-        <div className="p-5">
-          {cancellationRules.length > 0 ? (
-            <>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-3">
-                Cancellation Charges
-              </p>
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                        Time Before Departure
-                      </th>
-                      <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                        Cancellation Fee
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {cancellationRules.map((rule, i) => (
-                      <tr key={i}>
-                        <td className="px-4 py-3 text-slate-700">
-                          {rule.From && rule.To
-                            ? `${rule.From}–${rule.To} ${rule.Unit?.toLowerCase()}`
-                            : rule.From
-                              ? `More than ${rule.From} ${rule.Unit?.toLowerCase()}`
-                              : `Up to ${rule.To} ${rule.Unit?.toLowerCase()}`}
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-800">
-                          {rule.Details}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-3">
-                * Charges are per passenger. Airline charges may vary. Please
-                check the airline's website for final details.
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-slate-500">
-              Cancellation details not available.
-            </p>
-          )}
-        </div>
-      )}
+      {/* ── Fare Rules Tab (Merged Charges + Rules) ── */}
+      {activeTab === "rules" && (
+        <div className="p-0 overflow-y-auto custom-scrollbar max-h-[600px] bg-slate-50/30">
+          {/* Quick Status Header (Simplified to Status Only) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border-b border-slate-100 bg-white">
+             <div className="p-5 flex items-start gap-4 border-r border-slate-50">
+                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-600 shrink-0 shadow-sm">
+                   <FaPlane className="text-sm rotate-180" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em]">Refund Status</p>
+                  <p className="text-sm font-black text-slate-800 mt-0.5">
+                    {selectedFlight?.IsRefundable ? "Refundable" : "Non-Refundable"}
+                  </p>
+                </div>
+             </div>
+             <div className="p-5 flex items-start gap-4 border-r border-slate-50">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0 shadow-sm">
+                   <FaPlane className="text-sm" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em]">Change Policy</p>
+                  <p className="text-sm font-black text-slate-800 mt-0.5">
+                    {selectedFlight?.FareInclusions?.some(v => v.toLowerCase().includes("non-changeable")) ? "Fixed Dates" : "Changeable"}
+                  </p>
+                </div>
+             </div>
+             <div className="p-5 flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0 shadow-sm">
+                   <BsSuitcase className="text-sm" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em]">Pax Allowance</p>
+                  <p className="text-sm font-black text-slate-800 mt-0.5">{selectedFlight.Fare?.Baggage?.iB || selectedFlight.BaggageAllowance || "15 Kg"}</p>
+                </div>
+             </div>
+          </div>
 
-      {/* ── Date Change Tab ── */}
-      {activeTab === "datechange" && (
-        <div className="p-5">
-          {reissueRules.length > 0 ? (
-            <>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-3">
-                Date Change Charges
-              </p>
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                        Time Before Departure
-                      </th>
-                      <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                        Reissue Fee
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {reissueRules.map((rule, i) => (
-                      <tr key={i}>
-                        <td className="px-4 py-3 text-slate-700">
-                          {rule.From && rule.To
-                            ? `${rule.From}–${rule.To} ${rule.Unit?.toLowerCase()}`
-                            : rule.From
-                              ? `More than ${rule.From} ${rule.Unit?.toLowerCase()}`
-                              : `Up to ${rule.To} ${rule.Unit?.toLowerCase()}`}
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-800">
-                          {rule.Details}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div className="p-6 space-y-8">
+            {/* 1. Airline Remark (High Priority for Series Fares) */}
+            {selectedFlight?.AirlineRemark && (
+              <section className="bg-blue-600 rounded-3xl p-5 text-white shadow-xl">
+                 <div className="flex items-center gap-2 mb-3">
+                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] opacity-90">Important Airline Remark</p>
+                 </div>
+                 <p className="text-sm font-bold leading-relaxed">{selectedFlight.AirlineRemark}</p>
+              </section>
+            )}
+
+            {/* 2. Fare Inclusions (Fixed Split Logic) */}
+            {(() => {
+              const rawInclusions = selectedFlight?.FareInclusions || selectedFlight?.FareInclusionsNew || [];
+              const processedInclusions = rawInclusions.flatMap(inc => 
+                inc.split('&&').map(s => s.trim())
+              ).filter(Boolean);
+
+              if (processedInclusions.length === 0) return null;
+
+              return (
+                <section>
+                   <div className="flex items-center gap-2 mb-4">
+                     <div className="w-1.5 h-6 bg-emerald-500 rounded-full" />
+                     <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Fare Inclusions & Highlights</h4>
+                   </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {processedInclusions.map((inc, k) => {
+                        const displayLabel = inc.replace(/:(Included|Included)/gi, ' Included')
+                                                .replace(/[:]/g, ': ')
+                                                .trim();
+                        return (
+                          <div key={k} className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-xs hover:border-emerald-200 transition-all">
+                             <div className="w-5 h-5 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
+                                <span className="text-emerald-600 font-bold text-[10px]">✓</span>
+                             </div>
+                             <span className="text-xs font-semibold text-slate-700">{displayLabel}</span>
+                          </div>
+                        );
+                      })}
+                   </div>
+                </section>
+              );
+            })()}
+
+            {/* 3. Modification & Cancellation Charges (The ONLY place for fee numbers) */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                 <div className="w-1.5 h-6 bg-blue-600 rounded-full" />
+                 <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Modification & Cancellation Schedule</h4>
               </div>
-              <p className="text-[11px] text-slate-400 mt-3">
-                * Charges are per passenger. Airline charges may vary. Please
-                check the airline's website for final details.
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-slate-500">
-              Date change details not available.
-            </p>
-          )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Cancellation */}
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                      <span className="text-[11px] font-black text-slate-600 uppercase">Cancellation Fee</span>
+                      <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">Official</span>
+                   </div>
+                   {cancellationRules.length > 0 ? (
+                      <div className="divide-y divide-slate-50">
+                        {cancellationRules.map((rule, i) => (
+                          <div key={i} className="px-4 py-4 flex justify-between items-start">
+                             <span className="text-xs font-bold text-slate-600 pr-4">
+                                {rule.From && rule.To ? `${rule.From}–${rule.To} ${rule.Unit?.toLowerCase()}` : (rule.From ? `> ${rule.From} ${rule.Unit?.toLowerCase()}` : `< ${rule.To} ${rule.Unit?.toLowerCase()}`)}
+                             </span>
+                             <span className="text-xs font-black text-slate-800 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">{rule.Details}</span>
+                          </div>
+                        ))}
+                      </div>
+                   ) : <p className="p-4 text-xs text-slate-400 italic">No specific fee details available from airline.</p>}
+                </div>
+
+                {/* Date Change */}
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                      <span className="text-[11px] font-black text-slate-600 uppercase">Date Change Fee</span>
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">Official</span>
+                   </div>
+                   {reissueRules.length > 0 ? (
+                      <div className="divide-y divide-slate-50">
+                        {reissueRules.map((rule, i) => (
+                          <div key={i} className="px-4 py-4 flex justify-between items-start">
+                             <span className="text-xs font-bold text-slate-600 pr-4">
+                                {rule.From && rule.To ? `${rule.From}–${rule.To} ${rule.Unit?.toLowerCase()}` : (rule.From ? `> ${rule.From} ${rule.Unit?.toLowerCase()}` : `< ${rule.To} ${rule.Unit?.toLowerCase()}`)}
+                             </span>
+                             <span className="text-xs font-black text-slate-800 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">{rule.Details}</span>
+                          </div>
+                        ))}
+                      </div>
+                   ) : <p className="p-4 text-xs text-slate-400 italic">No specific fee details available from airline.</p>}
+                </div>
+              </div>
+            </section>
+
+            {/* 4. Detailed Official Fare Rules */}
+            {miniFareRules.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                   <div className="w-1.5 h-6 bg-slate-400 rounded-full" />
+                   <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Supplemental Airline Terms</h4>
+                </div>
+
+                <div className="space-y-4">
+                    {miniFareRules.map((rule, idx) => (
+                      <div key={idx} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs hover:border-blue-300 transition-colors">
+                         <button className="w-full px-5 py-4 flex justify-between items-center bg-slate-50/50 text-left border-b border-slate-100 group">
+                            <span className="text-[11px] font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                               <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                               {rule.Type}
+                            </span>
+                            <FaChevronDown className="text-[10px] text-slate-300 group-hover:text-blue-500 transition-colors" />
+                         </button>
+                         <div className="p-5 text-xs text-slate-600 leading-relaxed font-semibold bg-white whitespace-pre-wrap select-text">
+                            {rule.Details}
+                         </div>
+                      </div>
+                    ))}
+                </div>
+              </section>
+            )}
+
+            {/* Final Notice */}
+            <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6">
+               <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">!</div>
+                  <h4 className="text-[11px] font-black text-indigo-900 uppercase tracking-widest">Standard Compliance Notice</h4>
+               </div>
+               <p className="text-[11px] text-indigo-800 font-bold opacity-80 leading-relaxed italic">
+                 Fare basis and terms are automatically provided by the airline's GDS. Total refund amounts are calculated after deducting airline-specific non-refundable components.
+               </p>
+            </div>
+          </div>
         </div>
       )}
     </div>

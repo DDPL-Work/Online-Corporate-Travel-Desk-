@@ -39,17 +39,6 @@ const corporateSchema = new mongoose.Schema(
       mobile: { type: String, required: true },
       role: {
         type: String,
-        enum: ["corporate-super-admin"],
-        default: "corporate-super-admin",
-      },
-    },
-
-    secondaryContact: {
-      name: String,
-      email: { type: String, lowercase: true },
-      mobile: String,
-      role: {
-        type: String,
         enum: ["travel-admin"],
         default: "travel-admin",
       },
@@ -153,6 +142,21 @@ const corporateSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
+    },
+
+    // ───── BRANDING & LANDING PAGE ─────
+    branding: {
+      logo: {
+        url: { type: String, default: "" },
+        publicId: { type: String, default: "" },
+      },
+      primaryColor: { type: String, default: "#003580" },
+      secondaryColor: { type: String, default: "#0057b8" },
+      welcomeMessage: { type: String, default: "Welcome to our Travel Portal" },
+      landingPageTitle: { type: String, default: "Corporate Travel Desk" },
+      companyType: { type: String, default: "Private Limited" },
+      supportEmail: { type: String, default: "support@traveldesk.com" },
+      supportPhone: { type: String, default: "+1 800 123 4567" },
     },
 
     onboardedAt: Date,

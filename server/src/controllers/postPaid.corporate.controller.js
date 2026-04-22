@@ -22,31 +22,59 @@ exports.getPostpaidBalance = async (req, res, next) => {
     if (corporate.classification !== "postpaid")
       return next(new ApiError(400, "Not a postpaid corporate"));
 
-    // 🔹 Calculate used credit via aggregation (more efficient)
+    // 🔹 Calculate Current Cycle (Business Logic: Refresh every 15/30 days)
+    const onboardedAt = corporate.onboardedAt || corporate.createdAt;
+    const cycleDays = corporate.billingCycle === "15days" ? 15 : (corporate.billingCycle === "30days" ? 30 : (corporate.customBillingDays || 30));
+    
+    const now = new Date();
+    const cycleMs = cycleDays * 24 * 60 * 60 * 1000;
+    const timeDiff = now.getTime() - new Date(onboardedAt).getTime();
+    
+    const cycleIndex = Math.max(0, Math.floor(timeDiff / cycleMs));
+    const currentCycleStart = new Date(new Date(onboardedAt).getTime() + (cycleIndex * cycleMs));
+    const currentCycleEnd = new Date(currentCycleStart.getTime() + cycleMs);
+
+    // 🔹 Calculate used credit via aggregation (Only for Current Cycle)
     const result = await Ledger.aggregate([
       {
         $match: {
           corporateId: corporate._id,
-          type: "booking",
-          status: { $in: ["paid", "pending"] }, // count confirmed bookings
+          status: { $ne: "cancelled" },
+          createdAt: { $gte: currentCycleStart, $lte: currentCycleEnd } // Only current cycle
         },
       },
       {
         $group: {
           _id: null,
-          totalUsed: { $sum: "$amount" },
+          totalDebit: {
+            $sum: {
+              $cond: [{ $eq: ["$transactionType", "debit"] }, "$amount", 0],
+            },
+          },
+          totalCredit: {
+            $sum: {
+              $cond: [{ $eq: ["$transactionType", "credit"] }, "$amount", 0],
+            },
+          },
         },
       },
     ]);
 
-    const usedCredit = result[0]?.totalUsed || 0;
+    const totalDebit = result[0]?.totalDebit || 0;
+    const totalCredit = result[0]?.totalCredit || 0;
+    const usedCredit = totalDebit - totalCredit;
 
     res.json({
       success: true,
       balance: {
         totalLimit: corporate.creditLimit,
         usedCredit,
-        availableCredit: corporate.creditLimit - usedCredit,
+        availableCredit: Math.max(0, corporate.creditLimit - usedCredit),
+        billingCycle: corporate.billingCycle,
+        customBillingDays: corporate.customBillingDays,
+        onboardedAt: corporate.onboardedAt,
+        currentCycleStart,
+        currentCycleEnd,
       },
     });
   } catch (err) {
@@ -83,7 +111,7 @@ exports.getPostpaidTransactions = async (req, res, next) => {
 
     const [transactions, total] = await Promise.all([
       Ledger.find(filter)
-        .populate("createdBy", "name email")
+        .populate("userId", "name email")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),

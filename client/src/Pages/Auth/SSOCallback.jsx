@@ -72,15 +72,24 @@ const SSOCallback = () => {
       // ✅ Fetch dashboard immediately
       dispatch(fetchDashboardData(role));
 
-      // ✅ Navigate
-      if (role === "travel-admin") {
-        navigate("/total-bookings", { replace: true });
-      } else if (role === "super-admin") {
-        navigate("/onboarded-corporates", { replace: true });
-      } else if (role === "employee") {
-        navigate("/my-bookings", { replace: true });
-      } else if (role === "manager") {
-        navigate("/manager/total-bookings", { replace: true });
+      const corporateSlug = decoded.corporateSlug;
+
+      // ✅ Navigate to Dynamic Landing Page for non-super-admins
+      if (corporateSlug && role !== "super-admin") {
+        navigate(`/travel`, { replace: true });
+      } else {
+        // Fallback or super-admin routing
+        if (role === "travel-admin") {
+          navigate("/total-bookings", { replace: true });
+        } else if (role === "super-admin") {
+          navigate("/onboarded-corporates", { replace: true });
+        } else if (role === "employee") {
+          navigate("/my-bookings", { replace: true });
+        } else if (role === "manager") {
+          navigate("/manager/total-bookings", { replace: true });
+        } else {
+          navigate("/platform/flight-booking-info", { replace: true });
+        }
       }
     } catch (err) {
       navigate("/platform/flight-booking-info", { replace: true });

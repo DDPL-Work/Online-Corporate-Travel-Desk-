@@ -243,25 +243,25 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
   let bookingSnapshot;
 
-const mapCabinClass = (cabin) => {
-  const mapping = {
-    2: "Economy",
-    3: "Premium Economy",
-    4: "Business",
-    5: "Business", // no premium_business in schema → fallback
-    6: "First Class",
+  const mapCabinClass = (cabin) => {
+    const mapping = {
+      2: "Economy",
+      3: "Premium Economy",
+      4: "Business",
+      5: "Business", // no premium_business in schema → fallback
+      6: "First Class",
 
-    // string fallback
-    economy: "Economy",
-    "premium economy": "Premium Economy",
-    business: "Business",
-    "premium business": "Business",
-    first: "First Class",
-    first_class: "First Class",
+      // string fallback
+      economy: "Economy",
+      "premium economy": "Premium Economy",
+      business: "Business",
+      "premium business": "Business",
+      first: "First Class",
+      first_class: "First Class",
+    };
+
+    return mapping[String(cabin).toLowerCase()] || "Economy";
   };
-
-  return mapping[String(cabin).toLowerCase()] || "Economy";
-};
   if (bookingType === "flight" && Array.isArray(flightRequest?.segments)) {
     const segments = flightRequest.segments;
 
@@ -332,13 +332,39 @@ const mapCabinClass = (cabin) => {
     );
   }
 
+  /* ================= SSR POLICY: AUTO-APPROVE CHECK ================= */
+  const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
+
+  let requestStatus = "pending_approval"; // default
+
+  try {
+    const ssrPolicy = await EmployeeSsrPolicy.findOne({
+      corporateId: corporate._id,
+      employeeEmail: user.email?.toLowerCase().trim(),
+    }).lean();
+
+    // If policy exists and approvalRequired is false → auto-approve
+    if (ssrPolicy && ssrPolicy.approvalRequired === false) {
+      requestStatus = "approved";
+      logger.info("✅ SSR Policy: Auto-approving booking for employee", {
+        email: user.email,
+        corporateId: corporate._id,
+      });
+    }
+  } catch (policyErr) {
+    // If policy lookup fails, fall back to pending_approval (safe default)
+    logger.warn("⚠️ SSR Policy lookup failed, defaulting to pending_approval", {
+      error: policyErr.message,
+    });
+  }
+
   const bookingRequest = await BookingRequest.create({
     bookingReference: generateBookingReference(),
     bookingType,
     corporateId: corporate._id,
     userId: user._id,
 
-    requestStatus: "pending_approval",
+    requestStatus,
     executionStatus: "not_started",
 
     fareQuote: freshFareQuote,
@@ -375,13 +401,73 @@ const mapCabinClass = (cabin) => {
 
   /* ================= NOTIFICATION ================= */
 
-  await notificationService.sendApprovalNotifications({
-    bookingReference: bookingRequest.bookingReference,
-    requester: user,
-    corporateId: corporate._id,
-  });
+  // Only send approval notifications if still pending
+  if (requestStatus === "pending_approval") {
+    await notificationService.sendApprovalNotifications({
+      bookingReference: bookingRequest.bookingReference,
+      requester: user,
+      corporateId: corporate._id,
+    });
+  }
+
+  /* ================= AUTO-APPROVAL: CREATE BOOKING INTENT ================= */
+  if (requestStatus === "approved" && bookingType === "flight") {
+    try {
+      const isRoundTrip =
+        bookingSnapshot.sectors && bookingSnapshot.sectors.length === 2;
+      const [origin, destination] = bookingSnapshot.sectors[0].split("-");
+
+      const travelDate = new Date(bookingSnapshot.travelDate);
+      const now = new Date();
+      const validUntil = new Date(
+        Math.min(
+          travelDate.getTime() - 24 * 60 * 60 * 1000,
+          now.getTime() + 24 * 60 * 60 * 1000,
+        ),
+      );
+
+      const airlineCodes = [
+        ...new Set(flightRequest.segments.map((s) => s.airlineCode)),
+      ];
+
+      const fareResult = freshFareQuote?.Results?.[0];
+      const maxApprovedPrice = isRoundTrip
+        ? pricingSnapshot.totalAmount
+        : (Array.isArray(fareResult)
+            ? fareResult[0]?.Fare?.PublishedFare
+            : fareResult?.Fare?.PublishedFare) || pricingSnapshot.totalAmount;
+
+      await BookingIntent.create({
+        bookingRequestId: bookingRequest._id,
+        corporateId: bookingRequest.corporateId,
+        userId: bookingRequest.userId,
+        origin,
+        destination,
+        travelDate: bookingSnapshot.travelDate,
+        returnDate: bookingSnapshot.returnDate,
+        journeyType: isRoundTrip ? "RT" : "OW",
+        cabinClass: bookingSnapshot.cabinClass,
+        airlineCodes,
+        maxApprovedPrice,
+        approvedAt: new Date(),
+        validUntil,
+        approvalStatus: "approved",
+      });
+
+      logger.info("✅ BookingIntent created for auto-approved request", {
+        bookingRequestId: bookingRequest._id,
+      });
+    } catch (intentErr) {
+      logger.error("❌ Failed to create BookingIntent for auto-approval", {
+        error: intentErr.message,
+        bookingRequestId: bookingRequest._id,
+      });
+    }
+  }
 
   /* ================= RESPONSE ================= */
+
+  const isAutoApproved = requestStatus === "approved";
 
   res.status(201).json(
     new ApiResponse(
@@ -390,8 +476,11 @@ const mapCabinClass = (cabin) => {
         bookingRequestId: bookingRequest._id,
         bookingReference: bookingRequest.bookingReference,
         requestStatus: bookingRequest.requestStatus,
+        autoApproved: isAutoApproved,
       },
-      "Booking request submitted for approval",
+      isAutoApproved
+        ? "Booking request auto-approved (no approval required per policy)"
+        : "Booking request submitted for approval",
     ),
   );
 });
@@ -499,9 +588,9 @@ const isTraceExpiredError = (err) => {
 
 const cabinClassToTboCode = (cabin) =>
   ({
-    "Economy": 2,
+    Economy: 2,
     "Premium Economy": 3,
-    "Business": 4,
+    Business: 4,
     "Premium Business": 5,
     "First Class": 6,
   })[cabin] || 2;
@@ -1705,23 +1794,28 @@ exports.getMyBookingById = asyncHandler(async (req, res) => {
 
   // POSTPAID
   else if (corporate?.classification === "postpaid") {
-    const ledgerEntry = await Ledger.findOne({
-      bookingId: booking._id,
-      type: "booking",
-      status: "paid",
-    })
-      .sort({ createdAt: -1 })
-      .select("_id amount paidDate");
+    // 🔥 Check if we already have it marked in the document
+    if (booking.payment?.status === "completed") {
+      // already good
+    } else {
+      const ledgerEntry = await Ledger.findOne({
+        bookingId: booking._id,
+        type: "booking",
+        status: { $in: ["paid", "billed"] }, // ✅ Recognize billed status
+      })
+        .sort({ createdAt: -1 })
+        .select("_id amount paidDate");
 
-    booking.payment = ledgerEntry
-      ? {
-          status: "completed",
-          method: "agency",
-          amount: ledgerEntry.amount,
-          paidAt: ledgerEntry.paidDate,
-          transactionId: ledgerEntry._id,
-        }
-      : { status: "pending" };
+      booking.payment = ledgerEntry
+        ? {
+            status: "completed",
+            method: "agency",
+            amount: ledgerEntry.amount,
+            paidAt: ledgerEntry.paidDate || ledgerEntry.createdAt,
+            transactionId: ledgerEntry._id,
+          }
+        : { status: "pending" };
+    }
   }
 
   // FALLBACK

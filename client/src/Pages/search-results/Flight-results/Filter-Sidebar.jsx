@@ -137,6 +137,8 @@ const FlightFilterSidebar = ({
   setSelectedTerminals,
   selectedAirports,
   setSelectedAirports,
+  selectedDestinationAirports = [],
+  setSelectedDestinationAirports,
   selectedLayoverAirports,
   setSelectedLayoverAirports,
   selectedMaxDuration,
@@ -158,15 +160,13 @@ const FlightFilterSidebar = ({
     popularFilters: false,
     stops: true,
     departureTime: true,
-    arrivalTime: false,
-    flightNumber: false,
     airlines: true,
     fareType: false,
     terminal: false,
     airport: false,
+    destinationAirport: false,
     layoverAirport: false,
     duration: false,
-    environmental: true,
   });
 
   // Calculate price range from flights
@@ -275,39 +275,46 @@ const FlightFilterSidebar = ({
       : flight.Segments;
   };
 
-  // Get unique terminals
+  // Get unique terminals (Departure Only)
   const getTerminals = () => {
     const terminals = new Set();
 
     flights.forEach((flight) => {
       getSegments(flight).forEach((seg) => {
         const depT = seg?.Origin?.Airport?.Terminal;
-        const arrT = seg?.Destination?.Airport?.Terminal;
-
-        if (depT) terminals.add(`Dep: ${depT}`);
-        if (arrT) terminals.add(`Arr: ${arrT}`);
+        if (depT) terminals.add(depT);
       });
     });
 
-    return Array.from(terminals);
+    return Array.from(terminals).sort();
   };
 
-  // Get unique airports
-  const getAirports = () => {
+  // Get unique airports (Departure Only - Nearby Airport)
+  const getDepartureAirports = () => {
     const map = new Map();
 
     flights.forEach((flight) => {
       getSegments(flight).forEach((seg) => {
         const dep = seg?.Origin?.Airport;
-        const arr = seg?.Destination?.Airport;
-
         if (dep?.AirportCode) {
           map.set(dep.AirportCode, {
             code: dep.AirportCode,
             name: dep.AirportName || dep.CityName,
           });
         }
+      });
+    });
 
+    return Array.from(map.values());
+  };
+
+  // Get unique airports (Destination Only)
+  const getDestinationAirports = () => {
+    const map = new Map();
+
+    flights.forEach((flight) => {
+      getSegments(flight).forEach((seg) => {
+        const arr = seg?.Destination?.Airport;
         if (arr?.AirportCode) {
           map.set(arr.AirportCode, {
             code: arr.AirportCode,
@@ -438,6 +445,14 @@ const FlightFilterSidebar = ({
     setSelectedAirports(updated);
   };
 
+  const toggleDestinationAirport = (code) => {
+    const updated = selectedDestinationAirports.includes(code)
+      ? selectedDestinationAirports.filter((a) => a !== code)
+      : [...selectedDestinationAirports, code];
+
+    setSelectedDestinationAirports(updated);
+  };
+
   const toggleLayoverAirport = (code) => {
     const updated = selectedLayoverAirports.includes(code)
       ? selectedLayoverAirports.filter((a) => a !== code)
@@ -459,12 +474,11 @@ const FlightFilterSidebar = ({
     setSelectedMaxDuration(durationRange.max);
     setSelectedStops([]);
     setSelectedTime("");
-    setSelectedArrivalTime("");
     setSelectedAirlines([]);
-    setSelectedFlightNumbers([]);
     setSelectedFareTypes([]);
     setSelectedTerminals([]);
     setSelectedAirports([]);
+    setSelectedDestinationAirports([]);
     setSelectedLayoverAirports([]);
     setLowCO2(false);
     setPopularFilters({
@@ -697,61 +711,6 @@ const FlightFilterSidebar = ({
         </div>
       </FilterSection>
 
-      {/* Arrival Time */}
-      <FilterSection
-        title="Arrival Time"
-        isExpanded={expandedSections.arrivalTime}
-        onToggle={() => toggleSection("arrivalTime")}
-      >
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {times.map((t) => (
-            <div
-              key={t.label}
-              onClick={() =>
-                setSelectedArrivalTime(
-                  selectedArrivalTime === t.label ? "" : t.label,
-                )
-              }
-              className={`flex flex-col items-center justify-center border rounded-md px-2 py-2 text-xs cursor-pointer transition ${
-                selectedArrivalTime === t.label
-                  ? "bg-blue-500 text-white border-blue-500"
-                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-              }`}
-            >
-              <div className="mb-1">{t.icon}</div>
-              <div className="font-medium">{t.label}</div>
-              <div className="text-[10px] mt-0.5">{t.range}</div>
-            </div>
-          ))}
-        </div>
-      </FilterSection>
-
-      {/* Flight Number */}
-      <FilterSection
-        title="Flight Number"
-        isExpanded={expandedSections.flightNumber}
-        onToggle={() => toggleSection("flightNumber")}
-        clearText="CLEAR"
-        onClear={() => setSelectedFlightNumbers([])}
-      >
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {getFlightNumbers().map((number) => (
-            <label
-              key={number}
-              className="flex items-center gap-2 text-sm cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                checked={selectedFlightNumbers.includes(number)}
-                onChange={() => toggleFlightNumber(number)}
-                className="w-4 h-4 accent-blue-500"
-              />
-              <span>{number}</span>
-            </label>
-          ))}
-        </div>
-      </FilterSection>
-
       {/* Airlines */}
       <FilterSection
         title="Airlines"
@@ -807,9 +766,9 @@ const FlightFilterSidebar = ({
         </div>
       </FilterSection> */}
 
-      {/* Terminal */}
+      {/* Departure Terminal */}
       <FilterSection
-        title="Terminal"
+        title="Departure terminal"
         isExpanded={expandedSections.terminal}
         onToggle={() => toggleSection("terminal")}
       >
@@ -825,20 +784,20 @@ const FlightFilterSidebar = ({
                 onChange={() => toggleTerminal(terminal)}
                 className="w-4 h-4 accent-blue-500"
               />
-              <span>{terminal}</span>
+              <span>Terminal {terminal}</span>
             </label>
           ))}
         </div>
       </FilterSection>
 
-      {/* Airport */}
+      {/* Nearby Airport */}
       <FilterSection
-        title="Airport"
+        title="Nearby Airport"
         isExpanded={expandedSections.airport}
         onToggle={() => toggleSection("airport")}
       >
         <div className="space-y-2 max-h-48 overflow-y-auto">
-          {getAirports().map(({ code, name }) => (
+          {getDepartureAirports().map(({ code, name }) => (
             <label
               key={code}
               className="flex items-center gap-2 text-sm cursor-pointer"
@@ -856,6 +815,34 @@ const FlightFilterSidebar = ({
           ))}
         </div>
       </FilterSection>
+
+      {/* Destination Airport (when airport > 1) */}
+      {getDestinationAirports().length > 1 && (
+        <FilterSection
+          title="Destination airport"
+          isExpanded={expandedSections.destinationAirport}
+          onToggle={() => toggleSection("destinationAirport")}
+        >
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {getDestinationAirports().map(({ code, name }) => (
+              <label
+                key={code}
+                className="flex items-center gap-2 text-sm cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedDestinationAirports.includes(code)}
+                  onChange={() => toggleDestinationAirport(code)}
+                  className="w-4 h-4 accent-blue-500"
+                />
+                <span className="text-xs">
+                  {code} - {name}
+                </span>
+              </label>
+            ))}
+          </div>
+        </FilterSection>
+      )}
 
       {/* Layover Airport */}
       <FilterSection
@@ -913,24 +900,6 @@ const FlightFilterSidebar = ({
         )}
       </FilterSection>
 
-      {/* Environmental */}
-      <FilterSection
-        title="Environmental"
-        isExpanded={expandedSections.environmental}
-        onToggle={() => toggleSection("environmental")}
-      >
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={lowCO2}
-            onChange={() => setLowCO2(!lowCO2)}
-            className="w-4 h-4 accent-green-600"
-          />
-          <label className="flex items-center gap-2 text-green-600 cursor-pointer text-sm">
-            <FaLeaf /> Lower CO₂ emissions
-          </label>
-        </div>
-      </FilterSection>
     </div>
   );
 };

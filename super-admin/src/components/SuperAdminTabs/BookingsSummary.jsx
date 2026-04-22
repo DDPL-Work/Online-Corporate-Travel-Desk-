@@ -15,7 +15,10 @@ import {
   fetchHotelBookings,
 } from "../../Redux/Actions/corporate.related.thunks";
 import Pagination from "../Shared/Pagination";
-import { FlightBookingModal, HotelBookingModal } from "../Shared/BookingRequestDetailsModal";
+import {
+  FlightBookingModal,
+  HotelBookingModal,
+} from "../Shared/BookingRequestDetailsModal";
 
 const colors = {
   primary: "#0A4D68",
@@ -45,7 +48,9 @@ const getCorporateName = (b = {}) => {
 const getCorporateId = (b = {}) => {
   const corpId = b.corporateId || b.corporateCode || b.corporate;
   if (corpId && typeof corpId === "object") {
-    return corpId._id || corpId.id || corpId.code || corpId.corporateCode || "—";
+    return (
+      corpId._id || corpId.id || corpId.code || corpId.corporateCode || "—"
+    );
   }
   return corpId || "—";
 };
@@ -101,12 +106,13 @@ const normalizeFlight = (b = {}) => {
     "Route not available";
 
   const travelDate =
-  segments.find((s) => (s.journeyType || "onward") === "onward")?.departureDateTime ||
-  b.bookingSnapshot?.travelDate ||
-  b.travelDate ||
-  b.date ||
-  b.createdAt ||
-  "";
+    segments.find((s) => (s.journeyType || "onward") === "onward")
+      ?.departureDateTime ||
+    b.bookingSnapshot?.travelDate ||
+    b.travelDate ||
+    b.date ||
+    b.createdAt ||
+    "";
 
   const amount =
     Number(
@@ -210,12 +216,24 @@ const normalizeHotel = (b = {}) => {
 
 const isSuccessStatus = (status) => {
   const s = (status || "").toLowerCase();
-  return ["completed", "ticketed", "approved", "success", "voucher_generated"].includes(s);
+  return [
+    "completed",
+    "ticketed",
+    "approved",
+    "success",
+    "voucher_generated",
+  ].includes(s);
 };
 
 const isPendingStatus = (status) => {
   const s = (status || "").toLowerCase();
-  return ["pending", "pending_approval", "not_started", "initiated", "in_progress"].includes(s);
+  return [
+    "pending",
+    "pending_approval",
+    "not_started",
+    "initiated",
+    "in_progress",
+  ].includes(s);
 };
 
 const isBlockedStatus = (status) => {
@@ -256,27 +274,15 @@ export default function GlobalBookingsDashboard() {
     }
   }, [search, startDate, endDate, activeTab]);
 
-  // Fetch based on active tab + page + filters
-  useEffect(() => {
-    const params = { limit: DEFAULT_LIMIT };
-    if (startDate) params.fromDate = startDate;
-    if (endDate) params.toDate = endDate;
-
-    if (activeTab === "Flight") {
-      dispatch(fetchFlightBookings({ ...params, page: flightPage }));
-    } else {
-      dispatch(fetchHotelBookings({ ...params, page: hotelPage }));
-    }
-  }, [activeTab, flightPage, hotelPage, startDate, endDate, dispatch]);
-
-  // Reset page on tab switch
+  // Fetch all data at once on tab switch (no API pagination)
   useEffect(() => {
     if (activeTab === "Flight") {
-      setFlightPage(1);
+      dispatch(fetchFlightBookings());
     } else {
-      setHotelPage(1);
+      dispatch(fetchHotelBookings());
     }
-  }, [activeTab]);
+  }, [activeTab, dispatch]);
+
 
   const flights = useMemo(
     () =>
@@ -296,8 +302,12 @@ export default function GlobalBookingsDashboard() {
   );
 
   const corporates = useMemo(() => {
-    const validBookings = [...flights, ...hotels].filter(b => !isBlockedStatus(b.status));
-    const names = new Set(validBookings.map((b) => b.corporate).filter(Boolean));
+    const validBookings = [...flights, ...hotels].filter(
+      (b) => !isBlockedStatus(b.status),
+    );
+    const names = new Set(
+      validBookings.map((b) => b.corporate).filter(Boolean),
+    );
     return ["All", ...names];
   }, [flights, hotels]);
 
@@ -324,36 +334,48 @@ export default function GlobalBookingsDashboard() {
         dateMatch = (b.date || "").slice(0, 10) === travelDate;
       } else if (activeTab === "Hotel") {
         const cinMatch = !checkIn || (b.checkIn || "").slice(0, 10) === checkIn;
-        const coutMatch = !checkOut || (b.checkOut || "").slice(0, 10) === checkOut;
+        const coutMatch =
+          !checkOut || (b.checkOut || "").slice(0, 10) === checkOut;
         dateMatch = cinMatch && coutMatch;
       }
 
       const dStart = b.date || b.checkIn;
-      const startOk = !startDate || (dStart && new Date(dStart) >= new Date(startDate));
+      const startOk =
+        !startDate || (dStart && new Date(dStart) >= new Date(startDate));
 
       const dEnd = b.date || b.checkOut;
       const endOk = !endDate || (dEnd && new Date(dEnd) <= new Date(endDate));
 
-      return corpMatch && typeMatch && searchMatch && dateMatch && startOk && endOk;
+      return (
+        corpMatch && typeMatch && searchMatch && dateMatch && startOk && endOk
+      );
     });
-  }, [activeTab, flights, hotels, corporate, search, travelDate, checkIn, checkOut, startDate, endDate]);
+  }, [
+    activeTab,
+    flights,
+    hotels,
+    corporate,
+    search,
+    travelDate,
+    checkIn,
+    checkOut,
+    startDate,
+    endDate,
+  ]);
 
   const totalSpend = filtered.reduce((sum, b) => sum + (b.amount || 0), 0);
 
   const handleModalClose = () => setSelectedBooking(null);
 
-  const currentPagination =
-    activeTab === "Flight" ? flightPagination : hotelPagination;
-  const currentPage = currentPagination?.page || 1;
-  const totalPages =
-    currentPagination?.totalPages ||
-    Math.max(
-      1,
-      Math.ceil(
-        (currentPagination?.total || filtered.length || 0) /
-          (currentPagination?.limit || DEFAULT_LIMIT),
-      ),
-    );
+  // Frontend pagination — depend directly on page state so navigating pages is reactive
+  const currentPage = activeTab === "Flight" ? flightPage : hotelPage;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / DEFAULT_LIMIT));
+
+  const paginatedData = useMemo(() => {
+    const pg = activeTab === "Flight" ? flightPage : hotelPage;
+    const start = (pg - 1) * DEFAULT_LIMIT;
+    return filtered.slice(start, start + DEFAULT_LIMIT);
+  }, [filtered, flightPage, hotelPage, activeTab]);
 
   const handlePageChange = (page) => {
     if (activeTab === "Flight") {
@@ -454,7 +476,9 @@ export default function GlobalBookingsDashboard() {
 
         {/* FILTERS SECTION */}
         <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
-          <div className={`grid grid-cols-1 gap-4 ${activeTab === "Flight" ? "md:grid-cols-5" : "md:grid-cols-6"}`}>
+          <div
+            className={`grid grid-cols-1 gap-4 ${activeTab === "Flight" ? "md:grid-cols-5" : "md:grid-cols-6"}`}
+          >
             <LabeledInput label="Search">
               <div className="relative">
                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -554,9 +578,19 @@ export default function GlobalBookingsDashboard() {
                 No {activeTab.toLowerCase()} bookings found.
               </div>
             ) : activeTab === "Flight" ? (
-              <FlightTable data={filtered} onClose={handleModalClose} selectedBooking={selectedBooking} setSelectedBooking={setSelectedBooking} />
+              <FlightTable
+                data={paginatedData}
+                onClose={handleModalClose}
+                selectedBooking={selectedBooking}
+                setSelectedBooking={setSelectedBooking}
+              />
             ) : (
-              <HotelTable data={filtered} onClose={handleModalClose} selectedBooking={selectedBooking} setSelectedBooking={setSelectedBooking} />
+              <HotelTable
+                data={paginatedData}
+                onClose={handleModalClose}
+                selectedBooking={selectedBooking}
+                setSelectedBooking={setSelectedBooking}
+              />
             )}
           </div>
 
@@ -577,7 +611,7 @@ export default function GlobalBookingsDashboard() {
               Showing {filtered.length} {activeTab} Records
             </span>
             <span>
-              Est. Market Value: {" "}
+              Est. Market Value:{" "}
               <span
                 className={
                   activeTab === "Flight" ? "text-[#0A4D68]" : "text-[#088395]"
@@ -594,7 +628,12 @@ export default function GlobalBookingsDashboard() {
 }
 
 // --- FLIGHT TABLE COMPONENT -----------------------------------
-const FlightTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => (
+const FlightTable = ({
+  data,
+  selectedBooking,
+  setSelectedBooking,
+  onClose,
+}) => (
   <table className="w-full text-left border-collapse">
     <thead>
       <tr className="bg-[#0A4D68]">
@@ -619,9 +658,12 @@ const FlightTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => 
     </thead>
     <tbody className="divide-y divide-slate-100 text-sm">
       {data.map((b) => (
-        <tr key={b.id || b.empId} className="hover:bg-slate-50 transition-all bg-white">
+        <tr
+          key={b.id || b.empId}
+          className="hover:bg-slate-50 transition-all bg-white"
+        >
           <td className="px-6 py-4 font-mono text-[11px] text-slate-400">
-            #{b.bookingRef || b.id}
+            #{b.id}
           </td>
           <td className="px-6 py-4">
             <div className="flex flex-col">
@@ -639,7 +681,7 @@ const FlightTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => 
                 {b.employee}
               </span>
               <span className="text-[11px] text-teal-600 font-mono">
-                 {b.empId}
+                {b.empId}
               </span>
             </div>
           </td>
@@ -711,9 +753,12 @@ const HotelTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => (
     </thead>
     <tbody className="divide-y divide-slate-100 text-sm">
       {data.map((b) => (
-        <tr key={b.id || b.empId} className="hover:bg-slate-50 transition-all bg-white">
+        <tr
+          key={b.id || b.empId}
+          className="hover:bg-slate-50 transition-all bg-white"
+        >
           <td className="px-6 py-4 font-mono text-[11px] text-slate-400">
-            #{b.bookingRef || b.id}
+            #{b.id}
           </td>
           <td className="px-6 py-4">
             <div className="flex flex-col">
@@ -731,13 +776,15 @@ const HotelTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => (
                 {b.employee}
               </span>
               <span className="text-[11px] text-cyan-600 font-mono">
-               {b.empId}
+                {b.empId}
               </span>
             </div>
           </td>
           <td className="px-6 py-4 text-slate-500 font-medium">
             <div className="text-[12px]">{b.checkIn || "—"}</div>
-            <div className="text-[10px] text-slate-400">to {b.checkOut || "—"}</div>
+            <div className="text-[10px] text-slate-400">
+              to {b.checkOut || "—"}
+            </div>
           </td>
           <td className="px-6 py-4 font-black text-slate-900">
             ₹{(b.amount || 0).toLocaleString()}

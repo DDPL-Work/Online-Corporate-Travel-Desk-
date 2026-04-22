@@ -43,12 +43,28 @@ export default function CreditUtilizationPostpaid() {
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState(firstDay);
   const [endDate, setEndDate] = useState(lastDay);
-  const [corporate, setCorporate] = useState("All");
   const [status, setStatus] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
 
   const { balance, transactions, pagination, loadingBalance, loadingTransactions } =
     useSelector((state) => state.postpaid);
+
+  // Sync filters with current cycle when balance is loaded
+  useEffect(() => {
+    if (balance?.currentCycleStart && balance?.currentCycleEnd) {
+      setStartDate(new Date(balance.currentCycleStart).toISOString().split("T")[0]);
+      setEndDate(new Date(balance.currentCycleEnd).toISOString().split("T")[0]);
+    }
+  }, [balance]);
+
+  // Calculate days remaining
+  const daysRemaining = useMemo(() => {
+    if (!balance?.currentCycleEnd) return null;
+    const end = new Date(balance.currentCycleEnd);
+    const now = new Date();
+    const diff = end.getTime() - now.getTime();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }, [balance]);
 
   // Fetch balance once
   useEffect(() => {
@@ -63,15 +79,14 @@ export default function CreditUtilizationPostpaid() {
       page: currentPage,
       limit: 10,
     };
-    if (corporate !== "All") params.corporateId = corporate;
     if (status !== "All") params.status = status;
     dispatch(fetchPostpaidTransactions(params));
-  }, [dispatch, startDate, endDate, corporate, status, currentPage]);
+  }, [dispatch, startDate, endDate, status, currentPage]);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [startDate, endDate, corporate, status]);
+  }, [startDate, endDate, status]);
 
   // Safe arrays
   const safeTransactions = transactions || [];
@@ -82,43 +97,72 @@ export default function CreditUtilizationPostpaid() {
     const term = searchTerm.toLowerCase();
     return safeTransactions.filter(
       (t) =>
-        (t.corporateId?.corporateName || "").toLowerCase().includes(term) ||
         t.bookingId?.toLowerCase().includes(term) ||
         t.description?.toLowerCase().includes(term)
     );
   }, [safeTransactions, searchTerm]);
 
-  // Get unique corporates for dropdown (from loaded transactions)
-  const corporates = useMemo(() => {
-    const unique = new Set(
-      safeTransactions.map((t) => t.corporateId?.corporateName).filter(Boolean)
-    );
-    return ["All", ...Array.from(unique)];
-  }, [safeTransactions]);
-
   const statuses = ["All", "paid", "pending", "failed"]; // adjust based on actual statuses
 
   // Summary stats (based on filtered results)
   const totalTransactions = searchedTransactions.length;
-  const totalAmount = searchedTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-  const totalCreditUsed = searchedTransactions.reduce((sum, t) => sum + (t.creditUsed || 0), 0);
+  // const totalAmount = searchedTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+  // const totalCreditUsed = searchedTransactions.reduce((sum, t) => sum + (t.creditUsed || 0), 0);
 
   return (
     <div className="min-h-screen p-6 font-sans" style={{ backgroundColor: colors.light }}>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* PAGE HEADER */}
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-12 h-12 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white">
-            <FiCreditCard size={24} />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white">
+              <FiCreditCard size={24} />
+            </div>
+            <div className="text-left">
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase leading-none">
+                Credit Utilization (Postpaid)
+              </h1>
+              <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-widest">
+                Monitor corporate credit usage
+              </p>
+            </div>
           </div>
-          <div className="text-left">
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase leading-none">
-              Credit Utilization (Postpaid)
-            </h1>
-            <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-widest">
-              Monitor corporate credit usage
-            </p>
-          </div>
+
+          {!loadingBalance && balance && (
+            <div className="flex items-center gap-4">
+               <div className="flex flex-col items-end border-r border-slate-200 pr-4">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
+                  Lifecycle
+                </p>
+                <p className="text-xs font-bold text-slate-700">
+                  Since {balance.onboardedAt ? new Date(balance.onboardedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                </p>
+              </div>
+
+              <div className="flex flex-col items-end">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
+                  Current Cycle
+                </p>
+                <p className="text-xs font-bold text-slate-700">
+                  {balance.currentCycleStart ? new Date(balance.currentCycleStart).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "—"} 
+                  <span className="mx-1 text-slate-300">→</span>
+                  {balance.currentCycleEnd ? new Date(balance.currentCycleEnd).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "—"}
+                </p>
+              </div>
+
+              <div className="flex flex-col items-end border-l border-slate-200 pl-4">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
+                  Resets In
+                </p>
+                <div className="flex items-center gap-1.5">
+                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                   <p className="text-sm font-black text-[#0A4D68]">
+                    {daysRemaining} Days
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* STATS CARDS */}
@@ -148,16 +192,16 @@ export default function CreditUtilizationPostpaid() {
             iconColorCls="text-amber-600"
           />
           <StatCard
-            label="Available Credit"
+            label={balance?.availableCredit < 0 ? "Credit Over Limit" : "Available Credit"}
             value={
               loadingBalance
                 ? "..."
-                : `₹${(balance?.availableCredit || 0).toLocaleString()}`
+                : `₹${Math.abs(balance?.availableCredit || 0).toLocaleString()}${balance?.availableCredit < 0 ? " (Exceeded)" : ""}`
             }
             Icon={FiDollarSign}
-            borderCls="border-[#10B981]"
-            iconBgCls="bg-emerald-50"
-            iconColorCls="text-emerald-600"
+            borderCls={balance?.availableCredit < 0 ? "border-rose-500" : "border-[#10B981]"}
+            iconBgCls={balance?.availableCredit < 0 ? "bg-rose-50" : "bg-emerald-50"}
+            iconColorCls={balance?.availableCredit < 0 ? "text-rose-600" : "text-emerald-600"}
           />
           <StatCard
             label="Total Transactions (filtered)"
@@ -177,7 +221,7 @@ export default function CreditUtilizationPostpaid() {
                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Corporate / Booking ID / Description..."
+                  placeholder="Booking ID / Description..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
@@ -208,21 +252,6 @@ export default function CreditUtilizationPostpaid() {
                 />
               </div>
             </LabeledInput>
-
-            <LabeledInput label="Corporate">
-              <select
-                value={corporate}
-                onChange={(e) => setCorporate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
-              >
-                {corporates.map((c) => (
-                  <option key={c} value={c}>
-                    {c === "All" ? "All Corporates" : c}
-                  </option>
-                ))}
-              </select>
-            </LabeledInput>
-
             <LabeledInput label="Status">
               <select
                 value={status}
@@ -260,9 +289,7 @@ export default function CreditUtilizationPostpaid() {
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
                     Date
                   </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Corporate
-                  </th>
+                
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
                     Booking ID
                   </th>
@@ -302,16 +329,7 @@ export default function CreditUtilizationPostpaid() {
                       <td className="px-6 py-4 text-slate-600 font-medium">
                         {new Date(t.paidDate || t.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-800 text-[13px]">
-                            {t.corporateId?.corporateName || "—"}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            ID: {t.corporateId?._id || "—"}
-                          </span>
-                        </div>
-                      </td>
+                     
                       <td className="px-6 py-4 font-mono text-slate-600 text-xs">
                         {t.bookingId || "—"}
                       </td>
@@ -321,8 +339,8 @@ export default function CreditUtilizationPostpaid() {
                       <td className="px-6 py-4 font-black text-red-600">
                         - ₹{(t.amount || 0).toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 text-slate-600">
-                        ₹{(t.creditUsed || 0).toLocaleString()}
+                      <td className="px-6 py-4 text-slate-600 font-bold">
+                        ₹{(t.amount || 0).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-slate-600 max-w-xs truncate">
                         {t.description || "—"}
@@ -394,6 +412,12 @@ function StatusBadge({ status }) {
       text: "text-emerald-700",
       border: "border-emerald-100",
       label: "Paid",
+    },
+    billed: {
+      bg: "bg-cyan-50",
+      text: "text-cyan-700",
+      border: "border-cyan-100",
+      label: "Billed",
     },
     pending: {
       bg: "bg-amber-50",

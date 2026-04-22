@@ -15,7 +15,7 @@ export const preBookHotel = createAsyncThunk(
       const res = await api.post("/hotel-booking/prebook", payload);
       return res.data.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
+      return rejectWithValue(err.response?.data?.error || err.response?.data?.message || err.message);
     }
   }
 );
@@ -30,7 +30,7 @@ export const createHotelBookingRequest = createAsyncThunk(
       const res = await api.post("/hotel-booking/create-request", payload);
       return res.data.data; // { bookingRequestId, bookingReference, requestStatus }
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
+      return rejectWithValue(err.response?.data?.error || err.response?.data?.message || err.message);
     }
   }
 );
@@ -45,7 +45,7 @@ export const fetchMyHotelRequests = createAsyncThunk(
       const res = await api.get("/hotel-booking/my");
       return res.data.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
+      return rejectWithValue(err.response?.data?.error || err.response?.data?.message || err.message);
     }
   }
 );
@@ -60,7 +60,7 @@ export const fetchHotelRequestById = createAsyncThunk(
       const res = await api.get(`/hotel-booking/my/${id}`);
       return res.data?.data || res.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
+      return rejectWithValue(err.response?.data?.error || err.response?.data?.message || err.message);
     }
   }
 );
@@ -75,7 +75,7 @@ export const fetchRejectedHotelRequests = createAsyncThunk(
       const res = await api.get("/hotel-booking/my/rejected");
       return res.data.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
+      return rejectWithValue(err.response?.data?.error || err.response?.data?.message || err.message);
     }
   }
 );
@@ -91,7 +91,7 @@ export const fetchMyHotelBookings = createAsyncThunk(
 
       return res.data.data.bookings; // ✅ ONLY ARRAY
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
+      return rejectWithValue(err.response?.data?.error || err.response?.data?.message || err.message);
     }
   }
 );
@@ -106,7 +106,7 @@ export const executeHotelBooking = createAsyncThunk(
       const res = await api.post(`/hotel-booking/${bookingId}/execute`);
       return res.data.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
+      return rejectWithValue(err.response?.data?.error || err.response?.data?.message || err.message);
     }
   }
 );

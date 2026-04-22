@@ -264,7 +264,7 @@ bookingRequestSchema.pre("save", function () {
 
 /* 2️⃣ Enforce status transitions */
 const ALLOWED_STATUS_TRANSITIONS = {
-  draft: ["pending_approval"],
+  draft: ["pending_approval", "approved"],
   pending_approval: ["approved", "rejected"],
   approved: [],
   rejected: [],
@@ -286,6 +286,7 @@ bookingRequestSchema.pre("save", function () {
 
 /* 3️⃣ Freeze data after approval */
 bookingRequestSchema.pre("save", function () {
+  if (this.isNew) return; // Allow setting core fields on creation
   if (this.requestStatus !== "approved") return;
 
   const immutableFields = [

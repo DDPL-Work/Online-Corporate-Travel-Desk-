@@ -40,7 +40,7 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 import { FaUserPlus, FaHotel } from "react-icons/fa";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import {
   createHotelBookingRequest,
   fetchHotelRequestById,
@@ -55,6 +55,7 @@ import { Country } from "country-state-city";
 import api from "../../../API/axios";
 import { ProjectApproverBlock } from "./components/ProjectApproverBlock";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
+import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Utility: calculateNights                                       */
@@ -895,6 +896,9 @@ const HotelReviewBooking = () => {
   const { selectedRequest, loading, error, preBookData, preBookLoading } =
     useSelector((state) => state.hotelBookings);
 
+  const { myPolicy } = useSelector((state) => state.ssrPolicy);
+  const approvalRequired = myPolicy?.approvalRequired !== false;
+
   const { hotel, rooms, searchParams } = location.state || {};
 
   const [travelers, setTravelers] = useState([]);
@@ -933,6 +937,13 @@ const HotelReviewBooking = () => {
   useEffect(() => {
     if (id) dispatch(fetchHotelRequestById(id));
   }, [dispatch, id]);
+
+  // ── Fetch SSR Policy ──
+  useEffect(() => {
+    if (user?.role === "employee") {
+      dispatch(fetchMySSRPolicy());
+    }
+  }, [dispatch, user]);
 
   // ── Fetch GST details ──
   useEffect(() => {
@@ -1424,15 +1435,17 @@ const HotelReviewBooking = () => {
     };
 
     try {
-      await dispatch(
-        selectManager({
-          approverId: projectApproverData.approver?.id,
-          approverEmail: projectApproverData.approver?.email,
-          projectCodeId: projectApproverData.project?.id,
-          projectName: projectApproverData.project?.name,
-          projectClient: projectApproverData.project?.client,
-        }),
-      ).unwrap();
+      if (approvalRequired) {
+        await dispatch(
+          selectManager({
+            approverId: projectApproverData.approver?.id,
+            approverEmail: projectApproverData.approver?.email,
+            projectCodeId: projectApproverData.project?.id,
+            projectName: projectApproverData.project?.name,
+            projectClient: projectApproverData.project?.client,
+          }),
+        ).unwrap();
+      }
 
       const errors = validateTravellers(travelers);
 
@@ -1454,7 +1467,7 @@ const HotelReviewBooking = () => {
     } catch (err) {
       ToastWithTimer({
         type: "error",
-        message: err?.message || "Failed to submit request",
+        message: err || "Failed to submit request",
       });
     }
   };
@@ -1475,7 +1488,7 @@ const HotelReviewBooking = () => {
           try {
             return await dispatch(executeHotelBooking(bookingId)).unwrap();
           } catch (error) {
-            Swal.showValidationMessage(`Booking failed: ${error}`);
+            Swal.showValidationMessage(error);
           }
         },
         allowOutsideClick: () => !Swal.isLoading(),
@@ -1522,7 +1535,7 @@ const HotelReviewBooking = () => {
   /* ──────────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      <EmployeeHeader />
+      <CorporateNavbar />
 
       {/* ── Sticky back bar ── */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
@@ -2179,7 +2192,16 @@ const HotelReviewBooking = () => {
           {/* ── RIGHT: Price Summary ── */}
           <div className="lg:col-span-1">
             <div className="sticky top-20 space-y-4">
-              <ProjectApproverBlock onChange={setProjectApproverData} />
+              <div className="relative">
+                {!approvalRequired && (
+                  <div className="absolute top-2 right-4 z-10">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                      Optional
+                    </span>
+                  </div>
+                )}
+                <ProjectApproverBlock onChange={setProjectApproverData} />
+              </div>
 
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="bg-gradient-to-r from-[#0A4D68] to-[#088395] px-5 py-4">
@@ -2224,8 +2246,10 @@ const HotelReviewBooking = () => {
                   onClick={handleAction}
                   disabled={
                     actionLoading ||
-                    !projectApproverData.project ||
-                    !projectApproverData.approver
+                    (approvalRequired && (
+                      !projectApproverData.project ||
+                      !projectApproverData.approver
+                    ))
                   }
                   className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white uppercase tracking-wider bg-gradient-to-r from-[#0A4D68] to-[#088395] hover:from-[#093f54] hover:to-[#066876] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[#0A4D68]/20"
                 >

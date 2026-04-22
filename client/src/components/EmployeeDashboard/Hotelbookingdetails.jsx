@@ -472,7 +472,7 @@ const CANCEL_STATUS_CONFIG = {
   },
 };
 
-function CancellationSection({ booking, isConfirmed }) {
+function CancellationSection({ booking, isConfirmed, cancelPolicies = [], totalFare = 0 }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -536,8 +536,72 @@ function CancellationSection({ booking, isConfirmed }) {
 
     return null;
   })();
-  // console.log("PROVIDER STATUS:", providerStatus);
-  // console.log("MAPPED STATUS:", mappedStatus);
+
+  // Helper to calculate current charges
+  const calculateCurrentCharges = () => {
+    if (!cancelPolicies?.length) return { charge: 0, refund: totalFare, isFree: true };
+
+    const parseDate = (d) => {
+      if (!d) return null;
+      // Handle DD/MM/YYYY HH:mm:ss if present
+      if (typeof d === "string" && d.includes("/")) {
+        const parts = d.split(/[/\s:]/);
+        if (parts.length >= 3) {
+          const day = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1;
+          const year = parseInt(parts[2], 10);
+          const hour = parseInt(parts[3] || 0, 10);
+          const min = parseInt(parts[4] || 0, 10);
+          const sec = parseInt(parts[5] || 0, 10);
+          return new Date(year, month, day, hour, min, sec);
+        }
+      }
+      return new Date(d);
+    };
+
+    const now = new Date();
+    let applicablePolicy = null;
+
+    // Policies are usually sorted by date
+    // We look for the LATEST policy that has already started
+    for (const policy of cancelPolicies) {
+      const fromDate = parseDate(policy.FromDate);
+      if (fromDate && now >= fromDate) {
+        applicablePolicy = policy;
+      }
+    }
+
+    if (!applicablePolicy) {
+      // If no policy has started yet, check the first one
+      const firstPolicy = cancelPolicies[0];
+      const firstDate = parseDate(firstPolicy.FromDate);
+      if (firstDate && now < firstDate) {
+        return { charge: 0, refund: totalFare, isFree: true, note: "Pre-cancellation period (Free)" };
+      }
+      return { charge: 0, refund: totalFare, isFree: true, note: "No applicable policy found" };
+    }
+
+    let chargeAmount = 0;
+    const chargeValue = Number(applicablePolicy.CancellationCharge);
+
+    if (applicablePolicy.ChargeType === 2 || applicablePolicy.ChargeType === "Percentage") {
+      chargeAmount = (totalFare * chargeValue) / 100;
+    } else {
+      chargeAmount = chargeValue;
+    }
+
+    const refundAmount = Math.max(0, totalFare - chargeAmount);
+
+    return {
+      charge: chargeAmount,
+      refund: refundAmount,
+      isFree: chargeAmount === 0,
+      policy: applicablePolicy,
+      note: `Policy in effect since ${fmtDate(applicablePolicy.FromDate)}`
+    };
+  };
+
+  const currentCharges = calculateCurrentCharges();
 
   const handleSubmit = async () => {
     if (!reason) return;
@@ -743,6 +807,32 @@ function CancellationSection({ booking, isConfirmed }) {
                 </button>
               </div>
 
+              {/* ── Cancellation Charges Summary (NEW) ── */}
+              <div className="grid grid-cols-2 gap-3 pb-2">
+                <div className="bg-white border border-red-100 rounded-xl p-3 shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Cancellation Charges
+                  </p>
+                  <p className="text-lg font-black text-red-600">
+                    ₹{Number(currentCharges.charge).toLocaleString("en-IN")}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5 italic">
+                    {currentCharges.note || (currentCharges.isFree ? "Free Cancellation" : "Applicable now")}
+                  </p>
+                </div>
+                <div className="bg-white border border-emerald-100 rounded-xl p-3 shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Estimated Refund
+                  </p>
+                  <p className="text-lg font-black text-emerald-600">
+                    ₹{Number(currentCharges.refund).toLocaleString("en-IN")}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    To original payment mode
+                  </p>
+                </div>
+              </div>
+
               {/* Reason select */}
               <div>
                 <label className="block text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-red-600 mb-1.5">
@@ -784,8 +874,7 @@ function CancellationSection({ booking, isConfirmed }) {
               <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg sm:rounded-xl px-2.5 sm:px-3 py-2">
                 <FiInfo size={13} className="text-amber-500 mt-0.5 shrink-0" />
                 <p className="text-[10px] sm:text-[11px] text-amber-700 leading-snug">
-                  Your request will be reviewed by a travel admin. Cancellation
-                  charges may apply as per the hotel's policy. Refunds (if
+                  Your request organized summary: Total Charge <strong>₹{Number(currentCharges.charge).toLocaleString("en-IN")}</strong>. Refund (if
                   applicable) will be processed after approval.
                 </p>
               </div>
@@ -1457,7 +1546,12 @@ export default function HotelBookingDetails() {
         </div>
         <div className="mt-5">
           {/* ── Cancellation Request Section — always last in left col ── */}
-          <CancellationSection booking={booking} isConfirmed={isConfirmed} />
+          <CancellationSection
+            booking={booking}
+            isConfirmed={isConfirmed}
+            cancelPolicies={cancelPolicies}
+            totalFare={totalFare}
+          />
         </div>
       </main>
     </div>

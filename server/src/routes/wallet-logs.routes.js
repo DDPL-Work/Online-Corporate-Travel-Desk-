@@ -4,12 +4,12 @@ const WalletRechargeLog = require("../models/WalletActivityLog");
 const { verifyToken, authorizeRoles } = require("../middleware/auth.middleware");
 
 router.use(verifyToken);
-router.use(authorizeRoles("super-admin"));
+router.use(authorizeRoles("super-admin", "ops-member"));
 
 router.get(
   "/",
   verifyToken,
-  authorizeRoles("super-admin"),
+  authorizeRoles("super-admin", "ops-member"),
   async (req, res) => {
     const { status, corporateId, page = 1, limit = 20 } = req.query;
 

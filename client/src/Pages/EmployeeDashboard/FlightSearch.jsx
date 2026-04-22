@@ -19,7 +19,7 @@ import { MdArrowForward, MdAltRoute } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import TravelersClassModal from "../../components/FlightSearchComponents/TravelersClassModal";
-import EmployeeHeader from "./Employee-Header";
+import { CorporateNavbar } from "../../layout/CorporateNavbar";
 import { airportDatabase } from "../../data/airportDatabase";
 import { useFlightSearch } from "../../context/FlightSearchContext";
 import { searchFlights } from "../../Redux/Actions/flight.thunks";
@@ -203,19 +203,12 @@ export default function FlightSearchPage() {
   const {
     tripType: contextTripType,
     setTripType: setContextTripType,
-    nearbyAirportsTo,
-    setNearbyAirportsTo,
-    nearbyAirportsFrom,
-    setNearbyAirportsFrom,
-    flexibleDates,
-    setFlexibleDates,
     displayText,
     isModalOpen,
     modalPosition,
     handleApply,
     passengers,
     travelClass,
-    directOnly,
     openDropdown,
     closeDropdown,
   } = useFlightSearch();
@@ -263,10 +256,6 @@ export default function FlightSearchPage() {
       children,
       infants,
       cabinClass: CABIN_CLASS_MAP[travelClass] || "economy",
-      directFlight: directOnly,
-      nearbyAirportsFrom,
-      nearbyAirportsTo,
-      flexibleDates,
     };
     if (journeyType !== 3) {
       payload.origin = fromAirport.code;
@@ -281,7 +270,6 @@ export default function FlightSearchPage() {
         children,
         infants,
         cabinClass: CABIN_CLASS_MAP[travelClass] || "economy",
-        directFlight: directOnly,
         segments: multiCityFlights.map((f) => ({
           origin: f.from.code,
           destination: f.to.code,
@@ -367,10 +355,9 @@ export default function FlightSearchPage() {
     "ml-1.5 block text-xs text-gray-500 cursor-pointer font-medium";
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* ── Sticky Navbar ── */}
-      <div className="bg-white shadow-md sticky top-0 z-50">
-        <EmployeeHeader />
+    <div className="min-h-screen bg-gray-50 font-sans">
+      <div className="sticky top-0 z-50">
+        <CorporateNavbar />
       </div>
 
       {/* ── Hero Banner ── */}
@@ -515,23 +502,6 @@ export default function FlightSearchPage() {
                                 id={`multi-from-${index}`}
                                 error={errors[`multi-${index}`]}
                               />
-                              <label className="flex items-center mt-1.5">
-                                <input
-                                  type="checkbox"
-                                  checked={flight.nearbyFrom || false}
-                                  onChange={() =>
-                                    updateMultiCityFlight(
-                                      index,
-                                      "nearbyFrom",
-                                      !flight.nearbyFrom,
-                                    )
-                                  }
-                                  className={checkboxClass}
-                                />
-                                <span className={checkboxLabel}>
-                                  Nearby airports
-                                </span>
-                              </label>
                             </FieldBox>
 
                             {/* To */}
@@ -548,23 +518,6 @@ export default function FlightSearchPage() {
                                 placeholder="Search city or airport"
                                 id={`multi-to-${index}`}
                               />
-                              <label className="flex items-center mt-1.5">
-                                <input
-                                  type="checkbox"
-                                  checked={flight.nearbyTo || false}
-                                  onChange={() =>
-                                    updateMultiCityFlight(
-                                      index,
-                                      "nearbyTo",
-                                      !flight.nearbyTo,
-                                    )
-                                  }
-                                  className={checkboxClass}
-                                />
-                                <span className={checkboxLabel}>
-                                  Nearby airports
-                                </span>
-                              </label>
                             </FieldBox>
 
                             {/* Date */}
@@ -635,17 +588,6 @@ export default function FlightSearchPage() {
                           id="from-airport"
                           error={errors.from}
                         />
-                        <label className="flex items-center mt-1.5">
-                          <input
-                            type="checkbox"
-                            checked={nearbyAirportsFrom}
-                            onChange={() =>
-                              setNearbyAirportsFrom(!nearbyAirportsFrom)
-                            }
-                            className={checkboxClass}
-                          />
-                          <span className={checkboxLabel}>Nearby airports</span>
-                        </label>
                       </FieldBox>
 
                       {/* Swap button + To */}
@@ -672,20 +614,7 @@ export default function FlightSearchPage() {
                             id="to-airport"
                             error={errors.to}
                           />
-                          <label className="flex items-center mt-1.5">
-                            <input
-                              type="checkbox"
-                              checked={nearbyAirportsTo}
-                              onChange={() =>
-                                setNearbyAirportsTo(!nearbyAirportsTo)
-                              }
-                              className={checkboxClass}
-                            />
-                            <span className={checkboxLabel}>
-                              Nearby airports
-                            </span>
-                          </label>
-                        </FieldBox>
+                          </FieldBox>
                       </div>
 
                       {/* Departure */}
@@ -713,19 +642,7 @@ export default function FlightSearchPage() {
                             </p>
                           )} */}
                         </div>
-                        {tripType === "round-trip" && (
-                          <label className="flex items-center mt-1.5">
-                            <input
-                              type="checkbox"
-                              checked={flexibleDates}
-                              onChange={() => setFlexibleDates(!flexibleDates)}
-                              className={checkboxClass}
-                            />
-                            <span className={checkboxLabel}>
-                              Flexible dates ±3 days
-                            </span>
-                          </label>
-                        )}
+
                         {errors.departureDate && (
                           <p className="text-xs text-red-500 mt-1">
                             {errors.departureDate}
@@ -783,44 +700,7 @@ export default function FlightSearchPage() {
                     </div>
                   )}
 
-                  {/* ── Additional Options ── */}
-                  <div className="flex flex-wrap gap-x-6 gap-y-2 mb-5 pt-3 border-t border-gray-100">
-                    {[
-                      {
-                        id: "directOnly",
-                        label: "Direct flights only",
-                        checked: directOnly,
-                        onChange: () => {},
-                      },
-                      {
-                        id: "flexDates",
-                        label: "Flexible dates (±3 days)",
-                        checked: flexibleDates,
-                        onChange: () => setFlexibleDates(!flexibleDates),
-                      },
-                      {
-                        id: "nearbyBoth",
-                        label: "Include nearby airports",
-                        checked: nearbyAirportsFrom || nearbyAirportsTo,
-                        onChange: () => {},
-                      },
-                    ].map(({ id, label, checked, onChange }) => (
-                      <label
-                        key={id}
-                        className="flex items-center gap-2 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={onChange}
-                          className="w-4 h-4 text-blue-700 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-                        />
-                        <span className="text-sm text-gray-600 font-medium">
-                          {label}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
+                  {/* Search Button */}
 
                   {/* ── Search Button ── */}
                   <button
@@ -894,7 +774,7 @@ export default function FlightSearchPage() {
           onClose={closeDropdown}
           onApply={handleApply}
           modalPosition={modalPosition}
-          initialData={{ passengers, travelClass, directOnly }}
+          initialData={{ passengers, travelClass }}
         />
       )}
     </div>

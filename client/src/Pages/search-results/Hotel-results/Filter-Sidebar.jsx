@@ -9,6 +9,7 @@ import { IoClose } from "react-icons/io5";
 
 const FilterSidebar = ({
   hotels = [],
+  filteredHotels = [],
   filters,
   setFilters,
   searchText,
@@ -25,13 +26,18 @@ const FilterSidebar = ({
   });
 
   const [openLocation, setOpenLocation] = useState(false);
-  const [locationSearch, setLocationSearch] = useState("");
 
-  const locations = [...new Set(hotels.map((h) => h.address))];
+  // Derive unique partial locations (cities/areas) from addresses for suggestions
+  const locations = [...new Set(hotels.map((h) => {
+    const parts = h.address?.split(',') || [];
+    return parts.length > 1 ? parts[parts.length - 2].trim() : parts[0].trim();
+  }))].filter(l => l.length > 3);
 
   const filteredLocations = locations.filter((loc) =>
-    loc.toLowerCase().includes(locationSearch.toLowerCase()),
+    loc.toLowerCase().includes((filters.location || "").toLowerCase()),
   );
+
+  // ... (rest of the logic stays similar but we use filteredHotels for Map)
 
   // Extract cheapest room per hotel
   const hotelData = hotels?.map((hotel) => {
@@ -73,13 +79,6 @@ const FilterSidebar = ({
     return acc;
   }, {});
 
-  // Dynamic property types
-  const propertyCounts = hotels.reduce((acc, hotel) => {
-    const type = hotel.PropertyType || "Hotel";
-    acc[type] = (acc[type] || 0) + 1;
-    return acc;
-  }, {});
-
   const refundableCounts = hotels.reduce(
     (acc, hotel) => {
       if (hotel.refundable) acc.refundable++;
@@ -105,21 +104,6 @@ const FilterSidebar = ({
     }));
   };
 
-  const renderStars = (count) => {
-    const stars = [];
-    for (let i = 0; i < count; i++) {
-      stars.push(<BsStarFill key={i} className="text-amber-400" size={12} />);
-    }
-    return stars;
-  };
-
-  // Count active filters
-  const activeFilterCount =
-    filters.starRating.length +
-    (filters.mealType ? 1 : 0) +
-    (filters.refundable !== null ? 1 : 0) +
-    filters.amenities.length;
-
   const clearAllFilters = () => {
     setSearchText("");
     setFilters({
@@ -132,6 +116,13 @@ const FilterSidebar = ({
       location: "",
     });
   };
+
+  const activeFilterCount =
+    filters.starRating.length +
+    (filters.mealType ? 1 : 0) +
+    (filters.refundable !== null ? 1 : 0) +
+    filters.amenities.length +
+    (filters.location ? 1 : 0);
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-4 space-y-2 max-h-[calc(100vh-2rem)] overflow-y-auto">
@@ -159,7 +150,7 @@ const FilterSidebar = ({
       <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-100">
         <div className="mb-3">
           <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-2">
-            Search
+            Location & Hotel
           </label>
 
           {/* Name Search */}
@@ -167,71 +158,54 @@ const FilterSidebar = ({
             <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 text-xs" />
             <input
               type="text"
-              placeholder="Hotel name..."
+              placeholder="Search hotel name..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 border border-blue-200 rounded-lg text-sm bg-white/60 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
+              className="w-full pl-9 pr-3 py-2.5 border border-blue-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
 
-          {/* Location Dropdown */}
+          {/* Location Search with Dropdown */}
           <div className="relative">
-            {/* Selected Box */}
-            <div
-              onClick={() => setOpenLocation(!openLocation)}
-              className="w-full border border-blue-200 rounded-lg px-3 py-2.5 text-sm bg-white/60 backdrop-blur-sm flex items-center justify-between cursor-pointer hover:border-blue-400 transition"
-            >
-              <span className="truncate text-gray-700">
-                {filters.location || "Select Location"}
-              </span>
-              <MdExpandMore
-                className={`transition ${openLocation ? "rotate-180" : ""}`}
+            <div className="relative">
+              <FaMapMarkerAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 text-xs" />
+              <input
+                type="text"
+                placeholder="Area, landmank or city..."
+                value={filters.location}
+                onChange={(e) => {
+                  setFilters({ ...filters, location: e.target.value });
+                  setOpenLocation(true);
+                }}
+                onFocus={() => setOpenLocation(true)}
+                className="w-full pl-9 pr-8 py-2.5 border border-blue-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
+              {filters.location && (
+                <button 
+                  onClick={() => setFilters({ ...filters, location: "" })}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <IoClose size={14} />
+                </button>
+              )}
             </div>
 
-            {/* Dropdown */}
-            {openLocation && (
-              <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-                {/* Search */}
-                <div className="p-2 border-b">
-                  <input
-                    type="text"
-                    placeholder="Search location..."
-                    value={locationSearch}
-                    onChange={(e) => setLocationSearch(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                </div>
-
-                {/* List */}
-                <div className="max-h-48 overflow-y-auto">
+            {/* Suggestions Dropdown */}
+            {openLocation && filteredLocations.length > 0 && (
+              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-100 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                {filteredLocations.map((loc) => (
                   <div
+                    key={loc}
                     onClick={() => {
-                      setFilters({ ...filters, location: "" });
+                      setFilters({ ...filters, location: loc });
                       setOpenLocation(false);
                     }}
-                    className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer"
+                    className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-blue-50 cursor-pointer text-gray-700"
                   >
-                    All Locations
+                    <FaMapMarkerAlt className="text-blue-300" size={12} />
+                    {loc}
                   </div>
-
-                  {filteredLocations.map((loc) => (
-                    <div
-                      key={loc}
-                      onClick={() => {
-                        setFilters({ ...filters, location: loc });
-                        setOpenLocation(false);
-                      }}
-                      className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
-                        filters.location === loc
-                          ? "bg-blue-100 font-medium"
-                          : ""
-                      }`}
-                    >
-                      {loc}
-                    </div>
-                  ))}
-                </div>
+                ))}
               </div>
             )}
           </div>
@@ -240,16 +214,16 @@ const FilterSidebar = ({
         {/* Map Button */}
         <button
           onClick={() => setShowMap(true)}
-          className="w-full bg-gradient-to-r from-blue-700 to-blue-500 hover:from-blue-800 hover:to-blue-600 active:scale-95 flex items-center justify-center gap-2 text-white px-4 py-2.5 text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 text-sm font-semibold rounded-lg transition shadow-md flex items-center justify-center gap-2 mb-2"
         >
           <FaMapLocation size={14} />
-          Search on Map
+          View on Map
         </button>
 
         <MapModal
           open={showMap}
           onClose={() => setShowMap(false)}
-          hotels={hotels}
+          hotels={filteredHotels}
         />
       </div>
 

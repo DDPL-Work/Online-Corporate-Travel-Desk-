@@ -19,32 +19,23 @@ export const fetchFlightBookings = createAsyncThunk(
   "superAdmin/fetchFlightBookings",
   async (params = {}, { getState, rejectWithValue }) => {
     try {
-      const { page = 1, limit = 10, ...filters } = params;
-
-      const query = new URLSearchParams({
-        page,
-        limit,
-        ...filters,
-      }).toString();
+      // Only keep filters (no pagination)
+      const query = new URLSearchParams(params).toString();
 
       const res = await api.get(
-        `${BASE_URL}/flights?${query}`,
-        getConfig(getState),
+        `${BASE_URL}/flights${query ? `?${query}` : ""}`,
+        getConfig(getState)
       );
 
       const payload = res.data || {};
+
       return {
         data: payload.data || payload.results || [],
-        pagination: payload.pagination || {
-          page,
-          limit,
-          total: payload.total || 0,
-        },
       };
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
-  },
+  }
 );
 
 // ✈️ FLIGHT CANCELLATIONS
@@ -52,32 +43,22 @@ export const fetchFlightCancellations = createAsyncThunk(
   "corporateRelated/fetchFlightCancellations",
   async (params = {}, { getState, rejectWithValue }) => {
     try {
-      const { page = 1, limit = 10, ...filters } = params;
-
-      const query = new URLSearchParams({
-        page,
-        limit,
-        ...filters,
-      }).toString();
+      const query = new URLSearchParams(params).toString();
 
       const res = await api.get(
-        `${BASE_URL}/flights/cancellations?${query}`,
-        getConfig(getState),
+        `${BASE_URL}/flights/cancellations${query ? `?${query}` : ""}`,
+        getConfig(getState)
       );
 
       const payload = res.data || {};
+
       return {
         data: payload.data || [],
-        pagination: payload.pagination || {
-          page,
-          limit,
-          total: payload.total || 0,
-        },
       };
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
-  },
+  }
 );
 
 /* ===============================
@@ -184,27 +165,17 @@ export const fetchHotelBookings = createAsyncThunk(
   "superAdmin/fetchHotelBookings",
   async (params = {}, { getState, rejectWithValue }) => {
     try {
-      const { page = 1, limit = 10, ...filters } = params;
-
-      const query = new URLSearchParams({
-        page,
-        limit,
-        ...filters,
-      }).toString();
+      // No page/limit — fetch all data for frontend pagination
+      const query = new URLSearchParams(params).toString();
 
       const res = await api.get(
-        `${BASE_URL}/hotels?${query}`,
+        `${BASE_URL}/hotels${query ? `?${query}` : ""}`,
         getConfig(getState),
       );
 
       const payload = res.data || {};
       return {
         data: payload.data || payload.results || [],
-        pagination: payload.pagination || {
-          page,
-          limit,
-          total: payload.total || 0,
-        },
       };
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
@@ -217,27 +188,17 @@ export const fetchHotelCancellations = createAsyncThunk(
   "corporateRelated/fetchHotelCancellations",
   async (params = {}, { getState, rejectWithValue }) => {
     try {
-      const { page = 1, limit = 10, ...filters } = params;
-
-      const query = new URLSearchParams({
-        page,
-        limit,
-        ...filters,
-      }).toString();
+      // No page/limit — fetch all data for frontend pagination
+      const query = new URLSearchParams(params).toString();
 
       const res = await api.get(
-        `${BASE_URL}/hotels/cancellations?${query}`,
+        `${BASE_URL}/hotels/cancellations${query ? `?${query}` : ""}`,
         getConfig(getState),
       );
 
       const payload = res.data || {};
       return {
         data: payload.data || [],
-        pagination: payload.pagination || {
-          page,
-          limit,
-          total: payload.total || 0,
-        },
       };
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
@@ -324,6 +285,132 @@ export const updateCancellationQueryStatus = createAsyncThunk(
       return rejectWithValue(
         err?.response?.data || { message: "Update failed" }
       );
+    }
+  }
+);
+
+/* =====================================================
+   🔹 REVENUE DASHBOARD THUNKS
+===================================================== */
+
+export const fetchRevenueSummary = createAsyncThunk(
+  "revenue/fetchSummary",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { fromDate, toDate, corporateId } = params;
+      const res = await api.get(`/corporate-related/revenue/summary`, { 
+        params: { fromDate, toDate, corporateId } 
+      });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || { message: "Fetch failed" });
+    }
+  }
+);
+
+export const fetchCompanyWiseRevenue = createAsyncThunk(
+  "revenue/fetchCompanyWise",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { fromDate, toDate, corporateId } = params;
+      const res = await api.get(`/corporate-related/revenue/company-wise`, { 
+        params: { fromDate, toDate, corporateId } 
+      });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || { message: "Fetch failed" });
+    }
+  }
+);
+
+export const fetchMonthlyRevenue = createAsyncThunk(
+  "revenue/fetchMonthly",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { fromDate, toDate, corporateId } = params;
+      const res = await api.get(`/corporate-related/revenue/monthly`, { 
+        params: { fromDate, toDate, corporateId } 
+      });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || { message: "Fetch failed" });
+    }
+  }
+);
+
+export const fetchQuarterlyRevenue = createAsyncThunk(
+  "revenue/fetchQuarterly",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { fromDate, toDate, corporateId } = params;
+      const res = await api.get(`/corporate-related/revenue/quarterly`, { 
+        params: { fromDate, toDate, corporateId } 
+      });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || { message: "Fetch failed" });
+    }
+  }
+);
+
+export const fetchCorporateDetailedBookings = createAsyncThunk(
+  "revenue/fetchCorporateDetailed",
+  async ({ id, fromDate, toDate }, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/corporate-related/revenue/corporate-details/${id}`, { 
+        params: { fromDate, toDate } 
+      });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || { message: "Fetch failed" });
+    }
+  }
+);
+
+export const fetchHalfYearlyRevenue = createAsyncThunk(
+  "revenue/fetchHalfYearly",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/corporate-related/revenue/half-yearly`, { params });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || { message: "Fetch failed" });
+    }
+  }
+);
+
+export const fetchYearlyRevenue = createAsyncThunk(
+  "revenue/fetchYearly",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/corporate-related/revenue/yearly`, { params });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || { message: "Fetch failed" });
+    }
+  }
+);
+
+export const fetchDailyRevenue = createAsyncThunk(
+  "revenue/fetchDaily",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/corporate-related/revenue/daily`, { params });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || { message: "Fetch failed" });
+    }
+  }
+);
+
+export const fetchCorporates = createAsyncThunk(
+  "corporateRelated/fetchCorporates",
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const res = await api.get("/corporate-related/", getConfig(getState));
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
     }
   }
 );

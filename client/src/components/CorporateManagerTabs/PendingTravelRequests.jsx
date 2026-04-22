@@ -207,9 +207,29 @@ export default function PendingTravelRequestsForManager() {
     }
   };
 
+  const { user } = useSelector((state) => state.auth);
+  const isVerified = user?.managerRequestStatus === "approved";
+
   return (
     <div className="min-h-screen bg-slate-100 font-sans">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        {!isVerified && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 flex items-center gap-4 mb-2 shadow-sm animate-pulse">
+            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <FiAlertCircle className="text-amber-600" size={20} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-amber-900 tracking-tight">
+                Account Verification Pending
+              </h3>
+              <p className="text-[12px] text-amber-700 mt-0.5 leading-relaxed">
+                Your manager/approver account is currently awaiting verification from your company's Travel Admin. 
+                You will be able to approve or reject travel requests once your account is verified.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shrink-0">
             <FiList size={18} className="text-white" />
@@ -409,6 +429,7 @@ export default function PendingTravelRequestsForManager() {
           onClose={() => setSelectedRequest(null)}
           onApprove={handleAction}
           onReject={handleAction}
+          isVerified={isVerified}
         />
       )}
 
@@ -419,6 +440,7 @@ export default function PendingTravelRequestsForManager() {
           onClose={() => setSelectedRequest(null)}
           onApprove={handleAction}
           onReject={handleAction}
+          isVerified={isVerified}
         />
       )}
     </div>

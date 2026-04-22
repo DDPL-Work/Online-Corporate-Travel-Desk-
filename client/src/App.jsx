@@ -12,9 +12,13 @@ function App() {
         position="top-right"
         expand
         toastOptions={{
-          unstyled: true, // 🚀 this disables Sonner’s default styles completely
+          unstyled: true, 
           classNames: {
             toast: "sonner-toast",
+            success: "success",
+            error: "error",
+            info: "info",
+            warning: "warning",
           },
         }}
       />

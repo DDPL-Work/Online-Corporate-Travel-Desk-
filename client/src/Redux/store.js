@@ -32,6 +32,8 @@ import hotelAmendmentReducer from "./Slice/hotelAmendment.slice.js";
 
 
 import adminBookingReducer from "./Slice/travelAdmin.slice.js";
+import ssrPolicyReducer from "./Slice/ssrPolicy.slice.js";
+import landingPageReducer from "./Slice/landingPageSlice.js";
 
 export const store = configureStore({
   reducer: {
@@ -72,5 +74,11 @@ export const store = configureStore({
     hotel: hotelReducer,
     hotelBookings: hotelBookingReducer,
     hotelAmendment: hotelAmendmentReducer,
+
+    // SSR Policy
+    ssrPolicy: ssrPolicyReducer,
+
+    // Landing Page & Branding
+    landingPage: landingPageReducer,
   },
 });

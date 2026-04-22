@@ -16,7 +16,7 @@ import {
   parseRoundTripBooking,
   TravelerForm,
 } from "./CommonComponents";
-import EmployeeHeader from "../../EmployeeDashboard/Employee-Header";
+import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import {
   getRTFareQuote,
   getRTFareRule,
@@ -24,6 +24,7 @@ import {
 } from "../../../Redux/Actions/flight.thunks.RT";
 import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { mapSSRData } from "../../../utils/parseReturnFlight";
@@ -133,6 +134,9 @@ export default function RoundTripFlightBooking() {
     loading: approverLoading,
     error: approverError,
   } = useSelector((state) => state.employee);
+
+  const { myPolicy } = useSelector((state) => state.ssrPolicy);
+  const approvalRequired = myPolicy?.approvalRequired !== false;
 
   const traceId = location.state?.traceId || reduxTraceId || null;
 
@@ -1276,7 +1280,7 @@ export default function RoundTripFlightBooking() {
       return;
     }
 
-    if (!projectApproverData.project || !projectApproverData.approver) {
+    if (approvalRequired && (!projectApproverData.project || !projectApproverData.approver)) {
       ToastWithTimer({
         type: "error",
         message: "Please select a project and approver",
@@ -1303,15 +1307,17 @@ export default function RoundTripFlightBooking() {
 
     try {
       const payload = buildBookingRequestPayload();
-      await dispatch(
-        selectManager({
-          approverId: projectApproverData.approver?.id,
-          approverEmail: projectApproverData.approver?.email,
-          projectCodeId: projectApproverData.project?.id,
-          projectName: projectApproverData.project?.name,
-          projectClient: projectApproverData.project?.client,
-        }),
-      ).unwrap();
+      if (approvalRequired) {
+        await dispatch(
+          selectManager({
+            approverId: projectApproverData.approver?.id,
+            approverEmail: projectApproverData.approver?.email,
+            projectCodeId: projectApproverData.project?.id,
+            projectName: projectApproverData.project?.name,
+            projectClient: projectApproverData.project?.client,
+          }),
+        ).unwrap();
+      }
 
       await dispatch(createBookingRequest(payload)).unwrap();
 
@@ -1342,7 +1348,7 @@ export default function RoundTripFlightBooking() {
   // Readiness check for submit button (must stay before any early returns)
   const isFormReady = useMemo(() => {
     if (!purposeOfTravel?.trim()) return false;
-    if (!projectApproverData.project || !projectApproverData.approver) return false;
+    if (approvalRequired && (!projectApproverData.project || !projectApproverData.approver)) return false;
     if (infantCount > adultCount) return false;
 
     const isIntl = Boolean(
@@ -1430,8 +1436,8 @@ export default function RoundTripFlightBooking() {
 
   // Readiness check for submit button
   return (
-    <div className="min-h-screen bg-slate-50 font-[DM Sans]">
-      <EmployeeHeader />
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <CorporateNavbar />
       <RTSeatSelectionModal
         isOpen={showSeatModal.show}
         onClose={closeSeatModal}
