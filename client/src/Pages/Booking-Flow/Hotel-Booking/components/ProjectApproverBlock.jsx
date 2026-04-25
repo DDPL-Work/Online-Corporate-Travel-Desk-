@@ -19,11 +19,6 @@ import { fetchProjects } from "../../../../Redux/Actions/project.thunk";
 import { fetchEmployees } from "../../../../Redux/Slice/employeeActionSlice";
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Mock data — replace with your real API calls                   */
-/* ─────────────────────────────────────────────────────────────── */
-
-
-/* ─────────────────────────────────────────────────────────────── */
 /*  Dropdown with search                                            */
 /* ─────────────────────────────────────────────────────────────── */
 function SearchDropdown({
@@ -92,7 +87,10 @@ function SearchDropdown({
       )}
     </div>
   );
-}/*  Main Block                                                      */
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Main Block                                                      */
 /* ─────────────────────────────────────────────────────────────── */
 export function ProjectApproverBlock({ onChange }) {
   const getDisplayName = (item) => {
@@ -127,24 +125,45 @@ export function ProjectApproverBlock({ onChange }) {
   const dispatch = useDispatch();
   const { projects } = useSelector((state) => state.corporateProject);
   const { employees } = useSelector((state) => state.employee);
-  const corporateId = useSelector((state) => state.auth.user?.corporateId);
+  const { user } = useSelector((state) => state.auth);
+  const { myPolicy } = useSelector((state) => state.ssrPolicy);
+  const corporateId = user?.corporateId;
+
+  const isTravelAdmin = user?.role === "travel-admin";
+  const approvalRequired = !isTravelAdmin && myPolicy?.approvalRequired !== false;
 
   useEffect(() => {
     if (corporateId) {
       dispatch(fetchProjects(corporateId));
     }
-    dispatch(fetchEmployees());
-  }, [corporateId, dispatch]);
+    if (approvalRequired) {
+      dispatch(fetchEmployees());
+    }
+  }, [corporateId, dispatch, approvalRequired]);
 
   // Notify parent whenever values change
   useEffect(() => {
+    const project = manualProject ? projectManual : selectedProject;
+    const isProjectValid = manualProject 
+      ? (projectManual.id?.trim() && projectManual.name?.trim() && projectManual.client?.trim())
+      : !!selectedProject;
+
+    const approver = !approvalRequired 
+      ? { 
+          id: user?.id || user?._id || user?.userId, 
+          email: user?.email, 
+          name: `${user?.name?.firstName || ''} ${user?.name?.lastName || ''}`.trim(), 
+          role: user?.role 
+        }
+      : manualApprover
+        ? (approverEmail?.trim() ? { email: approverEmail } : null)
+        : selectedApprover;
+
     onChange?.({
-      project: manualProject ? projectManual : selectedProject,
-      approver: manualApprover
-        ? { email: approverEmail }
-        : selectedApprover,
+      project: isProjectValid ? project : null,
+      approver: approver,
     });
-  }, [selectedProject, projectManual, manualProject, selectedApprover, approverEmail, manualApprover]);
+  }, [selectedProject, projectManual, manualProject, selectedApprover, approverEmail, manualApprover, approvalRequired, user]);
 
   const clearProject = () => { setSelectedProject(null); setProjectManual({ id: "", name: "", client: "" }); };
   const clearApprover = () => { setSelectedApprover(null); setApproverEmail(""); };
@@ -169,12 +188,25 @@ export function ProjectApproverBlock({ onChange }) {
       {/* ── Header ── */}
       <div className="bg-[#0A4D68] px-5 py-4 flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-          <FiBriefcase size={15} className="text-white" />
+          {approvalRequired ? <FiBriefcase size={15} className="text-white" /> : <MdBusiness size={18} className="text-white" />}
         </div>
-        <div>
-          <h3 className="text-sm font-bold text-white">Project & Approver</h3>
-          <p className="text-[11px] text-indigo-200">Link booking to a project and assign an approver</p>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-bold text-white truncate">
+            {approvalRequired ? "Project & Approver" : "Project Details"}
+          </h3>
+          <p className="text-[11px] text-blue-100 truncate">
+            {approvalRequired 
+              ? "Link booking to a project and assign an approver" 
+              : "Link this booking to a project for tracking"}
+          </p>
         </div>
+        {!approvalRequired && (
+          <div className="ml-auto shrink-0 pl-2">
+            <span className="inline-block px-2 py-1 rounded text-[10px] font-bold text-white bg-white/20 border border-white/30 uppercase tracking-widest whitespace-nowrap leading-none">
+              Auto Approved
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="divide-y divide-slate-100">
@@ -187,7 +219,7 @@ export function ProjectApproverBlock({ onChange }) {
             <div className="flex items-center gap-1.5">
               <MdBusiness size={14} className="text-gray-500" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Project
+                Project Selection <span className="text-red-500">*</span>
               </span>
             </div>
             <button
@@ -296,155 +328,157 @@ export function ProjectApproverBlock({ onChange }) {
         {/* ════════════════════════════════════════ */}
         {/*  PART 2 — Approver Selection             */}
         {/* ════════════════════════════════════════ */}
-        <div className="p-5 space-y-3">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5">
-              <FiUser size={13} className="text-[#0A4D68]" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Approver / Manager
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => { setManualApprover((v) => !v); clearApprover(); }}
-              className="flex items-center gap-1 text-[11px] font-semibold text-[#0A4D68]/70 hover:text-[#0A4D68] transition"
-            >
-              <FiEdit3 size={11} />
-              {manualApprover ? "Search instead" : "Enter email manually"}
-            </button>
-          </div>
-
-          {!manualApprover ? (
-            <>
-              <SearchDropdown
-                placeholder="Search manager by name or email…"
-                items={employees.map(e => ({
-                  id: e.userId || e._id,
-                  userId: e.userId,
-                  employeeId: e._id,
-                  name: e.name,
-                  email: e.email,
-                  role: e.role,
-                }))}
-                selectedItem={selectedApprover}
-                onSelect={setSelectedApprover}
-                getLabel={(item) => `${getDisplayName(item)} (${item.email || ""})`}
-                showAllOnEmpty={false}
-                filterFn={(item, q) => {
-                  const nameStr =
-                    typeof item.name === "string"
-                      ? item.name
-                      : `${item.name?.firstName || ""} ${item.name?.lastName || ""}`.trim();
-                  return (
-                    nameStr.toLowerCase().includes(q.toLowerCase()) ||
-                    (item.email || "").toLowerCase().includes(q.toLowerCase())
-                  );
-                }}
-                renderItem={(item) => (
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center text-[11px] font-bold text-violet-700 shrink-0">
-                      {getInitials(item)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-semibold text-slate-700">
-                        {getDisplayName(item)}
-                      </p>
-                      <p className="text-[11px] text-slate-400 truncate">
-                        {item.email} · {item.role}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                renderSelected={(item) => (
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-5 h-5 rounded-full bg-violet-100 flex items-center justify-center text-[9px] font-bold text-[#0A4D68] shrink-0">
-                      {getInitials(item)}
-                    </div>
-                    <span className="text-[13px] font-semibold text-slate-700 truncate">
-                      {getDisplayName(item)}
-                    </span>
-                    <span className="text-[11px] text-slate-400 truncate hidden sm:block">· {item.role}</span>
-                  </div>
-                )}
-              />
-              {selectedApprover && (
-                <div className="flex items-center justify-between bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-violet-200 flex items-center justify-center text-[11px] font-bold text-[#0A4D68] shrink-0">
-                      {getInitials(selectedApprover)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-bold text-[#0A4D68]">
-                        {getDisplayName(selectedApprover)}
-                      </p>
-                      <p className="text-[11px] text-[#0A4D68]/50 truncate">{selectedApprover.email}</p>
-                    </div>
-                  </div>
-                  <button type="button" onClick={clearApprover} className="text-[#0A4D68]/40 hover:text-[#0A4D68] ml-2 shrink-0">
-                    <FiX size={14} />
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Manager Email Address
-              </label>
-              <div className="relative">
-                <FiMail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="email"
-                  placeholder="e.g. manager@company.com"
-                  value={approverEmail}
-                  onChange={(e) => setApproverEmail(e.target.value)}
-                  className="h-10 w-full pl-9 pr-3 text-[13px] bg-white border border-slate-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-400/10 transition text-slate-700 placeholder:text-slate-300"
-                />
+        {approvalRequired && (
+          <div className="p-5 space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <FiUser size={13} className="text-[#0A4D68]" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Approver / Manager <span className="text-red-500">*</span>
+                </span>
               </div>
+              <button
+                type="button"
+                onClick={() => { setManualApprover((v) => !v); clearApprover(); }}
+                className="flex items-center gap-1 text-[11px] font-semibold text-[#0A4D68]/70 hover:text-[#0A4D68] transition"
+              >
+                <FiEdit3 size={11} />
+                {manualApprover ? "Search instead" : "Enter email manually"}
+              </button>
+            </div>
 
-              {approverEmail && matchingApprovers(approverEmail).length > 0 && (
-                <div className="border border-violet-100 rounded-lg mt-1 max-h-40 overflow-y-auto divide-y divide-violet-50 bg-violet-50/50">
-                  {matchingApprovers(approverEmail).map((emp) => (
-                    <button
-                      key={emp._id || emp.userId}
-                      type="button"
-                      onClick={() => {
-                        setSelectedApprover({
-                          id: emp.userId || emp._id,
-                          userId: emp.userId,
-                          employeeId: emp._id,
-                          name: emp.name,
-                          email: emp.email,
-                          role: emp.role,
-                        });
-                        setManualApprover(false);
-                        setApproverEmail("");
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-white transition flex items-center gap-2"
-                    >
-                      <div className="w-6 h-6 rounded-full bg-violet-200 flex items-center justify-center text-[10px] font-bold text-[#0A4D68] shrink-0">
-                        {getInitials(emp)}
+            {!manualApprover ? (
+              <>
+                <SearchDropdown
+                  placeholder="Search manager by name or email…"
+                  items={employees.map(e => ({
+                    id: e.userId || e._id,
+                    userId: e.userId,
+                    employeeId: e._id,
+                    name: e.name,
+                    email: e.email,
+                    role: e.role,
+                  }))}
+                  selectedItem={selectedApprover}
+                  onSelect={setSelectedApprover}
+                  getLabel={(item) => `${getDisplayName(item)} (${item.email || ""})`}
+                  showAllOnEmpty={false}
+                  filterFn={(item, q) => {
+                    const nameStr =
+                      typeof item.name === "string"
+                        ? item.name
+                        : `${item.name?.firstName || ""} ${item.name?.lastName || ""}`.trim();
+                    return (
+                      nameStr.toLowerCase().includes(q.toLowerCase()) ||
+                      (item.email || "").toLowerCase().includes(q.toLowerCase())
+                    );
+                  }}
+                  renderItem={(item) => (
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center text-[11px] font-bold text-violet-700 shrink-0">
+                        {getInitials(item)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[13px] font-semibold text-slate-700 truncate">
-                          {getDisplayName(emp)}
+                        <p className="text-[13px] font-semibold text-slate-700">
+                          {getDisplayName(item)}
                         </p>
-                        <p className="text-[11px] text-slate-400 truncate">{emp.email} · {emp.role}</p>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          {item.email} · {item.role}
+                        </p>
                       </div>
+                    </div>
+                  )}
+                  renderSelected={(item) => (
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-5 h-5 rounded-full bg-violet-100 flex items-center justify-center text-[9px] font-bold text-[#0A4D68] shrink-0">
+                        {getInitials(item)}
+                      </div>
+                      <span className="text-[13px] font-semibold text-slate-700 truncate">
+                        {getDisplayName(item)}
+                      </span>
+                      <span className="text-[11px] text-slate-400 truncate hidden sm:block">· {item.role}</span>
+                    </div>
+                  )}
+                />
+                {selectedApprover && (
+                  <div className="flex items-center justify-between bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-violet-200 flex items-center justify-center text-[11px] font-bold text-[#0A4D68] shrink-0">
+                        {getInitials(selectedApprover)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-bold text-[#0A4D68]">
+                          {getDisplayName(selectedApprover)}
+                        </p>
+                        <p className="text-[11px] text-[#0A4D68]/50 truncate">{selectedApprover.email}</p>
+                      </div>
+                    </div>
+                    <button type="button" onClick={clearApprover} className="text-[#0A4D68]/40 hover:text-[#0A4D68] ml-2 shrink-0">
+                      <FiX size={14} />
                     </button>
-                  ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Manager Email Address
+                </label>
+                <div className="relative">
+                  <FiMail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="email"
+                    placeholder="e.g. manager@company.com"
+                    value={approverEmail}
+                    onChange={(e) => setApproverEmail(e.target.value)}
+                    className="h-10 w-full pl-9 pr-3 text-[13px] bg-white border border-slate-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-400/10 transition text-slate-700 placeholder:text-slate-300"
+                  />
                 </div>
-              )}
 
-              {approverEmail && /\S+@\S+\.\S+/.test(approverEmail) && (
-                <div className="flex items-center gap-2 mt-1 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 text-[12px] text-[#0A4D68] font-semibold">
-                  <FiCheck size={12} className="text-violet-500" />
-                  Approval request will be sent to <strong>{approverEmail}</strong>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                {approverEmail && matchingApprovers(approverEmail).length > 0 && (
+                  <div className="border border-violet-100 rounded-lg mt-1 max-h-40 overflow-y-auto divide-y divide-violet-50 bg-violet-50/50">
+                    {matchingApprovers(approverEmail).map((emp) => (
+                      <button
+                        key={emp._id || emp.userId}
+                        type="button"
+                        onClick={() => {
+                          setSelectedApprover({
+                            id: emp.userId || emp._id,
+                            userId: emp.userId,
+                            employeeId: emp._id,
+                            name: emp.name,
+                            email: emp.email,
+                            role: emp.role,
+                          });
+                          setManualApprover(false);
+                          setApproverEmail("");
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-white transition flex items-center gap-2"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-violet-200 flex items-center justify-center text-[10px] font-bold text-[#0A4D68] shrink-0">
+                          {getInitials(emp)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold text-slate-700 truncate">
+                            {getDisplayName(emp)}
+                          </p>
+                          <p className="text-[11px] text-slate-400 truncate">{emp.email} · {emp.role}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {approverEmail && /\S+@\S+\.\S+/.test(approverEmail) && (
+                  <div className="flex items-center gap-2 mt-1 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 text-[12px] text-[#0A4D68] font-semibold">
+                    <FiCheck size={12} className="text-violet-500" />
+                    Approval request will be sent to <strong>{approverEmail}</strong>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
     </div>
@@ -470,7 +504,3 @@ export function ProjectApproverBlock({ onChange }) {
 /*     approverId: projectApproverData.approver?.id,               */
 /*     approverEmail: projectApproverData.approver?.email,         */
 /* ─────────────────────────────────────────────────────────────── */
-
-
-
-

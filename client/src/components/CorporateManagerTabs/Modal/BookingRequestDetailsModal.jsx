@@ -943,6 +943,9 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
   const returnPNR = bookRes.returnPNR || null;
   const invoices = flightItin?.Invoice || [];
   const passengerInfo = flightItin?.Passenger || [];
+  const paxTicket = passengerInfo?.[0]?.Ticket || 
+                   bookRes?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket || {};
+  const ticketNumber = paxTicket.TicketId || paxTicket.TicketNumber || "";
   const totalAmount = pricing?.totalAmount ?? snap?.amount ?? 0;
   const amountCurrency = pricing?.currency || snap?.currency || "INR";
   const firstOnwardDate = onwardSegments[0]?.departureDateTime;
@@ -1511,9 +1514,19 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                             Ticket No
                           </p>
                           <p className="text-xs font-mono font-bold text-green-800">
-                            {provPax.Ticket.TicketNumber}
+                            {provPax.Ticket.TicketId || provPax.Ticket.TicketNumber}
                           </p>
                         </div>
+                        {provPax.BarcodeDetails?.Barcode?.[0]?.Content && (
+                           <div className="w-full">
+                             <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">
+                               Barcode Details (BCBP)
+                             </p>
+                             <p className="text-[10px] font-mono text-slate-500 bg-white border border-slate-100 p-2 rounded-lg break-all">
+                               {provPax.BarcodeDetails.Barcode[0].Content}
+                             </p>
+                           </div>
+                        )}
                         <div>
                           <p className="text-[10px] font-bold text-green-600 uppercase">
                             Status
@@ -1553,6 +1566,16 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                     </p>
                     <p className="text-sm font-mono font-black text-blue-900">
                       {pnr}
+                    </p>
+                  </div>
+                )}
+                {ticketNumber && (
+                  <div>
+                    <p className="text-[10px] font-bold text-blue-700 uppercase">
+                      Ticket ID
+                    </p>
+                    <p className="text-sm font-mono font-black text-blue-900">
+                      {ticketNumber}
                     </p>
                   </div>
                 )}

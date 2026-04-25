@@ -45,7 +45,7 @@ function Hero() {
   ];
 
   return (
-    <section className="relative bg-gradient-to-l from-blue-900 to-slate-950 overflow-hidden min-h-screen">
+    <section className="relative bg-gradient-to-l from-blue-900 to-slate-950 overflow-hidden min-h-[600px] xl:min-h-screen">
       {/* ambient glows */}
       <div
         className="absolute top-[-140px] right-[-100px] w-[600px] h-[600px] rounded-full opacity-10 pointer-events-none"
@@ -60,9 +60,9 @@ function Hero() {
         }}
       />
 
-      <div className="relative z-10 max-w-7xl mx-auto  py-20 lg:py-28 grid lg:grid-cols-2 gap-16 items-start">
+      <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10 lg:px-12 py-16 md:py-16 lg:py-20 flex flex-col md:grid md:grid-cols-2 gap-12 md:gap-10 lg:gap-16 items-center md:items-start">
         {/* LEFT – copy */}
-        <div className="flex flex-col gap-7 lg:pt-10">
+        <div className="flex flex-col gap-6 md:gap-7 md:pt-10 items-center md:items-start text-center md:text-left">
           {/* pill tag */}
           <div
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 backdrop-blur-sm w-fit"
@@ -77,7 +77,7 @@ function Hero() {
             </span>
           </div>
 
-          <h1 className="text-5xl sm:text-6xl xl:text-[60px] font-normal leading-[1.04] text-white font-['DM_Serif_Display']">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[60px] font-normal leading-tight md:leading-[1.1] lg:leading-[1.04] text-white font-['DM_Serif_Display']">
             The right <span style={{ color: ORANGE }}>hotel,</span>
             <br />
             Right{" "}
@@ -88,41 +88,39 @@ function Hero() {
             Right <span style={{ color: ORANGE }}>price.</span>
           </h1>
 
-          <div className="justify-center text-white/60 text-lg font-normal font-['Plus_Jakarta_Sans'] leading-7">
-            From business hotels to 5-star resorts, Traveamer has over
-            <br />
-            800,000 properties worldwide. Compliance is built-in, so
-            <br />
-            your team stays where they should—at a price you&apos;ll love.
+          <div className="text-white/60 text-base md:text-lg font-normal font-['Plus_Jakarta_Sans'] leading-relaxed">
+            From business hotels to 5-star resorts, Traveamer has over 800,000
+            properties worldwide. Compliance is built-in, so your team stays
+            where they should—at a price you&apos;ll love.
           </div>
 
-          <div className="flex flex-wrap gap-3 mt-1">
+          <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-3 mt-1 justify-center md:justify-start">
             <button
-              className="px-7 py-3.5 rounded-xl text-base font-semibold shadow-lg transition-all duration-200 hover:brightness-110 active:scale-95"
+              className="w-full sm:w-auto px-6 md:px-7 py-3 md:py-3.5 rounded-xl text-base font-semibold shadow-lg transition-all duration-200 hover:brightness-110 active:scale-95"
               style={{ background: ORANGE, color: AZURE }}
             >
               Start Free Trial
             </button>
-            <button className="px-7 py-3.5 rounded-xl text-base font-semibold text-white border border-white/40 hover:border-white/70 transition-all duration-200 flex items-center gap-2">
+
+            <button className="w-full sm:w-auto px-6 md:px-7 py-3 md:py-3.5 rounded-xl text-base font-semibold text-white border border-white/40 hover:border-white/70 transition-all duration-200 flex items-center justify-center gap-2">
               See How it Works <HiArrowRight />
             </button>
           </div>
 
-          {/* stats */}
-          <div className="flex gap-10 pt-6 border-t border-white/10">
+          <div className="flex flex-wrap gap-8 lg:gap-10 pt-6 border-t border-white/10 justify-center md:justify-start">
             {[
               { val: "800K+", label: "Properties" },
               { val: "150+", label: "Countries" },
-              { val: "100%", label: "Tax Compliant" },
+              { val: "100%", label: "Compliant" },
             ].map((s) => (
               <div key={s.label} className="flex flex-col gap-1">
                 <span
-                  className="text-3xl font-normal font-['DM_Serif_Display'] leading-9"
+                  className="text-2xl md:text-3xl font-normal font-['DM_Serif_Display'] leading-tight"
                   style={{ color: ORANGE }}
                 >
                   {s.val}
                 </span>
-                <span className="text-white text-sm font-medium">
+                <span className="text-white text-xs md:text-sm font-medium">
                   {s.label}
                 </span>
               </div>
@@ -273,7 +271,7 @@ function HowItWorks() {
     <section className="bg-slate-50 py-20 px-6">
       <div className="max-w-7xl mx-auto flex flex-col gap-12">
         {/* headline */}
-        <h2 className="text-5xl font-normal font-['DM_Serif_Display'] leading-tight text-black max-w-2xl">
+        <h2 className="text-3xl md:text-5xl font-normal font-['DM_Serif_Display'] leading-tight text-black max-w-2xl">
           Search. Select. Approve. <br />
           <span className="italic" style={{ color: ORANGE }}>
             Check-in.
@@ -343,13 +341,12 @@ function HowItWorks() {
               <Stars count={5} />
             </div>
 
-            {/* dates */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {["Check-in: Mar 15", "Check-out: Mar 17", "2 Nights"].map(
                 (d) => (
                   <div
                     key={d}
-                    className="px-3 py-2.5 bg-slate-100 rounded-xl text-center text-sky-950 text-xs font-medium"
+                    className="px-3 py-2.5 bg-slate-100 rounded-xl text-center text-sky-950 text-[10px] md:text-xs font-medium"
                   >
                     {d}
                   </div>
@@ -412,28 +409,22 @@ function GlobalCoverage() {
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none"></div>
 
       <div className="relative z-10 max-w-7xl mx-auto flex flex-col gap-12">
-        <div className="w-[548px] justify-center">
-          <span className="text-white text-5xl font-normal font-['DM_Serif_Display'] leading-[48px]">
+        <div className="w-full max-w-2xl">
+          <h2 className="text-white text-3xl md:text-5xl font-normal font-['DM_Serif_Display'] leading-tight">
             Every city your team travels to —{" "}
-          </span>
-          <span
-            style={{ color: ORANGE }}
-            className=" text-5xl font-normal font-['DM_Serif_Display'] leading-[48px]"
-          >
-            covered.
-          </span>
+            <span style={{ color: ORANGE }}>covered.</span>
+          </h2>
         </div>
 
-        {/* stat cards */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((s) => (
             <div
               key={s.label}
-              className="rounded-2xl border border-gray-200/20 backdrop-blur-sm p-6 flex flex-col items-center text-center gap-3 hover:border-white/20 transition-colors duration-200"
-              //   style={{ background: "rgba(255,255,255,0.05)" }}
+              className="rounded-2xl border border-white/10 backdrop-blur-sm p-8 flex flex-col items-center text-center gap-3 hover:border-white/20 transition-colors duration-200"
+              style={{ background: "rgba(255,255,255,0.03)" }}
             >
               <span style={{ color: ORANGE }}>{s.icon}</span>
-              <span className="text-white text-6xl font-normal font-['DM_Serif_Display'] leading-none">
+              <span className="text-white text-4xl lg:text-6xl font-normal font-['DM_Serif_Display'] leading-none">
                 {s.val}
               </span>
               <span className="text-white text-sm font-medium">{s.label}</span>
@@ -468,19 +459,14 @@ function CTA() {
         Get Started Today
       </span>
 
-      <div className="w-[602px] text-center justify-center">
-        <span className="text-white text-4xl font-normal font-['DM_Serif_Display'] leading-10">
-          Give your team the 
-        </span>
-        <span
-          style={{ color: ORANGE }}
-          className="italic text-4xl font-normal font-['DM_Serif_Display'] leading-10"
-        >
-          right hotel{" "}
-        </span>
-        <span className=" italic text-white text-4xl font-normal font-['DM_Serif_Display'] leading-10">
+      <div className="max-w-xl mx-auto text-center px-6">
+        <h2 className="text-white text-3xl md:text-4xl font-normal font-['DM_Serif_Display'] leading-tight">
+          Give your team the{" "}
+          <span className="italic" style={{ color: ORANGE }}>
+            right hotel
+          </span>{" "}
           at the right price — every time.
-        </span>
+        </h2>
       </div>
 
       <div className="pt-3 self-stretch text-center justify-center text-white/50 text-base font-normal font-['Plus_Jakarta_Sans'] leading-6">

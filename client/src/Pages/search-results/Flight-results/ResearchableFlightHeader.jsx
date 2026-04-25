@@ -229,7 +229,7 @@ function TripTypeDropdown({ value, onChange, editMode, journeyLabel }) {
   const labels = {
     1: "One Way",
     2: "Round Trip",
-    3: "Multi City"
+    // 3: "Multi City"
   };
 
   useEffect(() => {

@@ -9,6 +9,11 @@ const corporateSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    corporateType: {
+      type: String,
+      default: "pvt-ltd",
+      trim: true,
+    },
 
     // email: {
     //   type: String,

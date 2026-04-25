@@ -145,14 +145,14 @@ const HeroSection = () => (
     }}
   >
     {/* ── Main two-column row ── */}
-    <div className="mx-auto flex items-start justify-between px-20 py-[52px]">
+    <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center md:items-start justify-between px-6 md:px-10 lg:px-16 py-10 md:py-16 lg:py-20 gap-10 md:gap-8 lg:gap-16">
       {/* ────────────── Left column ────────────── */}
       <div
-        className="flex flex-col justify-start items-start"
-        style={{ paddingBottom: 86, paddingTop: 80 }}
+        className="flex flex-col justify-start items-center md:items-start w-full md:w-1/2 text-center md:text-left"
+        style={{ paddingBottom: 0, paddingTop: 40 }}
       >
         {/* Badge pill */}
-        <div className="mb-6">
+        <div className="mb-6 flex justify-center md:justify-start">
           <div
             className="px-4 py-1.5 rounded-full inline-flex items-center"
             style={{
@@ -161,7 +161,7 @@ const HeroSection = () => (
             }}
           >
             <span
-              className="text-[11px] font-semibold uppercase leading-4 tracking-widest"
+              className="text-[10px] md:text-[11px] font-semibold uppercase leading-4 tracking-widest"
               style={{
                 color: ORANGE,
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -175,10 +175,10 @@ const HeroSection = () => (
         {/* Headline */}
         <div className="mb-6">
           <h1
-            className="font-normal leading-[1.08]"
+            className="font-normal leading-tight md:leading-[1.1] lg:leading-[1.08]"
             style={{
               fontFamily: "'DM Serif Display', serif",
-              fontSize: 60,
+              fontSize: "clamp(32px, 5vw, 60px)",
               color: C.white,
               margin: 0,
             }}
@@ -199,21 +199,19 @@ const HeroSection = () => (
         </div>
 
         {/* Subtext */}
-        <div className="mb-8" style={{ maxWidth: 480 }}>
-          <div className="justify-center text-white/70 text-md font-normal font-['Plus_Jakarta_Sans'] leading-7">
-            Every travel request goes to the right person. Approved in
-            <br />
-            one click. Documented automatically. No more messy
-            <br />
-            emails — you stay in sync with your team.
+        <div className="mb-8 w-full max-w-xl md:max-w-full">
+          <div className="text-white/70 text-sm md:text-base font-normal font-['Plus_Jakarta_Sans'] leading-relaxed md:leading-7">
+            Every travel request goes to the right person. Approved in one
+            click. Documented automatically. No more messy emails — you stay in
+            sync with your team.
           </div>
         </div>
 
         {/* CTA row */}
-        <div className="flex gap-3 mb-12 flex-wrap items-center">
+        <div className="flex gap-3 mb-10 md:mb-12 flex-wrap items-center justify-center md:justify-start">
           {/* Gold filled button */}
           <button
-            className="h-11 px-8 rounded-lg text-sm font-semibold cursor-pointer border-0 transition-opacity hover:opacity-90"
+            className="h-10 md:h-11 px-6 md:px-8 rounded-lg text-xs md:text-sm font-semibold cursor-pointer border-0 transition-opacity hover:opacity-90"
             style={{
               background: ORANGE,
               color: C.navyDeep,
@@ -227,7 +225,7 @@ const HeroSection = () => (
 
           {/* Outline button */}
           <button
-            className="h-11 px-8 rounded-lg text-sm font-medium cursor-pointer bg-transparent transition-opacity hover:opacity-80"
+            className="h-10 md:h-11 px-6 md:px-8 rounded-lg text-xs md:text-sm font-medium cursor-pointer bg-transparent transition-opacity hover:opacity-80"
             style={{
               color: C.white,
               border: "2px solid rgba(255,255,255,0.30)",
@@ -238,8 +236,7 @@ const HeroSection = () => (
           </button>
         </div>
 
-        {/* Stats row */}
-        <div className="flex gap-10">
+        <div className="flex flex-wrap gap-5 md:gap-8 lg:gap-10 justify-center md:justify-start">
           {[
             { v: "1", l: "Review screen" },
             { v: "100%", l: "Trips on record" },
@@ -247,7 +244,7 @@ const HeroSection = () => (
           ].map(({ v, l }) => (
             <div key={l} className="flex flex-col gap-1">
               <span
-                className="text-2xl font-bold leading-8"
+                className="text-lg md:text-xl lg:text-2xl font-bold leading-7 md:leading-8"
                 style={{
                   color: ORANGE,
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -256,7 +253,7 @@ const HeroSection = () => (
                 {v}
               </span>
               <span
-                className="text-xs font-normal leading-4"
+                className="text-[9px] md:text-[10px] lg:text-xs font-normal leading-4"
                 style={{
                   color: "rgba(255,255,255,0.50)",
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -271,13 +268,12 @@ const HeroSection = () => (
 
       {/* ────────────── Right: Approval Card ────────────── */}
       <div
-        className="flex-none rounded-xl overflow-hidden"
+        className="w-full max-w-[560px] mx-auto lg:mx-0 rounded-xl overflow-hidden shadow-2xl"
         style={{
-          width: 560,
           background: "rgba(255,255,255,0.05)",
           border: `1px solid ${CARD_BORDER}`,
-          marginTop: 40,
-          marginBottom: 40,
+          marginTop: 0,
+          marginBottom: 0,
         }}
       >
         {/* Card header */}
@@ -517,51 +513,55 @@ const HeroSection = () => (
 );
 
 // ─── 2. Feature strip ──────────────────────────────────────────────────────────
-const Features = () => (
-  <div className="w-full bg-[#020617] border-t border-white/10 py-5 px-4">
-    <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-6">
-      {/* Item 1 */}
-      <div className="flex items-center whitespace-nowrap">
-        <span className="text-white font-bold text-sm font-['Plus_Jakarta_Sans']">
-          One click{" "}
-        </span>
-        <span className="text-white/60 font-normal text-sm font-['Plus_Jakarta_Sans'] ml-1.5">
-          to approve any request
-        </span>
-      </div>
+const Features = () => {
+  const items = [
+    { bold: "One click", light: "to approve any request" },
+    { bold: "Project Cost ID", light: "mandatory on every approval" },
+    { bold: "Full audit trail", light: "auto generated always" },
+    { bold: "Auto notifications", light: "employee informed instantly" },
+  ];
 
-      {/* Item 2 */}
-      <div className="flex items-center whitespace-nowrap">
-        <span className="text-white font-bold text-sm font-['Plus_Jakarta_Sans']">
-          Project Cost ID{" "}
-        </span>
-        <span className="text-white/60 font-normal text-sm font-['Plus_Jakarta_Sans'] ml-1.5">
-          mandatory on every approval
-        </span>
-      </div>
+  return (
+    <div className="w-full bg-[#020617] border-t border-white/10 py-10 lg:py-6 px-6 lg:px-4 overflow-hidden">
+      <div className="max-w-7xl mx-auto relative">
+        {/* Carousel Container */}
+        <div className="flex w-max md:w-full md:grid md:grid-cols-2 lg:grid-cols-4 md:justify-items-center items-center gap-x-10 md:gap-x-6 lg:gap-8 animate-infinite-scroll md:animate-none">
+          {/* Original Items */}
+          {items.map((it, idx) => (
+            <div
+              key={`orig-${idx}`}
+              className="flex flex-col md:items-center lg:items-start text-left md:text-center lg:text-left whitespace-nowrap md:whitespace-normal"
+            >
+              <span className="text-white font-bold text-sm font-['Plus_Jakarta_Sans']">
+                {it.bold}
+              </span>
+              <span className="text-white/60 font-normal text-xs md:text-sm font-['Plus_Jakarta_Sans'] mt-1">
+                {it.light}
+              </span>
+            </div>
+          ))}
 
-      {/* Item 3 */}
-      <div className="flex items-center whitespace-nowrap">
-        <span className="text-white font-bold text-sm font-['Plus_Jakarta_Sans']">
-          Full audit trail
-        </span>
-        <span className="text-white/60 font-normal text-sm font-['Plus_Jakarta_Sans']">
-          &mdash; auto generated always
-        </span>
-      </div>
-
-      {/* Item 4 */}
-      <div className="flex items-center whitespace-nowrap">
-        <span className="text-white font-bold text-sm font-['Plus_Jakarta_Sans']">
-          Auto notifications
-        </span>
-        <span className="text-white/60 font-normal text-sm font-['Plus_Jakarta_Sans']">
-          &mdash; employee informed instantly
-        </span>
+          {/* Duplicated Items (Hidden on MD screens and above) */}
+          <div className="flex md:hidden gap-x-10">
+            {items.map((it, idx) => (
+              <div
+                key={`dup-${idx}`}
+                className="flex flex-col text-left whitespace-nowrap"
+              >
+                <span className="text-white font-bold text-sm font-['Plus_Jakarta_Sans']">
+                  {it.bold}
+                </span>
+                <span className="text-white/60 font-normal text-xs md:text-sm font-['Plus_Jakarta_Sans'] mt-1">
+                  {it.light}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── 3. How It Works ──────────────────────────────────────────────────────────
 const STEPS = [
@@ -589,262 +589,96 @@ const STEPS = [
 
 const HowItWorksSection = () => (
   <section
-    className="w-full mx-[53px] py-24 px-6 "
+    className="w-full py-16 lg:py-24 px-6 lg:px-12"
     style={{ background: C.offWhite }}
   >
-    <div className="w-[1338px] inline-flex flex-col justify-start items-start gap-3.5">
+    <div className="max-w-7xl mx-auto flex flex-col justify-start items-start gap-3.5">
       <div className="self-stretch inline-flex justify-start items-start gap-4">
         <div className="inline-flex flex-col justify-start items-start gap-3.5">
           <div
             style={{ background: ORANGE }}
-            className="w-[512px] px-[5px] py-0.5  flex flex-col justify-start items-start"
+            className="w-full max-w-[512px] px-2.5 py-1 flex flex-col justify-start items-start"
           >
-            <div className="justify-center text-black text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.40px]">
+            <div className="text-black text-[10px] lg:text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.40px]">
               How It Works
             </div>
           </div>
           <div className="self-stretch flex flex-col justify-start items-start">
-            <div className="justify-center">
-              <span className="text-black text-4xl font-normal font-['DM_Serif_Display'] leading-10">
-                Request. Notify. Approve.
-                <br />
-              </span>
-              <span
-                style={{ color: ORANGE }}
-                className="italic text-4xl font-normal font-['DM_Serif_Display'] leading-10"
-              >
+            <h2 className="text-black text-3xl md:text-4xl font-normal font-['DM_Serif_Display'] leading-tight">
+              Request. Notify. Approve.
+              <br />
+              <span style={{ color: ORANGE }} className="italic">
                 Book. Done.
               </span>
-            </div>
+            </h2>
           </div>
         </div>
       </div>
-      <div className="w-full max-w-[512px] pl-3 flex flex-col justify-start items-start">
-        <div className="justify-center text-[#65758B] text-base font-normal font-['Plus_Jakarta_Sans'] leading-6">
+      <div className="w-full max-w-[512px] flex flex-col justify-start items-start">
+        <div className="text-[#65758B] text-sm lg:text-base font-normal font-['Plus_Jakarta_Sans'] leading-relaxed">
           Seamlessly connect employees and managers for faster booking.
         </div>
       </div>
     </div>
-    <div className="w-[1337px] inline-flex justify-between items-end gap-[60px] mt-[68px]">
+    <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-start lg:items-end gap-16 mt-12 lg:mt-[68px]">
       {/* Left Column*/}
-      <div className="w-[648px] inline-flex flex-col justify-start items-start gap-[70px] ">
-        <div className="self-stretch h-20 inline-flex justify-start items-start gap-5">
-          <div
-            style={{ background: ORANGE_FADE }}
-            className="w-10 h-10 py-1.5  rounded-full flex justify-center items-center"
-          >
+      <div className="w-full lg:w-1/2 flex flex-col justify-start items-start gap-12 lg:gap-[70px]">
+        {STEPS.map((step) => (
+          <div key={step.n} className="flex justify-start items-start gap-5">
             <div
-              style={{ color: ORANGE }}
-              className="text-center justify-center  text-lg font-bold font-['Plus_Jakarta_Sans'] leading-7"
+              style={{ background: ORANGE_FADE }}
+              className="w-10 h-10 min-w-[40px] rounded-full flex justify-center items-center"
             >
-              1
-            </div>
-          </div>
-          <div className="self-stretch inline-flex flex-col justify-start items-start gap-2">
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="justify-center text-slate-950 text-xl font-normal font-['DM_Serif_Display'] leading-7">
-                Employee raises a travel request
-              </div>
-            </div>
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="justify-center text-[#65758B] text-base font-normal font-['Plus_Jakarta_Sans'] leading-6">
-                Employee selects a flight or hotel within policy and submits the
-                request to the
-                <br />
-                travel admin or manager.
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="self-stretch h-20 inline-flex justify-start items-start gap-5">
-          <div
-            style={{ background: ORANGE_FADE }}
-            className="w-10 h-10 py-1.5  rounded-full flex justify-center items-center"
-          >
-            <div
-              style={{ color: ORANGE }}
-              className="text-center justify-center  text-lg font-bold font-['Plus_Jakarta_Sans'] leading-7"
-            >
-              2
-            </div>
-          </div>
-          <div className="self-stretch inline-flex flex-col justify-start items-start gap-2">
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="justify-center text-slate-950 text-xl font-normal font-['DM_Serif_Display'] leading-7">
-                Travel Admin and Manager notified instantly
-              </div>
-            </div>
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="justify-center text-[#65758B] text-base font-normal font-['Plus_Jakarta_Sans'] leading-6">
-                The travel admin or manager receives a notification instantly
-                via the app or
-                <br />
-                email, with all trip details, policy status and cost mentioned
-                for quick approval.
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="w-[648px] inline-flex justify-start items-start gap-5">
-          <div
-            style={{ background: ORANGE_FADE }}
-            className="w-10 h-10 py-1.5  rounded-full flex justify-center items-center"
-          >
-            <div
-              style={{ color: ORANGE }}
-              className="text-center justify-center text-lg font-bold font-['Plus_Jakarta_Sans'] leading-7"
-            >
-              3
-            </div>
-          </div>
-          <div className="self-stretch min-w-[588px] inline-flex flex-col justify-start items-start gap-2">
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="justify-center text-slate-950 text-xl font-normal font-['DM_Serif_Display'] leading-7">
-                Travel Admin approves in one click
-              </div>
-            </div>
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="justify-center text-[#65758B] text-base font-normal font-['Plus_Jakarta_Sans'] leading-6">
-                The admin/manager reviews the request and clicks approve on the
-                <br />
-                dashboard. The system documents everything automatically — no
-                manual
-                <br />
-                entry required.
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="self-stretch h-20 inline-flex justify-start items-start gap-5">
-          <div
-            style={{ background: ORANGE_FADE }}
-            className="w-10 h-10 py-1.5  rounded-full flex justify-center items-center"
-          >
-            <div
-              style={{ color: ORANGE }}
-              className="text-center justify-center  text-lg font-bold font-['Plus_Jakarta_Sans'] leading-7"
-            >
-              4
-            </div>
-          </div>
-          <div className="self-stretch inline-flex flex-col justify-start items-start gap-2">
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="justify-center text-slate-950 text-xl font-normal font-['DM_Serif_Display'] leading-7">
-                Employee notified — books instantly
-              </div>
-            </div>
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="justify-center text-[#65758B] text-base font-normal font-['Plus_Jakarta_Sans'] leading-6">
-                Once the travel request is approved, the employee is notified
-                through the app
-                <br />
-                and via email. They can book the trip with just one click.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      {/* Right Column */}
-      <div className="w-[628px] inline-flex flex-col justify-start items-start gap-8">
-        <div className="w-[629px]  bg-white rounded-xl shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.10)] shadow-lg flex flex-col justify-start items-start gap-2.5 overflow-hidden">
-          <div
-            style={{ background: ORANGE_FADE_20 }}
-            className="self-stretch h-11 px-5 py-3  border-b border-gray-100 inline-flex justify-start items-center gap-2"
-          >
-            <BsSend style={{ color: ORANGE }} />
-            <div className="inline-flex flex-col justify-start items-start">
               <div
                 style={{ color: ORANGE }}
-                className="justify-center  text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5"
+                className="text-lg font-bold font-['Plus_Jakarta_Sans']"
               >
-                Travel Admin — Action Required
+                {step.n}
               </div>
+            </div>
+            <div className="flex flex-col justify-start items-start gap-2">
+              <h3 className="text-slate-950 text-xl font-normal font-['DM_Serif_Display'] leading-7">
+                {step.title}
+              </h3>
+              <p className="text-[#65758B] text-sm lg:text-base font-normal font-['Plus_Jakarta_Sans'] leading-relaxed">
+                {step.desc}
+              </p>
             </div>
           </div>
-          <div className="self-stretch px-5 py-4 flex flex-col justify-start items-start gap-4">
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="self-stretch justify-center">
-                <span class="text-[#65758B] text-sm font-bold font-['Plus_Jakarta_Sans'] leading-6">
-                  Amit Kumar
-                </span>
-                <span class="text-[#65758B] text-sm font-normal font-['Plus_Jakarta_Sans'] leading-6">
-                  {" "}
-                  has requested travel to{" "}
-                </span>
-                <span class="text-[#65758B] text-sm font-bold font-['Plus_Jakarta_Sans'] leading-6">
-                  Delhi on 22 April
-                </span>
-                <span class="text-[#65758B] text-sm font-normal font-['Plus_Jakarta_Sans'] leading-6">
-                  . Flight Cost: ₹4,200, Hotel: ₹7,500/n. Manager: Rajat Gupta.
-                  Amount: ₹75,300.{" "}
-                </span>
-                <span class="text-[#65758B] text-sm font-bold font-['Plus_Jakarta_Sans'] leading-6">
-                  Total: ₹79,800
-                </span>
-                <span class="text-[#65758B] text-sm font-normal font-['Plus_Jakarta_Sans'] leading-6">
-                  . Project: Tuna, Travel Policy:
-                  <br />
-                  Standard.
-                </span>
-              </div>
+        ))}
+      </div>
+
+      {/* Right Column */}
+      <div className="w-full lg:w-1/2 flex flex-col justify-start items-start gap-8">
+        <div className="w-full bg-white rounded-xl shadow-xl border border-gray-100 flex flex-col justify-start items-start gap-2.5 overflow-hidden">
+          <div
+            style={{ background: ORANGE_FADE_20 }}
+            className="self-stretch h-12 px-5 py-3 border-b border-gray-100 inline-flex justify-start items-center gap-2"
+          >
+            <BsSend style={{ color: ORANGE }} />
+            <div className="text-[#C9A240] text-sm font-semibold font-['Plus_Jakarta_Sans']">
+              Travel Admin — Action Required
             </div>
-            <div className="self-stretch inline-flex justify-start items-start gap-28 mb-4">
-              <div
+          </div>
+          <div className="self-stretch px-5 lg:px-8 py-6 lg:py-8 flex flex-col justify-start items-start gap-6">
+            <div className="self-stretch text-slate-600 text-sm lg:text-base font-['Plus_Jakarta_Sans'] leading-relaxed">
+              <span className="font-bold">Amit Kumar</span> has requested travel
+              to <span className="font-bold">Delhi on 22 April</span>. Flight
+              Cost: ₹4,200, Hotel: ₹7,500/n. Manager: Rajat Gupta. Amount:
+              ₹75,300. <span className="font-bold">Total: ₹79,800</span>.
+              Project: Tuna, Travel Policy: Standard.
+            </div>
+
+            <div className="w-full flex flex-col sm:flex-row gap-3">
+              <button
                 style={{ background: ORANGE }}
-                className="w-80 px-5 py-2 rounded-lg flex justify-center items-center"
+                className="w-full sm:flex-1 h-12 rounded-lg flex justify-center items-center text-slate-950 text-sm font-semibold font-['Plus_Jakarta_Sans'] hover:opacity-90 transition-opacity"
               >
-                <div className="text-center justify-center text-slate-950 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
-                  Approve Request
-                </div>
-              </div>
-              <div className="w-40 px-5 py-2 opacity-60 rounded-lg  outline-1 -outline-offset-1 outline-slate-500 flex justify-center items-center">
-                <div className="text-center justify-center text-slate-500 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
-                  Reject
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="w-[629px] pb-3.5 bg-white rounded-xl shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.10)] shadow-lg  outline-1 -outline-offset-1 outline-gray-100 flex flex-col justify-start items-center gap-3.5 overflow-hidden">
-          <div className="self-stretch h-11 px-5 py-3 bg-[#65758B]/10 border-b border-gray-100 inline-flex justify-start items-center gap-2">
-            <BsBell />
-            <div className="inline-flex flex-col justify-start items-start">
-              <div className="justify-center text-slate-950 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
-                Manager — For Your Information
-              </div>
-            </div>
-          </div>
-          <div className="w-[581px] flex flex-col justify-start items-start">
-            <div className="self-stretch justify-center text-slate-500 text-sm font-normal font-['Plus_Jakarta_Sans'] leading-6">
-              Amit Sharma has raised a travel request to Delhi on 22 April.
-              Purpose: Tuna Phase 2 client meeting. Total cost: ₹19,800. Travel
-              Admin reviewing.
-            </div>
-          </div>
-        </div>
-        <div className="w-[629px] h-44 relative bg-white rounded-xl shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.10)] shadow-lg  outline-1 -outline-offset-1 outline-gray-100 overflow-hidden">
-          <div className="w-[627px] h-11 px-5 py-3 left-px top-px absolute bg-[#FFFBEB] border-b border-gray-100 inline-flex justify-start items-center gap-2">
-            <CiCircleCheck className="text-[#059669]" />
-            <div className="inline-flex flex-col justify-start items-start">
-              <div className="justify-center text-[#059669] text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
-                Employee — Trip Approved
-              </div>
-            </div>
-          </div>
-          <div className="w-[627px] px-5 py-4 left-px top-[46px] absolute inline-flex flex-col justify-start items-start gap-4">
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="self-stretch justify-center text-[#65758B] text-sm font-normal font-['Plus_Jakarta_Sans'] leading-6">
-                Your Delhi trip has been approved. IndiGo 6E 456 on 22 April is
-                confirmed and ready. Tap below to get your PNR instantly.
-              </div>
-            </div>
-            <div
-              style={{ background: ORANGE }}
-              className="self-stretch px-5 py-2  rounded-lg inline-flex justify-center items-center"
-            >
-              <div className="text-center justify-center text-slate-950 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
-                Book Now → Get PNR
-              </div>
+                Approve Request
+              </button>
+              <button className="w-full sm:flex-1 h-12 rounded-lg border-2 border-slate-200 flex justify-center items-center text-slate-400 text-sm font-semibold font-['Plus_Jakarta_Sans'] hover:bg-slate-50 transition-colors">
+                Reject
+              </button>
             </div>
           </div>
         </div>
@@ -852,7 +686,6 @@ const HowItWorksSection = () => (
     </div>
   </section>
 );
-
 // ─── 4. Who Approves ──────────────────────────────────────────────────────────
 const ROLES = [
   {
@@ -891,37 +724,31 @@ const ROLES = [
 ];
 
 const WhoApprovesSection = () => (
-  <section className="py-20 px-10" style={{ background: C.offWhite }}>
-    <div className="w-full mx-[53px] space-y-16">
-      <div className="self-stretch inline-flex flex-col justify-start items-start gap-3.5">
+  <section className="py-20 px-6 lg:px-12" style={{ background: C.offWhite }}>
+    <div className="max-w-7xl mx-auto space-y-12">
+      <div className="flex flex-col justify-start items-start gap-3.5">
         <div
           style={{ background: ORANGE }}
-          className="w-[512px] px-[5px] py-0.5  flex flex-col justify-start items-start"
+          className="w-full md:w-[519px] px-2.5 py-1 flex flex-col justify-start items-start"
         >
-          <div className="justify-center text-black text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.40px]">
+          <div className="text-black text-[10px] lg:text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.40px]">
             Who Approves
           </div>
         </div>
-        <div className="w-[1336px] flex flex-col justify-start items-start">
-          <div className="justify-center">
-            <span class="text-slate-800 text-4xl font-normal font-['DM_Serif_Display'] leading-10">
-              Every role has a<br />
-            </span>
-            <span
-              style={{ color: ORANGE }}
-              className="italic text-4xl font-normal font-['DM_Serif_Display'] leading-10"
-            >
+        <div className="flex flex-col justify-start items-start">
+          <h2 className="text-slate-800 text-3xl md:text-4xl font-normal font-['DM_Serif_Display'] leading-tight">
+            Every role has a<br />
+            <span style={{ color: ORANGE }} className="italic">
               clear purpose.
             </span>
-          </div>
+          </h2>
         </div>
-        <div className="w-[576px] max-w-[576px] flex flex-col justify-start items-center">
-          <div className="justify-center text-slate-500 text-base font-normal font-['Plus_Jakarta_Sans'] leading-6">
+        <div className="max-w-xl">
+          <p className="text-slate-500 text-sm lg:text-base font-normal font-['Plus_Jakarta_Sans'] leading-relaxed">
             From booking to approvals, Managers and Admin stay informed.
-            Experience
-            <br />
-            effortless travel management through a purpose-driven dashboard.
-          </div>
+            Experience effortless travel management through a purpose-driven
+            dashboard.
+          </p>
         </div>
       </div>
 
@@ -1013,51 +840,52 @@ const STATS = [
 
 const WhyItMattersSection = () => {
   return (
-    <section className="relative w-full min-h-[600px] bg-gradient-to-b from-slate-950 to-blue-900 py-20 px-10 flex flex-col justify-center overflow-hidden">
+    <section className="relative w-full min-h-[600px] bg-gradient-to-b from-slate-950 to-blue-900 py-16 lg:py-24 px-6 lg:px-12 flex flex-col justify-center overflow-hidden">
       {/* Background Large Text Overlay */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5">
-        <h1 className="text-[180px] font-bold font-sans whitespace-nowrap text-white/20">
+        <h1 className="text-[80px] lg:text-[180px] font-bold font-sans whitespace-nowrap text-white/20">
           Always on Record
         </h1>
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto w-full">
         {/* Header Section */}
-        <div className="mb-16">
+        <div className="mb-12 lg:mb-16">
           <div
             style={{ background: ORANGE }}
-            className="w-[512px] px-[5px] py-0.5  inline-flex flex-col justify-start items-start"
+            className="w-full md:w-[519px] px-2.5 py-1 inline-flex flex-col justify-start items-start"
           >
-            <div className="justify-center text-black text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.40px]">
+            <div className="text-black text-[10px] lg:text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.40px]">
               Why It Matters
             </div>
           </div>
 
-          <div className="justify-center text-white text-4xl font-normal font-['DM_Serif_Display'] leading-10 my-3">
+          <h2 className="text-white text-3xl md:text-5xl font-normal font-['DM_Serif_Display'] leading-tight my-4">
             Every trip. Every approval.
             <br />
             Always on record.
-          </div>
+          </h2>
 
-          <div className="self-stretch justify-center text-white/50 text-base font-normal font-['Plus_Jakarta_Sans'] leading-6">
+          <div className="max-w-2xl text-white/50 text-sm lg:text-base font-normal font-['Plus_Jakarta_Sans'] leading-relaxed">
             Whether you are a startup or a growing business, stay organized.
-            Know
-            <br />
-            exactly who approved what — and keep travel on track.
+            Know exactly who approved what — and keep travel on track.
           </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           {STATS.map((stat, index) => (
             <div
               key={index}
-              className="border-2 border-white rounded-xl p-8 flex flex-col items-center justify-center"
+              className="border-2 border-white rounded-xl p-4 sm:p-6 md:p-8 flex flex-col items-center justify-center"
             >
               <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mb-6">
                 {stat.icon}
               </div>
-              <div style={{color: ORANGE}} className=" text-4xl font-serif mb-2">
+              <div
+                style={{ color: ORANGE }}
+                className=" text-4xl font-serif mb-2"
+              >
                 {stat.value}
               </div>
               <div className="text-white/50 text-sm text-center font-sans">
@@ -1080,8 +908,8 @@ const PERKS = [
 ];
 
 const CTASection = () => (
-  <section className="py-10 px-10 mt-15" style={{ background: C.navyDeep }}>
-    <div className="max-w-[640px] mx-auto text-center">
+  <section className="py-16 px-6 mt-15" style={{ background: C.navyDeep }}>
+    <div className="max-w-3xl mx-auto text-center">
       <p
         className="text-[11px] font-bold uppercase tracking-[0.18em] mb-5"
         style={{ color: C.gold, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
@@ -1090,10 +918,10 @@ const CTASection = () => (
       </p>
 
       <h2
-        className="font-normal leading-[1.2] mb-4"
+        className="font-normal leading-tight mb-4"
         style={{
           fontFamily: "'DM Serif Display', serif",
-          fontSize: 40,
+          fontSize: "clamp(28px, 6vw, 40px)",
           color: C.white,
         }}
       >

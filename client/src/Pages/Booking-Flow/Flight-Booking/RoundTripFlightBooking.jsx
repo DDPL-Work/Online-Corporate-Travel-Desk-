@@ -24,6 +24,7 @@ import {
 } from "../../../Redux/Actions/flight.thunks.RT";
 import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import { approveApproval } from "../../../Redux/Actions/approval.thunks";
 import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { CABIN_MAP } from "../../../utils/formatter";
@@ -136,12 +137,19 @@ export default function RoundTripFlightBooking() {
   } = useSelector((state) => state.employee);
 
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
-  const approvalRequired = myPolicy?.approvalRequired !== false;
+  const isTravelAdmin = user?.role === "travel-admin";
+  const approvalRequired = !isTravelAdmin && myPolicy?.approvalRequired !== false;
 
   const traceId = location.state?.traceId || reduxTraceId || null;
 
   const adultCount = passengerCounts?.adults ?? searchParams?.adults ?? 1;
   const childCount = passengerCounts?.children ?? searchParams?.children ?? 0;
+
+  useEffect(() => {
+    if (user?.role === "employee" || user?.role === "manager") {
+      dispatch(fetchMySSRPolicy());
+    }
+  }, [dispatch, user]);
   const infantCount = passengerCounts?.infants ?? searchParams?.infants ?? 0;
   const totalPassengerCount = adultCount + childCount + infantCount;
   const seatEligibleCount = adultCount + childCount;
@@ -1084,10 +1092,10 @@ export default function RoundTripFlightBooking() {
       projectId: projectApproverData.project?.id,
       projectClient: projectApproverData.project?.client,
       projectCodeId: projectApproverData.project?.id,
-      approverId: projectApproverData.approver?.id,
-      approverEmail: projectApproverData.approver?.email,
-      approverName: projectApproverData.approver?.name,
-      approverRole: projectApproverData.approver?.role,
+      approverId: !approvalRequired ? (user?._id || user?.id || user?.userId) : projectApproverData.approver?.id,
+      approverEmail: !approvalRequired ? user?.email : projectApproverData.approver?.email,
+      approverName: !approvalRequired ? `${user?.name?.firstName} ${user?.name?.lastName}` : projectApproverData.approver?.name,
+      approverRole: !approvalRequired ? user?.role : projectApproverData.approver?.role,
       flightRequest: {
         // traceId: searchParams.traceId,
         traceId,
@@ -1280,7 +1288,7 @@ export default function RoundTripFlightBooking() {
       return;
     }
 
-    if (approvalRequired && (!projectApproverData.project || !projectApproverData.approver)) {
+    if (approvalRequired && !isTravelAdmin && (!projectApproverData.project || !projectApproverData.approver)) {
       ToastWithTimer({
         type: "error",
         message: "Please select a project and approver",
@@ -1307,7 +1315,7 @@ export default function RoundTripFlightBooking() {
 
     try {
       const payload = buildBookingRequestPayload();
-      if (approvalRequired) {
+      if (approvalRequired && !isTravelAdmin) {
         await dispatch(
           selectManager({
             approverId: projectApproverData.approver?.id,
@@ -1319,9 +1327,26 @@ export default function RoundTripFlightBooking() {
         ).unwrap();
       }
 
-      await dispatch(createBookingRequest(payload)).unwrap();
+      const result = await dispatch(createBookingRequest(payload)).unwrap();
 
-      navigate("/my-bookings", {
+      if (!approvalRequired) {
+        const requestId = result.bookingRequestId || result._id;
+        if (requestId && result.requestStatus !== "approved") {
+          await dispatch(
+            approveApproval({
+              id: requestId,
+              comments: "Self Approved by Travel Admin",
+              type: "flight",
+            }),
+          ).unwrap();
+        }
+        ToastWithTimer({
+          type: "success",
+          message: "Booking auto-approved successfully",
+        });
+      }
+
+      navigate("/my-pending-approvals", {
         state: { success: true },
       });
     } catch (err) {
@@ -1348,7 +1373,8 @@ export default function RoundTripFlightBooking() {
   // Readiness check for submit button (must stay before any early returns)
   const isFormReady = useMemo(() => {
     if (!purposeOfTravel?.trim()) return false;
-    if (approvalRequired && (!projectApproverData.project || !projectApproverData.approver)) return false;
+    if (!projectApproverData.project) return false;
+    if (approvalRequired && !projectApproverData.approver) return false;
     if (infantCount > adultCount) return false;
 
     const isIntl = Boolean(
@@ -1751,6 +1777,7 @@ export default function RoundTripFlightBooking() {
                 onSendForApproval={handleSendForApproval}
                 loading={actionLoading}
                 disabled={!isFormReady}
+                approvalRequired={approvalRequired}
               />
 
               <Amenities />

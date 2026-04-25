@@ -1242,6 +1242,9 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
   const returnPNR = bookRes.returnPNR || null;
   const invoices = flightItin?.Invoice || [];
   const passengerInfo = flightItin?.Passenger || [];
+  const paxTicket = passengerInfo?.[0]?.Ticket || 
+                   bookRes?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket || {};
+  const ticketNumber = paxTicket.TicketId || paxTicket.TicketNumber || "";
   const totalAmount =
     pricing?.totalAmount ??
     snap?.amount ??
@@ -1265,6 +1268,45 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
     },
     { adult: 0, child: 0, infant: 0 },
   );
+
+  const getChangeRequestIds = () => {
+    let ids = [];
+    if (raw?.amendment?.changeRequestIds) {
+      ids.push(...raw.amendment.changeRequestIds);
+    } else if (raw?.amendment?.changeRequestId) {
+      ids.push(raw.amendment.changeRequestId);
+    }
+    
+    // Also extract directly from response and history if available
+    let allResponses = [];
+    if (raw?.amendment?.response) {
+      allResponses.push(raw.amendment.response);
+    }
+    if (raw?.amendmentHistory && Array.isArray(raw.amendmentHistory)) {
+      raw.amendmentHistory.forEach(hist => {
+        if (hist.response) allResponses.push(hist.response);
+      });
+    }
+
+    allResponses.forEach(resp => {
+      const arr = Array.isArray(resp) ? resp : [resp];
+      arr.forEach(r => {
+        const info = r?.response?.Response?.TicketCRInfo || r?.Response?.TicketCRInfo;
+        const fallbackId = r?.response?.Response?.ChangeRequestId || r?.Response?.ChangeRequestId;
+        
+        if (Array.isArray(info)) {
+          info.forEach(i => { if (i?.ChangeRequestId) ids.push(i.ChangeRequestId) });
+        } else if (info?.ChangeRequestId) {
+          ids.push(info.ChangeRequestId);
+        } else if (fallbackId) {
+          ids.push(fallbackId);
+        }
+      });
+    });
+    return [...new Set(ids)].filter(Boolean);
+  };
+
+  const displayChangeRequestIds = getChangeRequestIds();
 
   return (
     <div
@@ -1300,7 +1342,13 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
 
         <div className="bg-sky-50 border-b border-sky-100 px-6 py-2.5 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
-            <ExecStatusBadge status={raw.executionStatus} />
+            <ExecStatusBadge 
+              status={
+                raw.executionStatus === "cancel_requested" 
+                  ? "cancelled" 
+                  : raw.executionStatus
+              } 
+            />
             <span className="text-xs text-sky-700 font-medium capitalize">
               {raw.requestStatus?.replace(/_/g, " ")}
             </span>
@@ -1314,7 +1362,12 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                 Return PNR: {returnPNR}
               </span>
             )}
-            {amendment.status && amendment.status !== "not_requested" && (
+            {displayChangeRequestIds.length > 0 && (
+              <span className="font-mono text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-bold">
+                Request ID: {displayChangeRequestIds.join(", ")}
+              </span>
+            )}
+            {amendment.status && amendment.status !== "not_requested" && raw.executionStatus !== "cancel_requested" && raw.executionStatus !== "cancelled" && (
               <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded uppercase">
                 Amendment: {amendment.status?.replace(/_/g, " ")}
               </span>
@@ -1598,7 +1651,7 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
           </div>
 
           {/* Mini Fare Rules */}
-          {miniFareRules.length > 0 && (
+          {miniFareRules.length > 0 && raw.executionStatus !== "cancelled" && raw.executionStatus !== "cancel_requested" && (
             <div>
               <SectionLabel
                 icon={<FiShield size={11} />}
@@ -1809,7 +1862,7 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                             Ticket No
                           </p>
                           <p className="text-xs font-mono font-bold text-green-800">
-                            {provPax.Ticket.TicketNumber}
+                            {provPax.Ticket.TicketId || provPax.Ticket.TicketNumber}
                           </p>
                         </div>
                         <div>
@@ -1828,6 +1881,16 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                             {formatDate(provPax.Ticket.IssueDate)}
                           </p>
                         </div>
+                        {provPax.BarcodeDetails?.Barcode?.[0]?.Content && (
+                           <div className="w-full mt-2">
+                             <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">
+                               Barcode Details (BCBP)
+                             </p>
+                             <p className="text-[10px] font-mono text-slate-500 bg-white border border-slate-100 p-2 rounded-lg break-all">
+                               {provPax.BarcodeDetails.Barcode[0].Content}
+                             </p>
+                           </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1851,6 +1914,16 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                     </p>
                     <p className="text-sm font-mono font-black text-blue-900">
                       {pnr}
+                    </p>
+                  </div>
+                )}
+                {ticketNumber && (
+                  <div>
+                    <p className="text-[10px] font-bold text-blue-700 uppercase">
+                      Ticket ID
+                    </p>
+                    <p className="text-sm font-mono font-black text-blue-900">
+                      {ticketNumber}
                     </p>
                   </div>
                 )}

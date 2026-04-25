@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-toastify";
 import {
   FiArrowLeft,
   FiDownload,
@@ -53,6 +54,7 @@ import {
   FLIGHT_STATUS_MAP,
 } from "../../utils/formatter";
 import Swal from "sweetalert2";
+import ReissueModal from "./ReissueModal";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Utility helpers                                                */
@@ -87,7 +89,12 @@ function extractCancellationChargeInfo(response) {
       info?.Charge,
       root?.CancellationCharge,
     ),
-    refundedAmount: firstDefined(info?.RefundedAmount, root?.RefundedAmount),
+    refundedAmount: firstDefined(
+      info?.RefundedAmount,
+      info?.RefundAmount,
+      root?.RefundedAmount,
+      root?.RefundAmount
+    ),
     creditNoteNo: firstDefined(info?.CreditNoteNo, root?.CreditNoteNo),
     errorMessage: root?.Error?.ErrorMessage || response?.message || null,
   };
@@ -878,6 +885,13 @@ function CancellationModal({ booking, onClose, onSuccess }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
+  const totalFare =
+    booking?.pricingSnapshot?.totalAmount ||
+    booking?.totalFare ||
+    booking?.fare?.totalFare ||
+    booking?.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Fare?.PublishedFare ||
+    0;
+
   const [step, setStep] = useState("loading"); // starts loading charges
   const [charges, setCharges] = useState(null);
   const [chargesError, setChargesError] = useState(null);
@@ -890,6 +904,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
   const [shouldFetchCharges, setShouldFetchCharges] = useState(true);
 
   const [showQueryModal, setShowQueryModal] = useState(false);
+  const [showReissueModal, setShowReissueModal] = useState(false);
   const [queryPriority, setQueryPriority] = useState("MEDIUM");
   const [queryRemarks, setQueryRemarks] = useState("");
 
@@ -977,19 +992,21 @@ function CancellationModal({ booking, onClose, onSuccess }) {
         }),
       );
       let changeRequestIds = [];
-
-      if (res.payload?.isRoundTrip) {
-        changeRequestIds = res.payload.data
-          ?.map(
+      const responses = res.payload?.data || [];
+      
+      if (responses.length > 0) {
+        changeRequestIds = responses
+          .map(
             (item) =>
-              item?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId,
+              item?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
+              item?.response?.Response?.ChangeRequestId,
           )
           .filter(Boolean);
       } else {
+        // Fallback for direct response structure
         const singleId =
           res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
           res.payload?.Response?.ChangeRequestId;
-
         if (singleId) changeRequestIds = [singleId];
       }
 
@@ -997,67 +1014,15 @@ function CancellationModal({ booking, onClose, onSuccess }) {
         throw new Error("No ChangeRequestId returned");
       }
 
-      setProcessingLabel("Waiting for airline confirmation…");
-      let status = "requested";
-      let attempts = 0;
-      let finalInfo = null;
-
-      while (
-        (status === "requested" || status === "in_progress") &&
-        attempts < 3
-      ) {
-        attempts++;
-        await new Promise((r) => setTimeout(r, 4000));
-        const statusResponses = await Promise.all(
-          changeRequestIds.map((id) =>
-            dispatch(
-              fetchChangeStatus({
-                changeRequestId: id,
-                bookingId: booking._id,
-              }),
-            ),
-          ),
-        );
-        let allCompleted = true;
-
-        for (const resItem of statusResponses) {
-          const crInfo =
-            resItem.payload?.Response?.TicketCRInfo?.[0] ||
-            resItem.payload?.Response;
-
-          const apiStatus = crInfo?.ChangeRequestStatus;
-          finalInfo = crInfo;
-
-          if (apiStatus !== 4) {
-            allCompleted = false;
-          }
-        }
-
-        status = allCompleted ? "completed" : "in_progress";
-      }
-
-      if (status === "failed")
-        throw new Error("Cancellation failed by airline/supplier");
-
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
       setShouldFetchCharges(false);
 
-      // 🔥 CLOSE MODAL IMMEDIATELY
+      toast.success("Cancellation request submitted successfully");
       onClose();
+      
       await dispatch(fetchMyBookingById(booking._id));
-
-      setSuccessData({
-        type: "full",
-        status,
-        cancellationCharge:
-          finalInfo?.CancellationCharge ??
-          parsedCharges?.[0]?.cancellationCharge,
-
-        refundedAmount:
-          finalInfo?.RefundedAmount ?? parsedCharges?.[0]?.refundedAmount,
-        creditNoteNo: finalInfo?.CreditNoteNo ?? creditNoteNo,
-      });
-      setStep("success");
+      // Force page refresh or reload if needed by navigating or reloading
+      navigate("/my-cancelled-bookings");
     } catch (err) {
       setChargesError(err?.message || "Cancellation failed. Please try again.");
       setStep("error");
@@ -1094,18 +1059,11 @@ function CancellationModal({ booking, onClose, onSuccess }) {
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
       setShouldFetchCharges(false);
 
-      // 🔥 CLOSE MODAL IMMEDIATELY
+      toast.success("Partial cancellation request submitted successfully");
       onClose();
 
       await dispatch(fetchMyBookingById(booking._id));
-
-      setSuccessData({
-        type: "partial",
-        route: sectorLabel(
-          selectedJourney === "return" ? returnSegs : onwardSegs,
-        ),
-      });
-      setStep("success");
+      navigate("/my-cancelled-bookings");
     } catch (err) {
       setChargesError(err?.message || "Partial cancellation failed.");
       setStep("error");
@@ -1126,9 +1084,10 @@ function CancellationModal({ booking, onClose, onSuccess }) {
         }),
       );
       if (res.error) throw new Error(res.payload || "Reissue failed");
+      toast.success("Reissue request submitted successfully");
+      onClose();
+      
       await dispatch(fetchMyBookingById(booking._id));
-      setSuccessData({ type: "reissue", newDate: reissueDate });
-      setStep("success");
     } catch (err) {
       setChargesError(err?.message || "Reissue failed. Please try again.");
       setStep("error");
@@ -1222,12 +1181,10 @@ function CancellationModal({ booking, onClose, onSuccess }) {
         throw new Error(res.payload || "Failed to create query");
       }
 
-      setSuccessData({
-        type: "query",
-        queryId: res.payload?.queryId,
-      });
-
-      setStep("success");
+      toast.success("Cancellation query created successfully");
+      onClose();
+      
+      await dispatch(fetchMyBookingById(booking._id));
     } catch (err) {
       setChargesError(err?.message || "Failed to create query");
       setStep("error");
@@ -1408,27 +1365,33 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                 <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-1">
                   Cancellation Charges
                 </p>
+                <div className="flex justify-between items-center text-sm pb-1">
+                  <span className="text-slate-600">Total Fare</span>
+                  <span className="font-black text-slate-800">
+                    ₹{totalFare}
+                  </span>
+                </div>
                 {parsedCharges.map((c, i) => (
                   <div
-                    key={i}
-                    className="flex justify-between items-center text-sm"
+                    key={`charge-${i}`}
+                    className="flex justify-between items-center text-sm border-t border-amber-200/50 pt-2"
                   >
                     <span className="text-slate-600">
-                      {c.bookingId ? `Booking ${c.bookingId}` : "Flight"}
+                      {c.bookingId ? `Cancellation Charge (Booking ${c.bookingId})` : "Cancellation Charge"}
                     </span>
                     <span className="font-black text-red-600">
-                      ₹{c.cancellationCharge}
+                      ₹{c.cancellationCharge ?? "0"}
                     </span>
                   </div>
                 ))}
                 {parsedCharges.map((c, i) => (
                   <div
-                    key={i}
-                    className="flex justify-between text-sm border-t pt-2"
+                    key={`refund-${i}`}
+                    className="flex justify-between text-sm border-t border-amber-200/50 pt-2"
                   >
-                    <span className="text-slate-600">Refund</span>
+                    <span className="text-slate-600 font-bold">Refund Amount</span>
                     <span className="font-black text-emerald-600">
-                      ₹{c.refundedAmount}
+                      ₹{c.refundedAmount ?? "0"}
                     </span>
                   </div>
                 ))}
@@ -2725,6 +2688,13 @@ export default function BookingDetails() {
                     <FiXCircle size={14} className="text-red-500" />
                     Cancellation Charges
                   </button>
+                  <button
+                    onClick={() => setShowReissueModal(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 hover:border-indigo-300 rounded-xl text-sm font-semibold transition-all"
+                  >
+                    <FiRefreshCw size={14} className="text-indigo-500" />
+                    Request Reissue
+                  </button>
                 </div>
               </div>
 
@@ -2762,6 +2732,14 @@ export default function BookingDetails() {
           onSuccess={() => {
             setShowCancellationModal(false);
           }}
+        />
+      )}
+
+      {/* ★ NEW Reissue Modal ── */}
+      {showReissueModal && (
+        <ReissueModal
+          booking={booking}
+          onClose={() => setShowReissueModal(false)}
         />
       )}
     </div>

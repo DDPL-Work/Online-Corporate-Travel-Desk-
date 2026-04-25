@@ -10,6 +10,8 @@ import walletReducer from "./Slice/walletSlice.js";
 import walletRechargeLogsReducer from "./Slice/walletRechargeLogsSlice";
 import tboBalanceReducer from "./Slice/tboBalanceSlice";
 import corporateRelatedReducer from "./Slice/corporate.related.slice.js"
+import postpaidReducer from "./Slice/postpaidSlice";
+import reissueReducer from "./Slice/reissueSlice";
 
 export const store = configureStore({
   reducer: {
@@ -18,11 +20,13 @@ export const store = configureStore({
     dashboard: dashboardReducer,
     profile: profileReducer,
     corporateRelated: corporateRelatedReducer,
+    postpaid: postpaidReducer,
     corporateList: corporateListReducer,
     corporateOnboarding: corporateOnboardingReducer,
     corporateAdmin: corporateAdminReducer,
     wallet: walletReducer,
     walletRechargeLogs: walletRechargeLogsReducer,
     tboBalance: tboBalanceReducer,
+    reissue: reissueReducer,
   },
 });

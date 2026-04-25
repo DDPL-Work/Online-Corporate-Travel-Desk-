@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
+import { FiEye, FiEyeOff } from "react-icons/fi";
 import { createOpsMember, updateOpsMember } from "../API/opsAPI";
 
 const ROLES = ["Booking Manager", "Support Agent", "Finance OPS"];
@@ -27,6 +28,7 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
   });
 
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (member) {
@@ -147,13 +149,22 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
             </Field>
 
             <Field label={isEdit ? "Reset Password (Leave blank to keep current)" : "Password"}>
-              <input
-                className="modal-input"
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder={isEdit ? "••••••••" : "Leave blank for auto-gen"}
-              />
+              <div className="relative">
+                <input
+                  className="modal-input w-full pr-10"
+                  type={showPassword ? "text" : "password"}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder={isEdit ? "••••••••" : "Leave blank for auto-gen"}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0A4D68] transition-colors"
+                >
+                  {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                </button>
+              </div>
             </Field>
           </div>
 

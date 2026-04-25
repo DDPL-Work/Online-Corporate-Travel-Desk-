@@ -25,11 +25,13 @@ const postPaidCorporate = require("./postPaid.corporate.routes");
 const flightAmendment = require("./flightAmendment.routes");
 const hotelAmendment = require("./hotelAmendment.routes");
 const gestRoutes = require("./gst.routes");
-const hotelBooking = require('./hotelBooking.routes');
-const project = require('./project.routes');
+const hotelBooking = require("./hotelBooking.routes");
+const project = require("./project.routes");
 const opsRoutes = require("./ops.routes");
 const ssrPolicyRoutes = require("./ssrPolicy.routes");
 const landingPageRoutes = require("./landingPage.routes");
+const tboSyncRoutes = require("./tboSync.routes");
+const flightReissueRoutes = require("./flightReissue.routes");
 
 // ------------------ ✅ IMPORTANT FIX ------------------
 // ✅ SSO MUST BE MOUNTED BEFORE /auth (to avoid JWT blocking)
@@ -46,7 +48,6 @@ router.use("/dashboard", dashboardRoutes);
 router.use("/wallet", walletRoutes);
 router.use("/vouchers", voucherRoutes);
 
-
 router.use("/super-admin", superAdminRoutes);
 router.use("/employees", employeeRoutes);
 router.use("/corporate-admin", corporateAdmin);
@@ -54,12 +55,13 @@ router.use("/travel-admin", travelAdmin);
 router.use("/corporate-manager", corporateManager);
 router.use("/corporate-projects", project);
 
-
 router.use("/wallet-logs", walletLogsRoutes);
 // router.use("/tbo", tboRoutes);
 router.use("/validate-price", validatePrice);
 router.use("/postpaid", postPaidCorporate);
 router.use("/flights/amendments", flightAmendment);
+router.use("/flights/reissue", flightReissueRoutes);
+router.use("/tbo", tboSyncRoutes);
 router.use("/hotels/amendments", hotelAmendment);
 router.use("/onboarding/gst", gestRoutes);
 router.use("/hotel-booking", hotelBooking);
@@ -86,17 +88,14 @@ router.get("/", (req, res) => {
       vouchers: "/api/v1/vouchers",
       sso: "/api/v1/auth/sso",
 
-
-      
       superAdmin: "/api/v1/super-admin",
       corporateRelatedRoutes: "/api/v1/corporate-related",
       employees: "/api/v1/employees",
-      corporateAdmin: "/api/v1/corporate-admin",    
+      corporateAdmin: "/api/v1/corporate-admin",
       travelAdmin: "api/v1/travel-admin",
-      corporateManager: "/api/v1/corporate-manager",    
-      project: "/api/v1/corporate-projects",   
-      
-      
+      corporateManager: "/api/v1/corporate-manager",
+      project: "/api/v1/corporate-projects",
+
       walletLogsRoutes: "/api/v1/wallet-logs",
       // tboRoutes: '/api/v1/tbo'
       validatePrice: "api/v1/validate-price",

@@ -46,7 +46,7 @@ const CARD_BG = "rgba(255,255,255,0.06)";
 ───────────────────────────────────────────── */
 function Hero() {
   return (
-    <section className="relative bg-gradient-to-l from-blue-900 to-slate-950 overflow-hidden min-h-screen flex items-center">
+    <section className="relative bg-gradient-to-l from-blue-900 to-slate-950 overflow-hidden  flex items-center">
       <div
         className="absolute bottom-[-80px] right-[-80px] w-[400px] h-[400px] rounded-full opacity-10 pointer-events-none"
         style={{
@@ -54,9 +54,9 @@ function Hero() {
         }}
       />
 
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-12 py-24 lg:py-32 grid lg:grid-cols-2 gap-16 items-start">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-5 sm:px-6 py-16 lg:py-32 flex flex-col lg:grid lg:grid-cols-2 gap-12 lg:gap-16 items-center text-center lg:text-left">
         {/* LEFT – copy */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col items-center lg:items-start gap-6">
           <span
             className="text-xs font-semibold tracking-[0.2em] uppercase"
             style={{ color: ORANGE }}
@@ -64,27 +64,25 @@ function Hero() {
             Who it's For · Growing business — 50 to 200 people
           </span>
 
-          <h1 className="text-4xl sm:text-5xl xl:text-6xl font-normal leading-tight text-white font-['DM_Serif_Display']">
+          <h1 className="text-3xl sm:text-5xl xl:text-6xl font-normal leading-tight text-white font-['DM_Serif_Display']">
             Your team is growing.
             <br />
             Your travel needs{" "}
             <span
-              className="italic text-6xl font-normal font-['DM_Serif_Display'] leading-[54.40px]"
+              className="italic text-4xl sm:text-6xl font-normal font-['DM_Serif_Display']"
               style={{ color: ORANGE }}
             >
               structure.
             </span>
           </h1>
 
-          <p className="justify-center text-white/60 text-base font-normal font-['Plus_Jakarta_Sans'] leading-6">
-            At some point, excel—or even WhatsApping each other—is
-            <br />
-            not a team system. Costs pile up and accountability
-            <br />
-            disappears. Traveamer brings structure to a growing team.
+          <p className="text-white/60 text-sm sm:text-base font-normal font-['Plus_Jakarta_Sans'] leading-relaxed max-w-[500px] mx-auto lg:mx-0">
+            At some point, excel—or even WhatsApping each other—is not a team
+            system. Costs pile up and accountability disappears. Traveamer
+            brings structure to a growing team.
           </p>
 
-          <div className="flex flex-wrap gap-3 mt-2">
+          <div className="flex flex-wrap gap-3 mt-2 justify-center lg:justify-start">
             <button
               className="h-11 px-8 rounded-[10px] text-sm font-semibold transition-all duration-200 hover:brightness-110 active:scale-95"
               style={{ background: ORANGE, color: "#0F172A" }}
@@ -97,52 +95,40 @@ function Hero() {
           </div>
 
           {/* stats */}
-          <div className="self-stretch pt-8 inline-flex justify-start items-start gap-10">
-            <div className="self-stretch inline-flex flex-col justify-start items-start">
-              <div className="self-stretch flex flex-col justify-start items-start">
-                <div className="justify-center text-white text-3xl font-bold font-['DM_Sans'] leading-9">
-                  1
-                </div>
+          <div className="flex flex-wrap md:flex-nowrap justify-center lg:justify-start items-start gap-6 sm:gap-10 pt-8">
+            <div className="flex flex-col justify-start items-start">
+              <div className="text-white text-2xl sm:text-3xl font-bold font-['DM_Sans'] leading-tight">
+                1
               </div>
-              <div className="self-stretch flex flex-col justify-start items-start">
-                <div className="justify-center text-white/50 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4">
-                  Platform for all
-                </div>
+              <div className="text-white/50 text-[10px] sm:text-xs font-normal font-['Plus_Jakarta_Sans'] leading-tight mt-1">
+                Platform for all
               </div>
             </div>
-            <div className="self-stretch inline-flex flex-col justify-start items-start">
-              <div className="self-stretch flex flex-col justify-start items-start">
-                <div className="justify-center">
-                  <span className="text-white text-3xl font-bold font-['DM_Sans'] leading-9">
-                    100
-                  </span>
-                  <span
-                    style={{ color: ORANGE }}
-                    className=" text-3xl font-bold font-['DM_Sans'] leading-9"
-                  >
-                    %
-                  </span>
-                </div>
-              </div>
-              <div className="self-stretch flex flex-col justify-start items-start">
-                <div className="justify-center text-white/50 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4">
-                  Expense report accuracy
-                </div>
-              </div>
-            </div>
-            <div className="self-stretch inline-flex flex-col justify-start items-start">
-              <div className="self-stretch flex flex-col justify-start items-start">
-                <div
+            <div className="flex flex-col justify-start items-start">
+              <div className="flex items-baseline">
+                <span className="text-white text-2xl sm:text-3xl font-bold font-['DM_Sans'] leading-tight">
+                  100
+                </span>
+                <span
                   style={{ color: ORANGE }}
-                  className="justify-center  text-3xl font-bold font-['DM_Sans'] leading-9"
+                  className="text-2xl sm:text-3xl font-bold font-['DM_Sans'] leading-tight ml-0.5"
                 >
-                  Live
-                </div>
+                  %
+                </span>
               </div>
-              <div className="self-stretch flex flex-col justify-start items-start">
-                <div className="justify-center text-white/50 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4">
-                  Spend visibility
-                </div>
+              <div className="text-white/50 text-[10px] sm:text-xs font-normal font-['Plus_Jakarta_Sans'] leading-tight mt-1">
+                Expense report accuracy
+              </div>
+            </div>
+            <div className="flex flex-col justify-start items-start">
+              <div
+                style={{ color: ORANGE }}
+                className="text-2xl sm:text-3xl font-bold font-['DM_Sans'] leading-tight"
+              >
+                Live
+              </div>
+              <div className="text-white/50 text-[10px] sm:text-xs font-normal font-['Plus_Jakarta_Sans'] leading-tight mt-1">
+                Spend visibility
               </div>
             </div>
           </div>
@@ -287,20 +273,42 @@ function InfoBar() {
     { bold: "Secretary / EA", rest: " books on behalf of teams" },
     { bold: "Live spend dashboard", rest: " — always current" },
   ];
+
   return (
-    <div className="bg-slate-950 border-t border-white/10 py-4">
-      <div className="max-w-7xl mx-auto px-6 flex flex-wrap justify-center gap-x-10 gap-y-2">
-        {items.map((it) => (
-          <p key={it.bold} className="text-sm text-white/60 whitespace-nowrap">
-            <span className="text-white/80 font-bold">{it.bold}</span>
-            {it.rest}
-          </p>
-        ))}
+    <div className="bg-slate-950 border-t border-white/10 py-6 overflow-hidden">
+      <div className="max-w-7xl mx-auto">
+        {/* Added md:gap-x-20 to increase spacing for Tablets/iPads */}
+        <div className="flex w-max lg:w-full lg:justify-center items-center gap-x-10 md:gap-x-20 animate-infinite-scroll lg:animate-none">
+          {/* First Set of Items */}
+          <div className="flex items-center gap-x-10 md:gap-x-20">
+            {items.map((it, idx) => (
+              <p
+                key={`set1-${idx}`}
+                className="text-sm text-white/60 whitespace-nowrap"
+              >
+                <span className="text-white/80 font-bold">{it.bold}</span>
+                {it.rest}
+              </p>
+            ))}
+          </div>
+
+          {/* Second Set of Items */}
+          <div className="flex lg:hidden items-center gap-x-10 md:gap-x-20">
+            {items.map((it, idx) => (
+              <p
+                key={`set2-${idx}`}
+                className="text-sm text-white/60 whitespace-nowrap"
+              >
+                <span className="text-white/80 font-bold">{it.bold}</span>
+                {it.rest}
+              </p>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
-
 /* ─────────────────────────────────────────────
    PAIN POINTS SECTION
 ───────────────────────────────────────────── */
@@ -324,18 +332,20 @@ function PainPoints() {
   ];
 
   return (
-    <section className="bg-slate-50 py-20 px-6">
+    <section className="bg-slate-50 py-10 md:py-20 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-12">
-          <span
-            className="inline-block px-[5px] w-[519px] py-0.5 mb-5 text-xs font-semibold tracking-[0.2em] uppercase"
+          <div
+            className="w-full lg:w-[519px] px-2.5 py-1 mb-5 text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase"
             style={{ background: ORANGE, color: "#000" }}
           >
             Your Reality Right Now
-          </span>
+          </div>
           <h2 className="mt-4 text-4xl md:text-5xl font-normal leading-tight text-black font-['DM_Serif_Display']">
-            Growing fast.{" "} <br />
-            <span className="italic" style={{ color: ORANGE }}>Travel getting messy.</span>
+            Growing fast. <br />
+            <span className="italic" style={{ color: ORANGE }}>
+              Travel getting messy.
+            </span>
           </h2>
           <p className="mt-4 text-slate-500 text-base max-w-lg leading-7">
             A ten-person team shouldn't walk high-fliers. Standardized travel is
@@ -344,21 +354,23 @@ function PainPoints() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
-          {cards.map((c) => (
+          {cards.map((card) => (
             <div
-              key={c.title}
-              className="bg-white rounded-2xl border border-slate-200 p-7 flex flex-col gap-4 hover:shadow-lg transition-shadow duration-300"
+              key={card.title}
+              className="bg-white rounded-2xl p-7 border border-slate-200 flex flex-col items-center text-center gap-5 hover:shadow-lg transition-all"
             >
               <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center"
-                style={{ background: "#f8fafc" }}
+                className="w-12 h-12 rounded-xl flex items-center justify-center"
+                style={{ background: "#FBBF2318" }}
               >
-                <span className="text-slate-900">{c.icon}</span>
+                <span style={{ color: ORANGE }}>{card.icon}</span>
               </div>
-              <h3 className="text-sky-950 text-base font-semibold leading-6">
-                {c.title}
+              <h3 className="text-slate-950 text-xl font-normal font-['DM_Serif_Display'] leading-tight">
+                {card.title}
               </h3>
-              <p className="text-slate-500 text-sm leading-6">{c.body}</p>
+              <p className="text-slate-500 text-sm leading-relaxed">
+                {card.body}
+              </p>
             </div>
           ))}
         </div>
@@ -405,43 +417,45 @@ function Features() {
   ];
 
   return (
-    <section className="bg-slate-50 py-20 px-6 border-t border-slate-100">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-12">
-          <span
-            className="text-xs font-semibold tracking-[0.2em] uppercase inline-block px-[5px] w-[519px] py-0.5 mb-5"
+    <section className="bg-white py-5 md:py-20 px-6 border-t border-slate-100">
+      <div className="max-w-7xl mx-auto flex flex-col items-start text-left">
+        <div className="mb-12 flex flex-col items-start">
+          <div
+            className="w-full lg:w-[519px] px-2.5 py-1 mb-5 text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase"
             style={{ background: ORANGE, color: "#000" }}
           >
             What Traveamer Does For You
-          </span>
-          <h2 className=" mt-4 text-4xl font-normal leading-tight text-black font-['DM_Serif_Display']">
-            One platform. <br />
-            <span className="italic" style={{ color: ORANGE }}>Every team. Every trip.</span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-normal leading-tight text-black font-['DM_Serif_Display']">
+            Everything you need. <br />
+            <span className="italic" style={{ color: ORANGE }}>
+              Nothing you don't.
+            </span>
           </h2>
-          <p className="mt-4 text-slate-500 text-base max-w-lg leading-7">
+          <p className="mt-4 text-slate-500 text-base max-w-lg leading-relaxed mx-auto lg:mx-0">
             Traveamer is about giving teams the autonomy they need — without the
             complexity of big systems.
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((f) => (
             <div
               key={f.title}
-              className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col gap-3 hover:shadow-md transition-shadow duration-300 group"
+              className="bg-slate-50 rounded-2xl border border-slate-200 p-8 flex flex-col items-center lg:items-start gap-4 text-center lg:text-left hover:shadow-md transition-all duration-300 group"
             >
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-200"
-                style={{ background: "#f8fafc" }}
+                className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors duration-200"
+                style={{ background: "#FBBF2318" }}
               >
-                <span className="text-slate-800 group-hover:text-orange-300 transition-colors duration-200">
+                <span className="text-slate-900 group-hover:text-orange-500 transition-colors duration-200">
                   {f.icon}
                 </span>
               </div>
-              <h3 className="text-sky-950 text-sm font-semibold leading-5 mt-2">
+              <h3 className="text-sky-950 text-xl font-normal font-['DM_Serif_Display']">
                 {f.title}
               </h3>
-              <p className="text-slate-500 text-xs leading-5">{f.body}</p>
+              <p className="text-slate-500 text-sm leading-relaxed">{f.body}</p>
             </div>
           ))}
         </div>
@@ -482,51 +496,47 @@ function HowItWorks() {
   ];
 
   return (
-    <section className="bg-slate-50 py-20 px-6 border-t border-slate-100">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-12">
-          <span
-            className="text-xs font-semibold tracking-[0.2em] uppercase inline-block px-[5px] w-[519px] py-0.5 mb-5"
-            style={{ background: ORANGE, color: "#000" }}
-          >
-            How It Works
-          </span>
-          <h2 className="mt-4 text-4xl font-normal leading-tight text-black font-['DM_Serif_Display']">
+    <section className="bg-slate-50 py-5 md:py-20 px-6 border-t border-slate-100">
+      <div className="max-w-7xl mx-auto flex flex-col items-start text-left">
+        <div
+          className="w-full lg:w-[519px] px-2.5 py-1 mb-5 text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase"
+          style={{ background: ORANGE, color: "#000" }}
+        >
+          How it works
+        </div>
+        <div className="mb-12 flex flex-col items-center lg:items-start">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-normal leading-tight text-black font-['DM_Serif_Display']">
             One system. <br />{" "}
-            <span className="italic" style={{ color: ORANGE }}>Your whole team.</span>
+            <span style={{ color: ORANGE }} className="italic">
+              Zero friction.
+            </span>
           </h2>
-          <p className="mt-3 text-slate-500 text-base max-w-sm leading-7">
-            Four simple steps to organized team travel.
-          </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {steps.map((s, i) => (
-            <div key={s.step} className="relative">
-              {/* connector line (desktop) */}
-              {i < steps.length - 1 && (
-                <div className="hidden lg:block absolute top-7 left-[calc(100%_-_1rem)] w-8 h-px bg-slate-200 z-10" />
-              )}
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col gap-3 h-full hover:shadow-md transition-shadow duration-300">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{ background: `${ORANGE}18` }}
-                  >
-                    <span style={{ color: ORANGE }}>{s.icon}</span>
-                  </div>
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                    style={{ background: `${ORANGE}18`, color: ORANGE }}
-                  >
-                    {s.step}
-                  </span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {steps.map((s) => (
+            <div
+              key={s.step}
+              className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col items-center lg:items-start gap-4 hover:shadow-md transition-shadow duration-300"
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ background: `${ORANGE}18` }}
+                >
+                  <span style={{ color: ORANGE }}>{s.icon}</span>
                 </div>
-                <h3 className="text-sky-950 text-sm font-semibold leading-5 mt-2">
-                  {s.title}
-                </h3>
-                <p className="text-slate-500 text-xs leading-5">{s.body}</p>
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                  style={{ background: `${ORANGE}18`, color: ORANGE }}
+                >
+                  {s.step}
+                </span>
               </div>
+              <h3 className="text-sky-950 text-sm font-semibold leading-5">
+                {s.title}
+              </h3>
+              <p className="text-slate-500 text-xs leading-5">{s.body}</p>
             </div>
           ))}
         </div>
@@ -558,7 +568,15 @@ function CTA() {
         Get Started Today
       </span>
 
-      <div className="text-center justify-center"><span className="text-white text-4xl font-normal font-['DM_Serif_Display'] leading-10">Your team is growing.<br/></span><span style={{color: ORANGE}} className="italic text-4xl font-normal font-['DM_Serif_Display'] leading-10">Your travel should keep up.</span></div>
+      <h2 className="text-2xl sm:text-4xl lg:text-5xl font-normal font-['DM_Serif_Display'] text-white leading-tight max-w-2xl px-4">
+        Your team is growing. <br />
+        <span
+          style={{ color: ORANGE }}
+          className="italic text-3xl sm:text-4xl lg:text-5xl"
+        >
+          Your travel should keep up.
+        </span>
+      </h2>
 
       <p className="mt-5 text-white/50 text-base max-w-sm leading-7 relative z-10">
         Organize your team travel today with Traveamer. Free 30-day trial.
@@ -579,7 +597,10 @@ function CTA() {
       <div className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-2 relative z-10">
         {perks.map((p) => (
           <div key={p} className="flex items-center gap-1.5">
-            <HiCheck className="text-orange-400 w-3.5 h-3.5 shrink-0" />
+            <HiCheck
+              style={{ color: ORANGE }}
+              className="w-3.5 h-3.5 shrink-0"
+            />
             <span className="text-white/50 text-xs">{p}</span>
           </div>
         ))}

@@ -7,6 +7,9 @@ const asyncHandler = require("../utils/asyncHandler");
 const Country = require("../models/CountryList");
 const redis = require("../config/redis");
 const stringify = require("fast-json-stable-stringify");
+const TBOCity = require("../models/TBOCity");
+const TBOHotel = require("../models/TBOHotel");
+const TBOHotelDetails = require("../models/TBOHotelDetails");
 
 /* =====================================================
    HELPERS
@@ -108,17 +111,33 @@ exports.getCountriesFromDB = asyncHandler(async (req, res) => {
 
 /* ---------------- CITY LIST ---------------- */
 exports.getCityList = asyncHandler(async (req, res) => {
-  const { countryCode } = req.query;
+  const { countryCode, search } = req.query;
 
   if (!countryCode) {
     throw new ApiError(400, "countryCode query param is required");
   }
 
-  const data = await tboService.getCityList(countryCode);
+  // Build query
+  const query = {
+    countryCode: countryCode.toUpperCase(),
+  };
 
-  res
-    .status(200)
-    .json(new ApiResponse(200, data, "City list fetched successfully"));
+  // Optional: search by city name (for autocomplete)
+  if (search) {
+    query.cityName = { $regex: search, $options: "i" };
+  }
+
+  const cities = await TBOCity.find(query)
+    .select("cityCode cityName countryCode countryName -_id")
+    .sort({ cityName: 1 });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      cities,
+      "City list fetched from database successfully"
+    )
+  );
 });
 
 /* ---------------- STATIC HOTEL DETAILS ---------------- */
@@ -213,35 +232,28 @@ exports.searchHotels = asyncHandler(async (req, res) => {
   }
 
   /* =====================================================
-   CACHE MISS → CALL TBO (PARALLEL CHUNKED SEARCH)
-===================================================== */
+     CACHE MISS → DB CODES → TBO SEARCH → DB DETAILS
+  ===================================================== */
   if (!indexedHotels) {
-    const hotelCodeResponse = await tboService.getTBOHotelCodeList(CityCode);
+    // 1. Fetch Hotel Codes from local DB
+    const localHotels = await TBOHotel.find({ cityCode: CityCode }).select("hotelCode").lean();
 
-    if (!hotelCodeResponse?.Hotels?.length) {
-      console.log("[hotel-search] no hotel codes found for city", CityCode);
+    if (!localHotels.length) {
+      console.log("[hotel-search] No hotel codes found in DB for city:", CityCode);
       indexedHotels = [];
     } else {
-      const hotelCodesArray = hotelCodeResponse.Hotels;
+      const hotelCodesArray = localHotels.map(h => h.hotelCode);
 
-      /* ---------------- CHUNKING LOGIC ---------------- */
+      /* ---------------- CHUNKING LOGIC (100 per request) ---------------- */
       const chunkSize = 100;
       const chunks = [];
-
       for (let i = 0; i < hotelCodesArray.length; i += chunkSize) {
-        const chunk = hotelCodesArray
-          .slice(i, i + chunkSize)
-          .map((h) => h.HotelCode)
-          .join(",");
-
-        chunks.push(chunk);
+        chunks.push(hotelCodesArray.slice(i, i + chunkSize).join(","));
       }
 
-      console.log(
-        `[hotel-search] total hotels: ${hotelCodesArray.length}, chunks: ${chunks.length}`,
-      );
+      console.log(`[hotel-search] Total hotels in DB: ${hotelCodesArray.length}, Chunks for TBO search: ${chunks.length}`);
 
-      /* ---------------- PARALLEL SEARCH ---------------- */
+      /* ---------------- PARALLEL SEARCH TO TBO ---------------- */
       const searchPromises = chunks.map((hotelCodesChunk, index) =>
         tboService
           .searchHotels({
@@ -260,78 +272,51 @@ exports.searchHotels = asyncHandler(async (req, res) => {
             return res;
           })
           .catch((err) => {
-            console.error(`[hotel-search] chunk ${index + 1} failed`, err?.message);
+            console.error(`[hotel-search] chunk ${index + 1} failed:`, err?.message);
             return null;
-          }),
+          })
       );
 
       const searchResponses = await Promise.all(searchPromises);
 
       /* ---------------- MERGE SEARCH RESULTS ---------------- */
-      const allSearchResults = searchResponses.flatMap(
-        (res) => res?.HotelResult || [],
-      );
-
-      /* ---------------- TRACE ID ---------------- */
-      traceId = searchResponses.find((r) => r?.TraceId)?.TraceId || null;
+      const allSearchResults = searchResponses.flatMap(res => res?.HotelResult || []);
+      traceId = searchResponses.find(r => r?.TraceId)?.TraceId || null;
 
       if (allSearchResults.length === 0) {
         indexedHotels = [];
       } else {
-        /* ---------------- STATIC DETAILS (ONLY FOR AVAILABLE) ---------------- */
-        const availableCodes = allSearchResults.map((h) => h.HotelCode);
-        const detailChunks = [];
-        for (let i = 0; i < availableCodes.length; i += chunkSize) {
-          detailChunks.push(availableCodes.slice(i, i + chunkSize).join(","));
-        }
+        /* ---------------- FETCH STATIC DETAILS FROM DB (INSTEAD OF API) ---------------- */
+        const availableCodes = allSearchResults.map(h => h.HotelCode);
+        
+        console.log(`[hotel-details] Fetching static details from DB for ${availableCodes.length} available hotels.`);
 
-        console.log(
-          `[hotel-details] fetching details for ${availableCodes.length} available hotels in ${detailChunks.length} chunks`,
-        );
+        const localDetails = await TBOHotelDetails.find({
+          hotelCode: { $in: availableCodes }
+        }).lean();
 
-        const detailsPromises = detailChunks.map((chunk, index) =>
-          tboService
-            .getStaticHotelDetails(chunk)
-            .then((res) => {
-              console.log(`[hotel-details] chunk ${index + 1} success`);
-              return res;
-            })
-            .catch((err) => {
-              console.error(`[hotel-details] chunk ${index + 1} failed`, err?.message);
-              return null;
-            }),
-        );
-
-        const detailResponses = await Promise.all(detailsPromises);
         const detailsMap = {};
-
-        detailResponses.forEach((res) => {
-          const detailsList =
-            res?.HotelDetails ||
-            res?.HotelDetails?.HotelDetails ||
-            [];
-          if (Array.isArray(detailsList)) {
-            detailsList.forEach((hotel) => {
-              detailsMap[hotel.HotelCode] = hotel;
-            });
-          }
+        localDetails.forEach(d => {
+          detailsMap[d.hotelCode] = d;
         });
 
-        /* ---------------- MERGE DETAILS ---------------- */
+        /* ---------------- MERGE DB DETAILS WITH TBO SEARCH RESULTS ---------------- */
         const mergedHotels = allSearchResults.map((hotel) => {
           const details = detailsMap[hotel.HotelCode];
 
           return {
             ...hotel,
-            HotelName: details?.HotelName || hotel.HotelName || "Hotel",
-            Address: details?.Address || hotel.Address || "",
-            CityName: details?.CityName || hotel.CityName || "",
-            CountryName: details?.CountryName || hotel.CountryName || "",
-            StarRating: details?.HotelRating || hotel.StarRating || 0,
-            Description: details?.Description || hotel.Description || "",
-            Images: details?.Images || hotel.Images || [],
-            Amenities: details?.HotelFacilities || hotel.Amenities || [],
-            Map: details?.Map || hotel.Map,
+            HotelName:   details?.hotelName   || hotel.HotelName || "Hotel",
+            Address:     details?.address     || hotel.Address || "",
+            CityName:    details?.cityName    || hotel.CityName || "",
+            CountryName: details?.countryName || hotel.CountryName || "",
+            StarRating:  details?.hotelRating || hotel.StarRating || 0,
+            Description: details?.description || hotel.Description || "",
+            Images:      details?.images      || hotel.Images || [],
+            Amenities:   details?.hotelFacilities || hotel.Amenities || [],
+            Map:         details?.map         || hotel.Map,
+            // Fallback to thumbnail if no images
+            Thumbnail:   details?.image || hotel.HotelThumbnail || ""
           };
         });
 
@@ -339,6 +324,7 @@ exports.searchHotels = asyncHandler(async (req, res) => {
         indexedHotels = addIndex(dedupedHotels);
       }
     }
+
 
     /* ---------------- CACHE ---------------- */
     try {

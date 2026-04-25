@@ -12,6 +12,7 @@ import {
 import { FaRupeeSign } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchWalletRechargeLogs } from "../../Redux/Slice/walletRechargeLogsSlice";
+import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import Pagination from "../Shared/Pagination";
 
 const colors = {
@@ -41,6 +42,10 @@ export default function WalletRechargeLogs() {
     (state) => state.walletRechargeLogs,
   );
 
+  const { corporates: onboardedCorporates } = useSelector(
+    (state) => state.corporateList,
+  );
+
   // Fetch logs when filters or page change (server-side)
   useEffect(() => {
     dispatch(
@@ -54,6 +59,10 @@ export default function WalletRechargeLogs() {
       }),
     );
   }, [dispatch, status, corporate, startDate, endDate, currentPage]);
+
+  useEffect(() => {
+    dispatch(fetchCorporates());
+  }, [dispatch]);
 
   // Reset to page 1 when server-side filters change
   useEffect(() => {
@@ -106,11 +115,20 @@ export default function WalletRechargeLogs() {
 
   // Extract unique corporate names for dropdown (from all logs, not filtered)
   const corporates = useMemo(() => {
-    const unique = new Set(
-      normalizedLogs.map((l) => l.corporateName).filter((n) => n !== "—"),
+    const fromOnboarded = (onboardedCorporates || []).map(
+      (c) => c.corporateName || c.name || c.title,
     );
-    return ["All", ...Array.from(unique)];
-  }, [normalizedLogs]);
+    const namesFromLogs = normalizedLogs
+      .map((l) => l.corporateName)
+      .filter((n) => n !== "—");
+
+    const allNames = new Set([
+      ...fromOnboarded,
+      ...namesFromLogs,
+    ]);
+
+    return ["All", ...Array.from(allNames).sort()];
+  }, [onboardedCorporates, normalizedLogs]);
 
   const methods = ["All", "Razorpay"]; // only one method from API
   const statuses = ["All", "Success", "Failed", "Pending"];
@@ -194,7 +212,7 @@ export default function WalletRechargeLogs() {
               </div>
             </LabeledInput>
 
-            <LabeledInput label="From Date">
+            <LabeledInput label="Booking From">
               <div className="relative">
                 <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -206,7 +224,7 @@ export default function WalletRechargeLogs() {
               </div>
             </LabeledInput>
 
-            <LabeledInput label="To Date">
+            <LabeledInput label="Booking To">
               <div className="relative">
                 <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input

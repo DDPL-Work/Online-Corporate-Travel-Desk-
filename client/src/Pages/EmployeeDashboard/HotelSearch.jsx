@@ -64,9 +64,7 @@ export default function HotelSearchPage() {
   const cityRef = useRef(null);
 
   const dispatch = useDispatch();
-  const { countries, citiesByCountry } = useSelector(
-    (state) => state.hotel,
-  );
+  const { countries, citiesByCountry } = useSelector((state) => state.hotel);
 
   const currentCities = citiesByCountry?.[country] || [];
 

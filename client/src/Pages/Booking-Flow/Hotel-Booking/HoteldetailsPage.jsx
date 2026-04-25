@@ -240,7 +240,7 @@ const HotelDetailsPage = () => {
   if (isInitialLoading && !hasDynamicData) {
     return (
       <>
-        <EmployeeHeader />
+        {/* <EmployeeHeader /> */}
         <HotelDetailsSkeleton />
       </>
     );
