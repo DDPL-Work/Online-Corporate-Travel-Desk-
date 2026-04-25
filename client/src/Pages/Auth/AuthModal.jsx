@@ -56,6 +56,7 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     gstLegalName: "",
     gstAddress: "",
     gstEmail: "",
+    corporateType: "pvt-ltd",
   });
 
   const [errors, setErrors] = useState({});

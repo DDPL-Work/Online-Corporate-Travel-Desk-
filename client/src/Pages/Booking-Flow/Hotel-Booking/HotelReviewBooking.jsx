@@ -47,6 +47,7 @@ import {
   executeHotelBooking,
   preBookHotel,
 } from "../../../Redux/Actions/hotelBooking.thunks";
+import { approveApproval } from "../../../Redux/Actions/approval.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import Swal from "sweetalert2";
 import PhoneInput from "react-phone-input-2";
@@ -897,7 +898,8 @@ const HotelReviewBooking = () => {
     useSelector((state) => state.hotelBookings);
 
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
-  const approvalRequired = myPolicy?.approvalRequired !== false;
+  const isTravelAdmin = user?.role === "travel-admin";
+  const approvalRequired = !isTravelAdmin && myPolicy?.approvalRequired !== false;
 
   const { hotel, rooms, searchParams } = location.state || {};
 
@@ -940,7 +942,7 @@ const HotelReviewBooking = () => {
 
   // ── Fetch SSR Policy ──
   useEffect(() => {
-    if (user?.role === "employee") {
+    if (user?.role === "employee" || user?.role === "manager") {
       dispatch(fetchMySSRPolicy());
     }
   }, [dispatch, user]);
@@ -1336,10 +1338,10 @@ const HotelReviewBooking = () => {
       projectName: projectApproverData.project?.name,
       projectId: projectApproverData.project?.id,
       projectClient: projectApproverData.project?.client,
-      approverId: projectApproverData.approver?.id,
-      approverEmail: projectApproverData.approver?.email,
-      approverName: projectApproverData.approver?.name,
-      approverRole: projectApproverData.approver?.role,
+      approverId: !approvalRequired ? (user?._id || user?.id || user?.userId) : projectApproverData.approver?.id,
+      approverEmail: !approvalRequired ? user?.email : projectApproverData.approver?.email,
+      approverName: !approvalRequired ? `${user?.name?.firstName} ${user?.name?.lastName}` : projectApproverData.approver?.name,
+      approverRole: !approvalRequired ? user?.role : projectApproverData.approver?.role,
       hotelRequest: {
         hotelCode:
           safeHotel?.HotelCode ||
@@ -1435,7 +1437,7 @@ const HotelReviewBooking = () => {
     };
 
     try {
-      if (approvalRequired) {
+      if (approvalRequired && !isTravelAdmin) {
         await dispatch(
           selectManager({
             approverId: projectApproverData.approver?.id,
@@ -1457,7 +1459,26 @@ const HotelReviewBooking = () => {
         return;
       }
 
-      await dispatch(createHotelBookingRequest(payload)).unwrap();
+      const result = await dispatch(createHotelBookingRequest(payload)).unwrap();
+
+      if (!approvalRequired) {
+        const requestId = result.bookingRequestId || result._id;
+        if (requestId && result.requestStatus !== "approved") {
+          await dispatch(
+            approveApproval({
+              id: requestId,
+              comments: "Self Approved by Travel Admin",
+              type: "hotel",
+            }),
+          ).unwrap();
+        }
+        ToastWithTimer({
+          type: "success",
+          message: "Booking auto-approved successfully",
+        });
+        navigate("/my-pending-approvals");
+        return;
+      }
 
       ToastWithTimer({
         type: "success",
@@ -2125,29 +2146,30 @@ const HotelReviewBooking = () => {
 
             {/* GST Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <div className="flex items-center gap-2.5 mb-4">
-                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 text-green-600">
-                  <FiTag size={15} />
-                </span>
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-700">
-                    GST Details{" "}
-                    <span className="text-xs font-normal text-slate-400">
-                      (Optional)
-                    </span>
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Add GST information for invoicing
-                  </p>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 text-green-600">
+                    <FiTag size={15} />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-700">
+                      GST Details
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Fetched automatically from your corporate profile
+                    </p>
+                  </div>
                 </div>
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded uppercase tracking-wider">
+                  Profile Locked
+                </span>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {[
                   {
                     label: "GSTIN",
                     key: "gstin",
-                    placeholder: "27ABCDE1234F2Z5",
-                    transform: (v) => v.toUpperCase(),
+                    placeholder: "GSTIN",
                   },
                   {
                     label: "Legal Name",
@@ -2164,44 +2186,31 @@ const HotelReviewBooking = () => {
                     key: "address",
                     placeholder: "Street, City, State, PIN",
                   },
-                ].map(({ label, key, placeholder, transform }) => (
-                  <div key={key}>
+                ].map(({ label, key, placeholder }) => (
+                  <div key={key} className={key === 'address' ? 'lg:col-span-3' : ''}>
                     <label className="block text-sm font-bold text-gray-700 mb-2">
                       {label}
                     </label>
                     <input
                       type="text"
                       value={gstDetails[key] || ""}
-                      onChange={(e) =>
-                        setGstDetails((prev) => ({
-                          ...prev,
-                          [key]: transform
-                            ? transform(e.target.value)
-                            : e.target.value,
-                        }))
-                      }
+                      readOnly
                       placeholder={placeholder}
-                      className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/10 transition bg-white"
+                      className="w-full px-4 py-2.5 border border-slate-100 rounded-lg text-sm bg-slate-50 text-slate-500 cursor-not-allowed font-medium"
                     />
                   </div>
                 ))}
               </div>
+              <p className="mt-4 text-[11px] text-slate-400 italic">
+                * Note: To update GST details, please contact your travel administrator.
+              </p>
             </div>
           </div>
 
           {/* ── RIGHT: Price Summary ── */}
           <div className="lg:col-span-1">
             <div className="sticky top-20 space-y-4">
-              <div className="relative">
-                {!approvalRequired && (
-                  <div className="absolute top-2 right-4 z-10">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
-                      Optional
-                    </span>
-                  </div>
-                )}
                 <ProjectApproverBlock onChange={setProjectApproverData} />
-              </div>
 
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="bg-gradient-to-r from-[#0A4D68] to-[#088395] px-5 py-4">
@@ -2246,10 +2255,8 @@ const HotelReviewBooking = () => {
                   onClick={handleAction}
                   disabled={
                     actionLoading ||
-                    (approvalRequired && (
-                      !projectApproverData.project ||
-                      !projectApproverData.approver
-                    ))
+                    !projectApproverData.project ||
+                    (approvalRequired && !projectApproverData.approver)
                   }
                   className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white uppercase tracking-wider bg-gradient-to-r from-[#0A4D68] to-[#088395] hover:from-[#093f54] hover:to-[#066876] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[#0A4D68]/20"
                 >
@@ -2261,7 +2268,7 @@ const HotelReviewBooking = () => {
                   ) : isBookNowMode ? (
                     "Confirm & Book Now"
                   ) : (
-                    "Request for Approval"
+                    approvalRequired ? "Request for Approval" : "Confirm & Book"
                   )}
                 </button>
               </div>

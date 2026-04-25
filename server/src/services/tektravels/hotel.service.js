@@ -313,7 +313,7 @@ class HotelService {
         },
       );
 
-      // logger.info("[HOTEL CODE LIST RESPONSE]", data);
+      logger.info("[HOTEL CODE LIST RESPONSE]", data);
 
       return data;
     } catch (err) {

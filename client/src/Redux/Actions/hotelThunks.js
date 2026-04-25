@@ -33,23 +33,27 @@ export const fetchCities = createAsyncThunk(
       const { data } = await api.get(
         `/hotels/cities?countryCode=${countryCode}`,
       );
+      
+      const rawCities = Array.isArray(data.data) ? data.data : data.data?.CityList || [];
+      
+      // EXPLICIT MAPPING to ensure structure is consistent
+      const mappedCities = rawCities.map(c => ({
+        cityName: c.cityName || c.CityName || c.Name || c.name || "",
+        cityCode: c.cityCode || c.CityCode || c.Code || c.code || "",
+        countryCode: c.countryCode || countryCode,
+        countryName: c.countryName || ""
+      }));
+
+      console.log(`🏙️ [Thunk] Cities for ${countryCode}:`, mappedCities.length);
+      if (mappedCities.length > 0) console.table(mappedCities.slice(0, 5));
+
       return {
         countryCode,
-        cities: data.data?.CityList || [],
+        cities: mappedCities,
       };
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
     }
-  },
-  {
-    condition: (countryCode, { getState }) => {
-      const { hotel } = getState();
-
-      // If cities already loaded for this country
-      if (hotel.citiesByCountry?.[countryCode]) {
-        return false;
-      }
-    },
   },
 );
 

@@ -41,6 +41,11 @@ export const FlightSegment = ({ data, label, fare, selected }) => (
               ( {data.fromAirport} ){" "}
             </span>
           </div>
+          {data.fromTerminal && (
+            <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 inline-block mt-1 uppercase tracking-wider">
+              T-{data.fromTerminal}
+            </div>
+          )}
         </div>
 
         {/* Duration & Stops Visual */}
@@ -71,6 +76,7 @@ export const FlightSegment = ({ data, label, fare, selected }) => (
             }`}
           >
             {formatStops(data.stops)}
+            {data.stops > 0 && data.stopCities?.length > 0 && ` via ${data.stopCities.join(", ")}`}
           </div>
         </div>
 
@@ -83,6 +89,11 @@ export const FlightSegment = ({ data, label, fare, selected }) => (
             {data.toCity}{" "}
             <span className="text-blue-700 text-xs">( {data.toAirport} ) </span>
           </div>
+          {data.toTerminal && (
+            <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 inline-block mt-1 uppercase tracking-wider text-right">
+              T-{data.toTerminal}
+            </div>
+          )}
         </div>
       </div>
 

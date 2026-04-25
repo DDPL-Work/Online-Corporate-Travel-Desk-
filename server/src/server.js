@@ -10,9 +10,14 @@ const PORT = config.server.port || 5000;
 console.log("GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID);
 console.log("GOOGLE_CALLBACK_URL:", process.env.GOOGLE_CALLBACK_URL);
 
+const { initCronJobs } = require("./utils/cronJobs");
+
 (async () => {
   try {
     await connectDB(config.database.uri, config.database.options);
+
+    // Initialize Cron Jobs
+    initCronJobs();
 
     const server = http.createServer(app);
 
@@ -38,7 +43,6 @@ API Version: ${config.api.version} 1️⃣
       logger.error("UNCAUGHT EXCEPTION:", err);
       process.exit(1);
     });
-
   } catch (err) {
     logger.error("❌ Server initialization failed:", err);
     process.exit(1);

@@ -743,6 +743,7 @@ export const PriceSummary = ({
   onSendForApproval,
   loading = false,
   disabled = false,
+  approvalRequired = true,
 }) => {
   if (!parsedFlightData) return null;
 
@@ -879,7 +880,7 @@ export const PriceSummary = ({
                 : "bg-blue-600 hover:bg-[#0A4D68]"
             }`}
         >
-          {loading ? "Submitting..." : disabled ? "Complete details to submit" : "Send For Approval"}
+          {loading ? "Submitting..." : disabled ? "Complete details to submit" : (approvalRequired ? "Send For Approval" : "Confirm & Book")}
         </button>
         {/* Approver Message */}
         <div className="mt-3 text-sm text-center">
@@ -889,7 +890,7 @@ export const PriceSummary = ({
 
           {approverError && <p className="text-red-500">{approverError}</p>}
 
-          {!approverLoading && approver && (
+          {approvalRequired && !approverLoading && approver && (
             <p className="text-gray-700">
               Your request will be sent to{" "}
               <span className="font-semibold">{approver.name}</span> (
@@ -1124,9 +1125,14 @@ export const TravelerForm = ({
 
         {/* ================= GST DETAILS ================= */}
         <div className="bg-white border-2 border-blue-100 rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-blue-900 mb-2">
-            GST Details <span className="text-red-500">*</span>
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-blue-900">
+              GST Details
+            </h3>
+            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded uppercase tracking-wider">
+              Fetched from Profile
+            </span>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -1135,14 +1141,9 @@ export const TravelerForm = ({
               <input
                 type="text"
                 value={gstDetails.gstin || ""}
-                onChange={(e) =>
-                  setGstDetails((prev) => ({
-                    ...prev,
-                    gstin: e.target.value.toUpperCase(),
-                  }))
-                }
-                placeholder="27ABCDE1234F2Z5"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                readOnly
+                placeholder="GSTIN"
+                className="w-full px-4 py-3 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
               />
             </div>
             <div>
@@ -1152,14 +1153,9 @@ export const TravelerForm = ({
               <input
                 type="text"
                 value={gstDetails.legalName || ""}
-                onChange={(e) =>
-                  setGstDetails((prev) => ({
-                    ...prev,
-                    legalName: e.target.value,
-                  }))
-                }
+                readOnly
                 placeholder="Company legal name"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                className="w-full px-4 py-3 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
               />
             </div>
             <div>
@@ -1169,34 +1165,27 @@ export const TravelerForm = ({
               <input
                 type="text"
                 value={gstDetails.gstEmail || ""}
-                onChange={(e) =>
-                  setGstDetails((prev) => ({
-                    ...prev,
-                    gstEmail: e.target.value,
-                  }))
-                }
+                readOnly
                 placeholder="GST Email"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                className="w-full px-4 py-3 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
               />
             </div>
-            <div>
+            <div className="lg:col-span-3">
               <label className="block text-sm font-bold text-gray-700 mb-2">
                 Billing Address
               </label>
               <input
                 type="text"
                 value={gstDetails.address || ""}
-                onChange={(e) =>
-                  setGstDetails((prev) => ({
-                    ...prev,
-                    address: e.target.value,
-                  }))
-                }
+                readOnly
                 placeholder="Street, City, State, PIN"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                className="w-full px-4 py-3 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
               />
             </div>
           </div>
+          <p className="mt-4 text-[11px] text-gray-400 italic">
+            * Note: GST details are managed by your Travel Administrator. Please contact them for any corrections.
+          </p>
         </div>
 
         {travelers.map((traveler, index) => (

@@ -677,7 +677,13 @@ export default function CorporateRevenue() {
                     tickLine={false}
                     tick={{ fill: "#64748b", fontSize: 9, fontWeight: 800 }}
                     tickFormatter={(v) =>
-                      `₹${v >= 1000 ? (v / 1000).toFixed(0) + "k" : v}`
+                      `₹${
+                        v >= 1000000
+                          ? (v / 1000000).toFixed(1) + "M"
+                          : v >= 1000
+                            ? (v / 1000).toFixed(0) + "k"
+                            : v
+                      }`
                     }
                   />
                   <Tooltip content={<CustomTooltip />} />
@@ -733,7 +739,13 @@ export default function CorporateRevenue() {
                     tickLine={false}
                     tick={{ fill: "#64748b", fontSize: 9, fontWeight: 800 }}
                     tickFormatter={(v) =>
-                      `₹${v >= 1000 ? (v / 1000).toFixed(0) + "k" : v}`
+                      `₹${
+                        v >= 1000000
+                          ? (v / 1000000).toFixed(1) + "M"
+                          : v >= 1000
+                            ? (v / 1000).toFixed(0) + "k"
+                            : v
+                      }`
                     }
                   />
                   <Tooltip
@@ -831,9 +843,11 @@ export default function CorporateRevenue() {
                 Total Rev
               </p>
               <p className="text-xl font-black text-[#0A4D68] leading-none">
-                {summary?.totalRevenue >= 100000
-                  ? (summary.totalRevenue / 1000).toFixed(0) + "k"
-                  : inr(summary?.totalRevenue)}
+                {summary?.totalRevenue >= 1000000
+                  ? (summary.totalRevenue / 1000000).toFixed(2) + "M"
+                  : summary?.totalRevenue >= 1000
+                    ? (summary.totalRevenue / 1000).toFixed(0) + "k"
+                    : inr(summary?.totalRevenue)}
               </p>
             </div>
           </div>
@@ -877,6 +891,9 @@ export default function CorporateRevenue() {
                   Company
                 </th>
                 <th className="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Account Type
+                </th>
+                <th className="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   Total Bookings
                 </th>
                 <th className="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -896,7 +913,7 @@ export default function CorporateRevenue() {
             <tbody className="divide-y divide-slate-50">
               {paginatedLeaderboard.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-20 text-center">
+                  <td colSpan="8" className="py-20 text-center">
                     <div className="flex flex-col items-center">
                       <FiActivity size={40} className="text-slate-200 mb-3" />
                       <p className="text-slate-400 font-bold uppercase text-xs">
@@ -925,6 +942,17 @@ export default function CorporateRevenue() {
                             {c.companyName}
                           </span>
                         </div>
+                      </td>
+                      <td className="px-8 py-3">
+                        <span
+                          className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
+                            c.accountType === "postpaid"
+                              ? "bg-purple-50 text-purple-700 border-purple-100"
+                              : "bg-emerald-50 text-emerald-700 border-emerald-100"
+                          }`}
+                        >
+                          {c.accountType}
+                        </span>
                       </td>
                       <td className="px-8 py-3">
                         <div className="flex items-center gap-2">

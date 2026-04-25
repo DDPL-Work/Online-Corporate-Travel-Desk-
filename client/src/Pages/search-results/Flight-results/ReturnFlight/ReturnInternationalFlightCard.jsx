@@ -110,6 +110,18 @@ export default function ReturnInternationalFlightCard({
               <div className="text-xs text-gray-500 font-medium">
                 {airlineCode}-{flightNumber}
               </div>
+              <div className="flex gap-2 mt-1">
+                {firstSeg?.Origin?.Airport?.Terminal && (
+                  <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-wider">
+                    T-{firstSeg.Origin.Airport.Terminal} (Dep)
+                  </span>
+                )}
+                {lastSeg?.Destination?.Airport?.Terminal && (
+                  <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-wider">
+                    T-{lastSeg.Destination.Airport.Terminal} (Arr)
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex flex-col items-center gap-1">

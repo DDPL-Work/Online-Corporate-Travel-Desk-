@@ -249,27 +249,37 @@ exports.fullCancellation = async (req, res) => {
 
     /* ✅ SUCCESS ONLY */
     const changeRequestIds = responses
-      .map((r) => r.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId)
+      .flatMap((r) => {
+        const info = r.response?.Response?.TicketCRInfo;
+        if (Array.isArray(info)) return info.map((i) => i?.ChangeRequestId);
+        if (info) return [info?.ChangeRequestId];
+        return [r.response?.Response?.ChangeRequestId];
+      })
       .filter(Boolean);
 
-      const STATUS_MAP = {
-  0: "cancel_requested",
-  1: "cancel_requested",
-  2: "cancel_requested",
-  3: "cancel_requested",
-  4: "cancelled",
-  5: "cancel_failed",
-  6: "cancelled",
-  7: "cancel_requested",
-  8: "cancel_requested",
-};
+    const STATUS_MAP = {
+      0: "cancel_requested",
+      1: "cancel_requested",
+      2: "cancel_requested",
+      3: "cancel_requested",
+      4: "cancelled",
+      5: "cancel_failed",
+      6: "cancelled",
+      7: "cancel_requested",
+      8: "cancel_requested",
+    };
 
-/* 🔥 DETERMINE FINAL STATUS (MULTI BOOKING SAFE) */
-let finalExecutionStatus = "cancel_requested";
+    /* 🔥 DETERMINE FINAL STATUS (MULTI BOOKING SAFE) */
+    let finalExecutionStatus = "cancel_requested";
 
-const statuses = responses
-  .map((r) => r.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus)
-  .filter((s) => s !== undefined && s !== null);
+    const statuses = responses
+      .flatMap((r) => {
+        const info = r.response?.Response?.TicketCRInfo;
+        if (Array.isArray(info)) return info.map((i) => i?.ChangeRequestStatus);
+        if (info) return [info?.ChangeRequestStatus];
+        return [r.response?.Response?.ChangeRequestStatus];
+      })
+      .filter((s) => s !== undefined && s !== null);
 
 /* If ALL are completed → cancelled */
 if (statuses.length && statuses.every((s) => s === 4 || s === 6)) {
@@ -466,14 +476,21 @@ exports.partialCancellation = async (req, res) => {
       });
     }
 
-    const changeRequestId =
-      result?.Response?.TicketCRInfo?.[0]?.ChangeRequestId || null;
+    const ticketCrInfo = result?.Response?.TicketCRInfo;
+    let changeRequestIds = [];
+    if (Array.isArray(ticketCrInfo)) {
+      changeRequestIds = ticketCrInfo.map((info) => info?.ChangeRequestId).filter(Boolean);
+    } else if (ticketCrInfo?.ChangeRequestId) {
+      changeRequestIds = [ticketCrInfo.ChangeRequestId];
+    } else if (result?.Response?.ChangeRequestId) {
+      changeRequestIds = [result.Response.ChangeRequestId];
+    }
 
     await updateBooking(booking._id, {
       executionStatus: "cancel_requested",
       amendment: {
         type: "PARTIAL_CANCEL",
-        changeRequestId,
+        changeRequestIds,
         status: "requested",
         response: result,
       },

@@ -5,6 +5,7 @@ const User = require("../models/User");
 const BookingRequest = require("../models/BookingRequest");
 const CancellationQuery = require("../models/CancellationQuery");
 const HotelBookingRequest = require("../models/hotelBookingRequest.model");
+const Ledger = require("../models/Ledger");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
@@ -22,6 +23,7 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
   // 🟢 Keep original destructuring
   // BASIC
   const corporateName = req.body.corporateName;
+  const corporateType = req.body.corporateType || "pvt-ltd";
   const classification = req.body.classification || "prepaid";
   const defaultApprover = req.body.defaultApprover || "travel-admin";
   const creditTermsNotes = req.body.creditTermsNotes;
@@ -130,6 +132,7 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
 
   const corporate = await Corporate.create({
     corporateName,
+    corporateType,
     registeredAddress,
     primaryContact,
     // secondaryContact,
@@ -324,8 +327,70 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
 // GET ALL CORPORATES
 // -----------------------------------------------------
 exports.getAllCorporates = asyncHandler(async (req, res) => {
-  const corporates = await Corporate.find().sort({ createdAt: -1 });
-  res.status(200).json(new ApiResponse(200, corporates, "Corporate list"));
+  const corporates = await Corporate.find().sort({ createdAt: -1 }).lean();
+
+  const enrichedCorporates = await Promise.all(
+    corporates.map(async (corp) => {
+      if (corp.classification !== "postpaid") return corp;
+
+      // 🔹 Calculate Current Cycle Start
+      const onboardedAt = corp.onboardedAt || corp.createdAt;
+      const cycleDays =
+        corp.billingCycle === "15days"
+          ? 15
+          : corp.billingCycle === "30days"
+          ? 30
+          : corp.customBillingDays || 30;
+
+      const now = new Date();
+      const cycleMs = cycleDays * 24 * 60 * 60 * 1000;
+      const timeDiff = now.getTime() - new Date(onboardedAt).getTime();
+
+      const cycleIndex = Math.max(0, Math.floor(timeDiff / cycleMs));
+      const currentCycleStart = new Date(
+        new Date(onboardedAt).getTime() + cycleIndex * cycleMs,
+      );
+
+      // 🔹 Aggregate Usage for Current Cycle
+      const result = await Ledger.aggregate([
+        {
+          $match: {
+            corporateId: corp._id,
+            status: { $ne: "cancelled" },
+            createdAt: { $gte: currentCycleStart },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalDebit: {
+              $sum: {
+                $cond: [{ $eq: ["$transactionType", "debit"] }, "$amount", 0],
+              },
+            },
+            totalCredit: {
+              $sum: {
+                $cond: [{ $eq: ["$transactionType", "credit"] }, "$amount", 0],
+              },
+            },
+          },
+        },
+      ]);
+
+      const totalDebit = result[0]?.totalDebit || 0;
+      const totalCredit = result[0]?.totalCredit || 0;
+      const currentCycleUsage = totalDebit - totalCredit;
+
+      return {
+        ...corp,
+        currentCredit: currentCycleUsage, // 🔥 Override with Current Cycle usage
+      };
+    }),
+  );
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, enrichedCorporates, "Corporate list"));
 });
 
 // -----------------------------------------------------

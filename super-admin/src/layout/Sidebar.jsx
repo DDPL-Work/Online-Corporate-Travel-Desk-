@@ -83,6 +83,12 @@ export default function Sidebar({ isOpen, onClose }) {
       permission: "Manage Cancellations",
     },
     {
+      to: "/all-reissue-requests",
+      label: "All Reissue Requests",
+      icon: <FaExchangeAlt />,
+      permission: "Manage Cancellations",
+    },
+    {
       to: "/corporate-revenue",
       label: "Corporate Revenue",
       icon: <FaMoneyBillWave />,

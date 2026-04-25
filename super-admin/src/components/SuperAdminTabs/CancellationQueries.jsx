@@ -145,7 +145,17 @@ const normalizeFlight = (b = {}) => {
     cancelDate: cancelDt,
     destination: route,
     amount,
-    refundStatus: b.refundStatus || "Pending",
+    refundStatus: (() => {
+      const dbStatus = b.cancellation?.refundStatus || b.refundStatus;
+      if (dbStatus && dbStatus.toLowerCase() !== "pending") return dbStatus;
+      const amendment = b.amendment || {};
+      const lastHistory = Array.isArray(b.amendmentHistory) && b.amendmentHistory.length
+        ? b.amendmentHistory[b.amendmentHistory.length - 1] : {};
+      const fRes = amendment.response?.[0]?.response?.Response?.TicketCRInfo?.[0] || 
+                   lastHistory.response?.[0]?.response?.Response?.TicketCRInfo?.[0];
+      if (fRes?.ChangeRequestStatus === 4 || fRes?.RefundedAmount > 0) return "Processed";
+      return dbStatus || "Pending";
+    })(),
     amendmentType: amendment.type || lastHistory.type || "",
     amendmentStatus: amendment.status || lastHistory.status || "",
     changeRequestId:
@@ -218,7 +228,17 @@ const normalizeHotel = (b = {}) => {
       b.room ||
       "",
     amount,
-    refundStatus: b.refundStatus || "Pending",
+    refundStatus: (() => {
+      const dbStatus = b.cancellation?.refundStatus || b.refundStatus;
+      if (dbStatus && dbStatus.toLowerCase() !== "pending") return dbStatus;
+      const amendment = b.amendment || {};
+      const lastHistory = Array.isArray(b.amendmentHistory) && b.amendmentHistory.length
+        ? b.amendmentHistory[b.amendmentHistory.length - 1] : {};
+      const hRes = amendment.providerResponse?.HotelChangeRequestResult || 
+                   lastHistory.providerResponse?.HotelChangeRequestResult || {};
+      if (hRes.ChangeRequestStatus === 3 || hRes.RefundedAmount > 0) return "Processed";
+      return dbStatus || "Pending";
+    })(),
     amendmentType: amendment.type || lastHistory.type || "",
     amendmentStatus: amendment.status || lastHistory.status || "",
     changeRequestId:
@@ -741,7 +761,7 @@ function CancellationQueryTab() {
               ))}
             </select>
           </LabeledInput>
-          <LabeledInput label="From Date">
+          <LabeledInput label="Booking From">
             <input
               type="date"
               value={fromDate}
@@ -749,7 +769,7 @@ function CancellationQueryTab() {
               className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
             />
           </LabeledInput>
-          <LabeledInput label="To Date">
+          <LabeledInput label="Booking To">
             <input
               type="date"
               value={toDate}

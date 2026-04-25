@@ -1,8 +1,8 @@
 // super-admin/src/components/SuperAdminTabs/OpsTeamManagement.jsx
 
 import React, { useEffect, useState } from "react";
-import { 
-  FiSearch, FiPlus, FiFilter, FiEdit2, FiTrash2, 
+import {
+  FiSearch, FiPlus, FiFilter, FiEdit2, FiTrash2,
   FiMoreVertical, FiUserPlus, FiShield, FiCheckCircle, FiXCircle, FiLock
 } from "react-icons/fi";
 import { toast } from "react-toastify";

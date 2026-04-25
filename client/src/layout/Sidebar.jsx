@@ -111,6 +111,11 @@ export default function Sidebar({ isOpen, onClose }) {
             icon: <FaClock />,
           },
           {
+            to: "/reissue-requests",
+            label: "Reissue Requests",
+            icon: <FaExchangeAlt />,
+          },
+          {
             to: "/approved-requests",
             label: "Approved Requests",
             icon: <FaCheck />,
@@ -210,6 +215,11 @@ export default function Sidebar({ isOpen, onClose }) {
           label: "Cancelled Bookings",
           icon: <MdCancel />,
         },
+        {
+          to: "/my-reissued",
+          label: "My Reissued",
+          icon: <FaExchangeAlt />,
+        },
         { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
         { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },
       ],
@@ -218,6 +228,11 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const managerMenu = useMemo(() => {
     return [
+      {
+        to: "/manager/team-management",
+        label: "Team Management",
+        icon: <FaUsers />,
+      },
       {
         label: "Company Bookings",
         icon: <FaClipboardList />,
@@ -236,6 +251,11 @@ export default function Sidebar({ isOpen, onClose }) {
             to: "/manager/pending-requests",
             label: "Pending Requests",
             icon: <FaClock />,
+          },
+          {
+            to: "/manager/reissue-requests",
+            label: "Reissue Requests",
+            icon: <FaExchangeAlt />,
           },
           {
             to: "/manager/approved-requests",
@@ -259,11 +279,6 @@ export default function Sidebar({ isOpen, onClose }) {
           },
         ],
       },
-      {
-        to: "/manager/team-management",
-        label: "Team Management",
-        icon: <FaUsers />,
-      },
     ];
   }, []);
 
@@ -285,6 +300,11 @@ export default function Sidebar({ isOpen, onClose }) {
       to: "/my-cancelled-bookings",
       label: "Cancelled Bookings",
       icon: <MdCancel />,
+    },
+    {
+      to: "/my-reissued",
+      label: "My Reissued",
+      icon: <FaExchangeAlt />,
     },
     { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
     { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },

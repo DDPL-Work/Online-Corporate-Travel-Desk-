@@ -1,19 +1,19 @@
-// Redis temporarily disabled for deployment push. Original implementation kept below.
+// // Redis temporarily disabled for deployment push. Original implementation kept below.
 
-//const Redis = require("ioredis");
+// const Redis = require("ioredis");
 
-//const redis = new Redis({
- // host: process.env.REDIS_HOST || "127.0.0.1",
-//  port: Number(process.env.REDIS_PORT) || 6379,
-//});
+// const redis = new Redis({
+//   host: process.env.REDIS_HOST || "127.0.0.1",
+//   port: Number(process.env.REDIS_PORT) || 6379,
+// });
 
-//redis.on("connect", () => {
-  //console.log("[redis] connected to", redis.options.host, redis.options.port);
-//});
+// redis.on("connect", () => {
+//   console.log("[redis] connected to", redis.options.host, redis.options.port);
+// });
 
-//redis.on("error", (err) => {
-  //console.error("[redis] connection error:", err?.message || err);
-//});
+// redis.on("error", (err) => {
+//   console.error("[redis] connection error:", err?.message || err);
+// });
 
-//module.exports = redis;
+// module.exports = redis;
 

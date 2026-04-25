@@ -12,8 +12,6 @@ import {
 } from "react-icons/md";
 import { HiOutlineSparkles, HiArrowRight, HiCheck } from "react-icons/hi";
 import { BsAirplaneFill } from "react-icons/bs";
-import { TbArmchair, TbToolsKitchen2 } from "react-icons/tb";
-import { RiAiGenerate2 } from "react-icons/ri";
 import LandingHeader from "../../../layout/LandingHeader";
 import LandingFooter from "../../../layout/LandingFooter";
 
@@ -55,7 +53,7 @@ function Hero() {
   ];
 
   return (
-    <section className="relative bg-gradient-to-l from-blue-900 to-slate-950 overflow-hidden min-h-screen">
+    <section className="relative bg-gradient-to-l from-blue-900 to-slate-950 overflow-hidden min-h-[600px] xl:min-h-screen">
       {/* ambient glows */}
       <div
         className="absolute top-[-160px] right-[-120px] w-[700px] h-[700px] rounded-full opacity-10 pointer-events-none"
@@ -70,9 +68,9 @@ function Hero() {
         }}
       />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-20 lg:py-28 grid lg:grid-cols-2 gap-16 items-start">
+      <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10 lg:px-12 py-16 md:py-16 lg:py-20 flex flex-col md:grid md:grid-cols-2 gap-12 md:gap-10 lg:gap-16 items-center md:items-start">
         {/* LEFT – copy */}
-        <div className="flex flex-col gap-7">
+        <div className="flex flex-col gap-6 md:gap-7 items-center md:items-start text-center md:text-left">
           {/* pill tag */}
           <div
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 backdrop-blur-sm w-fit"
@@ -87,32 +85,25 @@ function Hero() {
             </span>
           </div>
 
-          <div className="self-stretch justify-center">
-            <span className="text-white text-7xl font-normal font-['DM_Serif_Display'] leading-[72px]">
+          <div className="self-stretch">
+            <h1 className="text-white text-4xl md:text-5xl lg:text-7xl font-normal font-['DM_Serif_Display'] leading-tight md:leading-[1.1] lg:leading-[72px]">
               Book the{" "}
-            </span>
-            <span
-              style={{ color: ORANGE }}
-              className="italic text-7xl font-normal font-['DM_Serif_Display'] leading-[72px]"
-            >
-              right
+              <span style={{ color: ORANGE }} className="italic">
+                right
+              </span>
               <br />
-            </span>
-            <span className="text-white text-7xl font-normal font-['DM_Serif_Display'] leading-[72px]">
-              flight. In under
-              <br />
-              60 seconds.
-            </span>
+              flight. In under 60 seconds.
+            </h1>
           </div>
 
-          <p className="text-white/60 text-lg leading-7 max-w-md">
+          <p className="text-white/60 text-base md:text-lg leading-relaxed md:leading-7 max-w-md mx-auto md:mx-0">
             Eliminate endless tabs and back-and-forth. One-tap booking for you
             or your employees — your company stays in control. No waiting.
           </p>
 
-          <div className="flex flex-wrap gap-3 mt-1">
+          <div className="flex flex-wrap gap-3 mt-1 justify-center md:justify-start">
             <button
-              className="px-7 py-3.5 rounded-lg text-sm font-semibold transition-all duration-200 hover:brightness-110 active:scale-95"
+              className="px-6 md:px-7 py-3 md:py-3.5 rounded-lg text-sm font-semibold transition-all duration-200 hover:brightness-110 active:scale-95"
               style={{ background: ORANGE, color: DARK }}
             >
               Start Free Trial
@@ -123,17 +114,19 @@ function Hero() {
           </div>
 
           {/* stats */}
-          <div className="flex gap-10 pt-6 border-t border-white/10">
+          <div className="flex gap-8 md:gap-10 pt-6 border-t border-white/10 justify-center md:justify-start">
             {[
               { val: "60s", label: "PNR confirmed" },
-              { val: "500+", label: "Airlines worldwide" },
-              { val: "100%", label: "Tagged to project" },
+              { val: "500+", label: "Airlines" },
+              { val: "100%", label: "Tagged" },
             ].map((s) => (
               <div key={s.label} className="flex flex-col gap-1">
-                <span className="text-white text-3xl font-normal font-['DM_Serif_Display'] leading-9">
+                <span className="text-white text-2xl md:text-3xl font-normal font-['DM_Serif_Display'] leading-tight">
                   {s.val}
                 </span>
-                <span className="text-white/40 text-xs">{s.label}</span>
+                <span className="text-white/40 text-[10px] md:text-xs">
+                  {s.label}
+                </span>
               </div>
             ))}
           </div>
@@ -311,17 +304,35 @@ function InfoBar() {
     "GST Invoice auto-attached to every booking",
     "Project Cost ID tagged for every trip",
   ];
+
   return (
-    <div className="bg-slate-950 border-t border-white/10 py-4">
-      <div className="max-w-7xl mx-auto px-6 flex flex-wrap justify-center gap-x-10 gap-y-2">
-        {items.map((it) => (
-          <p
-            key={it}
-            className="text-white text-sm font-bold whitespace-nowrap"
-          >
-            {it}
-          </p>
-        ))}
+    <div className="bg-slate-950 border-t border-white/10 py-6 lg:py-4 px-6 overflow-hidden">
+      <div className="max-w-7xl mx-auto relative">
+        {/* Carousel Container */}
+        <div className="flex w-max md:w-full md:justify-center items-center gap-x-10 animate-infinite-scroll md:animate-none">
+          {/* Original Items */}
+          {items.map((it, idx) => (
+            <p
+              key={`orig-${idx}`}
+              className="text-white text-sm font-bold whitespace-nowrap"
+            >
+              {it}
+            </p>
+          ))}
+
+          {/* Duplicated Items (Hidden on MD screens and above) */}
+          {/* We only need the duplicate for the scroll effect on mobile */}
+          <div className="flex md:hidden gap-x-10">
+            {items.map((it, idx) => (
+              <p
+                key={`dup-${idx}`}
+                className="text-white text-sm font-bold whitespace-nowrap"
+              >
+                {it}
+              </p>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -360,19 +371,19 @@ function HowItWorks() {
         {/* LEFT – copy + steps */}
         <div className="flex flex-col gap-10">
           <div className="flex flex-col gap-4">
-            <span
-              className="inline-block px-[5px] w-[519px] py-0.5 mb-5 text-xs font-semibold tracking-[0.2em] uppercase"
-              style={{ background: ORANGE, color: "#000" }}
-            >
+          <div
+              className="w-full md:w-[519px] px-2.5 py-1 mb-5 text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase "
+            style={{ background: ORANGE, color: "#000" }}
+          >
               How It Works
-            </span>
-            <h2 className="text-4xl md:text-5xl font-normal leading-tight text-black font-['DM_Serif_Display']">
+            </div>
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-normal leading-tight text-black font-['DM_Serif_Display']">
               Search. Select. Approve.{" "}
               <span className="italic" style={{ color: ORANGE }}>
                 Book. Done.
               </span>
             </h2>
-            <p className="text-slate-500 text-base leading-6">
+            <p className="text-slate-500 text-sm lg:text-base leading-6">
               From first search to PNR confirmation — in under 60 seconds.
             </p>
           </div>
@@ -412,42 +423,48 @@ function HowItWorks() {
             </span>
           </div>
 
-          <div className="w-[602px] inline-flex justify-between items-center px-5 pb-3">
+          <div className="w-full flex justify-between items-center px-5 pb-5">
             <div className="flex justify-start items-center gap-1">
               <div
                 style={{ background: ORANGE }}
-                className="w-8 h-8  rounded-full flex justify-center items-center"
+                className="w-8 h-8 rounded-full flex justify-center items-center shrink-0"
               >
-                <div className="text-center justify-center text-azure-200 text-xs font-bold font-['DM_Sans'] leading-4">
+                <div className="text-center text-[#000D26] text-xs font-bold font-['DM_Sans']">
                   ✓
                 </div>
               </div>
-              <div style={{ background: ORANGE }} className="w-12 h-0.5 " />
+              <div
+                style={{ background: ORANGE }}
+                className="w-8 md:w-12 h-0.5"
+              />
             </div>
             <div className="flex justify-start items-center gap-1">
               <div
                 style={{ background: ORANGE }}
-                className="w-8 h-8  rounded-full flex justify-center items-center"
+                className="w-8 h-8 rounded-full flex justify-center items-center shrink-0"
               >
-                <div className="text-center justify-center text-azure-200 text-xs font-bold font-['DM_Sans'] leading-4">
+                <div className="text-center text-[#000D26] text-xs font-bold font-['DM_Sans']">
                   ✓
                 </div>
               </div>
-              <div style={{ background: ORANGE }} className="w-12 h-0.5 " />
+              <div
+                style={{ background: ORANGE }}
+                className="w-8 md:w-12 h-0.5"
+              />
             </div>
             <div className="flex justify-start items-center gap-1">
               <div
                 style={{ background: ORANGE }}
-                className="w-8 h-8  rounded-full flex justify-center items-center"
+                className="w-8 h-8 rounded-full flex justify-center items-center shrink-0"
               >
-                <div className="text-center justify-center text-azure-200 text-xs font-bold font-['DM_Sans'] leading-4">
+                <div className="text-center text-[#000D26] text-xs font-bold font-['DM_Sans']">
                   ✓
                 </div>
               </div>
-              <div className="w-12 h-0.5 bg-gray-100" />
+              <div className="w-8 md:w-12 h-0.5 bg-gray-100" />
             </div>
-            <div className="w-8 h-8 bg-gray-200 rounded-full flex justify-center items-center">
-              <div className="text-center justify-center text-azure-500 text-xs font-bold font-['DM_Sans'] leading-4">
+            <div className="w-8 h-8 bg-gray-200 rounded-full flex justify-center items-center shrink-0">
+              <div className="text-center text-slate-500 text-xs font-bold font-['DM_Sans']">
                 4
               </div>
             </div>
@@ -556,28 +573,24 @@ function SeatMealRights() {
   ];
 
   return (
-    <section className="bg-slate-50 py-20 px-6 border-t border-slate-100">
+    <section className="bg-slate-50 py-0 md:py-20 px-6 md:px-20 border-t border-slate-100">
       <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-start">
         {/* LEFT – copy */}
         <div className="flex flex-col gap-5">
-          <span
-            className="justify-center text-black text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.40px]"
+          <div
+            className="w-full md:w-[519px] px-2.5 py-1 text-[10px] lg:text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase tracking-[2.40px]"
             style={{ background: ORANGE, color: "#000" }}
           >
             Seat &amp; Meal Rights
-          </span>
+          </div>
           <div>
-            <h2 className="text-5xl font-normal leading-tight text-slate-900 font-['DM_Serif_Display']">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-normal leading-tight text-slate-900 font-['DM_Serif_Display']">
               Configured once.
-            </h2>
-            <h2
-              className="text-5xl font-normal leading-tight font-['DM_Serif_Display']"
-              style={{ color: ORANGE }}
-            >
-              Works forever.
+              <br />
+              <span style={{ color: ORANGE }}>Works forever.</span>
             </h2>
           </div>
-          <p className="text-slate-500 text-sm leading-5 max-w-xs pt-2">
+          <p className="text-slate-500 text-sm lg:text-base leading-relaxed max-w-sm pt-2">
             Travel Admin sets rights per employee one time. Nobody ever calls
             admin for a window seat again.
           </p>
@@ -586,7 +599,7 @@ function SeatMealRights() {
         {/* RIGHT – tier cards */}
         <div className="flex flex-col gap-4"></div>
       </div>
-      <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-start mt-10">
+      <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-start -mt-8 md:mt-10 mb-3 md:mb-0">
         {tiers.map((t) => (
           <div
             key={t.tier}
@@ -672,18 +685,18 @@ function GlobalCoverage() {
         <div className="flex flex-col gap-5">
           <div
             style={{ background: ORANGE, color: "#000" }}
-            className="w-[512px] pl-[5px] py-0.5 inline-flex flex-col justify-center items-start"
+            className="w-full md:w-[519px] px-2.5 py-1 inline-flex flex-col justify-center items-start"
           >
-            <div className="justify-center text-black text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.40px]">
+            <div className="text-black text-[10px] lg:text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.40px]">
               Global Coverage
             </div>
           </div>
-          <h2 className="text-white text-4xl md:text-5xl font-normal font-['DM_Serif_Display'] leading-tight">
+          <h2 className="text-white text-3xl md:text-5xl font-normal font-['DM_Serif_Display'] leading-tight">
             One platform.
             <br />
             Every flight your team needs.
           </h2>
-          <p className="text-white/50 text-sm leading-5 max-w-md">
+          <p className="text-white/50 text-sm lg:text-base leading-relaxed max-w-md">
             Whether your team flies domestic or international — Traveamer has
             them covered. One search. One approval. One booking.
           </p>
@@ -716,14 +729,14 @@ function GlobalCoverage() {
         > */}
         <div
           style={{ background: "rgba(255,255,255,0.05)" }}
-          className="w-[1340px] px-6 py-4  rounded-xl outline  -outline-offset-1 outline-white/10 inline-flex flex-col justify-start items-start"
+          className="w-full px-6 py-6 lg:py-4 rounded-xl border border-white/10"
         >
-          <div className="self-stretch flex flex-col justify-start items-start">
-            <div className="self-stretch justify-center">
-              <span className="text-white/80 text-xs font-semibold font-['Plus_Jakarta_Sans'] leading-5">
+          <div className="flex flex-col justify-start items-start">
+            <div className="justify-center">
+              <span className="text-white/80 text-xs lg:text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-relaxed">
                 Built for India, ready for the world.
               </span>
-              <span className="text-white/50 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-5">
+              <span className="text-white/50 text-xs lg:text-sm font-normal font-['Plus_Jakarta_Sans'] leading-relaxed">
                 {" "}
                 Traveamer is built to match complete domestic coverage across
                 all Indian carriers — and scales globally as your business
@@ -762,22 +775,17 @@ function CTA() {
         Get Started Today
       </span>
 
-      <h1 className="text-center justify-center">
-        <span className="text-white text-4xl font-normal font-['DM_Serif_Display'] leading-10">
+      <div className="max-w-xl mx-auto text-center px-6">
+        <h2 className="text-white text-3xl md:text-4xl font-normal font-['DM_Serif_Display'] leading-tight">
           Ready to give your team
           <br />
-        </span>
-        <span
-          style={{ color: ORANGE }}
-          className=" text-4xl font-normal font-['DM_Serif_Display'] leading-10"
-        >
-          flights in 60 seconds?
-        </span>
-      </h1>
+          <span style={{ color: ORANGE }}>flights in 60 seconds?</span>
+        </h2>
+      </div>
 
       <div className="py-3 self-stretch text-center justify-center text-white/50 text-base font-normal font-['Plus_Jakarta_Sans'] leading-6">
-        Join hundreds of Indian MSMEs who replaced travel chaos <br /> with Traveamer.
-        Free 30-day trial. No credit card needed.
+        Join hundreds of Indian MSMEs who replaced travel chaos <br /> with
+        Traveamer. Free 30-day trial. No credit card needed.
       </div>
 
       <div className="flex flex-wrap justify-center gap-3 mt-8">

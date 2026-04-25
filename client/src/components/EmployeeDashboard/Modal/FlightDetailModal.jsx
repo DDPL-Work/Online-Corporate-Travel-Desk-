@@ -206,8 +206,15 @@ function FlightHeroCard({ booking }) {
     flightReq?.cabinClass ||
     "Economy";
 
-  // ── PNR / booking ref
+  // ── PNR / booking ref / Ticket ID
   const pnr = result?.pnr || itinerary?.PNRDetails || booking?.pnr || "";
+  const paxTicket =
+    itinerary?.Passenger?.[0]?.Ticket ||
+    booking?.bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary
+      ?.Passenger?.[0]?.Ticket ||
+    {};
+
+  const ticketNumber = paxTicket.TicketId || paxTicket.TicketNumber || "";
   const executionStatus = "cancelled";
 
   return (
@@ -345,9 +352,9 @@ function FlightHeroCard({ booking }) {
           />
         </div>
 
-        {/* ── ROW 4: PNR ── */}
-        <div className="pt-3 sm:pt-4">
-          {pnr ? (
+        {/* ── ROW 4: PNR & Ticket ID ── */}
+        <div className="pt-3 sm:pt-4 flex flex-wrap gap-x-12 gap-y-3">
+          {pnr && (
             <div>
               <p className="text-[8px] sm:text-[9px] uppercase tracking-widest text-white/35 font-bold mb-1">
                 PNR / Booking Reference
@@ -356,10 +363,23 @@ function FlightHeroCard({ booking }) {
                 {pnr}
               </p>
             </div>
-          ) : (
+          )}
+          {ticketNumber && (
+            <div>
+              <p className="text-[8px] sm:text-[9px] uppercase tracking-widest text-white/35 font-bold mb-1">
+                Ticket ID / No.
+              </p>
+              <p className="text-base sm:text-xl font-black tracking-[0.12em] font-mono text-white">
+                {ticketNumber}
+              </p>
+            </div>
+          )}
+          {!pnr && !ticketNumber && (
             <div className="flex items-center gap-2 text-white/30">
               <FiAlertCircle size={14} />
-              <p className="text-[11px] font-medium">PNR not available</p>
+              <p className="text-[11px] font-medium">
+                Identifiers not available
+              </p>
             </div>
           )}
         </div>
@@ -515,96 +535,46 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
   const liveStatus = (() => {
     const status = changeStatus?.Response?.ChangeRequestStatus;
 
-    switch (status) {
-      case 0:
-        return "not_set";
-      case 1:
-        return "unassigned";
-      case 2:
-        return "assigned";
-      case 3:
-        return "acknowledged";
-      case 4:
-        return "completed";
-      case 5:
-        return "rejected";
-      case 6:
-        return "closed";
-      case 7:
-        return "pending";
-      case 8:
-        return "other";
-      default:
-        return null;
+    if (status !== undefined) {
+      switch (status) {
+        case 0:
+          return "not_set";
+        case 1:
+          return "unassigned";
+        case 2:
+          return "assigned";
+        case 3:
+          return "acknowledged";
+        case 4:
+          return "completed";
+        case 5:
+          return "rejected";
+        case 6:
+          return "closed";
+        case 7:
+          return "pending";
+        case 8:
+          return "other";
+      }
     }
+
+    // Fallback to DB amendment status
+    const dbStatus = booking?.amendment?.status;
+    if (dbStatus === "completed") return "completed";
+    if (dbStatus === "requested") return "unassigned";
+    if (dbStatus === "in_progress") return "acknowledged";
+    if (dbStatus === "failed") return "rejected";
+
+    return null;
   })();
 
   const getCancellationUI = () => {
-    switch (liveStatus) {
-      case "completed":
-        return {
-          text: "Booking Cancelled Successfully",
-          bg: "bg-red-50 border-red-100",
-          textColor: "text-red-700",
-          iconColor: "text-red-500",
-        };
-
-      case "rejected":
-        return {
-          text: "Cancellation Rejected",
-          bg: "bg-red-50 border-red-100",
-          textColor: "text-red-700",
-          iconColor: "text-red-500",
-        };
-
-      case "unassigned":
-        return {
-          text: "Cancellation Requested",
-          bg: "bg-orange-50 border-orange-100",
-          textColor: "text-orange-700",
-          iconColor: "text-orange-500",
-        };
-
-      case "assigned":
-        return {
-          text: "Cancellation Assigned",
-          bg: "bg-orange-50 border-orange-100",
-          textColor: "text-orange-700",
-          iconColor: "text-orange-500",
-        };
-
-      case "acknowledged":
-        return {
-          text: "Cancellation in Progress",
-          bg: "bg-orange-50 border-orange-100",
-          textColor: "text-orange-700",
-          iconColor: "text-orange-500",
-        };
-
-      case "pending":
-        return {
-          text: "Cancellation Pending",
-          bg: "bg-amber-50 border-amber-100",
-          textColor: "text-amber-700",
-          iconColor: "text-amber-500",
-        };
-
-      case "closed":
-        return {
-          text: "Request Closed",
-          bg: "bg-slate-50 border-slate-200",
-          textColor: "text-slate-700",
-          iconColor: "text-slate-500",
-        };
-
-      default:
-        return {
-          text: "Processing cancellation...",
-          bg: "bg-orange-50 border-orange-100",
-          textColor: "text-orange-700",
-          iconColor: "text-orange-500",
-        };
-    }
+    return {
+      text: "Booking Cancelled Successfully",
+      bg: "bg-red-50 border-red-100",
+      textColor: "text-red-700",
+      iconColor: "text-red-500",
+    };
   };
 
   const cancelUI = getCancellationUI();
@@ -638,12 +608,16 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
   }, [isOpen]);
 
   useEffect(() => {
-    if (!booking?.amendment?.changeRequestId) return;
+    const changeIds = booking?.amendment?.changeRequestIds || [];
+    const changeId =
+      changeIds.length > 0 ? changeIds[0] : booking?.amendment?.changeRequestId;
+
+    if (!changeId) return;
 
     // const interval = setInterval(() => {
     dispatch(
       fetchChangeStatus({
-        changeRequestId: booking.amendment.changeRequestId,
+        changeRequestId: changeId,
         bookingId: booking._id,
       }),
     );
@@ -665,9 +639,53 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
 
   const paymentSuccessful =
     booking?.payment?.status === "completed" || !!booking?.pnr;
-  const executionStatus = "cancelled";
+  const executionStatus = booking?.executionStatus;
   const isConfirmed =
     executionStatus === "ticketed" || executionStatus === "confirmed";
+
+  const getChangeRequestIds = () => {
+    let ids = [];
+    if (booking?.amendment?.changeRequestIds) {
+      ids.push(...booking.amendment.changeRequestIds);
+    } else if (booking?.amendment?.changeRequestId) {
+      ids.push(booking.amendment.changeRequestId);
+    }
+
+    // Also extract directly from response and history if available
+    let allResponses = [];
+    if (booking?.amendment?.response) {
+      allResponses.push(booking.amendment.response);
+    }
+    if (booking?.amendmentHistory && Array.isArray(booking.amendmentHistory)) {
+      booking.amendmentHistory.forEach((hist) => {
+        if (hist.response) allResponses.push(hist.response);
+      });
+    }
+
+    allResponses.forEach((resp) => {
+      const arr = Array.isArray(resp) ? resp : [resp];
+      arr.forEach((r) => {
+        const info =
+          r?.response?.Response?.TicketCRInfo || r?.Response?.TicketCRInfo;
+        const fallbackId =
+          r?.response?.Response?.ChangeRequestId ||
+          r?.Response?.ChangeRequestId;
+
+        if (Array.isArray(info)) {
+          info.forEach((i) => {
+            if (i?.ChangeRequestId) ids.push(i.ChangeRequestId);
+          });
+        } else if (info?.ChangeRequestId) {
+          ids.push(info.ChangeRequestId);
+        } else if (fallbackId) {
+          ids.push(fallbackId);
+        }
+      });
+    });
+    return [...new Set(ids)].filter(Boolean);
+  };
+
+  const displayChangeRequestIds = getChangeRequestIds();
 
   const totalFare =
     booking?.pricingSnapshot?.totalAmount ||
@@ -676,19 +694,14 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
     0;
 
   const getHeaderBadge = () => {
-    if (executionStatus === "cancelled" || liveStatus === "completed") {
+    if (
+      executionStatus === "cancelled" ||
+      executionStatus === "cancel_requested"
+    ) {
       return {
         text: "Cancelled",
         className: "bg-red-100 text-red-700",
         icon: <MdCancel size={11} />,
-      };
-    }
-
-    if (liveStatus && liveStatus !== "completed") {
-      return {
-        text: "Cancelling...",
-        className: "bg-orange-100 text-orange-700",
-        icon: <FiRefreshCw size={11} />,
       };
     }
 
@@ -813,10 +826,18 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
                           {cancelUI.text}
                         </p>
 
-                        {booking?.amendment?.changeRequestId && (
-                          <p className="text-[11px] text-orange-500 mt-1">
-                            Request ID: {booking.amendment.changeRequestId}
-                          </p>
+                        {displayChangeRequestIds.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            <p className="text-[11px] text-orange-500">
+                              Change Request ID:{" "}
+                              {displayChangeRequestIds.join(", ")}
+                            </p>
+                            {ticketNumber && (
+                              <p className="text-[11px] text-orange-400 font-semibold">
+                                Ticket ID: {ticketNumber}
+                              </p>
+                            )}
+                          </div>
                         )}
 
                         {booking?.cancelledAt && (
@@ -845,6 +866,7 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
                         const lastName = p?.LastName || p?.lastName || "";
                         const type = p?.PaxType || p?.passengerType || "";
                         const ticket =
+                          p?.Ticket?.TicketId ||
                           p?.Ticket?.TicketNumber ||
                           p?.ticket?.ticketNumber ||
                           p?.ticketNumber ||
@@ -852,6 +874,7 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
                         const seat = p?.SegmentAdditionalInfo?.[0]?.Seat || "";
                         const paxBaggage =
                           p?.SegmentAdditionalInfo?.[0]?.Baggage || "";
+                        const barcode = p?.BarcodeDetails?.Barcode?.[0]?.Content || "";
 
                         return (
                           <div
@@ -891,6 +914,12 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
                                   </span>
                                 )}
                               </div>
+                              {barcode && (
+                                <div className="mt-2 w-full pt-2 border-t border-slate-100">
+                                  <p className="text-[8px] font-bold text-slate-400 uppercase">Barcode Details</p>
+                                  <p className="text-[8px] font-mono text-slate-500 break-all bg-white p-1 rounded border border-slate-50">{barcode}</p>
+                                </div>
+                              )}
                             </div>
                             {paxBaggage && (
                               <div className="text-right shrink-0">

@@ -6,6 +6,8 @@ const {
   createCreditUsage,
   getPostpaidBalance,
   getPostpaidTransactions,
+  getPreviousCycles,
+  getCycleTransactions,
 } = require("../controllers/postPaid.corporate.controller");
 
 const {
@@ -33,6 +35,20 @@ router.post(
   verifyToken,
   authorizeRoles("travel-admin", "super-admin"),
   createCreditUsage,
+);
+
+router.get(
+  "/cycles",
+  verifyToken,
+  authorizeRoles("travel-admin", "super-admin"),
+  getPreviousCycles,
+);
+
+router.get(
+  "/cycles/:cycleIndex/transactions",
+  verifyToken,
+  authorizeRoles("travel-admin", "super-admin"),
+  getCycleTransactions,
 );
 
 module.exports = router;

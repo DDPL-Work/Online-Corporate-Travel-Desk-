@@ -16,6 +16,7 @@ import {
   fetchFlightCancellations,
   fetchHotelCancellations,
 } from "../../Redux/Actions/corporate.related.thunks";
+import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import Pagination from "../Shared/Pagination";
 import {
   FlightBookingModal,
@@ -112,7 +113,14 @@ const normalizeFlight = (b = {}) => {
     cancelDate: cancelDt,
     service: route,
     amount,
-    refundStatus: b.refundStatus || "Pending",
+    refundStatus: (() => {
+      const dbStatus = b.cancellation?.refundStatus || b.refundStatus;
+      if (dbStatus && dbStatus.toLowerCase() !== "pending") return dbStatus;
+      const fRes = amendment.response?.[0]?.response?.Response?.TicketCRInfo?.[0] || 
+                   lastHistory.response?.[0]?.response?.Response?.TicketCRInfo?.[0];
+      if (fRes?.ChangeRequestStatus === 4 || fRes?.RefundedAmount > 0) return "Processed";
+      return dbStatus || "Pending";
+    })(),
     amendmentType: amendment.type || lastHistory.type || "—",
     amendmentStatus: amendment.status || lastHistory.status || "—",
     changeRequestId: amendment.changeRequestId || lastHistory.changeRequestId || "—",
@@ -163,7 +171,14 @@ const normalizeHotel = (b = {}) => {
     date: b.bookingSnapshot?.checkInDate || b.hotelRequest?.checkInDate || b.checkIn || b.checkInDate || "",
     service: b.bookingSnapshot?.hotelName || b.hotelRequest?.selectedHotel?.hotelName || b.hotelName || b.property || "—",
     amount,
-    refundStatus: b.refundStatus || "Pending",
+    refundStatus: (() => {
+      const dbStatus = b.cancellation?.refundStatus || b.refundStatus;
+      if (dbStatus && dbStatus.toLowerCase() !== "pending") return dbStatus;
+      const hRes = amendment.providerResponse?.HotelChangeRequestResult || 
+                   lastHistory.providerResponse?.HotelChangeRequestResult || {};
+      if (hRes.ChangeRequestStatus === 3 || hRes.RefundedAmount > 0) return "Processed";
+      return dbStatus || "Pending";
+    })(),
     amendmentType: amendment.type || lastHistory.type || "—",
     amendmentStatus: amendment.status || lastHistory.status || "—",
     changeRequestId: amendment.changeRequestId || lastHistory.changeRequestId || "—",
@@ -179,6 +194,10 @@ export default function CancellationDashboard() {
     loadingHotelCancellations,
   } = useSelector((state) => state.corporateRelated);
 
+  const { corporates: onboardedCorporates } = useSelector(
+    (state) => state.corporateList,
+  );
+
   const [bookingType, setBookingType] = useState("All");
   const [search, setSearch] = useState("");
   const [corporate, setCorporate] = useState("All");
@@ -193,6 +212,7 @@ export default function CancellationDashboard() {
   useEffect(() => {
     dispatch(fetchFlightCancellations({}));
     dispatch(fetchHotelCancellations({}));
+    dispatch(fetchCorporates());
   }, [dispatch]);
 
   const allRecords = useMemo(() => {
@@ -202,9 +222,20 @@ export default function CancellationDashboard() {
   }, [flightCancellations, hotelCancellations]);
 
   const corporates = useMemo(() => {
-    const names = new Set(allRecords.map((b) => b.corporate).filter(Boolean));
-    return ["All", ...Array.from(names)];
-  }, [allRecords]);
+    const fromOnboarded = (onboardedCorporates || []).map(
+      (c) => c.corporateName || c.name || c.title,
+    );
+    const namesFromBookings = allRecords
+      .map((b) => b.corporate)
+      .filter(Boolean);
+
+    const allNames = new Set([
+      ...fromOnboarded,
+      ...namesFromBookings,
+    ]);
+
+    return ["All", ...Array.from(allNames).sort()];
+  }, [onboardedCorporates, allRecords]);
 
   const filtered = useMemo(() => {
     return allRecords.filter((b) => {
@@ -288,8 +319,8 @@ export default function CancellationDashboard() {
 
               <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-50">
                  <DateFilter label="Cancel Dt" value={cancelDate} onChange={setCancelDate} />
-                 <DateFilter label="Start Range" value={startDate} onChange={setStartDate} />
-                 <DateFilter label="End Range" value={endDate} onChange={setEndDate} />
+                 <DateFilter label="Booking From" value={startDate} onChange={setStartDate} />
+                 <DateFilter label="Booking To" value={endDate} onChange={setEndDate} />
               </div>
 
               <button className="p-2.5 bg-rose-700 text-white rounded-xl shadow-lg shadow-rose-700/20 hover:scale-105 active:scale-95 transition-all">
@@ -324,9 +355,9 @@ export default function CancellationDashboard() {
                         <tr key={b.id} className="hover:bg-slate-50/50 transition-all group">
                            <td className="px-6 py-3">
                               <div className="flex items-center gap-3">
-                                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${b.type === 'Flight' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                                 {/* <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${b.type === 'Flight' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
                                     {b.type === 'Flight' ? <FaPlane size={14} /> : <FaHotel size={14} />}
-                                 </div>
+                                 </div> */}
                                  <div className="max-w-[180px]">
                                     <p className="font-black text-[12px] text-slate-800 truncate leading-tight">{b.service}</p>
                                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">{b.type === 'Flight' ? b.airline : 'Hotel Stay'}</p>

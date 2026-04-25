@@ -93,8 +93,10 @@ export default function MultiCityFlightCard({
           const duration = `${Math.floor(durationMin / 60)}h ${
             durationMin % 60
           }m`;
-          const stops =
-            segments.length === 1 ? "Non-stop" : `${segments.length - 1} Stop`;
+          const stopCities = segments.slice(0, -1).map(s => s.Destination?.Airport?.AirportCode).filter(Boolean);
+          const stops = segments.length === 1 
+            ? "Non-stop" 
+            : `${segments.length - 1} Stop${segments.length > 2 ? 's' : ''} ${stopCities.length ? `via ${stopCities.join(', ')}` : ''}`;
 
           const price = getLegPrice(segments);
           const baggage = segments[0]?.Baggage || "15 Kg";
@@ -158,6 +160,11 @@ export default function MultiCityFlightCard({
                       <div className="text-sm font-semibold text-slate-700 mt-2">
                         {from}
                       </div>
+                      {firstSegment.Origin?.Airport?.Terminal && (
+                        <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 inline-block mt-1 uppercase tracking-wider">
+                          T-{firstSegment.Origin.Airport.Terminal}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col items-center gap-2">
@@ -185,6 +192,11 @@ export default function MultiCityFlightCard({
                       <div className="text-sm font-semibold text-slate-700 mt-2">
                         {to}
                       </div>
+                      {lastSegment.Destination?.Airport?.Terminal && (
+                        <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 inline-block mt-1 uppercase tracking-wider">
+                          T-{lastSegment.Destination.Airport.Terminal}
+                        </div>
+                      )}
                     </div>
                   </div>
 

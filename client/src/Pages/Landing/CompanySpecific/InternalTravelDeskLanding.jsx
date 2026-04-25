@@ -38,8 +38,9 @@ import { LuPlane } from "react-icons/lu";
 import { BsBell } from "react-icons/bs";
 import { useNavigate, useSearchParams, useParams, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import LandingFooter from "../../../layout/LandingFooter";
 import { logoutUser } from "../../../Redux/Slice/authSlice";
-import { CorporateNavbar } from "../../../layout/CorporateNavbar";
+import LandingHeader from "../../../layout/LandingHeader";
 import { airportDatabase } from "../../../data/airportDatabase";
 import { useFlightSearch } from "../../../context/FlightSearchContext";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
@@ -100,7 +101,7 @@ const CABIN_CLASS_MAP = {
 
 // ─── Shared Atoms ──────────────────────────────────────────────────────────────
 const GoldLabel = ({ children }) => (
-  <div className="inline-block mb-3 px-2 py-0.5" style={{ background: GOLD }}>
+  <div className="inline-block w-full md:w-[380px] mb-3 px-2 py-0.5" style={{ background: GOLD }}>
     <span
       className="text-[11px] font-bold uppercase tracking-[0.18em]"
       style={{ color: C.black, fontFamily: "'Plus Jakarta Sans',sans-serif" }}
@@ -567,16 +568,27 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
 
   const handleCityChange = (val) => {
     setCity(val);
-    setFilteredCities(
-      currentCities.filter((c) =>
-        c.Name?.toLowerCase().includes(val.toLowerCase()),
-      ),
-    );
+    if (!val.trim()) {
+      setFilteredCities([]);
+      setShowCitySuggestions(true);
+      return;
+    }
+
+    const filtered = currentCities.filter((c) => {
+      const name = (c.cityName || c.CityName || c.Name || "").toLowerCase();
+      return name.includes(val.toLowerCase());
+    });
+
+    setFilteredCities(filtered);
     setShowCitySuggestions(true);
   };
+
   const handleCitySelect = (cityObj) => {
-    setCity(cityObj.Name);
-    setSelectedCityCode(cityObj.Code);
+    const name = cityObj.cityName || cityObj.CityName || cityObj.Name || "";
+    const code = cityObj.cityCode || cityObj.CityCode || cityObj.Code || "";
+    setCity(name);
+    setSelectedCityCode(code);
+    setFilteredCities([]);
     setShowCitySuggestions(false);
   };
 
@@ -1280,46 +1292,57 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                               : "Popular Destinations"}
                           </p>
                         </div>
-                        {(filteredCities.length > 0
-                          ? filteredCities
-                          : currentCities
-                        ).map((c) => (
-                          <div
-                            key={c.Name}
-                            onMouseDown={() => handleCitySelect(c)}
-                            className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-amber-50 border-b"
-                            style={{ borderColor: FIELD_BORDER }}
-                          >
+                        {(() => {
+                          const listToRender = city.trim() ? filteredCities : currentCities;
+
+                          if (city.trim() && listToRender.length === 0) {
+                            return (
+                              <div className="px-4 py-8 text-center">
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                  No cities found for "{city}"
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          return listToRender.map((c, idx) => (
                             <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                              style={{ background: GOLD_10 }}
+                              key={(c.cityName || c.cityCode || idx) + idx}
+                              onMouseDown={() => handleCitySelect(c)}
+                              className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-amber-50 border-b last:border-0"
+                              style={{ borderColor: FIELD_BORDER }}
                             >
-                              <FaMapMarkerAlt
-                                style={{ color: GOLD, fontSize: 11 }}
-                              />
-                            </div>
-                            <div>
-                              <p
-                                className="text-sm font-semibold"
-                                style={{
-                                  color: C.navy,
-                                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                                }}
+                              <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                                style={{ background: GOLD_10 }}
                               >
-                                {c.Name}
-                              </p>
-                              <p
-                                className="text-xs"
-                                style={{
-                                  color: FIELD_MUTED,
-                                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                                }}
-                              >
-                                {selectedCountry?.name || "Hotels & Resorts"}
-                              </p>
+                                <FaMapMarkerAlt
+                                  style={{ color: GOLD, fontSize: 11 }}
+                                />
+                              </div>
+                              <div>
+                                <p
+                                  className="text-sm font-semibold"
+                                  style={{
+                                    color: C.navy,
+                                    fontFamily: "'Plus Jakarta Sans',sans-serif",
+                                  }}
+                                >
+                                  {c.cityName || c.CityName || c.Name || "Unknown"}
+                                </p>
+                                <p
+                                  className="text-xs"
+                                  style={{
+                                    color: FIELD_MUTED,
+                                    fontFamily: "'Plus Jakarta Sans',sans-serif",
+                                  }}
+                                >
+                                  {c.countryName || selectedCountry?.name || "Hotels & Resorts"}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ));
+                        })()}
                       </div>
                     )}
                   </div>
@@ -1785,7 +1808,7 @@ const TravelPolicies = ({ branding }) => {
             }
             sub={`Configured by ${branding?.corporateName || "your organisation"} via Travel Admin.`}
           />
-          <button
+          {/* <button
             className="flex items-center gap-2 mb-14 text-sm font-bold whitespace-nowrap hover:opacity-70 transition-opacity"
             style={{
               color: C.navy,
@@ -1793,7 +1816,7 @@ const TravelPolicies = ({ branding }) => {
             }}
           >
             View PDF Policy <RiArrowRightLine size={14} />
-          </button>
+          </button> */}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {POLICIES.map(({ label, icon, items }) => (
@@ -2054,227 +2077,6 @@ const SupportSection = ({ branding }) => {
   );
 };
 
-// ─── Footer ────────────────────────────────────────────────────────────────────
-const Footer = ({ branding }) => (
-  <footer style={{ background: C.navy, borderTop: `4px solid ${GOLD}` }}>
-    {/* ── Top brand bar ── */}
-    <div style={{ background: C.navyDeep }}>
-      <div className="max-w-7xl mx-auto px-6 md:px-10 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
-        {/* Brand */}
-        <div className="flex items-center gap-4">
-          {branding?.branding?.logo?.url ? (
-            <img
-              src={branding.branding.logo.url}
-              alt="Logo"
-              className="h-10 object-contain"
-            />
-          ) : (
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: GOLD }}
-            >
-              <LuPlane size={18} style={{ color: C.navy }} />
-            </div>
-          )}
-          <div>
-            <p
-              className="font-bold text-base leading-tight"
-              style={{
-                color: C.white,
-                fontFamily: "'Plus Jakarta Sans',sans-serif",
-              }}
-            >
-              {branding?.branding?.landingPageTitle ||
-                branding?.corporateName ||
-                "Travel Portal"}
-            </p>
-            <p
-              className="text-[11px] font-semibold uppercase tracking-widest mt-0.5"
-              style={{
-                color: GOLD,
-                fontFamily: "'Plus Jakarta Sans',sans-serif",
-              }}
-            >
-              Internal Travel Portal
-            </p>
-          </div>
-        </div>
-
-        {/* Quick action buttons */}
-        <div className="flex flex-wrap gap-3 justify-center">
-          {[
-            { label: "Search Flights", icon: <FaPlane size={12} /> },
-            { label: "Search Hotels", icon: <FaHotel size={12} /> },
-          ].map(({ label, icon }) => (
-            <button
-              key={label}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all hover:opacity-90 active:scale-95"
-              style={{
-                background: GOLD_10,
-                color: GOLD,
-                border: `1px solid ${GOLD_20}`,
-                fontFamily: "'Plus Jakarta Sans',sans-serif",
-              }}
-            >
-              {icon} {label}
-            </button>
-          ))}
-          <button
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all hover:opacity-90 active:scale-95"
-            style={{
-              background: GOLD,
-              color: C.navy,
-              fontFamily: "'Plus Jakarta Sans',sans-serif",
-            }}
-          >
-            <RiPhoneLine size={12} /> Emergency Support
-          </button>
-        </div>
-      </div>
-    </div>
-
-    {/* ── Main link columns ── */}
-    <div className="max-w-7xl mx-auto px-6 md:px-10 py-14">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
-        {/* Brand description column */}
-        <div className="col-span-2 md:col-span-1">
-          <div className="w-8 h-0.5 mb-5" style={{ background: GOLD }} />
-          <p
-            className="text-sm leading-7 mb-6"
-            style={{
-              color: "rgba(255,255,255,0.45)",
-              fontFamily: "'Plus Jakarta Sans',sans-serif",
-            }}
-          >
-            Seamless, policy-compliant travel management for teams of all sizes.
-            Powered by your Travel Admin.
-          </p>
-          {/* Social / trust badges */}
-          <div className="flex gap-3">
-            {["GST Ready", "ISO Certified", "GDPR"].map((b) => (
-              <span
-                key={b}
-                className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-                style={{
-                  background: GOLD_10,
-                  color: GOLD,
-                  border: `1px solid ${GOLD_20}`,
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                }}
-              >
-                {b}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Link columns */}
-        {[
-          {
-            head: "Quick Links",
-            links: [
-              { label: "Search Flights", href: "/search-flight" },
-              { label: "Search Hotels", href: "/search-hotel" },
-              { label: "My Bookings", href: "/my-bookings" },
-              { label: "Pending Approvals", href: "/pending-approvals" },
-            ],
-          },
-          {
-            head: "Resources",
-            links: [
-              { label: "Travel Policy PDF", href: "#" },
-              { label: "Expense Guidelines", href: "#" },
-              { label: "Emergency Guide", href: "#" },
-              { label: "FAQ", href: "#" },
-            ],
-          },
-          {
-            head: "Admin & Settings",
-            links: [
-              { label: "Branding Settings", href: "#" },
-              { label: "User Management", href: "#" },
-              { label: "SSR Management", href: "#" },
-              { label: "Credit Reports", href: "#" },
-            ],
-          },
-        ].map(({ head, links }) => (
-          <div key={head}>
-            <h5
-              className="text-[10px] font-black uppercase tracking-[0.25em] mb-5"
-              style={{
-                color: GOLD,
-                fontFamily: "'Plus Jakarta Sans',sans-serif",
-              }}
-            >
-              {head}
-            </h5>
-            <ul className="space-y-3">
-              {links.map(({ label, href }) => (
-                <li key={label}>
-                  <a
-                    href={href}
-                    className="text-sm font-medium transition-all hover:text-white flex items-center gap-1.5 group"
-                    style={{
-                      color: "rgba(255,255,255,0.45)",
-                      fontFamily: "'Plus Jakarta Sans',sans-serif",
-                    }}
-                  >
-                    <RiArrowRightLine
-                      size={12}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      style={{ color: GOLD }}
-                    />
-                    {label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-    </div>
-
-    {/* ── Bottom legal bar ── */}
-    <div
-      style={{
-        background: C.nearBlack,
-        borderTop: `1px solid rgba(255,255,255,0.07)`,
-      }}
-    >
-      <div className="max-w-7xl mx-auto px-6 md:px-10 py-5 flex flex-col md:flex-row items-center justify-between gap-4">
-        <p
-          className="text-xs"
-          style={{
-            color: "rgba(255,255,255,0.35)",
-            fontFamily: "'Plus Jakarta Sans',sans-serif",
-          }}
-        >
-          &copy; {new Date().getFullYear()}{" "}
-          {branding?.branding?.landingPageTitle ||
-            branding?.corporateName ||
-            "Travel Portal"}
-          . All rights reserved. &nbsp;·&nbsp; Powered by{" "}
-          <span style={{ color: GOLD }}>Travel Portal</span>
-        </p>
-        <div className="flex items-center gap-6">
-          {["Privacy Policy", "Terms of Use", "Cookie Policy"].map((l) => (
-            <a
-              key={l}
-              href="#"
-              className="text-[11px] font-medium transition-opacity hover:opacity-100"
-              style={{
-                color: "rgba(255,255,255,0.35)",
-                fontFamily: "'Plus Jakarta Sans',sans-serif",
-              }}
-            >
-              {l}
-            </a>
-          ))}
-        </div>
-      </div>
-    </div>
-  </footer>
-);
 
 // ─── MAIN EXPORT ───────────────────────────────────────────────────────────────
 export default function InternalTravelDeskLanding() {
@@ -2342,7 +2144,7 @@ export default function InternalTravelDeskLanding() {
       className="min-h-screen"
       style={{ fontFamily: "'Plus Jakarta Sans',sans-serif" }}
     >
-      <CorporateNavbar />
+      <LandingHeader />
       <HeroWithSearch
         branding={branding}
         navigate={navigate}
@@ -2351,9 +2153,9 @@ export default function InternalTravelDeskLanding() {
       <FeatureStrip />
       <HowToBook />
       <TravelPolicies branding={branding} />
-      <Restrictions />
+      {/* <Restrictions /> */}
       <SupportSection branding={branding} />
-      <Footer branding={branding} />
+      <LandingFooter />
 
       {/* Floating contact button */}
       <button
