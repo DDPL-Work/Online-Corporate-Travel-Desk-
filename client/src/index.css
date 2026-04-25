@@ -163,3 +163,29 @@ body {
     transform: translateY(0);
   }
 }
+
+@theme {
+  /* This defines the variable and the keyframes */
+  --animate-infinite-scroll: scroll 30s linear infinite;
+
+  @keyframes scroll {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+}
+
+/* In Tailwind 4, you must manually map the theme variable 
+  to a class if it doesn't auto-generate.
+*/
+.animate-infinite-scroll {
+  animation: var(--animate-infinite-scroll);
+}
+
+/* Optional: Pauses the scroll when a user hovers over it */
+.animate-infinite-scroll:hover {
+  animation-play-state: paused;
+}

@@ -232,6 +232,7 @@ export const Inp = ({
 
 export const RichSelect = ({ value, onChange, options, icon }) => {
   const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
   const ref = useRef(null);
 
   useEffect(() => {
@@ -240,9 +241,29 @@ export const RichSelect = ({ value, onChange, options, icon }) => {
         setOpen(false);
       }
     };
+    
+    const handleScroll = (e) => {
+      // Don't close if scrolling inside the dropdown itself
+      if (e.target.closest('.rich-select-menu')) return;
+      if (open) setOpen(false);
+    };
+
+    if (open && ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom,
+        left: rect.left,
+        width: rect.width
+      });
+    }
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [open]);
 
   const selected = options.find((o) => (o.value || o) === value) || options[0];
 
@@ -267,9 +288,16 @@ export const RichSelect = ({ value, onChange, options, icon }) => {
         />
       </button>
 
-      {/* Dropdown */}
+      {/* Dropdown - Fixed positioning to overlay footer */}
       {open && (
-        <div className="absolute z-50 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl overflow-y-auto max-h-60 animate-in fade-in zoom-in-95">
+        <div
+          className="fixed z-[100] mt-2 rounded-xl border border-slate-200 bg-white shadow-2xl overflow-y-auto max-h-60 animate-in fade-in zoom-in-95 origin-top rich-select-menu"
+          style={{ 
+            top: coords.top, 
+            left: coords.left, 
+            width: coords.width 
+          }}
+        >
           {options.map((o) => {
             const val = o.value || o;
             const label = o.label || o;

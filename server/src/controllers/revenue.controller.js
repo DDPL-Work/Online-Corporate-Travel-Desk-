@@ -129,16 +129,22 @@ exports.getCompanyWiseRevenue = asyncHandler(async (req, res) => {
 
   // Populate names
   const corporateIds = results.map((r) => r.corporateId);
-  const corporates = await Corporate.find({ _id: { $in: corporateIds } }, "corporateName");
+  const corporates = await Corporate.find({ _id: { $in: corporateIds } }, "corporateName classification");
   
-  const corpNameMap = {};
-  corporates.forEach(c => corpNameMap[c._id.toString()] = c.corporateName);
+  const corpInfoMap = {};
+  corporates.forEach(c => {
+    corpInfoMap[c._id.toString()] = { 
+      name: c.corporateName, 
+      classification: c.classification || "prepaid" 
+    };
+  });
 
   const totalGlobalRevenue = results.reduce((sum, r) => sum + r.revenue, 0);
 
   const finalData = results.map(r => ({
     ...r,
-    companyName: corpNameMap[r.corporateId] || "Unknown",
+    companyName: corpInfoMap[r.corporateId]?.name || "Unknown",
+    accountType: corpInfoMap[r.corporateId]?.classification || "prepaid",
     contribution: totalGlobalRevenue > 0 ? (r.revenue / totalGlobalRevenue) * 100 : 0
   })).sort((a, b) => b.revenue - a.revenue);
 

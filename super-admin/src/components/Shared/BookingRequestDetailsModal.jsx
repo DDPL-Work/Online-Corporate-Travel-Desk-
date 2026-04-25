@@ -8,6 +8,7 @@ import {
   amendBooking,
   fetchChangeStatus,
 } from "../../Redux/Actions/corporate.related.thunks";
+import { createReissueRequest } from "../../Redux/Actions/reissueThunks";
 import { resetAmendmentState } from "../../Redux/Slice/corporate.related.slice";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import {
@@ -300,6 +301,11 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
   const pnr = bookRes.pnr;
   const onwardPNR = bookRes.onwardPNR;
   const returnPNR = bookRes.returnPNR;
+  const flightAmendDetails = Array.isArray(amendment.response)
+    ? amendment.response.flatMap(
+        (r) => r.response?.Response?.TicketCRInfo || r.response?.TicketCRInfo || [],
+      )
+    : [];
 
   const allInvoices = [
     ...(onwardItin.Invoice || []).map((i) => ({ ...i, leg: "Onward" })),
@@ -407,6 +413,23 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                 value={raw.executionStatus}
                 color="text-emerald-700"
               />
+              {pnr && (
+                <StatTile label="PNR" value={pnr} color="text-sky-700" />
+              )}
+              {onwardPNR && (
+                <StatTile
+                  label="Onward PNR"
+                  value={onwardPNR}
+                  color="text-sky-700"
+                />
+              )}
+              {returnPNR && (
+                <StatTile
+                  label="Return PNR"
+                  value={returnPNR}
+                  color="text-purple-700"
+                />
+              )}
               <StatTile
                 label="Travel Date"
                 value={fmt(correctTravelDate)}
@@ -490,95 +513,118 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
           </Section>
           )}
 
-          {/* ══ 3. FLIGHT SEGMENTS (from flightRequest) ══ */}
+          {/* ══ 3. FLIGHT SEGMENTS ══ */}
           {segments.length > 0 && (
-            <Section
-              title={`Flight Segments — Request (${segments.length})`}
-              icon={<FaPlane size={11} />}
-            >
-              <div className="space-y-3">
+            <Section title="Flight Itinerary Details" icon={<FiLayers size={11} />}>
+              <div className="relative pl-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-gradient-to-b before:from-blue-600 before:via-blue-400 before:to-indigo-600 space-y-8">
                 {segments.map((seg, i) => (
-                  <div
-                    key={i}
-                    className="border border-gray-100 rounded-xl overflow-hidden"
-                  >
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-900">
-                          {seg.airlineCode} {seg.flightNumber}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {seg.airlineName}
-                        </span>
-                        {seg.aircraft && (
-                          <Chip color="sky">{seg.aircraft}</Chip>
-                        )}
-                        {seg.journeyType && (
+                  <div key={i} className="relative">
+                    {/* Departure Point */}
+                    <div className="absolute -left-[27px] top-0 w-[23px] h-[23px] rounded-full bg-white border-2 border-blue-600 flex items-center justify-center z-10 shadow-sm">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+                    </div>
+
+                    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden transition-all hover:border-blue-200">
+                      <div className="flex items-center justify-between px-4 py-3 bg-gray-50/50 border-b border-gray-100">
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-gray-900 tracking-tight">
+                              {seg.airlineCode} {seg.flightNumber}
+                            </span>
+                            <span className="text-[10px] text-gray-500 font-medium">
+                              {seg.airlineName}
+                            </span>
+                          </div>
+                          <div className="h-4 w-px bg-gray-200 mx-1" />
                           <Chip
-                            color={
-                              seg.journeyType === "onward" ? "teal" : "purple"
-                            }
+                            color={seg.journeyType === "onward" ? "blue" : "purple"}
+                            size="xs"
                           >
-                            {seg.journeyType}
+                            {seg.journeyType?.toUpperCase()}
                           </Chip>
-                        )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {seg.aircraft && (
+                            <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                              {seg.aircraft}
+                            </span>
+                          )}
+                          <Chip color="indigo" size="xs">
+                            {cabinLabel(seg.cabinClass)}
+                          </Chip>
+                        </div>
                       </div>
-                      <div className="flex gap-1.5 flex-wrap">
-                        {seg.fareClass && (
-                          <Chip color="teal">Fare: {seg.fareClass}</Chip>
+
+                      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Departure Details */}
+                        <div className="flex gap-4">
+                          <div className="flex flex-col items-center">
+                            <div className="text-[10px] font-bold text-blue-600 uppercase">DEP</div>
+                            <FiClock size={12} className="text-gray-300 my-1" />
+                          </div>
+                          <div>
+                            <p className="text-lg font-bold text-gray-900 leading-none">
+                              {fmtTime(seg.departureDateTime)}
+                            </p>
+                            <p className="text-xs font-semibold text-gray-600 mt-1">
+                              {getCity(seg, "origin")} ({seg.origin?.airportCode})
+                            </p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">
+                              {fmt(seg.departureDateTime)}
+                              {seg.origin?.terminal && ` · Terminal ${seg.origin.terminal}`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Arrival Details */}
+                        <div className="flex gap-4">
+                          <div className="flex flex-col items-center">
+                            <div className="text-[10px] font-bold text-indigo-600 uppercase">ARR</div>
+                            <FiClock size={12} className="text-gray-300 my-1" />
+                          </div>
+                          <div>
+                            <p className="text-lg font-bold text-gray-900 leading-none">
+                              {fmtTime(seg.arrivalDateTime)}
+                            </p>
+                            <p className="text-xs font-semibold text-gray-600 mt-1">
+                              {getCity(seg, "destination")} ({seg.destination?.airportCode})
+                            </p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">
+                              {fmt(seg.arrivalDateTime)}
+                              {seg.destination?.terminal && ` · Terminal ${seg.destination.terminal}`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer Info (Baggage, Duration) */}
+                      <div className="px-4 py-2.5 bg-indigo-50/30 border-t border-indigo-100/50 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-1.5">
+                            <FiPackage size={11} className="text-indigo-400" />
+                            <span className="text-[10px] font-medium text-indigo-700">
+                              Baggage: {seg.baggage?.checkIn || "Standard"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <FiBriefcase size={11} className="text-indigo-400" />
+                            <span className="text-[10px] font-medium text-indigo-700">
+                              Cabin: {seg.baggage?.cabin || "7KG"}
+                            </span>
+                          </div>
+                        </div>
+                        {seg.durationMinutes != null && (
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 bg-white px-2 py-0.5 rounded-full border border-indigo-100">
+                            <FiClock size={10} />
+                            {Math.floor(seg.durationMinutes / 60)}h {seg.durationMinutes % 60}m
+                          </div>
                         )}
-                        {seg.cabinClass != null && (
-                          <Chip color="blue">{cabinLabel(seg.cabinClass)}</Chip>
-                        )}
-                        <Chip color={seg.stopOver ? "amber" : "green"}>
-                          {seg.stopOver ? "Stopover" : "Non-stop"}
-                        </Chip>
-                        <Chip color="gray">Seg {seg.segmentIndex}</Chip>
                       </div>
                     </div>
-                    <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <KV
-                        label="From"
-                        value={`${getCity(seg, "origin")} (${seg.origin?.airportCode})`}
-                      />
-                      <KV
-                        label="To"
-                        value={`${getCity(seg, "destination")} (${seg.destination?.airportCode})`}
-                      />
-                      <KV
-                        label="Origin Terminal"
-                        value={seg.origin?.terminal || "—"}
-                      />
-                      <KV
-                        label="Destination Terminal"
-                        value={seg.destination?.terminal || "—"}
-                      />
-                      <KV
-                        label="Departure"
-                        value={fmtDT(seg.departureDateTime)}
-                      />
-                      <KV label="Arrival" value={fmtDT(seg.arrivalDateTime)} />
-                      {seg.durationMinutes != null && (
-                        <KV
-                          label="Duration"
-                          value={`${Math.floor(seg.durationMinutes / 60)}h ${seg.durationMinutes % 60}m`}
-                        />
-                      )}
-                      <KV label="Aircraft" value={seg.aircraft} />
-                      {seg.baggage?.checkIn && (
-                        <KV
-                          label="Check-in Baggage"
-                          value={seg.baggage.checkIn}
-                        />
-                      )}
-                      {seg.baggage?.cabin && (
-                        <KV label="Cabin Baggage" value={seg.baggage.cabin} />
-                      )}
-                      <KV label="Origin Country" value={seg.origin?.country} />
-                      <KV
-                        label="Destination Country"
-                        value={seg.destination?.country}
-                      />
+
+                    {/* Arrival Point (Pulse effect for current/last segment) */}
+                    <div className="absolute -left-[27px] bottom-0 w-[23px] h-[23px] rounded-full bg-white border-2 border-indigo-600 flex items-center justify-center z-10 shadow-sm">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
                     </div>
                   </div>
                 ))}
@@ -763,90 +809,6 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                         </div>
                       </div>
                     )}
-                    {/* Segment Details per Pax */}
-                    {(fb.SegmentDetails || []).length > 0 && (
-                      <div className="px-4 pb-4">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">
-                          Segment Baggage Allowance
-                        </p>
-                        <div className="space-y-1">
-                          {fb.SegmentDetails.map((sd, si) => (
-                            <div
-                              key={si}
-                              className="flex gap-6 text-xs text-gray-700"
-                            >
-                              <span className="text-gray-400">
-                                Segment {sd.FlightInfoIndex}:
-                              </span>
-                              {sd.CheckedInBaggage && (
-                                <span>
-                                  Check-in:{" "}
-                                  {sd.CheckedInBaggage.FreeText ||
-                                    sd.CheckedInBaggage.Value +
-                                      " " +
-                                      sd.CheckedInBaggage.Unit}
-                                </span>
-                              )}
-                              {sd.CabinBaggage && (
-                                <span>
-                                  Cabin:{" "}
-                                  {sd.CabinBaggage.FreeText ||
-                                    sd.CabinBaggage.Value +
-                                      " " +
-                                      sd.CabinBaggage.Unit}
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          {/* ══ 6. FARE RULES (from fareQuote) ══ */}
-          {fareRules.length > 0 && (
-            <Section
-              title="Fare Rules (from Quote)"
-              icon={<FiFileText size={11} />}
-            >
-              <div className="space-y-3">
-                {fareRules.map((fr, i) => (
-                  <div
-                    key={i}
-                    className="border border-gray-100 rounded-xl p-4"
-                  >
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      <Chip color="teal">
-                        {fr.Origin} → {fr.Destination}
-                      </Chip>
-                      <Chip color="blue">{fr.Airline}</Chip>
-                      <Chip color="gray">Basis: {fr.FareBasisCode}</Chip>
-                      {fr.FareFamilyCode && (
-                        <Chip color="purple">Family: {fr.FareFamilyCode}</Chip>
-                      )}
-                    </div>
-                    {(fr.FareInclusions || []).length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mb-3">
-                        {fr.FareInclusions.map((inc, ii) => (
-                          <span
-                            key={ii}
-                            className="px-2 py-0.5 bg-green-50 border border-green-100 text-green-700 text-[10px] rounded-lg flex items-center gap-1"
-                          >
-                            <FiCheckCircle size={9} /> {inc}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {fr.FareRuleDetail && (
-                      <div
-                        className="text-xs text-gray-600 bg-gray-50 rounded-lg p-3 max-h-32 overflow-y-auto prose prose-sm"
-                        dangerouslySetInnerHTML={{ __html: fr.FareRuleDetail }}
-                      />
-                    )}
                   </div>
                 ))}
               </div>
@@ -859,77 +821,78 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
               title="Change / Cancellation Rules"
               icon={<FiShield size={11} />}
             >
-              <div className="border border-gray-100 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50">
-                      {[
-                        "Type",
-                        "Journey",
-                        "Window",
-                        "Details",
-                        "Online Reissue",
-                        "Online Refund",
-                      ].map((h, i) => (
-                        <th
-                          key={i}
-                          className="px-4 py-3 text-[10px] font-medium uppercase tracking-widest text-gray-400 text-left"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {miniFareRules.map((r, i) => (
+                  <div
+                    key={i}
+                    className={`relative overflow-hidden border rounded-2xl p-4 transition-all hover:shadow-md ${
+                      r.Type === "Cancellation"
+                        ? "bg-red-50/30 border-red-100"
+                        : "bg-blue-50/30 border-blue-100"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            r.Type === "Cancellation"
+                              ? "bg-red-100 text-red-600"
+                              : "bg-blue-100 text-blue-600"
+                          }`}
                         >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {miniFareRules.map((r, i) => (
-                      <tr
-                        key={i}
-                        className="hover:bg-gray-50 transition-colors"
+                          {r.Type === "Cancellation" ? (
+                            <FiX size={14} />
+                          ) : (
+                            <FiRepeat size={14} />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-900 uppercase tracking-tight">
+                            {r.Type}
+                          </p>
+                          <p className="text-[10px] text-gray-500 font-medium">
+                            {r.JourneyPoints || "Global Rule"}
+                          </p>
+                        </div>
+                      </div>
+                      <Chip
+                        color={r.Type === "Cancellation" ? "red" : "blue"}
+                        size="xs"
                       >
-                        <td className="px-4 py-3">
-                          <Chip
-                            color={
-                              r.Type === "Cancellation"
-                                ? "red"
-                                : r.Type === "Reissue"
-                                  ? "blue"
-                                  : "gray"
-                            }
-                          >
-                            {r.Type || "—"}
-                          </Chip>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-600">
-                          {r.JourneyPoints || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-500">
-                          {r.From != null && r.Unit
-                            ? `${r.From}–${r.To || "∞"} ${r.Unit}`
-                            : "Any time"}
-                        </td>
-                        <td className="px-4 py-3 text-xs font-medium text-gray-800">
-                          {r.Details || "—"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Chip
-                            color={r.OnlineReissueAllowed ? "green" : "gray"}
-                            size="xs"
-                          >
-                            {r.OnlineReissueAllowed ? "Yes" : "No"}
-                          </Chip>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Chip
-                            color={r.OnlineRefundAllowed ? "green" : "gray"}
-                            size="xs"
-                          >
-                            {r.OnlineRefundAllowed ? "Yes" : "No"}
-                          </Chip>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        {r.From != null
+                          ? `${r.From}–${r.To || "∞"} ${r.Unit}`
+                          : "Anytime"}
+                      </Chip>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      <div className="flex justify-between items-end">
+                        <p className="text-sm font-semibold text-gray-800 leading-tight">
+                          {r.Details || "See full rules for details"}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-4 pt-2 border-t border-gray-100/50">
+                        <div className="flex items-center gap-1.5">
+                          <div
+                            className={`w-1.5 h-1.5 rounded-full ${r.OnlineReissueAllowed ? "bg-emerald-500" : "bg-gray-300"}`}
+                          />
+                          <span className="text-[10px] text-gray-500 font-medium">
+                            Online Reissue
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div
+                            className={`w-1.5 h-1.5 rounded-full ${r.OnlineRefundAllowed ? "bg-emerald-500" : "bg-gray-300"}`}
+                          />
+                          <span className="text-[10px] text-gray-500 font-medium">
+                            Online Refund
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </Section>
           )}
@@ -1190,43 +1153,7 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                       </div>
                     )}
 
-                    {/* Segment Additional Info (fare basis, baggage per seg) */}
-                    {(provPax?.SegmentAdditionalInfo || []).length > 0 && (
-                      <div className="px-4 pb-4 border-t border-gray-100">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-3 mb-2">
-                          Segment Fare Info
-                        </p>
-                        <div className="space-y-2">
-                          {provPax.SegmentAdditionalInfo.map((si, sii) => (
-                            <div
-                              key={sii}
-                              className="bg-gray-50 rounded-lg px-3 py-2 grid grid-cols-2 md:grid-cols-4 gap-3"
-                            >
-                              <KV
-                                label="Fare Basis"
-                                value={si.FareBasis}
-                                mono
-                              />
-                              <KV label="Baggage" value={si.Baggage} />
-                              <KV
-                                label="Cabin Baggage"
-                                value={si.CabinBaggage}
-                              />
-                              <KV label="Meal" value={si.Meal} />
-                              {si.Seat && <KV label="Seat" value={si.Seat} />}
-                              {si.NVA && <KV label="NVA" value={si.NVA} />}
-                              {si.NVB && <KV label="NVB" value={si.NVB} />}
-                              {si.SpecialService && (
-                                <KV
-                                  label="Special Service"
-                                  value={si.SpecialService}
-                                />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+
                   </div>
                 );
               })}
@@ -1242,7 +1169,7 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
               icon={<FiCheckCircle size={11} />}
             >
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <KV
                     label="PNR"
                     value={onwardItin.PNR || singleItin.PNR}
@@ -1252,14 +1179,6 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                     label="Booking ID"
                     value={onwardItin.BookingId || singleItin.BookingId}
                     mono
-                  />
-                  <KV
-                    label="Origin"
-                    value={onwardItin.Origin || singleItin.Origin}
-                  />
-                  <KV
-                    label="Destination"
-                    value={onwardItin.Destination || singleItin.Destination}
                   />
                   <KV
                     label="Airline Code"
@@ -1273,91 +1192,6 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                     }
                   />
                 </div>
-
-                {/* Confirmed Segments from booking result */}
-                {(onwardSegments.length > 0 || singleSegments.length > 0) && (
-                  <div>
-                    <p className="text-[10px] text-blue-700 uppercase tracking-widest font-semibold mb-2">
-                      Confirmed Segment(s)
-                    </p>
-                    <div className="space-y-2">
-                      {(onwardSegments.length > 0
-                        ? onwardSegments
-                        : singleSegments
-                      ).map((seg, si) => (
-                        <div
-                          key={si}
-                          className="bg-white border border-blue-100 rounded-lg p-3 grid grid-cols-2 md:grid-cols-4 gap-3"
-                        >
-                          <KV
-                            label="Flight"
-                            value={`${seg.Airline?.AirlineCode} ${seg.Airline?.FlightNumber}`}
-                          />
-                          <KV
-                            label="Airline PNR"
-                            value={seg.AirlinePNR || "—"}
-                            mono
-                          />
-                          <KV
-                            label="From"
-                            value={seg.Origin?.Airport?.AirportCode}
-                          />
-                          <KV
-                            label="To"
-                            value={seg.Destination?.Airport?.AirportCode}
-                          />
-                          <KV
-                            label="Departure"
-                            value={fmtDT(seg.Origin?.DepTime)}
-                          />
-                          <KV
-                            label="Arrival"
-                            value={fmtDT(seg.Destination?.ArrTime)}
-                          />
-                          <KV
-                            label="Duration"
-                            value={
-                              seg.Duration
-                                ? `${Math.floor(seg.Duration / 60)}h ${seg.Duration % 60}m`
-                                : "—"
-                            }
-                          />
-                          <KV
-                            label="Status"
-                            value={seg.FlightStatus || seg.Status}
-                          />
-                          <KV
-                            label="Cabin Class"
-                            value={cabinLabel(seg.CabinClass)}
-                          />
-                          <KV
-                            label="Fare Class"
-                            value={seg.Airline?.FareClass}
-                          />
-                          <KV label="Baggage" value={seg.Baggage} />
-                          <KV label="Cabin Baggage" value={seg.CabinBaggage} />
-                          <KV label="Aircraft" value={seg.Craft} />
-                          <KV
-                            label="Non-stop"
-                            value={seg.StopOver ? "Has Stopover" : "Non-stop"}
-                          />
-                          {seg.AccumulatedDuration && (
-                            <KV
-                              label="Accumulated Duration"
-                              value={`${Math.floor(seg.AccumulatedDuration / 60)}h ${seg.AccumulatedDuration % 60}m`}
-                            />
-                          )}
-                          {seg.GroundTime > 0 && (
-                            <KV
-                              label="Ground Time"
-                              value={`${seg.GroundTime}m`}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </Section>
           )}
@@ -1369,95 +1203,15 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
               icon={<FiRepeat size={11} />}
             >
               <div className="bg-purple-50 border border-purple-100 rounded-xl p-4">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <KV label="PNR" value={returnItin.PNR} mono />
                   <KV label="Booking ID" value={returnItin.BookingId} mono />
-                  <KV label="Origin" value={returnItin.Origin} />
-                  <KV label="Destination" value={returnItin.Destination} />
                   <KV label="Airline Code" value={returnItin.AirlineCode} />
                   <KV
                     label="Validating Airline"
                     value={returnItin.ValidatingAirlineCode}
                   />
                 </div>
-
-                {/* Return Segments */}
-                {returnSegments.length > 0 && (
-                  <div>
-                    <p className="text-[10px] text-purple-700 uppercase tracking-widest font-semibold mb-2">
-                      Confirmed Segment(s)
-                    </p>
-                    <div className="space-y-2">
-                      {returnSegments.map((seg, si) => (
-                        <div
-                          key={si}
-                          className="bg-white border border-purple-100 rounded-lg p-3 grid grid-cols-2 md:grid-cols-4 gap-3"
-                        >
-                          <KV
-                            label="Flight"
-                            value={`${seg.Airline?.AirlineCode} ${seg.Airline?.FlightNumber}`}
-                          />
-                          <KV
-                            label="Airline PNR"
-                            value={seg.AirlinePNR || "—"}
-                            mono
-                          />
-                          <KV
-                            label="From"
-                            value={seg.Origin?.Airport?.AirportCode}
-                          />
-                          <KV
-                            label="To"
-                            value={seg.Destination?.Airport?.AirportCode}
-                          />
-                          <KV
-                            label="Departure"
-                            value={fmtDT(seg.Origin?.DepTime)}
-                          />
-                          <KV
-                            label="Arrival"
-                            value={fmtDT(seg.Destination?.ArrTime)}
-                          />
-                          <KV
-                            label="Duration"
-                            value={
-                              seg.Duration
-                                ? `${Math.floor(seg.Duration / 60)}h ${seg.Duration % 60}m`
-                                : "—"
-                            }
-                          />
-                          <KV
-                            label="Status"
-                            value={seg.FlightStatus || seg.Status}
-                          />
-                          <KV
-                            label="Cabin Class"
-                            value={cabinLabel(seg.CabinClass)}
-                          />
-                          <KV
-                            label="Fare Class"
-                            value={seg.Airline?.FareClass}
-                          />
-                          <KV label="Baggage" value={seg.Baggage} />
-                          <KV label="Cabin Baggage" value={seg.CabinBaggage} />
-                          <KV label="Aircraft" value={seg.Craft} />
-                          {seg.AccumulatedDuration && (
-                            <KV
-                              label="Accumulated Duration"
-                              value={`${Math.floor(seg.AccumulatedDuration / 60)}h ${seg.AccumulatedDuration % 60}m`}
-                            />
-                          )}
-                          {seg.GroundTime > 0 && (
-                            <KV
-                              label="Ground Time"
-                              value={`${seg.GroundTime}m`}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Return Passengers Tickets */}
                 {allReturnPassengers.length > 0 && (
@@ -1560,29 +1314,80 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
           {/* ══ 15. AMENDMENT HISTORY ══ */}
           {amendHist.length > 0 && (
             <Section
-              title={`Amendment History (${amendHist.length})`}
-              icon={<FiInfo size={11} />}
+              title="Amendment Transaction History"
+              icon={<FiBarChart2 size={11} />}
             >
-              <div className="space-y-2">
+              <div className="relative pl-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-amber-200 space-y-6">
                 {amendHist.map((ah, i) => (
-                  <div
-                    key={i}
-                    className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 flex justify-between items-start gap-4"
-                  >
-                    <div>
-                      <Chip color="amber">{ah.type?.replace(/_/g, " ")}</Chip>
-                      <p className="text-xs text-gray-700 mt-1.5 capitalize font-medium">
-                        {ah.status?.replace(/_/g, " ")}
-                      </p>
-                      {ah.changeRequestId && (
-                        <p className="text-[10px] font-mono text-gray-400 mt-0.5">
-                          CR ID: {ah.changeRequestId}
+                  <div key={i} className="relative">
+                    <div className="absolute -left-[25px] top-1.5 w-[19px] h-[19px] rounded-full bg-white border-2 border-amber-500 flex items-center justify-center z-10 shadow-sm" />
+                    
+                    <div className="bg-amber-50/40 border border-amber-100 rounded-2xl p-4 transition-all hover:bg-amber-50/60">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Chip color="amber" size="xs">
+                              {ah.type?.replace(/_/g, " ").toUpperCase()}
+                            </Chip>
+                            <StatusBadge status={ah.status} />
+                          </div>
+                          {ah.changeRequestId && (
+                            <p className="text-[10px] font-mono text-gray-400">
+                              CR ID: {ah.changeRequestId}
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase">
+                          {fmtDT(ah.createdAt)}
                         </p>
-                      )}
+                      </div>
+
+                      {/* Detailed Refund Info in History */}
+                      {(() => {
+                        const hDetails = Array.isArray(ah.response)
+                          ? ah.response.flatMap(
+                              (r) =>
+                                r.response?.Response?.TicketCRInfo ||
+                                r.response?.TicketCRInfo ||
+                                [],
+                            )
+                          : [];
+                        return hDetails.length > 0 ? (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-3 border-t border-amber-200/50">
+                            {hDetails.map((det, di) => (
+                              <React.Fragment key={di}>
+                                {det.RefundedAmount != null && (
+                                  <div className="bg-white rounded-lg px-3 py-2 border border-amber-100">
+                                    <p className="text-[9px] text-gray-400 uppercase font-bold">Refund</p>
+                                    <p className="text-sm font-bold text-emerald-700 leading-tight">
+                                      {inr(det.RefundedAmount)}
+                                    </p>
+                                  </div>
+                                )}
+                                {det.CancellationCharge != null && (
+                                  <div className="bg-white rounded-lg px-3 py-2 border border-amber-100">
+                                    <p className="text-[9px] text-gray-400 uppercase font-bold">Charge</p>
+                                    <p className="text-sm font-bold text-rose-700 leading-tight">
+                                      {inr(det.CancellationCharge)}
+                                    </p>
+                                  </div>
+                                )}
+                                {det.CreditNoteNo && (
+                                  <div className="bg-white rounded-lg px-3 py-2 border border-amber-100">
+                                    <p className="text-[9px] text-gray-400 uppercase font-bold">Credit Note</p>
+                                    <p className="text-[11px] font-mono text-gray-800 leading-tight truncate">
+                                      {det.CreditNoteNo}
+                                    </p>
+                                  </div>
+                                )}
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-gray-500 italic">No financial breakdown available for this transaction.</p>
+                        );
+                      })()}
                     </div>
-                    <p className="text-[11px] text-gray-400 shrink-0">
-                      {fmtDT(ah.createdAt)}
-                    </p>
                   </div>
                 ))}
               </div>
@@ -1603,20 +1408,56 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                 />
                 <KV
                   label="Status"
-                  value={amendment.status?.replace(/_/g, " ")}
+                  value={
+                    flightAmendDetails.some((d) => d.ChangeRequestStatus === 4)
+                      ? "Processed"
+                      : amendment.status?.replace(/_/g, " ")
+                  }
                 />
                 <KV label="Requested At" value={fmtDT(amendment.requestedAt)} />
                 {amendment.amendmentType && (
                   <KV label="Amendment Type" value={amendment.amendmentType} />
                 )}
                 {amendment.remarks && (
-                  <KV label="Remarks" value={amendment.remarks} />
+                  <div className="col-span-full">
+                    <KV label="Remarks" value={amendment.remarks} />
+                  </div>
                 )}
                 {amendment.lastCheckedAt && (
                   <KV
                     label="Last Checked"
                     value={fmtDT(amendment.lastCheckedAt)}
                   />
+                )}
+
+                {/* Detailed Refund Info from CR Response */}
+                {flightAmendDetails.length > 0 && (
+                  <div className="col-span-full mt-2 pt-4 border-t border-amber-200 grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {flightAmendDetails.map((det, di) => (
+                      <React.Fragment key={di}>
+                        {det.RefundedAmount != null && (
+                          <KV
+                            label="Refunded Amount"
+                            value={inr(det.RefundedAmount)}
+                            highlight
+                          />
+                        )}
+                        {det.CancellationCharge != null && (
+                          <KV
+                            label="Cancellation Charge"
+                            value={inr(det.CancellationCharge)}
+                          />
+                        )}
+                        {det.CreditNoteNo && (
+                          <KV
+                            label="Credit Note No"
+                            value={det.CreditNoteNo}
+                            mono
+                          />
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </div>
                 )}
               </div>
             </Section>
@@ -1656,7 +1497,7 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                     },
                     {
                       id: "reissue",
-                      label: "Reissue",
+                      label: "Request reissue",
                       sub: "Request modification",
                     },
                     {
@@ -1695,68 +1536,115 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                       {cancellationCharges &&
                         (() => {
                           const c = cancellationCharges;
+                          const res = c?.Response || c?.response || {};
                           const charges =
                             c?.CancellationCharges ||
                             c?.cancellationCharges ||
                             {};
-                          const hasCards =
-                            charges.AirlineCharges != null ||
-                            charges.NetRefund != null;
+                          
+                          // TBO style response
+                          const refundAmt = res.RefundAmount ?? charges.RefundAmount;
+                          const cancelCharge = res.CancellationCharge ?? charges.CancellationCharge ?? charges.AirlineCharges;
+                          const currency = res.Currency || charges.Currency || "INR";
+                          const serviceTax = res.ServiceTax || 0;
+                          
+                          // If we have either the old charges object or the new Response object
+                          const hasData = refundAmt != null || cancelCharge != null || charges.NetRefund != null;
+
+                          if (!hasData) {
+                             return (
+                               <div className="bg-gray-50 border border-gray-100 rounded-xl p-6 text-center">
+                                 <p className="text-sm text-gray-500 italic">No detailed charge breakdown returned by provider.</p>
+                               </div>
+                             );
+                          }
+
                           return (
-                            <div className="space-y-3">
-                              {hasCards && (
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                  {charges.AirlineCharges != null && (
-                                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
-                                      <p className="text-[10px] text-gray-400 uppercase tracking-wide">
-                                        Airline fee
-                                      </p>
-                                      <p className="text-sm font-medium text-gray-900 mt-1">
-                                        {inr(charges.AirlineCharges)}
-                                      </p>
-                                      <p className="text-[10px] text-gray-400 mt-0.5">
-                                        Per passenger
-                                      </p>
-                                    </div>
-                                  )}
-                                  {charges.Tax != null && (
-                                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
-                                      <p className="text-[10px] text-gray-400 uppercase tracking-wide">
-                                        Tax refund
-                                      </p>
-                                      <p className="text-sm font-medium text-gray-900 mt-1">
-                                        {inr(charges.Tax)}
-                                      </p>
-                                      <p className="text-[10px] text-gray-400 mt-0.5">
-                                        Refundable
-                                      </p>
-                                    </div>
-                                  )}
-                                  {charges.NetRefund != null && (
-                                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
-                                      <p className="text-[10px] text-gray-400 uppercase tracking-wide">
-                                        Net refund
-                                      </p>
-                                      <p className="text-sm font-medium text-emerald-700 mt-1">
-                                        {inr(charges.NetRefund)}
-                                      </p>
-                                      <p className="text-[10px] text-gray-400 mt-0.5">
-                                        Estimated
-                                      </p>
-                                    </div>
-                                  )}
+                            <div className="space-y-4">
+                              {/* Summary Tiles */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="bg-white border border-blue-100 rounded-2xl p-4 shadow-sm">
+                                  <p className="text-[10px] text-blue-500 uppercase font-bold tracking-tight">Gross Refund</p>
+                                  <p className="text-lg font-bold text-gray-900 mt-1">
+                                    {inr(refundAmt)}
+                                  </p>
+                                  <p className="text-[9px] text-gray-400 mt-0.5">Base + Taxes</p>
                                 </div>
-                              )}
-                              <div>
-                                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                                  <FiFileText size={10} /> Provider response
-                                </p>
-                                <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-[11px] font-mono text-gray-500 max-h-48 overflow-auto whitespace-pre-wrap">
-                                  {JSON.stringify(cancellationCharges, null, 2)}
+                                <div className="bg-white border border-rose-100 rounded-2xl p-4 shadow-sm">
+                                  <p className="text-[10px] text-rose-500 uppercase font-bold tracking-tight">Cancellation Fee</p>
+                                  <p className="text-lg font-bold text-rose-700 mt-1">
+                                    {inr(cancelCharge)}
+                                  </p>
+                                  <p className="text-[9px] text-gray-400 mt-0.5">Airline Penalties</p>
+                                </div>
+                                {serviceTax > 0 && (
+                                  <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+                                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Service Tax</p>
+                                    <p className="text-lg font-bold text-gray-900 mt-1">
+                                      {inr(serviceTax)}
+                                    </p>
+                                  </div>
+                                )}
+                                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 shadow-sm">
+                                  <p className="text-[10px] text-emerald-600 uppercase font-bold tracking-tight">Net Refund</p>
+                                  <p className="text-xl font-bold text-emerald-700 mt-1">
+                                    {inr((refundAmt || 0) - (cancelCharge || 0) - (serviceTax || 0))}
+                                  </p>
+                                  <p className="text-[9px] text-emerald-600/60 mt-0.5 font-medium italic">Estimated Payback</p>
                                 </div>
                               </div>
-                            </div>
-                          );
+
+                              {/* Breakdown & GST */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-4">
+                                  <p className="text-[10px] text-gray-400 uppercase font-bold mb-3 tracking-widest flex items-center gap-1.5">
+                                    <FiDollarSign size={10} /> Transaction Details
+                                  </p>
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between items-center text-xs">
+                                      <span className="text-gray-500">Refundable Amount</span>
+                                      <span className="font-medium text-gray-800">{inr(refundAmt)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs">
+                                      <span className="text-gray-500">Cancellation Charges</span>
+                                      <span className="font-medium text-rose-600">-{inr(cancelCharge)}</span>
+                                    </div>
+                                    <div className="h-px bg-gray-200 my-1" />
+                                    <div className="flex justify-between items-center text-xs font-bold">
+                                      <span className="text-gray-700">Estimated Refund</span>
+                                      <span className="text-emerald-700">{inr((refundAmt || 0) - (cancelCharge || 0))}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {res.GST && (
+                                  <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-4">
+                                    <p className="text-[10px] text-gray-400 uppercase font-bold mb-3 tracking-widest flex items-center gap-1.5">
+                                      <FiShield size={10} /> GST Breakdown
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                       <div className="flex justify-between items-center text-[11px]">
+                                          <span className="text-gray-500">CGST</span>
+                                          <span className="font-medium text-gray-700">{inr(res.GST.CGSTAmount)}</span>
+                                       </div>
+                                       <div className="flex justify-between items-center text-[11px]">
+                                          <span className="text-gray-500">SGST</span>
+                                          <span className="font-medium text-gray-700">{inr(res.GST.SGSTAmount)}</span>
+                                       </div>
+                                       <div className="flex justify-between items-center text-[11px]">
+                                          <span className="text-gray-500">IGST</span>
+                                          <span className="font-medium text-gray-700">{inr(res.GST.IGSTAmount)}</span>
+                                       </div>
+                                       <div className="flex justify-between items-center text-[11px]">
+                                          <span className="text-gray-500">Cess</span>
+                                          <span className="font-medium text-gray-700">{inr(res.GST.CessAmount)}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
                         })()}
 
                       <button
@@ -2076,14 +1964,27 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                     <div className="space-y-4">
                       <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-800">
                         <FiInfo size={13} className="mt-0.5 shrink-0" />
-                        Reissue requests require approval from the airline.
-                        Provide complete details for the modification in the
-                        remarks field.
+                        Submit a reissue request. This will create a pending request in the system which can be tracked and executed from the "All Reissue Requests" dashboard.
                       </div>
 
                       <div>
                         <p className="text-xs text-gray-500 mb-1.5">
-                          Reissue remarks / modification details
+                          Reissue Type
+                        </p>
+                        <select
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                          defaultValue="FULL_JOURNEY"
+                          id="superAdminReissueType"
+                        >
+                          <option value="FULL_JOURNEY">Full Journey</option>
+                          <option value="ONWARD">Onward Only</option>
+                          <option value="RETURN">Return Only</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1.5">
+                          Reason for Reissue
                         </p>
                         <textarea
                           value={reissueRemarks}
@@ -2095,27 +1996,29 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                       </div>
 
                       <button
-                        onClick={() =>
+                        onClick={() => {
+                          const userStr = sessionStorage.getItem("adminUser") || sessionStorage.getItem("user");
+                          const user = userStr ? JSON.parse(userStr) : {};
+                          const rType = document.getElementById("superAdminReissueType").value;
+
                           dispatch(
-                            amendBooking({
+                            createReissueRequest({
                               bookingId: raw._id,
-                              segments: [],
-                              remarks: reissueRemarks,
+                              reissueType: rType,
+                              reason: reissueRemarks || "Requested by admin",
+                              userId: user._id,
                             }),
                           )
                             .unwrap()
-                            .then(() => toast.success("Reissue requested"))
+                            .then(() => toast.success("Reissue requested successfully"))
                             .catch((err) =>
-                              toast.error(err.message || "Failed"),
+                              toast.error(err.message || err || "Failed to submit request"),
                             )
-                        }
-                        disabled={amendmentLoading}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
                       >
                         <FiRepeat size={13} />
-                        {amendmentLoading
-                          ? "Processing…"
-                          : "Send reissue request"}
+                        Submit Reissue Request
                       </button>
                     </div>
                   )}
@@ -2273,6 +2176,7 @@ export const HotelBookingModal = ({ booking: rawProp, onClose }) => {
   const travelers = raw.travellers || [];
   const roomGuests = raw.hotelRequest?.roomGuests || [];
   const amendment = raw.amendment || {};
+  const amendHist = raw.amendmentHistory || [];
   const bookRes = raw.bookingResult || {};
   const corporateId = raw.corporateId || {};
 
@@ -2804,7 +2708,12 @@ export const HotelBookingModal = ({ booking: rawProp, onClose }) => {
                   />
                   <KV
                     label="Status"
-                    value={amendment.status?.replace(/_/g, " ")}
+                    value={
+                      amendRes.ChangeRequestStatus === 3 ||
+                      amendRes.RefundedAmount > 0
+                        ? "Processed"
+                        : amendment.status?.replace(/_/g, " ")
+                    }
                   />
                   <KV
                     label="Requested at"
@@ -2879,6 +2788,62 @@ export const HotelBookingModal = ({ booking: rawProp, onClose }) => {
                     />
                   </div>
                 )}
+              </div>
+            </Section>
+          )}
+
+          {/* Amendment History */}
+          {amendHist.length > 0 && (
+            <Section
+              title={`Amendment History (${amendHist.length})`}
+              icon={<FiInfo size={11} />}
+            >
+              <div className="space-y-2">
+                {amendHist.map((ah, i) => {
+                  const hRes =
+                    ah.providerResponse?.HotelChangeRequestResult ||
+                    ah.providerResponse?.HotelChangeRequestStatusResult ||
+                    {};
+                  return (
+                    <div
+                      key={i}
+                      className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 flex justify-between items-start gap-4"
+                    >
+                      <div>
+                        <Chip color="amber">{ah.type?.replace(/_/g, " ")}</Chip>
+                        <p className="text-xs text-gray-700 mt-1.5 capitalize font-medium">
+                          {ah.status?.replace(/_/g, " ")}
+                        </p>
+                        {ah.changeRequestId && (
+                          <p className="text-[10px] font-mono text-gray-400 mt-0.5">
+                            CR ID: {ah.changeRequestId}
+                          </p>
+                        )}
+
+                        {/* Detailed Refund Info in History */}
+                        {(hRes.RefundedAmount != null || hRes.CreditNoteNo) && (
+                          <div className="mt-2 pt-2 border-t border-amber-100/50 grid grid-cols-2 gap-x-4 gap-y-1">
+                            {hRes.RefundedAmount != null && (
+                              <div className="flex justify-between items-center text-[10px]">
+                                <span className="text-gray-400">Refund:</span>
+                                <span className="font-bold text-emerald-700">{inr(hRes.RefundedAmount)}</span>
+                              </div>
+                            )}
+                            {hRes.CreditNoteNo && (
+                              <div className="flex justify-between items-center text-[10px]">
+                                <span className="text-gray-400">CN:</span>
+                                <span className="font-mono">{hRes.CreditNoteNo}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-400 shrink-0">
+                        {fmtDT(ah.createdAt)}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </Section>
           )}

@@ -1633,21 +1633,6 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
   /* ================= FETCH DATA ================= */
   const [rawBookings, total] = await Promise.all([
     BookingRequest.find(query)
-      .select(
-        `
-        bookingReference
-        bookingType
-        requestStatus
-        executionStatus
-        bookingSnapshot
-        pricingSnapshot
-        createdAt
-        updatedAt
-        bookingResult
-        amendment
-        amendmentHistory
-      `,
-      )
       .sort({ createdAt: -1 })
       // .skip(skip)
       // .limit(Number(limit))

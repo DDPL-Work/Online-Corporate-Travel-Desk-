@@ -168,6 +168,22 @@ export const Step1 = ({ form, setForm, errors }) => (
       />
     </F>
 
+    <F label="Company Type" required>
+      <RichSelect
+        icon={<MdCorporateFare />}
+        value={form.corporateType}
+        onChange={(v) => setForm({ ...form, corporateType: v })}
+        options={[
+          { value: "pvt-ltd", label: "Private Limited", icon: <MdBusiness className="text-blue-500" /> },
+          { value: "public-ltd", label: "Public Limited / Corp", icon: <MdCorporateFare className="text-orange-500" /> },
+          { value: "government", label: "Government Entity", icon: <MdAccountBalance className="text-emerald-500" /> },
+          { value: "proprietorship", label: "Sole Proprietorship", icon: <MdPerson className="text-slate-500" /> },
+          { value: "partnership", label: "Partnership", icon: <MdGroups className="text-purple-500" /> },
+          { value: "independent", label: "Independent Professional", icon: <MdAutoGraph className="text-cyan-500" /> },
+        ]}
+      />
+    </F>
+
     <Grid>
       {/* <F
         label="Account Type"
@@ -266,11 +282,23 @@ export const Step2 = ({ form, setForm, errors }) => (
               <Inp
                 icon={<MdEmail />}
                 value={form.primaryEmail}
-                onChange={(v) => setForm({ ...form, primaryEmail: v })}
+                onChange={(v) => {
+                  const domain = v.includes("@") ? v.split("@")[1] : "";
+                  setForm({ ...form, primaryEmail: v, ssoDomain: domain });
+                }}
                 placeholder="rajesh@company.com"
                 type="email"
                 error={errors.primaryEmail}
               />
+              <label className="flex items-center gap-1.5 mt-1.5 ml-1 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  checked={form.gstEmail === form.primaryEmail && !!form.primaryEmail}
+                  onChange={(e) => setForm({ ...form, gstEmail: e.target.checked ? form.primaryEmail : "" })}
+                />
+                <span className="text-[10px] font-bold text-slate-400 group-hover:text-blue-600 transition-colors uppercase tracking-tight">Set as GST Email</span>
+              </label>
             </F>
             <F label="Mobile" required>
               <PhoneInput
@@ -353,6 +381,15 @@ export const Step2 = ({ form, setForm, errors }) => (
                 type="email"
                 error={errors.billingEmail}
               />
+              <label className="flex items-center gap-1.5 mt-1.5 ml-1 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  checked={form.gstEmail === form.billingEmail && !!form.billingEmail}
+                  onChange={(e) => setForm({ ...form, gstEmail: e.target.checked ? form.billingEmail : "" })}
+                />
+                <span className="text-[10px] font-bold text-slate-400 group-hover:text-blue-600 transition-colors uppercase tracking-tight">Set as GST Email</span>
+              </label>
             </F>
             <F label="Mobile">
               <PhoneInput
@@ -933,9 +970,10 @@ export const Step5 = ({ form, setForm, errors, gstAutoFilled, ...props }) => (
     </F>
     <F label="GST Email" required>
       <Inp
+        icon={<MdEmail />}
         value={form.gstEmail}
         onChange={(v) => setForm({ ...form, gstEmail: v })}
-        placeholder="ABC Travels Private Limited"
+        placeholder="finance@company.com"
         error={errors.gstEmail}
       />
     </F>

@@ -11,22 +11,17 @@ export const fetchPostpaidBalance = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const res = await api.get("postpaid/balance", {
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-        },
+        headers: { Authorization: `Bearer ${getToken()}` },
       });
-
-      return res.data; // { success, balance }
+      return res.data;
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data?.message || "Failed to fetch balance",
-      );
+      return rejectWithValue(err.response?.data?.message || "Failed to fetch balance");
     }
   },
 );
 
 // ==============================
-// GET TRANSACTIONS
+// GET TRANSACTIONS (current cycle)
 // ==============================
 export const fetchPostpaidTransactions = createAsyncThunk(
   "postpaid/fetchTransactions",
@@ -34,16 +29,46 @@ export const fetchPostpaidTransactions = createAsyncThunk(
     try {
       const res = await api.get("postpaid/transactions", {
         params,
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-        },
+        headers: { Authorization: `Bearer ${getToken()}` },
       });
-
-      return res.data; // { success, pagination, transactions }
+      return res.data;
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data?.message || "Failed to fetch transactions",
-      );
+      return rejectWithValue(err.response?.data?.message || "Failed to fetch transactions");
+    }
+  },
+);
+
+// ==============================
+// GET PREVIOUS CYCLES (statement list)
+// ==============================
+export const fetchPreviousCycles = createAsyncThunk(
+  "postpaid/fetchPreviousCycles",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.get("postpaid/cycles", {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      return res.data; // { success, cycles }
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || "Failed to fetch cycles");
+    }
+  },
+);
+
+// ==============================
+// GET TRANSACTIONS FOR A SPECIFIC CYCLE
+// ==============================
+export const fetchCycleTransactions = createAsyncThunk(
+  "postpaid/fetchCycleTransactions",
+  async ({ cycleIndex, page = 1, limit = 50 }, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`postpaid/cycles/${cycleIndex}/transactions`, {
+        params: { page, limit },
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      return res.data; // { success, statementId, cycle, pagination, transactions }
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || "Failed to fetch cycle transactions");
     }
   },
 );

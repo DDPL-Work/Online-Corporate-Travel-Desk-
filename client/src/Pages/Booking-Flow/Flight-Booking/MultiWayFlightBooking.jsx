@@ -16,6 +16,7 @@ import {
 } from "./CommonComponents";
 import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import { useDispatch, useSelector } from "react-redux";
+import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
 import {
   getFareQuote,
   getFareRule,
@@ -24,6 +25,9 @@ import {
 import api from "../../../API/axios";
 import SeatSelectionModal from "./SSR/SeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import { selectManager } from "../../../Redux/Actions/manager.thunk";
+import { approveApproval } from "../../../Redux/Actions/approval.thunks";
+import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { FareDetailsModal } from "./FareDetailsModal";
@@ -40,6 +44,15 @@ export default function MultiCityFlightBooking() {
 
   const { actionLoading } = useSelector((state) => state.bookings);
   const { user } = useSelector((state) => state.auth);
+  const { myPolicy } = useSelector((state) => state.ssrPolicy);
+  const isTravelAdmin = user?.role === "travel-admin";
+  const approvalRequired = !isTravelAdmin && myPolicy?.approvalRequired !== false;
+
+  useEffect(() => {
+    if (user?.role === "employee" || user?.role === "manager") {
+      dispatch(fetchMySSRPolicy());
+    }
+  }, [dispatch, user]);
 
   const {
     selectedFlight,
@@ -67,6 +80,10 @@ export default function MultiCityFlightBooking() {
     terms: false,
   });
 
+  const [projectApproverData, setProjectApproverData] = useState({
+    project: null,
+    approver: null,
+  });
   const [travelerErrors, setTravelerErrors] = useState({});
   const [purposeOfTravel, setPurposeOfTravel] = useState("");
   const [gstDetails, setGstDetails] = useState({
@@ -582,6 +599,14 @@ export default function MultiCityFlightBooking() {
 
     return {
       bookingType: "flight",
+      projectName: projectApproverData.project?.name,
+      projectId: projectApproverData.project?.id,
+      projectClient: projectApproverData.project?.client,
+      projectCodeId: projectApproverData.project?.id,
+      approverId: !approvalRequired ? (user?._id || user?.id || user?.userId) : projectApproverData.approver?.id,
+      approverEmail: !approvalRequired ? user?.email : projectApproverData.approver?.email,
+      approverName: !approvalRequired ? `${user?.name?.firstName} ${user?.name?.lastName}` : projectApproverData.approver?.name,
+      approverRole: !approvalRequired ? user?.role : projectApproverData.approver?.role,
       flightRequest: {
         traceId: searchParams.traceId,
         resultIndex: selectedFlight.ResultIndex,
@@ -730,6 +755,22 @@ export default function MultiCityFlightBooking() {
       return;
     }
 
+    if (!projectApproverData.project) {
+      ToastWithTimer({
+        type: "error",
+        message: "Please select a project",
+      });
+      return;
+    }
+
+    if (approvalRequired && !projectApproverData.approver) {
+      ToastWithTimer({
+        type: "error",
+        message: "Please select an approver",
+      });
+      return;
+    }
+
     // Validate traveler details before submission
     if (!validateTravelers()) {
       ToastWithTimer({
@@ -749,9 +790,37 @@ export default function MultiCityFlightBooking() {
 
     try {
       const payload = buildBookingRequestPayload();
-      await dispatch(createBookingRequest(payload)).unwrap();
+      if (approvalRequired) {
+        await dispatch(
+          selectManager({
+            approverId: projectApproverData.approver?.id,
+            approverEmail: projectApproverData.approver?.email,
+            projectCodeId: projectApproverData.project?.id,
+            projectName: projectApproverData.project?.name,
+            projectClient: projectApproverData.project?.client,
+          }),
+        ).unwrap();
+      }
+      const result = await dispatch(createBookingRequest(payload)).unwrap();
 
-      navigate("/my-bookings", {
+      if (!approvalRequired) {
+        const requestId = result.bookingRequestId || result._id;
+        if (requestId && result.requestStatus !== "approved") {
+          await dispatch(
+            approveApproval({
+              id: requestId,
+              comments: "Self Approved by Travel Admin",
+              type: "flight",
+            }),
+          ).unwrap();
+        }
+        ToastWithTimer({
+          type: "success",
+          message: "Booking auto-approved successfully",
+        });
+      }
+
+      navigate("/my-pending-approvals", {
         state: { success: true },
       });
     } catch (err) {
@@ -1043,6 +1112,7 @@ export default function MultiCityFlightBooking() {
           {/* RIGHT */}
           <div className="space-y-6">
             <div className="sticky top-6 space-y-6">
+              <ProjectApproverBlock onChange={setProjectApproverData} />
               <PriceSummary
                 parsedFlightData={{
                   ...parsedFlightData,
@@ -1055,6 +1125,7 @@ export default function MultiCityFlightBooking() {
                 selectedBaggage={selectedBaggage}
                 onSendForApproval={handleSendForApproval}
                 loading={actionLoading}
+                approvalRequired={approvalRequired}
               />
 
               <Amenities />

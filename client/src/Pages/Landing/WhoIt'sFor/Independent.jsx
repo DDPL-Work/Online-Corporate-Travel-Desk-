@@ -17,6 +17,8 @@ import { TbRuler2 } from "react-icons/tb";
 import LandingFooter from "../../../layout/LandingFooter";
 import LandingHeader from "../../../layout/LandingHeader";
 
+const ORANGE = "#C9A84C";
+
 /* ─────────────────────────────────────────────
    DATA
 ───────────────────────────────────────────── */
@@ -144,9 +146,9 @@ const perks = [
    BOOKING CARD
 ───────────────────────────────────────────── */
 const BookingCard = () => (
-  <div className="w-[573px] h-[498px] relative bg-white rounded-[20px] shadow-[0px_8px_10px_0px_rgba(0,0,0,0.25)] overflow-hidden">
+  <div className="w-full max-w-[573px] h-auto min-h-[498px] relative bg-white rounded-[20px] shadow-[0px_8px_10px_0px_rgba(0,0,0,0.25)] overflow-hidden flex flex-col">
     {/* ── Header ── */}
-    <div className="w-[573px] h-14 px-5 left-0 top-0 absolute bg-slate-950/95 inline-flex justify-between items-center">
+    <div className="w-full h-14 px-5 bg-slate-950/95 flex justify-between items-center shrink-0">
       <div className="flex justify-start items-start gap-4">
         <span className="text-white text-sm font-semibold font-['DM_Sans'] leading-5">
           My Travel
@@ -163,30 +165,30 @@ const BookingCard = () => (
     </div>
 
     {/* ── Filter Pills ── */}
-    <div className="w-[553px] pl-5 left-0 top-[82px] absolute inline-flex justify-start items-start gap-6">
+    <div className="w-full px-5 py-6 flex flex-wrap justify-start items-start gap-3 sm:gap-4">
       {/* CA */}
-      <div className="px-3 py-1.5 rounded-xl outline -outline-offset-1 outline-[#C9A84C] flex justify-start items-center gap-1.5">
+      <div className="px-3 py-1.5 rounded-xl outline -outline-offset-1 outline-[#C9A84C] flex justify-start items-center gap-1.5 whitespace-nowrap">
         <FiBriefcase size={14} className="text-slate-900" />
         <span className="text-slate-900 text-xs font-medium font-['Plus_Jakarta_Sans'] leading-4">
           CA
         </span>
       </div>
       {/* Wedding Planner */}
-      <div className="px-3 py-1.5 rounded-xl outline -outline-offset-1 outline-[#C9A84C] flex justify-start items-center gap-1.5">
+      <div className="px-3 py-1.5 rounded-xl outline -outline-offset-1 outline-[#C9A84C] flex justify-start items-center gap-1.5 whitespace-nowrap">
         <FiCalendar size={14} className="text-slate-900" />
         <span className="text-slate-900 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4">
           Wedding Planner
         </span>
       </div>
       {/* Consultant */}
-      <div className="px-3 py-1.5 rounded-xl outline -outline-offset-1 outline-[#C9A84C] flex justify-start items-center gap-1.5">
+      <div className="px-3 py-1.5 rounded-xl outline -outline-offset-1 outline-[#C9A84C] flex justify-start items-center gap-1.5 whitespace-nowrap">
         <FiTrendingUp size={14} className="text-slate-900" />
         <span className="text-slate-900 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4">
           Consultant
         </span>
       </div>
       {/* Event Coordinator */}
-      <div className="px-3 py-1.5 rounded-xl outline -outline-offset-1 outline-[#C9A84C] flex justify-start items-center gap-1.5">
+      <div className="px-3 py-1.5 rounded-xl outline -outline-offset-1 outline-[#C9A84C] flex justify-start items-center gap-1.5 whitespace-nowrap">
         <FiAward size={14} className="text-slate-900" />
         <span className="text-slate-900 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4">
           Event Coordinator
@@ -195,7 +197,7 @@ const BookingCard = () => (
     </div>
 
     {/* ── How is it billed + Fields ── */}
-    <div className="w-[533px] left-5 top-[142px] absolute inline-flex flex-col justify-start items-start gap-3">
+    <div className="w-full px-5 flex flex-col justify-start items-start gap-3 mt-4">
       {/* Label */}
       <div className="self-stretch">
         <span className="text-slate-900 text-xs font-normal font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-wide">
@@ -205,79 +207,65 @@ const BookingCard = () => (
 
       {/* FROM / TO / DATE / COST — all stacked full width */}
       <div className="self-stretch space-y-3">
-        <div className="flex items-center justify-center gap-3">
-          <div className="self-stretch w-[260.5px] h-[61px] px-4 py-3 bg-slate-900/5 rounded-2xl inline-flex flex-col justify-start items-start gap-0.5">
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="self-stretch justify-center text-slate-900/40 text-[10px] font-normal font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-wide">
-                From
-              </div>
-            </div>
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="self-stretch justify-center text-slate-900 text-sm font-medium font-['Plus_Jakarta_Sans'] leading-5">
-                Mumbai
-              </div>
-            </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="w-full px-4 py-3 bg-slate-900/5 rounded-2xl flex flex-col gap-0.5">
+            <span className="text-slate-900/40 text-[10px] font-normal font-['Plus_Jakarta_Sans'] uppercase tracking-wide">
+              From
+            </span>
+            <span className="text-slate-900 text-sm font-medium font-['Plus_Jakarta_Sans']">
+              Mumbai
+            </span>
           </div>
-          <div className="self-stretch w-[260.5px] h-[61px] px-4 py-3 bg-slate-900/5 rounded-2xl inline-flex flex-col justify-start items-start gap-0.5">
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="self-stretch justify-center text-slate-900/40 text-[10px] font-normal font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-wide">
-                To
-              </div>
-            </div>
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="self-stretch justify-center text-slate-900 text-sm font-medium font-['Plus_Jakarta_Sans'] leading-5">
-                Pune
-              </div>
-            </div>
+          <div className="w-full px-4 py-3 bg-slate-900/5 rounded-2xl flex flex-col gap-0.5">
+            <span className="text-slate-900/40 text-[10px] font-normal font-['Plus_Jakarta_Sans'] uppercase tracking-wide">
+              To
+            </span>
+            <span className="text-slate-900 text-sm font-medium font-['Plus_Jakarta_Sans']">
+              Pune
+            </span>
           </div>
         </div>
-        <div className="flex items-center justify-center gap-3">
-          <div className="self-stretch w-[260.5px] h-[61px] px-4 py-3 bg-slate-900/5 rounded-2xl inline-flex flex-col justify-start items-start gap-0.5">
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="self-stretch justify-center text-slate-900/40 text-[10px] font-normal font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-wide">
-                Date
-              </div>
-            </div>
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="self-stretch justify-center text-slate-900 text-sm font-medium font-['Plus_Jakarta_Sans'] leading-5">
-                24 April
-              </div>
-            </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="w-full px-4 py-3 bg-slate-900/5 rounded-2xl flex flex-col gap-0.5">
+            <span className="text-slate-900/40 text-[10px] font-normal font-['Plus_Jakarta_Sans'] uppercase tracking-wide">
+              Date
+            </span>
+            <span className="text-slate-900 text-sm font-medium font-['Plus_Jakarta_Sans']">
+              24 April
+            </span>
           </div>
-          <div className="self-stretch w-[260.5px] h-[61px] px-4 py-3 bg-slate-900/5 rounded-2xl inline-flex flex-col justify-start items-start gap-0.5">
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="self-stretch justify-center text-slate-900/40 text-[10px] font-normal font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-wide">
-                Cost
-              </div>
-            </div>
-            <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="self-stretch justify-center text-slate-900 text-sm font-medium font-['Plus_Jakarta_Sans'] leading-5">
-                ₹2,800
-              </div>
-            </div>
+          <div className="w-full px-4 py-3 bg-slate-900/5 rounded-2xl flex flex-col gap-0.5">
+            <span className="text-slate-900/40 text-[10px] font-normal font-['Plus_Jakarta_Sans'] uppercase tracking-wide">
+              Cost
+            </span>
+            <span className="text-slate-900 text-sm font-medium font-['Plus_Jakarta_Sans']">
+              ₹2,800
+            </span>
           </div>
         </div>
       </div>
     </div>
 
     {/* ── Tag to Client ── */}
-    <div className="w-[534px] left-5 top-[337px] absolute inline-flex flex-col justify-start items-start gap-2">
+    <div className="w-full px-5 flex flex-col justify-start items-start gap-2 mt-6">
       <span className="text-slate-950 text-xs font-bold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-wide">
         Tag to Client
       </span>
-      <div className="self-stretch px-4 py-3 bg-orange-400/10 rounded-2xl inline-flex justify-start items-center gap-2">
+      <div className="self-stretch px-4 py-3 bg-orange-400/10 rounded-2xl flex justify-start items-center gap-2">
         <FiTag size={14} className="text-black" />
-        <span className="text-slate-900 text-sm font-medium font-['Plus_Jakarta_Sans'] leading-5">
+        <span className="text-slate-900 text-sm font-medium font-['Plus_Jakarta_Sans'] leading-5 truncate">
           Reliance Industries — FY26 Audit
         </span>
       </div>
     </div>
 
     {/* ── CTA Button ── */}
-    <div className="w-[533px] py-3 left-5 top-[428px] absolute bg-[#C9A84C] rounded-2xl inline-flex justify-center items-center cursor-pointer hover:bg-orange-400 transition-all">
-      <span className="text-slate-900 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
-        ✦ Book &amp; Tag to Client
-      </span>
+    <div className="w-full px-5 mt-auto pb-6 pt-4">
+      <div className="w-full py-3 bg-[#C9A84C] rounded-2xl flex justify-center items-center cursor-pointer hover:bg-orange-400 transition-all">
+        <span className="text-slate-900 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
+          ✦ Book &amp; Tag to Client
+        </span>
+      </div>
     </div>
   </div>
 );
@@ -292,63 +280,52 @@ export default function Independent() {
       <main className="flex-1">
         {/* ── HERO ── */}
         <section className="w-full bg-linear-to-bl from-[#003399] to-[#000D26] overflow-hidden">
-          <div className="max-w-[1200px] mx-auto px-8 pt-16 pb-20 flex flex-col lg:flex-row items-start justify-between gap-16">
+          <div className="max-w-[1200px] mx-auto px-6 pt-16 pb-20 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-12 text-center lg:text-left">
             {/* Left Content */}
-            <div className="flex-1 max-w-[540px]">
-              {/* "Who it's For · Independent Professionals"
-                  text-orange-400 text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-widest */}
+            <div className="flex-1 max-w-[540px] flex flex-col items-center lg:items-start">
               <p className="text-[#C9A84C] text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-widest mb-6">
                 Who it's For · Independent Professionals
               </p>
 
-              {/* "You travel for your clients."
-                  text-white text-6xl font-normal font-['DM_Serif_Display'] leading-[60px] */}
-              <h1 className="text-white text-6xl font-normal font-['DM_Serif_Display'] leading-[60px] mb-0">
+              <h1 className="text-white text-3xl sm:text-5xl lg:text-6xl font-normal font-['DM_Serif_Display'] leading-tight mb-2">
                 You travel
                 <br />
                 for your clients.
               </h1>
 
-              {/* "Track it."
-                  text-orange-400 text-6xl font-normal font-['DM_Serif_Display'] leading-[60px]
-                  Note: DM Serif Display is inherently italic in its display weight */}
-              <h2 className="text-[#C9A84C] text-6xl font-normal font-['DM_Serif_Display'] leading-[60px] italic mb-8">
+              {/* "Track it." */}
+              <h2 className="text-[#C9A84C] text-3xl sm:text-5xl lg:text-6xl font-normal font-['DM_Serif_Display'] leading-tight italic mb-8">
                 Track it.
               </h2>
 
-              {/* Body text
-                  text-gray-400 text-base font-normal font-['Plus_Jakarta_Sans'] leading-6 */}
-              <p className="text-gray-400 text-base font-normal font-['Plus_Jakarta_Sans'] leading-6 mb-10 max-w-[390px]">
+              {/* Body text */}
+              <p className="text-gray-400 text-sm sm:text-base font-normal font-['Plus_Jakarta_Sans'] leading-relaxed mb-10 max-w-[390px] mx-auto lg:mx-0">
                 Whether you're a CA, wedding planner, architect, or consultant —
                 every client visit deserves to be documented. Book fast, tag to
                 your client, and always know what each relationship costs you.
               </p>
 
               {/* Buttons */}
-              <div className="flex flex-wrap gap-3 mb-12">
-                {/* "Get Started Free" — text-slate-900 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5 */}
-                <button className="px-6 py-3 bg-[#C9A84C] text-slate-900 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5 rounded-[10px] shadow-[0px_4px_16px_rgba(251,189,35,0.30)] hover:bg-orange-500 transition-colors">
+              <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-3 mb-12">
+                <button className="w-full sm:w-auto px-6 py-3 bg-[#C9A84C] text-slate-900 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5 rounded-[10px] shadow-[0px_4px_16px_rgba(251,189,35,0.30)] hover:bg-orange-500 transition-colors text-center">
                   Get Started Free
                 </button>
-                {/* "See How it Works →" — text-white text-sm font-medium font-['Plus_Jakarta_Sans'] leading-5 */}
-                <button className="px-6 py-3 text-white text-sm font-medium font-['Plus_Jakarta_Sans'] leading-5 rounded-[10px] border border-white/25 hover:bg-white/10 transition-colors">
+                <button className="w-full sm:w-auto px-6 py-3 text-white text-sm font-medium font-['Plus_Jakarta_Sans'] leading-5 rounded-[10px] border border-white/25 hover:bg-white/10 transition-colors flex justify-center items-center">
                   See How it Works →
                 </button>
               </div>
 
               {/* Stats */}
-              <div className="flex gap-10">
+              <div className="flex flex-wrap justify-center lg:justify-start gap-8 sm:gap-10">
                 {[
                   { stat: "60s", desc: "Route any\nflight in time" },
                   { stat: "1", desc: "Click client\ncost report" },
                   { stat: "0", desc: "Approvals\nalways needed" },
                 ].map(({ stat, desc }) => (
                   <div key={stat} className="flex flex-col gap-1">
-                    {/* stat — text-white text-3xl font-bold font-['DM_Sans'] leading-9 */}
                     <span className="text-white text-3xl font-bold font-['DM_Sans'] leading-9">
                       {stat}
                     </span>
-                    {/* desc — text-gray-400 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4 */}
                     <span className="text-gray-400 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4 whitespace-pre-line">
                       {desc}
                     </span>
@@ -365,42 +342,57 @@ export default function Independent() {
         </section>
 
         {/* ── FEATURE BANNER ── */}
-        <div className="w-full bg-slate-950 py-6">
-          <div className="w-[1545px] mx-auto px-[98px] grid grid-cols-2 md:grid-cols-4 gap-[121px] ">
-            {featuresHero.map(({ title, sub }) => (
-              <div
-                key={title}
-                className="flex flex-col items-center text-center gap-2.5"
-              >
-                {/* title — text-white text-lg font-normal font-['DM_Serif_Display'] leading-8 */}
-                <span className="self-stretch h-6 text-center justify-center text-white text-lg font-normal font-['DM_Serif_Display'] leading-8">
-                  {title}
-                </span>
-                {/* sub — text-white text-base font-light font-['Plus_Jakarta_Sans'] leading-5 */}
-                <span className="self-stretch text-center justify-center text-white text-base font-light font-['Plus_Jakarta_Sans'] leading-5">
-                  {sub}
-                </span>
+        <div className="w-full bg-slate-950 py-10 px-6 overflow-hidden">
+          <div className="max-w-7xl mx-auto relative">
+            {/* Carousel Container */}
+            <div className="flex w-max md:w-full md:grid md:grid-cols-2 lg:grid-cols-4 md:justify-items-center items-center gap-x-12 md:gap-x-12 lg:gap-16 animate-infinite-scroll md:animate-none">
+              {/* Original Items */}
+              {featuresHero.map(({ title, sub }, idx) => (
+                <div
+                  key={`orig-${idx}`}
+                  className="flex flex-col items-center text-center gap-2 whitespace-nowrap md:whitespace-normal"
+                >
+                  <span className="text-white text-lg font-normal font-['DM_Serif_Display'] leading-tight">
+                    {title}
+                  </span>
+                  <span className="text-white/70 text-sm sm:text-base font-light font-['Plus_Jakarta_Sans'] leading-snug">
+                    {sub}
+                  </span>
+                </div>
+              ))}
+
+              {/* Duplicated Items (Hidden on MD screens and above) */}
+              <div className="flex md:hidden gap-x-12">
+                {featuresHero.map(({ title, sub }, idx) => (
+                  <div
+                    key={`dup-${idx}`}
+                    className="flex flex-col items-center text-center gap-2 whitespace-nowrap"
+                  >
+                    <span className="text-white text-lg font-normal font-['DM_Serif_Display'] leading-tight">
+                      {title}
+                    </span>
+                    <span className="text-white/70 text-sm sm:text-base font-light font-['Plus_Jakarta_Sans'] leading-snug">
+                      {sub}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
 
         {/* ── WHO THIS IS FOR ── */}
         <section className="w-full bg-slate-50 py-20 overflow-hidden">
-          <div className="max-w-[1340px] mx-auto px-8">
-            {/* Heading */}
-            <div className="mb-12">
-              {/* Label — text-black text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-widest */}
-              <div className="inline-block px-[5px] w-[519px] py-0.5 bg-[#C9A84C] mb-5">
-                <span className="text-black text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-widest">
-                  —— Who this is for
-                </span>
+          <div className="max-w-[1340px] mx-auto px-8 flex flex-col items-start text-left">
+            <div className="mb-12 flex flex-col items-start">
+              <div
+                style={{ background: ORANGE, color: "#000" }}
+                className="w-full md:w-[519px] px-2.5 py-1 mb-5 text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase"
+              >
+                Who this is for
               </div>
 
-              {/* "Built for professionals who work independently."
-                  "Built for" + "professionals" = text-black text-5xl font-normal font-['DM_Serif_Display'] leading-[50px]
-                  "who work independently." = text-blue-900 text-5xl font-normal font-['DM_Serif_Display'] leading-[50px] */}
-              <h2 className="text-black text-5xl font-normal font-['DM_Serif_Display'] leading-[50px] mb-4">
+              <h2 className="text-black text-3xl sm:text-4xl lg:text-5xl font-normal font-['DM_Serif_Display'] leading-tight mb-4">
                 <span className="italic">Built for </span>
                 <span className="not-italic">professionals</span>
                 <br />
@@ -409,30 +401,24 @@ export default function Independent() {
                 </span>
               </h2>
 
-              {/* Subtitle — text-stone-500 text-base font-normal font-['Plus_Jakarta_Sans'] leading-5 */}
-              <p className="text-stone-500 text-base font-normal font-['Plus_Jakarta_Sans'] leading-5 max-w-md">
+              <p className="text-stone-500 text-base font-normal font-['Plus_Jakarta_Sans'] leading-relaxed max-w-md mx-auto lg:mx-0">
                 If you travel to clients — not for a company — Traveamer is
-                designed for you. Fit
-                <br />
-                10 people. No complexity. Just organised.
+                designed for you. Fit 10 people. No complexity. Just organised.
               </p>
             </div>
 
-            {/* Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {personas.map(({ icon, title, desc }) => (
                 <div
                   key={title}
-                  className="bg-white rounded-2xl shadow-[0px_2px_11px_rgba(4,13,22,0.20)] border border-orange-400/60 p-7 flex flex-col gap-3 hover:shadow-[0px_4px_16px_rgba(4,13,22,0.12)] transition-shadow"
+                  className="bg-white rounded-2xl shadow-[0px_2px_11px_rgba(4,13,22,0.20)] border border-orange-400/60 p-7 flex flex-col items-center lg:items-start text-center lg:text-left gap-3 hover:shadow-[0px_4px_16px_rgba(4,13,22,0.12)] transition-shadow"
                 >
                   <div className="w-9 h-9 flex items-center justify-center">
                     {icon}
                   </div>
-                  {/* title — text-black text-base font-normal font-['DM_Serif_Display'] leading-5 */}
                   <h3 className="text-black text-base font-normal font-['DM_Serif_Display'] leading-5">
                     {title}
                   </h3>
-                  {/* desc — text-stone-500 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-5 */}
                   <p className="text-stone-500 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-5">
                     {desc}
                   </p>
@@ -443,120 +429,104 @@ export default function Independent() {
         </section>
 
         {/* ── WHAT TRAVEAMER DOES ── */}
-        <section className="w-full bg-slate-50 py-20">
-          <div className="max-w-[1340px] mx-auto px-8 flex flex-col lg:flex-row gap-16 items-start justify-between">
-            {/* Left */}
-            <div className="flex-1 max-w-[600px]">
-              {/* Label */}
-              <div className="inline-block px-[5px] w-[519px] py-0.5 bg-[#C9A84C] mb-4">
-                <span className="text-black  text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-widest">
-                  —— What traveamer does for you
-                </span>
-              </div>
-
-              {/* "Three things. Nothing more."
-                  "Three things." = text-black text-5xl font-normal font-['DM_Serif_Display'] leading-[50px]
-                  "Nothing more." = text-blue-900 text-5xl font-normal font-['DM_Serif_Display'] leading-[50px] */}
-              <h2 className="text-5xl font-normal font-['DM_Serif_Display'] leading-[50px] mb-3">
-                <span className="text-black">Three things.</span>
-                <br />
-                <span className="text-blue-900 italic">Nothing more.</span>
-              </h2>
-
-              {/* Subtitle — text-stone-500 text-sm font-normal font-['Plus_Jakarta_Sans'] leading-5 */}
-              <p className="text-stone-500 text-sm font-normal font-['Plus_Jakarta_Sans'] leading-5 mb-10 max-w-lg">
-                No complexity. No approval workflows. No admin features you'll
-                never use.
-                <br />
-                Just the three things an independent professional actually
-                needs.
-              </p>
-
-              <div className="flex flex-col gap-8">
-                {features.map(({ icon, title, desc }) => (
-                  <div key={title} className="flex gap-4 items-start">
-                    <div className="w-9 h-9 min-w-9 bg-[#C9A84C] rounded-xl flex justify-center items-center">
-                      {icon}
-                    </div>
-                    <div>
-                      {/* feature title — text-slate-950 text-base font-normal font-['DM_Serif_Display'] leading-5 */}
-                      <h3 className="text-slate-950 text-base font-normal font-['DM_Serif_Display'] leading-5 mb-1">
-                        {title}
-                      </h3>
-                      {/* feature desc — text-stone-500 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-5 */}
-                      <p className="text-stone-500 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-5">
-                        {desc}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Right: Client Spend Card */}
-            <div className="w-full lg:w-[580px] bg-white rounded-2xl shadow-[0px_5px_12px_rgba(4,13,22,0.20)] border border-stone-300/10 p-6 flex flex-col gap-5">
-              <div className="flex justify-between items-center">
-                <div>
-                  {/* "Client Travel Spend — April 2024"
-                      text-slate-950 text-sm font-bold font-['Plus_Jakarta_Sans'] leading-5 */}
-                  <p className="text-slate-950 text-sm font-bold font-['Plus_Jakarta_Sans'] leading-5">
-                    Client Travel Spend — April 2024
-                  </p>
-                  {/* "4 clients · 8 trips · This month"
-                      text-stone-500 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4 */}
-                  <p className="text-stone-500 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4 mt-0.5">
-                    4 clients · 8 trips · This month
-                  </p>
+        <section className="w-full bg-slate-50 -py-5 md:py-20">
+          <div className="max-w-[1340px] mx-auto px-8 flex flex-col items-start text-left">
+            <div className="flex flex-col xl:flex-row gap-10 xl:gap-16 items-start justify-between">
+              <div className="w-full xl:flex-1 xl:max-w-[600px] flex flex-col items-start">
+                <div
+                  className="w-full lg:w-[519px] px-2.5 py-1 mb-5 text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase"
+                  style={{ background: ORANGE, color: "#000" }}
+                >
+                  What traveamer does
                 </div>
-                {/* "⬡ Full Report" — text-orange-400 text-[10px] font-normal font-['Plus_Jakarta_Sans'] leading-4 */}
-                <button className="px-2.5 py-1 rounded-full border border-orange-400/20 text-[#C9A84C] text-[10px] font-normal font-['Plus_Jakarta_Sans'] leading-4 hover:bg-orange-400/5 transition-colors">
-                  ⬡ Full Report
-                </button>
-              </div>
 
-              <div className="flex flex-col">
-                {clientData.map(({ name, detail, amount, color }, idx) => (
-                  <div
-                    key={name}
-                    className={`flex justify-between items-center py-3.5 ${
-                      idx < clientData.length - 1
-                        ? "border-b border-gray-700/50"
-                        : ""
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: color }}
-                      />
-                      <div className="pb-0.5">
-                        {/* client name — text-slate-950 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5 */}
-                        <p className="text-slate-950 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
-                          {name}
-                        </p>
-                        {/* client detail — text-stone-500 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4 */}
-                        <p className="text-stone-500 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4">
-                          {detail}
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-normal font-['DM_Serif_Display'] leading-tight mb-3">
+                  <span className="text-black">Three things.</span>
+                  <br />
+                  <span className="text-blue-900 italic">Nothing more.</span>
+                </h2>
+
+                <p className="text-stone-500 text-sm font-normal font-['Plus_Jakarta_Sans'] leading-relaxed mb-10 max-w-lg mx-auto lg:mx-0">
+                  No complexity. No approval workflows. No admin features you'll
+                  never use.
+                  <br />
+                  Just the three things an independent professional actually
+                  needs.
+                </p>
+
+                <div className="flex flex-col gap-8 items-center lg:items-start">
+                  {features.map(({ icon, title, desc }) => (
+                    <div key={title} className="flex gap-4 items-start">
+                      <div className="w-9 h-9 min-w-9 bg-[#C9A84C] rounded-xl flex justify-center items-center">
+                        {icon}
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-slate-950 text-base font-normal font-['DM_Serif_Display'] leading-5 mb-1">
+                          {title}
+                        </h3>
+                        <p className="text-stone-500 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-5">
+                          {desc}
                         </p>
                       </div>
                     </div>
-                    {/* amount — text-blue-900 text-sm font-semibold font-['DM_Sans'] leading-5 */}
-                    <span className="text-blue-900 text-sm font-semibold font-['DM_Sans'] leading-5">
-                      {amount}
-                    </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
-              <div className="flex justify-between items-center pt-3 border-t border-gray-700/50">
-                {/* "Total This Month" — text-stone-500 text-xs font-medium font-['Plus_Jakarta_Sans'] leading-4 */}
-                <span className="text-stone-500 text-xs font-medium font-['Plus_Jakarta_Sans'] leading-4">
-                  Total This Month
-                </span>
-                {/* "₹43,400" — text-orange-400 text-base font-bold font-['DM_Sans'] leading-6 */}
-                <span className="text-[#C9A84C] text-base font-bold font-['DM_Sans'] leading-6">
-                  ₹43,400
-                </span>
+              <div className="w-full xl:w-[580px] bg-white rounded-2xl shadow-[0px_5px_12px_rgba(4,13,22,0.20)] border border-stone-300/10 p-6 flex flex-col gap-5">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-slate-950 text-sm font-bold font-['Plus_Jakarta_Sans'] leading-5">
+                      Client Travel Spend — April 2024
+                    </p>
+                    <p className="text-stone-500 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4 mt-0.5">
+                      4 clients · 8 trips · This month
+                    </p>
+                  </div>
+                  <button className="px-2.5 py-1 rounded-full border border-orange-400/20 text-[#C9A84C] text-[10px] font-normal font-['Plus_Jakarta_Sans'] leading-4 hover:bg-orange-400/5 transition-colors">
+                    ⬡ Full Report
+                  </button>
+                </div>
+
+                <div className="flex flex-col">
+                  {clientData.map(({ name, detail, amount, color }, idx) => (
+                    <div
+                      key={name}
+                      className={`flex justify-between items-center py-3.5 ${
+                        idx < clientData.length - 1
+                          ? "border-b border-gray-700/50"
+                          : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: color }}
+                        />
+                        <div className="pb-0.5 text-left">
+                          <p className="text-slate-950 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5">
+                            {name}
+                          </p>
+                          <p className="text-stone-500 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4">
+                            {detail}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-blue-900 text-sm font-semibold font-['DM_Sans'] leading-5">
+                        {amount}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between items-center pt-3 border-t border-gray-700/50">
+                  <span className="text-stone-500 text-xs font-medium font-['Plus_Jakarta_Sans'] leading-4">
+                    Total This Month
+                  </span>
+                  <span className="text-[#C9A84C] text-base font-bold font-['DM_Sans'] leading-6">
+                    ₹43,400
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -564,25 +534,21 @@ export default function Independent() {
 
         {/* ── HOW IT WORKS ── */}
         <section className="w-full bg-slate-50 py-20">
-          <div className="max-w-[1340px] mx-auto px-8">
-            <div className="mb-14">
-              {/* Label */}
-              <div className="inline-block px-[5px] w-[519px] py-0.5 bg-[#C9A84C] mb-4">
-                <span className="text-black text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-widest">
-                  —— How it works
-                </span>
+          <div className="max-w-[1340px] mx-auto px-8 flex flex-col items-center lg:items-start text-left">
+            <div className="mb-14 flex flex-col items-start">
+              <div
+                className="w-full md:w-[519px] px-2.5 py-1 mb-5 text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase"
+                style={{ background: ORANGE, color: "#000" }}
+              >
+                How it works
               </div>
 
-              {/* "Search. Book. Tag. Done."
-                  "Search. Book. Tag." = text-black text-5xl font-bold font-['DM_Sans'] leading-[50px]
-                  "Done." = text-blue-900 text-5xl font-bold font-['DM_Sans'] leading-[50px] — italic per screenshot */}
-              <h2 className="text-5xl font-bold font-['DM_Sans'] leading-[50px] mb-3">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-['DM_Sans'] leading-tight mb-3 text-left">
                 <span className="text-black font-bold">Search. Book. Tag.</span>
                 <br />
                 <span className="text-blue-900 italic">Done.</span>
               </h2>
 
-              {/* Subtitle — text-stone-500 text-sm font-normal font-['Plus_Jakarta_Sans'] leading-5 */}
               <p className="text-stone-500 text-sm font-normal font-['Plus_Jakarta_Sans'] leading-5 max-w-md">
                 Four steps. No approval. No waiting. Just you and your next
                 client visit — organised.
@@ -590,8 +556,7 @@ export default function Independent() {
             </div>
 
             <div className="relative">
-              {/* Connector line */}
-              <div className="hidden lg:block absolute top-10 left-[10%] right-[10%] h-0.5 bg-linear-to-r from-blue-500 via-blue-500 to-blue-500/60 z-0" />
+              <div className="hidden lg:block absolute top-10 left-[10%] right-[10%] h-0.5 bg-linear-to-r from-blue-500 via-blue-500 to-blue-500/60 z-0 item-center lg:item-start" />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 relative z-10">
                 {steps.map(({ num, icon, title, desc }) => (
@@ -604,17 +569,14 @@ export default function Independent() {
                         {icon}
                       </div>
                       <div className="absolute -top-2 -right-2 w-7 h-7 bg-blue-900 rounded-full flex justify-center items-center">
-                        {/* step number — text-white text-xs font-bold font-['Inter'] leading-4 */}
                         <span className="text-white text-xs font-bold font-['Inter'] leading-4">
                           {num}
                         </span>
                       </div>
                     </div>
-                    {/* step title — text-slate-950 text-xl font-normal font-['DM_Serif_Display'] leading-7 */}
                     <h3 className="text-slate-950 text-xl font-normal font-['DM_Serif_Display'] leading-7 mb-2">
                       {title}
                     </h3>
-                    {/* step desc — text-stone-500 text-sm font-normal font-['Plus_Jakarta_Sans'] leading-6 */}
                     <p className="text-stone-500 text-sm font-normal font-['Plus_Jakarta_Sans'] leading-6 max-w-[200px]">
                       {desc}
                     </p>
@@ -628,10 +590,7 @@ export default function Independent() {
         {/* ── CTA ── */}
         <section className="w-full bg-slate-950 py-20 overflow-hidden">
           <div className="max-w-[1400px] mx-auto px-8 flex flex-col items-center text-center gap-6">
-            {/* "Your next client visit deserves better tracking."
-                "Your next client visit" = text-white text-5xl font-normal font-['DM_Serif_Display'] leading-[48px]
-                "deserves better tracking." = text-orange-400 text-5xl font-normal font-['DM_Serif_Display'] leading-[48px] */}
-            <h2 className="text-5xl font-normal font-['DM_Serif_Display'] leading-12 max-w-2xl">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-normal font-['DM_Serif_Display'] leading-tight max-w-2xl px-4">
               <span className="text-white">Your next client visit</span>
               <br />
               <span className="text-[#C9A84C] italic">
@@ -639,19 +598,16 @@ export default function Independent() {
               </span>
             </h2>
 
-            {/* Subtitle — text-gray-400 text-sm font-normal font-['Plus_Jakarta_Sans'] leading-5 */}
             <p className="text-gray-400 text-sm font-normal font-['Plus_Jakarta_Sans'] leading-5 max-w-sm pb-4">
               Free to get started. No credit card. No complexity. Just organised
               travel — built for the way you work.
             </p>
 
-            <div className="flex flex-wrap justify-center gap-4">
-              {/* "Get Started Free" — text-slate-900 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5 */}
-              <button className="px-8 py-3.5 bg-[#C9A84C] text-slate-900 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5 rounded-2xl hover:bg-orange-400 transition-colors">
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <button className="w-full sm:w-auto px-8 py-3.5 bg-[#C9A84C] text-slate-900 text-sm font-semibold font-['Plus_Jakarta_Sans'] leading-5 rounded-2xl hover:bg-orange-400 transition-colors text-center">
                 Get Started Free
               </button>
-              {/* "Book a Demo ↗" — text-white text-sm font-medium font-['Plus_Jakarta_Sans'] leading-5 */}
-              <button className="px-8 py-3.5 text-white text-sm font-medium font-['Plus_Jakarta_Sans'] leading-5 rounded-2xl border border-white/25 hover:bg-white/10 transition-colors">
+              <button className="w-full sm:w-auto px-8 py-3.5 text-white text-sm font-medium font-['Plus_Jakarta_Sans'] leading-5 rounded-2xl border border-white/25 hover:bg-white/10 transition-colors flex justify-center items-center">
                 Book a Demo ↗
               </button>
             </div>
@@ -659,13 +615,11 @@ export default function Independent() {
             <div className="flex flex-wrap justify-center gap-6 mt-2">
               {perks.map((perk) => (
                 <div key={perk} className="flex items-center gap-1.5">
-                  {/* checkmark icon — color orange-400 per Figma */}
                   <FiCheck
                     size={12}
                     className="text-[#C9A84C]"
                     strokeWidth={2.5}
                   />
-                  {/* perk text — text-gray-400 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4 */}
                   <span className="text-gray-400 text-xs font-normal font-['Plus_Jakarta_Sans'] leading-4">
                     {perk}
                   </span>

@@ -20,11 +20,36 @@ import {
 import { FaPlane, FaHotel } from "react-icons/fa";
 import { 
   fetchCorporates, 
-  fetchCompanyWiseRevenue,
-  fetchCorporateDetailedBookings 
+  fetchCompanyWiseRevenue
 } from "../../Redux/Actions/corporate.related.thunks";
+import {
+  fetchPostpaidBalance,
+  fetchPostpaidTransactions,
+  fetchPreviousCycles,
+  fetchCycleTransactions,
+} from "../../Redux/Actions/postpaidThunks";
+import { clearCycleTransactions } from "../../Redux/Slice/postpaidSlice";
 import { toast } from "react-toastify";
 import Pagination from "../Shared/Pagination";
+
+const fmt = (d) =>
+  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }) : "—";
+
+const fmtAmt = (n) =>
+  Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const STMT_COLS = [
+  "Row", "Statement ID", "Statement Period",
+  "Statement Date", "Due Date", "Delay Days", "Amount (₹)",
+];
+
+const TX_COLS = [
+  "Transaction ID", "Doc Type",
+  "Invoice Date", "Product Type", "Booking Date", "Booking Ref",
+  "Txn Type", "Amount (₹)", "Status",
+];
+
+const DRILL_PAGE_SIZE = 10;
 
 const COLORS = {
   critical: "#EF4444",
@@ -59,12 +84,18 @@ export default function CreditStatusAlerts() {
 
   // Drill-down Transaction Ledger
   const [drillDownId, setDrillDownId] = useState(null);
-  const [drillDownData, setDrillDownData] = useState([]);
-  const [ddLoading, setDdLoading] = useState(false);
-  const [ddPage, setDdPage] = useState(1);
-  const [ddSearch, setDdSearch] = useState("");
-  const [ddType, setDdType] = useState("All");
-  const [ddStatus, setDdStatus] = useState("All");
+
+  // Drill-down Cycle & Tabs
+  const [activeTab, setActiveTab] = useState("current");
+  const [drillCycle, setDrillCycle] = useState(null);
+  const [drillPage, setDrillPage] = useState(1);
+
+  const {
+    balance, loadingBalance: loadingPostpaidBalance,
+    transactions, pagination: transactionsMeta, loadingTransactions,
+    previousCycles, loadingCycles,
+    cycleTransactions, cycleTransactionsMeta, loadingCycleTransactions,
+  } = useSelector((s) => s.postpaid);
 
   useEffect(() => {
     const loadBaseData = async () => {
@@ -101,31 +132,95 @@ export default function CreditStatusAlerts() {
     }
   }, [startDate, endDate, dispatch]);
 
-  // Fetch Detailed Drill-down
+  /* ── Effects for Postpaid Data ─────────────────────────── */
   useEffect(() => {
     if (drillDownId) {
-      const fetchDD = async () => {
-        setDdLoading(true);
-        try {
-          const res = await dispatch(fetchCorporateDetailedBookings({ 
-            id: drillDownId, 
-            fromDate: startDate, 
-            toDate: endDate 
-          })).unwrap();
-          setDrillDownData(res.data || []);
-          setDdPage(1);
-          setDdSearch("");
-          setDdType("All");
-          setDdStatus("All");
-        } catch (err) {
-          toast.error("Failed to load detailed ledger");
-        } finally {
-          setDdLoading(false);
-        }
-      };
-      fetchDD();
+      dispatch(fetchPostpaidBalance({ corporateId: drillDownId }));
     }
-  }, [drillDownId, startDate, endDate, dispatch]);
+  }, [dispatch, drillDownId]);
+
+  useEffect(() => {
+    if (drillDownId && activeTab === "previous" && !drillCycle) {
+      dispatch(fetchPreviousCycles({ corporateId: drillDownId }));
+    }
+  }, [dispatch, drillDownId, activeTab, drillCycle]);
+
+  useEffect(() => {
+    if (!drillCycle?.isCurrent || !drillDownId) return;
+    const params = {
+      corporateId: drillDownId,
+      startDate: balance?.currentCycleStart
+        ? new Date(balance.currentCycleStart).toISOString().split("T")[0]
+        : undefined,
+      endDate: balance?.currentCycleEnd
+        ? new Date(balance.currentCycleEnd).toISOString().split("T")[0]
+        : undefined,
+      page: 1,
+      limit: 500,
+    };
+    dispatch(fetchPostpaidTransactions(params));
+  }, [dispatch, drillCycle, balance, drillDownId]);
+
+  useEffect(() => {
+    if (!drillCycle || drillCycle.isCurrent || !drillDownId) return;
+    dispatch(fetchCycleTransactions({ 
+      corporateId: drillDownId, 
+      cycleIndex: drillCycle.cycleIndex 
+    }));
+  }, [dispatch, drillCycle, drillDownId]);
+
+  /* ── Derived Postpaid values ──────────────────────────────── */
+  const currentCycleRow = useMemo(() => {
+    if (!balance || !drillDownId) return null;
+    const stmtDate = balance.currentCycleEnd
+      ? new Date(new Date(balance.currentCycleEnd).getTime() + 86400000)
+      : null;
+    const dueDate = stmtDate
+      ? new Date(stmtDate.getTime() + 8 * 86400000)
+      : null;
+    const delayDays = dueDate && new Date() > dueDate
+      ? Math.floor((Date.now() - dueDate.getTime()) / 86400000)
+      : 0;
+    return {
+      rowNum: 1,
+      cycleIndex: "current",
+      statementId: "CURRENT CYCLE",
+      trackId: "—",
+      periodStart: balance.currentCycleStart,
+      periodEnd: balance.currentCycleEnd,
+      statementDate: stmtDate,
+      dueDate,
+      delayDays,
+      statementAmount: balance.usedCredit || 0,
+      isCurrent: true,
+    };
+  }, [balance, drillDownId]);
+
+  const handleTabSwitch = (tab) => {
+    setActiveTab(tab);
+    setDrillCycle(null);
+    dispatch(clearCycleTransactions());
+  };
+
+  const handleBackFromCycle = () => {
+    setDrillCycle(null);
+    setDrillPage(1);
+    dispatch(clearCycleTransactions());
+  };
+
+  const openDrillDownCycle = (row) => {
+    setDrillCycle(row);
+    setDrillPage(1);
+  };
+
+  const drillTx = drillCycle?.isCurrent ? (transactions || []) : (cycleTransactions || []);
+  const drillLoading = drillCycle?.isCurrent ? loadingTransactions : loadingCycleTransactions;
+  const drillStmtId = drillCycle?.statementId;
+
+  const paginatedDrillTx = useMemo(() => {
+    const start = (drillPage - 1) * DRILL_PAGE_SIZE;
+    return drillTx.slice(start, start + DRILL_PAGE_SIZE);
+  }, [drillTx, drillPage]);
 
   const setQuickPeriod = (type) => {
     const now = new Date();
@@ -175,19 +270,6 @@ export default function CreditStatusAlerts() {
     });
   }, [processedData, searchTerm, filterStatus, filterCycle, minLimit, maxLimit, usageThreshold]);
 
-  const filteredDD = useMemo(() => {
-    return drillDownData.filter((item) => {
-      const matchSearch = 
-        item.reference.toLowerCase().includes(ddSearch.toLowerCase()) ||
-        item.employee.toLowerCase().includes(ddSearch.toLowerCase());
-      
-      const matchType = ddType === "All" || item.type === ddType;
-      const matchStatus = ddStatus === "All" || (item.status && item.status.toLowerCase().includes(ddStatus.toLowerCase()));
-
-      return matchSearch && matchType && matchStatus;
-    });
-  }, [drillDownData, ddSearch, ddType, ddStatus]);
-
   const stats = useMemo(() => {
     const criticalCount = processedData.filter(c => c.status === "Critical").length;
     const warningCount = processedData.filter(c => c.status === "Warning").length;
@@ -213,17 +295,20 @@ export default function CreditStatusAlerts() {
     );
   }
 
-  // --- LEDGER DRILL DOWN VIEW ---
+  // --- CYCLE-BASED DRILL DOWN VIEW ---
   if (drillDownId) {
     const target = corporates.find(c => c._id === drillDownId) || {};
-    const paginatedDD = filteredDD.slice((ddPage -1) * ITEMS_PER_PAGE, ddPage * ITEMS_PER_PAGE);
 
     return (
       <div className="min-h-screen p-4 lg:p-6 bg-[#F8FAFC] space-y-6 animate-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <button 
-              onClick={() => setDrillDownId(null)}
+              onClick={() => {
+                setDrillDownId(null);
+                setDrillCycle(null);
+                setActiveTab("current");
+              }}
               className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-all shadow-sm group"
             >
               <FiArrowLeft size={24} className="group-hover:-translate-x-1 transition-transform" />
@@ -242,7 +327,7 @@ export default function CreditStatusAlerts() {
                  </div>
                  <div className="w-1 h-1 rounded-full bg-slate-300" />
                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Liquidity:</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Available Credit:</span>
                     <span className={`text-[11px] font-black ${target.creditLimit - target.currentCredit < target.creditLimit * 0.1 ? 'text-red-600' : 'text-emerald-600'}`}>
                       {inr(target.creditLimit - target.currentCredit)}
                     </span>
@@ -250,137 +335,162 @@ export default function CreditStatusAlerts() {
               </div>
             </div>
           </div>
-          <div className="flex bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm gap-4 items-center">
-             <div className="px-4 py-2 text-center border-r border-slate-50">
-                <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Items Found</p>
-                <p className="text-sm font-black text-slate-800 leading-none">{filteredDD.length}</p>
-             </div>
-             <div className="px-4 py-2 text-center">
-                <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Period Spend</p>
-                <p className="text-sm font-black text-[#0A4D68] leading-none">{inr(filteredDD.reduce((s,i) => s+i.amount, 0))}</p>
-             </div>
+
+          <div className="flex gap-1 bg-white border border-slate-100 rounded-2xl p-1 shadow-sm h-fit">
+            {[["current", "Current Cycle"], ["previous", "Previous Cycles"]].map(([k, lbl]) => (
+              <button
+                key={k}
+                onClick={() => handleTabSwitch(k)}
+                className="px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                style={{
+                  background: activeTab === k ? COLORS.primary : "transparent",
+                  color: activeTab === k ? "#fff" : "#94a3b8",
+                }}
+              >
+                {lbl}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* LEDGER FILTERS */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4">
-           <div className="flex flex-wrap items-center gap-4">
-              <div className="flex-1 min-w-[300px] relative group">
-                <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0A4D68] transition-colors" />
-                <input 
-                  type="text"
-                  placeholder="Search by reference or employee name..."
-                  value={ddSearch}
-                  onChange={(e) => setDdSearch(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-[#0A4D68]/10 transition-all placeholder:text-slate-300"
-                />
+        {/* ── DRILL-DOWN CYCLE DETAIL VIEW ── */}
+        {drillCycle && (
+          <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={handleBackFromCycle}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase border border-slate-200 bg-white hover:bg-slate-100 transition-colors text-slate-600 shadow-sm"
+              >
+                <FiArrowLeft size={13} />
+                Back to {activeTab === "current" ? "Summary" : "Statements"}
+              </button>
+              <div className="bg-white border border-slate-100 rounded-xl px-4 py-2 text-[10px] flex items-center gap-2 flex-wrap shadow-sm font-black uppercase">
+                <span className="text-slate-400 tracking-widest">Statement:</span>
+                <span style={{ color: COLORS.primary }}>{drillStmtId}</span>
+                <span className="text-slate-300">|</span>
+                <span className="text-slate-500">
+                  {fmt(drillCycle.periodStart)} – {fmt(drillCycle.periodEnd)}
+                </span>
               </div>
-              <div className="flex items-center gap-3">
-                 <FilterSelect 
-                    label="Booking Type"
-                    value={ddType}
-                    onChange={setDdType}
-                    options={[
-                      { label: "All Types", value: "All" },
-                      { label: "Flights", value: "Flight" },
-                      { label: "Hotels", value: "Hotel" }
-                    ]}
-                 />
-                 <FilterSelect 
-                    label="Transaction Status"
-                    value={ddStatus}
-                    onChange={setDdStatus}
-                    options={[
-                      { label: "All Statuses", value: "All" },
-                      { label: "Voucher / Success", value: "success" },
-                      { label: "Pending", value: "pending" },
-                      { label: "Cancelled", value: "cancel" }
-                    ]}
-                 />
-                 {(ddSearch || ddType !== 'All' || ddStatus !== 'All') && (
-                   <button 
-                    onClick={() => {setDdSearch(""); setDdType("All"); setDdStatus("All");}}
-                    className="p-3 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-all border border-rose-100 shadow-xs"
-                    title="Clear Filters"
-                   >
-                     <FiRotateCcw size={16} />
-                   </button>
-                 )}
-              </div>
-           </div>
-        </div>
+            </div>
 
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-           <div className="px-8 py-5 border-b border-slate-50 flex items-center justify-between">
-              <h3 className="font-black text-slate-800 uppercase text-sm tracking-widest">Transaction Ledger</h3>
-              <Pagination 
-                currentPage={ddPage} 
-                totalPages={Math.ceil(filteredDD.length / ITEMS_PER_PAGE)} 
-                onPageChange={setDdPage} 
-              />
-           </div>
-           
-           <div className="overflow-x-auto min-h-[400px]">
-              {ddLoading ? (
-                 <div className="py-20 text-center">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#0A4D68] mx-auto mb-4"></div>
-                    <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest animate-pulse">Syncing transactions...</p>
-                 </div>
-              ) : (
-                <table className="w-full text-left border-collapse">
-                   <thead>
-                      <tr className="bg-slate-50 shadow-inner">
-                         <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
-                         <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Reference</th>
-                         <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee</th>
-                         <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</th>
-                         <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                         <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Credit Used</th>
+            <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+               <div className="px-8 py-5 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                  <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest">Transactions — {drillStmtId}</h3>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{drillTx.length} records</span>
+               </div>
+               
+               <div className="overflow-x-auto min-h-[400px]">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-900 border-b border-slate-800">
+                        {TX_COLS.map((h) => (
+                          <th key={h} className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                        ))}
                       </tr>
-                   </thead>
-                   <tbody className="divide-y divide-slate-100">
-                      {paginatedDD.map((item, idx) => (
-                        <tr key={idx} className="group hover:bg-slate-50 transition-all border-l-4 border-transparent hover:border-[#0A4D68]">
-                           <td className="px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-tighter">
-                              {new Date(item.date).toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' })}
-                           </td>
-                           <td className="px-8 py-4">
-                              <span className="font-mono text-[11px] font-black text-slate-800 uppercase leading-none">{item.reference}</span>
-                           </td>
-                           <td className="px-8 py-4">
-                              <div className="flex items-center gap-3">
-                                 <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
-                                    <FiUser size={14} />
-                                 </div>
-                                 <span className="text-[12px] font-black text-slate-700">{item.employee}</span>
-                              </div>
-                           </td>
-                           <td className="px-8 py-4">
-                              <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest w-fit shadow-xs ${item.type === 'Flight' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
-                                 {item.type === 'Flight' ? <FaPlane size={10} /> : <FaHotel size={10} />}
-                                 {item.type}
-                              </div>
-                           </td>
-                           <td className="px-8 py-4">
-                              <span className={`text-[10px] font-black uppercase tracking-widest ${item.status?.toLowerCase().includes('success') || item.status?.toLowerCase().includes('voucher') ? 'text-emerald-600' : item.status?.toLowerCase().includes('cancel') ? 'text-rose-600' : 'text-amber-600'}`}>
-                                 {item.status?.replace(/_/g, ' ')}
-                              </span>
-                           </td>
-                           <td className="px-8 py-4 text-right font-black text-slate-900 text-[13px]">
-                              {inr(item.amount)}
-                           </td>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {drillLoading ? (
+                        <tr><td colSpan={TX_COLS.length} className="py-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A4D68] mx-auto"></div></td></tr>
+                      ) : drillTx.length === 0 ? (
+                        <tr><td colSpan={TX_COLS.length} className="py-20 text-center text-slate-400 font-black uppercase text-[10px] tracking-widest">No transactions found for this cycle</td></tr>
+                      ) : paginatedDrillTx.map((t, idx) => (
+                        <tr key={t._id} className="hover:bg-slate-50 transition-all text-[11px] font-bold text-slate-600">
+                          <td className="px-6 py-3 font-mono text-slate-400 text-[10px]">{t._id}</td>
+
+
+                          <td className="px-6 py-3">{t.type === "booking" ? "Sales Invoice" : t.type || "—"}</td>
+                          <td className="px-6 py-3">{fmt(t.bookingDate || t.createdAt)}</td>
+                          <td className="px-6 py-3">
+                            {t.metadata?.bookingType || t.metadata?.productType || (t.type === "booking" ? "Air - Domestic" : "—")}
+                          </td>
+                          <td className="px-6 py-3">{fmt(t.travelDate || t.bookingDate)}</td>
+                          <td className="px-6 py-3 font-mono">{t.bookingReference || t.paymentReference || "—"}</td>
+                          <td className="px-6 py-3 uppercase">{t.transactionType || (t.type === "booking" ? "debit" : "credit")}</td>
+                          <td className={`px-6 py-3 font-black ${(t.transactionType === "debit" || (!t.transactionType && t.type === "booking")) ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {(t.transactionType === "debit" || (!t.transactionType && t.type === "booking")) ? "-" : "+"}₹{fmtAmt(t.amount)}
+                          </td>
+                          <td className="px-6 py-3"><StatusBadge status={t.status} /></td>
                         </tr>
                       ))}
-                      {filteredDD.length === 0 && (
-                        <tr>
-                           <td colSpan="6" className="py-20 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">No transaction history found for this period</td>
-                        </tr>
+                    </tbody>
+                  </table>
+               </div>
+               
+               <div className="bg-slate-50 px-8 py-4 border-t border-slate-100 flex items-center justify-between">
+                  <div className="flex gap-6 items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{drillTx.length} items</span>
+                    <div className="w-px h-4 bg-slate-200" />
+                    <span className="text-xs font-black text-slate-700">
+                      Net: ₹{fmtAmt(
+                        drillTx.filter(t => t.transactionType === "debit" || (!t.transactionType && t.type === "booking")).reduce((s, t) => s + (t.amount || 0), 0) -
+                        drillTx.filter(t => t.transactionType === "credit" || (!t.transactionType && ["payment", "topup", "refund"].includes(t.type))).reduce((s, t) => s + (t.amount || 0), 0)
                       )}
-                   </tbody>
-                </table>
-              )}
-           </div>
-        </div>
+                    </span>
+                  </div>
+                  <Pagination 
+                    currentPage={drillPage} 
+                    totalPages={Math.ceil(drillTx.length / DRILL_PAGE_SIZE)} 
+                    onPageChange={setDrillPage} 
+                  />
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── CYCLE LIST VIEW ── */}
+        {!drillCycle && (
+          <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+            <div className="px-8 py-5 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+              <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest">
+                {activeTab === "current" ? "Current Billing Cycle" : "Statement History"}
+              </h3>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-900 border-b border-slate-800">
+                    {STMT_COLS.map((h) => (
+                      <th key={h} className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {activeTab === "current" ? (
+                    loadingPostpaidBalance ? (
+                      <tr><td colSpan={STMT_COLS.length} className="py-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A4D68] mx-auto"></div></td></tr>
+                    ) : !currentCycleRow ? (
+                      <tr><td colSpan={STMT_COLS.length} className="py-20 text-center text-slate-400 font-black uppercase text-[10px] tracking-widest">No active cycle data</td></tr>
+                    ) : (
+                      <StatementRow row={currentCycleRow} onClick={() => openDrillDownCycle(currentCycleRow)} />
+                    )
+                  ) : (
+                    loadingCycles ? (
+                      <tr><td colSpan={STMT_COLS.length} className="py-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A4D68] mx-auto"></div></td></tr>
+                    ) : previousCycles.length === 0 ? (
+                      <tr><td colSpan={STMT_COLS.length} className="py-20 text-center text-slate-400 font-black uppercase text-[10px] tracking-widest">No statement history available</td></tr>
+                    ) : (
+                      previousCycles.map((c) => (
+                        <StatementRow key={c.cycleIndex} row={c} onClick={() => openDrillDownCycle(c)} />
+                      ))
+                    )
+                  )}
+                </tbody>
+                {activeTab === "previous" && previousCycles.length > 0 && (
+                  <tfoot className="bg-slate-50">
+                    <tr>
+                      <td colSpan={STMT_COLS.length - 1} className="px-8 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Historical Volume</td>
+                      <td className="px-8 py-4 font-black text-slate-900 text-sm">
+                        ₹{fmtAmt(previousCycles.reduce((sum, c) => sum + (c.statementAmount || 0), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -478,8 +588,8 @@ export default function CreditStatusAlerts() {
              </div>
 
              <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-100 shadow-inner">
-                <DateFilter label="From" value={startDate} onChange={setStartDate} />
-                <DateFilter label="To" value={endDate} onChange={setEndDate} />
+                <DateFilter label="Booking From" value={startDate} onChange={setStartDate} />
+                <DateFilter label="Booking To" value={endDate} onChange={setEndDate} />
              </div>
           </div>
         </div>
@@ -494,7 +604,7 @@ export default function CreditStatusAlerts() {
                 { label: "All Risk Tiers", value: "All" },
                 { label: "Critical Only (>90%)", value: "Critical" },
                 { label: "Warning Only (>75%)", value: "Warning" },
-                { label: "Stable Only", value: "active" }
+                { label: "Stable Only", value: "Healthy" }
               ]}
            />
            <FilterSelect 
@@ -657,6 +767,36 @@ export default function CreditStatusAlerts() {
   );
 }
 
+/* ── SHARED STATEMENT ROW ── */
+function StatementRow({ row, onClick }) {
+  return (
+    <tr
+      onClick={onClick}
+      className="group hover:bg-slate-50 cursor-pointer transition-all border-l-4 border-transparent hover:border-[#088395] text-[11px] font-bold"
+    >
+      <td className="px-8 py-4 font-mono text-slate-400">{row.rowNum}</td>
+      <td className="px-8 py-4">
+        <span className="flex items-center gap-2 text-[#088395] font-black">
+          {row.statementId} <FiArrowUpRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+        </span>
+      </td>
+      <td className="px-8 py-4 whitespace-nowrap text-slate-600 font-black">
+        {fmt(row.periodStart)} – {fmt(row.periodEnd)}
+      </td>
+      <td className="px-8 py-4 whitespace-nowrap text-slate-500">{fmt(row.statementDate)}</td>
+      <td className="px-8 py-4 whitespace-nowrap text-slate-500">{fmt(row.dueDate)}</td>
+      <td className="px-8 py-4 text-center">
+        <span
+          className={`px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-xs ${row.delayDays > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}
+        >
+          {row.delayDays} Days Delay
+        </span>
+      </td>
+      <td className="px-8 py-4 font-black text-slate-900 text-[13px]">₹{fmtAmt(row.statementAmount)}</td>
+    </tr>
+  );
+}
+
 function SummaryCard({ label, value, icon, color, sub }) {
   return (
     <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 group hover:border-slate-200 transition-all hover:-translate-y-1 duration-300">
@@ -708,5 +848,26 @@ function DateFilter({ label, value, onChange }) {
          className="px-2 py-1 bg-white border border-slate-100 rounded-lg text-[10px] font-black text-[#0A4D68] outline-none w-[110px] focus:ring-1 focus:ring-[#0A4D68]/10 transition-all text-center shadow-xs"
        />
     </div>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    paid:      { bg: "#ECFDF5", text: "#065F46", label: "Paid" },
+    billed:    { bg: "#ECFEFF", text: "#155E75", label: "Billed" },
+    pending:   { bg: "#FFFBEB", text: "#92400E", label: "Pending" },
+    failed:    { bg: "#FFF1F2", text: "#9F1239", label: "Failed" },
+    cancelled: { bg: "#F1F5F9", text: "#475569", label: "Cancelled" },
+    voucher:   { bg: "#ECFDF5", text: "#065F46", label: "Vouchered" },
+    success:   { bg: "#ECFDF5", text: "#065F46", label: "Success" },
+  };
+  const s = map[status?.toLowerCase()] || map.pending;
+  return (
+    <span
+      className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase"
+      style={{ backgroundColor: s.bg, color: s.text }}
+    >
+      {s.label}
+    </span>
   );
 }

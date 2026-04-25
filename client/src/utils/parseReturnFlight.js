@@ -24,9 +24,12 @@ export const parseRoundTrip = (segments = []) => {
       arrival: last.Destination.ArrTime,
       duration: segs.reduce((sum, s) => sum + (s.Duration || 0), 0),
       stops: segs.length - 1,
+      stopCities: segs.slice(0, -1).map(s => s.Destination?.Airport?.AirportCode).filter(Boolean),
       baggage: first.Baggage,
       refundable: true,
       logo: `https://images.kiwi.com/airlines/64/${first.Airline?.AirlineCode}.png`,
+      fromTerminal: first.Origin.Airport?.Terminal,
+      toTerminal: last.Destination.Airport?.Terminal,
     };
   };
 
@@ -93,6 +96,7 @@ export const parseSingleJourney = (segs = []) => {
     durationMins: segs.reduce((s, x) => s + (x.Duration || 0), 0),
 
     stops: segs.length - 1,
+    stopCities: segs.slice(0, -1).map(s => s.Destination?.Airport?.AirportCode).filter(Boolean),
     baggage: first.Baggage || first.BaggageAllowance || "—",
 
     refundable:
@@ -100,6 +104,8 @@ export const parseSingleJourney = (segs = []) => {
     cabinClassCode: first.CabinClass,
 
     logo: `https://images.kiwi.com/airlines/64/${first.Airline?.AirlineCode}.png`,
+    fromTerminal: first.Origin.Airport?.Terminal,
+    toTerminal: last.Destination.Airport?.Terminal,
   };
 };
 

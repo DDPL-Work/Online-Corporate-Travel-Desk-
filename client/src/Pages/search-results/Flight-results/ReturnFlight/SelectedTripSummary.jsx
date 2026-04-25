@@ -26,6 +26,13 @@ const getJourney = (flight) => {
     arrTime: last.Destination.ArrTime,
     supplierFareClass: first.SupplierFareClass || "Standard",
     cabinClass: CABIN_MAP?.[first.CabinClass] || "Economy",
+    fromTerminal: first.Origin.Airport.Terminal,
+    toTerminal: last.Destination.Airport.Terminal,
+    stops: segs.length - 1,
+    stopCities: segs
+      .slice(0, -1)
+      .map((s) => s.Destination?.Airport?.AirportCode)
+      .filter(Boolean),
   };
 };
 
@@ -66,14 +73,31 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                   <div className="text-xs text-gray-500 mt-0.5">
                     {onwardData.airline} · {onwardData.flightNo}
                   </div>
-
                   <div className="text-xs text-gray-600 mt-0.5">
                     {formatDate(onwardData.depTime)} ·{" "}
                     {formatTime(onwardData.depTime)} –{" "}
                     {formatTime(onwardData.arrTime)}
                   </div>
 
-                  <div className="flex gap-2 mt-1.5">
+                  <div className="flex flex-wrap gap-2 mt-1.5">
+                    {onwardData.fromTerminal && (
+                      <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-bold uppercase rounded border border-blue-100">
+                        T-{onwardData.fromTerminal} (Dep)
+                      </span>
+                    )}
+                    {onwardData.toTerminal && (
+                      <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-bold uppercase rounded border border-blue-100">
+                        T-{onwardData.toTerminal} (Arr)
+                      </span>
+                    )}
+                    {onwardData.stops > 0 && (
+                      <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 text-[9px] font-bold uppercase rounded border border-amber-100">
+                        {onwardData.stops} Stop{onwardData.stops > 1 ? "s" : ""}{" "}
+                        {onwardData.stopCities?.length > 0
+                          ? `via ${onwardData.stopCities.join(", ")}`
+                          : ""}
+                      </span>
+                    )}
                     <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
                       CLASS: {onwardData.cabinClass}
                     </span>
@@ -116,7 +140,25 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                     {formatTime(returnData.arrTime)}
                   </div>
 
-                  <div className="flex gap-2 mt-1.5">
+                  <div className="flex flex-wrap gap-2 mt-1.5">
+                    {returnData.fromTerminal && (
+                      <span className="px-1.5 py-0.5 bg-green-50 text-green-700 text-[9px] font-bold uppercase rounded border border-green-100">
+                        T-{returnData.fromTerminal} (Dep)
+                      </span>
+                    )}
+                    {returnData.toTerminal && (
+                      <span className="px-1.5 py-0.5 bg-green-50 text-green-700 text-[9px] font-bold uppercase rounded border border-green-100">
+                        T-{returnData.toTerminal} (Arr)
+                      </span>
+                    )}
+                    {returnData.stops > 0 && (
+                      <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 text-[9px] font-bold uppercase rounded border border-amber-100">
+                        {returnData.stops} Stop{returnData.stops > 1 ? "s" : ""}{" "}
+                        {returnData.stopCities?.length > 0
+                          ? `via ${returnData.stopCities.join(", ")}`
+                          : ""}
+                      </span>
+                    )}
                     <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
                       CLASS: {returnData.cabinClass}
                     </span>
@@ -148,7 +190,7 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                 console.log("CLICK WORKING");
                 const isDomesticRoundTrip =
                   onward?.Segments?.[0]?.length === 1 &&
-                  ret?.Segments?.[0]?.length === 1; 
+                  ret?.Segments?.[0]?.length === 1;
 
                 // ✅ CASE 1: DOMESTIC ROUND TRIP → DUAL API
                 if (isDomesticRoundTrip) {

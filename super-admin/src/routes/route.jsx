@@ -20,6 +20,7 @@ import ApiConfigurations from "../components/SuperAdminTabs/ApiConfigurations";
 import SystemLogs from "../components/SuperAdminTabs/SystemLogs";
 import CancellationDashboard from "../components/SuperAdminTabs/CancelledBookingsSummary";
 import CancellationQueries from "../components/SuperAdminTabs/CancellationQueries";
+import AllReissueRequests from "../components/SuperAdminTabs/AllReissueRequests";
 import PendingCorporates from "../components/SuperAdminTabs/PendingCorporates";
 import OpsTeamManagement from "../components/SuperAdminTabs/OpsTeamManagement";
 import ProfileSettings from "../Pages/Auth/ProfileSettings";
@@ -51,6 +52,7 @@ export const appRouter = createBrowserRouter([
           { path: "/bookings-summary", element: <BookingsSummary /> },
           { path: "/cancellation-summary", element: <CancellationDashboard /> },
           { path: "/cancellation-query", element: <CancellationQueries /> },
+          { path: "/all-reissue-requests", element: <AllReissueRequests /> },
           { path: "/corporate-revenue", element: <CorporateRevenue /> },
           { path: "/credit-status", element: <CreditStatusAlerts /> },
           { path: "/wallet-recharge-logs", element: <WalletRechargeLogs /> },

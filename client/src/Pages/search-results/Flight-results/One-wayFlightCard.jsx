@@ -99,10 +99,40 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
     { id: "rules", label: "Fare Rules" },
   ];
 
-  const cancellationRules = miniFareRules.filter(
+  let cancellationRules = miniFareRules.filter(
     (r) => r.Type === "Cancellation",
   );
-  const reissueRules = miniFareRules.filter((r) => r.Type === "Reissue");
+  let reissueRules = miniFareRules.filter((r) => r.Type === "Reissue");
+
+  const isCancellationFallback = cancellationRules.length === 0;
+  const isReissueFallback = reissueRules.length === 0;
+
+  if (isCancellationFallback) {
+    if (selectedFlight?.IsRefundable) {
+      cancellationRules = [
+        { From: "0", To: "72", Unit: "Hours", Details: "Approx. ₹3,500 (Subject to Airline)", Type: "Cancellation" },
+        { From: "72", To: "Any", Unit: "Hours", Details: "Approx. ₹3,000 (Subject to Airline)", Type: "Cancellation" }
+      ];
+    } else {
+      cancellationRules = [
+        { From: "0", To: "Any", Unit: "Hours", Details: "Non-Refundable as per Airline", Type: "Cancellation" }
+      ];
+    }
+  }
+
+  if (isReissueFallback) {
+    const isChangeable = !selectedFlight?.FareInclusions?.some(v => v.toLowerCase().includes("non-changeable"));
+    if (isChangeable) {
+      reissueRules = [
+        { From: "0", To: "72", Unit: "Hours", Details: "Approx. ₹3,250 + Fare Diff.", Type: "Reissue" },
+        { From: "72", To: "Any", Unit: "Hours", Details: "Approx. ₹2,750 + Fare Diff.", Type: "Reissue" }
+      ];
+    } else {
+      reissueRules = [
+        { From: "0", To: "Any", Unit: "Hours", Details: "Fixed Dates / Non-Changeable", Type: "Reissue" }
+      ];
+    }
+  }
 
   return (
     <div className="border-t border-blue-100 bg-white/80">
@@ -127,127 +157,122 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
       {/* ── Flight Details Tab ── */}
       {activeTab === "flight" && (
         <div className="divide-y divide-blue-100">
-          {segmentsArrays.map((segments, sIdx) => {
-            const firstSegment = segments[0];
-            const lastSegment = segments[segments.length - 1];
-
-            const airlineCode = firstSegment.Airline?.AirlineCode;
-            const fareClass =
-              firstSegment?.SupplierFareClass ||
-              firstSegment?.FareClassification?.Type ||
-              "Standard";
-
-            const from = firstSegment.Origin?.Airport?.CityName;
-            const fromCountry = firstSegment.Origin?.Airport?.CountryName;
-            const fromTerminal = firstSegment.Origin?.Airport?.Terminal;
-            const to = lastSegment.Destination?.Airport?.CityName;
-            const toCountry = lastSegment.Destination?.Airport?.CountryName;
-            const toTerminal = lastSegment.Destination?.Airport?.Terminal;
-
-            const departure = formatTime(firstSegment.Origin?.DepTime);
-            const arrival = formatTime(lastSegment.Destination?.ArrTime);
-            const depDate = formatDate(firstSegment.Origin?.DepTime);
-            const arrDate = formatDate(lastSegment.Destination?.ArrTime);
-
-            const durationMin = segments.reduce((sum, s) => sum + (s.Duration || 0), 0);
-            const duration = `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`;
-            const stops = segments.length === 1 ? "Non-stop" : `${segments.length - 1} Stop`;
-
-            const checkinBaggage =
-              fareBreakdown?.SegmentDetails?.[sIdx]?.CheckedInBaggage?.FreeText ||
-              firstSegment?.Baggage ||
-              "15 Kg";
-            const cabinBaggage =
-              fareBreakdown?.SegmentDetails?.[sIdx]?.CabinBaggage?.FreeText ||
-              firstSegment?.CabinBaggage ||
-              "7 Kg";
-
+          {segmentsArrays.map((legSegments, sIdx) => {
             return (
-              <div key={sIdx} className="p-5">
+              <div key={sIdx} className="p-0">
                 {segmentsArrays.length > 1 && (
-                  <p className="text-xs font-bold uppercase tracking-wider text-blue-600 mb-4 bg-blue-50 px-3 py-1.5 rounded-lg inline-block">
-                    {sIdx === 0 ? "Onward Journey" : "Return Journey"}
-                  </p>
+                  <div className="p-5 pb-0">
+                    <p className="text-xs font-black uppercase tracking-widest text-blue-600 mb-4 bg-blue-50 px-3 py-1.5 rounded-lg inline-block">
+                      {sIdx === 0 ? "Onward Journey" : "Return Journey"}
+                    </p>
+                  </div>
                 )}
-                {/* Timeline Row */}
-                <div className="flex items-center justify-between gap-4 items-start">
-                  {/* Departure */}
-                  <div>
-                    <p className="text-xl font-bold text-slate-800">{departure}</p>
-                    <p className="text-xs text-blue-600 font-medium mt-0.5">
-                      {depDate}
-                    </p>
-                    {fromTerminal && (
-                      <p className="text-xs text-slate-600 font-medium mt-2">
-                        Terminal {fromTerminal}
-                      </p>
-                    )}
-                    <p className="text-xs text-slate-500">
-                      {from}, {fromCountry}
-                    </p>
-                  </div>
 
-                  {fareClass && (
-                    <span className="ml-2 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-semibold border border-blue-200">
-                      {fareClass}
-                    </span>
-                  )}
+                <div className="divide-y divide-slate-100">
+                  {legSegments.map((segment, hIdx) => {
+                    const nextSegment = legSegments[hIdx + 1];
+                    const from = segment.Origin?.Airport?.CityName;
+                    const fromCode = segment.Origin?.Airport?.AirportCode;
+                    const fromTerminal = segment.Origin?.Airport?.Terminal;
+                    const to = segment.Destination?.Airport?.CityName;
+                    const toCode = segment.Destination?.Airport?.AirportCode;
+                    const toTerminal = segment.Destination?.Airport?.Terminal;
 
-                  {/* Arrival */}
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-slate-800">{arrival}</p>
-                    <p className="text-xs text-blue-600 font-medium mt-0.5">
-                      {arrDate}
-                    </p>
-                    {toTerminal && (
-                      <p className="text-xs text-slate-600 font-medium mt-2">
-                        Terminal {toTerminal}
-                      </p>
-                    )}
-                    <p className="text-xs text-slate-500">
-                      {to}, {toCountry}
-                    </p>
-                  </div>
-                </div>
+                    const depTime = segment.Origin?.DepTime;
+                    const arrTime = segment.Destination?.ArrTime;
 
-                {/* Baggage Grid */}
-                <div className="mt-5 grid grid-cols-3 gap-3">
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
-                      Baggage (Adult)
-                    </p>
-                    <p className="text-sm font-semibold text-slate-700">
-                      {checkinBaggage}
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Check-in</p>
-                  </div>
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
-                      Cabin (Adult)
-                    </p>
-                    <p className="text-sm font-semibold text-slate-700">
-                      {cabinBaggage}
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      Hand baggage
-                    </p>
-                  </div>
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
-                      Aircraft
-                    </p>
-                    <p className="text-sm font-semibold text-slate-700">
-                      {firstSegment?.Craft || "—"}
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      Aircraft type
-                    </p>
-                  </div>
+                    const airline = segment.Airline?.AirlineName;
+                    const airlineCode = segment.Airline?.AirlineCode;
+                    const flightNumber = segment.Airline?.FlightNumber;
+                    const craft = segment?.Craft || "—";
+                    
+                    const durationMin = segment.Duration || 0;
+                    const duration = `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`;
+
+                    const checkinBaggage =
+                      fareBreakdown?.SegmentDetails?.[sIdx]?.CheckedInBaggage?.FreeText ||
+                      segment?.Baggage ||
+                      "15 Kg";
+                    const cabinBaggage =
+                      fareBreakdown?.SegmentDetails?.[sIdx]?.CabinBaggage?.FreeText ||
+                      segment?.CabinBaggage ||
+                      "7 Kg";
+
+                    // Calculate Layover
+                    let layoverContent = null;
+                    if (nextSegment) {
+                      const arr = new Date(segment.Destination?.ArrTime);
+                      const dep = new Date(nextSegment.Origin?.DepTime);
+                      const diffMs = dep - arr;
+                      const diffMin = Math.floor(diffMs / 60000);
+                      const layoverHours = Math.floor(diffMin / 60);
+                      const layoverMins = diffMin % 60;
+
+                      layoverContent = (
+                        <div className="bg-amber-50/50 border-y border-amber-100 px-8 py-3 flex items-center gap-3">
+                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          <p className="text-[11px] font-bold text-amber-700 uppercase tracking-widest">
+                            Layover in {segment.Destination?.Airport?.CityName} ({segment.Destination?.Airport?.AirportCode}) — {layoverHours}h {layoverMins}m
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <React.Fragment key={hIdx}>
+                        <div className="p-6">
+                          {/* Segment Header */}
+                          <div className="flex items-center gap-3 mb-6">
+                            <img
+                              src={airlineLogo(airlineCode)}
+                              alt={airline}
+                              className="w-10 h-10 rounded-xl border border-slate-100 shadow-sm object-contain p-1"
+                            />
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">{airline}</p>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
+                                {airlineCode}-{flightNumber} • {craft}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start justify-between gap-8">
+                            {/* Departure */}
+                            <div className="flex-1">
+                              <p className="text-xl font-black text-slate-800">{formatTime(depTime)}</p>
+                              <p className="text-xs font-bold text-blue-600 mt-1">{formatDate(depTime)}</p>
+                              <div className="mt-3">
+                                <p className="text-sm font-bold text-slate-700">{from} ({fromCode})</p>
+                                {fromTerminal && <p className="text-[10px] font-bold text-slate-500 mt-0.5">Terminal {fromTerminal}</p>}
+                              </div>
+                            </div>
+
+                            {/* Middle - Duration */}
+                            <div className="flex flex-col items-center pt-2">
+                               <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{duration}</div>
+                               <div className="h-12 w-px bg-linear-to-b from-blue-200 to-transparent border-l border-dashed border-blue-300" />
+                            </div>
+
+                            {/* Arrival */}
+                            <div className="flex-1 text-right">
+                              <p className="text-xl font-black text-slate-800">{formatTime(arrTime)}</p>
+                              <p className="text-xs font-bold text-blue-600 mt-1">{formatDate(arrTime)}</p>
+                              <div className="mt-3">
+                                <p className="text-sm font-bold text-slate-700">{to} ({toCode})</p>
+                                {toTerminal && <p className="text-[10px] font-bold text-slate-500 mt-0.5">Terminal {toTerminal}</p>}
+                              </div>
+                            </div>
+                          </div>
+
+                        </div>
+                        {layoverContent}
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
               </div>
             );
           })}
-
         </div>
       )}
 
@@ -333,7 +358,7 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em]">Change Policy</p>
                   <p className="text-sm font-black text-slate-800 mt-0.5">
-                    {selectedFlight?.FareInclusions?.some(v => v.toLowerCase().includes("non-changeable")) ? "Fixed Dates" : "Changeable"}
+                    {selectedFlight?.FareInclusions?.some(v => v.toLowerCase().includes("non-changeable")) ? "Fixed Dates" : "As per Policy"}
                   </p>
                 </div>
              </div>
@@ -406,7 +431,9 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
                 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                    <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                       <span className="text-[11px] font-black text-slate-600 uppercase">Cancellation Fee</span>
-                      <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">Official</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isCancellationFallback ? "text-slate-600 bg-slate-50 border-slate-200" : "text-red-600 bg-red-50 border-red-100"}`}>
+                        {isCancellationFallback ? "Policy Guidance" : "Official"}
+                      </span>
                    </div>
                    {cancellationRules.length > 0 ? (
                       <div className="divide-y divide-slate-50">
@@ -426,7 +453,9 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
                 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                    <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                       <span className="text-[11px] font-black text-slate-600 uppercase">Date Change Fee</span>
-                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">Official</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isReissueFallback ? "text-slate-600 bg-slate-50 border-slate-200" : "text-blue-600 bg-blue-50 border-blue-100"}`}>
+                        {isReissueFallback ? "Policy Guidance" : "Official"}
+                      </span>
                    </div>
                    {reissueRules.length > 0 ? (
                       <div className="divide-y divide-slate-50">
@@ -576,10 +605,12 @@ export default function OneWayFlightCard({
   const from = firstSegment.Origin?.Airport?.CityName;
   const fromCountry = firstSegment.Origin?.Airport?.CountryName;
   const fromAirport = firstSegment.Origin?.Airport?.AirportName;
+  const fromTerminal = firstSegment.Origin?.Airport?.Terminal;
 
   const to = lastSegment.Destination?.Airport?.CityName;
   const toCountry = lastSegment.Destination?.Airport?.CountryName;
   const toAirport = lastSegment.Destination?.Airport?.AirportName;
+  const toTerminal = lastSegment.Destination?.Airport?.Terminal;
 
   const departure = formatTime(firstSegment.Origin?.DepTime);
   const arrival = formatTime(lastSegment.Destination?.ArrTime);
@@ -590,8 +621,10 @@ export default function OneWayFlightCard({
   const durationMin = segments.reduce((sum, s) => sum + (s.Duration || 0), 0);
   const duration = `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`;
 
-  const stops =
-    segments.length === 1 ? "Non-stop" : `${segments.length - 1} Stop`;
+  const stopCities = segments.slice(0, -1).map(s => s.Destination?.Airport?.AirportCode).filter(Boolean);
+  const stops = segments.length === 1 
+    ? "Non-stop" 
+    : `${segments.length - 1} Stop${segments.length > 2 ? 's' : ''} ${stopCities.length ? `via ${stopCities.join(', ')}` : ''}`;
 
   const baggage = selectedFlight.Fare?.Baggage?.iB || "15 Kg";
   const refundable = selectedFlight.IsRefundable;
@@ -671,6 +704,11 @@ export default function OneWayFlightCard({
                   {from}, {fromCountry}
                 </div>
                 <div className="text-xs text-slate-500">({fromAirport})</div>
+                {fromTerminal && (
+                  <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 inline-block mt-1 uppercase tracking-wider">
+                    T-{fromTerminal}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col items-center gap-2 px-6">
@@ -700,6 +738,11 @@ export default function OneWayFlightCard({
                   {to}, {toCountry}
                 </div>
                 <div className="text-xs text-slate-500">({toAirport})</div>
+                {toTerminal && (
+                  <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 inline-block mt-1 uppercase tracking-wider">
+                    T-{toTerminal}
+                  </div>
+                )}
               </div>
             </div>
 

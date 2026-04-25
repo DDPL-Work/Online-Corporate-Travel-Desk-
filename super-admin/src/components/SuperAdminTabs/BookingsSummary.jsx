@@ -14,6 +14,7 @@ import {
   fetchFlightBookings,
   fetchHotelBookings,
 } from "../../Redux/Actions/corporate.related.thunks";
+import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import Pagination from "../Shared/Pagination";
 import {
   FlightBookingModal,
@@ -128,6 +129,7 @@ const normalizeFlight = (b = {}) => {
 
   return {
     id: b._id || b.bookingId || "—",
+    pnr: b.bookingResult?.pnr || b.pnr || b.itinerary?.PNR || "—",
     bookingRef: b.bookingReference || b._id || "—",
     corporate: getCorporateName(b),
     corpId: getCorporateId(b),
@@ -144,6 +146,17 @@ const normalizeFlight = (b = {}) => {
     destination: route,
     amount,
     status: b.executionStatus || b.requestStatus || b.status || "Pending",
+    refundStatus: (() => {
+      const dbStatus = b.cancellation?.refundStatus || b.refundStatus;
+      if (dbStatus && dbStatus.toLowerCase() !== "pending") return dbStatus;
+      const amendment = b.amendment || {};
+      const lastHistory = Array.isArray(b.amendmentHistory) && b.amendmentHistory.length
+        ? b.amendmentHistory[b.amendmentHistory.length - 1] : {};
+      const fRes = amendment.response?.[0]?.response?.Response?.TicketCRInfo?.[0] || 
+                   lastHistory.response?.[0]?.response?.Response?.TicketCRInfo?.[0];
+      if (fRes?.ChangeRequestStatus === 4 || fRes?.RefundedAmount > 0) return "Processed";
+      return dbStatus || null;
+    })(),
     airline:
       b.bookingSnapshot?.airline ||
       segments[0]?.airlineName ||
@@ -206,6 +219,17 @@ const normalizeHotel = (b = {}) => {
       "Hotel",
     amount,
     status: b.executionStatus || b.requestStatus || b.status || "Pending",
+    refundStatus: (() => {
+      const dbStatus = b.cancellation?.refundStatus || b.refundStatus;
+      if (dbStatus && dbStatus.toLowerCase() !== "pending") return dbStatus;
+      const amendment = b.amendment || {};
+      const lastHistory = Array.isArray(b.amendmentHistory) && b.amendmentHistory.length
+        ? b.amendmentHistory[b.amendmentHistory.length - 1] : {};
+      const hRes = amendment.providerResponse?.HotelChangeRequestResult || 
+                   lastHistory.providerResponse?.HotelChangeRequestResult || {};
+      if (hRes.ChangeRequestStatus === 3 || hRes.RefundedAmount > 0) return "Processed";
+      return dbStatus || null;
+    })(),
     roomType:
       b.hotelRequest?.selectedRoom?.rawRoomData?.Name?.[0] ||
       b.roomType ||
@@ -252,6 +276,10 @@ export default function GlobalBookingsDashboard() {
     loadingHotels,
   } = useSelector((state) => state.corporateRelated);
 
+  const { corporates: onboardedCorporates } = useSelector(
+    (state) => state.corporateList,
+  );
+
   const [activeTab, setActiveTab] = useState("Flight");
   const [corporate, setCorporate] = useState("All");
   const [search, setSearch] = useState("");
@@ -283,6 +311,10 @@ export default function GlobalBookingsDashboard() {
     }
   }, [activeTab, dispatch]);
 
+  useEffect(() => {
+    dispatch(fetchCorporates());
+  }, [dispatch]);
+
 
   const flights = useMemo(
     () =>
@@ -302,14 +334,23 @@ export default function GlobalBookingsDashboard() {
   );
 
   const corporates = useMemo(() => {
+    const fromOnboarded = (onboardedCorporates || []).map(
+      (c) => c.corporateName || c.name || c.title,
+    );
     const validBookings = [...flights, ...hotels].filter(
       (b) => !isBlockedStatus(b.status),
     );
-    const names = new Set(
-      validBookings.map((b) => b.corporate).filter(Boolean),
-    );
-    return ["All", ...names];
-  }, [flights, hotels]);
+    const namesFromBookings = validBookings
+      .map((b) => b.corporate)
+      .filter(Boolean);
+
+    const allNames = new Set([
+      ...fromOnboarded,
+      ...namesFromBookings,
+    ]);
+    
+    return ["All", ...Array.from(allNames).sort()];
+  }, [onboardedCorporates, flights, hotels]);
 
   const filtered = useMemo(() => {
     const source = activeTab === "Flight" ? flights : hotels;
@@ -535,7 +576,7 @@ export default function GlobalBookingsDashboard() {
                 </LabeledInput>
               </>
             )}
-            <LabeledInput label="Start Date">
+            <LabeledInput label="Booking From">
               <input
                 type="date"
                 value={startDate}
@@ -544,7 +585,7 @@ export default function GlobalBookingsDashboard() {
               />
             </LabeledInput>
 
-            <LabeledInput label="End Date">
+            <LabeledInput label="Booking To">
               <input
                 type="date"
                 value={endDate}
@@ -642,7 +683,7 @@ const FlightTable = ({
           "Corporate Account",
           "Traveller / ID",
           "Travel Date",
-          "Amount",
+          "PNR",
           "Status",
           "Airline / Route",
           "Action",
@@ -694,11 +735,22 @@ const FlightTable = ({
                 })
               : "—"}
           </td>
-          <td className="px-6 py-4 font-black text-slate-900">
-            ₹{(b.amount || 0).toLocaleString()}
+          <td className="px-6 py-4 font-mono font-black text-[#0A4D68] uppercase tracking-tighter">
+            {b.pnr}
           </td>
           <td className="px-6 py-4">
             <StatusLabel status={b.status} />
+            {b.refundStatus && (
+              <p
+                className={`text-[9px] font-black uppercase mt-1 ${
+                  b.refundStatus.toLowerCase().includes("process")
+                    ? "text-emerald-600"
+                    : "text-rose-600"
+                }`}
+              >
+                Refund: {b.refundStatus}
+              </p>
+            )}
           </td>
           <td className="px-6 py-4">
             <div className="flex flex-col">
@@ -791,6 +843,11 @@ const HotelTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => (
           </td>
           <td className="px-6 py-4">
             <StatusLabel status={b.status} />
+            {b.refundStatus && (
+              <p className="text-[9px] font-black text-rose-600 uppercase mt-1">
+                Refund: {b.refundStatus}
+              </p>
+            )}
           </td>
           <td className="px-6 py-4">
             <div className="flex flex-col">
