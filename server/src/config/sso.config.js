@@ -140,7 +140,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: process.env.GOOGLE_CALLBACK_URL || process.env.GOOGLE_CALLBACK_URL_2,
+        callbackURL: process.env.GOOGLE_CALLBACK_URL,
         passReqToCallback: true,
       },
       async (req, accessToken, refreshToken, profile, done) => {
@@ -440,7 +440,7 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
         tokenURL: "https://accounts.zoho.com/oauth/v2/token",
         clientID: process.env.ZOHO_CLIENT_ID,
         clientSecret: process.env.ZOHO_CLIENT_SECRET,
-        callbackURL: process.env.ZOHO_CALLBACK_URL || process.env.ZOHO_CALLBACK_URL_2,
+        callbackURL: process.env.ZOHO_CALLBACK_URL,
         scope: ["aaaserver.profile.READ"],
         passReqToCallback: true,
       },
