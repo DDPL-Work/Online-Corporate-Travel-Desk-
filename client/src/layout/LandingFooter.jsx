@@ -165,7 +165,7 @@ export default function LandingFooter({ onTabChange }) {
               {/* IATA logo */}
               <div className="mb-5">
                 <img
-                  className="h-[3rem]"
+                  className="h-[4.5rem]"
                   src="/iata-logo.svg"
                   alt="iata-logo"
                 />
@@ -338,7 +338,7 @@ export default function LandingFooter({ onTabChange }) {
             }
           }}
         >
-          <img src={logo} alt="Traveamer" className="h-7" />
+          <img src={logo} alt="Traveamer" className="h-10" />
         </div>
 
         {/* Copyright */}

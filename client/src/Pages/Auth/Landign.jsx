@@ -127,7 +127,7 @@ function Navbar({ onAuthOpen }) {
         <div className="flex items-center">
           <img
             src="/logo-primary.png" // change to your logo path
-            alt="COTD Logo"
+            alt="Traveamer Logo"
             className="h-14 w-auto object-contain"
           />
         </div>
@@ -1375,7 +1375,7 @@ function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Logo + Tagline */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-[#000D26] to-[#C9A240] flex items-center justify-center">
               <MdFlightTakeoff className="text-white text-lg" />
             </div>
             <div>
@@ -1383,7 +1383,7 @@ function Footer() {
                 className="font-black text-lg"
                 style={{ fontFamily: "'Outfit',sans-serif" }}
               >
-                COTD
+                Traveamer
               </p>
               <p className="text-slate-400 text-xs">
                 Corporate Travel Made Simple
@@ -1410,7 +1410,7 @@ function Footer() {
 
         {/* Bottom Row */}
         <div className="border-t border-white/10 mt-8 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} COTD. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Traveamer. All rights reserved.</p>
 
           <div className="flex gap-4">
             <FaLinkedin className="hover:text-white cursor-pointer transition-colors" />
