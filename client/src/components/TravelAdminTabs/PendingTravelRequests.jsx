@@ -87,6 +87,9 @@ export default function PendingTravelRequests() {
         bookedDate: b.createdAt ? new Date(b.createdAt) : new Date(),
         estimatedCost,
         originalData: b, // Important for the detailed modal
+        isTravelPassed: isHotel
+          ? Boolean(b.hotelRequest?.checkInDate && new Date() > new Date(b.hotelRequest.checkInDate))
+          : Boolean(b.flightRequest?.segments?.[0]?.departureDateTime && new Date() > new Date(b.flightRequest.segments[0].departureDateTime)),
       };
 
       if (isHotel) {
@@ -287,12 +290,14 @@ export default function PendingTravelRequests() {
                     </td>
                   </tr>
                 ) : (
-                  filteredData.map((r, i) => (
+                  filteredData.map((r, i) => {
+                    const isDiscarded = r.isTravelPassed && r.status === "pending_approval";
+                    return (
                     <tr
                       key={r.id}
                       className={`transition-colors hover:bg-slate-50 ${
                         i % 2 === 0 ? "bg-white" : "bg-slate-50/50"
-                      }`}
+                      } ${isDiscarded ? "opacity-60 grayscale-[50%]" : ""}`}
                     >
                       <td className="px-4 py-3">
                         <IdCell id={r.id} />
@@ -322,7 +327,13 @@ export default function PendingTravelRequests() {
                       </td>
 
                       <td className="px-4 py-3">
-                        <StatusBadge status={r.status} />
+                        {isDiscarded ? (
+                          <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded text-[11px] font-semibold border border-slate-200 whitespace-nowrap">
+                            Discarded
+                          </span>
+                        ) : (
+                          <StatusBadge status={r.status} />
+                        )}
                       </td>
 
                       <td className="px-4 py-3">
@@ -355,13 +366,18 @@ export default function PendingTravelRequests() {
                       <td className="px-4 py-3">
                         <button
                           onClick={() => setSelectedRequest(r)}
-                          className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] transition shadow-sm"
+                          disabled={isDiscarded}
+                          className={`px-3 py-1 text-xs font-semibold text-white rounded-md transition shadow-sm ${
+                            isDiscarded
+                              ? "bg-slate-300 cursor-not-allowed"
+                              : "bg-[#0A4D68] hover:bg-[#083a50]"
+                          }`}
                         >
                           View
                         </button>
                       </td>
                     </tr>
-                  ))
+                  )})
                 )}
               </tbody>
             </table>

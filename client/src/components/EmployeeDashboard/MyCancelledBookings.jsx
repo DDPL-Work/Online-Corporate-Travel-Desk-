@@ -90,7 +90,7 @@ function Stars({ count }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  Cancelled Flight Card                                          */
 /* ─────────────────────────────────────────────────────────────── */
-function CancelledFlightCard({ flight, onViewDetails }) {
+function CancelledFlightCard({ flight, onViewDetails, userRole }) {
   const refund = REFUND_CONFIG[flight.refundStatus];
   const RefundIcon = refund.icon;
 
@@ -262,29 +262,33 @@ function CancelledFlightCard({ flight, onViewDetails }) {
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-          {/* <div>
-            <p className="text-[11px] text-slate-400 mb-0.5">Original fare</p>
-            <p className="text-[17px] font-bold text-slate-800">
-              <span className="line-through text-slate-300 text-[13px] mr-1">
-                ₹{flight.originalFare.toLocaleString("en-IN")}
-              </span>
-              {flight.refundStatus === "nonrefundable" && (
-                <span className="text-red-600 text-[13px] font-semibold">
-                  No refund
-                </span>
-              )}
-              {flight.refundStatus === "processed" && (
-                <span className="text-emerald-600 text-[13px] font-semibold">
-                  ₹{flight.refundAmount.toLocaleString("en-IN")} back
-                </span>
-              )}
-              {flight.refundStatus === "pending" && (
-                <span className="text-amber-600 text-[13px] font-semibold">
-                  ₹{flight.refundAmount.toLocaleString("en-IN")} pending
-                </span>
-              )}
-            </p>
-          </div> */}
+          <div>
+            {( userRole === "travel-admin") && (
+              <>
+                <p className="text-[11px] text-slate-400 mb-0.5">Original fare</p>
+                <p className="text-[17px] font-bold text-slate-800">
+                  <span className="line-through text-slate-300 text-[13px] mr-1">
+                    ₹{flight.originalFare.toLocaleString("en-IN")}
+                  </span>
+                  {flight.refundStatus === "nonrefundable" && (
+                    <span className="text-red-600 text-[13px] font-semibold">
+                      No refund
+                    </span>
+                  )}
+                  {flight.refundStatus === "processed" && (
+                    <span className="text-emerald-600 text-[13px] font-semibold">
+                      ₹{flight.refundAmount.toLocaleString("en-IN")} back
+                    </span>
+                  )}
+                  {flight.refundStatus === "pending" && (
+                    <span className="text-amber-600 text-[13px] font-semibold">
+                      ₹{flight.refundAmount.toLocaleString("en-IN")} pending
+                    </span>
+                  )}
+                </p>
+              </>
+            )}
+          </div>
           <button
             onClick={() => onViewDetails(flight)}
             className="flex items-center gap-2 bg-[#0A4D68] hover:bg-[#083d52] active:scale-[0.98] text-white text-[12px] font-semibold px-4 py-2 rounded-2xl transition-all duration-150 cursor-pointer border-none"
@@ -861,6 +865,7 @@ export default function CancelledFlightsPage() {
                     key={flight.id}
                     flight={flight}
                     onViewDetails={handleViewDetails}
+                    userRole={userRole}
                   />
                 ))
               : filtered.map((hotel) => (

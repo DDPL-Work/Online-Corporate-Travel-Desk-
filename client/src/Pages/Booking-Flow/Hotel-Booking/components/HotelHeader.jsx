@@ -44,7 +44,7 @@ const HotelHeader = ({ name, address, rating, cityName, countryName }) => {
                     key={i}
                     className={
                       i < Math.floor(rating)
-                        ? "text-orange-400"
+                        ? "text-[#C9A84C]"
                         : "text-slate-200"
                     }
                     size={14}
@@ -56,12 +56,12 @@ const HotelHeader = ({ name, address, rating, cityName, countryName }) => {
               </span>
             </div>
 
-            <h1 className="text-3xl font-black text-[#0a2540] tracking-tight">
+            <h1 className="text-3xl font-black text-[#0A203E] tracking-tight">
               {name}
             </h1>
 
             <div className="flex items-center gap-2 text-sm text-slate-500">
-              <FaMapMarkerAlt className="text-blue-500 shrink-0" />
+              <FaMapMarkerAlt className="text-[#C9A84C] shrink-0" />
               <span className="font-medium">
                 {address}
                 {(cityName || countryName) && (

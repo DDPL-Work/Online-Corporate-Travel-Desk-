@@ -34,7 +34,6 @@ import api from "../../../API/axios";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
 
-
 export default function RoundTripFlightBooking() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -123,7 +122,7 @@ export default function RoundTripFlightBooking() {
     address: "",
     gstEmail: "",
   });
- const { actionLoading } = useSelector((state) => state.bookings);
+  const { actionLoading } = useSelector((state) => state.bookings);
   const fareQuote = useSelector((state) => state.flightsRT.fareQuoteRT);
   const fareRule = useSelector((state) => state.flightsRT.fareRuleRT);
   const ssr = useSelector((state) => state.flightsRT.ssrRT);
@@ -138,7 +137,8 @@ export default function RoundTripFlightBooking() {
 
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
   const isTravelAdmin = user?.role === "travel-admin";
-  const approvalRequired = !isTravelAdmin && myPolicy?.approvalRequired !== false;
+  const approvalRequired =
+    !isTravelAdmin && myPolicy?.approvalRequired !== false;
 
   const traceId = location.state?.traceId || reduxTraceId || null;
 
@@ -199,12 +199,20 @@ export default function RoundTripFlightBooking() {
     return { base: 0, tax: 0 };
   };
 
-  const isRTSeatReady = useMemo(() => {
+  const isRTSSRReady = useMemo(() => {
     if (ssrLoading) return { onward: "loading", return: "loading" };
 
+    const checkSSR = (leg) => {
+      const data = ssrData?.[leg];
+      const hasSeats = (data?.seats?.length || 0) > 0;
+      const hasMeals = (data?.meals?.length || 0) > 0;
+      const hasBaggage = (data?.baggage?.length || 0) > 0;
+      return hasSeats || hasMeals || hasBaggage;
+    };
+
     return {
-      onward: ssrData?.onward?.seats?.length > 0 ? true : "none",
-      return: ssrData?.return?.seats?.length > 0 ? true : "none",
+      onward: checkSSR("onward") ? true : "none",
+      return: checkSSR("return") ? true : "none",
     };
   }, [ssrLoading, ssrData]);
 
@@ -275,13 +283,13 @@ export default function RoundTripFlightBooking() {
   }, [user, searchParams, adultCount, childCount, infantCount]);
 
   useEffect(() => {
-    console.log("🟢 Seat Ready Check", {
-      onward: isRTSeatReady.onward,
-      return: isRTSeatReady.return,
+    console.log("🟢 SSR Ready Check", {
+      onward: isRTSSRReady.onward,
+      return: isRTSSRReady.return,
       onwardSSR: ssr?.onward?.[rawFlightData?.onward?.ResultIndex],
       returnSSR: ssr?.return?.[rawFlightData?.return?.ResultIndex],
     });
-  }, [isRTSeatReady, ssr, rawFlightData]);
+  }, [isRTSSRReady, ssr, rawFlightData]);
 
   console.log("SSR ONWARD SeatDynamic:", ssr?.onward?.Results?.SeatDynamic);
 
@@ -418,7 +426,9 @@ export default function RoundTripFlightBooking() {
       originalSearchData?.return?.Fare?.PublishedFare ??
       0;
 
-    const onwardTotal = onwardPublished ? Math.ceil(Number(onwardPublished)) : 0;
+    const onwardTotal = onwardPublished
+      ? Math.ceil(Number(onwardPublished))
+      : 0;
     const returnTotal = returnPublished
       ? Math.ceil(Number(returnPublished))
       : 0;
@@ -528,32 +538,39 @@ export default function RoundTripFlightBooking() {
     if (onwardIdx !== returnIdx && !fareQuote?.return) return;
 
     dispatch(
-      getRTFareRule({ traceId, resultIndex: onwardIdx, journeyType: "onward" })
+      getRTFareRule({ traceId, resultIndex: onwardIdx, journeyType: "onward" }),
     );
 
     dispatch(
-      getRTSSR({ traceId, resultIndex: onwardIdx, journeyType: "onward" })
+      getRTSSR({ traceId, resultIndex: onwardIdx, journeyType: "onward" }),
     );
 
     if (onwardIdx !== returnIdx) {
       dispatch(
-        getRTFareRule({ traceId, resultIndex: returnIdx, journeyType: "return" })
+        getRTFareRule({
+          traceId,
+          resultIndex: returnIdx,
+          journeyType: "return",
+        }),
       );
 
       dispatch(
-        getRTSSR({ traceId, resultIndex: returnIdx, journeyType: "return" })
+        getRTSSR({ traceId, resultIndex: returnIdx, journeyType: "return" }),
       );
     }
   }, [traceId, rawFlightData, fareQuote, dispatch]);
 
   useEffect(() => {
     if (!rawFlightData || !ssr) return;
-    
-    setSSRLoading(true);
-    const onwardResultIdx = rawFlightData?.onward?.ResultIndex?.toString().trim();
-    const returnResultIdx = rawFlightData?.return?.ResultIndex?.toString().trim();
 
-    const rawSsrResponse = ssr?.onward?.[onwardResultIdx] || ssr?.return?.[returnResultIdx];
+    setSSRLoading(true);
+    const onwardResultIdx =
+      rawFlightData?.onward?.ResultIndex?.toString().trim();
+    const returnResultIdx =
+      rawFlightData?.return?.ResultIndex?.toString().trim();
+
+    const rawSsrResponse =
+      ssr?.onward?.[onwardResultIdx] || ssr?.return?.[returnResultIdx];
 
     if (rawSsrResponse) {
       if (rawSsrResponse?.Response?.Error?.ErrorCode === 5) {
@@ -639,10 +656,10 @@ export default function RoundTripFlightBooking() {
 
     const normalizedSSRForJourney = ssrData?.[ssrJourneyType];
 
-    if (!normalizedSSRForJourney || !normalizedSSRForJourney.seats || normalizedSSRForJourney.seats.length === 0) {
+    if (isRTSSRReady[ssrJourneyType] === "none") {
       ToastWithTimer({
         type: "info",
-        message: "Seat selection not available for this flight.",
+        message: `No add-ons (Seats/Meals/Baggage) available for the ${journeyType} flight.`,
       });
       return;
     }
@@ -849,7 +866,9 @@ export default function RoundTripFlightBooking() {
       const [journeyType, segmentIndex] = key.split("|");
 
       // Handle both cases where mealList might be an array or an object With .list (backward compatibility)
-      const listToIterate = Array.isArray(mealList) ? mealList : mealList.list || [];
+      const listToIterate = Array.isArray(mealList)
+        ? mealList
+        : mealList.list || [];
 
       listToIterate.forEach((meal, travelerIndex) => {
         meals.push({
@@ -1092,10 +1111,18 @@ export default function RoundTripFlightBooking() {
       projectId: projectApproverData.project?.id,
       projectClient: projectApproverData.project?.client,
       projectCodeId: projectApproverData.project?.id,
-      approverId: !approvalRequired ? (user?._id || user?.id || user?.userId) : projectApproverData.approver?.id,
-      approverEmail: !approvalRequired ? user?.email : projectApproverData.approver?.email,
-      approverName: !approvalRequired ? `${user?.name?.firstName} ${user?.name?.lastName}` : projectApproverData.approver?.name,
-      approverRole: !approvalRequired ? user?.role : projectApproverData.approver?.role,
+      approverId: !approvalRequired
+        ? user?._id || user?.id || user?.userId
+        : projectApproverData.approver?.id,
+      approverEmail: !approvalRequired
+        ? user?.email
+        : projectApproverData.approver?.email,
+      approverName: !approvalRequired
+        ? `${user?.name?.firstName} ${user?.name?.lastName}`
+        : projectApproverData.approver?.name,
+      approverRole: !approvalRequired
+        ? user?.role
+        : projectApproverData.approver?.role,
       flightRequest: {
         // traceId: searchParams.traceId,
         traceId,
@@ -1143,7 +1170,7 @@ export default function RoundTripFlightBooking() {
 
         paxType: (t.type || "ADULT").toUpperCase(),
         linkedAdultIndex:
-          t.type === "INFANT" ? t.linkedAdultIndex ?? 0 : null,
+          t.type === "INFANT" ? (t.linkedAdultIndex ?? 0) : null,
 
         isLeadPassenger: idx === 0,
       })),
@@ -1288,7 +1315,11 @@ export default function RoundTripFlightBooking() {
       return;
     }
 
-    if (approvalRequired && !isTravelAdmin && (!projectApproverData.project || !projectApproverData.approver)) {
+    if (
+      approvalRequired &&
+      !isTravelAdmin &&
+      (!projectApproverData.project || !projectApproverData.approver)
+    ) {
       ToastWithTimer({
         type: "error",
         message: "Please select a project and approver",
@@ -1305,7 +1336,11 @@ export default function RoundTripFlightBooking() {
       return;
     }
 
-    if (!gstDetails?.gstin?.trim() || !gstDetails?.legalName?.trim() || !gstDetails?.address?.trim()) {
+    if (
+      !gstDetails?.gstin?.trim() ||
+      !gstDetails?.legalName?.trim() ||
+      !gstDetails?.address?.trim()
+    ) {
       ToastWithTimer({
         type: "error",
         message: "Please fill all GST details",
@@ -1353,9 +1388,7 @@ export default function RoundTripFlightBooking() {
       ToastWithTimer({
         type: "error",
         message:
-          err?.message ||
-          err?.payload ||
-          "Failed to submit booking request",
+          err?.message || err?.payload || "Failed to submit booking request",
       });
     }
   };
@@ -1393,7 +1426,6 @@ export default function RoundTripFlightBooking() {
       if (!t.email?.trim()) return false;
       if (!t.phoneWithCode?.trim()) return false;
 
-
       if (t.type === "INFANT") {
         if (
           typeof t.linkedAdultIndex !== "number" ||
@@ -1407,7 +1439,12 @@ export default function RoundTripFlightBooking() {
       if (isIntl && !t.passportNumber?.trim()) return false;
     }
 
-    if (!gstDetails?.gstin?.trim() || !gstDetails?.legalName?.trim() || !gstDetails?.address?.trim()) return false;
+    if (
+      !gstDetails?.gstin?.trim() ||
+      !gstDetails?.legalName?.trim() ||
+      !gstDetails?.address?.trim()
+    )
+      return false;
 
     return true;
   }, [
@@ -1424,8 +1461,8 @@ export default function RoundTripFlightBooking() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="h-14 w-14 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Loading flight details…</p>
+          <div className="h-14 w-14 border-4 border-slate-200 border-t-[#0A203E] rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-600 font-medium">Loading flight details…</p>
         </div>
       </div>
     );
@@ -1434,13 +1471,13 @@ export default function RoundTripFlightBooking() {
   if (!parsedFlightData) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-xl shadow-md text-center max-w-md w-full">
-          <p className="text-gray-700 font-semibold mb-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-center max-w-md w-full">
+          <p className="text-slate-700 font-bold mb-6">
             No flight data available. Please search again.
           </p>
           <button
             onClick={() => navigate("/")}
-            className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="w-full py-4 bg-[#0A203E] text-white rounded-xl font-bold hover:brightness-110 transition shadow-lg shadow-[#0A203E]/20 uppercase tracking-widest text-xs"
           >
             Back to Search
           </button>
@@ -1483,17 +1520,19 @@ export default function RoundTripFlightBooking() {
       />
 
       {/* Top Bar */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-full mx-10 px-4 py-3 flex items-center justify-between">
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div className="max-w-full mx-10 px-4 py-4 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm text-slate-600 hover:text-blue-700 transition"
+            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#0A203E] transition group"
           >
-            <MdArrowBack size={18} />
+            <span className="size-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center group-hover:border-[#0A203E]/30 transition-colors">
+              <MdArrowBack size={18} />
+            </span>
             Back to results
           </button>
           <div className="flex items-center gap-4">
-            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-600 text-white">
+            <span className="px-4 py-1.5 text-[10px] font-black rounded-full bg-[#0A203E] text-white uppercase tracking-widest shadow-md">
               ROUND-TRIP
             </span>
           </div>
@@ -1507,10 +1546,10 @@ export default function RoundTripFlightBooking() {
           <div className="lg:col-span-2 space-y-8">
             {/* Flight Summary Card */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6 bg-linear-to-br from-blue-50 to-blue-100">
+              <div className="p-6 bg-slate-50 border-b border-slate-200">
                 <div className="flex justify-between items-start mb-5">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900">
+                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
                       Round Trip Flight Details
                     </h2>
                   </div>
@@ -1581,24 +1620,24 @@ export default function RoundTripFlightBooking() {
             </div>
             {/* Onward Flight Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-5 bg-linear-to-r from-green-50 to-emerald-50 border-l-4 border-green-500">
+              <div className="p-5 bg-slate-50 border-l-4 border-[#C9A84C]">
                 <button
                   onClick={() => toggleSection("onwardFlightDetails")}
-                  className="w-full flex items-center justify-between"
+                  className="w-full flex items-center justify-between cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-                      <MdFlightTakeoff className="text-white text-2xl" />
+                    <div className="w-12 h-12 bg-[#0A203E] rounded-full flex items-center justify-center shadow-lg shadow-[#0A203E]/20">
+                      <MdFlightTakeoff className="text-[#C9A84C] text-2xl" />
                     </div>
                     <div className="text-left">
-                      <p className="font-bold text-lg text-green-800">
+                      <p className="font-black text-lg text-[#0A203E] uppercase tracking-tight">
                         Onward Journey
                       </p>
-                      <p className="text-sm text-gray-700 font-medium">
+                      <p className="text-sm text-slate-700 font-bold">
                         {onwardRoute?.from} → {onwardRoute?.to} •{" "}
                         {formatDate(onwardRoute?.dateTime)}
                       </p>
-                      <p className="text-xs text-gray-600">
+                      <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-0.5">
                         {parsedFlightData.onwardSegments?.length || 0} Flight
                         {(parsedFlightData.onwardSegments?.length || 0) > 1
                           ? "s"
@@ -1606,11 +1645,11 @@ export default function RoundTripFlightBooking() {
                       </p>
                     </div>
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
                     {expandedSections.onwardFlightDetails ? (
-                      <AiOutlineMinus className="text-green-700" />
+                      <AiOutlineMinus className="text-slate-600" />
                     ) : (
-                      <AiOutlinePlus className="text-green-700" />
+                      <AiOutlinePlus className="text-slate-600" />
                     )}
                   </div>
                 </button>
@@ -1639,24 +1678,24 @@ export default function RoundTripFlightBooking() {
             </div>
             {/* Return Flight Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-5 bg-linear-to-r from-purple-50 to-indigo-50 border-l-4 border-purple-500">
+              <div className="p-5 bg-slate-50 border-l-4 border-[#0A203E]">
                 <button
                   onClick={() => toggleSection("returnFlightDetails")}
-                  className="w-full flex items-center justify-between"
+                  className="w-full flex items-center justify-between cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
-                      <MdFlightLand className="text-white text-2xl" />
+                    <div className="w-12 h-12 bg-[#C9A84C] rounded-full flex items-center justify-center shadow-lg shadow-[#C9A84C]/20">
+                      <MdFlightLand className="text-[#0A203E] text-2xl" />
                     </div>
                     <div className="text-left">
-                      <p className="font-bold text-lg text-purple-800">
+                      <p className="font-black text-lg text-[#0A203E] uppercase tracking-tight">
                         Return Journey
                       </p>
-                      <p className="text-sm text-gray-700 font-medium">
+                      <p className="text-sm text-slate-700 font-bold">
                         {returnRoute?.from} → {returnRoute?.to} •{" "}
                         {formatDate(returnRoute?.dateTime)}
                       </p>
-                      <p className="text-xs text-gray-600">
+                      <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-0.5">
                         {parsedFlightData.returnSegments?.length || 0} Flight
                         {(parsedFlightData.returnSegments?.length || 0) > 1
                           ? "s"
@@ -1664,11 +1703,11 @@ export default function RoundTripFlightBooking() {
                       </p>
                     </div>
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
                     {expandedSections.returnFlightDetails ? (
-                      <AiOutlineMinus className="text-purple-700" />
+                      <AiOutlineMinus className="text-slate-600" />
                     ) : (
-                      <AiOutlinePlus className="text-purple-700" />
+                      <AiOutlinePlus className="text-slate-600" />
                     )}
                   </div>
                 </button>
@@ -1698,47 +1737,50 @@ export default function RoundTripFlightBooking() {
 
             {/* Traveller Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <TravelerForm
-          travelers={travelers}
-          updateTraveler={updateTraveler}
-          errors={travelerErrors}
-          parsedFlightData={parsedFlightData}
-          purposeOfTravel={purposeOfTravel}
-          setPurposeOfTravel={setPurposeOfTravel}
-          isInternational={isInternational}
-          gstDetails={gstDetails}
-          setGstDetails={setGstDetails}
-          canAddMore={travelers.length < maxForms}
-          onAddTraveler={() =>
-            setTravelers((prev) => {
-              if (prev.length >= maxForms) return prev;
+              <TravelerForm
+                travelers={travelers}
+                updateTraveler={updateTraveler}
+                errors={travelerErrors}
+                parsedFlightData={parsedFlightData}
+                purposeOfTravel={purposeOfTravel}
+                setPurposeOfTravel={setPurposeOfTravel}
+                isInternational={isInternational}
+                gstDetails={gstDetails}
+                setGstDetails={setGstDetails}
+                canAddMore={travelers.length < maxForms}
+                onAddTraveler={() =>
+                  setTravelers((prev) => {
+                    if (prev.length >= maxForms) return prev;
 
-              const currentAdults = prev.filter((t) => t.type === "ADULT")
-                .length;
-              const currentChildren = prev.filter((t) => t.type === "CHILD")
-                .length;
-              const currentInfants = prev.filter((t) => t.type === "INFANT")
-                .length;
+                    const currentAdults = prev.filter(
+                      (t) => t.type === "ADULT",
+                    ).length;
+                    const currentChildren = prev.filter(
+                      (t) => t.type === "CHILD",
+                    ).length;
+                    const currentInfants = prev.filter(
+                      (t) => t.type === "INFANT",
+                    ).length;
 
-              let nextType = "ADULT";
-              if (currentChildren < childCount) nextType = "CHILD";
-              else if (currentInfants < infantCount) nextType = "INFANT";
+                    let nextType = "ADULT";
+                    if (currentChildren < childCount) nextType = "CHILD";
+                    else if (currentInfants < infantCount) nextType = "INFANT";
 
-              const newTraveler = initialTraveler(
-                prev.length + 1,
-                nextType,
-              );
-              if (nextType === "INFANT") {
-                newTraveler.linkedAdultIndex = Math.min(
-                  currentInfants,
-                  Math.max(adultCount - 1, 0),
-                );
-              }
+                    const newTraveler = initialTraveler(
+                      prev.length + 1,
+                      nextType,
+                    );
+                    if (nextType === "INFANT") {
+                      newTraveler.linkedAdultIndex = Math.min(
+                        currentInfants,
+                        Math.max(adultCount - 1, 0),
+                      );
+                    }
 
-              return [...prev, newTraveler];
-            })
-          }
-        />
+                    return [...prev, newTraveler];
+                  })
+                }
+              />
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
@@ -1748,10 +1790,7 @@ export default function RoundTripFlightBooking() {
                   Fare Rules & Policies
                 </h2>
                 {/* Button + Modal */}
-                <FareDetailsModal
-                  fareQuote={fareQuote}
-                  fareRule={fareRule}
-                />
+                <FareDetailsModal fareQuote={fareQuote} fareRule={fareRule} />
               </div>
             </div>
           </div>

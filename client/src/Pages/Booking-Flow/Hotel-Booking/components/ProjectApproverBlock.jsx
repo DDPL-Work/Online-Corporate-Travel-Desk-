@@ -58,7 +58,7 @@ function SearchDropdown({
           onFocus={() => setOpen(true)}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
           placeholder={placeholder}
-          className="w-full h-10 pl-8 pr-3 text-sm bg-white border border-slate-200 rounded-lg hover:border-[#0A4D68]/40 focus:outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition text-left text-slate-700 placeholder:text-slate-400"
+          className="w-full h-10 pl-8 pr-3 text-sm bg-white border border-slate-200 rounded-lg hover:border-[#0A203E]/40 focus:outline-none focus:border-[#0A203E] focus:ring-2 focus:ring-[#0A203E]/10 transition text-left text-slate-700 placeholder:text-slate-400"
         />
       </div>
 
@@ -73,11 +73,11 @@ function SearchDropdown({
                   key={item.id}
                   type="button"
                   onClick={() => { onSelect(item); setOpen(false); setQuery(""); }}
-                  className="w-full text-left px-3 py-2.5 hover:bg-[#0A4D68]/5 transition flex items-center justify-between group"
+                  className="w-full text-left px-3 py-2.5 hover:bg-[#0A203E]/5 transition flex items-center justify-between group"
                 >
                   {renderItem(item)}
                   {selectedItem?.id === item.id && (
-                    <FiCheck size={13} className="text-[#0A4D68] shrink-0 ml-2" />
+                    <FiCheck size={13} className="text-[#0A203E] shrink-0 ml-2" />
                   )}
                 </button>
               ))
@@ -186,15 +186,15 @@ export function ProjectApproverBlock({ onChange }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-4">
       {/* ── Header ── */}
-      <div className="bg-[#0A4D68] px-5 py-4 flex items-center gap-2.5">
+      <div className="bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] px-5 py-4 flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-          {approvalRequired ? <FiBriefcase size={15} className="text-white" /> : <MdBusiness size={18} className="text-white" />}
+          {approvalRequired ? <FiBriefcase size={15} className="text-[#0A203E]" /> : <MdBusiness size={18} className="text-[#0A203E]" />}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-bold text-white truncate">
+          <h3 className="text-sm font-bold text-[#0A203E] truncate">
             {approvalRequired ? "Project & Approver" : "Project Details"}
           </h3>
-          <p className="text-[11px] text-blue-100 truncate">
+          <p className="text-[11px] text-[#0A203E]/70 font-medium truncate">
             {approvalRequired 
               ? "Link booking to a project and assign an approver" 
               : "Link this booking to a project for tracking"}
@@ -202,7 +202,7 @@ export function ProjectApproverBlock({ onChange }) {
         </div>
         {!approvalRequired && (
           <div className="ml-auto shrink-0 pl-2">
-            <span className="inline-block px-2 py-1 rounded text-[10px] font-bold text-white bg-white/20 border border-white/30 uppercase tracking-widest whitespace-nowrap leading-none">
+            <span className="inline-block px-2 py-1 rounded text-[10px] font-bold text-[#0A203E] bg-white/20 border border-[#0A203E]/30 uppercase tracking-widest whitespace-nowrap leading-none">
               Auto Approved
             </span>
           </div>
@@ -217,7 +217,7 @@ export function ProjectApproverBlock({ onChange }) {
         <div className="p-5 space-y-3">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-1.5">
-              <MdBusiness size={14} className="text-gray-500" />
+              <MdBusiness size={14} className="text-slate-500" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 Project Selection <span className="text-red-500">*</span>
               </span>
@@ -225,7 +225,7 @@ export function ProjectApproverBlock({ onChange }) {
             <button
               type="button"
               onClick={() => { setManualProject((v) => !v); clearProject(); }}
-              className="flex items-center gap-1 text-[11px] font-semibold text-[#0A4D68]/70 hover:text-[#0A4D68] transition"
+              className="flex items-center gap-1 text-[11px] font-semibold text-[#0A203E]/70 hover:text-[#0A203E] transition"
             >
               <FiEdit3 size={11} />
               {manualProject ? "Search instead" : "Enter manually"}
@@ -250,29 +250,29 @@ export function ProjectApproverBlock({ onChange }) {
                   <div className="flex flex-col gap-0.5 min-w-0">
                     <span className="text-[13px] font-semibold text-slate-700 truncate">{item.name}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-gray-600 bg-indigo-50 px-1.5 py-0.5 rounded">{item.id}</span>
+                      <span className="text-[10px] font-bold text-gray-600 bg-slate-50 px-1.5 py-0.5 rounded">{item.id}</span>
                       <span className="text-[11px] text-slate-400 truncate">{item.client}</span>
                     </div>
                   </div>
                 )}
                 renderSelected={(item) => (
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-[10px] font-bold text-gray-600 bg-gray-50 px-1.5 py-0.5 rounded shrink-0">{item.id}</span>
+                    <span className="text-[10px] font-bold text-gray-600 bg-slate-50 px-1.5 py-0.5 rounded shrink-0">{item.id}</span>
                     <span className="text-[13px] font-semibold text-slate-700 truncate">{item.name}</span>
                     <span className="text-[11px] text-slate-400 truncate hidden sm:block">· {item.client}</span>
                   </div>
                 )}
               />
               {selectedProject && (
-                <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
+                <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
                   <div className="flex items-center gap-2 min-w-0">
-                    <FiCheck size={13} className="text-gray-500 shrink-0" />
+                    <FiCheck size={13} className="text-slate-500 shrink-0" />
                     <div className="min-w-0">
                       <p className="text-[13px] font-bold text-gray-800 truncate">{selectedProject.name}</p>
-                      <p className="text-[11px] text-gray-500">{selectedProject.id} · {selectedProject.client}</p>
+                      <p className="text-[11px] text-slate-500">{selectedProject.id} · {selectedProject.client}</p>
                     </div>
                   </div>
-                  <button type="button" onClick={clearProject} className="text-gray-400 hover:text-gray-700 ml-2 shrink-0">
+                  <button type="button" onClick={clearProject} className="text-slate-400 hover:text-gray-700 ml-2 shrink-0">
                     <FiX size={14} />
                   </button>
                 </div>
@@ -292,7 +292,7 @@ export function ProjectApproverBlock({ onChange }) {
                       placeholder="e.g. PRJ-001"
                       value={projectManual.id}
                       onChange={(e) => setProjectManual((p) => ({ ...p, id: e.target.value }))}
-                      className="h-10 w-full pl-7 pr-3 text-[13px] bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/10 transition text-slate-700 placeholder:text-slate-300"
+                      className="h-10 w-full pl-7 pr-3 text-[13px] bg-white border border-slate-200 rounded-lg outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/10 transition text-slate-700 placeholder:text-slate-300"
                     />
                   </div>
                 </div>
@@ -305,7 +305,7 @@ export function ProjectApproverBlock({ onChange }) {
                     placeholder="e.g. Acme Corp"
                     value={projectManual.client}
                     onChange={(e) => setProjectManual((p) => ({ ...p, client: e.target.value }))}
-                    className="h-10 w-full px-3 text-[13px] bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/10 transition text-slate-700 placeholder:text-slate-300"
+                    className="h-10 w-full px-3 text-[13px] bg-white border border-slate-200 rounded-lg outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/10 transition text-slate-700 placeholder:text-slate-300"
                   />
                 </div>
               </div>
@@ -318,7 +318,7 @@ export function ProjectApproverBlock({ onChange }) {
                   placeholder="e.g. Website Redesign"
                   value={projectManual.name}
                   onChange={(e) => setProjectManual((p) => ({ ...p, name: e.target.value }))}
-                  className="h-10 w-full px-3 text-[13px] bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/10 transition text-slate-700 placeholder:text-slate-300"
+                  className="h-10 w-full px-3 text-[13px] bg-white border border-slate-200 rounded-lg outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/10 transition text-slate-700 placeholder:text-slate-300"
                 />
               </div>
             </div>
@@ -332,7 +332,7 @@ export function ProjectApproverBlock({ onChange }) {
           <div className="p-5 space-y-3">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1.5">
-                <FiUser size={13} className="text-[#0A4D68]" />
+                <FiUser size={13} className="text-[#0A203E]" />
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   Approver / Manager <span className="text-red-500">*</span>
                 </span>
@@ -340,7 +340,7 @@ export function ProjectApproverBlock({ onChange }) {
               <button
                 type="button"
                 onClick={() => { setManualApprover((v) => !v); clearApprover(); }}
-                className="flex items-center gap-1 text-[11px] font-semibold text-[#0A4D68]/70 hover:text-[#0A4D68] transition"
+                className="flex items-center gap-1 text-[11px] font-semibold text-[#0A203E]/70 hover:text-[#0A203E] transition"
               >
                 <FiEdit3 size={11} />
                 {manualApprover ? "Search instead" : "Enter email manually"}
@@ -375,7 +375,7 @@ export function ProjectApproverBlock({ onChange }) {
                   }}
                   renderItem={(item) => (
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center text-[11px] font-bold text-violet-700 shrink-0">
+                      <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-[11px] font-bold text-slate-700 shrink-0">
                         {getInitials(item)}
                       </div>
                       <div className="min-w-0">
@@ -390,7 +390,7 @@ export function ProjectApproverBlock({ onChange }) {
                   )}
                   renderSelected={(item) => (
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-5 h-5 rounded-full bg-violet-100 flex items-center justify-center text-[9px] font-bold text-[#0A4D68] shrink-0">
+                      <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-[9px] font-bold text-[#0A203E] shrink-0">
                         {getInitials(item)}
                       </div>
                       <span className="text-[13px] font-semibold text-slate-700 truncate">
@@ -401,19 +401,19 @@ export function ProjectApproverBlock({ onChange }) {
                   )}
                 />
                 {selectedApprover && (
-                  <div className="flex items-center justify-between bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5">
+                  <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-violet-200 flex items-center justify-center text-[11px] font-bold text-[#0A4D68] shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[11px] font-bold text-[#0A203E] shrink-0">
                         {getInitials(selectedApprover)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[13px] font-bold text-[#0A4D68]">
+                        <p className="text-[13px] font-bold text-[#0A203E]">
                           {getDisplayName(selectedApprover)}
                         </p>
-                        <p className="text-[11px] text-[#0A4D68]/50 truncate">{selectedApprover.email}</p>
+                        <p className="text-[11px] text-[#0A203E]/50 truncate">{selectedApprover.email}</p>
                       </div>
                     </div>
-                    <button type="button" onClick={clearApprover} className="text-[#0A4D68]/40 hover:text-[#0A4D68] ml-2 shrink-0">
+                    <button type="button" onClick={clearApprover} className="text-[#0A203E]/40 hover:text-[#0A203E] ml-2 shrink-0">
                       <FiX size={14} />
                     </button>
                   </div>
@@ -431,12 +431,12 @@ export function ProjectApproverBlock({ onChange }) {
                     placeholder="e.g. manager@company.com"
                     value={approverEmail}
                     onChange={(e) => setApproverEmail(e.target.value)}
-                    className="h-10 w-full pl-9 pr-3 text-[13px] bg-white border border-slate-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-400/10 transition text-slate-700 placeholder:text-slate-300"
+                    className="h-10 w-full pl-9 pr-3 text-[13px] bg-white border border-slate-200 rounded-lg outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/10 transition text-slate-700 placeholder:text-slate-300"
                   />
                 </div>
 
                 {approverEmail && matchingApprovers(approverEmail).length > 0 && (
-                  <div className="border border-violet-100 rounded-lg mt-1 max-h-40 overflow-y-auto divide-y divide-violet-50 bg-violet-50/50">
+                  <div className="border border-slate-200 rounded-lg mt-1 max-h-40 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50">
                     {matchingApprovers(approverEmail).map((emp) => (
                       <button
                         key={emp._id || emp.userId}
@@ -455,7 +455,7 @@ export function ProjectApproverBlock({ onChange }) {
                         }}
                         className="w-full text-left px-3 py-2 hover:bg-white transition flex items-center gap-2"
                       >
-                        <div className="w-6 h-6 rounded-full bg-violet-200 flex items-center justify-center text-[10px] font-bold text-[#0A4D68] shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-[#0A203E] shrink-0">
                           {getInitials(emp)}
                         </div>
                         <div className="min-w-0">
@@ -470,8 +470,8 @@ export function ProjectApproverBlock({ onChange }) {
                 )}
 
                 {approverEmail && /\S+@\S+\.\S+/.test(approverEmail) && (
-                  <div className="flex items-center gap-2 mt-1 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 text-[12px] text-[#0A4D68] font-semibold">
-                    <FiCheck size={12} className="text-violet-500" />
+                  <div className="flex items-center gap-2 mt-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] text-[#0A203E] font-semibold">
+                    <FiCheck size={12} className="text-[#C9A84C]" />
                     Approval request will be sent to <strong>{approverEmail}</strong>
                   </div>
                 )}

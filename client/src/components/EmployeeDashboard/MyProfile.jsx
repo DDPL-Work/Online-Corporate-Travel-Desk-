@@ -55,7 +55,7 @@ const CORPORATE_FIELDS = [
   },
   {
     key: "designation",
-    label: "Designation",
+    label: "Corporate Role",
     icon: FiBriefcase,
     type: "text",
     editable: true,
@@ -276,7 +276,7 @@ export default function MyProfile() {
                        <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">Project Name</th>
                        <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">Primary Approver (Manager)</th>
                        <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">Status</th>
-                       <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">Reviewer</th>
+                       <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">Role</th>
                      </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-50">
@@ -312,9 +312,9 @@ export default function MyProfile() {
                            </span>
                          </td>
                          <td className="px-8 py-6 text-right">
-                           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#0A4D68] text-white rounded-lg shadow-sm">
+                           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100 shadow-sm">
                              <FiUser size={10} />
-                             <span className="text-[9px] font-black uppercase tracking-widest">Travel Admin</span>
+                             <span className="text-[9px] font-black uppercase tracking-widest">Manager</span>
                            </div>
                          </td>
                        </tr>
@@ -365,23 +365,73 @@ export default function MyProfile() {
                  </table>
               </div>
 
-              <div className="p-8 bg-slate-50/50 border-t border-slate-100">
-                 <div className="flex items-start gap-4 p-4 bg-white rounded-2xl border border-slate-200">
-                   <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
-                      <FiShield size={20} />
-                   </div>
-                   <div>
-                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Corporate Oversight (Travel Admin)</h4>
-                      <p className="text-[15px] text-slate-400 font-bold mt-1 leading-relaxed">
-                        All booking requests are verified against corporate policy by 
-                        <span className="text-[#0A4D68] ml-1 ">{localProfile.travelAdmin?.name || "the Travel Administrator"}</span><span className="text-blue-500"> ({localProfile.travelAdmin?.email || "N/A"}).</span>
-                      </p>
-                      <p className="text-[10px] text-slate-500 font-bold mt-3 italic">
-                        Note: All manager-approved bookings are subject to final validation by the Travel Administrator.
-                      </p>
-                   </div>
-                 </div>
+          {/* ── Designated Authorities (Direct Hierarchy) ── */}
+          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <FiShield />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Designated Authorities</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Direct Approval Hierarchy</p>
+                </div>
               </div>
+            </div>
+
+            <div className="p-0">
+               <table className="w-full text-left border-collapse">
+                 <thead>
+                   <tr className="bg-slate-50/50">
+                     <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">Authority Name</th>
+                     <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">Email Address</th>
+                     <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100 text-right">Role</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-slate-50">
+                   {/* Manager Row */}
+                   {(localProfile.manager || localProfile.managerId) && (
+                     <tr className="group hover:bg-slate-50/30 transition-colors">
+                       <td className="px-8 py-6">
+                         <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white text-[10px] font-black shadow-sm">
+                              {(localProfile.manager?.name || "M").charAt(0)}
+                            </div>
+                            <p className="text-sm font-black text-slate-700">{localProfile.manager?.name || "Assigned Manager"}</p>
+                         </div>
+                       </td>
+                       <td className="px-8 py-6 text-xs font-bold text-slate-400 tracking-tight">{localProfile.manager?.email || "—"}</td>
+                       <td className="px-8 py-6 text-right">
+                         <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-100">
+                           Reporting Manager
+                         </span>
+                       </td>
+                     </tr>
+                   )}
+
+                   {/* Travel Admin Row */}
+                   {localProfile.travelAdmin && (
+                     <tr className="group hover:bg-slate-50/30 transition-colors">
+                       <td className="px-8 py-6">
+                         <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-[#0A4D68] flex items-center justify-center text-white text-[10px] font-black shadow-sm">
+                              {(localProfile.travelAdmin?.name || "A").charAt(0)}
+                            </div>
+                            <p className="text-sm font-black text-slate-700">{localProfile.travelAdmin?.name || "Travel Admin"}</p>
+                         </div>
+                       </td>
+                       <td className="px-8 py-6 text-xs font-bold text-slate-400 tracking-tight">{localProfile.travelAdmin?.email || "—"}</td>
+                       <td className="px-8 py-6 text-right">
+                         <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-600 border border-indigo-100">
+                           Travel Administrator
+                         </span>
+                       </td>
+                     </tr>
+                   )}
+                 </tbody>
+               </table>
+            </div>
+          </div>
             </div>
           )}
 

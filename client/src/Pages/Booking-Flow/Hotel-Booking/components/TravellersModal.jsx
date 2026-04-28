@@ -69,7 +69,7 @@ const validatePassenger = (p, isInternational) => {
 ───────────────────────────────────────── */
 const Field = ({ label, required, error, children, hint }) => (
   <div className="flex flex-col gap-1">
-    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+    <label className="text-[11px] font-bold text-white/60 uppercase tracking-wider flex items-center gap-1">
       {label}
       {required && <span className="text-red-500">*</span>}
     </label>
@@ -80,7 +80,7 @@ const Field = ({ label, required, error, children, hint }) => (
       </span>
     )}
     {hint && !error && (
-      <span className="text-[10px] text-slate-400">{hint}</span>
+      <span className="text-[10px] text-white/40">{hint}</span>
     )}
   </div>
 );
@@ -88,8 +88,8 @@ const Field = ({ label, required, error, children, hint }) => (
 const inputCls = (error) =>
   `w-full px-3 py-2 text-sm rounded-lg border font-medium outline-none transition-all ${
     error
-      ? "border-red-300 bg-red-50 text-red-800 focus:ring-2 focus:ring-red-200"
-      : "border-slate-200 bg-white text-slate-800 focus:border-[#0d7fe8] focus:ring-2 focus:ring-blue-100"
+      ? "border-red-300 bg-red-500/10 text-red-800 focus:ring-2 focus:ring-red-200"
+      : "border-white/10 bg-[#04112F] text-white focus:border-[#C9A84C] focus:ring-2 focus:ring-blue-100"
   }`;
 
 /* ─────────────────────────────────────────
@@ -113,20 +113,20 @@ const PassengerCard = ({ passenger, index, roomIndex, onChange, errors, isIntern
 
   return (
     <div className={`rounded-xl border-2 overflow-hidden transition-all ${
-      hasErrors ? "border-red-200" : isComplete ? "border-emerald-200" : "border-slate-200"
+      hasErrors ? "border-red-200" : isComplete ? "border-emerald-200" : "border-white/10"
     }`}>
       {/* Card Header */}
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
         className={`w-full flex items-center justify-between px-4 py-3 transition ${
-          hasErrors ? "bg-red-50" : isComplete ? "bg-emerald-50" : "bg-slate-50"
+          hasErrors ? "bg-red-500/10" : isComplete ? "bg-emerald-500/10" : "bg-[#04112F]"
         }`}
       >
         <div className="flex items-center gap-3">
           {/* Avatar */}
           <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-            isChild ? "bg-pink-100" : passenger.LeadPassenger ? "bg-[#0a2540]" : "bg-blue-100"
+            isChild ? "bg-pink-100" : passenger.LeadPassenger ? "bg-[#0A203E]" : "bg-blue-100"
           }`}>
             {isChild
               ? <FaChild className="text-pink-600 text-sm" />
@@ -137,13 +137,13 @@ const PassengerCard = ({ passenger, index, roomIndex, onChange, errors, isIntern
           </div>
           <div className="text-left">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-black text-slate-800">
+              <span className="text-sm font-black text-white">
                 {passenger.FirstName && passenger.LastName
                   ? `${passenger.Title} ${passenger.FirstName} ${passenger.LastName}`
                   : paxLabel}
               </span>
               {passenger.LeadPassenger && (
-                <span className="text-[9px] font-black uppercase tracking-widest bg-[#0a2540] text-white px-1.5 py-0.5 rounded-full">
+                <span className="text-[9px] font-black uppercase tracking-widest bg-[#0A203E] text-white px-1.5 py-0.5 rounded-full">
                   Lead
                 </span>
               )}
@@ -153,7 +153,7 @@ const PassengerCard = ({ passenger, index, roomIndex, onChange, errors, isIntern
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-white/40">
               {hasErrors ? `${Object.keys(errors).length} field(s) need attention` : isComplete ? "Complete" : "Fill in details"}
             </p>
           </div>
@@ -161,13 +161,13 @@ const PassengerCard = ({ passenger, index, roomIndex, onChange, errors, isIntern
         <div className="flex items-center gap-2">
           {isComplete && !hasErrors && <MdCheckCircle className="text-emerald-500 text-lg" />}
           {hasErrors && <MdErrorOutline className="text-red-400 text-lg" />}
-          {open ? <MdExpandLess className="text-slate-400 text-xl" /> : <MdExpandMore className="text-slate-400 text-xl" />}
+          {open ? <MdExpandLess className="text-white/40 text-xl" /> : <MdExpandMore className="text-white/40 text-xl" />}
         </div>
       </button>
 
       {/* Form Body */}
       {open && (
-        <div className="p-4 bg-white space-y-4">
+        <div className="p-4 bg-[#04112F] space-y-4">
           {/* Row 1: Title + First + Last */}
           <div className="grid grid-cols-12 gap-3">
             <div className="col-span-2">
@@ -243,7 +243,7 @@ const PassengerCard = ({ passenger, index, roomIndex, onChange, errors, isIntern
               hint={passenger.LeadPassenger ? "Required for lead guest" : "Optional"}
             >
               <div className="relative">
-                <MdPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-base" />
+                <MdPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-base" />
                 <input
                   type="tel"
                   value={passenger.Phoneno}
@@ -260,7 +260,7 @@ const PassengerCard = ({ passenger, index, roomIndex, onChange, errors, isIntern
               hint={passenger.LeadPassenger ? "Required for lead guest" : "Optional"}
             >
               <div className="relative">
-                <MdEmail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-base" />
+                <MdEmail className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-base" />
                 <input
                   type="email"
                   value={passenger.Email}
@@ -274,18 +274,18 @@ const PassengerCard = ({ passenger, index, roomIndex, onChange, errors, isIntern
 
           {/* Passport Section */}
           <div className={`rounded-xl p-3 border-2 ${
-            isInternational ? "border-blue-200 bg-blue-50" : "border-slate-100 bg-slate-50"
+            isInternational ? "border-[#1E293B] bg-[#1E293B]" : "border-white/5 bg-[#04112F]"
           }`}>
             <div className="flex items-center gap-2 mb-3">
-              <FaPassport className={`text-sm ${isInternational ? "text-[#0d7fe8]" : "text-slate-400"}`} />
+              <FaPassport className={`text-sm ${isInternational ? "text-[#0d7fe8]" : "text-white/40"}`} />
               <span className={`text-xs font-black uppercase tracking-wider ${
-                isInternational ? "text-[#0d7fe8]" : "text-slate-500"
+                isInternational ? "text-[#0d7fe8]" : "text-white/60"
               }`}>
                 Passport Details
               </span>
               {isInternational
                 ? <span className="text-[9px] font-black bg-[#0d7fe8] text-white px-1.5 py-0.5 rounded-full">REQUIRED</span>
-                : <span className="text-[9px] font-bold bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded-full">OPTIONAL</span>
+                : <span className="text-[9px] font-bold bg-[#04112F]/10 text-white/60 px-1.5 py-0.5 rounded-full">OPTIONAL</span>
               }
             </div>
 
@@ -338,7 +338,7 @@ const PassengerCard = ({ passenger, index, roomIndex, onChange, errors, isIntern
           {!isInternational && (
             <Field label="PAN Card" error={errors.PAN} hint="Optional — format: ABCDE1234F">
               <div className="relative">
-                <MdCreditCard className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-base" />
+                <MdCreditCard className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-base" />
                 <input
                   type="text"
                   value={passenger.PAN}
@@ -371,12 +371,12 @@ const RoomSection = ({ roomIndex, passengers, onChange, errors, isInternational,
         </div>
         <div>
           <span className="font-black text-[#0a2540] text-sm">Room {roomIndex + 1}</span>
-          <span className="text-slate-400 text-[11px] ml-2">
+          <span className="text-white/40 text-[11px] ml-2">
             {roomConfig?.adults || 1} Adult{(roomConfig?.adults || 1) > 1 ? "s" : ""}
             {roomConfig?.children > 0 ? `, ${roomConfig.children} Child${roomConfig.children > 1 ? "ren" : ""}` : ""}
           </span>
         </div>
-        <div className="flex-1 h-px bg-slate-200" />
+        <div className="flex-1 h-px bg-[#04112F]/10" />
       </div>
 
       {/* Passenger cards */}
@@ -525,7 +525,7 @@ const TravellersModal = ({
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="bg-white w-full flex flex-col overflow-hidden"
+        className="bg-[#04112F] w-full flex flex-col overflow-hidden"
         style={{
           maxWidth: 680,
           maxHeight: "92vh",
@@ -534,10 +534,10 @@ const TravellersModal = ({
         }}
       >
         {/* ── Modal Header ── */}
-        <div className="shrink-0 px-6 py-4 border-b border-slate-100" style={{ background: "#0a2540" }}>
+        <div className="shrink-0 px-6 py-4 border-b border-white/5" style={{ background: "#0a2540" }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-[#04112F]/10 flex items-center justify-center">
                 <FaUsers className="text-white text-lg" />
               </div>
               <div>
@@ -553,7 +553,7 @@ const TravellersModal = ({
             </div>
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
+              className="w-9 h-9 rounded-xl bg-[#04112F]/10 hover:bg-[#04112F]/20 flex items-center justify-center transition"
             >
               <MdClose className="text-white text-xl" />
             </button>
@@ -571,7 +571,7 @@ const TravellersModal = ({
                 </span>
               )}
             </div>
-            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-[#04112F]/10 rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-500"
                 style={{
@@ -585,11 +585,11 @@ const TravellersModal = ({
 
         {/* ── International notice ── */}
         {isInternational && (
-          <div className="shrink-0 mx-4 mt-4 px-4 py-3 rounded-xl bg-blue-50 border border-blue-200 flex items-start gap-3">
+          <div className="shrink-0 mx-4 mt-4 px-4 py-3 rounded-xl bg-[#1E293B] border border-[#1E293B] flex items-start gap-3">
             <MdFlight className="text-[#0d7fe8] text-xl shrink-0 mt-0.5" />
             <div>
               <p className="text-xs font-black text-[#0a2540]">International Booking</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">
+              <p className="text-[11px] text-white/60 mt-0.5">
                 Passport number, issue date, and expiry date are <strong>mandatory</strong> for all guests on international bookings.
               </p>
             </div>
@@ -624,15 +624,15 @@ const TravellersModal = ({
         </div>
 
         {/* ── Footer ── */}
-        <div className="shrink-0 px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-4">
+        <div className="shrink-0 px-6 py-4 border-t border-white/5 bg-[#04112F] flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <BsShieldCheck className="text-emerald-500 text-lg" />
-            <span className="text-[11px] text-slate-500">Your data is encrypted and secure</span>
+            <span className="text-[11px] text-white/60">Your data is encrypted and secure</span>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-100 transition"
+              className="px-5 py-2.5 rounded-xl border-2 border-white/10 text-white/80 font-bold text-sm hover:bg-[#000D26] transition"
             >
               Cancel
             </button>

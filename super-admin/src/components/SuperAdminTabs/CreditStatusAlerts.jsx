@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   FiAlertTriangle,
@@ -31,6 +31,7 @@ import {
 import { clearCycleTransactions } from "../../Redux/Slice/postpaidSlice";
 import { toast } from "react-toastify";
 import Pagination from "../Shared/Pagination";
+import TableActionBar from "../Shared/TableActionBar";
 
 const fmt = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }) : "—";
@@ -64,6 +65,7 @@ const ITEMS_PER_PAGE = 10;
 
 export default function CreditStatusAlerts() {
   const dispatch = useDispatch();
+  const tableScrollRef = useRef(null);
   
   // Filters & Pagination
   const [searchTerm, setSearchTerm] = useState("");
@@ -656,9 +658,17 @@ export default function CreditStatusAlerts() {
         </div>
       </div>
 
+      <TableActionBar
+        scrollRef={tableScrollRef}
+        exportLabel="Export Alerts"
+        onExport={() => toast.info("Preparing alert report...")}
+        exportClassName="bg-[#B45309] hover:bg-[#92400E] shadow-[#B45309]/20"
+        arrowClassName="border-amber-100 bg-amber-50 text-[#B45309] hover:bg-amber-100 hover:border-amber-200 hover:text-[#92400E] disabled:hover:bg-amber-50"
+      />
+
       {/* DATA TABLE */}
       <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-        <div className="overflow-x-auto min-h-[400px]">
+        <div ref={tableScrollRef} className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-900 border-b border-slate-800">

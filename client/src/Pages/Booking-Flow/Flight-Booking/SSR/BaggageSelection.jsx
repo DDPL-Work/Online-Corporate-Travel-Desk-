@@ -11,9 +11,15 @@ export const BaggageTable = ({
 }) => {
   if (!Array.isArray(baggage) || baggage.length === 0) {
     return (
-      <p className="text-sm text-gray-500 text-center py-6">
-        No baggage information available
-      </p>
+      <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+          <BsLuggage className="text-4xl text-slate-300" />
+        </div>
+        <h3 className="text-xl font-bold text-gray-800 mb-2">No Extra Baggage Options</h3>
+        <p className="text-gray-500 max-w-xs mx-auto">
+          Additional baggage cannot be pre-booked for this flight. Standard baggage rules still apply.
+        </p>
+      </div>
     );
   }
 
@@ -21,8 +27,8 @@ export const BaggageTable = ({
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center gap-2">
-          🧳 Choose Your Baggage
+        <h2 className="text-lg sm:text-xl font-black text-[#0A203E] uppercase tracking-tight flex items-center gap-2">
+          <BsLuggage className="text-[#C9A84C]" /> Choose Your Baggage
         </h2>
         {selectable && (
           <button
@@ -46,8 +52,8 @@ export const BaggageTable = ({
               key={idx}
               className={`relative border rounded-2xl p-5 shadow-sm transition-all duration-200 hover:shadow-md flex flex-col justify-between ${
                 isAdded
-                  ? "border-blue-600 bg-blue-50"
-                  : "border-gray-200 bg-white hover:border-blue-300"
+                  ? "border-[#0A203E] bg-slate-50"
+                  : "border-gray-200 bg-white hover:border-[#C9A84C]"
               }`}
             >
               <div className="flex items-center justify-between mb-3">
@@ -55,12 +61,12 @@ export const BaggageTable = ({
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                      isAdded ? "bg-blue-100" : "bg-sky-50"
+                      isAdded ? "bg-slate-100" : "bg-slate-50"
                     }`}
                   >
                     <BsLuggage
                       className={`text-xl ${
-                        isAdded ? "text-blue-700" : "text-blue-500"
+                        isAdded ? "text-[#0A203E]" : "text-[#C9A84C]"
                       }`}
                     />
                   </div>
@@ -84,7 +90,7 @@ export const BaggageTable = ({
                     className={`px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-all duration-200 shadow-sm ${
                       isAdded
                         ? "bg-gray-300 text-gray-700 cursor-default"
-                        : "bg-blue-600 text-white hover:bg-blue-700"
+                        : "bg-[#0A203E] text-white hover:bg-[#0A203E]/90"
                     }`}
                   >
                     {isAdded ? "Added" : "Add"}
@@ -94,11 +100,11 @@ export const BaggageTable = ({
 
               {/* Price */}
               <div className="flex justify-between items-center">
-                <p className="text-lg sm:text-xl font-bold text-blue-700">
+                <p className="text-lg sm:text-xl font-bold text-[#0A203E]">
                   ₹{bag.Price}
                 </p>
                 {isAdded && (
-                  <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-semibold text-[#0A203E] bg-[#C9A84C]/10 px-2 py-0.5 rounded-full">
                     Selected
                   </span>
                 )}
@@ -108,17 +114,7 @@ export const BaggageTable = ({
         })}
       </div>
 
-      {/* Footer Actions */}
-      {selectable && (
-        <div className="flex justify-end items-center gap-3 pt-4 border-t border-gray-200">
-          <button
-            onClick={onConfirm}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition"
-          >
-            Confirm Selection
-          </button>
-        </div>
-      )}
+
     </div>
   );
 };

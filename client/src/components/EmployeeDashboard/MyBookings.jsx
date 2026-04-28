@@ -95,7 +95,7 @@ function StatusBadge({ status }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  Flight Booking Card                                            */
 /* ─────────────────────────────────────────────────────────────── */
-function FlightBookingCard({ b, navigate }) {
+function FlightBookingCard({ b, navigate, userRole }) {
   const snapshot = b.bookingSnapshot || {};
   const sectors = snapshot.sectors || [];
 
@@ -203,10 +203,7 @@ function FlightBookingCard({ b, navigate }) {
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-100">
           <span className="text-lg font-black text-[#0A4D68]">
-            ₹
-            {Number(b.pricingSnapshot?.totalAmount || 0).toLocaleString(
-              "en-IN",
-            )}
+            {( userRole === "travel-admin") ? `₹${Number(b.pricingSnapshot?.totalAmount || 0).toLocaleString("en-IN")}` : ""}
           </span>
           <button
             onClick={() => navigate(`/my-bookings/${b._id}`)}
@@ -223,7 +220,7 @@ function FlightBookingCard({ b, navigate }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  Hotel Booking Card                                             */
 /* ─────────────────────────────────────────────────────────────── */
-function HotelBookingCard({ b, navigate }) {
+function HotelBookingCard({ b, navigate, userRole }) {
   const snapshot = b.bookingSnapshot || {};
   const hotelReq = b.hotelRequest || {};
   const selectedHotel = hotelReq.selectedHotel || {};
@@ -395,7 +392,7 @@ function HotelBookingCard({ b, navigate }) {
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-100">
           <span className="text-lg font-black text-[#0A4D68]">
-            ₹{Number(finalPrice || 0).toLocaleString("en-IN")}
+            {( userRole === "travel-admin") ? `₹${Number(finalPrice || 0).toLocaleString("en-IN")}` : ""}
           </span>
           <button
             onClick={() => navigate(`/my-hotel-booking/${b._id}`)}
@@ -423,6 +420,7 @@ export default function MyBookings() {
   const { completed: hotelBookings, loading: hotelLoading } = useSelector(
     (s) => s.hotelBookings,
   );
+  const userRole = useSelector((s) => s.auth?.user?.role);
 
   const [activeTab, setActiveTab] = useState("flight");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -789,9 +787,9 @@ export default function MyBookings() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredBookings.map((b) =>
               activeTab === "flight" ? (
-                <FlightBookingCard key={b._id} b={b} navigate={navigate} />
+                <FlightBookingCard key={b._id} b={b} navigate={navigate} userRole={userRole} />
               ) : (
-                <HotelBookingCard key={b._id} b={b} navigate={navigate} />
+                <HotelBookingCard key={b._id} b={b} navigate={navigate} userRole={userRole} />
               ),
             )}
           </div>

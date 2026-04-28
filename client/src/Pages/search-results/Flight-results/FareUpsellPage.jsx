@@ -309,61 +309,61 @@ function normalizeResults(results = [], traceId = "") {
 // ─── Cabin theme config ───────────────────────────────────────────────────────
 const CABIN_CFG = {
   Economy: {
-    accent: "#2563eb",
-    accentLight: "#eff6ff",
-    accentRing: "#bfdbfe",
-    popularBg: "from-blue-600 to-blue-500",
+    accent: "#0A203E",
+    accentLight: "#f8fafc",
+    accentRing: "#e2e8f0",
+    popularBg: "from-[#0A203E] to-[#1a3a5a]",
     tabActive:
-      "bg-blue-600 text-white border-transparent shadow-md shadow-blue-200",
+      "bg-[#0A203E] text-white border-transparent shadow-md shadow-[#0A203E]/20",
     tabIdle:
-      "text-slate-500 border-slate-200 bg-white hover:text-blue-600 hover:bg-blue-50",
+      "text-slate-500 border-slate-200 bg-white hover:text-[#0A203E] hover:bg-slate-50",
     selectBtn:
-      "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200/50",
-    selectBtnOutline: "border-2 border-blue-500 text-blue-600 hover:bg-blue-50",
+      "bg-[#0A203E] hover:bg-[#1a3a5a] text-white shadow-md shadow-[#0A203E]/20",
+    selectBtnOutline: "border-2 border-slate-200 text-slate-700 hover:bg-slate-50",
     icon: MdFlight,
   },
   "Premium Economy": {
-    accent: "#7c3aed",
-    accentLight: "#f5f3ff",
-    accentRing: "#ddd6fe",
-    popularBg: "from-violet-600 to-violet-500",
+    accent: "#C9A84C",
+    accentLight: "#fcfaf4",
+    accentRing: "#f1e8d0",
+    popularBg: "from-[#C9A84C] to-[#d4b96a]",
     tabActive:
-      "bg-violet-600 text-white border-transparent shadow-md shadow-violet-200",
+      "bg-[#C9A84C] text-[#0A203E] border-transparent shadow-md shadow-[#C9A84C]/20",
     tabIdle:
-      "text-slate-500 border-slate-200 bg-white hover:text-violet-600 hover:bg-violet-50",
+      "text-slate-500 border-slate-200 bg-white hover:text-[#C9A84C] hover:bg-slate-50",
     selectBtn:
-      "bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200/50",
+      "bg-[#C9A84C] hover:bg-[#d4b96a] text-[#0A203E] shadow-md shadow-[#C9A84C]/20",
     selectBtnOutline:
-      "border-2 border-violet-500 text-violet-600 hover:bg-violet-50",
+      "border-2 border-[#C9A84C]/30 text-[#C9A84C] hover:bg-slate-50",
     icon: MdAirlineSeatReclineExtra,
   },
   Business: {
-    accent: "#b45309",
-    accentLight: "#fffbeb",
-    accentRing: "#fde68a",
-    popularBg: "from-amber-600 to-amber-500",
+    accent: "#1e293b",
+    accentLight: "#f1f5f9",
+    accentRing: "#cbd5e1",
+    popularBg: "from-slate-800 to-slate-700",
     tabActive:
-      "bg-amber-600 text-white border-transparent shadow-md shadow-amber-200",
+      "bg-slate-800 text-white border-transparent shadow-md shadow-slate-200",
     tabIdle:
-      "text-slate-500 border-slate-200 bg-white hover:text-amber-600 hover:bg-amber-50",
+      "text-slate-500 border-slate-200 bg-white hover:text-slate-800 hover:bg-slate-50",
     selectBtn:
-      "bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-200/50",
+      "bg-slate-800 hover:bg-slate-900 text-white shadow-md shadow-slate-200/50",
     selectBtnOutline:
-      "border-2 border-amber-500 text-amber-600 hover:bg-amber-50",
+      "border-2 border-slate-700 text-slate-700 hover:bg-slate-50",
     icon: MdWorkspacePremium,
   },
   First: {
-    accent: "#be123c",
-    accentLight: "#fff1f2",
-    accentRing: "#fecdd3",
-    popularBg: "from-rose-600 to-rose-500",
+    accent: "#0A203E",
+    accentLight: "#f1f5f9",
+    accentRing: "#cbd5e1",
+    popularBg: "from-slate-900 to-slate-800",
     tabActive:
-      "bg-rose-600 text-white border-transparent shadow-md shadow-rose-200",
+      "bg-slate-900 text-[#C9A84C] border-transparent shadow-md shadow-slate-200",
     tabIdle:
-      "text-slate-500 border-slate-200 bg-white hover:text-rose-600 hover:bg-rose-50",
+      "text-slate-500 border-slate-200 bg-white hover:text-slate-900 hover:bg-slate-50",
     selectBtn:
-      "bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-200/50",
-    selectBtnOutline: "border-2 border-rose-500 text-rose-600 hover:bg-rose-50",
+      "bg-slate-900 hover:bg-black text-[#C9A84C] shadow-md shadow-slate-200/50",
+    selectBtnOutline: "border-2 border-slate-800 text-slate-800 hover:bg-slate-50",
     icon: BsStarFill,
   },
 };
@@ -942,7 +942,7 @@ export default function FareUpsellPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans">
+    <div className="min-h-screen bg-slate-50 font-sans">
       <CorporateNavbar />
 
       <div className="max-w-7xl mx-auto px-4 py-6">
@@ -1015,7 +1015,7 @@ export default function FareUpsellPage() {
                   )}
                   {routeInfo.depDate && (
                     <span
-                      className="text-[11px] font-semibold px-3 py-1.5 rounded-full border"
+                      className="text-[11px] font-bold px-3 py-1.5 rounded-full border"
                       style={{
                         background: cfg.accentLight,
                         borderColor: cfg.accentRing,
@@ -1057,10 +1057,10 @@ export default function FareUpsellPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setActiveJourneyTab("onward")}
-                  className={`px-5 py-2 rounded-full text-sm font-bold border transition ${
+                  className={`px-6 py-2.5 rounded-xl text-sm font-black border transition-all cursor-pointer uppercase tracking-wider ${
                     activeJourneyTab === "onward"
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-slate-500 border-slate-200"
+                      ? "bg-[#0A203E] text-white border-[#0A203E] shadow-lg"
+                      : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
                   }`}
                 >
                   ✈️ Onward
@@ -1068,10 +1068,10 @@ export default function FareUpsellPage() {
 
                 <button
                   onClick={() => setActiveJourneyTab("return")}
-                  className={`px-5 py-2 rounded-full text-sm font-bold border transition ${
+                  className={`px-6 py-2.5 rounded-xl text-sm font-black border transition-all cursor-pointer uppercase tracking-wider ${
                     activeJourneyTab === "return"
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-slate-500 border-slate-200"
+                      ? "bg-[#0A203E] text-white border-[#0A203E] shadow-lg"
+                      : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
                   }`}
                 >
                   🔁 Return
@@ -1204,7 +1204,7 @@ export default function FareUpsellPage() {
                     },
                   });
                 }}
-                className="w-full mt-6 h-12 bg-blue-600 text-white font-bold rounded-xl"
+                className="w-full mt-6 h-14 bg-[#C9A84C] text-[#0A203E] font-black rounded-xl uppercase tracking-widest shadow-xl hover:brightness-110 transition-all cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
               >
                 Continue with Selected Fares
               </button>

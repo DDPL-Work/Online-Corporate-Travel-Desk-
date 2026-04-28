@@ -60,13 +60,13 @@ const ssrPolicySlice = createSlice({
       .addCase(fetchMySSRPolicy.rejected, (state, { payload }) => {
         state.myPolicyLoading = false;
         state.myPolicyError = payload;
-        // Default permissive policy on error
+        // Default restricted policy on error
         state.myPolicy = {
-          allowSeat: true, allowMeal: true, allowBaggage: true,
+          allowSeat: false, allowMeal: false, allowBaggage: false,
           seatPriceRange: { min: 0, max: 99999 },
           mealPriceRange: { min: 0, max: 99999 },
           baggagePriceRange: { min: 0, max: 99999 },
-          approvalRequired: true, approvalEmail: "",
+          approvalRequired: true,
           isDefault: true,
         };
       });

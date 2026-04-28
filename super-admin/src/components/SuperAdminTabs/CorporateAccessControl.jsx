@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  FiFilter,
   FiEdit2,
-  FiPlusCircle,
   FiToggleLeft,
   FiToggleRight,
   FiCheckCircle,
@@ -11,8 +9,6 @@ import {
   FiSearch,
   FiUsers,
   FiActivity,
-  FiClock,
-  FiUserCheck,
 } from "react-icons/fi";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
@@ -20,13 +16,13 @@ import { toast } from "react-toastify";
 import EditCorporateModal from "../../Modal/EditCorporateModal";
 import {
   fetchCorporates,
-  approveCorporate,
   toggleCorporateStatus,
   fetchCorporateById,
 } from "../../Redux/Slice/corporateListSlice";
 import ViewCorporateModal from "../../Modal/ViewCorporateModal";
 import { ToastConfirm } from "../../utils/ToastConfirm";
 import FinancialApprovalModal from "../../Modal/FinancialApprovalModal";
+import TableActionBar from "../Shared/TableActionBar";
 
 const colors = {
   primary: "#0A4D68",
@@ -36,13 +32,24 @@ const colors = {
   dark: "#1E293B",
 };
 
+const formatExportCurrency = (value) =>
+  `INR ${Number(value || 0).toLocaleString("en-IN")}`;
+
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
 export default function CorporateAccessControl() {
+  const tableScrollRef = useRef(null);
   const dispatch = useDispatch();
 
   const {
     corporates = [],
     loading,
-    error,
   } = useSelector((state) => state.corporateList);
 
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -64,32 +71,37 @@ export default function CorporateAccessControl() {
   }, [dispatch]);
 
   /* ---------------- FILTER LOGIC ---------------- */
-  const baseCorporates = corporates.filter(c => c.status !== "pending");
+  const baseCorporates = useMemo(
+    () => corporates.filter((c) => c.status !== "pending"),
+    [corporates],
+  );
 
-  const corporatesList = [
-    "All",
-    ...new Set(baseCorporates.map((x) => x.corporateName)),
-  ];
+  const corporatesList = useMemo(
+    () => ["All", ...new Set(baseCorporates.map((x) => x.corporateName))],
+    [baseCorporates],
+  );
   const statuses = ["All", "active", "inactive"];
 
-  const filtered = baseCorporates.filter((c) => {    
-    const corpMatch =
-      corporateFilter === "All" || c.corporateName === corporateFilter;
-    const statusMatch = statusFilter === "All" || c.status === statusFilter;
-    const searchMatch =
-      !searchTerm ||
-      c.corporateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.primaryContact?.name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      c.primaryContact?.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    return corpMatch  && statusMatch && searchMatch;
-  });
+  const filtered = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return baseCorporates.filter((c) => {
+      const corpMatch =
+        corporateFilter === "All" || c.corporateName === corporateFilter;
+      const statusMatch = statusFilter === "All" || c.status === statusFilter;
+      const searchMatch =
+        !normalizedSearch ||
+        c.corporateName?.toLowerCase().includes(normalizedSearch) ||
+        c.primaryContact?.name?.toLowerCase().includes(normalizedSearch) ||
+        c.primaryContact?.email?.toLowerCase().includes(normalizedSearch);
+
+      return corpMatch && statusMatch && searchMatch;
+    });
+  }, [baseCorporates, corporateFilter, statusFilter, searchTerm]);
 
   // Stats
   const totalCorporates = filtered.length;
   const activeCount = filtered.filter((c) => c.status === "active").length;
-  // const pendingCount = filtered.filter((c) => c.status === "pending").length;
   const inactiveCount = filtered.filter((c) => c.status === "inactive").length;
   const totalCredit = filtered.reduce(
     (sum, c) => sum + (c.classification === "postpaid" ? c.creditLimit : 0),
@@ -131,6 +143,91 @@ export default function CorporateAccessControl() {
     });
   };
 
+  const handleExport = () => {
+    if (loading) return;
+
+    if (filtered.length === 0) {
+      toast.info("No corporates available to export");
+      return;
+    }
+
+    const headers = [
+      "Corporate Name",
+      "Primary Contact",
+      "Primary Email",
+      "Classification",
+      "Wallet Balance",
+      "Current Credit",
+      "Credit Limit",
+      "SSO Domain",
+      "Status",
+    ];
+
+    const rows = filtered.map((corporate) => [
+      corporate.corporateName || "N/A",
+      corporate.primaryContact?.name || "N/A",
+      corporate.primaryContact?.email || "N/A",
+      corporate.classification || "N/A",
+      formatExportCurrency(corporate.walletBalance),
+      formatExportCurrency(corporate.currentCredit),
+      formatExportCurrency(corporate.creditLimit),
+      corporate.ssoConfig?.domain || "N/A",
+      corporate.status || "inactive",
+    ]);
+
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:10px;vertical-align:top;">${escapeHtml(cell)}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <table>
+      <thead>
+        <tr>
+          ${headers
+            .map(
+              (header) =>
+                `<th style="border:1px solid #cbd5e1;padding:10px;background:#0A4D68;color:#ffffff;font-weight:700;text-align:left;">${escapeHtml(header)}</th>`,
+            )
+            .join("")}
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRows}
+      </tbody>
+    </table>
+  </body>
+</html>`;
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `corporate-access-control-${stamp}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success("Corporate list exported");
+  };
+
   /* ---------------- UI ---------------- */
   return (
     <div className="min-h-screen p-6 font-sans" style={{ backgroundColor: colors.light }}>
@@ -155,34 +252,23 @@ export default function CorporateAccessControl() {
           <StatCard
             label="Total Corporates"
             value={totalCorporates}
-            Icon={FiUsers}
+            icon={<FiUsers size={18} className="text-[#0A4D68]" />}
             borderCls="border-[#0A4D68]"
             iconBgCls="bg-[#0A4D68]/10"
-            iconColorCls="text-[#0A4D68]"
           />
           <StatCard
             label="Active"
             value={activeCount}
-            Icon={FiActivity}
+            icon={<FiActivity size={18} className="text-emerald-600" />}
             borderCls="border-emerald-500"
             iconBgCls="bg-emerald-50"
-            iconColorCls="text-emerald-600"
           />
-          {/* <StatCard
-            label="Pending"
-            value={pendingCount}
-            Icon={FiClock}
-            borderCls="border-amber-500"
-            iconBgCls="bg-amber-50"
-            iconColorCls="text-amber-600"
-          /> */}
           <StatCard
             label="Inactive"
             value={inactiveCount}
-            Icon={FiXCircle}
+            icon={<FiXCircle size={18} className="text-rose-600" />}
             borderCls="border-rose-500"
             iconBgCls="bg-rose-50"
-            iconColorCls="text-rose-600"
           />
         </div>
 
@@ -222,7 +308,7 @@ export default function CorporateAccessControl() {
                 className="w-full uppercase px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
               >
                 {statuses.map((s) => (
-                  <option  key={s} value={s}>
+                  <option key={s} value={s}>
                     {s === "All" ? "All Statuses" : s}
                   </option>
                 ))}
@@ -237,34 +323,35 @@ export default function CorporateAccessControl() {
             <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
               Corporate List
             </h2>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-bold transition-all shadow-md uppercase bg-[#0A4D68] hover:bg-[#088395]"
-              onClick={() => {}} // optional export
-            >
-              <FiFilter /> Export
-            </button>
+            <TableActionBar
+              scrollRef={tableScrollRef}
+              exportLabel="Export"
+              onExport={handleExport}
+              exportClassName="bg-[#0A4D68] hover:bg-[#088395] shadow-[#0A4D68]/20"
+              arrowClassName="border-teal-100 bg-teal-50 text-[#0A4D68] hover:bg-teal-100 hover:border-teal-200 hover:text-[#08384d] disabled:hover:bg-teal-50"
+            />
           </div>
 
-          <div className="overflow-x-auto">
+          <div ref={tableScrollRef} className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr style={{ backgroundColor: colors.primary }} className="text-white">
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                  <th className="px-6 py-3 text-[11px] font-bold uppercase tracking-widest">
                     Corporate
                   </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                  <th className="px-6 py-3 text-[11px] font-bold uppercase tracking-widest">
                     Primary Contact
                   </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                  <th className="px-6 py-3 text-[11px] font-bold uppercase tracking-widest">
                     Classification
                   </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                  <th className="px-6 py-3 text-[11px] font-bold uppercase tracking-widest">
                     Wallet / Credit
                   </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                  <th className="px-6 py-3 text-[11px] font-bold uppercase tracking-widest">
                     Status
                   </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                  <th className="px-6 py-3 text-[11px] font-bold uppercase tracking-widest">
                     Actions
                   </th>
                 </tr>
@@ -280,9 +367,9 @@ export default function CorporateAccessControl() {
                 {!loading &&
                   filtered.map((c) => (
                     <tr key={c._id} className="hover:bg-slate-50 transition-all">
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-3 align-middle">
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-800 text-[13px]">
+                          <span className="font-bold text-slate-800 text-[13px] whitespace-nowrap">
                             {c.corporateName}
                           </span>
                           {c.ssoConfig?.domain && (
@@ -292,9 +379,9 @@ export default function CorporateAccessControl() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-3 align-middle">
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-700 text-[13px]">
+                          <span className="font-bold text-slate-700 text-[13px] whitespace-nowrap">
                             {c.primaryContact?.name || "—"}
                           </span>
                           <span className="text-[11px] text-teal-600 font-mono">
@@ -302,19 +389,19 @@ export default function CorporateAccessControl() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 capitalize text-slate-600">
+                      <td className="px-6 py-3 align-middle capitalize text-slate-600">
                         {c.classification}
                       </td>
-                      <td className="px-6 py-4 font-mono text-slate-700 font-medium">
+                      <td className="px-6 py-3 align-middle font-mono text-slate-700 font-medium whitespace-nowrap">
                         {c.classification === "postpaid"
                           ? `₹${c.currentCredit?.toLocaleString()} / ₹${c.creditLimit?.toLocaleString()}`
                           : `₹${c.walletBalance?.toLocaleString()}`}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-3 align-middle">
                         <StatusBadge status={c.status} />
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-3">
+                      <td className="px-6 py-3 align-middle">
+                        <div className="flex gap-3 items-center">
                           <ActionButton
                             icon={<FiEye size={16} />}
                             onClick={() => handleView(c._id)}
@@ -408,7 +495,7 @@ export default function CorporateAccessControl() {
 }
 
 /* ------------------- HELPER COMPONENTS ------------------- */
-function StatCard({ label, value, borderCls, iconBgCls, iconColorCls, Icon }) {
+function StatCard({ label, value, borderCls, iconBgCls, icon }) {
   return (
     <div
       className={`bg-white rounded-xl p-4 flex items-center gap-3 shadow-sm border-l-4 ${borderCls}`}
@@ -416,7 +503,7 @@ function StatCard({ label, value, borderCls, iconBgCls, iconColorCls, Icon }) {
       <div
         className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBgCls}`}
       >
-        <Icon size={18} className={iconColorCls} />
+        {icon}
       </div>
       <div className="text-left">
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">

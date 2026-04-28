@@ -73,7 +73,11 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
   if (existingPhone) throw new ApiError(400, "Phone number already exists");
 
   // GST Email Preference: 1. Accounts (Billing), 2. Travel-admin (Primary)
-  gstDetails.gstEmail = gstDetails.gstEmail || billingDepartment?.email || primaryContact?.email || "";
+  gstDetails.gstEmail =
+    gstDetails.gstEmail ||
+    billingDepartment?.email ||
+    primaryContact?.email ||
+    "";
 
   // --------------------------------------------------
   // 🟢 CLOUDINARY UPLOAD SECTION (NEW)
@@ -166,8 +170,6 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
       ),
     );
 });
-
-
 
 // -----------------------------------------------------
 // APPROVE CORPORATE (SUPER ADMIN ONLY)
@@ -339,8 +341,8 @@ exports.getAllCorporates = asyncHandler(async (req, res) => {
         corp.billingCycle === "15days"
           ? 15
           : corp.billingCycle === "30days"
-          ? 30
-          : corp.customBillingDays || 30;
+            ? 30
+            : corp.customBillingDays || 30;
 
       const now = new Date();
       const cycleMs = cycleDays * 24 * 60 * 60 * 1000;
@@ -583,7 +585,6 @@ exports.getAllHotelBookings = async (req, res) => {
   }
 };
 
-
 exports.getCancelledOrRequestedFlights = async (req, res) => {
   try {
     const {
@@ -721,7 +722,6 @@ exports.getCancelledOrRequestedHotels = async (req, res) => {
   }
 };
 
-
 // Get cancellation queries
 exports.fetchCancellationQueries = async (req, res) => {
   try {
@@ -781,8 +781,7 @@ exports.fetchCancellationQueries = async (req, res) => {
         b?.bookingResult?.providerResponse?.Response?.Response
           ?.FlightItinerary || {};
 
-      const segments =
-        itinerary?.Segments || b?.flightRequest?.segments || [];
+      const segments = itinerary?.Segments || b?.flightRequest?.segments || [];
 
       const firstSegment = Array.isArray(segments)
         ? segments[0]
@@ -817,21 +816,17 @@ exports.fetchCancellationQueries = async (req, res) => {
               const seg = s?.[0] || s; // handle nested array
               return {
                 origin:
-                  seg?.Origin?.Airport?.AirportCode ||
-                  seg?.origin?.airportCode,
+                  seg?.Origin?.Airport?.AirportCode || seg?.origin?.airportCode,
 
                 destination:
                   seg?.Destination?.Airport?.AirportCode ||
                   seg?.destination?.airportCode,
 
-                airline:
-                  seg?.Airline?.AirlineName || seg?.airlineName,
+                airline: seg?.Airline?.AirlineName || seg?.airlineName,
 
-                flightNumber:
-                  seg?.Airline?.FlightNumber || seg?.flightNumber,
+                flightNumber: seg?.Airline?.FlightNumber || seg?.flightNumber,
 
-                departureTime:
-                  seg?.Origin?.DepTime || seg?.departureDateTime,
+                departureTime: seg?.Origin?.DepTime || seg?.departureDateTime,
               };
             }) || [],
 
@@ -895,19 +890,19 @@ exports.fetchCancellationQueries = async (req, res) => {
   }
 };
 
-
 // PATCH /api/cancellation-queries/:id/status
 exports.updateCancellationQueryStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, remarks } = req.body;
+    const { status, remarks, resolution } = req.body;
 
     /* ─────────────────────────────
        🔥 VALIDATION
     ───────────────────────────── */
-    const allowedStatus = ["PENDING", "APPROVED", "REJECTED"];
+    const normalizedStatus = String(status || "").toUpperCase();
+    const allowedStatus = ["OPEN", "IN_PROGRESS", "RESOLVED", "REJECTED"];
 
-    if (!status || !allowedStatus.includes(status)) {
+    if (!normalizedStatus || !allowedStatus.includes(normalizedStatus)) {
       return res.status(400).json({
         success: false,
         message: `Invalid status. Allowed: ${allowedStatus.join(", ")}`,
@@ -926,13 +921,24 @@ exports.updateCancellationQueryStatus = async (req, res) => {
       });
     }
 
+    const hasResolutionUpdate =
+      resolution &&
+      typeof resolution === "object" &&
+      Object.keys(resolution).some((key) => resolution[key] !== undefined);
+    const hasRemarksUpdate =
+      typeof remarks === "string" && remarks !== query.remarks;
+
     /* ─────────────────────────────
        🚫 PREVENT DUPLICATE UPDATE
     ───────────────────────────── */
-    if (query.status === status) {
+    if (
+      query.status === normalizedStatus &&
+      !hasResolutionUpdate &&
+      !hasRemarksUpdate
+    ) {
       return res.status(400).json({
         success: false,
-        message: `Query is already ${status}`,
+        message: `Query is already ${normalizedStatus}`,
       });
     }
 
@@ -941,10 +947,24 @@ exports.updateCancellationQueryStatus = async (req, res) => {
     ───────────────────────────── */
     const previousStatus = query.status;
 
-    query.status = status;
+    query.status = normalizedStatus;
 
-    if (remarks) {
+    if (typeof remarks === "string") {
       query.remarks = remarks;
+    }
+
+    if (hasResolutionUpdate) {
+      query.resolution = {
+        ...(query.resolution?.toObject?.() || query.resolution || {}),
+        ...resolution,
+      };
+    }
+
+    if (query.status === "RESOLVED" && !query.resolution?.resolvedAt) {
+      query.resolution = {
+        ...(query.resolution?.toObject?.() || query.resolution || {}),
+        resolvedAt: new Date(),
+      };
     }
 
     /* ─────────────────────────────
@@ -953,10 +973,10 @@ exports.updateCancellationQueryStatus = async (req, res) => {
     query.logs.push({
       action: "STATUS_UPDATED",
       by: req.user?.role === "admin" ? "ADMIN" : "USER",
-      message: `Status changed from ${previousStatus} to ${status}`,
-      meta: {
-        remarks: remarks || null,
-      },
+      message:
+        previousStatus === normalizedStatus
+          ? `Query details updated while status remained ${normalizedStatus}`
+          : `Status changed from ${previousStatus} to ${normalizedStatus}`,
     });
 
     await query.save();

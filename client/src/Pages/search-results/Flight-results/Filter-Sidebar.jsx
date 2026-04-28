@@ -82,7 +82,7 @@ const RangeSlider = ({ min, max, values, onChange, formatValue }) => {
       >
         {/* Selected range */}
         <div
-          className="absolute h-2 bg-blue-500 rounded-full"
+          className="absolute h-2 bg-[#C9A84C] rounded-full"
           style={{
             left: `${leftPos}%`,
             width: `${rightPos - leftPos}%`,
@@ -91,14 +91,14 @@ const RangeSlider = ({ min, max, values, onChange, formatValue }) => {
 
         {/* Left thumb */}
         <div
-          className="absolute w-4 h-4 bg-white border-2 border-blue-500 rounded-full -top-1 -ml-2 cursor-grab active:cursor-grabbing shadow-md"
+          className="absolute w-4 h-4 bg-white border-2 border-[#C9A84C] rounded-full -top-1 -ml-2 cursor-grab active:cursor-grabbing shadow-md"
           style={{ left: `${leftPos}%` }}
           onMouseDown={handleMouseDown(0)}
         />
 
         {/* Right thumb */}
         <div
-          className="absolute w-4 h-4 bg-white border-2 border-blue-500 rounded-full -top-1 -ml-2 cursor-grab active:cursor-grabbing shadow-md"
+          className="absolute w-4 h-4 bg-white border-2 border-[#C9A84C] rounded-full -top-1 -ml-2 cursor-grab active:cursor-grabbing shadow-md"
           style={{ left: `${rightPos}%` }}
           onMouseDown={handleMouseDown(1)}
         />
@@ -289,39 +289,37 @@ const FlightFilterSidebar = ({
     return Array.from(terminals).sort();
   };
 
-  // Get unique airports (Departure Only - Nearby Airport)
+  // Get unique airports (Departure Only - Nearby Airport of Origin)
   const getDepartureAirports = () => {
     const map = new Map();
 
     flights.forEach((flight) => {
-      getSegments(flight).forEach((seg) => {
-        const dep = seg?.Origin?.Airport;
-        if (dep?.AirportCode) {
-          map.set(dep.AirportCode, {
-            code: dep.AirportCode,
-            name: dep.AirportName || dep.CityName,
-          });
-        }
-      });
+      const outsegs = Array.isArray(flight.Segments[0]) ? flight.Segments[0] : [flight.Segments[0]];
+      const dep = outsegs[0]?.Origin?.Airport;
+      if (dep?.AirportCode) {
+        map.set(dep.AirportCode, {
+          code: dep.AirportCode,
+          name: dep.AirportName || dep.CityName,
+        });
+      }
     });
 
     return Array.from(map.values());
   };
 
-  // Get unique airports (Destination Only)
+  // Get unique airports (Destination Only - Nearby Airport of Destination)
   const getDestinationAirports = () => {
     const map = new Map();
 
     flights.forEach((flight) => {
-      getSegments(flight).forEach((seg) => {
-        const arr = seg?.Destination?.Airport;
-        if (arr?.AirportCode) {
-          map.set(arr.AirportCode, {
-            code: arr.AirportCode,
-            name: arr.AirportName || arr.CityName,
-          });
-        }
-      });
+      const outsegs = Array.isArray(flight.Segments[0]) ? flight.Segments[0] : [flight.Segments[0]];
+      const arr = outsegs[outsegs.length - 1]?.Destination?.Airport;
+      if (arr?.AirportCode) {
+        map.set(arr.AirportCode, {
+          code: arr.AirportCode,
+          name: arr.AirportName || arr.CityName,
+        });
+      }
     });
 
     return Array.from(map.values());
@@ -556,7 +554,7 @@ const FlightFilterSidebar = ({
                 e.stopPropagation();
                 onClear();
               }}
-              className="text-xs text-blue-600 hover:text-blue-700 uppercase"
+              className="text-xs text-[#C9A84C] hover:text-[#b08f3a] uppercase"
             >
               {clearText}
             </button>
@@ -579,7 +577,7 @@ const FlightFilterSidebar = ({
         <h2 className="text-lg font-bold text-gray-800">Filters</h2>
         <button
           onClick={resetAllFilters}
-          className="text-sm cursor-pointer text-blue-600 hover:text-blue-700 uppercase font-medium"
+          className="text-sm cursor-pointer text-[#C9A84C] hover:text-[#b08f3a] uppercase font-medium"
         >
           RESET
         </button>
@@ -623,7 +621,7 @@ const FlightFilterSidebar = ({
               type="checkbox"
               checked={popularFilters.earlyMorning}
               onChange={() => togglePopularFilter("earlyMorning")}
-              className="w-4 h-4 accent-blue-500"
+              className="w-4 h-4 accent-[#C9A84C]"
             />
             <span>Early Morning (Before 8 AM)</span>
           </label>
@@ -632,7 +630,7 @@ const FlightFilterSidebar = ({
               type="checkbox"
               checked={popularFilters.refundable}
               onChange={() => togglePopularFilter("refundable")}
-              className="w-4 h-4 accent-blue-500"
+              className="w-4 h-4 accent-[#C9A84C]"
             />
             <span>Refundable</span>
           </label>
@@ -641,7 +639,7 @@ const FlightFilterSidebar = ({
               type="checkbox"
               checked={popularFilters.directOnly}
               onChange={() => togglePopularFilter("directOnly")}
-              className="w-4 h-4 accent-blue-500"
+              className="w-4 h-4 accent-[#C9A84C]"
             />
             <span>Direct Flights Only</span>
           </label>
@@ -650,7 +648,7 @@ const FlightFilterSidebar = ({
               type="checkbox"
               checked={popularFilters.shortDuration}
               onChange={() => togglePopularFilter("shortDuration")}
-              className="w-4 h-4 accent-blue-500"
+              className="w-4 h-4 accent-[#C9A84C]"
             />
             <span>Short Duration (&lt; 3hrs)</span>
           </label>
@@ -674,11 +672,11 @@ const FlightFilterSidebar = ({
                   type="checkbox"
                   checked={selectedStops.includes(label)}
                   onChange={() => toggleStop(label)}
-                  className="w-4 h-4 accent-blue-500"
+                  className="w-4 h-4 accent-[#C9A84C]"
                 />
                 <span>{label}</span>
               </div>
-              <span className="text-gray-500">({count})</span>
+              {/* <span className="text-gray-500">({count})</span> */}
             </label>
           ))}
         </div>
@@ -699,7 +697,7 @@ const FlightFilterSidebar = ({
               }
               className={`flex flex-col items-center justify-center border rounded-md px-2 py-2 text-xs cursor-pointer transition ${
                 selectedTime === t.label
-                  ? "bg-blue-500 text-white border-blue-500"
+                  ? "bg-[#C9A84C] text-[#0A203E] border-[#C9A84C]"
                   : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
               }`}
             >
@@ -730,7 +728,7 @@ const FlightFilterSidebar = ({
                   type="checkbox"
                   checked={selectedAirlines.includes(name)}
                   onChange={() => toggleAirline(name)}
-                  className="w-4 h-4 accent-blue-500"
+                  className="w-4 h-4 accent-[#C9A84C]"
                 />
                 <span className="text-xs">{name}</span>
               </div>
@@ -782,7 +780,7 @@ const FlightFilterSidebar = ({
                 type="checkbox"
                 checked={selectedTerminals.includes(terminal)}
                 onChange={() => toggleTerminal(terminal)}
-                className="w-4 h-4 accent-blue-500"
+                className="w-4 h-4 accent-[#C9A84C]"
               />
               <span>Terminal {terminal}</span>
             </label>
@@ -790,9 +788,9 @@ const FlightFilterSidebar = ({
         </div>
       </FilterSection>
 
-      {/* Nearby Airport */}
+      {/* Departure Airport */}
       <FilterSection
-        title="Nearby Airport"
+        title="Departure airport"
         isExpanded={expandedSections.airport}
         onToggle={() => toggleSection("airport")}
       >
@@ -806,7 +804,7 @@ const FlightFilterSidebar = ({
                 type="checkbox"
                 checked={selectedAirports.includes(code)}
                 onChange={() => toggleAirport(code)}
-                className="w-4 h-4 accent-blue-500"
+                className="w-4 h-4 accent-[#C9A84C]"
               />
               <span className="text-xs">
                 {code} - {name}
@@ -817,7 +815,7 @@ const FlightFilterSidebar = ({
       </FilterSection>
 
       {/* Destination Airport (when airport > 1) */}
-      {getDestinationAirports().length > 1 && (
+      {getDestinationAirports().length > 0 && (
         <FilterSection
           title="Destination airport"
           isExpanded={expandedSections.destinationAirport}
@@ -833,7 +831,7 @@ const FlightFilterSidebar = ({
                   type="checkbox"
                   checked={selectedDestinationAirports.includes(code)}
                   onChange={() => toggleDestinationAirport(code)}
-                  className="w-4 h-4 accent-blue-500"
+                  className="w-4 h-4 accent-[#C9A84C]"
                 />
                 <span className="text-xs">
                   {code} - {name}
@@ -863,7 +861,7 @@ const FlightFilterSidebar = ({
                   type="checkbox"
                   checked={selectedLayoverAirports.includes(code)}
                   onChange={() => toggleLayoverAirport(code)}
-                  className="w-4 h-4 accent-blue-500"
+                  className="w-4 h-4 accent-[#C9A84C]"
                 />
                 <span className="text-xs">
                   {code} - {name}

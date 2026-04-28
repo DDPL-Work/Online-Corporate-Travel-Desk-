@@ -127,12 +127,15 @@ function FlightRequestCard({ trip, onView }) {
       })
     : null;
 
+  const isTravelPassed = trip.startDate && new Date() > new Date(trip.startDate);
+  const isDiscarded = isTravelPassed && trip.status === "pending_approval";
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
+    <div className={`bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 ${isDiscarded ? 'opacity-70' : ''}`}>
       {/* top accent bar — amber for pending, green for approved */}
       <div
         className={`h-[5px] ${
-          trip.status === "approved" ? "bg-emerald-500" : "bg-amber-400"
+          isDiscarded ? "bg-slate-400" : trip.status === "approved" ? "bg-emerald-500" : "bg-amber-400"
         }`}
       />
 
@@ -154,10 +157,10 @@ function FlightRequestCard({ trip, onView }) {
           </div>
 
           <div
-            className={`flex items-center gap-1.5 ${cfg.badgeBg} ${cfg.badgeText} border ${cfg.badgeBorder} rounded-full px-2.5 py-1 text-[11px] font-semibold shrink-0`}
+            className={`flex items-center gap-1.5 ${isDiscarded ? 'bg-slate-100 text-slate-600 border-slate-200' : `${cfg.badgeBg} ${cfg.badgeText} border ${cfg.badgeBorder}`} rounded-full px-2.5 py-1 text-[11px] font-semibold shrink-0`}
           >
-            <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-            {cfg.label}
+            <span className={`w-1.5 h-1.5 rounded-full ${isDiscarded ? 'bg-slate-400' : cfg.dot}`} />
+            {isDiscarded ? "Discarded" : cfg.label}
           </div>
         </div>
 
@@ -203,17 +206,14 @@ function FlightRequestCard({ trip, onView }) {
 
         {/* Status strip */}
         <div
-          className={`flex items-center gap-2 ${cfg.bg} ${cfg.border} border rounded-xl px-3 py-2 mb-4`}
+          className={`flex items-center gap-2 border rounded-xl px-3 py-2 mb-4 ${
+            isDiscarded ? "bg-slate-50 border-slate-200 text-slate-500" : `${cfg.bg} ${cfg.border} ${cfg.text}`
+          }`}
         >
-          <StatusIcon size={13} className={cfg.iconColor} />
-          <span className={`text-[11px] font-semibold ${cfg.text}`}>
-            {cfg.label}
+          {isDiscarded ? <FiXCircle size={13} className="text-slate-400" /> : <StatusIcon size={13} className={cfg.iconColor} />}
+          <span className={`text-[11px] font-semibold`}>
+            {isDiscarded ? "Booking request is discarded (Travel date passed)" : cfg.label}
           </span>
-          {trip.fareExpired && (
-            <span className="ml-auto text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
-              FARE EXPIRED
-            </span>
-          )}
         </div>
 
         {/* Footer */}
@@ -235,7 +235,8 @@ function FlightRequestCard({ trip, onView }) {
           </div> */}
           <button
             onClick={() => onView(trip)}
-            className="flex items-center gap-2 bg-[#0A4D68] hover:bg-[#083d52] active:scale-[0.98] text-white text-[12px] font-semibold px-4 py-2 rounded-2xl transition-all duration-150 cursor-pointer border-none"
+            disabled={isDiscarded}
+            className={`flex items-center gap-2 text-white text-[12px] font-semibold px-4 py-2 rounded-2xl transition-all duration-150 border-none ${isDiscarded ? "bg-slate-300 cursor-not-allowed" : "bg-[#0A4D68] hover:bg-[#083d52] active:scale-[0.98] cursor-pointer"}`}
           >
             <FiEye size={13} />
             View Details
@@ -270,11 +271,14 @@ function HotelRequestCard({ trip, onView }) {
       })
     : null;
 
+  const isTravelPassed = trip.startDate && new Date() > new Date(trip.startDate);
+  const isDiscarded = isTravelPassed && trip.status === "pending_approval";
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
+    <div className={`bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 ${isDiscarded ? 'opacity-70' : ''}`}>
       <div
         className={`h-[5px] ${
-          trip.status === "approved" ? "bg-emerald-500" : "bg-amber-400"
+          isDiscarded ? "bg-slate-400" : trip.status === "approved" ? "bg-emerald-500" : "bg-amber-400"
         }`}
       />
 
@@ -296,10 +300,10 @@ function HotelRequestCard({ trip, onView }) {
           </div>
 
           <div
-            className={`flex items-center gap-1.5 ${cfg.badgeBg} ${cfg.badgeText} border ${cfg.badgeBorder} rounded-full px-2.5 py-1 text-[11px] font-semibold shrink-0`}
+            className={`flex items-center gap-1.5 ${isDiscarded ? 'bg-slate-100 text-slate-600 border-slate-200' : `${cfg.badgeBg} ${cfg.badgeText} border ${cfg.badgeBorder}`} rounded-full px-2.5 py-1 text-[11px] font-semibold shrink-0`}
           >
-            <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-            {cfg.label}
+            <span className={`w-1.5 h-1.5 rounded-full ${isDiscarded ? 'bg-slate-400' : cfg.dot}`} />
+            {isDiscarded ? "Discarded" : cfg.label}
           </div>
         </div>
 
@@ -350,11 +354,13 @@ function HotelRequestCard({ trip, onView }) {
 
         {/* Status strip */}
         <div
-          className={`flex items-center gap-2 ${cfg.bg} ${cfg.border} border rounded-xl px-3 py-2 mb-4`}
+          className={`flex items-center gap-2 border rounded-xl px-3 py-2 mb-4 ${
+            isDiscarded ? "bg-slate-50 border-slate-200 text-slate-500" : `${cfg.bg} ${cfg.border} ${cfg.text}`
+          }`}
         >
-          <StatusIcon size={13} className={cfg.iconColor} />
-          <span className={`text-[11px] font-semibold ${cfg.text}`}>
-            {cfg.label}
+          {isDiscarded ? <FiXCircle size={13} className="text-slate-400" /> : <StatusIcon size={13} className={cfg.iconColor} />}
+          <span className={`text-[11px] font-semibold`}>
+            {isDiscarded ? "Booking request is discarded (Check-in date passed)" : cfg.label}
           </span>
         </div>
 
@@ -377,7 +383,8 @@ function HotelRequestCard({ trip, onView }) {
           </div> */}
           <button
             onClick={() => onView(trip)}
-            className="flex items-center gap-2 bg-[#0A4D68] hover:bg-[#083d52] active:scale-[0.98] text-white text-[12px] font-semibold px-4 py-2 rounded-2xl transition-all duration-150 cursor-pointer border-none"
+            disabled={isDiscarded}
+            className={`flex items-center gap-2 text-white text-[12px] font-semibold px-4 py-2 rounded-2xl transition-all duration-150 border-none ${isDiscarded ? "bg-slate-300 cursor-not-allowed" : "bg-[#0A4D68] hover:bg-[#083d52] active:scale-[0.98] cursor-pointer"}`}
           >
             <FiEye size={13} />
             View Details

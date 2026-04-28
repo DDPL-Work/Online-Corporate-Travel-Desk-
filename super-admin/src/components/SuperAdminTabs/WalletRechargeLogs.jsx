@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   FiFilter,
   FiDownload,
@@ -6,7 +6,6 @@ import {
   FiXCircle,
   FiSearch,
   FiCalendar,
-  FiDollarSign,
   FiCreditCard,
 } from "react-icons/fi";
 import { FaRupeeSign } from "react-icons/fa";
@@ -14,6 +13,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchWalletRechargeLogs } from "../../Redux/Slice/walletRechargeLogsSlice";
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import Pagination from "../Shared/Pagination";
+import TableActionBar from "../Shared/TableActionBar";
 
 const colors = {
   primary: "#0A4D68",
@@ -28,6 +28,7 @@ const colors = {
 
 export default function WalletRechargeLogs() {
   const dispatch = useDispatch();
+  const tableScrollRef = useRef(null);
 
   // Filter states
   const [startDate, setStartDate] = useState("");
@@ -148,7 +149,7 @@ export default function WalletRechargeLogs() {
         {/* PAGE HEADER */}
         <div className="flex items-center gap-3 mb-2">
           <div className="w-12 h-12 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white">
-            <FiDollarSign size={24} />
+            <FaRupeeSign size={24} />
           </div>
           <div className="text-left">
             <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase leading-none">
@@ -286,15 +287,16 @@ export default function WalletRechargeLogs() {
             <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
               Recharge Records
             </h2>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-bold transition-all shadow-md uppercase bg-[#0A4D68] hover:bg-[#088395]"
-              onClick={() => {}} // optional export
-            >
-              <FiDownload /> Export
-            </button>
+            <TableActionBar
+              scrollRef={tableScrollRef}
+              exportLabel="Export"
+              onExport={() => {}}
+              exportClassName="bg-[#0A4D68] hover:bg-[#088395] shadow-[#0A4D68]/20"
+              arrowClassName="border-cyan-100 bg-cyan-50 text-[#0A4D68] hover:bg-cyan-100 hover:border-cyan-200 hover:text-[#08384d] disabled:hover:bg-cyan-50"
+            />
           </div>
 
-          <div className="overflow-x-auto">
+          <div ref={tableScrollRef} className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr

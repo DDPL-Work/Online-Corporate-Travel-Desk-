@@ -20,14 +20,16 @@ import { formatDateWithYear } from "../../utils/formatter";
 /* ─────────────────────────────────────────────────────────────── */
 /*  Summary Stats                                                  */
 /* ─────────────────────────────────────────────────────────────── */
-function SummaryStats({ flightTrips, hotelTrips }) {
+function SummaryStats({ flightTrips, hotelTrips, userRole }) {
   const totalSpend = [...flightTrips, ...hotelTrips].reduce(
     (sum, t) => sum + (t.pricingSnapshot?.totalAmount || 0),
     0,
   );
 
+  const canSeeSpend = userRole === "travel-admin";
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div className={`grid grid-cols-2 ${canSeeSpend ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-3 mb-6`}>
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">
           Total Upcoming
@@ -50,14 +52,16 @@ function SummaryStats({ flightTrips, hotelTrips }) {
         </p>
         <p className="text-2xl font-black text-teal-700">{hotelTrips.length}</p>
       </div>
-      <div className="bg-emerald-50 rounded-xl border border-emerald-100 p-4">
-        <p className="text-[10px] uppercase tracking-widest text-emerald-500 font-bold mb-1">
-          Total Spend
-        </p>
-        <p className="text-2xl font-black text-emerald-700">
-          ₹{totalSpend.toLocaleString("en-IN")}
-        </p>
-      </div>
+      {canSeeSpend && (
+        <div className="bg-emerald-50 rounded-xl border border-emerald-100 p-4">
+          <p className="text-[10px] uppercase tracking-widest text-emerald-500 font-bold mb-1">
+            Total Spend
+          </p>
+          <p className="text-2xl font-black text-emerald-700">
+            ₹{totalSpend.toLocaleString("en-IN")}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -95,7 +99,7 @@ function getUrgency(dateStr) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  Flight Trip Card                                               */
 /* ─────────────────────────────────────────────────────────────── */
-function FlightTripCard({ trip, onView }) {
+function FlightTripCard({ trip, onView, userRole }) {
   const snapshot = trip.bookingSnapshot || {};
   const sectors = (snapshot.sectors || [])
     .map((s) => s.replace("-", " → "))
@@ -169,9 +173,9 @@ function FlightTripCard({ trip, onView }) {
         )}
 
         {/* Footer */}
-        <div className="flex items-end justify-end pt-3 border-t border-slate-100">
-          {/* <div>
-            {trip.pricingSnapshot?.totalAmount && (
+        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+          <div>
+            {( userRole === "travel-admin") && trip.pricingSnapshot?.totalAmount && (
               <>
                 <p className="text-[11px] text-slate-400 mb-0.5">Total fare</p>
                 <p className="text-[17px] font-bold text-slate-800">
@@ -182,7 +186,7 @@ function FlightTripCard({ trip, onView }) {
                 </p>
               </>
             )}
-          </div> */}
+          </div>
           <button
             onClick={() => onView(trip)}
             className="flex items-center gap-2 bg-[#0A4D68] hover:bg-[#083d52] active:scale-[0.98] text-white text-[12px] font-semibold px-4 py-2 rounded-2xl transition-all duration-150 cursor-pointer border-none"
@@ -199,7 +203,7 @@ function FlightTripCard({ trip, onView }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  Hotel Trip Card                                                */
 /* ─────────────────────────────────────────────────────────────── */
-function HotelTripCard({ trip, onView }) {
+function HotelTripCard({ trip, onView, userRole }) {
   const snapshot = trip.bookingSnapshot || {};
   const checkIn = snapshot.checkInDate || snapshot.travelDate;
   const checkOut = snapshot.checkOutDate || snapshot.returnDate;
@@ -304,9 +308,9 @@ function HotelTripCard({ trip, onView }) {
         )}
 
         {/* Footer */}
-        <div className="flex items-end justify-end pt-3 border-t border-slate-100">
-          {/* <div>
-            {trip.pricingSnapshot?.totalAmount && (
+        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+          <div>
+            {( userRole === "travel-admin") && trip.pricingSnapshot?.totalAmount && (
               <>
                 <p className="text-[11px] text-slate-400 mb-0.5">Total fare</p>
                 <p className="text-[17px] font-bold text-slate-800">
@@ -317,7 +321,7 @@ function HotelTripCard({ trip, onView }) {
                 </p>
               </>
             )}
-          </div> */}
+          </div>
           <button
             onClick={() => onView(trip)}
             className="flex items-center gap-2 bg-[#0A4D68] hover:bg-[#083d52] active:scale-[0.98] text-white text-[12px] font-semibold px-4 py-2 rounded-2xl transition-all duration-150 cursor-pointer border-none"
@@ -349,6 +353,7 @@ export default function MyUpcomingTrips() {
   const { completed: hotelBookings = [], loading: hotelLoading } = useSelector(
     (state) => state.hotelBookings,
   );
+  const userRole = useSelector((state) => state.auth?.user?.role);
 
   useEffect(() => {
     dispatch(fetchMyBookings());
@@ -560,6 +565,7 @@ export default function MyUpcomingTrips() {
           <SummaryStats
             flightTrips={upcomingFlights}
             hotelTrips={upcomingHotels}
+            userRole={userRole}
           />
         )}
 
@@ -643,6 +649,7 @@ export default function MyUpcomingTrips() {
                         key={trip._id}
                         trip={trip}
                         onView={(t) => navigate(`/my-bookings/${t._id}`)}
+                        userRole={userRole}
                       />
                     ))
                   : filteredHotels.map((trip) => (
@@ -650,6 +657,7 @@ export default function MyUpcomingTrips() {
                         key={trip._id}
                         trip={trip}
                         onView={(t) => navigate(`/my-hotel-booking/${t._id}`)}
+                        userRole={userRole}
                       />
                     ))}
               </div>

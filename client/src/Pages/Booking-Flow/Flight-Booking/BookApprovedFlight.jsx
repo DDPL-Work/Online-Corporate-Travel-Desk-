@@ -8,7 +8,10 @@ import {
   FiUser,
   FiDollarSign,
   FiMapPin,
+  FiBriefcase,
 } from "react-icons/fi";
+import { MdFlightTakeoff } from "react-icons/md";
+import { BsLuggage } from "react-icons/bs";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -301,7 +304,7 @@ export default function BookApprovedFlight() {
   if (loading)
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
-        <div className="h-12 w-12 border-4 border-[#0A4D68]/30 border-t-[#0A4D68] rounded-full animate-spin" />
+        <div className="h-12 w-12 border-4 border-[#0A203E]/30 border-t-[#0A203E] rounded-full animate-spin" />
       </div>
     );
 
@@ -352,7 +355,7 @@ export default function BookApprovedFlight() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-10 font-sans">
-      <CorporateNavbar />
+      {/* <CorporateNavbar /> */}
 
       {/* 🔙 BACK BUTTON */}
       <div className="max-w-7xl mx-auto mt-4 px-4">
@@ -368,8 +371,8 @@ export default function BookApprovedFlight() {
       <div className="max-w-7xl mx-auto mt-10">
         {/* ===== HEADER ===== */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-[#0A4D68]">
-            ✈️ Flight Confirmation Dashboard
+          <h1 className="text-4xl font-black text-[#0A203E] uppercase tracking-tight flex items-center justify-center gap-4">
+            <MdFlightTakeoff className="text-[#C9A84C]" /> Flight Confirmation Dashboard
           </h1>
           <p className="text-gray-600">
             Review and confirm your approved flight booking
@@ -378,10 +381,10 @@ export default function BookApprovedFlight() {
 
         {/* ===== STATUS BAR ===== */}
         <div
-          className={`flex items-center justify-center gap-2 py-3 mb-8 rounded-xl border-2 border-gray-200 ${statusInfo.bg}`}
+          className={`flex items-center justify-center gap-2 py-4 mb-8 rounded-2xl border border-slate-200 shadow-sm ${statusInfo.bg}`}
         >
-          <FiClock className={`${statusInfo.color}`} />
-          <span className={`font-medium ${statusInfo.color}`}>
+          <FiClock className={`${statusInfo.color} text-lg`} />
+          <span className={`font-black uppercase tracking-widest text-sm ${statusInfo.color}`}>
             {statusInfo.text}
           </span>
         </div>
@@ -389,61 +392,62 @@ export default function BookApprovedFlight() {
         {/* ===== BENTO GRID ===== */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 🟦 OVERVIEW CARD */}
-          <div className="lg:col-span-2 bg-linear-to-r from-[#0A4D68] to-[#088395] text-white rounded-xl p-6 shadow-lg">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <FiAirplay /> Booking Overview
+          <div className="lg:col-span-2 bg-[#0A203E] text-white rounded-2xl p-8 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#C9A84C]/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+            <h2 className="text-xl font-black mb-6 flex items-center gap-2 uppercase tracking-widest">
+              <FiAirplay className="text-[#C9A84C]" /> Booking Overview
             </h2>
             <div className="grid sm:grid-cols-2 gap-3 text-sm">
               <p>
-                <span className="font-medium">Booking Ref:</span>{" "}
+                <span className="font-bold text-[#C9A84C] uppercase tracking-tighter mr-2">Ref:</span>{" "}
                 {booking.bookingReference}
               </p>
               <p>
-                <span className="font-medium">Purpose:</span>{" "}
+                <span className="font-bold text-[#C9A84C] uppercase tracking-tighter mr-2">Purpose:</span>{" "}
                 {booking.purposeOfTravel}
               </p>
               <p>
-                <span className="font-medium">Requested:</span>{" "}
-                {/* {new Date(booking.createdAt).toLocaleString()} */}
+                <span className="font-bold text-[#C9A84C] uppercase tracking-tighter mr-2">Requested:</span>{" "}
                 {formatDateTime(booking.createdAt)}
               </p>
               <p>
-                <span className="font-medium">Total Amount:</span> ₹
+                <span className="font-bold text-[#C9A84C] uppercase tracking-tighter mr-2">Amount:</span> ₹
                 {booking.pricingSnapshot?.totalAmount}
               </p>
             </div>
           </div>
 
           {/* 🟩 STATUS & ACTION CARD */}
-          <div className="bg-green-50 border border-green-200 rounded-xl p-6 shadow-md flex flex-col justify-between">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-green-700 mb-3">
+              <h3 className="text-sm font-black text-[#0A203E] uppercase tracking-widest mb-4">
                 Current Status
               </h3>
-              <p className={`text-sm ${statusInfo.color}`}>{statusInfo.text}</p>
+              <p className={`text-xs font-bold px-3 py-1.5 rounded-lg inline-block ${statusInfo.bg} ${statusInfo.color}`}>
+                {statusInfo.text}
+              </p>
             </div>
             {booking.requestStatus === "approved" && approver && (
-              <div className="mt-3 text-sm bg-green-100 text-green-800 rounded-lg p-3">
-                <p className="font-semibold flex items-center gap-1">
-                  <FiUser /> Approved By
+              <div className="mt-6 text-sm bg-slate-50 border border-slate-100 rounded-xl p-4">
+                <p className="font-black text-[#0A203E] uppercase tracking-widest text-[10px] flex items-center gap-2 mb-2">
+                  <FiUser className="text-[#C9A84C]" /> Approved By
                 </p>
-                <p>
+                <p className="font-bold text-slate-800">
                   {approver.name?.firstName} {approver.name?.lastName}
                 </p>
-                <p className="text-xs text-gray-600">{approver.email}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{approver.email}</p>
               </div>
             )}
 
             <button
-              // disabled={actionLoading || !statusInfo.canBook}
               disabled={
                 actionLoading || isApprovalExpired || !statusInfo.canBook
               }
               onClick={handleBookFlight}
-              className={`mt-4 px-5 py-2.5 rounded-lg text-white font-semibold flex items-center justify-center gap-2 transition ${
+              className={`mt-6 px-5 py-4 rounded-xl text-white font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg ${
                 statusInfo.canBook
-                  ? "bg-green-600 hover:bg-green-700"
-                  : "bg-gray-400 cursor-not-allowed"
+                  ? "bg-[#0A203E] hover:brightness-110 shadow-[#0A203E]/20"
+                  : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
               }`}
             >
               {actionLoading ? (
@@ -460,16 +464,16 @@ export default function BookApprovedFlight() {
           </div>
 
           {/* 🟧 FLIGHT ITINERARY */}
-          <div className="lg:col-span-2 bg-linear-to-br from-orange-50 to-white border border-orange-200 rounded-xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-orange-700 mb-4 flex items-center gap-2">
-              <FiMapPin /> Flight Itinerary
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <h2 className="text-sm font-black text-[#0A203E] uppercase tracking-widest mb-6 flex items-center gap-2">
+              <FiMapPin className="text-[#C9A84C]" /> Flight Itinerary
             </h2>
 
             <div className="space-y-6">
               {/* ========= ONE WAY ========= */}
               {journeyType === "one-way" && (
                 <>
-                  <h3 className="text-sm font-semibold text-orange-700">
+                  <h3 className="text-xs font-black text-[#C9A84C] uppercase tracking-widest mb-4">
                     One-way Journey
                   </h3>
 
@@ -490,10 +494,10 @@ export default function BookApprovedFlight() {
 
               {/* ========= ROUND TRIP ========= */}
               {journeyType === "round-trip" && (
-                <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* ✈️ ONWARD */}
-                  <div>
-                    <h3 className="text-sm font-semibold text-green-700 mb-3">
+                  <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
+                    <h3 className="text-[10px] font-black text-[#0A203E] uppercase tracking-widest mb-4 border-b border-slate-200 pb-2">
                       Onward Flight
                     </h3>
                     {grouped.onward.map((seg, idx) => (
@@ -502,27 +506,27 @@ export default function BookApprovedFlight() {
                   </div>
 
                   {/* 🔁 RETURN */}
-                  <div className="pt-4">
-                    <h3 className="text-sm font-semibold text-blue-700 mb-3">
+                  <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
+                    <h3 className="text-[10px] font-black text-[#0A203E] uppercase tracking-widest mb-4 border-b border-slate-200 pb-2">
                       Return Flight
                     </h3>
                     {grouped.return.map((seg, idx) => (
                       <FlightSegmentCard key={idx} seg={seg} />
                     ))}
                   </div>
-                </>
+                </div>
               )}
 
               {/* ========= MULTI CITY ========= */}
               {journeyType === "multi-city" && (
                 <>
-                  <h3 className="text-sm font-semibold text-purple-700">
+                  <h3 className="text-xs font-black text-[#C9A84C] uppercase tracking-widest mb-4">
                     Multi-city Journey
                   </h3>
 
                   {grouped.all.map((seg, idx) => (
-                    <div key={idx}>
-                      <p className="text-xs text-gray-500 mb-1">
+                    <div key={idx} className="mb-4 last:mb-0">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                         Route {idx + 1}: {seg.origin.airportCode} →{" "}
                         {seg.destination.airportCode}
                       </p>
@@ -535,43 +539,52 @@ export default function BookApprovedFlight() {
           </div>
 
           {/* 🟦 FARE DETAILS */}
-          <div className="bg-linear-to-br from-teal-50 to-white border border-teal-200 rounded-xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-teal-700 mb-3 flex items-center gap-2">
-              <FiDollarSign /> Fare Breakdown
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <h2 className="text-sm font-black text-[#0A203E] uppercase tracking-widest mb-4 flex items-center gap-2">
+              <FiDollarSign className="text-[#C9A84C]" /> Fare Breakdown
             </h2>
-            <div className="text-sm text-gray-700 space-y-1">
+            <div className="text-sm text-slate-700 space-y-1">
               {/* <p>Base Fare: ₹{flight.fareSnapshot.baseFare}</p> */}
               {flight?.fareSnapshot ? (
                 <>
-                  <div className="text-sm text-gray-700 space-y-1">
-                    <p>Base Fare: ₹{Math.ceil(baseFare)}</p>
-                    <p>Tax: ₹{Math.ceil(tax)}</p>
+                  <div className="text-sm text-slate-700 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Base Fare:</span>
+                      <span className="font-bold text-[#0A203E]">₹{Math.ceil(baseFare)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Tax:</span>
+                      <span className="font-bold text-[#0A203E]">₹{Math.ceil(tax)}</span>
+                    </div>
 
                     {isRoundTrip && (
-                      <div className="mt-2 text-xs text-gray-500 space-y-1">
-                        <p className="font-semibold text-gray-700">
-                          Breakdown:
+                      <div className="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500 space-y-1">
+                        <p className="font-black text-slate-400 uppercase tracking-widest text-[9px] mb-2">
+                          Route Breakdown
                         </p>
-                        <p>
-                          Onward: ₹
-                          {flight?.fareQuote?.Results?.[0]?.Fare
-                            ?.PublishedFare || 0}
-                        </p>
-                        <p>
-                          Return: ₹
-                          {flight?.fareQuote?.Results?.[1]?.Fare
-                            ?.PublishedFare || 0}
-                        </p>
+                        <div className="flex justify-between">
+                          <span>Onward:</span>
+                          <span>₹{flight?.fareQuote?.Results?.[0]?.Fare?.PublishedFare || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Return:</span>
+                          <span>₹{flight?.fareQuote?.Results?.[1]?.Fare?.PublishedFare || 0}</span>
+                        </div>
                       </div>
                     )}
 
-                    <p className="font-semibold mt-2">Total Amount: ₹{Math.ceil(total)}</p>
+                    <div className="mt-4 pt-4 border-t-2 border-slate-200 flex justify-between items-center text-base">
+                      <span className="font-black text-[#0A203E] uppercase tracking-widest text-xs">Total Amount</span>
+                      <span className="font-black text-[#0A203E]">₹{Math.ceil(total)}</span>
+                    </div>
 
-                    <p>Refundable: {refundable ? "Yes" : "No"}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center mt-4">
+                      Refundable: {refundable ? "Yes" : "No"}
+                    </p>
                   </div>
                 </>
               ) : (
-                <p className="text-gray-500 text-sm">
+                <p className="text-slate-500 text-sm">
                   Fare details not available
                 </p>
               )}
@@ -579,9 +592,9 @@ export default function BookApprovedFlight() {
           </div>
 
           {/* 🟩 TRAVELLERS CARD */}
-          <div className="lg:col-span-3 bg-linear-to-br from-green-50 to-white border border-green-200 rounded-xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-[#0A4D68] mb-4 flex items-center gap-2">
-              <FiUser /> Travellers
+          <div className="lg:col-span-3 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <h2 className="text-sm font-black text-[#0A203E] uppercase tracking-widest mb-6 flex items-center gap-2">
+              <FiUser className="text-[#C9A84C]" /> Travellers
             </h2>
             <div className="grid md:grid-cols-2 gap-4">
               {/* {booking.travellers.map((t, i) => ( */}
@@ -591,13 +604,13 @@ export default function BookApprovedFlight() {
                     key={i}
                     className="bg-white border border-green-100 rounded-lg p-4 shadow-sm hover:shadow-md transition"
                   >
-                    <div className="flex justify-between items-center mb-2">
-                      <p className="font-semibold text-[#0A4D68]">
+                    <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                      <p className="font-black text-[#0A203E] uppercase tracking-tight">
                         {t.title} {t.firstName} {t.lastName}
                       </p>
                       {t.isLeadPassenger && (
-                        <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded">
-                          Lead Traveller
+                        <span className="text-[10px] font-black px-2 py-1 bg-[#C9A84C]/10 text-[#C9A84C] rounded uppercase tracking-widest">
+                          Lead
                         </span>
                       )}
                     </div>
@@ -627,7 +640,7 @@ export default function BookApprovedFlight() {
               </div>
               <button
                 onClick={handleCreateNewRequest}
-                className="text-sm font-semibold px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition"
+                className="text-xs font-black px-6 py-2.5 rounded-xl bg-[#0A203E] text-white hover:brightness-110 transition uppercase tracking-widest shadow-lg shadow-[#0A203E]/20"
               >
                 Revalidate Flight
               </button>
@@ -640,51 +653,66 @@ export default function BookApprovedFlight() {
 }
 
 const FlightSegmentCard = ({ seg }) => (
-  <div className="bg-white border border-orange-100 rounded-xl p-4 hover:shadow-md transition">
+  <div className="bg-white border border-slate-100 rounded-xl p-5 hover:shadow-md transition mb-3 last:mb-0">
     {/* AIRLINE */}
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
+    <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+      <div className="flex items-center gap-4">
         <img
           src={airlineLogo(seg.airlineCode)}
           alt={seg.airlineName}
-          className="w-8 h-8 object-contain"
+          className="w-10 h-10 object-contain"
         />
         <div>
-          <p className="font-semibold text-[#0A4D68] text-sm">
-            {seg.airlineName} ({seg.airlineCode}-{seg.flightNumber})
+          <p className="font-black text-[#0A203E] text-xs uppercase tracking-tight">
+            {seg.airlineName}
           </p>
-          <p className="text-xs text-gray-500">
-            Aircraft: {seg.aircraft || "—"}
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+            {seg.airlineCode}-{seg.flightNumber} | {seg.aircraft || "—"}
           </p>
         </div>
       </div>
 
-      <span className="text-xs px-2 py-1 rounded bg-orange-100 text-orange-700">
+      <span className="text-[10px] font-black px-3 py-1 rounded-full bg-slate-100 text-[#0A203E] uppercase tracking-widest">
         {getCabinClassLabel(seg.cabinClass)}
       </span>
     </div>
 
     {/* ROUTE */}
-    <div className="mt-3 flex items-center justify-between text-sm">
+    <div className="mt-4 flex items-center justify-between text-sm">
       <div>
-        <p className="font-medium">
-          {seg.origin.city} ({seg.origin.airportCode})
+        <p className="font-black text-[#0A203E] text-base leading-tight">
+          {seg.origin.airportCode}
         </p>
-        <p className="text-xs text-gray-500">
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+          {seg.origin.city}
+        </p>
+        <p className="text-[10px] text-[#C9A84C] font-black mt-1">
           {formatDateTime(seg.departureDateTime)}
         </p>
       </div>
 
-      <div className="text-center text-xs text-gray-600">
-        <p>{formatDuration(seg.durationMinutes)}</p>
-        <p>{seg.stopOver ? "Stopover" : "Non-stop"}</p>
+      <div className="flex flex-col items-center flex-1 px-4">
+        <div className="w-full flex items-center gap-2">
+          <div className="h-[1px] flex-1 bg-slate-200"></div>
+          <FiAirplay className="text-[#C9A84C] text-xs" />
+          <div className="h-[1px] flex-1 bg-slate-200"></div>
+        </div>
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+          {formatDuration(seg.durationMinutes)}
+        </p>
+        <p className="text-[9px] text-[#0A203E] font-black uppercase tracking-tighter">
+          {seg.stopOver ? "Stopover" : "Non-stop"}
+        </p>
       </div>
 
       <div className="text-right">
-        <p className="font-medium">
-          {seg.destination.city} ({seg.destination.airportCode})
+        <p className="font-black text-[#0A203E] text-base leading-tight">
+          {seg.destination.airportCode}
         </p>
-        <p className="text-xs text-gray-500">
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+          {seg.destination.city}
+        </p>
+        <p className="text-[10px] text-[#C9A84C] font-black mt-1">
           {formatDateTime(seg.arrivalDateTime)}
         </p>
       </div>
@@ -692,9 +720,9 @@ const FlightSegmentCard = ({ seg }) => (
 
     {/* BAGGAGE */}
     {seg.baggage && (
-      <div className="mt-3 text-xs text-gray-600 flex gap-4">
-        <span>🧳 {seg.baggage.checkIn || "—"}</span>
-        <span>🎒 {seg.baggage.cabin || "—"}</span>
+      <div className="mt-4 pt-3 border-t border-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest flex gap-6">
+        <span className="flex items-center gap-2"><BsLuggage className="text-xs text-[#C9A84C]" /> {seg.baggage.checkIn || "—"}</span>
+        <span className="flex items-center gap-2"><FiBriefcase className="text-xs text-[#C9A84C]" /> {seg.baggage.cabin || "—"}</span>
       </div>
     )}
   </div>
