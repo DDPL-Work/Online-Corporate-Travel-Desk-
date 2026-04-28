@@ -1,6 +1,6 @@
 // super-admin/src/components/SuperAdminTabs/OpsTeamManagement.jsx
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   FiSearch, FiPlus, FiFilter, FiEdit2, FiTrash2,
   FiMoreVertical, FiUserPlus, FiShield, FiCheckCircle, FiXCircle, FiLock
@@ -11,6 +11,7 @@ import OpsMemberModal from "../../Modal/OpsMemberModal";
 import { ToastConfirm } from "../../utils/ToastConfirm";
 import { useSelector } from "react-redux";
 import { Navigate } from "react-router-dom";
+import TableActionBar from "../Shared/TableActionBar";
 
 const colors = {
   primary: "#0A4D68",
@@ -21,6 +22,7 @@ const colors = {
 };
 
 export default function OpsTeamManagement() {
+  const tableScrollRef = useRef(null);
   const { role } = useSelector((state) => state.auth);
   
   if (role !== "super-admin") {
@@ -180,9 +182,17 @@ export default function OpsTeamManagement() {
           </FilterItem>
         </div>
 
+        <TableActionBar
+          scrollRef={tableScrollRef}
+          exportLabel="Export Team"
+          onExport={() => {}}
+          exportClassName="bg-[#7C2D12] hover:bg-[#9A3412] shadow-[#7C2D12]/20"
+          arrowClassName="border-orange-100 bg-orange-50 text-[#9A3412] hover:bg-orange-100 hover:border-orange-200 hover:text-[#7C2D12] disabled:hover:bg-orange-50"
+        />
+
         {/* TABLE */}
         <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-          <div className="overflow-x-auto">
+          <div ref={tableScrollRef} className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-[#0A4D68] text-white">

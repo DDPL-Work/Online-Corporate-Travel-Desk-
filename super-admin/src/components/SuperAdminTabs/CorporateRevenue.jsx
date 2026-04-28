@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   FiFilter,
   FiDownload,
   FiCalendar,
   FiTrendingUp,
-  FiDollarSign,
   FiBriefcase,
   FiSearch,
   FiPieChart,
@@ -54,6 +53,7 @@ import {
 import api from "../../API/axios";
 import { toast } from "react-toastify";
 import Pagination from "../Shared/Pagination";
+import TableActionBar from "../Shared/TableActionBar";
 
 const COLORS = [
   "#0A4D68",
@@ -68,6 +68,7 @@ const ITEMS_PER_PAGE = 10;
 
 export default function CorporateRevenue() {
   const dispatch = useDispatch();
+  const leaderboardScrollRef = useRef(null);
 
   // 🟢 1. STATE HOOKS
   const [dateRange, setDateRange] = useState("thisMonth");
@@ -340,7 +341,7 @@ export default function CorporateRevenue() {
           <KPICard
             label="Corporate Spent"
             value={inr(totalSelectedRev)}
-            icon={<FiDollarSign />}
+            icon={<FaRupeeSign />}
             color="#0A4D68"
             size="small"
           />
@@ -579,7 +580,7 @@ export default function CorporateRevenue() {
         <KPICard
           label="Total Revenue"
           value={inr(summary?.totalRevenue)}
-          icon={<FiDollarSign />}
+          icon={<FaRupeeSign />}
           color="#0A4D68"
           trend="+12.5%"
           isGood={true}
@@ -871,41 +872,52 @@ export default function CorporateRevenue() {
               onPageChange={setLeaderboardPage}
               showFirstLast={false}
             />
-            <button
-              onClick={() => toast.info("Preparing report...")}
-              className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-black/10 active:scale-95"
-            >
-              <FiDownload /> Export
-            </button>
+            <TableActionBar
+              scrollRef={leaderboardScrollRef}
+              exportLabel="Export"
+              onExport={() => toast.info("Preparing report...")}
+              exportClassName="bg-slate-900 hover:bg-black shadow-black/10"
+              arrowClassName="border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 disabled:hover:bg-slate-50"
+            />
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div ref={leaderboardScrollRef} className="overflow-x-auto">
+          <table className="min-w-[1220px] w-full table-fixed text-left border-collapse">
+            <colgroup>
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "24%" }} />
+              <col style={{ width: "13%" }} />
+              <col style={{ width: "14%" }} />
+              <col style={{ width: "16%" }} />
+              <col style={{ width: "11%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "4%" }} />
+            </colgroup>
             <thead>
               <tr className="bg-slate-50/50 leading-none">
-                <th className="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap align-middle">
                   Rank
                 </th>
-                <th className="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap align-middle">
                   Company
                 </th>
-                <th className="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap align-middle">
                   Account Type
                 </th>
-                <th className="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap align-middle">
                   Total Bookings
                 </th>
-                <th className="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap align-middle">
                   Revenue Spread
                 </th>
-                <th className="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap align-middle">
                   Revenue
                 </th>
-                <th className="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap align-middle">
                   Contribution
                 </th>
-                <th className="px-8 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap align-middle">
                   Action
                 </th>
               </tr>
@@ -928,24 +940,24 @@ export default function CorporateRevenue() {
                   return (
                     <tr
                       key={c.corporateId}
-                      className="hover:bg-slate-50/50 transition-all group"
+                      className="h-[84px] hover:bg-slate-50/50 transition-all group"
                     >
-                      <td className="px-8 py-3 font-black text-slate-300 group-hover:text-[#0A4D68]">
+                      <td className="px-6 py-4 align-middle font-black text-slate-300 group-hover:text-[#0A4D68] whitespace-nowrap">
                         #{String(rank).padStart(2, "0")}
                       </td>
-                      <td className="px-8 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-black text-[13px] capitalize group-hover:bg-[#0A4D68]/10 group-hover:text-[#0A4D68] transition-colors">
+                      <td className="px-6 py-4 align-middle">
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 font-black text-[15px] capitalize group-hover:bg-[#0A4D68]/10 group-hover:text-[#0A4D68] transition-colors">
                             {c.companyName[0]}
                           </div>
-                          <span className="font-black text-[12px] text-slate-800 tracking-tight">
+                          <span className="block max-w-[240px] font-black text-[13px] leading-snug text-slate-800 tracking-tight">
                             {c.companyName}
                           </span>
                         </div>
                       </td>
-                      <td className="px-8 py-3">
+                      <td className="px-6 py-4 align-middle">
                         <span
-                          className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
+                          className={`inline-flex min-w-[116px] items-center justify-center px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
                             c.accountType === "postpaid"
                               ? "bg-purple-50 text-purple-700 border-purple-100"
                               : "bg-emerald-50 text-emerald-700 border-emerald-100"
@@ -954,16 +966,16 @@ export default function CorporateRevenue() {
                           {c.accountType}
                         </span>
                       </td>
-                      <td className="px-8 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2.5 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-600 tracking-tighter uppercase">
+                      <td className="px-6 py-4 align-middle">
+                        <div className="flex items-center">
+                          <span className="inline-flex min-w-[110px] items-center justify-center px-3 py-2 bg-slate-100 rounded-xl text-[10px] font-black text-slate-600 tracking-tighter uppercase leading-none">
                             {c.bookings} Bookings
                           </span>
                         </div>
                       </td>
-                      <td className="px-8 py-3">
-                        <div className="w-[100px] space-y-1.5 leading-none">
-                          <div className="flex justify-between text-[7px] font-black uppercase text-slate-400 tracking-widest mb-0.5">
+                      <td className="px-6 py-4 align-middle">
+                        <div className="w-[170px] space-y-2 leading-none">
+                          <div className="flex justify-between text-[9px] font-black uppercase text-slate-400 tracking-widest">
                             <span>
                               F:{" "}
                               {Math.round(
@@ -979,7 +991,7 @@ export default function CorporateRevenue() {
                               %
                             </span>
                           </div>
-                          <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+                          <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
                             <div
                               className="h-full bg-[#0A4D68]"
                               style={{
@@ -995,18 +1007,18 @@ export default function CorporateRevenue() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-8 py-3 text-right">
-                        <span className="text-[12px] font-black text-slate-900 tracking-tight">
+                      <td className="px-6 py-4 align-middle text-right">
+                        <span className="text-[13px] font-black text-slate-900 tracking-tight whitespace-nowrap">
                           {inr(c.revenue)}
                         </span>
                       </td>
-                      <td className="px-8 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5 text-emerald-600 font-black text-[10px] tracking-tighter">
+                      <td className="px-6 py-4 align-middle text-right">
+                        <div className="flex items-center justify-end gap-1.5 text-emerald-600 font-black text-[10px] tracking-tighter whitespace-nowrap">
                           <FiArrowUpRight size={10} />{" "}
                           {c.contribution.toFixed(1)}%
                         </div>
                       </td>
-                      <td className="px-8 py-3 text-center">
+                      <td className="px-6 py-4 align-middle text-center">
                         <button
                           onClick={() => setDrillDownId(c.corporateId)}
                           className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#0A4D68] hover:bg-[#0A4D68]/10 hover:border-[#0A4D68]/20 transition-all hover:scale-110 active:scale-95 mx-auto"

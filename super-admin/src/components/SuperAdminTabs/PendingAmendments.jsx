@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   FiFilter,
   FiEdit3,
@@ -10,6 +10,7 @@ import {
 } from "react-icons/fi";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import { pendingAmendmentsData } from "../../data/dummyData";
+import TableActionBar from "../Shared/TableActionBar";
 
 const colors = {
   primary: "#0A4D68",
@@ -23,6 +24,7 @@ const colors = {
 };
 
 export default function PendingAmendments() {
+  const tableScrollRef = useRef(null);
   // Tab state
   const [activeTab, setActiveTab] = useState("Flight");
 
@@ -276,15 +278,16 @@ export default function PendingAmendments() {
             <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
               {activeTab} Amendment Requests
             </h2>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-bold transition-all shadow-md uppercase bg-[#0A4D68] hover:bg-[#088395]"
-              onClick={() => {}} // optional export
-            >
-              <FiFilter /> Export
-            </button>
+            <TableActionBar
+              scrollRef={tableScrollRef}
+              exportLabel="Export"
+              onExport={() => {}}
+              exportClassName="bg-[#0F766E] hover:bg-[#115E59] shadow-[#0F766E]/20"
+              arrowClassName="border-emerald-100 bg-emerald-50 text-[#0F766E] hover:bg-emerald-100 hover:border-emerald-200 hover:text-[#115E59] disabled:hover:bg-emerald-50"
+            />
           </div>
 
-          <div className="overflow-x-auto">
+          <div ref={tableScrollRef} className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr

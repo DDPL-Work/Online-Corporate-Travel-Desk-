@@ -92,7 +92,7 @@ export default function Layout() {
         </div>
 
         {/* ===== MAIN AREA ===== */}
-        <div className="flex-1 flex flex-col lg:ml-64">
+        <div className="flex-1 min-w-0 flex flex-col lg:ml-64">
           {/* ===== STICKY HEADER ===== */}
           <header className="sticky top-0 z-40 bg-white shadow-sm">
             <Header
@@ -103,8 +103,8 @@ export default function Layout() {
           </header>
 
           {/* ===== SCROLLABLE CONTENT ===== */}
-          <main className="flex-1 overflow-y-auto px-2 py-2">
-            <div className="max-w-7xl mx-auto">
+          <main className="flex-1 overflow-y-auto overflow-x-auto px-2 py-2">
+            <div className="w-full max-w-screen-2xl mx-auto">
               <Outlet />
             </div>
           </main>

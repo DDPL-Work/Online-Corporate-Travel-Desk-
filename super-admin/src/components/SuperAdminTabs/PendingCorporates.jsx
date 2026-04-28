@@ -1,18 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  FiFilter,
   FiEdit2,
-  FiPlusCircle,
-  FiToggleLeft,
-  FiToggleRight,
   FiCheckCircle,
-  FiXCircle,
+  FiToggleLeft,
   FiEye,
   FiSearch,
   FiUsers,
-  FiActivity,
   FiClock,
-  FiUserCheck,
 } from "react-icons/fi";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
@@ -20,13 +14,13 @@ import { toast } from "react-toastify";
 import EditCorporateModal from "../../Modal/EditCorporateModal";
 import {
   fetchCorporates,
-  approveCorporate,
-  toggleCorporateStatus,
+  updateCorporate,
   fetchCorporateById,
 } from "../../Redux/Slice/corporateListSlice";
 import ViewCorporateModal from "../../Modal/ViewCorporateModal";
 import { ToastConfirm } from "../../utils/ToastConfirm";
 import FinancialApprovalModal from "../../Modal/FinancialApprovalModal";
+import TableActionBar from "../Shared/TableActionBar";
 
 const colors = {
   primary: "#0A4D68",
@@ -36,69 +30,81 @@ const colors = {
   dark: "#1E293B",
 };
 
+const formatExportCurrency = (value) =>
+  `INR ${Number(value || 0).toLocaleString("en-IN")}`;
+
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
 export default function PendingCorporates() {
+  const tableScrollRef = useRef(null);
   const dispatch = useDispatch();
 
-  const {
-    corporates = [],
-    loading,
-    error,
-  } = useSelector((state) => state.corporateList);
+  const { corporates = [], loading } = useSelector(
+    (state) => state.corporateList,
+  );
 
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [viewCorporate, setViewCorporate] = useState(null);
   const [openEdit, setOpenEdit] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [openFinancialApprove, setOpenFinancialApprove] = useState(false);
-
-  // Filter states
   const [corporateFilter, setCorporateFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("pending");
   const [searchTerm, setSearchTerm] = useState("");
 
-  /* ---------------- FETCH ---------------- */
   useEffect(() => {
     dispatch(fetchCorporates())
       .unwrap()
       .catch((err) => toast.error(err));
   }, [dispatch]);
 
-  /* ---------------- FILTER LOGIC ---------------- */
-  const baseCorporates = corporates.filter(c => c.status === "pending");
+  const baseCorporates = useMemo(
+    () => corporates.filter((c) => c.status === "pending"),
+    [corporates],
+  );
 
-  const corporatesList = [
-    "All",
-    ...new Set(baseCorporates.map((x) => x.corporateName)),
-  ];
+  const corporatesList = useMemo(
+    () => ["All", ...new Set(baseCorporates.map((x) => x.corporateName))],
+    [baseCorporates],
+  );
 
-  const filtered = baseCorporates.filter((c) => {    
-    const corpMatch =
-      corporateFilter === "All" || c.corporateName === corporateFilter;
-    const searchMatch =
-      !searchTerm ||
-      c.corporateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.primaryContact?.name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      c.primaryContact?.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    return corpMatch  && searchMatch;
-  });
+  const filtered = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
 
-  // Stats
+    return baseCorporates.filter((corporate) => {
+      const corpMatch =
+        corporateFilter === "All" ||
+        corporate.corporateName === corporateFilter;
+      const searchMatch =
+        !normalizedSearch ||
+        corporate.corporateName?.toLowerCase().includes(normalizedSearch) ||
+        corporate.primaryContact?.name
+          ?.toLowerCase()
+          .includes(normalizedSearch) ||
+        corporate.primaryContact?.email
+          ?.toLowerCase()
+          .includes(normalizedSearch);
+
+      return corpMatch && searchMatch;
+    });
+  }, [baseCorporates, corporateFilter, searchTerm]);
+
   const totalCorporates = filtered.length;
-//   const activeCount = filtered.filter((c) => c.status === "active").length;
   const pendingCount = filtered.filter((c) => c.status === "pending").length;
-  const inactiveCount = filtered.filter((c) => c.status === "inactive").length;
   const totalCredit = filtered.reduce(
     (sum, c) => sum + (c.classification === "postpaid" ? c.creditLimit : 0),
-    0
+    0,
   );
   const totalWallet = filtered.reduce(
     (sum, c) => sum + (c.classification === "prepaid" ? c.walletBalance : 0),
-    0
+    0,
   );
 
-  /* ---------------- ACTIONS ---------------- */
   const handleView = async (id) => {
     try {
       const res = await dispatch(fetchCorporateById(id)).unwrap();
@@ -114,14 +120,22 @@ export default function PendingCorporates() {
     setOpenFinancialApprove(true);
   };
 
-  const handleToggleStatus = (id) => {
+  const handleReject = (corporate) => {
     ToastConfirm({
-      message: "Change corporate status?",
-      confirmText: "Change",
+      message: `Reject onboarding request for ${corporate.corporateName}?`,
+      confirmText: "Reject",
       onConfirm: async () => {
         try {
-          await dispatch(toggleCorporateStatus(id)).unwrap();
-          toast.info("Corporate status updated");
+          await dispatch(
+            updateCorporate({
+              id: corporate._id,
+              payload: {
+                status: "inactive",
+                isActive: false,
+              },
+            }),
+          ).unwrap();
+          toast.info("Corporate request rejected");
         } catch (err) {
           toast.error(err);
         }
@@ -129,11 +143,97 @@ export default function PendingCorporates() {
     });
   };
 
-  /* ---------------- UI ---------------- */
+  const handleExport = () => {
+    if (loading) return;
+
+    if (filtered.length === 0) {
+      toast.info("No pending corporates available to download");
+      return;
+    }
+
+    const headers = [
+      "Corporate Name",
+      "Primary Contact",
+      "Primary Email",
+      "Classification",
+      "Wallet Balance",
+      "Current Credit",
+      "Credit Limit",
+      "SSO Domain",
+      "Status",
+    ];
+
+    const rows = filtered.map((corporate) => [
+      corporate.corporateName || "N/A",
+      corporate.primaryContact?.name || "N/A",
+      corporate.primaryContact?.email || "N/A",
+      corporate.classification || "N/A",
+      formatExportCurrency(corporate.walletBalance),
+      formatExportCurrency(corporate.currentCredit),
+      formatExportCurrency(corporate.creditLimit),
+      corporate.ssoConfig?.domain || "N/A",
+      corporate.status || "pending",
+    ]);
+
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:10px;vertical-align:top;">${escapeHtml(cell)}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <table>
+      <thead>
+        <tr>
+          ${headers
+            .map(
+              (header) =>
+                `<th style="border:1px solid #cbd5e1;padding:10px;background:#0A4D68;color:#ffffff;font-weight:700;text-align:left;">${escapeHtml(header)}</th>`,
+            )
+            .join("")}
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRows}
+      </tbody>
+    </table>
+  </body>
+</html>`;
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `pending-corporates-${stamp}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success("Pending corporate list downloaded");
+  };
+
   return (
-    <div className="min-h-screen p-6 font-sans" style={{ backgroundColor: colors.light }}>
+    <div
+      className="min-h-screen p-6 font-sans"
+      style={{ backgroundColor: colors.light }}
+    >
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* PAGE HEADER */}
         <div className="flex items-center gap-3 mb-2">
           <div className="w-12 h-12 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white">
             <FiUsers size={24} />
@@ -148,43 +248,23 @@ export default function PendingCorporates() {
           </div>
         </div>
 
-        {/* STATS CARDS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <StatCard
             label="Total Corporates"
             value={totalCorporates}
-            Icon={FiUsers}
+            icon={<FiUsers size={18} className="text-[#0A4D68]" />}
             borderCls="border-[#0A4D68]"
             iconBgCls="bg-[#0A4D68]/10"
-            iconColorCls="text-[#0A4D68]"
           />
-          {/* <StatCard
-            label="Active"
-            value={activeCount}
-            Icon={FiActivity}
-            borderCls="border-emerald-500"
-            iconBgCls="bg-emerald-50"
-            iconColorCls="text-emerald-600"
-          /> */}
           <StatCard
-            label="Pending"
+            label="Pending Review"
             value={pendingCount}
-            Icon={FiClock}
+            icon={<FiClock size={18} className="text-amber-600" />}
             borderCls="border-amber-500"
             iconBgCls="bg-amber-50"
-            iconColorCls="text-amber-600"
-          />
-          <StatCard
-            label="Inactive"
-            value={inactiveCount}
-            Icon={FiXCircle}
-            borderCls="border-rose-500"
-            iconBgCls="bg-rose-50"
-            iconColorCls="text-rose-600"
           />
         </div>
 
-        {/* FILTERS SECTION */}
         <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <LabeledInput label="Search">
@@ -206,64 +286,74 @@ export default function PendingCorporates() {
                 onChange={(e) => setCorporateFilter(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
               >
-                {corporatesList.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                {corporatesList.map((corporate) => (
+                  <option key={corporate} value={corporate}>
+                    {corporate}
                   </option>
                 ))}
               </select>
             </LabeledInput>
-            {/* <LabeledInput label="Status">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
-              >
-                {statuses.map((s) => (
-                  <option key={s} value={s}>
-                    {s === "All" ? "All Statuses" : s}
-                  </option>
-                ))}
-              </select>
-            </LabeledInput> */}
           </div>
         </div>
 
-        {/* TABLE SECTION */}
         <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
           <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
             <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
               Corporate List
             </h2>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-bold transition-all shadow-md uppercase bg-[#0A4D68] hover:bg-[#088395]"
-              onClick={() => {}} // optional export
-            >
-              <FiFilter /> Export
-            </button>
+            <TableActionBar
+              scrollRef={tableScrollRef}
+              exportLabel="Export"
+              onExport={handleExport}
+              exportClassName="bg-[#7C3AED] hover:bg-[#6D28D9] shadow-[#7C3AED]/20"
+              arrowClassName="border-violet-100 bg-violet-50 text-[#7C3AED] hover:bg-violet-100 hover:border-violet-200 hover:text-[#5B21B6] disabled:hover:bg-violet-50"
+            />
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div ref={tableScrollRef} className="overflow-x-auto">
+            <table className="min-w-[1180px] w-full table-fixed text-left border-collapse">
+              <colgroup>
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "16%" }} />
+              </colgroup>
               <thead>
-                <tr style={{ backgroundColor: colors.primary }} className="text-white">
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Corporate
+                <tr
+                  style={{ backgroundColor: colors.primary }}
+                  className="text-white"
+                >
+                  <th className="h-[72px] px-6 py-3 text-[11px] font-bold uppercase tracking-widest align-middle">
+                    <span className="block whitespace-nowrap leading-tight">
+                      Corporate
+                    </span>
                   </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Primary Contact
+                  <th className="h-[72px] px-6 py-3 text-[11px] font-bold uppercase tracking-widest align-middle">
+                    <span className="block whitespace-nowrap leading-tight">
+                      Primary Contact
+                    </span>
                   </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Classification
+                  <th className="h-[72px] px-6 py-3 text-[11px] font-bold uppercase tracking-widest align-middle">
+                    <span className="block whitespace-nowrap leading-tight">
+                      Classification
+                    </span>
                   </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Wallet / Credit
+                  <th className="h-[72px] px-6 py-3 text-[11px] font-bold uppercase tracking-widest align-middle">
+                    <span className="block whitespace-nowrap leading-tight">
+                      Wallet / Credit
+                    </span>
                   </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Status
+                  <th className="h-[72px] px-6 py-3 text-[11px] font-bold uppercase tracking-widest align-middle">
+                    <span className="block whitespace-nowrap leading-tight">
+                      Status
+                    </span>
                   </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Actions
+                  <th className="h-[72px] px-6 py-3 text-[11px] font-bold uppercase tracking-widest align-middle text-center">
+                    <span className="block whitespace-nowrap leading-tight">
+                      Actions
+                    </span>
                   </th>
                 </tr>
               </thead>
@@ -275,87 +365,84 @@ export default function PendingCorporates() {
                     </td>
                   </tr>
                 )}
+
                 {!loading &&
-                  filtered.map((c) => (
-                    <tr key={c._id} className="hover:bg-slate-50 transition-all">
-                      <td className="px-6 py-4">
+                  filtered.map((corporate) => (
+                    <tr
+                      key={corporate._id}
+                      className="hover:bg-slate-50 transition-all"
+                    >
+                      <td className="px-6 py-2 align-middle">
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-800 text-[13px]">
-                            {c.corporateName}
+                          <span className="font-bold text-slate-800 text-[13px] whitespace-nowrap">
+                            {corporate.corporateName}
                           </span>
-                          {c.ssoConfig?.domain && (
+                          {corporate.ssoConfig?.domain && (
                             <span className="text-[10px] text-slate-400 font-mono">
-                              {c.ssoConfig.domain}
+                              {corporate.ssoConfig.domain}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-2 align-middle">
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-700 text-[13px]">
-                            {c.primaryContact?.name || "—"}
+                          <span className="font-bold text-slate-700 text-[13px] whitespace-nowrap">
+                            {corporate.primaryContact?.name || "—"}
                           </span>
                           <span className="text-[11px] text-teal-600 font-mono">
-                            {c.primaryContact?.email || "—"}
+                            {corporate.primaryContact?.email || "—"}
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 capitalize text-slate-600">
-                        {c.classification}
+                      <td className="px-6 py-2 align-middle capitalize text-slate-600">
+                        {corporate.classification}
                       </td>
-                      <td className="px-6 py-4 font-mono text-slate-700 font-medium">
-                        {c.classification === "postpaid"
-                          ? `₹${c.currentCredit?.toLocaleString()} / ₹${c.creditLimit?.toLocaleString()}`
-                          : `₹${c.walletBalance?.toLocaleString()}`}
+                      <td className="px-6 py-2 align-middle font-mono text-slate-700 font-medium whitespace-nowrap">
+                        {corporate.classification === "postpaid"
+                          ? `₹${corporate.currentCredit?.toLocaleString()} / ₹${corporate.creditLimit?.toLocaleString()}`
+                          : `₹${corporate.walletBalance?.toLocaleString()}`}
                       </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={c.status} />
+                      <td className="px-6 py-2 align-middle">
+                        <StatusBadge status={corporate.status} />
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-3">
+                      <td className="px-6 py-2 align-middle">
+                        <div className="flex gap-3 items-center justify-center">
                           <ActionButton
                             icon={<FiEye size={16} />}
-                            onClick={() => handleView(c._id)}
-                            tooltip="View"
+                            onClick={() => handleView(corporate._id)}
+                            tooltip="View Corporate"
                             color="text-slate-600"
                             hoverBg="bg-slate-100"
                           />
                           <ActionButton
                             icon={<FiEdit2 size={16} />}
                             onClick={() => {
-                              setSelectedRow(c);
+                              setSelectedRow(corporate);
                               setOpenEdit(true);
                             }}
-                            tooltip="Edit"
+                            tooltip="Edit Corporate"
                             color="text-blue-600"
                             hoverBg="bg-blue-50"
                           />
-                          {c.status === "pending" && (
-                            <ActionButton
-                              icon={<FiCheckCircle size={16} />}
-                              onClick={() => handleApprove(c)}
-                              tooltip="Approve"
-                              color="text-green-600"
-                              hoverBg="bg-green-50"
-                            />
-                          )}
                           <ActionButton
-                            icon={
-                              c.status === "active" ? (
-                                <FiToggleRight size={20} />
-                              ) : (
-                                <FiToggleLeft size={20} />
-                              )
-                            }
-                            onClick={() => handleToggleStatus(c._id)}
-                            tooltip="Toggle Status"
-                            color={c.status === "active" ? "text-green-600" : "text-red-600"}
+                            icon={<FiCheckCircle size={16} />}
+                            onClick={() => handleApprove(corporate)}
+                            tooltip="Approve Corporate"
+                            color="text-green-600"
+                            hoverBg="bg-green-50"
+                          />
+                          <ActionButton
+                            icon={<FiToggleLeft size={20} />}
+                            onClick={() => handleReject(corporate)}
+                            tooltip="Reject Corporate"
+                            color="text-red-600"
                             hoverBg="bg-slate-100"
                           />
                         </div>
                       </td>
                     </tr>
                   ))}
+
                 {!loading && filtered.length === 0 && (
                   <tr>
                     <td colSpan="6" className="py-8 text-center text-slate-500">
@@ -370,13 +457,13 @@ export default function PendingCorporates() {
           <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
             <span>Showing {filtered.length} corporate(s)</span>
             <span>
-              Total Credit Limit: ₹{totalCredit.toLocaleString()} | Total Wallet: ₹{totalWallet.toLocaleString()}
+              Total Credit Limit: ₹{totalCredit.toLocaleString()} | Total
+              Wallet: ₹{totalWallet.toLocaleString()}
             </span>
           </div>
         </div>
       </div>
 
-      {/* MODALS */}
       {isViewOpen && viewCorporate && (
         <ViewCorporateModal
           corporate={viewCorporate}
@@ -386,12 +473,14 @@ export default function PendingCorporates() {
           }}
         />
       )}
+
       {openEdit && selectedRow && (
         <EditCorporateModal
           corporate={selectedRow}
           onClose={() => setOpenEdit(false)}
         />
       )}
+
       {openFinancialApprove && selectedRow && (
         <FinancialApprovalModal
           corporate={selectedRow}
@@ -405,8 +494,7 @@ export default function PendingCorporates() {
   );
 }
 
-/* ------------------- HELPER COMPONENTS ------------------- */
-function StatCard({ label, value, borderCls, iconBgCls, iconColorCls, Icon }) {
+function StatCard({ label, value, borderCls, iconBgCls, icon }) {
   return (
     <div
       className={`bg-white rounded-xl p-4 flex items-center gap-3 shadow-sm border-l-4 ${borderCls}`}
@@ -414,7 +502,7 @@ function StatCard({ label, value, borderCls, iconBgCls, iconColorCls, Icon }) {
       <div
         className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBgCls}`}
       >
-        <Icon size={18} className={iconColorCls} />
+        {icon}
       </div>
       <div className="text-left">
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
@@ -457,10 +545,12 @@ function StatusBadge({ status }) {
       bg: "bg-rose-50",
       text: "text-rose-700",
       border: "border-rose-100",
-      label: "Inactive",
+      label: "Rejected",
     },
   };
+
   const style = config[status] || config.inactive;
+
   return (
     <span
       className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border ${style.bg} ${style.text} ${style.border}`}

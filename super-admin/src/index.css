@@ -21,8 +21,8 @@ body {
   animation: fadeIn 0.6s ease-out;
 }
 
-* Hide scrollbar for Chrome,
-Safari and Opera */ .scrollbar-hide::-webkit-scrollbar {
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
 
@@ -142,4 +142,18 @@ body {
 
 .modal-input:disabled {
   @apply opacity-50 cursor-not-allowed bg-gray-100;
+}
+
+.filter-date-input {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.filter-date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+.filter-date-input::-webkit-datetime-edit {
+  padding-right: 0.25rem;
 }

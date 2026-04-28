@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   FiKey,
   FiFilter,
@@ -8,15 +8,16 @@ import {
   FiToggleRight,
   FiLink,
   FiSearch,
-  FiDollarSign,
   FiCreditCard,
   FiActivity,
 } from "react-icons/fi";
+import { FaRupeeSign } from "react-icons/fa";
 import { apiConfigurationsData } from "../../data/dummyData";
 import AddApiConfigModal from "../../Modal/AddApiConfigModal";
 import EditApiConfigModal from "../../Modal/EditApiConfigModal";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchTboBalance } from "../../Redux/Slice/tboBalanceSlice";
+import TableActionBar from "../Shared/TableActionBar";
 
 const colors = {
   primary: "#0A4D68",
@@ -29,6 +30,7 @@ const colors = {
 };
 
 export default function ApiConfigurations() {
+  const tableScrollRef = useRef(null);
   const [records, setRecords] = useState(apiConfigurationsData);
   const [openAdd, setOpenAdd] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
@@ -118,7 +120,7 @@ export default function ApiConfigurations() {
           <StatCard
             label="TBO API Balance"
             value={balanceLoading ? "Loading..." : `${currency} ${(Number(balance) || 0).toLocaleString()}`}
-            Icon={FiDollarSign}
+            Icon={FaRupeeSign}
             borderCls="border-[#05BFDB]"
             iconBgCls="bg-[#05BFDB]/10"
             iconColorCls="text-[#05BFDB]"
@@ -239,15 +241,16 @@ export default function ApiConfigurations() {
             <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
               API Configuration List
             </h2>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-bold transition-all shadow-md uppercase bg-[#0A4D68] hover:bg-[#088395]"
-              onClick={() => {}} // optional export
-            >
-              <FiFilter /> Export
-            </button>
+            <TableActionBar
+              scrollRef={tableScrollRef}
+              exportLabel="Export"
+              onExport={() => {}}
+              exportClassName="bg-[#0A4D68] hover:bg-[#088395] shadow-[#0A4D68]/20"
+              arrowClassName="border-sky-100 bg-sky-50 text-[#0A4D68] hover:bg-sky-100 hover:border-sky-200 hover:text-[#08384d] disabled:hover:bg-sky-50"
+            />
           </div>
 
-          <div className="overflow-x-auto">
+          <div ref={tableScrollRef} className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr style={{ backgroundColor: colors.primary }} className="text-white">

@@ -900,14 +900,15 @@ exports.fetchCancellationQueries = async (req, res) => {
 exports.updateCancellationQueryStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, remarks } = req.body;
+    const { status, remarks, resolution } = req.body;
 
     /* ─────────────────────────────
        🔥 VALIDATION
     ───────────────────────────── */
-    const allowedStatus = ["PENDING", "APPROVED", "REJECTED"];
+    const normalizedStatus = String(status || "").toUpperCase();
+    const allowedStatus = ["OPEN", "IN_PROGRESS", "RESOLVED", "REJECTED"];
 
-    if (!status || !allowedStatus.includes(status)) {
+    if (!normalizedStatus || !allowedStatus.includes(normalizedStatus)) {
       return res.status(400).json({
         success: false,
         message: `Invalid status. Allowed: ${allowedStatus.join(", ")}`,
@@ -926,13 +927,24 @@ exports.updateCancellationQueryStatus = async (req, res) => {
       });
     }
 
+    const hasResolutionUpdate =
+      resolution &&
+      typeof resolution === "object" &&
+      Object.keys(resolution).some((key) => resolution[key] !== undefined);
+    const hasRemarksUpdate =
+      typeof remarks === "string" && remarks !== query.remarks;
+
     /* ─────────────────────────────
        🚫 PREVENT DUPLICATE UPDATE
     ───────────────────────────── */
-    if (query.status === status) {
+    if (
+      query.status === normalizedStatus &&
+      !hasResolutionUpdate &&
+      !hasRemarksUpdate
+    ) {
       return res.status(400).json({
         success: false,
-        message: `Query is already ${status}`,
+        message: `Query is already ${normalizedStatus}`,
       });
     }
 
@@ -941,10 +953,24 @@ exports.updateCancellationQueryStatus = async (req, res) => {
     ───────────────────────────── */
     const previousStatus = query.status;
 
-    query.status = status;
+    query.status = normalizedStatus;
 
-    if (remarks) {
+    if (typeof remarks === "string") {
       query.remarks = remarks;
+    }
+
+    if (hasResolutionUpdate) {
+      query.resolution = {
+        ...(query.resolution?.toObject?.() || query.resolution || {}),
+        ...resolution,
+      };
+    }
+
+    if (query.status === "RESOLVED" && !query.resolution?.resolvedAt) {
+      query.resolution = {
+        ...(query.resolution?.toObject?.() || query.resolution || {}),
+        resolvedAt: new Date(),
+      };
     }
 
     /* ─────────────────────────────
@@ -953,10 +979,10 @@ exports.updateCancellationQueryStatus = async (req, res) => {
     query.logs.push({
       action: "STATUS_UPDATED",
       by: req.user?.role === "admin" ? "ADMIN" : "USER",
-      message: `Status changed from ${previousStatus} to ${status}`,
-      meta: {
-        remarks: remarks || null,
-      },
+      message:
+        previousStatus === normalizedStatus
+          ? `Query details updated while status remained ${normalizedStatus}`
+          : `Status changed from ${previousStatus} to ${normalizedStatus}`,
     });
 
     await query.save();
