@@ -50,12 +50,15 @@ export default function SeatSelectionModal({
     dispatch(fetchMySSRPolicy());
   }, [dispatch]);
 
-  const policyAllowSeat    = ssrPolicy?.allowSeat    ?? true;
-  const policyAllowMeal    = ssrPolicy?.allowMeal    ?? true;
+  const policyAllowSeat = ssrPolicy?.allowSeat ?? true;
+  const policyAllowMeal = ssrPolicy?.allowMeal ?? true;
   const policyAllowBaggage = ssrPolicy?.allowBaggage ?? true;
-  const seatPriceRange     = ssrPolicy?.seatPriceRange    || { min: 0, max: 99999 };
-  const mealPriceRange     = ssrPolicy?.mealPriceRange    || { min: 0, max: 99999 };
-  const baggagePriceRange  = ssrPolicy?.baggagePriceRange || { min: 0, max: 99999 };
+  const seatPriceRange = ssrPolicy?.seatPriceRange || { min: 0, max: 99999 };
+  const mealPriceRange = ssrPolicy?.mealPriceRange || { min: 0, max: 99999 };
+  const baggagePriceRange = ssrPolicy?.baggagePriceRange || {
+    min: 0,
+    max: 99999,
+  };
 
   const [seatModalOpen, setSeatModalOpen] = useState(true);
   const [mealModalOpen, setMealModalOpen] = useState(false);
@@ -87,7 +90,8 @@ export default function SeatSelectionModal({
 
         const isWindowSeat = (s) => [1, 4, 6, 7].includes(Number(s.SeatType));
         const isAisleSeat = (s) => [2, 10, 12, 13].includes(Number(s.SeatType));
-        const isMiddleSeat = (s) => [3, 16, 18, 19].includes(Number(s.SeatType));
+        const isMiddleSeat = (s) =>
+          [3, 16, 18, 19].includes(Number(s.SeatType));
 
         const isExtraLegroomSeat = (s) =>
           s.Text?.toLowerCase().includes("extra leg") ||
@@ -173,20 +177,8 @@ export default function SeatSelectionModal({
   }, [seatsFlat]);
 
   const handleSSR = (type) => {
-    // ── Policy gate ──────────────────────────────────────────
-    if (type === "seat" && !policyAllowSeat) {
-      ToastWithTimer({ type: "error", message: "Seat selection is restricted for your account. Contact Admin." });
-      return;
-    }
-    if (type === "meal" && !policyAllowMeal) {
-      ToastWithTimer({ type: "error", message: "Meal selection is not allowed for your account." });
-      return;
-    }
-    if (type === "baggage" && !policyAllowBaggage) {
-      ToastWithTimer({ type: "error", message: "Baggage selection is restricted for your account. Contact Admin." });
-      return;
-    }
-    // ──────────────────────────────────────────────────────────
+    // ── Note: We allow opening the tabs so users can select FREE items. ──────
+    // The restriction happens during individual item selection. ───────────────
     setSeatModalOpen(false);
     setMealModalOpen(false);
     setBaggageModalOpen(false);
@@ -223,7 +215,7 @@ export default function SeatSelectionModal({
         !m.AirlineCode ||
         !m.FlightNumber ||
         (m.AirlineCode === segment?.fD?.aI?.code &&
-          String(m.FlightNumber).trim() === String(segment?.fD?.fN).trim())
+          String(m.FlightNumber).trim() === String(segment?.fD?.fN).trim()),
     );
     return normalizeSSRList(filteredMeals);
   }, [segmentSSR.meals, segment]);
@@ -231,7 +223,13 @@ export default function SeatSelectionModal({
   const normalizeBaggage = (list = []) => {
     const flatList = Array.isArray(list[0]) ? list.flat() : list;
     return flatList
-      .filter((b) => !b.AirlineCode || !b.FlightNumber || (b.AirlineCode === segment?.fD?.aI?.code && String(b.FlightNumber).trim() === String(segment?.fD?.fN).trim()))
+      .filter(
+        (b) =>
+          !b.AirlineCode ||
+          !b.FlightNumber ||
+          (b.AirlineCode === segment?.fD?.aI?.code &&
+            String(b.FlightNumber).trim() === String(segment?.fD?.fN).trim()),
+      )
       .map((b) => ({
         ...b,
         Code: b.Code || `BAG_${b.Weight}`,
@@ -253,19 +251,25 @@ export default function SeatSelectionModal({
   const tryToggle = (seat) => {
     if (!seat || seat.occupied) return;
 
-    // ── Policy: seat allowed? ────────────────────────────────
-    if (!policyAllowSeat) {
-      ToastWithTimer({ type: "error", message: "Seat selection is restricted for your account." });
-      return;
+    // ── Policy: paid seat allowed? ───────────────────────────
+    if (seat.price > 0) {
+      if (!policyAllowSeat) {
+        ToastWithTimer({
+          type: "error",
+          message:
+            "Paid seat selection is restricted for your account. Contact Admin.",
+        });
+        return;
+      }
+      if (seat.price < seatPriceRange.min || seat.price > seatPriceRange.max) {
+        ToastWithTimer({
+          type: "error",
+          message: `Selected seat price ₹${seat.price} exceeds your allowed range (₹${seatPriceRange.min}–₹${seatPriceRange.max}).`,
+        });
+        return;
+      }
     }
-    // ── Policy: price range ──────────────────────────────────
-    if (seat.price < seatPriceRange.min || seat.price > seatPriceRange.max) {
-      ToastWithTimer({
-        type: "error",
-        message: `Selected seat price ₹${seat.price} exceeds your allowed range (₹${seatPriceRange.min}–₹${seatPriceRange.max}).`,
-      });
-      return;
-    }
+    // ────────────────────────────────────────────────────────
     // ────────────────────────────────────────────────────────
     const key = `${journeyType}|${segmentIndex}`;
     const seatObj = selectedSeats[key] || { list: [], priceMap: {} };
@@ -292,11 +296,22 @@ export default function SeatSelectionModal({
   };
 
   const getTotalPrice = () => {
-    const key = `${journeyType}|${segmentIndex}`;
-    const seatObj = selectedSeats[key] || { list: [], priceMap: {} };
-    return seatObj.list.reduce((total, seatNo) => {
-      return total + (seatObj.priceMap[seatNo] || 0);
-    }, 0);
+    let total = 0;
+    // Seats
+    Object.values(selectedSeats).forEach((v) => {
+      v?.list?.forEach((s) => (total += v.priceMap?.[s] || 0));
+    });
+    // Meals
+    Object.values(selectedMeals).forEach((meals) => {
+      meals?.forEach((m) => {
+        if (m?.Price) total += Number(m.Price || 0);
+      });
+    });
+    // Baggage
+    Object.values(selectedBaggage).forEach((bag) => {
+      if (bag?.Price) total += Number(bag.Price) * travelers.length;
+    });
+    return total;
   };
 
   // Tooltip + Seat Render
@@ -335,9 +350,9 @@ export default function SeatSelectionModal({
       seatClasses += " cursor-pointer shadow-sm";
     } else {
       // Free Standard Seat
-      colorClass = "bg-sky-100";
-      borderClass = "border-2 border-sky-300";
-      hoverEffect = "hover:bg-sky-200";
+      colorClass = "bg-slate-50";
+      borderClass = "border-2 border-slate-200";
+      hoverEffect = "hover:bg-slate-100";
       seatClasses += " cursor-pointer";
     }
 
@@ -379,7 +394,7 @@ export default function SeatSelectionModal({
             )}
             {seat.occupied && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-gray-400 text-sm font-bold">✕</span>
+                <AiOutlineClose className="text-gray-400 text-xs font-bold" />
               </div>
             )}
           </div>
@@ -470,7 +485,7 @@ export default function SeatSelectionModal({
       items.push({
         key: "free",
         label: "Standard",
-        seatClass: "bg-sky-100 border-sky-300",
+        seatClass: "bg-slate-50 border-slate-300",
       });
 
     if (hasPaid)
@@ -503,33 +518,29 @@ export default function SeatSelectionModal({
   if (!isOpen) return null;
 
   if (ssrError) {
-  return (
-    <div
-      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
-      onClick={onClose}
-    >
+    return (
       <div
-        className="bg-white p-6 rounded-xl text-center max-w-sm w-full"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
+        onClick={onClose}
       >
-        <h2 className="text-lg font-semibold mb-2">
-          No SSR Available
-        </h2>
-
-        <p className="text-gray-600 mb-4">
-          {ssrErrorMessage}
-        </p>
-
-        <button
-          onClick={onClose}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+        <div
+          className="bg-white p-6 rounded-xl text-center max-w-sm w-full"
+          onClick={(e) => e.stopPropagation()}
         >
-          Close
-        </button>
+          <h2 className="text-lg font-semibold mb-2">No SSR Available</h2>
+
+          <p className="text-gray-600 mb-4">{ssrErrorMessage}</p>
+
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-[#0A203E] text-white rounded-lg font-bold uppercase tracking-wider text-xs"
+          >
+            Close
+          </button>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   return (
     <div
@@ -541,9 +552,9 @@ export default function SeatSelectionModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
-        <div className="flex items-center justify-between px-5 py-3 bg-linear-to-r from-blue-700 to-blue-600 text-white">
-          <div className="flex items-center gap-3 font-semibold text-lg">
-            <FaConciergeBell />    Seat SSRs
+        <div className="flex items-center justify-between px-5 py-4 bg-[#0A203E] text-white">
+          <div className="flex items-center gap-3 font-bold text-lg uppercase tracking-widest">
+            <FaConciergeBell className="text-[#C9A84C]" /> Selection Center
           </div>
           <button
             onClick={onClose}
@@ -554,11 +565,26 @@ export default function SeatSelectionModal({
         </div>
 
         {/* Tabs (Seats, Meals, Baggage) */}
-        <div className="flex items-center justify-center gap-3 bg-blue-50 py-2 border-b border-blue-100">
+        <div className="flex items-center justify-center gap-4 bg-slate-50 py-3 border-b border-slate-200">
           {[
-            { key: "seat",    label: "Seats",   icon: MdEventSeat, allowed: policyAllowSeat },
-            { key: "meal",    label: "Meals",   icon: MdRestaurant, allowed: policyAllowMeal },
-            { key: "baggage", label: "Baggage", icon: BsLuggage,    allowed: policyAllowBaggage },
+            {
+              key: "seat",
+              label: "Seats",
+              icon: MdEventSeat,
+              allowed: policyAllowSeat,
+            },
+            {
+              key: "meal",
+              label: "Meals",
+              icon: MdRestaurant,
+              allowed: policyAllowMeal,
+            },
+            {
+              key: "baggage",
+              label: "Baggage",
+              icon: BsLuggage,
+              allowed: policyAllowBaggage,
+            },
           ].map(({ key, label, icon: Icon, allowed }) => (
             <button
               key={key}
@@ -568,10 +594,10 @@ export default function SeatSelectionModal({
                 !allowed
                   ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-70"
                   : (key === "seat" && seatModalOpen) ||
-                    (key === "meal" && mealModalOpen) ||
-                    (key === "baggage" && baggageModalOpen)
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "bg-white text-blue-600 border border-blue-200 hover:bg-blue-100"
+                      (key === "meal" && mealModalOpen) ||
+                      (key === "baggage" && baggageModalOpen)
+                    ? "bg-[#0A203E] text-white shadow-md border-[#0A203E]"
+                    : "bg-white text-[#0A203E] border border-slate-200 hover:bg-slate-100"
               }`}
             >
               <Icon className="text-base" /> {label}
@@ -585,192 +611,183 @@ export default function SeatSelectionModal({
         </div>
 
         {/* MAIN BODY */}
-        {seatModalOpen && (
-          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-            {/* LEFT SIDE — Seat Map */}
-            <div className="flex-1 bg-sky-50 p-4 sm:p-6 overflow-auto">
-              {/* Cabin Info */}
-              {/* <div className="flex justify-between items-center mb-4 bg-white rounded-xl shadow-sm p-3 border border-gray-100">
-                <div>
-                  <h3 className="font-bold text-gray-800 text-sm sm:text-base">
-                    {segment?.da?.city} → {segment?.aa?.city}
-                  </h3>
-                  <p className="text-xs text-gray-500">
-                    {getSelectedSeatsCount()} of {travelers.length} Seat(s)
-                    selected
-                  </p>
-                </div>
-                <div className="text-blue-600 font-semibold text-sm sm:text-base">
-                  ₹{getTotalPrice()}
-                </div>
-              </div> */}
-
-              {/* Seat Map Container */}
-              <div className="relative bg-linear-to-b from-sky-100 to-white rounded-2xl shadow-inner p-5">
-                {/* Cockpit */}
-                <div className="flex justify-center mb-4">
-                  <div className="w-48 sm:w-56">
-                    <svg viewBox="0 0 200 90" className="w-full">
-                      <defs>
-                        <linearGradient
-                          id="cockpitGradient"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop offset="0%" stopColor="#e2e8f0" />
-                          <stop offset="100%" stopColor="#94a3b8" />
-                        </linearGradient>
-                        <linearGradient
-                          id="windowGradient"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop offset="0%" stopColor="#1e293b" />
-                          <stop offset="100%" stopColor="#0f172a" />
-                        </linearGradient>
-                      </defs>
-
-                      {/* Cockpit shape */}
-                      <path
-                        d="M 20 85 Q 20 20, 100 5 Q 180 20, 180 85 Z"
-                        fill="url(#cockpitGradient)"
-                        stroke="#64748b"
-                        strokeWidth="1.2"
-                      />
-                      {/* Windows */}
-                      <path
-                        d="M 55 40 Q 100 15, 145 40 Q 100 25, 55 40 Z"
-                        fill="url(#windowGradient)"
-                        stroke="#334155"
-                        strokeWidth="1"
-                        opacity="0.9"
-                      />
-                    </svg>
+        <div className="flex-1 overflow-hidden">
+          {seatModalOpen && (
+            <div className="h-full flex flex-col lg:flex-row overflow-hidden">
+              {/* LEFT SIDE — Seat Map */}
+              <div className="flex-1 bg-slate-50 p-4 sm:p-6 overflow-auto">
+                <div className="relative bg-linear-to-b from-slate-100 to-white rounded-2xl shadow-inner p-5">
+                  {/* Cockpit */}
+                  <div className="flex justify-center mb-4">
+                    <div className="w-48 sm:w-56">
+                      <svg viewBox="0 0 200 90" className="w-full">
+                        <defs>
+                          <linearGradient
+                            id="cockpitGradient"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop offset="0%" stopColor="#e2e8f0" />
+                            <stop offset="100%" stopColor="#94a3b8" />
+                          </linearGradient>
+                          <linearGradient
+                            id="windowGradient"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop offset="0%" stopColor="#1e293b" />
+                            <stop offset="100%" stopColor="#0f172a" />
+                          </linearGradient>
+                        </defs>
+                        <path
+                          d="M 20 85 Q 20 20, 100 5 Q 180 20, 180 85 Z"
+                          fill="url(#cockpitGradient)"
+                          stroke="#64748b"
+                          strokeWidth="1.2"
+                        />
+                        <path
+                          d="M 55 40 Q 100 15, 145 40 Q 100 25, 55 40 Z"
+                          fill="url(#windowGradient)"
+                          stroke="#334155"
+                          strokeWidth="1"
+                          opacity="0.9"
+                        />
+                      </svg>
+                    </div>
                   </div>
-                </div>
 
-                {/* Cabin Body */}
-                <div className="bg-white rounded-xl shadow-inner border border-gray-100 p-4">
-                  {/* Column Labels */}
-                  <div className="flex justify-center gap-4 mb-3 text-xs font-semibold text-gray-600">
-                    {seatConfiguration.map((groupSize, groupIndex) => {
-                      const startCol = seatConfiguration
-                        .slice(0, groupIndex)
-                        .reduce((a, b) => a + b, 0);
-                      const groupCols = Array.from(
-                        { length: groupSize },
-                        (_, i) => String.fromCharCode(65 + startCol + i),
-                      );
-                      return (
-                        <div key={groupIndex} className="flex gap-2">
-                          {groupCols.map((col) => (
-                            <div key={col} className="w-8 text-center">
-                              {col}
-                            </div>
-                          ))}
-                          {groupIndex < seatConfiguration.length - 1 && (
-                            <div className="w-6"></div>
-                          )}
+                  {/* Cabin Body */}
+                  <div className="bg-white rounded-xl shadow-inner border border-gray-100 p-4">
+                    {Object.keys(seatRows).length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                          <MdEventSeat className="text-4xl text-slate-300" />
                         </div>
-                      );
-                    })}
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">
+                          Seat Map Unavailable
+                        </h3>
+                        <p className="text-gray-500 max-w-xs mx-auto">
+                          The airline has not released the seat map for this
+                          flight yet. You can still select meals and baggage
+                          from the tabs above.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-center gap-4 mb-3 text-xs font-semibold text-gray-600">
+                          {seatConfiguration.map((groupSize, groupIndex) => {
+                            const startCol = seatConfiguration
+                              .slice(0, groupIndex)
+                              .reduce((a, b) => a + b, 0);
+                            const groupCols = Array.from(
+                              { length: groupSize },
+                              (_, i) => String.fromCharCode(65 + startCol + i),
+                            );
+                            return (
+                              <div key={groupIndex} className="flex gap-2">
+                                {groupCols.map((col) => (
+                                  <div key={col} className="w-8 text-center">
+                                    {col}
+                                  </div>
+                                ))}
+                                {groupIndex < seatConfiguration.length - 1 && (
+                                  <div className="w-6"></div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="relative mx-auto max-w-[720px] bg-linear-to-b from-gray-50 to-white rounded-[60px] border border-gray-200 shadow-inner px-6 py-8">
+                          <div
+                            className="flex flex-col items-center"
+                            style={{ rowGap: "clamp(14px, 2.2vh, 22px)" }}
+                          >
+                            {Object.keys(seatRows)
+                              .sort((a, b) => a - b)
+                              .map((rowNumber) => {
+                                const rowNum = Number(rowNumber);
+                                const isExit = exitRows.has(rowNum);
+                                return (
+                                  <React.Fragment key={rowNum}>
+                                    {isExit && (
+                                      <div
+                                        className="w-full relative flex items-center justify-center mt-3 mb-3 z-0"
+                                        style={{ height: "24px" }}
+                                      >
+                                        <div className="absolute -left-[24px] flex items-center z-10">
+                                          <div className="w-8 h-12 bg-orange-400 blur-xl opacity-40 absolute -left-4 pointer-events-none"></div>
+                                          <div className="w-3.5 h-4 bg-red-600 rounded-[2px] flex items-center justify-center shadow-md">
+                                            <span className="text-white text-[9px] font-bold leading-none">
+                                              {"<"}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="bg-red-600 text-white text-[10px] font-semibold px-3 py-0.5 rounded-[3px] shadow-sm z-10 border border-red-700">
+                                          Emergency Door
+                                        </div>
+                                        <div className="absolute -right-[24px] flex items-center justify-end z-10">
+                                          <div className="w-8 h-12 bg-orange-400 blur-xl opacity-40 absolute -right-4 pointer-events-none"></div>
+                                          <div className="w-3.5 h-4 bg-red-600 rounded-[2px] flex items-center justify-center shadow-md">
+                                            <span className="text-white text-[9px] font-bold leading-none">
+                                              {">"}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {renderSeatRow(rowNum)}
+                                  </React.Fragment>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  {/* Seat Rows */}
-                  <div className="relative mx-auto max-w-[720px] bg-linear-to-b from-gray-50 to-white rounded-[60px] border border-gray-200 shadow-inner px-6 py-8">
-                    <div
-                      className="flex flex-col items-center"
-                      style={{
-                        rowGap: "clamp(14px, 2.2vh, 22px)",
-                      }}
-                    >
-                      {Object.keys(seatRows)
-                        .sort((a, b) => a - b)
-                        .map((rowNumber) => {
-                          const rowNum = Number(rowNumber);
-                          const isExit = exitRows.has(rowNum);
-
-                          return (
-                            <React.Fragment key={rowNum}>
-                              {isExit && (
-                                <div className="w-full relative flex items-center justify-center mt-3 mb-3 z-0" style={{ height: "24px" }}>
-                                  {/* Left external glow & arrow box */}
-                                  <div className="absolute -left-[24px] flex items-center z-10">
-                                      <div className="w-8 h-12 bg-orange-400 blur-xl opacity-40 absolute -left-4 pointer-events-none"></div>
-                                      <div className="w-3.5 h-4 bg-red-600 rounded-[2px] flex items-center justify-center shadow-md">
-                                          <span className="text-white text-[9px] font-bold leading-none">{"<"}</span>
-                                      </div>
-                                  </div>
-
-                                  {/* Center badge */}
-                                  <div className="bg-red-600 text-white text-[10px] font-semibold px-3 py-0.5 rounded-[3px] shadow-sm z-10 border border-red-700">
-                                      Emergency Door
-                                  </div>
-
-                                  {/* Right external glow & arrow box */}
-                                  <div className="absolute -right-[24px] flex items-center justify-end z-10">
-                                      <div className="w-8 h-12 bg-orange-400 blur-xl opacity-40 absolute -right-4 pointer-events-none"></div>
-                                      <div className="w-3.5 h-4 bg-red-600 rounded-[2px] flex items-center justify-center shadow-md">
-                                          <span className="text-white text-[9px] font-bold leading-none">{">"}</span>
-                                      </div>
-                                  </div>
-                                </div>
-                              )}
-
-                              {renderSeatRow(rowNum)}
-                            </React.Fragment>
-                          );
-                        })}
+                  <div className="flex justify-center mt-6 sm:mt-8">
+                    <div className="w-56 sm:w-64">
+                      <svg viewBox="0 0 200 80" className="w-full">
+                        <defs>
+                          <linearGradient
+                            id="tailGradient"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop offset="0%" stopColor="#cbd5e1" />
+                            <stop offset="100%" stopColor="#64748b" />
+                          </linearGradient>
+                        </defs>
+                        <path
+                          d="M 40 10 Q 100 70, 160 10 Q 150 50, 100 75 Q 50 50, 40 10 Z"
+                          fill="url(#tailGradient)"
+                          stroke="#475569"
+                          strokeWidth="1.2"
+                        />
+                        <path
+                          d="M 90 5 L 110 5 L 105 35 L 95 35 Z"
+                          fill="#94a3b8"
+                          stroke="#64748b"
+                          strokeWidth="0.8"
+                        />
+                      </svg>
                     </div>
                   </div>
                 </div>
-
-                {/* Tail Section */}
-                <div className="flex justify-center mt-6 sm:mt-8">
-                  <div className="w-56 sm:w-64">
-                    <svg viewBox="0 0 200 80" className="w-full">
-                      <defs>
-                        <linearGradient
-                          id="tailGradient"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop offset="0%" stopColor="#cbd5e1" />
-                          <stop offset="100%" stopColor="#64748b" />
-                        </linearGradient>
-                      </defs>
-                      <path
-                        d="M 40 10 Q 100 70, 160 10 Q 150 50, 100 75 Q 50 50, 40 10 Z"
-                        fill="url(#tailGradient)"
-                        stroke="#475569"
-                        strokeWidth="1.2"
-                      />
-                      <path
-                        d="M 90 5 L 110 5 L 105 35 L 95 35 Z"
-                        fill="#94a3b8"
-                        stroke="#64748b"
-                        strokeWidth="0.8"
-                      />
-                    </svg>
-                  </div>
-                </div>
               </div>
-            </div>
 
-            {/* RIGHT SIDE — Summary */}
-            <div className="w-full lg:w-72 border-t lg:border-t-0 lg:border-l border-gray-200 bg-white flex flex-col">
-              <div className="flex-1 p-4 overflow-auto">
+              {/* RIGHT SIDE — Selection Summary */}
+              <div className="w-full lg:w-72 border-t lg:border-t-0 lg:border-l border-gray-200 bg-white flex flex-col p-4 overflow-auto">
                 <h3 className="font-semibold text-gray-800 mb-3">
-                  Your Selection
+                  Seat Selection
                 </h3>
-
-                {/* Selected Seats */}
                 <div className="space-y-2 mb-4">
                   {(() => {
                     const key = `${journeyType}|${segmentIndex}`;
@@ -778,167 +795,182 @@ export default function SeatSelectionModal({
                       list: [],
                       priceMap: {},
                     };
-
-                    if (seatObj.list.length === 0) {
+                    if (seatObj.list.length === 0)
                       return (
-                        <div className="text-center text-gray-400 py-4">
-                          <MdEventSeat className="text-3xl mx-auto mb-2" />
-                          <p>No seats selected</p>
-                        </div>
+                        <p className="text-xs text-gray-400 text-center">
+                          No seats selected
+                        </p>
                       );
-                    }
-
                     return seatObj.list.map((seatNo) => (
                       <div
                         key={seatNo}
-                        className="flex justify-between items-center bg-sky-50 border border-sky-100 rounded-lg px-3 py-2 shadow-sm"
+                        className="flex justify-between items-center bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5 shadow-sm text-xs"
                       >
-                        <div>
-                          <div className="font-medium text-gray-800 text-sm">
-                            Seat {seatNo}
-                          </div>
-                          <div className="text-xs text-gray-500">
+                        <span className="font-medium text-gray-800">
+                          Seat {seatNo}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500">
                             {seatObj.priceMap[seatNo]
                               ? `₹${seatObj.priceMap[seatNo]}`
                               : "Free"}
-                          </div>
+                          </span>
+                          <button
+                            onClick={() =>
+                              onSeatSelect(
+                                journeyType,
+                                segmentIndex,
+                                seatNo,
+                                seatObj.priceMap[seatNo],
+                              )
+                            }
+                            className="text-gray-400 hover:text-red-500"
+                          >
+                            <AiOutlineClose size={12} />
+                          </button>
                         </div>
-                        <button
-                          onClick={() =>
-                            onSeatSelect(
-                              journeyType,
-                              segmentIndex,
-                              seatNo,
-                              seatObj.priceMap[seatNo],
-                            )
-                          }
-                          className="text-gray-400 hover:text-red-500"
-                        >
-                          <AiOutlineClose size={14} />
-                        </button>
                       </div>
                     ));
                   })()}
                 </div>
 
-                {/* LEGEND SECTION */}
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <h4 className="font-semibold text-gray-800 text-sm mb-4">
-                    Seat Legend
+                <div className="mt-auto pt-4 border-t border-gray-200">
+                  <h4 className="font-semibold text-gray-800 text-[10px] uppercase tracking-wider mb-3">
+                    Legend
                   </h4>
-
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-xs text-gray-700">
+                  <div className="grid grid-cols-2 gap-2 text-[10px] text-gray-700">
                     {legendItems.map((item) => (
-                      <div key={item.key} className="flex items-center gap-3">
-                        <div className="relative w-7 h-7">
-                          <div
-                            className={`absolute inset-0 rounded-t-xl rounded-b-md border-2 ${item.seatClass}`}
-                          >
-                            {/* Exit indicator */}
-                            {item.exit && (
-                              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-red-500 rounded-full" />
-                            )}
-
-                            {/* {item.paid && (
-                              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-1 bg-orange-400 rounded-full" />
-                            )} */}
-
-                            {/* Occupied indicator */}
-                            {item.occupied && (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-gray-400 text-sm font-bold">
-                                  ✕
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <span className="font-medium">{item.label}</span>
+                      <div key={item.key} className="flex items-center gap-2">
+                        <div
+                          className={`w-4 h-4 rounded-[4px] border ${item.seatClass}`}
+                        ></div>
+                        <span>{item.label}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* TOTAL + BUTTONS */}
-              <div className="p-4 border-t bg-white">
-                <div className="flex justify-between text-sm font-semibold text-gray-700 mb-2">
-                  <span>Total</span>
-                  <span className="text-blue-700 text-base font-bold">
-                    ₹{getTotalPrice()}
-                  </span>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors"
-                >
-                  Confirm ({getSelectedSeatsCount()})
-                </button>
-                <button
-                  onClick={() => {
-                    const key = `${journeyType}|${segmentIndex}`;
-                    const seatObj = selectedSeats[key];
-                    if (seatObj?.list) {
-                      seatObj.list.forEach((seatNo) => {
-                        onSeatSelect(
-                          journeyType,
-                          segmentIndex,
-                          seatNo,
-                          seatObj.priceMap[seatNo],
-                        );
+          {mealModalOpen && (
+            <div className="h-full p-4 overflow-auto bg-slate-50">
+              <MealSelectionCards
+                meals={normalizedMeals}
+                selectedMeals={selectedMeals}
+                onToggleMeal={(j, si, meal, tc) => {
+                  const price = Number(meal.Price || 0);
+                  if (price > 0) {
+                    if (!policyAllowMeal) {
+                      ToastWithTimer({
+                        type: "error",
+                        message:
+                          "Paid meal selection is not allowed for your account.",
                       });
+                      return;
                     }
-                  }}
-                  className="w-full py-1 text-gray-500 hover:text-gray-700 text-xs mt-2"
-                >
-                  Clear All
-                </button>
+                    if (
+                      price < mealPriceRange.min ||
+                      price > mealPriceRange.max
+                    ) {
+                      ToastWithTimer({
+                        type: "error",
+                        message: `Meal price ₹${price} exceeds your allowed range.`,
+                      });
+                      return;
+                    }
+                  }
+                  onToggleMeal(j, si, meal, tc);
+                }}
+                journeyType={journeyType}
+                flightIndex={segmentIndex}
+                travelersCount={travelers.length}
+                onClearMeals={handleClearMeals}
+                // Universal footer handles confirmation
+              />
+            </div>
+          )}
+
+          {baggageModalOpen && (
+            <div className="h-full p-4 overflow-auto bg-slate-50">
+              <BaggageTable
+                baggage={normalizedBaggage}
+                selectable
+                selectedBaggage={
+                  selectedBaggage?.[`${journeyType}|${segmentIndex}`]
+                }
+                onAddBaggage={(bag) => {
+                  const price = Number(bag.Price || 0);
+                  if (price > 0) {
+                    if (!policyAllowBaggage) {
+                      ToastWithTimer({
+                        type: "error",
+                        message:
+                          "Paid baggage selection is restricted for your account.",
+                      });
+                      return;
+                    }
+                    if (
+                      price < baggagePriceRange.min ||
+                      price > baggagePriceRange.max
+                    ) {
+                      ToastWithTimer({
+                        type: "error",
+                        message: `Baggage price ₹${price} exceeds your allowed range.`,
+                      });
+                      return;
+                    }
+                  }
+                  onSelectBaggage(journeyType, segmentIndex, bag);
+                }}
+                onClearBaggage={() =>
+                  onSelectBaggage(journeyType, segmentIndex, null)
+                }
+                // Universal footer handles confirmation
+              />
+            </div>
+          )}
+        </div>
+
+        {/* UNIVERSAL FOOTER */}
+        <div className="p-4 border-t bg-white flex items-center justify-between gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+          <div className="flex items-center gap-6">
+            <div>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                Total Price
+              </p>
+              <p className="text-xl font-black text-[#0A203E] leading-none mt-1">
+                ₹{getTotalPrice()?.toLocaleString("en-IN")}
+              </p>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 border-l border-gray-100 pl-6">
+              <div className="text-center">
+                <p className="text-[10px] text-gray-400 font-bold uppercase">
+                  Seats
+                </p>
+                <p className="text-xs font-bold text-gray-700 mt-0.5">
+                  {getSelectedSeatsCount()}
+                </p>
+              </div>
+              <div className="text-center ml-4">
+                <p className="text-[10px] text-gray-400 font-bold uppercase">
+                  Meals
+                </p>
+                <p className="text-xs font-bold text-gray-700 mt-0.5">
+                  {selectedMeals[`${journeyType}|${segmentIndex}`]?.length || 0}
+                </p>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Meals / Baggage Sections remain unchanged */}
-        {mealModalOpen && (
-          <div className="p-4 overflow-auto bg-sky-50">
-            <MealSelectionCards
-              meals={normalizedMeals}
-              selectedMeals={selectedMeals}
-              onToggleMeal={onToggleMeal}
-              journeyType={journeyType}
-              flightIndex={segmentIndex}
-              travelersCount={travelers.length}
-              onClearMeals={handleClearMeals}
-              onConfirm={() => {
-                setMealModalOpen(false);
-                setSeatModalOpen(true);
-              }}
-            />
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="px-8 py-3 bg-[#0A203E] hover:bg-[#0A203E]/90 text-white rounded-xl font-black text-sm transition-all shadow-lg shadow-blue-200 uppercase tracking-widest"
+            >
+              Confirm Selection
+            </button>
           </div>
-        )}
-
-        {baggageModalOpen && (
-          <div className="p-4 overflow-auto bg-sky-50">
-            <BaggageTable
-              baggage={normalizedBaggage}
-              selectable
-              selectedBaggage={
-                selectedBaggage?.[`${journeyType}|${segmentIndex}`]
-              }
-              onAddBaggage={(bag) =>
-                onSelectBaggage(journeyType, segmentIndex, bag)
-              }
-              onClearBaggage={() =>
-                onSelectBaggage(journeyType, segmentIndex, null)
-              }
-              onConfirm={() => {
-                setBaggageModalOpen(false);
-                setSeatModalOpen(true);
-              }}
-            />
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );

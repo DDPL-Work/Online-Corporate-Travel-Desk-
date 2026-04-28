@@ -35,10 +35,10 @@ const employeeSsrPolicySchema = new mongoose.Schema(
       default: null,
     },
 
-    // ── SSR Permission Flags ──────────────────────────────
-    allowSeat: { type: Boolean, default: true },
-    allowMeal: { type: Boolean, default: true },
-    allowBaggage: { type: Boolean, default: true },
+    // ── SSR Permission Flags (Controls Paid Bookings) ────
+    allowSeat: { type: Boolean, default: false },
+    allowMeal: { type: Boolean, default: false },
+    allowBaggage: { type: Boolean, default: false },
 
     // ── Price Range Controls ──────────────────────────────
     seatPriceRange: { type: priceRangeSchema, default: () => ({ min: 0, max: 99999 }) },

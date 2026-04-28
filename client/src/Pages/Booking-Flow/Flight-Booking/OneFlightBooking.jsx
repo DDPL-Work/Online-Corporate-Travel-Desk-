@@ -35,16 +35,14 @@ import api from "../../../API/axios";
 import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
 import Swal from "sweetalert2";
 
-
-
 export default function OneFlightBooking() {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
   useEffect(() => {
-  console.log("Navigation State:", location.state);
-}, [location.state]);
+    console.log("Navigation State:", location.state);
+  }, [location.state]);
 
   const { traceId, fareQuote, fareRule, ssr } = useSelector(
     (state) => state.flights,
@@ -61,7 +59,8 @@ export default function OneFlightBooking() {
 
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
   const isTravelAdmin = user?.role === "travel-admin";
-  const approvalRequired = !isTravelAdmin && myPolicy?.approvalRequired !== false; // default true
+  const approvalRequired =
+    !isTravelAdmin && myPolicy?.approvalRequired !== false; // default true
 
   const isSSRError = ssr?.Response?.ResponseStatus === 2;
 
@@ -313,12 +312,13 @@ export default function OneFlightBooking() {
     }
   }, [loading, selectedFlight, rawFlightData, navigate]);
 
-  const isSeatReady = useMemo(() => {
+  const isSSRReady = useMemo(() => {
     if (isSSRError) return false;
-
-    const segments = ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat;
-
-    return Array.isArray(segments) && segments.length > 0;
+    const hasSeats =
+      (ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.length || 0) > 0;
+    const hasMeals = (ssr?.Response?.MealDynamic?.length || 0) > 0;
+    const hasBaggage = (ssr?.Response?.Baggage?.length || 0) > 0;
+    return hasSeats || hasMeals || hasBaggage;
   }, [ssr, isSSRError]);
 
   const validateMandatorySSR = () => {
@@ -358,10 +358,12 @@ export default function OneFlightBooking() {
   };
 
   const openSeatModal = (segmentIndex) => {
-    if (!isSeatReady) {
+    if (!isSSRReady) {
       ToastWithTimer({
         type: "info",
-        message: isSSRError ? ssrErrorMessage : "Seat data is not available",
+        message: isSSRError
+          ? ssrErrorMessage
+          : "No add-ons (Seats/Meals/Baggage) are available for this flight.",
       });
       return;
     }
@@ -664,10 +666,18 @@ export default function OneFlightBooking() {
       projectId: projectApproverData.project?.id,
       projectClient: projectApproverData.project?.client,
       projectCodeId: projectApproverData.project?.id,
-      approverId: !approvalRequired ? (user?._id || user?.id || user?.userId) : projectApproverData.approver?.id,
-      approverEmail: !approvalRequired ? user?.email : projectApproverData.approver?.email,
-      approverName: !approvalRequired ? `${user?.name?.firstName} ${user?.name?.lastName}` : projectApproverData.approver?.name,
-      approverRole: !approvalRequired ? user?.role : projectApproverData.approver?.role,
+      approverId: !approvalRequired
+        ? user?._id || user?.id || user?.userId
+        : projectApproverData.approver?.id,
+      approverEmail: !approvalRequired
+        ? user?.email
+        : projectApproverData.approver?.email,
+      approverName: !approvalRequired
+        ? `${user?.name?.firstName} ${user?.name?.lastName}`
+        : projectApproverData.approver?.name,
+      approverRole: !approvalRequired
+        ? user?.role
+        : projectApproverData.approver?.role,
       flightRequest: {
         traceId: searchParams.traceId,
         resultIndex: selectedFlight.ResultIndex,
@@ -826,7 +836,11 @@ export default function OneFlightBooking() {
       return;
     }
 
-    if (approvalRequired && !isTravelAdmin && (!projectApproverData.project || !projectApproverData.approver)) {
+    if (
+      approvalRequired &&
+      !isTravelAdmin &&
+      (!projectApproverData.project || !projectApproverData.approver)
+    ) {
       ToastWithTimer({
         type: "error",
         message: "Please select a project and approver",
@@ -960,8 +974,8 @@ export default function OneFlightBooking() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="h-14 w-14 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Loading flight details…</p>
+          <div className="h-14 w-14 border-4 border-slate-200 border-t-[#0A203E] rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-600 font-medium">Loading flight details…</p>
         </div>
       </div>
     );
@@ -970,13 +984,13 @@ export default function OneFlightBooking() {
   if (!parsedFlightData) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-xl shadow-md text-center max-w-md w-full">
-          <p className="text-gray-700 font-semibold mb-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-center max-w-md w-full">
+          <p className="text-slate-700 font-bold mb-6">
             No flight data available.
           </p>
           <button
             onClick={() => navigate("/")}
-            className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="w-full py-4 bg-[#0A203E] text-white rounded-xl font-bold hover:brightness-110 transition shadow-lg shadow-[#0A203E]/20 uppercase tracking-widest text-xs"
           >
             Back to Search
           </button>
@@ -1004,13 +1018,15 @@ export default function OneFlightBooking() {
       <CorporateNavbar />
 
       {/* Top Bar */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 py-3">
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-4">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm text-slate-600 hover:text-blue-700 transition"
+            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#0A203E] transition group"
           >
-            <MdArrowBack size={18} />
+            <span className="size-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center group-hover:border-[#0A203E]/30 transition-colors">
+              <MdArrowBack size={18} />
+            </span>
             Back to results
           </button>
         </div>
@@ -1023,21 +1039,26 @@ export default function OneFlightBooking() {
           <div className="lg:col-span-2 space-y-8">
             {/* Flight Summary */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6 bg-linear-to-br from-blue-50 to-blue-100 shadow-lg">
+              <div className="p-6 bg-slate-50 border-b border-slate-200">
                 <div className="flex justify-between items-start mb-5">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3">
+                    <h2 className="text-xl font-black text-slate-900 flex items-center gap-3 uppercase tracking-tight">
                       Flight Details
-                      <span className="px-3 py-1 text-xs font-bold rounded-full bg-blue-100 text-blue-800 uppercase tracking-wide">
+                      <span className="px-3 py-1 text-[10px] font-black rounded-full bg-[#C9A84C] text-[#0A203E] uppercase tracking-widest">
                         {tripType}
                       </span>
                     </h2>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-slate-200 text-slate-700 uppercase tracking-widest border border-slate-300">
-                        Class: {CABIN_MAP[selectedFlight?.Segments?.[0]?.[0]?.CabinClass] || "Economy"}
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className="px-2.5 py-1 text-[10px] font-black rounded-md bg-white text-slate-700 uppercase tracking-widest border border-slate-200 shadow-xs">
+                        Class:{" "}
+                        {CABIN_MAP[
+                          selectedFlight?.Segments?.[0]?.[0]?.CabinClass
+                        ] || "Economy"}
                       </span>
-                      <span className="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-emerald-100 text-emerald-800 uppercase tracking-widest border border-emerald-200">
-                        Fare: {selectedFlight?.Segments?.[0]?.[0]?.SupplierFareClass || "Standard"}
+                      <span className="px-2.5 py-1 text-[10px] font-black rounded-md bg-[#0A203E] text-white uppercase tracking-widest border border-[#0A203E] shadow-sm">
+                        Fare:{" "}
+                        {selectedFlight?.Segments?.[0]?.[0]
+                          ?.SupplierFareClass || "Standard"}
                       </span>
                     </div>
                   </div>
@@ -1092,11 +1113,11 @@ export default function OneFlightBooking() {
 
                 <button
                   onClick={() => toggleSection("flightDetails")}
-                  className="mt-5 w-full text-sm font-medium text-blue-700 hover:text-blue-800 flex justify-center items-center gap-2"
+                  className="mt-6 w-full text-[11px] font-black text-[#C9A84C] hover:text-[#0A203E] flex justify-center items-center gap-2 uppercase tracking-widest transition-colors cursor-pointer"
                 >
                   {expandedSections.flightDetails
-                    ? "Hide Details"
-                    : "View Details"}
+                    ? "Hide Timeline"
+                    : "View Timeline"}
                   {expandedSections.flightDetails ? (
                     <AiOutlineMinus />
                   ) : (
@@ -1113,7 +1134,7 @@ export default function OneFlightBooking() {
                       selectedSeats={selectedSeats}
                       openSeatModal={openSeatModal}
                       journeyType="onward"
-                      isSeatReady={isSeatReady}
+                      isSeatReady={isSSRReady}
                     />
                   </div>
                 </div>
@@ -1160,10 +1181,7 @@ export default function OneFlightBooking() {
                   Fare Rules & Policies
                 </h2>
                 {/* Button + Modal */}
-                <FareDetailsModal
-                  fareQuote={fareQuote}
-                  fareRule={fareRule}
-                />
+                <FareDetailsModal fareQuote={fareQuote} fareRule={fareRule} />
               </div>
             </div>
           </div>

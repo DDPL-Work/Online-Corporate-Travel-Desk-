@@ -131,13 +131,15 @@ exports.getCityList = asyncHandler(async (req, res) => {
     .select("cityCode cityName countryCode countryName -_id")
     .sort({ cityName: 1 });
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      cities,
-      "City list fetched from database successfully"
-    )
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        cities,
+        "City list fetched from database successfully",
+      ),
+    );
 });
 
 /* ---------------- STATIC HOTEL DETAILS ---------------- */
@@ -148,12 +150,21 @@ exports.getStaticHotelDetails = asyncHandler(async (req, res) => {
     throw new ApiError(400, "hotelCode is required");
   }
 
-  const data = await tboService.getStaticHotelDetails(hotelCode);
+  // Fetch from DB instead of TBO API
+  const hotel = await TBOHotelDetails.findOne({ hotelCode }).lean();
 
-  res
+  if (!hotel) {
+    throw new ApiError(404, "Hotel details not found in database");
+  }
+
+  return res
     .status(200)
     .json(
-      new ApiResponse(200, data, "Static hotel details fetched successfully"),
+      new ApiResponse(
+        200,
+        hotel,
+        "Static hotel details fetched successfully from DB",
+      ),
     );
 });
 
@@ -236,13 +247,18 @@ exports.searchHotels = asyncHandler(async (req, res) => {
   ===================================================== */
   if (!indexedHotels) {
     // 1. Fetch Hotel Codes from local DB
-    const localHotels = await TBOHotel.find({ cityCode: CityCode }).select("hotelCode").lean();
+    const localHotels = await TBOHotel.find({ cityCode: CityCode })
+      .select("hotelCode")
+      .lean();
 
     if (!localHotels.length) {
-      console.log("[hotel-search] No hotel codes found in DB for city:", CityCode);
+      console.log(
+        "[hotel-search] No hotel codes found in DB for city:",
+        CityCode,
+      );
       indexedHotels = [];
     } else {
-      const hotelCodesArray = localHotels.map(h => h.hotelCode);
+      const hotelCodesArray = localHotels.map((h) => h.hotelCode);
 
       /* ---------------- CHUNKING LOGIC (100 per request) ---------------- */
       const chunkSize = 100;
@@ -251,7 +267,9 @@ exports.searchHotels = asyncHandler(async (req, res) => {
         chunks.push(hotelCodesArray.slice(i, i + chunkSize).join(","));
       }
 
-      console.log(`[hotel-search] Total hotels in DB: ${hotelCodesArray.length}, Chunks for TBO search: ${chunks.length}`);
+      console.log(
+        `[hotel-search] Total hotels in DB: ${hotelCodesArray.length}, Chunks for TBO search: ${chunks.length}`,
+      );
 
       /* ---------------- PARALLEL SEARCH TO TBO ---------------- */
       const searchPromises = chunks.map((hotelCodesChunk, index) =>
@@ -268,35 +286,44 @@ exports.searchHotels = asyncHandler(async (req, res) => {
             ResponseTime,
           })
           .then((res) => {
-            console.log(`[hotel-search] chunk ${index + 1} success: ${res?.HotelResult?.length || 0} hotels`);
+            console.log(
+              `[hotel-search] chunk ${index + 1} success: ${res?.HotelResult?.length || 0} hotels`,
+            );
             return res;
           })
           .catch((err) => {
-            console.error(`[hotel-search] chunk ${index + 1} failed:`, err?.message);
+            console.error(
+              `[hotel-search] chunk ${index + 1} failed:`,
+              err?.message,
+            );
             return null;
-          })
+          }),
       );
 
       const searchResponses = await Promise.all(searchPromises);
 
       /* ---------------- MERGE SEARCH RESULTS ---------------- */
-      const allSearchResults = searchResponses.flatMap(res => res?.HotelResult || []);
-      traceId = searchResponses.find(r => r?.TraceId)?.TraceId || null;
+      const allSearchResults = searchResponses.flatMap(
+        (res) => res?.HotelResult || [],
+      );
+      traceId = searchResponses.find((r) => r?.TraceId)?.TraceId || null;
 
       if (allSearchResults.length === 0) {
         indexedHotels = [];
       } else {
         /* ---------------- FETCH STATIC DETAILS FROM DB (INSTEAD OF API) ---------------- */
-        const availableCodes = allSearchResults.map(h => h.HotelCode);
-        
-        console.log(`[hotel-details] Fetching static details from DB for ${availableCodes.length} available hotels.`);
+        const availableCodes = allSearchResults.map((h) => h.HotelCode);
+
+        console.log(
+          `[hotel-details] Fetching static details from DB for ${availableCodes.length} available hotels.`,
+        );
 
         const localDetails = await TBOHotelDetails.find({
-          hotelCode: { $in: availableCodes }
+          hotelCode: { $in: availableCodes },
         }).lean();
 
         const detailsMap = {};
-        localDetails.forEach(d => {
+        localDetails.forEach((d) => {
           detailsMap[d.hotelCode] = d;
         });
 
@@ -306,17 +333,17 @@ exports.searchHotels = asyncHandler(async (req, res) => {
 
           return {
             ...hotel,
-            HotelName:   details?.hotelName   || hotel.HotelName || "Hotel",
-            Address:     details?.address     || hotel.Address || "",
-            CityName:    details?.cityName    || hotel.CityName || "",
+            HotelName: details?.hotelName || hotel.HotelName || "Hotel",
+            Address: details?.address || hotel.Address || "",
+            CityName: details?.cityName || hotel.CityName || "",
             CountryName: details?.countryName || hotel.CountryName || "",
-            StarRating:  details?.hotelRating || hotel.StarRating || 0,
+            StarRating: details?.hotelRating || hotel.StarRating || 0,
             Description: details?.description || hotel.Description || "",
-            Images:      details?.images      || hotel.Images || [],
-            Amenities:   details?.hotelFacilities || hotel.Amenities || [],
-            Map:         details?.map         || hotel.Map,
+            Images: details?.images || hotel.Images || [],
+            Amenities: details?.hotelFacilities || hotel.Amenities || [],
+            Map: details?.map || hotel.Map,
             // Fallback to thumbnail if no images
-            Thumbnail:   details?.image || hotel.HotelThumbnail || ""
+            Thumbnail: details?.image || hotel.HotelThumbnail || "",
           };
         });
 
@@ -324,7 +351,6 @@ exports.searchHotels = asyncHandler(async (req, res) => {
         indexedHotels = addIndex(dedupedHotels);
       }
     }
-
 
     /* ---------------- CACHE ---------------- */
     try {

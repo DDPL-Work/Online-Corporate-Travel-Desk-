@@ -77,10 +77,11 @@ export const FlightSearchProvider = ({ children }) => {
 
     const rect = event.currentTarget.getBoundingClientRect();
 
+    const isRightAligned = rect.left > window.innerWidth / 2;
+
     setModalPosition({
       top: rect.bottom + 6,
-      left: rect.left,
-      width: rect.width,
+      ...(isRightAligned ? { right: window.innerWidth - rect.right } : { left: rect.left }),
     });
 
     setIsModalOpen(true);

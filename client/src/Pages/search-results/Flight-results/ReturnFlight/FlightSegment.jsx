@@ -3,139 +3,108 @@ import { FaPlane, FaSuitcase } from "react-icons/fa";
 import { formatDuration, formatStops, formatTime, getCabinClassLabel } from "../../../../utils/formatter";
 
 export const FlightSegment = ({ data, label, fare, selected }) => (
-  <div>
+  <div className="flex flex-col w-full">
     {/* Main Flight Info Row */}
-    <div className="flex items-center justify-between gap-6">
+    <div className="flex items-center justify-between gap-4">
       {/* Left: Airline Info */}
-      <div className="flex items-center gap-4 flex-1">
-        {/* Airline Logo */}
-        <div className="flex shrink-0">
+      <div className="flex items-center gap-3 w-[160px] shrink-0">
+        <div className="w-10 h-10 rounded shadow-sm bg-white border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden p-1">
           <img
             src={data.logo}
-            className="w-11 h-11 object-contain"
+            className="w-full h-full object-contain"
             alt={data.airline}
             onError={(e) => {
-              e.target.src = "https://via.placeholder.com/44";
+              e.target.src = "https://via.placeholder.com/32";
             }}
           />
         </div>
-
-        {/* Airline Name & Flight Number */}
-        <div className="min-w-[110px]">
-          <div className="font-semibold text-sm text-gray-900 leading-tight">
+        <div className="flex flex-col">
+          <span className="font-bold text-[13px] text-gray-900 leading-tight">
             {data.airline}
-          </div>
-          <div className="text-xs text-gray-500 mt-0.5">
+          </span>
+          <span className="text-[11px] text-gray-500 mt-0.5">
             {data.flightNumber}
-          </div>
+          </span>
         </div>
+      </div>
 
-        {/* Departure Info */}
-        <div className="text-left min-w-20">
-          <div className="text-xl font-bold text-gray-900">
+      {/* Middle: Flight Times and Path */}
+      <div className="flex items-center justify-between flex-1 px-2">
+        {/* Departure */}
+        <div className="flex flex-col items-start w-[120px]">
+          <span className="text-lg font-black text-gray-900 leading-none">
             {formatTime(data.depTime)}
-          </div>
-          <div className="text-xs text-gray-600 font-medium mt-1">
-            {data.fromCity}{" "}
-            <span className="text-blue-700 text-xs">
-              ( {data.fromAirport} ){" "}
-            </span>
-          </div>
+          </span>
+          <span className="text-[11px] text-gray-600 mt-1">
+            {data.fromCity} <span className="text-[#C9A84C] font-bold">( {data.fromAirport} )</span>
+          </span>
           {data.fromTerminal && (
-            <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 inline-block mt-1 uppercase tracking-wider">
+            <span className="text-[9px] font-bold text-[#C9A84C] bg-slate-50 px-1.5 py-0.5 rounded border border-[#C9A84C]/20 mt-1 uppercase">
               T-{data.fromTerminal}
-            </div>
+            </span>
           )}
         </div>
 
-        {/* Duration & Stops Visual */}
-        <div className="flex flex-col items-center px-6 min-w-[150px]">
-          <div className="text-xs text-gray-500 mb-1.5 font-medium">
+        {/* Path / Duration */}
+        <div className="flex flex-col items-center w-[140px] px-2">
+          <span className="text-[11px] text-gray-500 font-medium mb-1">
             {formatDuration(data.durationMins)}
+          </span>
+          <div className="w-full flex items-center relative">
+            <div className="flex-1 h-[1px] bg-slate-200"></div>
+            <div className="w-4 h-4 bg-[#C9A84C] rounded-full flex items-center justify-center mx-1 shrink-0 shadow-sm">
+              <FaPlane className="text-white text-[8px]" />
+            </div>
+            <div className="flex-1 h-[1px] bg-slate-200"></div>
           </div>
-
-          {/* Flight Path Line */}
-          <div className="relative w-full flex items-center">
-            <div className="flex-1 border-t-2 border-gray-300"></div>
-
-            {/* Stop Indicator */}
-            {data.stops === 0 ? (
-              <div className="w-8 h-8 flex items-center justify-center bg-gray-400 rounded-full mx-1.5 shrink-0"> <FaPlane className="text-white" /></div>
-            ) : (
-              <div className="px-2 flex shrink-0">
-                <div className="w-8 h-8 flex items-center justify-center bg-orange-500 rounded-full"> <FaPlane className="text-white" /> </div>
-              </div>
-            )}
-
-            <div className="flex-1 border-t-2 border-gray-300"></div>
-          </div>
-
-          <div
-            className={`text-xs mt-1.5 font-medium ${
-              data.stops === 0 ? "text-green-600" : "text-gray-600"
-            }`}
-          >
+          <span className={`text-[10px] mt-1 font-medium ${data.stops === 0 ? "text-emerald-600" : "text-gray-500"}`}>
             {formatStops(data.stops)}
-            {data.stops > 0 && data.stopCities?.length > 0 && ` via ${data.stopCities.join(", ")}`}
-          </div>
+          </span>
         </div>
 
-        {/* Arrival Info */}
-        <div className="text-left min-w-20">
-          <div className="text-xl font-bold text-gray-900">
+        {/* Arrival */}
+        <div className="flex flex-col items-end w-[120px]">
+          <span className="text-lg font-black text-gray-900 leading-none">
             {formatTime(data.arrTime)}
-          </div>
-          <div className="text-xs text-gray-600 font-medium mt-1">
-            {data.toCity}{" "}
-            <span className="text-blue-700 text-xs">( {data.toAirport} ) </span>
-          </div>
+          </span>
+          <span className="text-[11px] text-gray-600 mt-1 text-right">
+            {data.toCity} <span className="text-[#C9A84C] font-bold">( {data.toAirport} )</span>
+          </span>
           {data.toTerminal && (
-            <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 inline-block mt-1 uppercase tracking-wider text-right">
+            <span className="text-[9px] font-bold text-[#C9A84C] bg-slate-50 px-1.5 py-0.5 rounded border border-[#C9A84C]/20 mt-1 uppercase text-right">
               T-{data.toTerminal}
-            </div>
+            </span>
           )}
         </div>
       </div>
 
       {/* Right: Price Section */}
-      {fare && (
-        <div className="text-right border-l-2 border-gray-100 pl-6 min-w-[130px]">
-          <div className="text-2xl font-bold text-gray-900">
-            ₹{fare.toLocaleString("en-IN")}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">per adult</div>
-        </div>
-      )}
+      <div className="shrink-0 min-w-[120px] pl-4 border-l border-gray-200/60 flex flex-col items-end justify-center">
+        {fare && (
+          <>
+            <span className="text-xl font-black text-gray-900 leading-none">
+              ₹{fare.toLocaleString("en-IN")}
+            </span>
+            <span className="text-[10px] text-gray-500 mt-1">per adult</span>
+          </>
+        )}
+      </div>
     </div>
 
     {/* Bottom Tags Row */}
-    <div className="flex items-center gap-2 mt-4 pt-3.5 border-t border-gray-100">
-      {/* Cabin Class */}
+    <div className="flex items-center gap-2 mt-3 pt-3">
       {data.cabinClassCode && (
-        <span className="inline-flex items-center text-xs text-gray-700 bg-gray-100 px-2.5 py-1 rounded-md font-medium">
+        <span className="inline-flex items-center text-[10px] text-gray-600 bg-white border border-gray-200 px-2 py-0.5 rounded font-medium shadow-sm">
           {getCabinClassLabel(data.cabinClassCode)}
         </span>
       )}
-
-      {/* Baggage */}
-      <span className="inline-flex items-center gap-1.5 text-xs text-gray-700 bg-gray-100 px-2.5 py-1 rounded-md font-medium">
-        <FaSuitcase className="text-[10px]" />
+      <span className="inline-flex items-center gap-1.5 text-[10px] text-gray-600 bg-white border border-gray-200 px-2 py-0.5 rounded font-medium shadow-sm">
+        <FaSuitcase className="text-gray-400 text-[10px]" />
         {data.baggage}
       </span>
-
-      {/* Refundable Badge */}
-      {data.refundable === true && (
-        <span className="inline-flex items-center text-xs text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-md font-semibold">
-          ✓ Refundable
-        </span>
-      )}
-
-      {/* Non-refundable Badge */}
-      {data.refundable === false && (
-        <span className="inline-flex items-center text-xs text-gray-600 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-md">
-          Non-refundable
-        </span>
-      )}
+      <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded font-medium shadow-sm border ${data.refundable ? 'text-gray-600 bg-white border-gray-200' : 'text-gray-600 bg-gray-50 border-gray-200'}`}>
+        {data.refundable ? 'Refundable' : 'Non-refundable'}
+      </span>
     </div>
   </div>
 );

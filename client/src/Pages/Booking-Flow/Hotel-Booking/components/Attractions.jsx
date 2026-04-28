@@ -74,7 +74,7 @@ const resolveAttraction = (name) => {
     return { icon: FaChild,        color: "text-violet-600", bg: "bg-violet-50",  border: "border-violet-200", badge: "bg-violet-100 text-violet-700", category: "Entertainment" };
 
   // Default
-  return { icon: FaCamera,        color: "text-[#0d7fe8]",  bg: "bg-blue-50",    border: "border-blue-200",   badge: "bg-blue-100 text-blue-700",    category: "Sightseeing" };
+  return { icon: FaCamera,        color: "text-[#C9A84C]",  bg: "bg-blue-50",    border: "border-blue-200",   badge: "bg-blue-100 text-blue-700",    category: "Sightseeing" };
 };
 
 /* ─────────────────────────────────────────
@@ -95,7 +95,7 @@ const AttractionCard = ({ name, index, meta }) => {
       {/* Name */}
       <span className="text-xs font-semibold text-slate-700 leading-tight flex-1">{name}</span>
       {/* Pin */}
-      <MdLocationOn className="text-slate-300 group-hover:text-[#0d7fe8] transition text-base shrink-0" />
+      <MdLocationOn className="text-slate-300 group-hover:text-[#C9A84C] transition text-base shrink-0" />
     </div>
   );
 };
@@ -137,19 +137,19 @@ const Attractions = ({ attractions = {} }) => {
       {/* Header */}
       <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#0a2540] flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-[#0A203E] flex items-center justify-center shrink-0">
             <MdAttractions className="text-white text-lg" />
           </div>
           <div>
-            <h2 className="font-black text-[#0a2540] text-base leading-none">Nearby Attractions</h2>
+            <h2 className="font-black text-[#0A203E] text-base leading-none">Nearby Attractions</h2>
             <p className="text-[11px] text-slate-400 mt-0.5">
               {list.length} places · within reach of the hotel
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#0d7fe8] animate-pulse" />
-          <span className="text-[11px] font-bold text-[#0d7fe8]">Near Hotel</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] animate-pulse" />
+          <span className="text-[11px] font-bold text-[#C9A84C]">Near Hotel</span>
         </div>
       </div>
 
@@ -167,7 +167,7 @@ const Attractions = ({ attractions = {} }) => {
                   onClick={() => { setActiveCategory(cat); setShowAll(false); }}
                   className={`shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-full border transition-all whitespace-nowrap ${
                     isActive
-                      ? "bg-[#0a2540] text-white border-[#0a2540] shadow-sm"
+                      ? "bg-[#0A203E] text-white border-[#0A203E] shadow-sm"
                       : `${badge} border-transparent hover:opacity-80`
                   }`}
                 >
@@ -194,7 +194,7 @@ const Attractions = ({ attractions = {} }) => {
         {filtered.length > LIMIT && (
           <button
             onClick={() => setShowAll((v) => !v)}
-            className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-slate-200 text-[#0d7fe8] font-bold text-xs hover:border-[#0d7fe8] hover:bg-blue-50 transition w-full"
+            className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-slate-200 text-[#C9A84C] font-bold text-xs hover:border-[#C9A84C] hover:bg-blue-50 transition w-full"
           >
             {showAll
               ? <><MdExpandLess className="text-base" /> Show Less</>

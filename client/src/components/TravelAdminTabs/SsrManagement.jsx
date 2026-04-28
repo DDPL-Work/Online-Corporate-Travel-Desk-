@@ -198,7 +198,6 @@ function CustomAutocomplete({ employees, value, onChange, placeholder, disabled,
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background-color: #cbd5e1;
-          border-radius: 10px;
         }
       `}</style>
     </div>
@@ -222,13 +221,13 @@ function PolicyDetailModal({ policy, onClose }) {
   );
 
   const PermBadge = ({ allowed, label }) => (
-    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border ${
+    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 rounded-full border ${
       allowed
         ? "bg-emerald-50 text-emerald-700 border-emerald-200"
         : "bg-red-50 text-red-600 border-red-200"
     }`}>
-      {allowed ? <FiCheckCircle size={11}/> : <FiXCircle size={11}/>}
-      {label} {allowed ? "Allowed" : "Blocked"}
+      {allowed ? <FiCheckCircle size={10}/> : <FiXCircle size={10}/>}
+      {label}
     </span>
   );
 
@@ -269,15 +268,14 @@ function PolicyDetailModal({ policy, onClose }) {
             <FiXCircle size={16} />
           </button>
         </div>
-
         {/* Body */}
         <div className="p-5 space-y-3">
           {/* Permissions */}
-          <Detail label="SSR Permissions" icon={FiShield}>
+          <Detail label="Paid SSR Permissions" icon={FiShield}>
             <div className="flex flex-wrap gap-2 mt-1">
-              <PermBadge allowed={policy.allowSeat} label="Seat" />
-              <PermBadge allowed={policy.allowMeal} label="Meal" />
-              <PermBadge allowed={policy.allowBaggage} label="Baggage" />
+              <PermBadge allowed={policy.allowSeat} label="Paid Seat" />
+              <PermBadge allowed={policy.allowMeal} label="Paid Meal" />
+              <PermBadge allowed={policy.allowBaggage} label="Paid Baggage" />
             </div>
           </Detail>
 
@@ -289,14 +287,13 @@ function PolicyDetailModal({ policy, onClose }) {
                 { label: "Meal", range: policy.mealPriceRange, allowed: policy.allowMeal },
                 { label: "Baggage", range: policy.baggagePriceRange, allowed: policy.allowBaggage },
               ].map(({ label, range, allowed }) => (
-                <div key={label} className={`flex items-center justify-between text-sm ${
-                  !allowed ? "opacity-40" : ""
-                }`}>
-                  <span className="text-slate-500 font-semibold w-20">{label}</span>
-                  {allowed
-                    ? <RangePill min={range?.min} max={range?.max} />
-                    : <span className="text-xs text-slate-400 italic">N/A (blocked)</span>
-                  }
+                <div key={label} className={`flex items-center justify-between text-sm ${!allowed ? "opacity-40" : ""}`}>
+                  <span className="text-slate-500 font-semibold w-24">{label} Paid Range</span>
+                  {allowed ? (
+                    <RangePill min={range?.min} max={range?.max} />
+                  ) : (
+                    <span className="text-[10px] text-slate-400 italic">Not Allowed</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -359,9 +356,9 @@ function PolicyList({ policies, listLoading, onDelete, onView, onEdit }) {
         <thead>
           <tr className="bg-[#0A4D68] text-white text-xs font-bold uppercase tracking-wider">
             <th className="px-4 py-3 text-left">Employee Email</th>
-            <th className="px-4 py-3 text-center">Seat</th>
-            <th className="px-4 py-3 text-center">Meal</th>
-            <th className="px-4 py-3 text-center">Baggage</th>
+            <th className="px-4 py-3 text-center">Paid Seat</th>
+            <th className="px-4 py-3 text-center">Paid Meal</th>
+            <th className="px-4 py-3 text-center">Paid Baggage</th>
             <th className="px-4 py-3 text-center">Approval</th>
             <th className="px-4 py-3 text-center">Actions</th>
           </tr>
@@ -371,13 +368,16 @@ function PolicyList({ policies, listLoading, onDelete, onView, onEdit }) {
             <tr key={p._id} className={`text-[13px] ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"} hover:bg-sky-50 transition-colors`}>
               <td className="px-4 py-3 font-mono text-slate-700 text-xs">{p.employeeEmail}</td>
               <td className="px-4 py-3 text-center">
-                <StatusBadge text={p.allowSeat ? "✓ On" : "✗ Off"} color={p.allowSeat ? "green" : "red"} />
+                <StatusBadge text={p.allowSeat ? "✓ Allowed" : "✗ Blocked"} color={p.allowSeat ? "green" : "red"} />
+                {p.allowSeat && <p className="text-[9px] text-slate-400 mt-0.5">₹{p.seatPriceRange?.min}–₹{p.seatPriceRange?.max}</p>}
               </td>
               <td className="px-4 py-3 text-center">
-                <StatusBadge text={p.allowMeal ? "✓ On" : "✗ Off"} color={p.allowMeal ? "green" : "red"} />
+                <StatusBadge text={p.allowMeal ? "✓ Allowed" : "✗ Blocked"} color={p.allowMeal ? "green" : "red"} />
+                {p.allowMeal && <p className="text-[9px] text-slate-400 mt-0.5">₹{p.mealPriceRange?.min}–₹{p.mealPriceRange?.max}</p>}
               </td>
               <td className="px-4 py-3 text-center">
-                <StatusBadge text={p.allowBaggage ? "✓ On" : "✗ Off"} color={p.allowBaggage ? "green" : "red"} />
+                <StatusBadge text={p.allowBaggage ? "✓ Allowed" : "✗ Blocked"} color={p.allowBaggage ? "green" : "red"} />
+                {p.allowBaggage && <p className="text-[9px] text-slate-400 mt-0.5">₹{p.baggagePriceRange?.min}–₹{p.baggagePriceRange?.max}</p>}
               </td>
               <td className="px-4 py-3 text-center">
                 <StatusBadge text={p.approvalRequired ? "Required" : "Auto"} color={p.approvalRequired ? "amber" : "green"} />
@@ -431,9 +431,9 @@ export default function SsrManagement() {
   const [activeTab, setActiveTab] = useState("configure"); // configure | list
   const [viewPolicy, setViewPolicy] = useState(null); // policy to show in detail modal
 
-  const [allowSeat,    setAllowSeat]    = useState(true);
-  const [allowMeal,    setAllowMeal]    = useState(true);
-  const [allowBaggage, setAllowBaggage] = useState(true);
+  const [allowSeat,    setAllowSeat]    = useState(false);
+  const [allowMeal,    setAllowMeal]    = useState(false);
+  const [allowBaggage, setAllowBaggage] = useState(false);
 
   const [seatMin,    setSeatMin]    = useState(0);
   const [seatMax,    setSeatMax]    = useState(99999);
@@ -459,9 +459,9 @@ export default function SsrManagement() {
   useEffect(() => {
     if (!lookedUp) return;
     const p = lookedUp.policy;
-    setAllowSeat(p.allowSeat ?? true);
-    setAllowMeal(p.allowMeal ?? true);
-    setAllowBaggage(p.allowBaggage ?? true);
+    setAllowSeat(p.allowSeat ?? false);
+    setAllowMeal(p.allowMeal ?? false);
+    setAllowBaggage(p.allowBaggage ?? false);
     setSeatMin(p.seatPriceRange?.min ?? 0);
     setSeatMax(p.seatPriceRange?.max ?? 99999);
     setMealMin(p.mealPriceRange?.min ?? 0);
@@ -544,9 +544,9 @@ export default function SsrManagement() {
   // ── Edit handler: pre-fill form from existing policy & switch tab ────────
   const handleEdit = (p) => {
     setEmailInput(p.employeeEmail);
-    setAllowSeat(p.allowSeat ?? true);
-    setAllowMeal(p.allowMeal ?? true);
-    setAllowBaggage(p.allowBaggage ?? true);
+    setAllowSeat(p.allowSeat ?? false);
+    setAllowMeal(p.allowMeal ?? false);
+    setAllowBaggage(p.allowBaggage ?? false);
     setSeatMin(p.seatPriceRange?.min ?? 0);
     setSeatMax(p.seatPriceRange?.max ?? 99999);
     setMealMin(p.mealPriceRange?.min ?? 0);
@@ -662,31 +662,33 @@ export default function SsrManagement() {
             {/* ── Steps 2-5 only visible after lookup ─────────────── */}
             {lookedUp && (
               <>
-                {/* ── Step 2: SSR Permissions ────────────────────── */}
+
+
+                {/* ── Step 2: Paid SSR Permissions ────────────────── */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                   <SectionHeader
                     icon={FiShield}
-                    title="SSR Permissions"
-                    sub="Toggle which SSR services this employee is allowed to access"
+                    title="Paid SSR Access"
+                    sub="Grant permission to book paid seats, meals or baggage"
                   />
-                  <div className="grid gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <Toggle
-                      label="Seat Selection"
-                      description="Allow employee to choose seats during booking"
+                      label="Paid Seat"
+                      description="Can book paid seats"
                       icon={MdAirlineSeatReclineNormal}
                       enabled={allowSeat}
                       onChange={setAllowSeat}
                     />
                     <Toggle
-                      label="Meal Selection"
-                      description="Allow employee to select meal preferences"
+                      label="Paid Meal"
+                      description="Can book paid meals"
                       icon={MdLunchDining}
                       enabled={allowMeal}
                       onChange={setAllowMeal}
                     />
                     <Toggle
-                      label="Extra Baggage"
-                      description="Allow employee to add extra baggage allowance"
+                      label="Paid Baggage"
+                      description="Can book paid baggage"
                       icon={MdLuggage}
                       enabled={allowBaggage}
                       onChange={setAllowBaggage}
@@ -697,38 +699,46 @@ export default function SsrManagement() {
                 {/* ── Step 3: Price Range Controls ───────────────── */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                   <SectionHeader
-                    icon={FiShield}
-                    title="Price Range Controls"
-                    sub="Define the allowed SSR price limits. Selections outside range will be blocked."
+                    icon={FiDollarSign}
+                    title="Paid Price Limits"
+                    sub="Define the allowed price ranges for SSR items (only visible when allowed)"
                   />
                   <div className="grid md:grid-cols-3 gap-4">
-                    <PriceRangeInput
-                      label="Seat"
-                      icon={MdAirlineSeatReclineNormal}
-                      minVal={seatMin}
-                      maxVal={seatMax}
-                      onMinChange={setSeatMin}
-                      onMaxChange={setSeatMax}
-                      disabled={!allowSeat}
-                    />
-                    <PriceRangeInput
-                      label="Meal"
-                      icon={MdLunchDining}
-                      minVal={mealMin}
-                      maxVal={mealMax}
-                      onMinChange={setMealMin}
-                      onMaxChange={setMealMax}
-                      disabled={!allowMeal}
-                    />
-                    <PriceRangeInput
-                      label="Baggage"
-                      icon={MdLuggage}
-                      minVal={bagMin}
-                      maxVal={bagMax}
-                      onMinChange={setBagMin}
-                      onMaxChange={setBagMax}
-                      disabled={!allowBaggage}
-                    />
+                    {allowSeat && (
+                      <PriceRangeInput
+                        label="Seat"
+                        icon={MdAirlineSeatReclineNormal}
+                        minVal={seatMin}
+                        maxVal={seatMax}
+                        onMinChange={setSeatMin}
+                        onMaxChange={setSeatMax}
+                      />
+                    )}
+                    {allowMeal && (
+                      <PriceRangeInput
+                        label="Meal"
+                        icon={MdLunchDining}
+                        minVal={mealMin}
+                        maxVal={mealMax}
+                        onMinChange={setMealMin}
+                        onMaxChange={setMealMax}
+                      />
+                    )}
+                    {allowBaggage && (
+                      <PriceRangeInput
+                        label="Baggage"
+                        icon={MdLuggage}
+                        minVal={bagMin}
+                        maxVal={bagMax}
+                        onMinChange={setBagMin}
+                        onMaxChange={setBagMax}
+                      />
+                    )}
+                    {!allowSeat && !allowMeal && !allowBaggage && (
+                      <div className="col-span-3 py-4 text-center text-slate-400 italic text-sm">
+                        No paid SSR options enabled. Only free items will be available to the employee.
+                      </div>
+                    )}
                   </div>
                 </div>
 

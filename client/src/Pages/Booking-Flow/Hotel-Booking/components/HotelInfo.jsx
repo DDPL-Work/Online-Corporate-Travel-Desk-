@@ -215,7 +215,7 @@ const SectionCard = ({ section, defaultOpen = true }) => {
           >
             <Icon className={`${meta.iconColor} text-base`} />
           </div>
-          <span className="font-black text-[#0a2540] text-sm">
+          <span className="font-black text-[#0A203E] text-sm">
             {section.title}
           </span>
         </div>
@@ -267,7 +267,7 @@ const SectionCard = ({ section, defaultOpen = true }) => {
    Check-In / Check-Out Card
 ───────────────────────────────────────── */
 const CheckTimesCard = ({ checkIn, checkOut }) => (
-  <div className="bg-[#0a2540] rounded-xl p-4 flex items-center gap-0">
+  <div className="bg-[#0A203E] rounded-xl p-4 flex items-center gap-0">
     <div className="flex-1 flex flex-col items-center gap-1 py-2">
       <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center mb-1">
         <MdLogin className="text-white text-xl" />
@@ -315,7 +315,7 @@ const ContactCard = ({ contact }) => {
         <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
           <MdLocationOn className="text-blue-600 text-base" />
         </div>
-        <h3 className="font-black text-[#0a2540] text-sm">
+        <h3 className="font-black text-[#0A203E] text-sm">
           Contact Information
         </h3>
       </div>
@@ -326,7 +326,7 @@ const ContactCard = ({ contact }) => {
             <span className="font-semibold">Phone:</span>{" "}
             <a
               href={`tel:${contact.phone}`}
-              className="text-[#0d7fe8] hover:underline"
+              className="text-[#C9A84C] hover:underline"
             >
               {contact.phone}
             </a>
@@ -338,7 +338,7 @@ const ContactCard = ({ contact }) => {
             <span className="font-semibold">Email:</span>{" "}
             <a
               href={`mailto:${contact.email}`}
-              className="text-[#0d7fe8] hover:underline"
+              className="text-[#C9A84C] hover:underline"
             >
               {contact.email}
             </a>
@@ -352,7 +352,7 @@ const ContactCard = ({ contact }) => {
               href={contact.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#0d7fe8] hover:underline break-all"
+              className="text-[#C9A84C] hover:underline break-all"
             >
               {contact.website}
             </a>
@@ -385,7 +385,7 @@ const MapSection = ({ mapString }) => {
         <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
           <MdLocationOn className="text-emerald-600 text-base" />
         </div>
-        <span className="font-black text-[#0a2540] text-sm">Location Map</span>
+        <span className="font-black text-[#0A203E] text-sm">Location Map</span>
       </div>
       <div className="aspect-video w-full bg-slate-100 relative group">
         {isValid ? (
@@ -426,11 +426,11 @@ const HotelInfo = ({ description = "", checkIn, checkOut, contact = {}, map }) =
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
       {/* ── Header ── */}
       <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-[#0a2540] flex items-center justify-center shrink-0">
+        <div className="w-9 h-9 rounded-xl bg-[#0A203E] flex items-center justify-center shrink-0">
           <MdHotel className="text-white text-lg" />
         </div>
         <div>
-          <h2 className="font-black text-[#0a2540] text-base leading-none">
+          <h2 className="font-black text-[#0A203E] text-base leading-none">
             About the Hotel
           </h2>
           <p className="text-[11px] text-slate-400 mt-0.5">
@@ -464,7 +464,7 @@ const HotelInfo = ({ description = "", checkIn, checkOut, contact = {}, map }) =
         {sections.length > 3 && (
           <button
             onClick={() => setShowAll((v) => !v)}
-            className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-slate-200 text-[#0d7fe8] font-bold text-xs hover:border-[#0d7fe8] hover:bg-blue-50 transition w-full"
+            className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-slate-200 text-[#C9A84C] font-bold text-xs hover:border-[#C9A84C] hover:bg-blue-50 transition w-full"
           >
             {showAll ? (
               <>

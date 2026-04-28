@@ -120,7 +120,7 @@ const RoomTypesList = ({
               placeholder="Search room type (e.g. Deluxe)"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#0A4D68] w-48"
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#C9A84C] focus:border-[#C9A84C] w-48"
             />
           </div>
 
@@ -130,7 +130,7 @@ const RoomTypesList = ({
             <select
               value={selectedMeal}
               onChange={(e) => setSelectedMeal(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#0A4D68]"
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#C9A84C] focus:border-[#C9A84C]"
             >
               {mealTypes.map((meal) => (
                 <option key={meal} value={meal}>

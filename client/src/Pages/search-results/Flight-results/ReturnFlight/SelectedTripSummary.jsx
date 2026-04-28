@@ -49,7 +49,7 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
   const totalFare = onwardFare + returnFare;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 shadow-2xl z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50">
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between gap-10">
           {/* LEFT: FLIGHT DETAILS */}
@@ -64,29 +64,29 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                 />
 
                 <div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                  <div className="flex items-center gap-2 text-sm font-bold text-slate-800 uppercase tracking-wider">
                     <span>{onwardData.fromCode}</span>
-                    <MdOutlineFlight className="text-blue-600" />
+                    <MdOutlineFlight className="text-[#C9A84C] rotate-90" />
                     <span>{onwardData.toCode}</span>
                   </div>
 
                   <div className="text-xs text-gray-500 mt-0.5">
                     {onwardData.airline} · {onwardData.flightNo}
                   </div>
-                  <div className="text-xs text-gray-600 mt-0.5">
+                  <div className="text-xs text-slate-600 mt-0.5 font-medium">
                     {formatDate(onwardData.depTime)} ·{" "}
-                    {formatTime(onwardData.depTime)} –{" "}
-                    {formatTime(onwardData.arrTime)}
+                    <span className="text-[#0A203E] font-bold">{formatTime(onwardData.depTime)}</span> –{" "}
+                    <span className="text-[#0A203E] font-bold">{formatTime(onwardData.arrTime)}</span>
                   </div>
 
                   <div className="flex flex-wrap gap-2 mt-1.5">
                     {onwardData.fromTerminal && (
-                      <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-bold uppercase rounded border border-blue-100">
+                      <span className="px-1.5 py-0.5 bg-slate-50 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
                         T-{onwardData.fromTerminal} (Dep)
                       </span>
                     )}
                     {onwardData.toTerminal && (
-                      <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-bold uppercase rounded border border-blue-100">
+                      <span className="px-1.5 py-0.5 bg-slate-50 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
                         T-{onwardData.toTerminal} (Arr)
                       </span>
                     )}
@@ -98,10 +98,10 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                           : ""}
                       </span>
                     )}
-                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
+                    <span className="px-1.5 py-0.5 bg-slate-50 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
                       CLASS: {onwardData.cabinClass}
                     </span>
-                    <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-bold uppercase rounded border border-blue-200">
+                    <span className="px-1.5 py-0.5 bg-slate-100 text-[#C9A84C] text-[9px] font-black uppercase rounded border border-slate-200">
                       FARE: {onwardData.supplierFareClass}
                     </span>
                   </div>
@@ -111,7 +111,7 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
 
             {/* DIVIDER */}
             {onwardData && returnData && (
-              <div className="h-12 w-px bg-gray-300"></div>
+              <div className="h-12 w-px bg-slate-200"></div>
             )}
 
             {/* RETURN */}
@@ -124,9 +124,9 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                 />
 
                 <div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                  <div className="flex items-center gap-2 text-sm font-bold text-slate-800 uppercase tracking-wider">
                     <span>{returnData.fromCode}</span>
-                    <MdOutlineFlight className="text-green-600" />
+                    <MdOutlineFlight className="text-[#C9A84C] rotate-90" />
                     <span>{returnData.toCode}</span>
                   </div>
 
@@ -134,20 +134,20 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                     {returnData.airline} · {returnData.flightNo}
                   </div>
 
-                  <div className="text-xs text-gray-600 mt-0.5">
+                  <div className="text-xs text-slate-600 mt-0.5 font-medium">
                     {formatDate(returnData.depTime)} ·{" "}
-                    {formatTime(returnData.depTime)} –{" "}
-                    {formatTime(returnData.arrTime)}
+                    <span className="text-[#0A203E] font-bold">{formatTime(returnData.depTime)}</span> –{" "}
+                    <span className="text-[#0A203E] font-bold">{formatTime(returnData.arrTime)}</span>
                   </div>
 
                   <div className="flex flex-wrap gap-2 mt-1.5">
                     {returnData.fromTerminal && (
-                      <span className="px-1.5 py-0.5 bg-green-50 text-green-700 text-[9px] font-bold uppercase rounded border border-green-100">
+                      <span className="px-1.5 py-0.5 bg-slate-50 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
                         T-{returnData.fromTerminal} (Dep)
                       </span>
                     )}
                     {returnData.toTerminal && (
-                      <span className="px-1.5 py-0.5 bg-green-50 text-green-700 text-[9px] font-bold uppercase rounded border border-green-100">
+                      <span className="px-1.5 py-0.5 bg-slate-50 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
                         T-{returnData.toTerminal} (Arr)
                       </span>
                     )}
@@ -162,14 +162,14 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                     <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
                       CLASS: {returnData.cabinClass}
                     </span>
-                    <span className="px-1.5 py-0.5 bg-green-50 text-green-700 text-[9px] font-bold uppercase rounded border border-green-200">
+                    <span className="px-1.5 py-0.5 bg-slate-100 text-[#C9A84C] text-[9px] font-black uppercase rounded border border-slate-200">
                       FARE: {returnData.supplierFareClass}
                     </span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-sm text-orange-600 font-medium bg-orange-50 px-4 py-2 rounded-lg border border-orange-200">
+              <div className="text-sm text-[#C9A84C] font-bold bg-slate-50 px-6 py-2.5 rounded-xl border border-[#C9A84C]/20 uppercase tracking-widest animate-pulse">
                 Select return flight to continue
               </div>
             )}
@@ -178,8 +178,8 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
           {/* RIGHT: PRICE + CTA */}
           <div className="flex items-center gap-6">
             <div className="text-right">
-              <div className="text-xs text-gray-500">Total price</div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Payable</div>
+              <div className="text-2xl font-black text-[#0A203E]">
                 ₹{totalFare.toLocaleString("en-IN")}
               </div>
             </div>
@@ -245,7 +245,7 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                   window.open("/fare-upsell", "_blank");
                 }
               }}
-              className="px-6 py-3 bg-blue-500 text-white font-bold rounded-lg"
+              className="px-6 py-3 bg-white text-slate-600 font-black rounded-xl border border-slate-200 hover:text-[#0A203E] hover:border-[#0A203E]/30 transition-all cursor-pointer disabled:opacity-50 uppercase tracking-widest text-xs"
             >
               More Fares
             </button>
@@ -253,10 +253,10 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
             <button
               disabled={!ret}
               onClick={onContinue}
-              className="px-10 py-3 bg-orange-500 text-white text-lg font-bold rounded-lg
-                disabled:opacity-40 disabled:cursor-not-allowed
-                hover:bg-orange-600 active:bg-orange-700 transition-all
-                shadow-lg hover:shadow-xl disabled:shadow-none"
+              className="px-12 py-3 bg-[#0A203E] text-white text-lg font-black rounded-xl
+                disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed
+                hover:brightness-110 active:scale-95 transition-all
+                shadow-lg hover:shadow-[#0A203E]/20 disabled:shadow-none uppercase tracking-widest text-xs"
             >
               Continue
             </button>

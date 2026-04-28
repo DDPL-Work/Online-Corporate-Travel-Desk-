@@ -112,7 +112,10 @@ const groupFlightsByIdentity = (results = []) => {
 
     const supplierFareClass =
       `${segment?.SupplierFareClass || ""}`.trim() || "Standard";
-    const fareClassKey = supplierFareClass.toLowerCase();
+    let fareClassKey = supplierFareClass.toLowerCase();
+    if (fareClassKey.includes("inst_series")) {
+      fareClassKey = "inst_series";
+    }
     const publishedFare = toFiniteNumber(
       item?.Fare?.PublishedFare ?? item?.Fare?.OfferedFare,
       0,
@@ -224,10 +227,13 @@ const groupFlightsByFareOptions = (results = []) => {
       baggage: item?.Segments?.[0]?.[0]?.Baggage,
     };
 
-    const existingIndex = group.fareOptions.findIndex(
-      (opt) =>
-        opt.supplierFareClass.toLowerCase() === supplierFareClass.toLowerCase(),
-    );
+    const existingIndex = group.fareOptions.findIndex((opt) => {
+      let optClass = opt.supplierFareClass.toLowerCase();
+      let currClass = supplierFareClass.toLowerCase();
+      if (optClass.includes("inst_series")) optClass = "inst_series";
+      if (currClass.includes("inst_series")) currClass = "inst_series";
+      return optClass === currClass;
+    });
 
     if (existingIndex === -1) {
       group.fareOptions.push(fareOption);
@@ -784,21 +790,21 @@ export default function FlightSearchResults() {
       );
     }
 
-    /* ---------------- AIRPORTS ---------------- */
+    /* ---------------- AIRPORTS (Departure & Destination) ---------------- */
     if (selectedAirports.length) {
-      result = result.filter((f) =>
-        getSegments(f).some((s) =>
-          selectedAirports.includes(s?.Origin?.Airport?.AirportCode),
-        ),
-      );
+      result = result.filter((f) => {
+        const outsegs = Array.isArray(f.Segments?.[0]) ? f.Segments[0] : [f.Segments?.[0]];
+        const originCode = outsegs?.[0]?.Origin?.Airport?.AirportCode;
+        return selectedAirports.includes(originCode);
+      });
     }
 
     if (selectedDestinationAirports.length) {
-      result = result.filter((f) =>
-        getSegments(f).some((s) =>
-          selectedDestinationAirports.includes(s?.Destination?.Airport?.AirportCode),
-        ),
-      );
+      result = result.filter((f) => {
+        const outsegs = Array.isArray(f.Segments?.[0]) ? f.Segments[0] : [f.Segments?.[0]];
+        const destCode = outsegs?.[outsegs.length - 1]?.Destination?.Airport?.AirportCode;
+        return selectedDestinationAirports.includes(destCode);
+      });
     }
 
     /* ---------------- LAYOVER AIRPORTS ---------------- */
@@ -1079,15 +1085,15 @@ export default function FlightSearchResults() {
 
             {/* Return Flight Tabs */}
             {Number(journeyType) === 2 && !isInternationalReturnGrouped && (
-              <div className="sticky top-[165px] z-30 bg-gray-300 border-b border-gray-200 rounded-lg shadow-sm">
+              <div className="sticky top-[165px] z-30 bg-slate-50 border-b border-slate-200 rounded-lg shadow-sm">
                 <div className="flex gap-1 p-2">
                   {/* ONWARD ROUTE */}
                   <button
                     onClick={() => setActiveTab("onward")}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-sm transition ${
+                    className={`flex-1 px-4 py-2.5 rounded-lg font-bold text-sm transition ${
                       activeTab === "onward"
-                        ? "bg-blue-600 text-white shadow"
-                        : "text-gray-700 hover:bg-gray-100"
+                        ? "bg-[#C9A84C] text-[#0A203E] shadow"
+                        : "text-slate-600 hover:bg-slate-100"
                     }`}
                   >
                     {fromCity} → {toCity} {selectedOnward && "✓"}
@@ -1097,12 +1103,12 @@ export default function FlightSearchResults() {
                   <button
                     onClick={() => setActiveTab("return")}
                     disabled={!selectedOnward}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-sm transition ${
+                    className={`flex-1 px-4 py-2.5 rounded-lg font-bold text-sm transition ${
                       activeTab === "return"
-                        ? "bg-blue-600 text-white shadow"
+                        ? "bg-[#C9A84C] text-[#0A203E] shadow"
                         : selectedOnward
-                          ? "text-gray-700 hover:bg-gray-100"
-                          : "text-gray-400 cursor-not-allowed"
+                          ? "text-slate-600 hover:bg-slate-100"
+                          : "text-slate-400 cursor-not-allowed"
                     }`}
                   >
                     {toCity} → {fromCity} {selectedReturn && "✓"}

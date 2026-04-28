@@ -73,7 +73,11 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
   if (existingPhone) throw new ApiError(400, "Phone number already exists");
 
   // GST Email Preference: 1. Accounts (Billing), 2. Travel-admin (Primary)
-  gstDetails.gstEmail = gstDetails.gstEmail || billingDepartment?.email || primaryContact?.email || "";
+  gstDetails.gstEmail =
+    gstDetails.gstEmail ||
+    billingDepartment?.email ||
+    primaryContact?.email ||
+    "";
 
   // --------------------------------------------------
   // 🟢 CLOUDINARY UPLOAD SECTION (NEW)
@@ -166,8 +170,6 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
       ),
     );
 });
-
-
 
 // -----------------------------------------------------
 // APPROVE CORPORATE (SUPER ADMIN ONLY)
@@ -339,8 +341,8 @@ exports.getAllCorporates = asyncHandler(async (req, res) => {
         corp.billingCycle === "15days"
           ? 15
           : corp.billingCycle === "30days"
-          ? 30
-          : corp.customBillingDays || 30;
+            ? 30
+            : corp.customBillingDays || 30;
 
       const now = new Date();
       const cycleMs = cycleDays * 24 * 60 * 60 * 1000;
@@ -583,7 +585,6 @@ exports.getAllHotelBookings = async (req, res) => {
   }
 };
 
-
 exports.getCancelledOrRequestedFlights = async (req, res) => {
   try {
     const {
@@ -721,7 +722,6 @@ exports.getCancelledOrRequestedHotels = async (req, res) => {
   }
 };
 
-
 // Get cancellation queries
 exports.fetchCancellationQueries = async (req, res) => {
   try {
@@ -781,8 +781,7 @@ exports.fetchCancellationQueries = async (req, res) => {
         b?.bookingResult?.providerResponse?.Response?.Response
           ?.FlightItinerary || {};
 
-      const segments =
-        itinerary?.Segments || b?.flightRequest?.segments || [];
+      const segments = itinerary?.Segments || b?.flightRequest?.segments || [];
 
       const firstSegment = Array.isArray(segments)
         ? segments[0]
@@ -817,21 +816,17 @@ exports.fetchCancellationQueries = async (req, res) => {
               const seg = s?.[0] || s; // handle nested array
               return {
                 origin:
-                  seg?.Origin?.Airport?.AirportCode ||
-                  seg?.origin?.airportCode,
+                  seg?.Origin?.Airport?.AirportCode || seg?.origin?.airportCode,
 
                 destination:
                   seg?.Destination?.Airport?.AirportCode ||
                   seg?.destination?.airportCode,
 
-                airline:
-                  seg?.Airline?.AirlineName || seg?.airlineName,
+                airline: seg?.Airline?.AirlineName || seg?.airlineName,
 
-                flightNumber:
-                  seg?.Airline?.FlightNumber || seg?.flightNumber,
+                flightNumber: seg?.Airline?.FlightNumber || seg?.flightNumber,
 
-                departureTime:
-                  seg?.Origin?.DepTime || seg?.departureDateTime,
+                departureTime: seg?.Origin?.DepTime || seg?.departureDateTime,
               };
             }) || [],
 
@@ -894,7 +889,6 @@ exports.fetchCancellationQueries = async (req, res) => {
     });
   }
 };
-
 
 // PATCH /api/cancellation-queries/:id/status
 exports.updateCancellationQueryStatus = async (req, res) => {

@@ -122,15 +122,15 @@ export default function HotelSearchPage() {
   const handleCityChange = (val) => {
     setCity(val);
     const filtered = currentCities.filter((c) =>
-      c.Name?.toLowerCase().includes(val.toLowerCase()),
+      c.cityName?.toLowerCase().includes(val.toLowerCase()),
     );
     setFilteredCities(filtered);
     setShowCitySuggestions(true);
   };
 
   const handleCitySelect = (cityObj) => {
-    setCity(cityObj.Name);
-    setSelectedCityCode(cityObj.Code);
+    setCity(cityObj.cityName);
+    setSelectedCityCode(cityObj.cityCode);
     setShowCitySuggestions(false);
   };
 
@@ -339,7 +339,7 @@ export default function HotelSearchPage() {
                       : currentCities
                     ).map((c) => (
                       <div
-                        key={c.Name}
+                        key={c.cityCode}
                         onMouseDown={() => handleCitySelect(c)}
                         className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 cursor-pointer transition group"
                       >
@@ -348,7 +348,7 @@ export default function HotelSearchPage() {
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-gray-800 group-hover:text-blue-700">
-                            {c.Name}
+                            {c.cityName}
                           </p>
                           <p className="text-xs text-gray-400">
                             {selectedCountry?.name || "Hotels & Resorts"}

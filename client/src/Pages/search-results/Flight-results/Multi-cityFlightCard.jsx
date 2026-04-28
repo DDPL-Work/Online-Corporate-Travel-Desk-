@@ -67,8 +67,9 @@ export default function MultiCityFlightCard({
 
   // ---------------------------------------------------
 
+  // return (
   return (
-    <div className="max-w-[1060px] bg-linear-to-br from-white via-blue-50/40 to-white border border-blue-200 rounded-2xl transition-all duration-300 overflow-hidden shadow-sm">
+    <div className="max-w-[1060px] bg-linear-to-br from-white via-slate-50 to-white border border-slate-200 rounded-2xl transition-all duration-300 overflow-hidden shadow-sm">
       <div className="relative p-6">
         {/* Each Flight Leg */}
         {legs.map((segments, i) => {
@@ -105,10 +106,10 @@ export default function MultiCityFlightCard({
             firstSegment?.FlightStatus || firstSegment?.Status || "Scheduled";
 
           return (
-            <div key={i} className="border border-blue-100 rounded-xl mb-4">
+            <div key={i} className="border border-slate-100 rounded-xl mb-4 overflow-hidden">
               <button
                 onClick={() => setOpenIndex(openIndex === i ? -1 : i)}
-                className="flex justify-between w-full items-center px-4 py-1.5 bg-blue-50/40 hover:bg-blue-100/40 rounded-t-xl transition-colors cursor-pointer"
+                className="flex justify-between w-full items-center px-4 py-1.5 bg-slate-50/50 hover:bg-slate-100 rounded-t-xl transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <img
@@ -135,13 +136,13 @@ export default function MultiCityFlightCard({
                 </div>
                 <div className="flex items-center gap-4">
                   {/* <span className="text-sm text-gray-600">{duration}</span> */}
-                  <span className="font-semibold text-blue-700">
+                  <span className="font-bold text-[#0A203E]">
                     ₹{price.toLocaleString()}
                   </span>
                   {openIndex === i ? (
-                    <FaChevronUp className="text-blue-600" />
+                    <FaChevronUp className="text-[#C9A84C]" />
                   ) : (
-                    <FaChevronDown className="text-blue-600" />
+                    <FaChevronDown className="text-[#C9A84C]" />
                   )}
                 </div>
               </button>
@@ -154,14 +155,14 @@ export default function MultiCityFlightCard({
                       <div className="text-lg font-bold text-slate-800">
                         {formatTime(depTime)}
                       </div>
-                      <div className="text-xs font-medium text-blue-600">
+                      <div className="text-xs font-bold text-[#C9A84C]">
                         {formatDate(depTime)}
                       </div>
                       <div className="text-sm font-semibold text-slate-700 mt-2">
                         {from}
                       </div>
                       {firstSegment.Origin?.Airport?.Terminal && (
-                        <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 inline-block mt-1 uppercase tracking-wider">
+                        <div className="text-[10px] font-black text-[#C9A84C] bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200 inline-block mt-1 uppercase tracking-wider">
                           T-{firstSegment.Origin.Airport.Terminal}
                         </div>
                       )}
@@ -169,9 +170,9 @@ export default function MultiCityFlightCard({
 
                     <div className="flex flex-col items-center gap-2">
                       <div className="relative w-full mb-3">
-                        <div className="h-0.5 bg-linear-to-r from-blue-200 via-blue-400 to-blue-200 w-32"></div>
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-2 rounded-full shadow-md border border-blue-200">
-                          <MdOutlineFlight className="text-blue-600 text-lg rotate-90" />
+                        <div className="h-0.5 bg-linear-to-r from-slate-200 via-[#C9A84C] to-slate-200 w-32"></div>
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-2 rounded-full shadow-md border border-slate-200">
+                          <MdOutlineFlight className="text-[#C9A84C] text-lg rotate-90" />
                         </div>
                       </div>
                       <div className="text-xs font-semibold text-slate-600 whitespace-nowrap">
@@ -186,14 +187,14 @@ export default function MultiCityFlightCard({
                       <div className="text-lg font-bold text-slate-800">
                         {formatTime(arrTime)}
                       </div>
-                      <div className="text-xs font-medium text-blue-600">
+                      <div className="text-xs font-bold text-[#C9A84C]">
                         {formatDate(arrTime)}
                       </div>
                       <div className="text-sm font-semibold text-slate-700 mt-2">
                         {to}
                       </div>
                       {lastSegment.Destination?.Airport?.Terminal && (
-                        <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 inline-block mt-1 uppercase tracking-wider">
+                        <div className="text-[10px] font-black text-[#C9A84C] bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200 inline-block mt-1 uppercase tracking-wider">
                           T-{lastSegment.Destination.Airport.Terminal}
                         </div>
                       )}
@@ -203,8 +204,8 @@ export default function MultiCityFlightCard({
                   {/* Tags */}
                   <div className="flex flex-wrap gap-2 mt-4">
                     {travelClass && (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg border border-blue-200 uppercase">
-                        <MdAirlineSeatReclineNormal /> {travelClass}
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 uppercase">
+                        <MdAirlineSeatReclineNormal className="text-[#C9A84C]" /> {travelClass}
                       </span>
                     )}
                     <span className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200">
@@ -217,9 +218,9 @@ export default function MultiCityFlightCard({
                     )}
                     <button
                       onClick={() => handleFareOptionsClick(resultIndex)}
-                      className="inline-flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-100 transition hover:underline cursor-pointer"
+                      className="inline-flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 transition cursor-pointer"
                     >
-                      <BiSolidOffer /> Fare Options
+                      <BiSolidOffer className="text-[#C9A84C]" /> Fare Options
                     </button>
                   </div>
                 </div>
@@ -230,18 +231,19 @@ export default function MultiCityFlightCard({
 
         {/* --- Global Details Section --- */}
         <div className="mt-4 flex flex-col gap-4">
-           <div className="flex justify-between items-center bg-blue-50/20 px-4 py-2 rounded-xl border border-blue-100">
+           <div className="flex justify-between items-center bg-slate-50/50 px-4 py-2 rounded-xl border border-slate-200">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pricing & Policy Center</span>
-              <button
+            <button
                 onClick={() => setShowDetails(!showDetails)}
-                className="text-xs font-black text-blue-600 hover:text-blue-800 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-blue-200 shadow-sm transition-all"
+                className="text-[11px] font-black text-[#C9A84C] hover:text-[#0A203E] flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 shadow-sm transition-all uppercase tracking-widest"
               >
-                {showDetails ? "Hide Fare Details ▲" : "View Fare Details ▼"}
+                {showDetails ? "Hide Fare Details" : "View Fare Details"}
+                {showDetails ? <FaChevronUp /> : <FaChevronDown />}
               </button>
            </div>
            
            {showDetails && (
-              <div className="border border-blue-200 rounded-2xl overflow-hidden bg-white shadow-lg animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-lg animate-in fade-in slide-in-from-top-2 duration-300">
                  <FlightDetailsDropdown selectedFlight={{ Segments: legs, Fare: fare, ...segments[0] }} />
               </div>
            )}
@@ -250,10 +252,10 @@ export default function MultiCityFlightCard({
         {/* Footer */}
         <div className="flex items-center justify-between mt-6">
           <div className="text-left">
-            <div className="text-3xl font-bold bg-linear-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
+            <div className="text-3xl font-black text-[#0A203E]">
               ₹{totalPrice.toLocaleString()}
             </div>
-            <div className="text-xs text-slate-600 mt-1 font-medium">
+            <div className="text-[10px] text-slate-500 mt-0.5 font-black uppercase tracking-widest">
               Total (incl. taxes)
             </div>
           </div>
@@ -292,10 +294,9 @@ export default function MultiCityFlightCard({
                 },
               });
             }}
-            className="relative group px-8 py-3.5 bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 cursor-pointer"
+            className="px-10 py-3.5 bg-[#0A203E] text-white rounded-xl font-black shadow-lg shadow-[#0A203E]/20 transition-all duration-300 hover:scale-[1.02] active:scale-95 uppercase tracking-widest text-xs"
           >
-            <span className="relative z-10">Select</span>
-            <div className="absolute inset-0 bg-white/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            Book Now
           </button>
         </div>
       </div>

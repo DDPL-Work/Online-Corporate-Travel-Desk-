@@ -63,7 +63,7 @@ export const CountrySelector = ({ value, onChange, countries, label = "Country",
       </button>
 
       {open && !disabled && (
-        <div className="absolute top-full left-0 w-64 mt-1 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+        <div className="absolute top-full left-0 w-full mt-1 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
           <div className="p-2 border-b border-gray-100 bg-white sticky top-0">
             <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-2.5 py-1.5">
               <FaSearch className="text-gray-400 text-xs" />
