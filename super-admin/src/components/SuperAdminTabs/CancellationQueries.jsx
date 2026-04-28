@@ -1,26 +1,26 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FiSearch,
   FiDownload,
   FiEye,
-  FiDollarSign,
   FiXCircle,
   FiRotateCcw,
   FiAlertCircle,
   FiTrash2,
   FiMessageSquare,
-  FiChevronDown,
   FiX,
   FiClock,
   FiCheckCircle,
 } from "react-icons/fi";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
+import { toast } from "sonner";
 import {
   fetchCancellationQueries,
   updateCancellationQueryStatus,
 } from "../../Redux/Actions/corporate.related.thunks";
 import Pagination from "../Shared/Pagination";
+import TableActionBar from "../Shared/TableActionBar";
 import {
   FlightBookingModal,
   HotelBookingModal,
@@ -32,6 +32,10 @@ import {
 
 const QUERY_STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "REJECTED"];
 const QUERY_PRIORITIES = ["LOW", "MEDIUM", "HIGH"];
+
+// FIX 1: min-w + explicit width on date inputs so dd-mm-yyyy and calendar icon are fully visible
+const FILTER_DATE_INPUT_CLASS =
+  "filter-date-input w-full min-w-[175px] px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50";
 
 const STATUS_STYLES = {
   OPEN: "bg-blue-50 text-blue-700 border-blue-200",
@@ -84,7 +88,7 @@ const normalizeCorpId = (val) => {
   return val;
 };
 
-const normalizeFlight = (b = {}) => {
+const _normalizeFlight = (b = {}) => {
   const traveller = (b.travellers && b.travellers[0]) || {};
   const travellerName =
     [traveller.firstName, traveller.lastName]
@@ -168,7 +172,7 @@ const normalizeFlight = (b = {}) => {
   };
 };
 
-const normalizeHotel = (b = {}) => {
+const _normalizeHotel = (b = {}) => {
   const traveller = (b.travellers && b.travellers[0]) || {};
   const guestName =
     b.employeeName ||
@@ -266,21 +270,33 @@ function QueryDetailModal({ query, onClose, onStatusChange }) {
   );
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    setStatus(query.status || "OPEN");
+    setResolutionMsg(query.resolution?.message || "");
+    setRefundAmount(query.resolution?.refundAmount || "");
+    setCancelCharge(query.resolution?.cancellationCharge || "");
+    setCreditNoteNo(query.resolution?.creditNoteNo || "");
+  }, [query]);
+
   const handleSave = async () => {
-    setSaving(true);
-    await onStatusChange(query._id || query.queryId, {
-      status,
-      resolution: {
-        message: resolutionMsg,
-        refundAmount: Number(refundAmount) || 0,
-        cancellationCharge: Number(cancelCharge) || 0,
-        creditNoteNo,
-        resolvedAt:
-          status === "RESOLVED" ? new Date().toISOString() : undefined,
-      },
-    });
-    setSaving(false);
-    onClose();
+    try {
+      setSaving(true);
+      await onStatusChange(query._id || query.queryId, {
+        status,
+        remarks: query.remarks,
+        resolution: {
+          message: resolutionMsg,
+          refundAmount: Number(refundAmount) || 0,
+          cancellationCharge: Number(cancelCharge) || 0,
+          creditNoteNo,
+          resolvedAt:
+            status === "RESOLVED" ? new Date().toISOString() : undefined,
+        },
+      });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const fmt = (d) =>
@@ -582,6 +598,7 @@ function QueryDetailModal({ query, onClose, onStatusChange }) {
 // ─────────────────────────────────────────────
 
 function CancellationQueryTab() {
+  const tableScrollRef = useRef(null);
   const dispatch = useDispatch();
   const {
     cancellationQueries,
@@ -599,7 +616,10 @@ function CancellationQueryTab() {
 
   // Reset to page 1 when filters change
   useEffect(() => {
-    setPage(1);
+    const resetId = window.requestAnimationFrame(() => {
+      setPage(1);
+    });
+    return () => window.cancelAnimationFrame(resetId);
   }, [statusFilter, search, fromDate, toDate, requestedDate]);
 
   // Fetch all data at once (no API pagination)
@@ -611,6 +631,14 @@ function CancellationQueryTab() {
     () => cancellationQueries || [],
     [cancellationQueries],
   );
+
+  useEffect(() => {
+    if (!selectedQuery?._id) return;
+    const updatedSelectedQuery = queries.find((q) => q._id === selectedQuery._id);
+    if (updatedSelectedQuery && updatedSelectedQuery !== selectedQuery) {
+      setSelectedQuery(updatedSelectedQuery);
+    }
+  }, [queries, selectedQuery]);
 
   const filtered = useMemo(
     () =>
@@ -657,8 +685,21 @@ function CancellationQueryTab() {
 
   const handleStatusChange = useCallback(
     async (id, payload) => {
-      await dispatch(updateCancellationQueryStatus({ id, ...payload }));
-      dispatch(fetchCancellationQueries());
+      try {
+        const response = await dispatch(
+          updateCancellationQueryStatus({ id, ...payload }),
+        ).unwrap();
+        await dispatch(fetchCancellationQueries()).unwrap();
+        toast.success(response?.message || "Query status updated");
+        return response;
+      } catch (error) {
+        const message =
+          error?.message ||
+          error?.error ||
+          "Failed to update cancellation query";
+        toast.error(message);
+        throw error;
+      }
     },
     [dispatch],
   );
@@ -687,40 +728,36 @@ function CancellationQueryTab() {
         <StatCard
           label="Open"
           value={statusCounts.OPEN}
-          Icon={FiAlertCircle}
+          icon={<FiAlertCircle size={18} className="text-blue-600" />}
           borderCls="border-blue-500"
           iconBgCls="bg-blue-50"
-          iconColorCls="text-blue-600"
         />
         <StatCard
           label="In Progress"
           value={statusCounts.IN_PROGRESS}
-          Icon={FiClock}
+          icon={<FiClock size={18} className="text-amber-600" />}
           borderCls="border-amber-500"
           iconBgCls="bg-amber-50"
-          iconColorCls="text-amber-600"
         />
         <StatCard
           label="Resolved"
           value={statusCounts.RESOLVED}
-          Icon={FiCheckCircle}
+          icon={<FiCheckCircle size={18} className="text-emerald-600" />}
           borderCls="border-emerald-500"
           iconBgCls="bg-emerald-50"
-          iconColorCls="text-emerald-600"
         />
         <StatCard
           label="Rejected"
           value={statusCounts.REJECTED}
-          Icon={FiXCircle}
+          icon={<FiXCircle size={18} className="text-rose-600" />}
           borderCls="border-rose-500"
           iconBgCls="bg-rose-50"
-          iconColorCls="text-rose-600"
         />
       </div>
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid gap-4 grid-cols-3">
           <LabeledInput label="Search">
             <div className="relative">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -766,7 +803,7 @@ function CancellationQueryTab() {
               type="date"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+              className={FILTER_DATE_INPUT_CLASS}
             />
           </LabeledInput>
           <LabeledInput label="Booking To">
@@ -774,7 +811,7 @@ function CancellationQueryTab() {
               type="date"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+              className={FILTER_DATE_INPUT_CLASS}
             />
           </LabeledInput>
           <LabeledInput label="Requested Date">
@@ -782,7 +819,7 @@ function CancellationQueryTab() {
               type="date"
               value={requestedDate}
               onChange={(e) => setRequestedDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+              className={FILTER_DATE_INPUT_CLASS}
             />
           </LabeledInput>
         </div>
@@ -795,12 +832,16 @@ function CancellationQueryTab() {
             <FiMessageSquare size={18} className="text-rose-600" />
             Query List
           </h2>
-          <button className="flex items-center gap-2 px-4 py-2 bg-rose-700 text-white rounded-lg text-xs font-bold shadow-md uppercase">
-            <FiDownload /> Export Queries
-          </button>
+          <TableActionBar
+            scrollRef={tableScrollRef}
+            exportLabel="Export Queries"
+            onExport={() => {}}
+            exportClassName="bg-rose-700 hover:bg-rose-800 shadow-rose-700/20"
+            arrowClassName="border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:border-rose-200 hover:text-rose-800 disabled:hover:bg-rose-50"
+          />
         </div>
 
-        <div className="overflow-x-auto">
+        <div ref={tableScrollRef} className="overflow-x-auto">
           {loadingCancellationQueries ? (
             <div className="p-10 text-center text-sm text-slate-400">
               Loading queries...
@@ -840,7 +881,6 @@ function CancellationQueryTab() {
                     query={q}
                     fmt={fmt}
                     onView={() => setSelectedQuery(q)}
-                    onStatusChange={handleStatusChange}
                   />
                 ))}
               </tbody>
@@ -873,20 +913,10 @@ function CancellationQueryTab() {
 }
 
 // ─────────────────────────────────────────────
-// QUERY ROW (inline status dropdown)
+// QUERY ROW
 // ─────────────────────────────────────────────
 
-function QueryRow({ query, fmt, onView, onStatusChange }) {
-  const [status, setStatus] = useState(query.status || "OPEN");
-  const [updating, setUpdating] = useState(false);
-
-  const handleStatusChange = async (newStatus) => {
-    setStatus(newStatus);
-    setUpdating(true);
-    await onStatusChange(query._id || query.queryId, { status: newStatus });
-    setUpdating(false);
-  };
-
+function QueryRow({ query, fmt, onView }) {
   return (
     <tr className="hover:bg-rose-50/20 transition-all bg-white">
       <td className="px-5 py-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">
@@ -928,26 +958,13 @@ function QueryRow({ query, fmt, onView, onStatusChange }) {
           {query.priority || "MEDIUM"}
         </span>
       </td>
+      {/* FIX 2: Added whitespace-nowrap so "IN PROGRESS" never wraps to two lines */}
       <td className="px-5 py-4">
-        <div className="relative">
-          <select
-            value={status}
-            disabled={updating}
-            onChange={(e) => handleStatusChange(e.target.value)}
-            className={`appearance-none px-2 py-1 pr-6 rounded-full text-[10px] font-black uppercase border cursor-pointer outline-none ${STATUS_STYLES[status] || STATUS_STYLES.OPEN} ${updating ? "opacity-50" : ""}`}
-            style={{ backgroundImage: "none" }}
-          >
-            {QUERY_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s.replace("_", " ")}
-              </option>
-            ))}
-          </select>
-          <FiChevronDown
-            size={10}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60"
-          />
-        </div>
+        <span
+          className={`inline-flex items-center px-3 py-1.5 rounded-full text-[10px] font-black uppercase border whitespace-nowrap ${STATUS_STYLES[query.status] || STATUS_STYLES.OPEN}`}
+        >
+          {(query.status || "OPEN").replace("_", " ")}
+        </span>
       </td>
       <td className="px-5 py-4 text-[11px] text-slate-500 whitespace-nowrap">
         {fmt(query.requestedAt)}
@@ -966,14 +983,11 @@ function QueryRow({ query, fmt, onView, onStatusChange }) {
 }
 
 // ─────────────────────────────────────────────
-// MAIN DASHBOARD
-// ─────────────────────────────────────────────
-
-// ─────────────────────────────────────────────
 // HOTEL CANCELLATION QUERY TAB (dummy data)
 // ─────────────────────────────────────────────
 
 function HotelCancellationQueryTab() {
+  const tableScrollRef = useRef(null);
   const [search, setSearch]               = useState("");
   const [statusFilter, setStatusFilter]   = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
@@ -983,7 +997,12 @@ function HotelCancellationQueryTab() {
   const [page, setPage]                   = useState(1);
   const [selectedQuery, setSelectedQuery] = useState(null);
 
-  useEffect(() => { setPage(1); }, [statusFilter, search, fromDate, toDate, requestedDate]);
+  useEffect(() => {
+    const resetId = window.requestAnimationFrame(() => {
+      setPage(1);
+    });
+    return () => window.cancelAnimationFrame(resetId);
+  }, [statusFilter, search, fromDate, toDate, requestedDate]);
 
   const fmt = (d) =>
     d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -1023,15 +1042,15 @@ function HotelCancellationQueryTab() {
     <div className="space-y-5">
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Open"        value={statusCounts.OPEN}        Icon={FiAlertCircle}  borderCls="border-blue-500"    iconBgCls="bg-blue-50"    iconColorCls="text-blue-600" />
-        <StatCard label="In Progress" value={statusCounts.IN_PROGRESS} Icon={FiClock}        borderCls="border-amber-500"   iconBgCls="bg-amber-50"   iconColorCls="text-amber-600" />
-        <StatCard label="Resolved"    value={statusCounts.RESOLVED}    Icon={FiCheckCircle}  borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-        <StatCard label="Rejected"    value={statusCounts.REJECTED}    Icon={FiXCircle}      borderCls="border-rose-500"    iconBgCls="bg-rose-50"    iconColorCls="text-rose-600" />
+        <StatCard label="Open"        value={statusCounts.OPEN}        icon={<FiAlertCircle size={18} className="text-blue-600" />} borderCls="border-blue-500"    iconBgCls="bg-blue-50" />
+        <StatCard label="In Progress" value={statusCounts.IN_PROGRESS} icon={<FiClock size={18} className="text-amber-600" />}       borderCls="border-amber-500"   iconBgCls="bg-amber-50" />
+        <StatCard label="Resolved"    value={statusCounts.RESOLVED}    icon={<FiCheckCircle size={18} className="text-emerald-600" />} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" />
+        <StatCard label="Rejected"    value={statusCounts.REJECTED}    icon={<FiXCircle size={18} className="text-rose-600" />}     borderCls="border-rose-500"    iconBgCls="bg-rose-50" />
       </div>
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid gap-4 grid-cols-3">
           <LabeledInput label="Search">
             <div className="relative">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1056,15 +1075,15 @@ function HotelCancellationQueryTab() {
           </LabeledInput>
           <LabeledInput label="From Date">
             <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50" />
+              className={FILTER_DATE_INPUT_CLASS} />
           </LabeledInput>
           <LabeledInput label="To Date">
             <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50" />
+              className={FILTER_DATE_INPUT_CLASS} />
           </LabeledInput>
           <LabeledInput label="Requested Date">
             <input type="date" value={requestedDate} onChange={(e) => setRequestedDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50" />
+              className={FILTER_DATE_INPUT_CLASS} />
           </LabeledInput>
         </div>
       </div>
@@ -1076,12 +1095,16 @@ function HotelCancellationQueryTab() {
             <FiMessageSquare size={18} className="text-teal-600" />
             Hotel Query List
           </h2>
-          <button className="flex items-center gap-2 px-4 py-2 bg-teal-700 text-white rounded-lg text-xs font-bold shadow-md uppercase">
-            <FiDownload /> Export Queries
-          </button>
+          <TableActionBar
+            scrollRef={tableScrollRef}
+            exportLabel="Export Queries"
+            onExport={() => {}}
+            exportClassName="bg-teal-700 hover:bg-teal-800 shadow-teal-700/20"
+            arrowClassName="border-teal-100 bg-teal-50 text-teal-700 hover:bg-teal-100 hover:border-teal-200 hover:text-teal-800 disabled:hover:bg-teal-50"
+          />
         </div>
 
-        <div className="overflow-x-auto">
+        <div ref={tableScrollRef} className="overflow-x-auto">
           {filtered.length === 0 ? (
             <div className="p-10 text-center text-sm text-slate-400">No hotel cancellation queries found.</div>
           ) : (
@@ -1111,12 +1134,13 @@ function HotelCancellationQueryTab() {
                       {q.bookingSnapshot?.totalFare != null ? `₹${Number(q.bookingSnapshot.totalFare).toLocaleString()}` : "—"}
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase border ${PRIORITY_STYLES[q.priority] || PRIORITY_STYLES.MEDIUM}`}>
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase border whitespace-nowrap ${PRIORITY_STYLES[q.priority] || PRIORITY_STYLES.MEDIUM}`}>
                         {q.priority || "MEDIUM"}
                       </span>
                     </td>
+                    {/* FIX 2: Added whitespace-nowrap so "IN PROGRESS" never wraps to two lines */}
                     <td className="px-5 py-4">
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase border ${STATUS_STYLES[q.status] || STATUS_STYLES.OPEN}`}>
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase border whitespace-nowrap ${STATUS_STYLES[q.status] || STATUS_STYLES.OPEN}`}>
                         {(q.status || "OPEN").replace("_", " ")}
                       </span>
                     </td>
@@ -1142,7 +1166,7 @@ function HotelCancellationQueryTab() {
         </div>
       </div>
 
-      {/* Detail Modal (reuse QueryDetailModal in view-only mode) */}
+      {/* Detail Modal */}
       {selectedQuery && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setSelectedQuery(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -1247,7 +1271,7 @@ export default function CancellationQueries() {
 // SHARED COMPONENTS
 // ─────────────────────────────────────────────
 
-function StatCard({ label, value, iconBgCls, iconColorCls, borderCls, Icon }) {
+function StatCard({ label, value, iconBgCls, borderCls, icon }) {
   return (
     <div
       className={`bg-white rounded-xl p-4 flex items-center gap-3 shadow-sm border-l-4 ${borderCls}`}
@@ -1255,7 +1279,7 @@ function StatCard({ label, value, iconBgCls, iconColorCls, borderCls, Icon }) {
       <div
         className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBgCls}`}
       >
-        <Icon size={18} className={iconColorCls} />
+        {icon}
       </div>
       <div className="text-left">
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">

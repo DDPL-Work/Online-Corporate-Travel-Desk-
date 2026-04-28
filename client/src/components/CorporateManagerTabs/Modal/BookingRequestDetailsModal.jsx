@@ -733,7 +733,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                   <p className="text-[10px] text-slate-400 uppercase font-bold">
                     Approved By
                   </p>
-                  
+
                   <div className="flex-1">
                     <p className="font-bold text-slate-900">
                       {leadTraveller?.firstName} {leadTraveller?.lastName}
@@ -819,14 +819,20 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                 />
               </div>
 
-              <SectionLabel icon={<FiLayers size={11} />} title="Project Details" />
+              <SectionLabel
+                icon={<FiLayers size={11} />}
+                title="Project Details"
+              />
               <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
                 <InfoRow label="Project ID" value={raw.projectId} padded />
                 <InfoRow label="Project Name" value={raw.projectName} padded />
                 <InfoRow label="Client" value={raw.projectClient} padded />
               </div>
 
-              <SectionLabel icon={<FiUser size={11} />} title="Approver Details" />
+              <SectionLabel
+                icon={<FiUser size={11} />}
+                title="Approver Details"
+              />
               <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
                 <InfoRow label="Approver ID" value={raw.approverId} padded />
                 <InfoRow
@@ -846,7 +852,12 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                 />
                 <InfoRow
                   label="Approver Role"
-                  value={approverDetails.role || raw.approverRole || approver.role || "—"}
+                  value={
+                    approverDetails.role ||
+                    raw.approverRole ||
+                    approver.role ||
+                    "—"
+                  }
                   padded
                 />
               </div>
@@ -943,8 +954,11 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
   const returnPNR = bookRes.returnPNR || null;
   const invoices = flightItin?.Invoice || [];
   const passengerInfo = flightItin?.Passenger || [];
-  const paxTicket = passengerInfo?.[0]?.Ticket || 
-                   bookRes?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket || {};
+  const paxTicket =
+    passengerInfo?.[0]?.Ticket ||
+    bookRes?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]
+      ?.Ticket ||
+    {};
   const ticketNumber = paxTicket.TicketId || paxTicket.TicketNumber || "";
   const totalAmount = pricing?.totalAmount ?? snap?.amount ?? 0;
   const amountCurrency = pricing?.currency || snap?.currency || "INR";
@@ -1300,51 +1314,338 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
             </div>
           </div>
 
-          {/* Mini Fare Rules */}
-          {miniFareRules.length > 0 && (
-            <div>
-              <SectionLabel
-                icon={<FiShield size={11} />}
-                title="Fare Rules (Change / Cancel)"
-              />
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left">Type</th>
-                      <th className="px-4 py-2.5 text-left">Journey</th>
-                      <th className="px-4 py-2.5 text-left">Window</th>
-                      <th className="px-4 py-2.5 text-right">Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {miniFareRules.map((r, i) => (
-                      <tr key={i} className="hover:bg-slate-50/50">
-                        <td className="px-4 py-3">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${r.Type === "Cancellation" ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}
+          {/* Fare Rules */}
+          {(() => {
+            // Get fare rules from bookingResult (has full HTML detail)
+            const resultFareRules =
+              bookRes.providerResponse?.Response?.Response?.FlightItinerary
+                ?.FareRules ||
+              bookRes.providerResponse?.FlightItinerary?.FareRules ||
+              [];
+
+            // Fallback to fareQuote results
+            const quoteFareRules =
+              raw.flightRequest?.fareQuote?.Results?.[0]?.FareRules || [];
+
+            const fareRules = resultFareRules.length
+              ? resultFareRules
+              : quoteFareRules;
+
+            // Parse HTML into structured content
+            const parseRuleDetail = (html) => {
+              if (!html || html.trim() === "") return null;
+
+              // Extract <li> bullet items
+              const bullets = [];
+              const liMatches = html.matchAll(/<li>([\s\S]*?)<\/li>/gi);
+              for (const match of liMatches) {
+                const text = match[1]
+                  .replace(/<[^>]+>/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim();
+                if (text) bullets.push(text);
+              }
+
+              // Extract table rows
+              const tableRows = [];
+              const trMatches = html.matchAll(/<tr>([\s\S]*?)<\/tr>/gi);
+              for (const match of trMatches) {
+                const cells = [];
+                const tdMatches = match[1].matchAll(
+                  /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi,
+                );
+                for (const td of tdMatches) {
+                  const text = td[1]
+                    .replace(/<[^>]+>/g, " ")
+                    .replace(/\s+/g, " ")
+                    .trim();
+                  if (text) cells.push(text);
+                }
+                if (cells.length) tableRows.push(cells);
+              }
+
+              // Extract paragraphs (text outside lists/tables)
+              const withoutStructured = html
+                .replace(/<table[\s\S]*?<\/table>/gi, "")
+                .replace(/<ul[\s\S]*?<\/ul>/gi, "")
+                .replace(/<ol[\s\S]*?<\/ol>/gi, "");
+
+              const paragraphs = withoutStructured
+                .replace(/<br\s*\/?>/gi, "\n")
+                .replace(/<b>([\s\S]*?)<\/b>/gi, "$1")
+                .replace(/<[^>]+>/g, "")
+                .split("\n")
+                .map((s) => s.trim())
+                .filter((s) => s.length > 2);
+
+              return { bullets, tableRows, paragraphs };
+            };
+
+            if (!fareRules.length && !miniFareRules.length) return null;
+
+            return (
+              <div>
+                <SectionLabel
+                  icon={<FiShield size={11} />}
+                  title="Fare Rules"
+                />
+
+                <div className="space-y-4">
+                  {/* ── Mini Fare Rules quick-reference table ── */}
+                  {miniFareRules.length > 0 && (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="bg-slate-800 px-4 py-2.5 flex items-center gap-2">
+                        <FiShield size={11} className="text-slate-300" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-300">
+                          Quick Reference · Change / Cancel Fees
+                        </span>
+                      </div>
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-widest font-bold border-b border-slate-200">
+                          <tr>
+                            <th className="px-4 py-2.5 text-left">Type</th>
+                            <th className="px-4 py-2.5 text-left">Journey</th>
+                            <th className="px-4 py-2.5 text-left">Window</th>
+                            <th className="px-4 py-2.5 text-right">Fee</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {miniFareRules.map((r, i) => (
+                            <tr key={i} className="hover:bg-slate-50/50">
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                    r.Type === "Cancellation"
+                                      ? "bg-red-50 text-red-700 border border-red-100"
+                                      : "bg-blue-50 text-blue-700 border border-blue-100"
+                                  }`}
+                                >
+                                  {r.Type}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs font-semibold text-slate-700">
+                                {r.JourneyPoints}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-slate-500">
+                                {r.From != null && r.Unit
+                                  ? `${r.From}–${r.To || "∞"} ${r.Unit}`
+                                  : "Any time"}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <span
+                                  className={`text-sm font-black ${
+                                    r.Details === "Nil" || r.Details === "0"
+                                      ? "text-emerald-600"
+                                      : r.Details?.includes("%")
+                                        ? "text-red-600"
+                                        : "text-slate-800"
+                                  }`}
+                                >
+                                  {r.Details}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* ── Detailed Fare Rules per sector ── */}
+                  {fareRules.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                        Detailed Rules by Sector
+                      </p>
+                      {fareRules.map((rule, i) => {
+                        const parsed = parseRuleDetail(rule.FareRuleDetail);
+                        const hasFareInclusions =
+                          Array.isArray(rule.FareInclusions) &&
+                          rule.FareInclusions.length > 0;
+
+                        return (
+                          <div
+                            key={i}
+                            className="border border-slate-200 rounded-xl overflow-hidden"
                           >
-                            {r.Type}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-600">
-                          {r.JourneyPoints}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-500">
-                          {r.From != null && r.Unit
-                            ? `${r.From}–${r.To || "∞"} ${r.Unit}`
-                            : "Any time"}
-                        </td>
-                        <td className="px-4 py-3 text-right font-bold text-slate-800">
-                          {r.Details}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                            {/* Sector header */}
+                            <div className="bg-gradient-to-r from-[#0A4D68] to-[#0a6d8a] px-4 py-3 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-white font-black text-base">
+                                    {rule.Origin}
+                                  </span>
+                                  <span className="text-blue-200 text-sm">
+                                    →
+                                  </span>
+                                  <span className="text-white font-black text-base">
+                                    {rule.Destination}
+                                  </span>
+                                </div>
+                                <span className="text-blue-200 text-[10px]">
+                                  ·
+                                </span>
+                                <span className="text-blue-200 text-[11px] font-semibold">
+                                  {rule.Airline}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-blue-300">
+                                  Fare Basis
+                                </span>
+                                <span className="bg-white/20 text-white text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-full">
+                                  {rule.FareBasisCode}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="p-4 space-y-4 bg-white">
+                              {/* Fare Inclusions chips */}
+                              {hasFareInclusions && (
+                                <div>
+                                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                                    What's Included
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {rule.FareInclusions.map((inc, k) => {
+                                      const isBag = inc
+                                        .toLowerCase()
+                                        .includes("baggage");
+                                      const isMeal = inc
+                                        .toLowerCase()
+                                        .includes("meal");
+                                      const isSeat = inc
+                                        .toLowerCase()
+                                        .includes("seat");
+                                      const isCancel = inc
+                                        .toLowerCase()
+                                        .includes("cancel");
+                                      const isReissue = inc
+                                        .toLowerCase()
+                                        .includes("reissue");
+
+                                      const color = isCancel
+                                        ? "bg-red-50 text-red-700 border-red-100"
+                                        : isReissue
+                                          ? "bg-blue-50 text-blue-700 border-blue-100"
+                                          : isBag
+                                            ? "bg-violet-50 text-violet-700 border-violet-100"
+                                            : isMeal
+                                              ? "bg-amber-50 text-amber-700 border-amber-100"
+                                              : isSeat
+                                                ? "bg-teal-50 text-teal-700 border-teal-100"
+                                                : "bg-slate-50 text-slate-600 border-slate-200";
+
+                                      return (
+                                        <span
+                                          key={k}
+                                          className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border ${color}`}
+                                        >
+                                          {inc}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Parsed rule detail */}
+                              {parsed && (
+                                <>
+                                  {/* Table rows (structured rules) */}
+                                  {parsed.tableRows.length > 0 && (
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full text-xs border border-slate-100 rounded-lg overflow-hidden">
+                                        <tbody className="divide-y divide-slate-100">
+                                          {parsed.tableRows.map((row, k) => (
+                                            <tr
+                                              key={k}
+                                              className={
+                                                k % 2 === 0
+                                                  ? "bg-white"
+                                                  : "bg-slate-50/50"
+                                              }
+                                            >
+                                              {row.map((cell, l) => (
+                                                <td
+                                                  key={l}
+                                                  className={`px-3 py-2 text-slate-700 ${
+                                                    l === 0
+                                                      ? "font-semibold text-slate-800 w-2/5"
+                                                      : ""
+                                                  }`}
+                                                >
+                                                  {cell}
+                                                </td>
+                                              ))}
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+
+                                  {/* Bullet points */}
+                                  {parsed.bullets.length > 0 && (
+                                    <ul className="space-y-1.5">
+                                      {parsed.bullets.map((b, k) => (
+                                        <li
+                                          key={k}
+                                          className="flex items-start gap-2.5 text-[12px] text-slate-600"
+                                        >
+                                          <span className="text-[#0A4D68] mt-1 shrink-0 text-[8px]">
+                                            ●
+                                          </span>
+                                          {b}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+
+                                  {/* Paragraphs */}
+                                  {parsed.paragraphs.length > 0 && (
+                                    <div className="space-y-1">
+                                      {parsed.paragraphs.map((p, k) => (
+                                        <p
+                                          key={k}
+                                          className="text-[12px] text-slate-600 leading-relaxed"
+                                        >
+                                          {p}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Empty state */}
+                                  {!parsed.tableRows.length &&
+                                    !parsed.bullets.length &&
+                                    !parsed.paragraphs.length && (
+                                      <p className="text-[11px] text-slate-400 italic">
+                                        {i === 0
+                                          ? "No additional details available for this sector."
+                                          : "Please refer to the first sector's fare rules above."}
+                                      </p>
+                                    )}
+                                </>
+                              )}
+
+                              {/* No detail at all */}
+                              {!parsed && !hasFareInclusions && (
+                                <p className="text-[11px] text-slate-400 italic">
+                                  No fare rule details available for this
+                                  sector.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* SSR */}
           {(ssrSnap.seats?.length || 0) +
@@ -1514,18 +1815,19 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                             Ticket No
                           </p>
                           <p className="text-xs font-mono font-bold text-green-800">
-                            {provPax.Ticket.TicketId || provPax.Ticket.TicketNumber}
+                            {provPax.Ticket.TicketId ||
+                              provPax.Ticket.TicketNumber}
                           </p>
                         </div>
                         {provPax.BarcodeDetails?.Barcode?.[0]?.Content && (
-                           <div className="w-full">
-                             <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">
-                               Barcode Details (BCBP)
-                             </p>
-                             <p className="text-[10px] font-mono text-slate-500 bg-white border border-slate-100 p-2 rounded-lg break-all">
-                               {provPax.BarcodeDetails.Barcode[0].Content}
-                             </p>
-                           </div>
+                          <div className="w-full">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">
+                              Barcode Details (BCBP)
+                            </p>
+                            <p className="text-[10px] font-mono text-slate-500 bg-white border border-slate-100 p-2 rounded-lg break-all">
+                              {provPax.BarcodeDetails.Barcode[0].Content}
+                            </p>
+                          </div>
                         )}
                         <div>
                           <p className="text-[10px] font-bold text-green-600 uppercase">
@@ -1624,41 +1926,168 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
           )}
 
           {/* Amendment History */}
+          {/* Amendment History */}
           {amendHist.length > 0 && (
             <div>
               <SectionLabel
                 icon={<FiInfo size={11} />}
                 title={`Amendment History (${amendHist.length})`}
               />
-              <div className="space-y-2">
-                {amendHist.map((ah, i) => (
-                  <div
-                    key={i}
-                    className="bg-orange-50 border border-orange-100 rounded-xl p-4 flex justify-between items-start gap-4"
-                  >
-                    <div>
-                      <span className="px-2 py-0.5 bg-orange-200 text-orange-800 text-[10px] font-bold rounded uppercase">
-                        {ah.type?.replace(/_/g, " ")}
-                      </span>
-                      <p className="text-xs text-slate-600 mt-1 font-semibold capitalize">
-                        {ah.status?.replace(/_/g, " ")}
-                      </p>
-                      {ah.changeRequestId && (
-                        <p className="text-[10px] font-mono text-slate-400 mt-0.5">
-                          CR ID: {ah.changeRequestId}
+              <div className="space-y-3">
+                {amendHist.map((ah, i) => {
+                  // Extract TicketCRInfo from nested response
+                  const ticketCRList =
+                    ah.response?.flatMap?.(
+                      (item) => item?.response?.Response?.TicketCRInfo || [],
+                    ) ||
+                    ah.response?.Response?.TicketCRInfo ||
+                    [];
+
+                  const isCancelled =
+                    ah.type === "FULL_CANCEL" || ah.type === "PARTIAL_CANCEL";
+
+                  return (
+                    <div
+                      key={i}
+                      className="bg-orange-50 border border-orange-100 rounded-xl p-4 space-y-3"
+                    >
+                      {/* Header row */}
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${
+                              isCancelled
+                                ? "bg-red-100 text-red-700"
+                                : "bg-blue-100 text-blue-700"
+                            }`}
+                          >
+                            {ah.type?.replace(/_/g, " ")}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${
+                              ah.status === "requested"
+                                ? "bg-amber-100 text-amber-700"
+                                : ah.status === "completed"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {ah.status?.replace(/_/g, " ")}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 shrink-0">
+                          {formatDateTime(ah.createdAt)}
                         </p>
-                      )}
-                    </div>
-                    <div className="text-right text-[11px] text-slate-400">
-                      <p>{formatDateTime(ah.createdAt)}</p>
+                      </div>
+
+                      {/* TicketCRInfo details */}
+                      {ticketCRList.map((cr, j) => (
+                        <div
+                          key={j}
+                          className="bg-white border border-orange-100 rounded-xl p-4 space-y-3"
+                        >
+                          {/* Remarks banner */}
+                          {cr.Remarks && (
+                            <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                              <FiCheckCircle
+                                size={13}
+                                className="text-emerald-500 shrink-0 mt-0.5"
+                              />
+                              <p className="text-[12px] text-emerald-800 font-semibold">
+                                {cr.Remarks}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Financial grid */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {cr.CancellationCharge != null && (
+                              <div>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">
+                                  Cancellation Charge
+                                </p>
+                                <p className="text-sm font-black text-red-600">
+                                  ₹{cr.CancellationCharge.toLocaleString()}
+                                </p>
+                              </div>
+                            )}
+                            {cr.RefundedAmount != null && (
+                              <div>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">
+                                  Refunded Amount
+                                </p>
+                                <p className="text-sm font-black text-emerald-600">
+                                  ₹{cr.RefundedAmount.toLocaleString()}
+                                </p>
+                              </div>
+                            )}
+                            {cr.CreditNoteNo && (
+                              <div>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">
+                                  Credit Note No.
+                                </p>
+                                <p className="text-sm font-mono font-bold text-slate-800">
+                                  {cr.CreditNoteNo}
+                                </p>
+                              </div>
+                            )}
+                            {cr.CreditNoteCreatedOn && (
+                              <div>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">
+                                  Credit Note Date
+                                </p>
+                                <p className="text-sm font-semibold text-slate-700">
+                                  {formatDateTime(cr.CreditNoteCreatedOn)}
+                                </p>
+                              </div>
+                            )}
+                            {cr.ChangeRequestId && (
+                              <div>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">
+                                  Change Request ID
+                                </p>
+                                <p className="text-sm font-mono font-bold text-slate-700">
+                                  {cr.ChangeRequestId}
+                                </p>
+                              </div>
+                            )}
+                            {cr.TicketId && (
+                              <div>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">
+                                  Ticket ID
+                                </p>
+                                <p className="text-sm font-mono font-bold text-slate-700">
+                                  {cr.TicketId}
+                                </p>
+                              </div>
+                            )}
+                            {cr.ChangeRequestStatus != null && (
+                              <div>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">
+                                  CR Status
+                                </p>
+                                <p className="text-sm font-bold text-slate-700">
+                                  {cr.ChangeRequestStatus === 4
+                                    ? "✅ Completed"
+                                    : cr.ChangeRequestStatus === 1
+                                      ? "🔄 In Progress"
+                                      : `Status ${cr.ChangeRequestStatus}`}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Error message if any */}
                       {ah.response?.Response?.Error?.ErrorMessage && (
-                        <p className="text-red-500 mt-0.5 text-[10px]">
-                          {ah.response.Response.Error.ErrorMessage}
+                        <p className="text-red-500 text-[11px] font-semibold">
+                          ⚠ {ah.response.Response.Error.ErrorMessage}
                         </p>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1696,30 +2125,35 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                   </div>
                 )}
               </div>
-               <InfoRow
-                  label="Approver Name"
-                  value={
-                    approverDetails.name ||
-                    `${approver.name?.firstName || ""} ${approver.name?.lastName || ""}`.trim() ||
-                    raw.approverName ||
-                    "—"
-                  }
-                  padded
-                />
-                <InfoRow
-                  label="Approver Email"
-                  value={approverDetails.email || raw.approverEmail || "—"}
-                  padded
-                />
-                <InfoRow
-                  label="Approver Role"
-                  value={approverDetails.role || raw.approverRole || approver.role || "—"}
-                  padded
-                />
+              <InfoRow
+                label="Approver Name"
+                value={
+                  approverDetails.name ||
+                  `${approver.name?.firstName || ""} ${approver.name?.lastName || ""}`.trim() ||
+                  raw.approverName ||
+                  "—"
+                }
+                padded
+              />
+              <InfoRow
+                label="Approver Email"
+                value={approverDetails.email || raw.approverEmail || "—"}
+                padded
+              />
+              <InfoRow
+                label="Approver Role"
+                value={
+                  approverDetails.role ||
+                  raw.approverRole ||
+                  approver.role ||
+                  "—"
+                }
+                padded
+              />
 
-                 <InfoRow label="Project ID" value={raw.projectId} padded />
-                <InfoRow label="Project Name" value={raw.projectName} padded />
-                <InfoRow label="Client" value={raw.projectClient} padded />
+              <InfoRow label="Project ID" value={raw.projectId} padded />
+              <InfoRow label="Project Name" value={raw.projectName} padded />
+              <InfoRow label="Client" value={raw.projectClient} padded />
             </div>
             <div>
               <SectionLabel icon={<FiTag size={11} />} title="Booking Meta" />
@@ -1737,7 +2171,7 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                   mono
                   padded
                 />
-               
+
                 <InfoRow
                   label="Execution Status"
                   value={raw.executionStatus?.replace(/_/g, " ")}
@@ -1755,7 +2189,6 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
                   value={formatDateTime(raw.updatedAt)}
                   padded
                 />
-               
               </div>
             </div>
           </div>

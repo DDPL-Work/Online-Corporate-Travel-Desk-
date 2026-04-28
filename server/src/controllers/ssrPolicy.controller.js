@@ -11,9 +11,9 @@ const asyncHandler = require("../utils/asyncHandler");
 ───────────────────────────────────────────────────────────────────────────── */
 
 const DEFAULT_POLICY = {
-  allowSeat: true,
-  allowMeal: true,
-  allowBaggage: true,
+  allowSeat: false,
+  allowMeal: false,
+  allowBaggage: false,
   seatPriceRange: { min: 0, max: 99999 },
   mealPriceRange: { min: 0, max: 99999 },
   baggagePriceRange: { min: 0, max: 99999 },
@@ -76,9 +76,9 @@ exports.upsertPolicy = asyncHandler(async (req, res) => {
         corporateId: req.user.corporateId,
         employeeEmail: employeeEmail.toLowerCase().trim(),
         employeeId: employee?._id || null,
-        allowSeat: allowSeat ?? true,
-        allowMeal: allowMeal ?? true,
-        allowBaggage: allowBaggage ?? true,
+        allowSeat: allowSeat ?? false,
+        allowMeal: allowMeal ?? false,
+        allowBaggage: allowBaggage ?? false,
         seatPriceRange: seatPriceRange ?? { min: 0, max: 99999 },
         mealPriceRange: mealPriceRange ?? { min: 0, max: 99999 },
         baggagePriceRange: baggagePriceRange ?? { min: 0, max: 99999 },
@@ -185,12 +185,21 @@ exports.deletePolicy = asyncHandler(async (req, res) => {
    Access: any authenticated user
 ───────────────────────────────────────────────────────────────────────────── */
 exports.getMyPolicy = asyncHandler(async (req, res) => {
-  const policy = await EmployeeSsrPolicy.findOne({
+  let policy = await EmployeeSsrPolicy.findOne({
     corporateId: req.user.corporateId,
     employeeEmail: req.user.email.toLowerCase().trim(),
-  }).lean();
+  });
 
-  // Return default open policy if none configured
+  // Auto-set restricted default policy if none exists
+  if (!policy && req.user.corporateId) {
+    policy = await EmployeeSsrPolicy.create({
+      corporateId: req.user.corporateId,
+      employeeEmail: req.user.email.toLowerCase().trim(),
+      employeeId: req.user.id,
+      ...DEFAULT_POLICY,
+    });
+  }
+
   res.status(200).json(
     new ApiResponse(
       200,
@@ -214,54 +223,63 @@ exports.validateSsrSelections = asyncHandler(async (req, res) => {
     employeeEmail: req.user.email.toLowerCase().trim(),
   }).lean();
 
-  // No policy → everything allowed
-  if (!policy) {
-    return res.status(200).json(new ApiResponse(200, { valid: true }, "SSR valid"));
-  }
-
+  // No policy → use default (which is now restricted)
+  const effectivePolicy = policy || DEFAULT_POLICY;
   const errors = [];
 
   // ── Seat validation ──
-  if (seats.length > 0 && !policy.allowSeat) {
-    errors.push("Seat selection is restricted for your account.");
-  } else if (seats.length > 0 && policy.allowSeat) {
+  if (seats.length > 0) {
     for (const seat of seats) {
       const price = seat.price || 0;
-      if (price < policy.seatPriceRange.min || price > policy.seatPriceRange.max) {
-        errors.push(
-          `Seat price ₹${price} exceeds your allowed range (₹${policy.seatPriceRange.min}–₹${policy.seatPriceRange.max}).`
-        );
-        break;
+      if (price > 0) {
+        if (!effectivePolicy.allowSeat) {
+          errors.push("Paid seat selection is restricted for your account.");
+          break;
+        }
+        if (price < effectivePolicy.seatPriceRange.min || price > effectivePolicy.seatPriceRange.max) {
+          errors.push(
+            `Seat price ₹${price} exceeds your allowed range (₹${effectivePolicy.seatPriceRange.min}–₹${effectivePolicy.seatPriceRange.max}).`
+          );
+          break;
+        }
       }
     }
   }
 
   // ── Meal validation ──
-  if (meals.length > 0 && !policy.allowMeal) {
-    errors.push("Meal selection is not allowed for your account.");
-  } else if (meals.length > 0 && policy.allowMeal) {
+  if (meals.length > 0) {
     for (const meal of meals) {
       const price = meal.price || 0;
-      if (price < policy.mealPriceRange.min || price > policy.mealPriceRange.max) {
-        errors.push(
-          `Meal price ₹${price} exceeds your allowed range (₹${policy.mealPriceRange.min}–₹${policy.mealPriceRange.max}).`
-        );
-        break;
+      if (price > 0) {
+        if (!effectivePolicy.allowMeal) {
+          errors.push("Paid meal selection is not allowed for your account.");
+          break;
+        }
+        if (price < effectivePolicy.mealPriceRange.min || price > effectivePolicy.mealPriceRange.max) {
+          errors.push(
+            `Meal price ₹${price} exceeds your allowed range (₹${effectivePolicy.mealPriceRange.min}–₹${effectivePolicy.mealPriceRange.max}).`
+          );
+          break;
+        }
       }
     }
   }
 
   // ── Baggage validation ──
-  if (baggage.length > 0 && !policy.allowBaggage) {
-    errors.push("Baggage selection exceeds your allowed limit.");
-  } else if (baggage.length > 0 && policy.allowBaggage) {
+  if (baggage.length > 0) {
     for (const bag of baggage) {
       const price = bag.price || 0;
-      if (price < policy.baggagePriceRange.min || price > policy.baggagePriceRange.max) {
-        errors.push(
-          `Baggage price ₹${price} exceeds your allowed range (₹${policy.baggagePriceRange.min}–₹${policy.baggagePriceRange.max}).`
-        );
-        break;
+      if (price > 0) {
+        if (!effectivePolicy.allowBaggage) {
+          errors.push("Paid baggage selection is restricted for your account.");
+          break;
+        }
+        if (price < effectivePolicy.baggagePriceRange.min || price > effectivePolicy.baggagePriceRange.max) {
+          errors.push(
+            `Baggage price ₹${price} exceeds your allowed range (₹${effectivePolicy.baggagePriceRange.min}–₹${effectivePolicy.baggagePriceRange.max}).`
+          );
+          break;
+        }
       }
     }
   }

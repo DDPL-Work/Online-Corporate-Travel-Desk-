@@ -18,16 +18,17 @@ import {
   FiCalendar,
   FiClock,
   FiShield,
-  FiInfo,
   FiChevronDown,
   FiChevronUp,
   FiStar,
   FiXCircle,
   FiAlertTriangle,
-  FiDollarSign,
   FiX,
   FiLoader,
-  FiStopCircle,
+  FiMail,
+  FiMessageSquare,
+  FiGlobe,
+  FiPhone,
 } from "react-icons/fi";
 import {
   downloadTicketPdf,
@@ -50,16 +51,14 @@ import {
   formatDateWithYear,
   getCabinClassLabel,
   airlineLogo,
-  airlineThemes,
   FLIGHT_STATUS_MAP,
 } from "../../utils/formatter";
 import Swal from "sweetalert2";
 import ReissueModal from "./ReissueModal";
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Utility helpers                                                */
-/* ─────────────────────────────────────────────────────────────── */
-
+/* ────────────────────────────────────────────────────────────── */
+/*  Utility helpers (unchanged)                                   */
+/* ────────────────────────────────────────────────────────────── */
 function formatPaxType(paxType) {
   const map = { ADULT: "Adult", CHILD: "Child", INFANT: "Infant" };
   return map[paxType] || paxType || "Unknown";
@@ -82,7 +81,6 @@ function extractCancellationChargeInfo(response) {
     ? root.TicketCRInfo[0]
     : root?.TicketCRInfo;
   const info = cancelChargeDetails || ticketCrInfo || {};
-
   return {
     cancellationCharge: firstDefined(
       info?.CancellationCharge,
@@ -93,7 +91,7 @@ function extractCancellationChargeInfo(response) {
       info?.RefundedAmount,
       info?.RefundAmount,
       root?.RefundedAmount,
-      root?.RefundAmount
+      root?.RefundAmount,
     ),
     creditNoteNo: firstDefined(info?.CreditNoteNo, root?.CreditNoteNo),
     errorMessage: root?.Error?.ErrorMessage || response?.message || null,
@@ -112,35 +110,24 @@ function formatLayoverDuration(mins) {
   return h > 0 ? `${h}h ${m}m layover` : `${m}m layover`;
 }
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Shared primitives                                              */
-/* ─────────────────────────────────────────────────────────────── */
-
+/* ────────────────────────────────────────────────────────────── */
+/*  Shared primitives (restyled)                                  */
+/* ────────────────────────────────────────────────────────────── */
 function StatusPill({ status, size = "sm" }) {
   const map = {
-    Confirmed: "bg-emerald-400/20 text-emerald-300 ring-1 ring-emerald-400/30",
-    Pending: "bg-amber-400/20   text-amber-300   ring-1 ring-amber-400/30",
-    Cancelled: "bg-red-400/20     text-red-300     ring-1 ring-red-400/30",
-    ticketed: "bg-emerald-400/20 text-emerald-300 ring-1 ring-emerald-400/30",
-    approved: "bg-blue-400/20 text-blue-300 ring-1 ring-blue-400/30",
-    pending: "bg-amber-400/20   text-amber-300   ring-1 ring-amber-400/30",
-    cancelled: "bg-red-400/20     text-red-300     ring-1 ring-red-400/30",
-  };
-  const dot = {
-    Confirmed: "bg-emerald-400",
-    Pending: "bg-amber-400",
-    Cancelled: "bg-red-400",
-    ticketed: "bg-emerald-400",
-    approved: "bg-blue-400",
-    pending: "bg-amber-400",
-    cancelled: "bg-red-400",
+    Confirmed: "bg-green-100 text-green-800",
+    Pending: "bg-amber-100 text-amber-800",
+    Cancelled: "bg-red-100 text-red-800",
+    ticketed: "bg-green-100 text-green-800",
+    approved: "bg-blue-100 text-blue-800",
+    pending: "bg-amber-100 text-amber-800",
+    cancelled: "bg-red-100 text-red-800",
   };
   const key = status?.toLowerCase() || "pending";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase ${map[key] || map.Pending}`}
+      className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase ${map[key] || map.pending}`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${dot[key] || dot.Pending}`} />
       {status}
     </span>
   );
@@ -148,10 +135,10 @@ function StatusPill({ status, size = "sm" }) {
 
 function InfoRow({ label, value, accent, mono }) {
   return (
-    <div className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
-      <span className="text-xs text-slate-400 font-medium">{label}</span>
+    <div className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+      <span className="text-xs text-gray-500 font-medium">{label}</span>
       <span
-        className={`text-[13px] font-semibold ${accent ? "text-teal-600" : "text-slate-800"} ${mono ? "font-mono tracking-wide" : ""}`}
+        className={`text-[13px] font-semibold ${accent ? "text-teal-600" : "text-gray-800"} ${mono ? "font-mono tracking-wide" : ""}`}
       >
         {value ?? "—"}
       </span>
@@ -159,175 +146,10 @@ function InfoRow({ label, value, accent, mono }) {
   );
 }
 
-function BentoCard({ children, className = "" }) {
-  return (
-    <div
-      className={`bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm ${className}`}
-    >
-      {children}
-    </div>
-  );
-}
-
-function CardLabel({ icon: Icon, label }) {
-  return (
-    <div className="flex items-center gap-2 mb-5">
-      <span className="bg-cyan-50 rounded-lg p-1.5 flex items-center justify-center">
-        <Icon size={13} className="text-teal-600" />
-      </span>
-      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-        {label}
-      </span>
-    </div>
-  );
-}
-
-function MetaChip({ icon: Icon, label, value }) {
-  return (
-    <div className="flex items-center gap-2 bg-white/[0.07] rounded-xl px-3 py-2.5 border border-white/10">
-      <Icon size={13} className="text-white/50 shrink-0" />
-      <div>
-        <p className="text-[9px] uppercase tracking-widest text-white/40 font-bold leading-none mb-0.5">
-          {label}
-        </p>
-        <p className="text-[13px] font-semibold text-white leading-none">
-          {value || "—"}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function RouteConnector({ duration, stops = 0 }) {
-  return (
-    <div className="flex flex-col items-center gap-1 px-2">
-      <span className="text-[10px] font-bold tracking-widest text-white/40 uppercase">
-        {duration}
-      </span>
-      <div className="flex items-center gap-0 w-full">
-        <span className="w-2 h-2 rounded-full border-2 border-white/30 shrink-0" />
-        <div className="flex-1 relative flex items-center">
-          <div className="w-full border-t border-dashed border-white/20" />
-          <span className="absolute left-1/2 -translate-x-1/2 -translate-y-[55%] text-sm select-none">
-            ✈
-          </span>
-        </div>
-        <span className="w-2 h-2 rounded-full bg-white/30 shrink-0" />
-      </div>
-      <span className="text-[9px] font-bold tracking-widest text-white/30 uppercase">
-        {stops === 0 ? "Non-stop" : `${stops} stop${stops > 1 ? "s" : ""}`}
-      </span>
-    </div>
-  );
-}
-
-function LayoverBanner({ prevSeg, nextSeg }) {
-  const mins = layoverMinutes(prevSeg, nextSeg);
-  const airport =
-    prevSeg?.destination?.airportCode || prevSeg?.destination?.city || "—";
-  const city = prevSeg?.destination?.city || "";
-  return (
-    <div className="flex items-center gap-3 px-4 py-3 my-3 rounded-xl bg-white/10 border border-white/15">
-      <FiClock size={13} className="text-amber-300 shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-widest text-amber-300 mb-0.5">
-          Layover · {airport} {city ? `(${city})` : ""}
-        </p>
-        <div className="flex items-center gap-4 text-[11px] text-white/50">
-          <span>Arrive {formatTime(prevSeg.arrivalDateTime)}</span>
-          <span className="text-white/25">→</span>
-          <span>Depart {formatTime(nextSeg.departureDateTime)}</span>
-          <span className="ml-auto font-semibold text-amber-200">
-            {formatLayoverDuration(mins)}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FareClassBadge({ label, color }) {
-  const bgStyle = color
-    ? { backgroundColor: color + "33", borderColor: color + "66" }
-    : {};
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black tracking-wide border"
-      style={bgStyle}
-    >
-      <FiStar
-        size={10}
-        style={color ? { color } : {}}
-        className={!color ? "text-teal-400" : ""}
-      />
-      <span style={color ? { color } : { color: "#2dd4bf" }}>{label}</span>
-    </span>
-  );
-}
-
-function SegmentRow({ seg, fareClassInfo, isFirst, isLast }) {
-  return (
-    <div className="grid grid-cols-[1fr_160px_1fr] items-center py-5 border-b border-white/10 last:border-0">
-      <div className="space-y-1">
-        {isFirst && (
-          <p className="text-[11px] text-white/40 font-bold uppercase tracking-widest">
-            From
-          </p>
-        )}
-        <p className="text-[40px] font-black tracking-tighter leading-none">
-          {seg?.origin?.city}
-        </p>
-        <p className="text-sm text-white/70 font-medium">
-          {seg?.origin?.airportCode}
-        </p>
-        {seg?.origin?.terminal && (
-          <p className="text-[10px] text-white/30">
-            Terminal {seg.origin.terminal}
-          </p>
-        )}
-        <div className="flex items-baseline gap-2 mt-1">
-          <p className="text-xl font-black">
-            {formatTime(seg?.departureDateTime)}
-          </p>
-          <p className="text-xs text-white/40">
-            {formatDate(seg?.departureDateTime)}
-          </p>
-        </div>
-      </div>
-
-      <RouteConnector duration={formatDuration(seg?.durationMinutes)} />
-
-      <div className="text-right space-y-1">
-        {isFirst && (
-          <p className="text-[11px] text-white/40 font-bold uppercase tracking-widest">
-            To
-          </p>
-        )}
-        <p className="text-[40px] font-black tracking-tighter leading-none">
-          {seg?.destination?.city}
-        </p>
-        <p className="text-sm text-white/70 font-medium">
-          {seg?.destination?.airportCode}
-        </p>
-        {seg?.destination?.terminal && (
-          <p className="text-[10px] text-white/30">
-            Terminal {seg.destination.terminal}
-          </p>
-        )}
-        <div className="flex items-baseline gap-2 justify-end mt-1">
-          <p className="text-xl font-black">
-            {formatTime(seg?.arrivalDateTime)}
-          </p>
-          <p className="text-xs text-white/40">
-            {formatDate(seg?.arrivalDateTime)}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function JourneyCard({
+/* ────────────────────────────────────────────────────────────── */
+/*  New light flight card component (replaces JourneyCard)       */
+/* ────────────────────────────────────────────────────────────── */
+function FlightCard({
   journeyType,
   segments,
   pnr,
@@ -342,389 +164,593 @@ function JourneyCard({
   const lastSeg = segments[segments.length - 1];
   const isDownloading = downloading === journeyType;
 
-  let supplierFareClass = null;
-  let fareClassColor = null;
+  // Resolve airline info string
+  const airlineInfo = [
+    firstSeg?.airlineName,
+    segments.map((s) => `${s.airlineCode} ${s.flightNumber}`).join(" · "),
+    getCabinClassLabel?.(firstSeg?.cabinClass) || "Economy",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-  if (journeyType === "onward") {
-    const fi = safeGet(
-      bookingResult,
-      "onwardResponse",
-      "Response",
-      "Response",
-      "FlightItinerary",
-    );
-    supplierFareClass =
-      fi?.SupplierFareClasses || fi?.FareClassification?.split?.("#")?.[0];
-    fareClassColor = fi?.FareClassification?.split?.("#")?.[1];
-  } else if (journeyType === "return") {
-    const fi = safeGet(
-      bookingResult,
-      "returnResponse",
-      "Response",
-      "Response",
-      "FlightItinerary",
-    );
-    supplierFareClass =
-      fi?.SupplierFareClasses || fi?.FareClassification?.split?.("#")?.[0];
-    fareClassColor = fi?.FareClassification?.split?.("#")?.[1];
-  }
+  // Total stops across all segments
+  const totalStops = segments.length - 1;
+  const stopLabel =
+    totalStops === 0
+      ? "Non-stop"
+      : `${totalStops} Stop${totalStops > 1 ? "s" : ""} · ${segments
+          .slice(0, -1)
+          .map((s) => s.destination?.airportCode)
+          .join(", ")}`;
 
-  if (!supplierFareClass && fareQuoteResults?.length) {
-    const idx = journeyType === "return" ? 1 : 0;
-    const result = fareQuoteResults[idx] || fareQuoteResults[0];
-    supplierFareClass =
-      result?.Segments?.[0]?.[0]?.SupplierFareClass ||
-      result?.FareClassification?.Type;
-    fareClassColor = result?.FareClassification?.Color;
-    if (!supplierFareClass)
-      supplierFareClass = result?.Segments?.[0]?.[0]?.FareClassification?.Type;
-  }
+  // Overall journey duration: departure of first seg → arrival of last seg
+  const journeyOrigin = firstSeg?.origin;
+  const journeyDestination = lastSeg?.destination;
+  const departureTime = formatTime(firstSeg?.departureDateTime);
+  const arrivalTime = formatTime(lastSeg?.arrivalDateTime);
 
-  const theme = airlineThemes?.[firstSeg?.airlineCode] || {
-    primary: "#0A2540",
-    secondary: "#0c3352",
+  const totalMinutes =
+    segments.reduce((sum, s) => sum + (s.durationMinutes || 0), 0) +
+    segments.slice(0, -1).reduce((sum, s, i) => {
+      return sum + layoverMinutes(s, segments[i + 1]);
+    }, 0);
+
+  const totalDuration = formatDuration(totalMinutes);
+
+  // Helper to find airport names from deeper data structures
+  const resolveAirportName = (code, isOrigin) => {
+    // 1. Check if already in segment (unlikely but safe)
+    const segMatch = segments.find(s => (isOrigin ? s.origin?.airportCode : s.destination?.airportCode) === code);
+    const existing = isOrigin ? (segMatch?.origin?.airportName || segMatch?.origin?.AirportName) : (segMatch?.destination?.airportName || segMatch?.destination?.AirportName);
+    if (existing) return existing;
+
+    // 2. Check bookingResult (confirmed itinerary)
+    const itinerary = journeyType === "return" 
+      ? bookingResult?.returnResponse?.Response?.Response?.FlightItinerary 
+      : (bookingResult?.onwardResponse || bookingResult?.providerResponse)?.Response?.Response?.FlightItinerary;
+    
+    const tboSegs = itinerary?.Segments || [];
+    const tboMatch = tboSegs.find(s => (isOrigin ? s.Origin?.Airport?.AirportCode : s.Destination?.Airport?.AirportCode) === code);
+    if (tboMatch) return isOrigin ? tboMatch.Origin?.Airport?.AirportName : tboMatch.Destination?.Airport?.AirportName;
+
+    // 3. Check fareQuoteResults (pre-booking snapshot)
+    for (const res of (fareQuoteResults || [])) {
+      for (const segGroup of (res.Segments || [])) {
+        for (const s of segGroup) {
+          const matchCode = isOrigin ? s.Origin?.Airport?.AirportCode : s.Destination?.Airport?.AirportCode;
+          if (matchCode === code) return isOrigin ? s.Origin?.Airport?.AirportName : s.Destination?.Airport?.AirportName;
+        }
+      }
+    }
+    return null;
   };
-  const gradient = `linear-gradient(140deg, ${theme.primary} 0%, ${theme.secondary} 60%, ${theme.primary} 100%)`;
 
-  const statusLabel = FLIGHT_STATUS_MAP?.["Confirmed"]?.label || "Confirmed";
-
-  let ticketNumber = null;
-  let issueDate = null;
-  let validatingAirline = null;
-
-  const responseKey =
-    journeyType === "return" ? "returnResponse" : "onwardResponse";
-  const fi = safeGet(
-    bookingResult,
-    responseKey,
-    "Response",
-    "Response",
-    "FlightItinerary",
-  );
-  if (fi) {
-    ticketNumber = fi.Passenger?.[0]?.Ticket?.TicketNumber;
-    issueDate = fi.Passenger?.[0]?.Ticket?.IssueDate;
-    validatingAirline = fi.ValidatingAirlineCode;
-  }
+  const originAirportName = resolveAirportName(journeyOrigin?.airportCode, true);
+  const destAirportName = resolveAirportName(journeyDestination?.airportCode, false);
 
   return (
-    <div
-      className="rounded-2xl overflow-hidden shadow-2xl text-white relative"
-      style={{ background: gradient }}
-    >
-      <div
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(0deg,#fff 0px,#fff 1px,transparent 1px,transparent 40px),repeating-linear-gradient(90deg,#fff 0px,#fff 1px,transparent 1px,transparent 40px)",
-        }}
-      />
-
-      <div className="relative p-6 grid gap-0">
-        <div className="flex items-center gap-3 pb-5 border-b border-white/10">
-          {airlineLogo?.(firstSeg?.airlineCode) ? (
-            <img
-              src={airlineLogo(firstSeg.airlineCode)}
-              alt=""
-              className="w-10 h-10 rounded-xl object-contain bg-white/10 p-1.5 shrink-0"
-            />
-          ) : (
-            <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-sm font-black shrink-0">
-              {firstSeg?.airlineCode}
-            </div>
+    <div className="bg-[#F5F0E8] rounded-2xl border border-[#E0D8C8] overflow-hidden">
+      {/* Card header row */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#E0D8C8]">
+        <div className="flex items-center gap-2">
+          <span className="text-[#A07840] text-xs">
+            {journeyType === "return" ? "↙" : "↗"}
+          </span>
+          <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
+            {journeyType === "return" ? "Return" : "One-Way"}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          {pnr && (
+            <span className="inline-flex items-center gap-1.5 bg-gray-900 text-white rounded-full px-3.5 py-1.5">
+              <span className="text-[9px] font-bold uppercase tracking-widest opacity-50">
+                PNR
+              </span>
+              <span className="font-mono text-[13px] font-bold">{pnr}</span>
+            </span>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold truncate">
-              {firstSeg?.airlineName}
+          <span className="text-[11px] text-[#8B7355] font-medium tracking-wide">
+            {airlineInfo}
+          </span>
+        </div>
+      </div>
+
+      {/* Main flight row */}
+      <div className="px-5 pt-5 pb-4">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+          {/* Origin */}
+          <div>
+            <p className="text-[11px] font-bold text-[#8B7355] uppercase tracking-wider mb-2">
+              {formatDate(firstSeg?.departureDateTime)}
             </p>
-            <p className="text-[11px] text-white/50 mt-0.5">
-              {segments
-                .map((s) => `${s.airlineCode} ${s.flightNumber}`)
-                .join(" → ")}
+            <p className="text-[44px] font-black tracking-tight leading-none text-gray-900">
+              {departureTime}
             </p>
-          </div>
-
-          <div className="flex flex-col items-end gap-2">
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/30 bg-white/10 px-2.5 py-1 rounded-full">
-              {journeyType === "return" ? "↩ Return" : "↗ Onward"}
-            </span>
-            <StatusPill status={statusLabel} />
-          </div>
-        </div>
-
-        {supplierFareClass && (
-          <div className="py-3 border-b border-white/10 flex items-center gap-2">
-            <FareClassBadge label={supplierFareClass} color={fareClassColor} />
-            <span className="text-[10px] text-white/30 font-medium">
-              Fare Class
-            </span>
-          </div>
-        )}
-
-        <div className="border-b border-white/10">
-          {segments.map((seg, i) => (
-            <React.Fragment key={i}>
-              {i > 0 && (
-                <LayoverBanner prevSeg={segments[i - 1]} nextSeg={seg} />
-              )}
-              <SegmentRow
-                seg={seg}
-                isFirst={i === 0}
-                isLast={i === segments.length - 1}
-              />
-            </React.Fragment>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-3 gap-2.5 py-4 border-b border-white/10">
-          <MetaChip
-            icon={FiPackage}
-            label="Check-in"
-            value={firstSeg?.baggage?.checkIn}
-          />
-          <MetaChip
-            icon={FiPackage}
-            label="Cabin bag"
-            value={firstSeg?.baggage?.cabin}
-          />
-          <MetaChip
-            icon={FiMapPin}
-            label="Terminal"
-            value={firstSeg?.origin?.terminal || "N/A"}
-          />
-        </div>
-
-        {ticketNumber && (
-          <div className="grid grid-cols-3 gap-2.5 py-4 border-b border-white/10">
-            <MetaChip
-              icon={FiFileText}
-              label="Ticket No."
-              value={ticketNumber}
-            />
-            <MetaChip
-              icon={FiCalendar}
-              label="Issue Date"
-              value={issueDate ? formatDate(issueDate) : "—"}
-            />
-            <MetaChip
-              icon={FiTag}
-              label="Validating Airline"
-              value={validatingAirline}
-            />
-          </div>
-        )}
-
-        {paymentSuccessful && (
-          <div className="pt-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[9px] uppercase tracking-widest text-white/35 font-bold mb-1">
-                Booking Reference (PNR)
+            <div className="flex flex-col gap-0.5 mt-2">
+              <div className="flex items-baseline gap-2">
+                <span className="text-[15px] font-bold text-gray-900">
+                  {journeyOrigin?.airportCode}
+                </span>
+                <span className="text-[12px] text-[#8B7355] font-medium uppercase tracking-wide">
+                  {journeyOrigin?.city}
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-400 font-medium leading-tight">
+                {originAirportName}
               </p>
-              {pnr ? (
-                <p className="text-xl font-black tracking-[0.15em] font-mono text-white">
-                  {pnr}
-                </p>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <FiRefreshCw
-                    size={13}
-                    className="text-white/40 animate-spin"
-                  />
-                  <span className="text-sm text-white/40 font-semibold">
-                    Awaiting assignment…
+            </div>
+          </div>
+
+          {/* Connector */}
+          <div className="flex flex-col items-center gap-1.5 min-w-[160px]">
+            <span className="text-[11px] font-semibold text-[#8B7355]">
+              {totalDuration}
+            </span>
+            <div className="flex items-center w-full gap-0">
+              <div className="flex-1 border-t-[1.5px] border-dashed border-[#C8B898]" />
+              <span className="mx-2 text-[#A07840] text-sm">✈</span>
+              <div className="flex-1 border-t-[1.5px] border-dashed border-[#C8B898]" />
+            </div>
+            <span className="text-[10px] font-semibold text-[#8B7355] uppercase tracking-wide">
+              {stopLabel}
+            </span>
+          </div>
+
+          {/* Destination */}
+          <div className="text-right">
+            <p className="text-[11px] font-bold text-[#8B7355] uppercase tracking-wider mb-2">
+              {formatDate(lastSeg?.arrivalDateTime)}
+            </p>
+            <p className="text-[44px] font-black tracking-tight leading-none text-gray-900">
+              {arrivalTime}
+            </p>
+            <div className="flex flex-col gap-0.5 mt-2">
+              <div className="flex items-baseline gap-2 justify-end">
+                <span className="text-[12px] text-[#8B7355] font-medium uppercase tracking-wide">
+                  {journeyDestination?.city}
+                </span>
+                <span className="text-[15px] font-bold text-gray-900">
+                  {journeyDestination?.airportCode}
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-400 font-medium leading-tight">
+                {destAirportName}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Layover banners (between segments) */}
+        {segments.length > 1 && (
+          <div className="mt-4 space-y-2">
+            {segments.slice(0, -1).map((seg, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 bg-white/60 border border-[#E0D8C8] rounded-xl px-4 py-2.5"
+              >
+                <span className="text-[#A07840] text-xs shrink-0">◎</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[13px] font-semibold text-gray-800">
+                    {seg.destination?.airportCode}
+                  </span>
+                  <span className="text-[12px] text-[#8B7355] font-medium ml-1.5 uppercase tracking-wide">
+                    {seg.destination?.city}
                   </span>
                 </div>
-              )}
-            </div>
-
-            {pnr && showDownload && (
-              <button
-                onClick={() => onDownload(journeyType)}
-                disabled={isDownloading}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl text-[13px] font-bold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-md"
-              >
-                <FiDownload size={14} />
-                {isDownloading ? "Downloading…" : "Download Ticket"}
-              </button>
-            )}
+                <div className="flex items-center gap-3 text-[11px] text-[#8B7355] shrink-0">
+                  {seg.destination?.terminal &&
+                    segments[i + 1]?.origin?.terminal && (
+                      <span className="font-medium">
+                        T{seg.destination.terminal} → T
+                        {segments[i + 1].origin.terminal}
+                      </span>
+                    )}
+                  <span className="flex items-center gap-1 font-semibold">
+                    <FiClock size={11} />
+                    {formatLayoverDuration(
+                      layoverMinutes(seg, segments[i + 1]),
+                    )}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
+      </div>
 
-        {!paymentSuccessful && (
-          <div className="pt-4 flex items-center gap-2 text-white/30">
-            <FiAlertCircle size={14} />
-            <p className="text-xs font-medium">
-              Complete payment to view PNR and download ticket
-            </p>
-          </div>
+      {/* Baggage chips footer */}
+      <div className="px-5 pb-4 flex items-center gap-2 flex-wrap">
+        {firstSeg?.origin?.terminal && (
+          <span className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-[#D8CEB8] bg-white/50 text-[#6B5B3E]">
+            T{firstSeg.origin.terminal}
+          </span>
+        )}
+        {firstSeg?.baggage?.cabin && (
+          <span className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-[#D8CEB8] bg-white/50 text-[#6B5B3E]">
+            {firstSeg.baggage.cabin} Cab
+          </span>
+        )}
+        {firstSeg?.baggage?.checkIn && (
+          <span className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-[#D8CEB8] bg-white/50 text-[#6B5B3E]">
+            {firstSeg.baggage.checkIn} Check
+          </span>
         )}
       </div>
     </div>
   );
 }
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  SSR Section                                                    */
-/* ─────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────── */
+/*  SSR Section (restyled)                                         */
+/* ────────────────────────────────────────────────────────────── */
 function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
   if (!ssrSnapshot) return null;
 
-  const { seats = [], meals = [], baggage = [] } = ssrSnapshot;
-  if (!seats.length && !meals.length && !baggage.length) return null;
+  const seats = ssrSnapshot?.seats || [];
+  const meals = ssrSnapshot?.meals || [];
+  const baggage = ssrSnapshot?.baggage || [];
+  const hasSSR = seats.length > 0 || meals.length > 0 || baggage.length > 0;
 
-  const travelerMap = {};
-  travellers.forEach((t, idx) => {
-    travelerMap[idx] = `${t.title} ${t.firstName} ${t.lastName}`;
+  if (!hasSSR) return null;
+
+  // Build traveler name map by index
+  const travelerName = (idx) => {
+    const t = travellers[idx];
+    return t
+      ? `${t.title} ${t.firstName} ${t.lastName}`
+      : `Passenger ${idx + 1}`;
+  };
+
+  // Build segment route label by index
+  const segRoute = (segIdx) => {
+    const seg = segments[segIdx];
+    if (!seg) return null;
+    return `${seg.origin?.airportCode} → ${seg.destination?.airportCode}`;
+  };
+
+  // Group all SSR items by travelerIndex, then by segmentIndex
+  // Shape: { [travelerIndex]: { seats: [], meals: [], baggage: [] } }
+  const byTraveler = {};
+
+  travellers.forEach((_, idx) => {
+    byTraveler[idx] = { seats: [], meals: [], baggage: [] };
   });
 
-  const journeyTypes = [
-    ...new Set(segments.map((s) => s.journeyType || "onward")),
-  ];
+  seats.forEach((s) => {
+    if (byTraveler[s.travelerIndex]) byTraveler[s.travelerIndex].seats.push(s);
+  });
+  meals.forEach((m) => {
+    if (byTraveler[m.travelerIndex]) byTraveler[m.travelerIndex].meals.push(m);
+  });
+  baggage.forEach((b) => {
+    if (byTraveler[b.travelerIndex])
+      byTraveler[b.travelerIndex].baggage.push(b);
+  });
+
+  // Only include travelers that actually have at least one SSR
+  const activeTravelers = Object.entries(byTraveler).filter(
+    ([, data]) =>
+      data.seats.length > 0 || data.meals.length > 0 || data.baggage.length > 0,
+  );
+
+  if (!activeTravelers.length) return null;
 
   return (
-    <BentoCard className="md:col-span-2">
-      <CardLabel icon={FiStar} label="SSR — Seats, Meals & Extras" />
-      <div className="grid gap-4 md:grid-cols-2">
-        {journeyTypes.map((jt) => {
-          const jtSeats = seats.filter((s) => s.journeyType === jt);
-          const jtMeals = meals.filter((m) => m.journeyType === jt);
-          const jtBaggage = baggage.filter((b) => b.journeyType === jt);
-          const jtSegs = segments.filter(
-            (s) => (s.journeyType || "onward") === jt,
-          );
+    <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-5">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-5">
+        <FiStar size={13} className="text-[#A07840]" />
+        <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
+          Seat, Meal &amp; Baggage Add-ons
+        </span>
+      </div>
+
+      {/* One card per passenger */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {activeTravelers.map(([travelerIdx, data]) => {
+          const idx = parseInt(travelerIdx);
+          const t = travellers[idx];
+          const paxTypeLabel =
+            t?.paxType === "ADULT"
+              ? "Adult"
+              : t?.paxType === "CHILD"
+                ? "Child"
+                : t?.paxType === "INFANT"
+                  ? "Infant"
+                  : "Passenger";
+
+          const passengerTotal = [
+            ...data.seats.map((s) => s.price || 0),
+            ...data.meals.map((m) => m.price || 0),
+            ...data.baggage.map((b) => b.price || 0),
+          ].reduce((a, b) => a + b, 0);
 
           return (
             <div
-              key={jt}
-              className="rounded-xl border border-slate-200 bg-slate-50/60 p-4"
+              key={travelerIdx}
+              className="bg-white rounded-xl border border-[#E8E0D0] p-4"
             >
-              <p className="text-xs font-black uppercase tracking-widest text-teal-600 mb-3">
-                {jt === "return" ? "↩ Return" : "↗ Onward"}
-              </p>
-
-              {jtSegs.map((seg, si) => {
-                const segSeats = jtSeats.filter((s) => s.segmentIndex === si);
-                const segMeals = jtMeals.filter((m) => m.segmentIndex === si);
-                const segBag = jtBaggage.filter((b) => b.segmentIndex === si);
-
-                return (
-                  <div key={si} className="mb-4 last:mb-0">
-                    <p className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
-                      {seg.origin?.airportCode} → {seg.destination?.airportCode}
-                    </p>
-
-                    {segSeats.map((seat, i) => (
-                      <div
-                        key={i}
-                        className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0"
-                      >
-                        <div>
-                          <p className="text-xs font-semibold text-slate-700">
-                            Seat: {seat.seatNo}
-                          </p>
-                          <p className="text-[10px] text-slate-400">
-                            {travelerMap[seat.travelerIndex] ||
-                              `Traveller ${seat.travelerIndex + 1}`}
-                          </p>
-                        </div>
-                        {!isEmployee && seat.price > 0 && (
-                          <span className="text-xs font-bold text-slate-600">
-                            ₹{seat.price}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-
-                    {segMeals.map((meal, i) => (
-                      <div
-                        key={i}
-                        className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0"
-                      >
-                        <div>
-                          <p className="text-xs font-semibold text-slate-700">
-                            Meal: {meal.code}
-                          </p>
-                          <p className="text-[10px] text-slate-400">
-                            Qty: {meal.description || 1} ·{" "}
-                            {travelerMap[meal.travelerIndex] ||
-                              `Traveller ${meal.travelerIndex + 1}`}
-                          </p>
-                        </div>
-                        {!isEmployee && meal.price > 0 && (
-                          <span className="text-xs font-bold text-slate-600">
-                            ₹{meal.price}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-
-                    {segBag.map((b, i) => (
-                      <div
-                        key={i}
-                        className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0"
-                      >
-                        <div>
-                          <p className="text-xs font-semibold text-slate-700">
-                            Extra Baggage: {b.weight || b.description || "—"}
-                          </p>
-                          <p className="text-[10px] text-slate-400">
-                            {travelerMap[b.travelerIndex] ||
-                              `Traveller ${b.travelerIndex + 1}`}
-                          </p>
-                        </div>
-                        {!isEmployee && b.price > 0 && (
-                          <span className="text-xs font-bold text-slate-600">
-                            ₹{b.price}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-
-                    {!segSeats.length && !segMeals.length && !segBag.length && (
-                      <p className="text-[11px] text-slate-300 italic">
-                        No SSR for this segment
-                      </p>
-                    )}
+              {/* Passenger header */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-[#F5F0E8] border border-[#E0D8C8] flex items-center justify-center shrink-0">
+                    <FiUser size={12} className="text-[#A07840]" />
                   </div>
-                );
-              })}
+                  <div>
+                    <p className="text-[13px] font-bold text-gray-900 leading-none">
+                      {travelerName(idx)}
+                    </p>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">
+                      {paxTypeLabel}
+                    </p>
+                  </div>
+                </div>
+                {passengerTotal > 0 && (
+                  <span className="text-[12px] font-bold text-gray-900">
+                    ₹{passengerTotal}
+                  </span>
+                )}
+              </div>
+
+              <div className="border-t border-[#F0EBE0] pt-3 space-y-2">
+                {/* Seats */}
+                {data.seats.map((s, i) => (
+                  <div
+                    key={`seat-${i}`}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840]">
+                        S
+                      </span>
+                      <div>
+                        <p className="text-[12px] font-semibold text-gray-800">
+                          Seat {s.seatNo}
+                        </p>
+                        {segRoute(s.segmentIndex) && (
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+                            {segRoute(s.segmentIndex)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[12px] font-semibold text-gray-700">
+                      {s.price > 0 ? `₹${s.price}` : "Free"}
+                    </span>
+                  </div>
+                ))}
+
+                {/* Meals */}
+                {data.meals.map((m, i) => (
+                  <div
+                    key={`meal-${i}`}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840]">
+                        M
+                      </span>
+                      <div>
+                        <p className="text-[12px] font-semibold text-gray-800">
+                          {m.code}
+                          {m.description && typeof m.description === "string"
+                            ? ` · ${m.description}`
+                            : ""}
+                        </p>
+                        {segRoute(m.segmentIndex) && (
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+                            {segRoute(m.segmentIndex)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[12px] font-semibold text-gray-700">
+                      {m.price > 0 ? (
+                        `₹${m.price}`
+                      ) : (
+                        <span className="text-[11px] text-gray-400 italic font-normal">
+                          Complimentary
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+
+                {/* Baggage */}
+                {data.baggage.map((b, i) => (
+                  <div
+                    key={`bag-${i}`}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840]">
+                        B
+                      </span>
+                      <div>
+                        <p className="text-[12px] font-semibold text-gray-800">
+                          {b.weight || b.description || "Extra Baggage"}
+                        </p>
+                        {segRoute(b.segmentIndex) && (
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+                            {segRoute(b.segmentIndex)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[12px] font-semibold text-gray-700">
+                      {b.price > 0 ? `₹${b.price}` : "Free"}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           );
         })}
       </div>
-    </BentoCard>
-  );
-}
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Booking Summary card                                           */
-/* ─────────────────────────────────────────────────────────────── */
-function BookingSummaryCard({ booking, displayPnr }) {
-  return (
-    <div className="">
-      <CardLabel icon={FiFileText} label="Booking Summary" />
-      <div className="grid grid-cols-1 gap-x-8">
-        <div>
-          <InfoRow label="Project Name" value={booking.projectName} />
-          <InfoRow label="Project Code" value={booking.projectCodeId} />
-          <InfoRow label="Project Client" value={booking.projectClient} />
-          <InfoRow label="Approver Email" value={booking.approverEmail} />
-          <InfoRow label="Approver Role" value={booking.approverRole} />
-          {booking.approverComments && (
-            <InfoRow
-              label="Approver Comments"
-              value={booking.approverComments}
-            />
-          )}
-        </div>
-      </div>
+      {/* Grand total across all passengers */}
+      {(() => {
+        const grandTotal = [
+          ...seats.map((s) => s.price || 0),
+          ...meals.map((m) => m.price || 0),
+          ...baggage.map((b) => b.price || 0),
+        ].reduce((a, b) => a + b, 0);
+
+        return grandTotal > 0 ? (
+          <div className="mt-4 flex justify-between items-center pt-4 border-t border-[#E0D8C8]">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
+              Total Add-on Charges
+            </span>
+            <span className="text-[15px] font-bold text-gray-900">
+              ₹{grandTotal}
+            </span>
+          </div>
+        ) : null;
+      })()}
     </div>
   );
 }
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Invoice Section (role-gated)                                   */
-/* ─────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────── */
+/*  Booking Summary card (restyled)                               */
+/* ────────────────────────────────────────────────────────────── */
+function BookingSummaryCard({ booking, displayPnr }) {
+  const approvalStatus = booking.approvalStatus || booking.status;
+  const isApproved =
+    approvalStatus === "approved" ||
+    approvalStatus === "Approved" ||
+    booking.executionStatus === "ticketed";
+
+  const topFields = [
+    {
+      icon: <FiBriefcase size={11} className="text-[#A07840]" />,
+      label: "Project Name",
+      value: booking.projectName,
+    },
+    {
+      icon: <FiTag size={11} className="text-[#A07840]" />,
+      label: "Project Code",
+      value: booking.projectCodeId,
+    },
+    {
+      icon: <FiBriefcase size={11} className="text-[#A07840]" />,
+      label: "Project Client",
+      value: booking.projectClient,
+    },
+    {
+      icon: <FiMail size={11} className="text-[#A07840]" />,
+      label: "Approver Email",
+      value: booking.approverEmail,
+    },
+    {
+      icon: <FiShield size={11} className="text-[#A07840]" />,
+      label: "Approver Role",
+      value: booking.approverRole,
+    },
+    {
+      icon: <FiMessageSquare size={11} className="text-[#A07840]" />,
+      label: "Approver Comments",
+      value: booking.approverComments || "—",
+    },
+  ];
+
+  // Payment info (bottom row)
+  const paymentStatus = booking.payment?.status || "—";
+  const amountPaid = booking.pricingSnapshot?.totalAmount
+    ? `₹${booking.pricingSnapshot.totalAmount}`
+    : booking.fare?.totalFare
+      ? `₹${booking.fare.totalFare}`
+      : "—";
+  const paymentMethod =
+    booking.payment?.method || booking.payment?.gateway || "—";
+  const transactionId =
+    booking.payment?.transactionId || booking.payment?.orderId || "—";
+
+  return (
+    <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] overflow-hidden">
+      {/* ── Top: Booking Summary ── */}
+      <div className="p-5">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <FiBriefcase size={13} className="text-[#A07840]" />
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
+              Booking Summary
+            </span>
+          </div>
+          {isApproved && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-emerald-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Approved
+            </span>
+          )}
+        </div>
+
+        {/* 3-column fields grid */}
+        <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+          {topFields.map((field, i) => (
+            <div key={i}>
+              <div className="flex items-center gap-1 mb-1">
+                {field.icon}
+                <span className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355]">
+                  {field.label}
+                </span>
+              </div>
+              <p className="text-[13px] font-semibold text-gray-900 break-words leading-snug">
+                {field.value || "—"}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Bottom: Payment Status row ── */}
+      <div className="border-t border-[#E0D8C8] grid grid-cols-4 divide-x divide-[#E0D8C8]">
+        {[
+          {
+            label: "Status",
+            value: paymentStatus,
+            valueClass:
+              paymentStatus === "completed"
+                ? "text-emerald-700"
+                : paymentStatus === "failed"
+                  ? "text-red-600"
+                  : "text-amber-700",
+          },
+          {
+            label: "Amount Paid",
+            value: amountPaid,
+            valueClass: "text-gray-900",
+          },
+          {
+            label: "Method",
+            value: paymentMethod,
+            valueClass: "text-gray-900",
+          },
+          {
+            label: "Transaction",
+            value: transactionId,
+            valueClass: "text-gray-900 font-mono text-[11px]",
+          },
+        ].map((col, i) => (
+          <div key={i} className="px-4 py-3">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355] mb-1">
+              {col.label}
+            </p>
+            <p
+              className={`text-[13px] font-semibold truncate ${col.valueClass}`}
+            >
+              {col.value}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+/* ────────────────────────────────────────────────────────────── */
+/*  Invoice Section (restyled)                                     */
+/* ────────────────────────────────────────────────────────────── */
 function InvoiceSection({ bookingResult, isEmployee }) {
   if (isEmployee) return null;
 
@@ -744,6 +770,13 @@ function InvoiceSection({ bookingResult, isEmployee }) {
     "Response",
     "FlightItinerary",
   );
+  const singleFI = safeGet(
+    bookingResult,
+    "providerResponse",
+    "Response",
+    "Response",
+    "FlightItinerary",
+  );
 
   if (onwardFI?.InvoiceNo) {
     invoices.push({
@@ -751,7 +784,6 @@ function InvoiceSection({ bookingResult, isEmployee }) {
       no: onwardFI.InvoiceNo,
       amount: onwardFI.InvoiceAmount,
       date: onwardFI.InvoiceCreatedOn,
-      status: onwardFI.InvoiceStatus,
     });
   }
   if (returnFI?.InvoiceNo) {
@@ -760,24 +792,33 @@ function InvoiceSection({ bookingResult, isEmployee }) {
       no: returnFI.InvoiceNo,
       amount: returnFI.InvoiceAmount,
       date: returnFI.InvoiceCreatedOn,
-      status: returnFI.InvoiceStatus,
+    });
+  }
+
+  // Fallback for one-way trips
+  if (!invoices.length && singleFI?.InvoiceNo) {
+    invoices.push({
+      label: "Onward",
+      no: singleFI.InvoiceNo,
+      amount: singleFI.InvoiceAmount,
+      date: singleFI.InvoiceCreatedOn,
     });
   }
 
   if (!invoices.length) return null;
 
   return (
-    <BentoCard className="md:col-span-2">
-      <CardLabel icon={FiFileText} label="Invoice Details" />
-      <div className="grid gap-3 md:grid-cols-2">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
+        <FiFileText size={14} /> Invoice Details
+      </h3>
+      <div className="grid gap-4 md:grid-cols-2">
         {invoices.map((inv, i) => (
           <div
             key={i}
-            className="rounded-xl border border-slate-200 bg-slate-50/60 p-4"
+            className="border border-gray-100 rounded-lg p-3 bg-gray-50"
           >
-            <p className="text-xs font-black uppercase tracking-widest text-teal-600 mb-2">
-              {inv.label} Invoice
-            </p>
+            <p className="text-sm font-semibold mb-2">{inv.label} Invoice</p>
             <InfoRow label="Invoice No." value={inv.no} mono />
             <InfoRow
               label="Invoice Date"
@@ -791,17 +832,20 @@ function InvoiceSection({ bookingResult, isEmployee }) {
           </div>
         ))}
       </div>
-    </BentoCard>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Fare Rules collapsible                                         */
-/* ─────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────── */
+/*  Fare Rules (restyled, non-collapsible by default)            */
+/* ────────────────────────────────────────────────────────────── */
+
 function FareRulesSection({ bookingResult }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const rules = [];
+
+  // ── Round-trip paths ──
   const onwardFI = safeGet(
     bookingResult,
     "onwardResponse",
@@ -817,52 +861,240 @@ function FareRulesSection({ bookingResult }) {
     "FlightItinerary",
   );
 
+  // ── One-way path ──
+  const singleFI =
+    safeGet(
+      bookingResult,
+      "providerResponse",
+      "Response",
+      "Response",
+      "FlightItinerary",
+    ) ||
+    safeGet(
+      bookingResult,
+      "providerResponse",
+      "raw",
+      "Response",
+      "Response",
+      "FlightItinerary",
+    );
+
   if (onwardFI?.FareRules?.length)
-    rules.push({ label: "Onward", rules: onwardFI.FareRules });
+    rules.push({
+      label: "Onward",
+      journeyType: "onward",
+      rules: onwardFI.FareRules,
+    });
   if (returnFI?.FareRules?.length)
-    rules.push({ label: "Return", rules: returnFI.FareRules });
+    rules.push({
+      label: "Return",
+      journeyType: "return",
+      rules: returnFI.FareRules,
+    });
+
+  // Fallback: one-way trip — only add if round-trip paths yielded nothing
+  if (!rules.length && singleFI?.FareRules?.length)
+    rules.push({
+      label: "Onward",
+      journeyType: "onward",
+      rules: singleFI.FareRules,
+    });
 
   if (!rules.length) return null;
 
+  const staticNotes = [
+    "GST, RAF and any other applicable charges are extra.",
+    "Fees are indicative per pax and per sector.",
+    "Domestic: submit cancellation/reissue request at least 2 hours before the airline policy time limit.",
+    "International: submit cancellation/reissue request at least 4 hours before the airline policy time limit.",
+  ];
+
   return (
-    <BentoCard className="md:col-span-2">
+    <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-5">
+      {/* Section header */}
       <button
-        className="w-full flex items-center justify-between"
+        className="w-full flex items-center justify-between mb-5"
         onClick={() => setOpen((v) => !v)}
       >
-        <CardLabel icon={FiShield} label="Fare Rules" />
-        {open ? (
-          <FiChevronUp size={16} className="text-slate-400" />
-        ) : (
-          <FiChevronDown size={16} className="text-slate-400" />
-        )}
-      </button>
-      {open && (
-        <div className="mt-2 space-y-4">
-          {rules.map((r, i) => (
-            <div key={i}>
-              <p className="text-xs font-black uppercase tracking-widest text-teal-600 mb-2">
-                   {r.label}
-                 </p>
-              {r.rules.map((rule, j) => (
-                <div key={j} className="mb-3">
-                  <p className="text-xs font-semibold text-slate-600">
-                    {rule.Origin} → {rule.Destination} · {rule.Airline} ·{" "}
-                    {rule.FareBasisCode}
-                  </p>
-                  {rule.FareRuleDetail && (
-                    <div
-                      className="text-xs text-slate-500 mt-1 prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: rule.FareRuleDetail }}
-                    />
-                  )}
-               </div>
-              ))}
-            </div>
-          ))}
+        <div className="flex items-center gap-2">
+          <span className="text-[#A07840]">
+            <FiFileText size={14} />
+          </span>
+          <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
+            Fare Rules
+          </span>
         </div>
+        <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
+          As per Airline Policy
+        </span>
+      </button>
+
+      {open && (
+        <>
+          {/* Rule cards grid */}
+          {rules.map((r, i) => {
+            const firstRule = r.rules[0];
+            const airlineCode = firstRule?.Airline || "";
+            const fareBasis = firstRule?.FareBasisCode || "";
+            const origin = firstRule?.Origin || "";
+            const destination =
+              r.rules[r.rules.length - 1]?.Destination ||
+              firstRule?.Destination ||
+              "";
+
+            // ── Parse HTML into clean structured lines ──
+            const parseRuleDetail = (html) => {
+              if (!html) return [];
+              // Extract <li> items first
+              const liItems = [];
+              const liMatches = html.matchAll(/<li>([\s\S]*?)<\/li>/gi);
+              for (const match of liMatches) {
+                const text = match[1]
+                  .replace(/<[^>]+>/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim();
+                if (text) liItems.push({ type: "bullet", text });
+              }
+
+              // Extract text outside of <ul>/<ol> blocks as paragraph lines
+              const withoutLists = html
+                .replace(/<ul[\s\S]*?<\/ul>/gi, "")
+                .replace(/<ol[\s\S]*?<\/ol>/gi, "");
+
+              const paragraphText = withoutLists
+                .replace(/<br\s*\/?>/gi, "\n")
+                .replace(/<[^>]+>/g, "")
+                .replace(/\r/g, "")
+                .split("\n")
+                .map((s) => s.trim())
+                .filter(Boolean);
+
+              const paragraphs = paragraphText.map((t) => ({
+                type: "paragraph",
+                text: t,
+              }));
+
+              return [...paragraphs, ...liItems];
+            };
+
+            return (
+              <div
+                key={i}
+                className="bg-white rounded-xl border border-[#E8E0D0] p-4"
+              >
+                {/* Card header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[#A07840] text-xs">
+                      {r.journeyType === "return" ? "↙" : "↗"}
+                    </span>
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
+                      {r.label}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-[#8B7355] font-medium">
+                    {airlineCode} · {fareBasis}
+                  </span>
+                </div>
+
+                {/* Route */}
+                <p className="text-[22px] font-bold text-gray-900 tracking-tight mb-3">
+                  {origin} → {destination}
+                </p>
+
+                {/* Fare basis pill */}
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#8B7355]">
+                    Fare Basis
+                  </span>
+                  <span className="bg-gray-900 text-white text-[11px] font-bold px-3 py-1 rounded-full font-mono">
+                    {fareBasis}
+                  </span>
+                </div>
+
+                {/* All fare rules for this journey — parsed cleanly */}
+                <div className="space-y-4">
+                  {r.rules.map((rule, j) => {
+                    const lines = parseRuleDetail(rule.FareRuleDetail);
+                    const paragraphs = lines.filter(
+                      (l) => l.type === "paragraph",
+                    );
+                    const bullets = lines.filter((l) => l.type === "bullet");
+
+                    // Skip rules with no content at all
+                    if (!lines.length && j > 0) return null;
+
+                    return (
+                      <div
+                        key={j}
+                        className={
+                          j > 0 ? "pt-3 border-t border-[#F0EBE0]" : ""
+                        }
+                      >
+                        {/* Sub-route label for multi-leg rules */}
+                        {j > 0 && (
+                          <p className="text-[11px] font-bold text-[#8B7355] uppercase tracking-wider mb-2">
+                            {rule.Origin} → {rule.Destination}
+                          </p>
+                        )}
+
+                        {/* Paragraph lines */}
+                        {paragraphs.map((p, k) => (
+                          <p
+                            key={k}
+                            className="text-[13px] text-gray-600 leading-relaxed mb-2 last:mb-0"
+                          >
+                            {p.text}
+                          </p>
+                        ))}
+
+                        {/* Bullet list items */}
+                        {bullets.length > 0 && (
+                          <ul className="mt-2 space-y-1.5">
+                            {bullets.map((b, k) => (
+                              <li key={k} className="flex items-start gap-2.5">
+                                <span className="text-[#A07840] mt-[3px] shrink-0 text-[10px]">
+                                  ●
+                                </span>
+                                <span className="text-[13px] text-gray-600 leading-relaxed">
+                                  {b.text}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {/* Empty state for rules with no detail */}
+                        {!lines.length && (
+                          <p className="text-[12px] text-gray-400 italic">
+                            No additional details available for this sector.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Static policy notes */}
+          {/* <ul className="space-y-2 border-t border-[#E0D8C8] pt-4">
+            {staticNotes.map((note, i) => (
+              <li
+                key={i}
+                className="flex items-start gap-2.5 text-[13px] text-gray-600"
+              >
+                <span className="text-[#A07840] mt-0.5 shrink-0 text-xs">
+                  ●
+                </span>
+                {note}
+              </li>
+            ))}
+          </ul> */}
+        </>
       )}
-    </BentoCard>
+    </div>
   );
 }
 
@@ -889,7 +1121,8 @@ function CancellationModal({ booking, onClose, onSuccess }) {
     booking?.pricingSnapshot?.totalAmount ||
     booking?.totalFare ||
     booking?.fare?.totalFare ||
-    booking?.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Fare?.PublishedFare ||
+    booking?.bookingResult?.providerResponse?.Response?.Response
+      ?.FlightItinerary?.Fare?.PublishedFare ||
     0;
 
   const [step, setStep] = useState("loading"); // starts loading charges
@@ -904,7 +1137,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
   const [shouldFetchCharges, setShouldFetchCharges] = useState(true);
 
   const [showQueryModal, setShowQueryModal] = useState(false);
-  const [showReissueModal, setShowReissueModal] = useState(false);
+  // const [showReissueModal, setShowReissueModal] = useState(false);
   const [queryPriority, setQueryPriority] = useState("MEDIUM");
   const [queryRemarks, setQueryRemarks] = useState("");
 
@@ -993,7 +1226,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
       );
       let changeRequestIds = [];
       const responses = res.payload?.data || [];
-      
+
       if (responses.length > 0) {
         changeRequestIds = responses
           .map(
@@ -1019,7 +1252,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
 
       toast.success("Cancellation request submitted successfully");
       onClose();
-      
+
       await dispatch(fetchMyBookingById(booking._id));
       // Force page refresh or reload if needed by navigating or reloading
       navigate("/my-cancelled-bookings");
@@ -1086,7 +1319,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
       if (res.error) throw new Error(res.payload || "Reissue failed");
       toast.success("Reissue request submitted successfully");
       onClose();
-      
+
       await dispatch(fetchMyBookingById(booking._id));
     } catch (err) {
       setChargesError(err?.message || "Reissue failed. Please try again.");
@@ -1183,7 +1416,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
 
       toast.success("Cancellation query created successfully");
       onClose();
-      
+
       await dispatch(fetchMyBookingById(booking._id));
     } catch (err) {
       setChargesError(err?.message || "Failed to create query");
@@ -1377,7 +1610,9 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                     className="flex justify-between items-center text-sm border-t border-amber-200/50 pt-2"
                   >
                     <span className="text-slate-600">
-                      {c.bookingId ? `Cancellation Charge (Booking ${c.bookingId})` : "Cancellation Charge"}
+                      {c.bookingId
+                        ? `Cancellation Charge (Booking ${c.bookingId})`
+                        : "Cancellation Charge"}
                     </span>
                     <span className="font-black text-red-600">
                       ₹{c.cancellationCharge ?? "0"}
@@ -1389,7 +1624,9 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                     key={`refund-${i}`}
                     className="flex justify-between text-sm border-t border-amber-200/50 pt-2"
                   >
-                    <span className="text-slate-600 font-bold">Refund Amount</span>
+                    <span className="text-slate-600 font-bold">
+                      Refund Amount
+                    </span>
                     <span className="font-black text-emerald-600">
                       ₹{c.refundedAmount ?? "0"}
                     </span>
@@ -2193,16 +2430,14 @@ export default function BookingDetails() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { selected: booking, loading } = useSelector((s) => s.bookings);
-
   const userRole = useSelector((s) => s.auth?.user?.role);
   const sessionRole =
     sessionStorage.getItem("userRole") || sessionStorage.getItem("role");
-  const isEmployee = userRole === "employee" || sessionRole === "employee";
+  const isEmployee = userRole === "employee" || userRole === "manager" || sessionRole === "employee" || sessionRole === "manager";
 
   const [downloading, setDownloading] = useState(null);
   const [amendmentType, setAmendmentType] = useState(null);
   const [showPartialCancel, setShowPartialCancel] = useState(false);
-  // ★ NEW state
   const [showCancellationModal, setShowCancellationModal] = useState(false);
 
   const cancelRequested =
@@ -2229,11 +2464,8 @@ export default function BookingDetails() {
 
   if (loading || !booking) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
-        <div className="w-11 h-11 rounded-full border-[3px] border-slate-200 border-t-teal-500 animate-spin" />
-        <p className="text-sm text-slate-400 font-medium">
-          Loading booking details…
-        </p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-2 border-gray-300 border-t-teal-500 rounded-full animate-spin" />
       </div>
     );
   }
@@ -2246,6 +2478,7 @@ export default function BookingDetails() {
   const fareQuoteResults = booking.flightRequest?.fareQuote?.Results || [];
   const bookingResult = booking.bookingResult;
 
+  // Group segments by journey type
   const journeyMap = {};
   allSegments.forEach((seg) => {
     const jt = seg.journeyType || "onward";
@@ -2256,34 +2489,35 @@ export default function BookingDetails() {
   const isRoundTrip = journeyTypes.includes("return");
   const isOneWay = !isRoundTrip;
 
-  const isInternationalRT =
-    allSegments.length > 1 &&
+  // PNR handling for international RT vs domestic
+  let pnrsByJourney = {};
+  if (
+    isRoundTrip &&
     allSegments.some(
-      (f) => f.origin?.country !== "IN" || f.destination?.country !== "IN",
-    ) &&
-    allSegments.some((f) => f.journeyType === "return");
-
-  const pnrsByJourney = isInternationalRT
-    ? {
-        onward: booking.bookingResult?.pnr || null,
-        return: booking.bookingResult?.pnr || null,
-      }
-    : {
-        onward:
-          booking.bookingResult?.onwardPNR ||
-          booking.bookingResult?.pnr ||
-          null,
-        return: booking.bookingResult?.returnPNR || null,
-      };
-
-  const displayPnr =
-    booking.bookingResult?.pnr ||
-    (pnrsByJourney.onward && pnrsByJourney.return
-      ? `${pnrsByJourney.onward} / ${pnrsByJourney.return}`
-      : pnrsByJourney.onward || null);
+      (s) => s.origin?.country !== "IN" || s.destination?.country !== "IN",
+    )
+  ) {
+    pnrsByJourney = {
+      onward: booking.bookingResult?.pnr || null,
+      return: booking.bookingResult?.pnr || null,
+    };
+  } else {
+    pnrsByJourney = {
+      onward:
+        booking.bookingResult?.onwardPNR || booking.bookingResult?.pnr || null,
+      return: booking.bookingResult?.returnPNR || null,
+    };
+  }
 
   const paymentSuccessful = booking.payment?.status === "completed";
   const executionStatus = isCancelled ? "cancelled" : booking.executionStatus;
+  const departureTime = allSegments?.[0]?.departureDateTime;
+  const isTravelPassed = departureTime && new Date() > new Date(departureTime);
+  const showCancellationChargesBtn =
+    paymentSuccessful &&
+    executionStatus === "ticketed" &&
+    !isCancelled &&
+    !isTravelPassed;
 
   const handleDownloadTicket = async (journeyType) => {
     if (!pnrsByJourney[journeyType]) return;
@@ -2292,24 +2526,10 @@ export default function BookingDetails() {
     setDownloading(null);
   };
 
-  const departureTime = allSegments?.[0]?.departureDateTime;
-  const isTravelPassed = departureTime && new Date() > new Date(departureTime);
-
-  const seatSelections = ssrSnapshot?.seats || [];
-  const mealSelections = ssrSnapshot?.meals || [];
-  const totalSeatPrice = seatSelections.reduce(
-    (sum, s) => sum + (s?.price || 0),
-    0,
-  );
-  const totalMealPrice = mealSelections.reduce(
-    (sum, m) => sum + (m?.price || 0),
-    0,
-  );
-
-  let baseFare = 0;
-  let tax = 0;
-  let refundable = false;
-
+  // Fare summary calculations (simplified)
+  let baseFare = 0,
+    tax = 0,
+    refundable = false;
   if (isRoundTrip && fareSnapshot) {
     baseFare =
       (fareSnapshot.onwardFare?.BaseFare || 0) +
@@ -2325,28 +2545,19 @@ export default function BookingDetails() {
     refundable = fareSnapshot?.refundable || false;
   }
 
-  // ★ Show cancellation charges button condition:
-  // ticket is issued, payment done, not cancelled, travel not passed
-  const showCancellationChargesBtn =
-    paymentSuccessful &&
-    executionStatus === "ticketed" &&
-    !isCancelled &&
-    !isTravelPassed;
-
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      {/* ── Header bar ── */}
-      <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-slate-200/80">
-        <div className="max-w-7xl mx-auto px-5 h-14 flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800 transition"
+            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
-            <FiArrowLeft size={16} />
-            Back
+            <FiArrowLeft size={16} /> Back
           </button>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-mono text-slate-400">
+            <span className="text-xs text-gray-500 font-mono">
               {booking.bookingReference}
             </span>
             <StatusPill status={executionStatus} />
@@ -2354,359 +2565,654 @@ export default function BookingDetails() {
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-5 py-8 pb-24 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* ── 1. Journey Cards ── */}
-        {journeyTypes.map((jt, jIdx) => {
-          const segs = journeyMap[jt] || [];
-          const isOdd = journeyTypes.length % 2 !== 0;
-          const isLast = jIdx === journeyTypes.length - 1;
-          const spanFull = journeyTypes.length === 1 || (isOdd && isLast);
-          return (
-            <div key={jt} className={spanFull ? "md:col-span-2" : ""}>
-              <JourneyCard
-                journeyType={jt}
-                segments={segs}
-                pnr={pnrsByJourney[jt]}
-                paymentSuccessful={paymentSuccessful}
-                downloading={downloading}
-                onDownload={handleDownloadTicket}
-                showDownload={isRoundTrip}
-                fareQuoteResults={fareQuoteResults}
-                bookingResult={bookingResult}
-              />
-            </div>
-          );
-        })}
-
-        {/* ── Global Download (One-Way) ── */}
-        {isOneWay && paymentSuccessful && pnrsByJourney.onward && (
-          <div className="md:col-span-2 flex justify-end">
+      <main className="max-w-6xl mx-auto px-5 py-8 pb-24 space-y-6">
+        {/* ── Header: "Your trip is confirmed" ── */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">
+              Reservation
+            </p>
+            <h1 className="text-[36px] font-black text-gray-900 tracking-tight leading-none mb-3">
+              Your trip is confirmed.
+            </h1>
+            <p className="text-sm text-gray-500  leading-relaxed">
+              A clean, single-page record of your itinerary, passengers and
+              payment.
+            </p>
+          </div>
+        </div>
+        {/* Flight cards */}
+        {journeyTypes.map((jt) => (
+          <FlightCard
+            key={jt}
+            journeyType={jt}
+            segments={journeyMap[jt]}
+            pnr={pnrsByJourney[jt]}
+            paymentSuccessful={paymentSuccessful}
+            downloading={downloading}
+            onDownload={handleDownloadTicket}
+            showDownload={isRoundTrip}
+            fareQuoteResults={fareQuoteResults}
+            bookingResult={bookingResult}
+          />
+        ))}
+        {/* Global download button for one-way */}
+        {/* {isOneWay && paymentSuccessful && pnrsByJourney.onward && (
+          <div className="flex justify-end">
             <button
               onClick={() => handleDownloadTicket("onward")}
               disabled={downloading === "onward"}
-              className="flex items-center gap-2 px-6 py-3 bg-teal-600 text-white hover:bg-teal-700 rounded-xl text-sm font-bold transition-all duration-150 disabled:opacity-50 shadow-lg"
+              className="flex items-center gap-2 px-5 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-700 disabled:opacity-50"
             >
-              <FiDownload size={15} />
-              {downloading === "onward" ? "Downloading…" : "Download Ticket"}
+              <FiDownload size={14} />{" "}
+              {downloading === "onward" ? "Downloading…" : "Download E-Ticket"}
             </button>
           </div>
-        )}
+        )} */}
+        {/* ── Passenger Section ── */}
+        <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-5">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-5">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
+              Passengers · {travellers.length}
+            </p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
+              Listed once for the entire trip
+            </p>
+          </div>
 
-        <div className="md:col-span-2">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            {/* ── 2. Passenger Details ── */}
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                <CardLabel icon={FiUser} label="Passenger Details" />
+          {/* Cards grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {travellers.map((trav, idx) => {
+              const seatSSR = ssrSnapshot?.seats?.find(
+                (s) => s.travelerIndex === idx,
+              );
+              const seatNo = seatSSR?.seatNo;
 
-                {travellers.length === 0 ? (
-                  <p className="text-sm text-slate-500">
-                    No traveller details available.
-                  </p>
-                ) : (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {travellers.map((trav, idx) => (
-                      <div
-                        key={trav._id || idx}
-                        className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-white transition-all p-4 shadow-sm hover:shadow-md"
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-3">
-                          <div>
-                            <p className="text-base font-bold text-slate-900">
-                              {trav.title} {trav.firstName} {trav.lastName}
-                            </p>
-                            {trav.email && (
-                              <p className="text-xs text-slate-400 mt-0.5">
-                                {trav.email}
-                              </p>
-                            )}
-                          </div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
-                            {formatPaxType(trav.paxType)}
+              // ── Extract per-passenger ticket number from bookingResult ──
+              const onwardPassengers =
+                safeGet(
+                  bookingResult,
+                  "onwardResponse",
+                  "Response",
+                  "Response",
+                  "FlightItinerary",
+                  "Passenger",
+                ) || [];
+              const returnPassengers =
+                safeGet(
+                  bookingResult,
+                  "returnResponse",
+                  "Response",
+                  "Response",
+                  "FlightItinerary",
+                  "Passenger",
+                ) || [];
+
+              // One-way: lives directly under providerResponse.Response.Response.FlightItinerary.Passenger
+              const singleTripPassengers =
+                safeGet(
+                  bookingResult,
+                  "providerResponse",
+                  "Response",
+                  "Response",
+                  "FlightItinerary",
+                  "Passenger",
+                ) || [];
+
+              // Resolve correct passenger list for this trip type
+              const isRoundTripBooking =
+                onwardPassengers.length > 0 || returnPassengers.length > 0;
+
+              const resolvedOnwardPax = isRoundTripBooking
+                ? onwardPassengers
+                : singleTripPassengers;
+              const resolvedReturnPax = isRoundTripBooking
+                ? returnPassengers
+                : [];
+
+              const TicketId = resolvedOnwardPax[idx]?.Ticket?.TicketId;
+              const onwardTicket =
+                resolvedOnwardPax[idx]?.Ticket?.TicketNumber || null;
+              const returnTicket =
+                resolvedReturnPax[idx]?.Ticket?.TicketNumber || null;
+              // Show onward PNR per passenger card
+              const cardPnr = pnrsByJourney?.onward || null;
+
+              return (
+                <div
+                  key={trav._id || idx}
+                  className="bg-white rounded-xl border border-[#E8E0D0] p-4"
+                >
+                  {/* Top: name + seat — unchanged */}
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-[15px] font-bold text-gray-900">
+                        {trav.title} {trav.firstName} {trav.lastName}
+                      </p>
+                      {trav.isLeadPassenger && (
+                        <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          <FiStar size={9} className="text-amber-500" />
+                          Lead
+                        </span>
+                      )}
+                    </div>
+                    {seatNo && (
+                      <p className="text-[13px] font-bold text-gray-900 whitespace-nowrap">
+                        Seat {seatNo}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Pax type + Ticket Id pill — unchanged */}
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                      {formatPaxType(trav.paxType)}
+                      {seatSSR?.type ? ` · ${seatSSR.type}` : ""}
+                    </p>
+                    {TicketId && (
+                      <span className="inline-flex items-center gap-1.5 bg-gray-900 text-white rounded-full px-3 py-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                        <span className="text-[9px] font-bold uppercase tracking-widest opacity-60">
+                          Ticket Id
+                        </span>
+                        <span className="font-mono text-[12px] font-bold">
+                          {TicketId}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Divider */}
+                  <div className="border-t border-gray-100 my-3" />
+
+                  {/* Detail grid — 2 columns */}
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                    {/* ── Phone: lead only ── */}
+                    {trav.isLeadPassenger && (
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <FiPhone size={9} className="text-gray-400" />
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                            Phone
                           </span>
                         </div>
-
-                        <div className="space-y-1">
-                          {trav.phoneWithCode && (
-                            <InfoRow label="Phone" value={trav.phoneWithCode} />
-                          )}
-                          <InfoRow label="Gender" value={trav.gender} />
-                          <InfoRow
-                            label="DOB"
-                            value={
-                              trav.dateOfBirth
-                                ? formatDateWithYear(trav.dateOfBirth)
-                                : "—"
-                            }
-                          />
-                          <InfoRow
-                            label="Nationality"
-                            value={trav.nationality}
-                          />
-                          {trav.passportNumber && (
-                            <InfoRow
-                              label="Passport"
-                              value={trav.passportNumber}
-                              mono
-                            />
-                          )}
-                          {trav.passportExpiry && (
-                            <InfoRow
-                              label="Expiry"
-                              value={formatDateWithYear(trav.passportExpiry)}
-                            />
-                          )}
-                          {typeof trav.linkedAdultIndex === "number" &&
-                            trav.linkedAdultIndex >= 0 && (
-                              <InfoRow
-                                label="Linked Adult"
-                                value={`Traveller ${trav.linkedAdultIndex + 1}`}
-                              />
-                            )}
-                        </div>
-
-                        {trav.isLeadPassenger && (
-                          <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full w-fit">
-                            <FiCheckCircle size={12} />
-                            Lead passenger
-                          </div>
-                        )}
+                        <p className="text-[13px] font-semibold text-gray-800">
+                          {trav.phoneWithCode || "—"}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+                    )}
 
-            {/* ── 3. Booking Summary ── */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sticky top-20">
-                <BookingSummaryCard booking={booking} displayPnr={displayPnr} />
-              </div>
-            </div>
+                    {/* Gender */}
+                    <div>
+                      <div className="flex items-center gap-1 mb-1">
+                        <FiUser size={9} className="text-gray-400" />
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                          Gender
+                        </span>
+                      </div>
+                      <p className="text-[13px] font-semibold text-gray-800">
+                        {trav.gender || "—"}
+                      </p>
+                    </div>
+
+                    {/* DOB */}
+                    <div>
+                      <div className="flex items-center gap-1 mb-1">
+                        <FiCalendar size={9} className="text-gray-400" />
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                          DOB
+                        </span>
+                      </div>
+                      <p className="text-[13px] font-semibold text-gray-800">
+                        {trav.dateOfBirth
+                          ? formatDateWithYear(trav.dateOfBirth)
+                          : "—"}
+                      </p>
+                    </div>
+
+                    {/* Nationality */}
+                    <div>
+                      <div className="flex items-center gap-1 mb-1">
+                        <FiGlobe size={9} className="text-gray-400" />
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                          Nationality
+                        </span>
+                      </div>
+                      <p className="text-[13px] font-semibold text-gray-800">
+                        {trav.nationality || "—"}
+                      </p>
+                    </div>
+
+                    {/* Passport (if present) */}
+                    {trav.passportNumber && (
+                      <div className="col-span-2">
+                        <div className="flex items-center gap-1 mb-1">
+                          <FiCreditCard size={9} className="text-gray-400" />
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                            Passport
+                          </span>
+                        </div>
+                        <p className="text-[13px] font-mono font-semibold text-gray-800">
+                          {trav.passportNumber}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* ── Email: lead only, spans full width ── */}
+                    {trav.isLeadPassenger && trav.email && (
+                      <div className="col-span-2">
+                        <div className="flex items-center gap-1 mb-1">
+                          <FiMail size={9} className="text-gray-400" />
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                            Email
+                          </span>
+                        </div>
+                        <p className="text-[13px] font-semibold text-gray-800 break-all">
+                          {trav.email}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Ticket Numbers — unchanged */}
+                  {(onwardTicket || returnTicket) && (
+                    <div className="mt-3 pt-3 border-t border-[#F0EBE0] space-y-2">
+                      {onwardTicket && (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <FiTag size={10} className="text-[#A07840]" />
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355]">
+                              PNR · Onward
+                            </span>
+                          </div>
+                          <span className="font-mono text-[11px] font-bold text-gray-800 bg-[#F5F0E8] px-2 py-0.5 rounded-md">
+                            {onwardTicket}
+                          </span>
+                        </div>
+                      )}
+                      {returnTicket && returnTicket !== onwardTicket && (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <FiTag size={10} className="text-[#A07840]" />
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355]">
+                              PNR · Return
+                            </span>
+                          </div>
+                          <span className="font-mono text-[11px] font-bold text-gray-800 bg-[#F5F0E8] px-2 py-0.5 rounded-md">
+                            {returnTicket}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
-
-        {/* ── 4. SSR Details ── */}
+        {/* Two-column block: Passenger + Booking Summary */}
+        {/* Booking summary (right column) */}
+        <div className="lg:col-span-1">
+          <BookingSummaryCard
+            booking={booking}
+            displayPnr={pnrsByJourney.onward || null}
+          />
+        </div>
+        {/* SSR Section */}
         <SSRSection
           ssrSnapshot={ssrSnapshot}
           travellers={travellers}
           segments={allSegments}
           isEmployee={isEmployee}
         />
-
-        {/* ── 5. Fare Summary (role-gated) ── */}
+        {/* Fare summary (for non-employee) */}
         {!isEmployee && (
-          <BentoCard>
-            <CardLabel icon={FiCreditCard} label="Fare Summary" />
-            <InfoRow label="Base Fare" value={`₹${baseFare}`} />
-            <InfoRow label="Tax" value={`₹${tax}`} />
-            {totalSeatPrice > 0 && (
-              <InfoRow label="Seat Charges" value={`₹${totalSeatPrice}`} />
-            )}
-            {totalMealPrice > 0 && (
-              <InfoRow label="Meal Charges" value={`₹${totalMealPrice}`} />
-            )}
-            {isRoundTrip && fareSnapshot && (
-              <div className="mt-4 space-y-2 text-xs text-slate-500">
-                <p className="font-semibold text-slate-700">Fare Breakdown</p>
-                {fareSnapshot.onwardFare && (
-                  <div className="flex justify-between">
-                    <span>Onward (Base + Tax)</span>
-                    <span>
-                      ₹{Math.ceil(fareSnapshot.onwardFare.PublishedFare)}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
+              <FiCreditCard size={14} /> Fare Summary
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+              <InfoRow label="Base Fare" value={`₹${baseFare}`} />
+              <InfoRow label="Tax" value={`₹${tax}`} />
+              <InfoRow
+                label="Currency"
+                value={pricingSnap?.currency || "INR"}
+              />
+              <InfoRow
+                label="Refundable"
+                value={refundable ? "Yes" : "No"}
+                accent={refundable}
+              />
+            </div>
+
+            {/* ── SSR Charges: only render if any SSR data exists ── */}
+            {(() => {
+              const seats = ssrSnapshot?.seats || [];
+              const meals = ssrSnapshot?.meals || [];
+              const baggage = ssrSnapshot?.baggage || [];
+              const hasSSR =
+                seats.length > 0 || meals.length > 0 || baggage.length > 0;
+              if (!hasSSR) return null;
+
+              const travelerName = (idx) => {
+                const t = travellers[idx];
+                return t
+                  ? `${t.title} ${t.firstName} ${t.lastName}`
+                  : `Pax ${idx + 1}`;
+              };
+              const segLabel = (segIdx) => {
+                const seg = allSegments[segIdx];
+                if (!seg) return "";
+                return `${seg.origin?.airportCode}→${seg.destination?.airportCode}`;
+              };
+
+              const ssrTotal = [
+                ...seats.map((s) => s.price || 0),
+                ...meals.map((m) => m.price || 0),
+                ...baggage.map((b) => b.price || 0),
+              ].reduce((a, b) => a + b, 0);
+
+              return (
+                <div className="mt-4 bg-[#FAF7F2] border border-[#E8E0D0] rounded-xl p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-[#A07840] mb-3 flex items-center gap-1.5">
+                    <FiPackage size={11} /> Seat, Meal &amp; Baggage Charges
+                  </p>
+
+                  {seats.map((s, i) => (
+                    <div
+                      key={`seat-${i}`}
+                      className="flex justify-between items-center py-1.5 border-b border-[#EDE8E0] last:border-0 text-[12px]"
+                    >
+                      <span className="text-gray-500">
+                        Seat · {s.seatNo} &nbsp;
+                        <span className="text-[11px] text-gray-400">
+                          ({travelerName(s.travelerIndex)}
+                          {segLabel(s.segmentIndex)
+                            ? ` · ${segLabel(s.segmentIndex)}`
+                            : ""}
+                          )
+                        </span>
+                      </span>
+                      <span className="font-semibold text-gray-800">
+                        ₹{s.price || 0}
+                      </span>
+                    </div>
+                  ))}
+
+                  {meals.map((m, i) => (
+                    <div
+                      key={`meal-${i}`}
+                      className="flex justify-between items-center py-1.5 border-b border-[#EDE8E0] last:border-0 text-[12px]"
+                    >
+                      <span className="text-gray-500">
+                        Meal · {m.code} &nbsp;
+                        <span className="text-[11px] text-gray-400">
+                          ({travelerName(m.travelerIndex)}
+                          {segLabel(m.segmentIndex)
+                            ? ` · ${segLabel(m.segmentIndex)}`
+                            : ""}
+                          )
+                        </span>
+                      </span>
+                      {m.price > 0 ? (
+                        <span className="font-semibold text-gray-800">
+                          ₹{m.price}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-gray-400 italic">
+                          Complimentary
+                        </span>
+                      )}
+                    </div>
+                  ))}
+
+                  {baggage.map((b, i) => (
+                    <div
+                      key={`bag-${i}`}
+                      className="flex justify-between items-center py-1.5 border-b border-[#EDE8E0] last:border-0 text-[12px]"
+                    >
+                      <span className="text-gray-500">
+                        Baggage · {b.weight || b.description || "Extra"} &nbsp;
+                        <span className="text-[11px] text-gray-400">
+                          ({travelerName(b.travelerIndex)}
+                          {segLabel(b.segmentIndex)
+                            ? ` · ${segLabel(b.segmentIndex)}`
+                            : ""}
+                          )
+                        </span>
+                      </span>
+                      <span className="font-semibold text-gray-800">
+                        ₹{b.price || 0}
+                      </span>
+                    </div>
+                  ))}
+
+                  <div className="flex justify-between items-center mt-2.5 pt-2 border-t border-dashed border-[#D8CEB8] text-[12px]">
+                    <span className="text-gray-500 font-semibold">
+                      SSR Total
+                    </span>
+                    <span className="font-semibold text-gray-900">
+                      ₹{ssrTotal.toFixed(2)}
                     </span>
                   </div>
-                )}
-                {fareSnapshot.returnFare && (
-                  <div className="flex justify-between">
-                    <span>Return (Base + Tax)</span>
-                    <span>
-                      ₹{Math.ceil(fareSnapshot.returnFare.PublishedFare)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-            <InfoRow label="Currency" value={pricingSnap?.currency || "INR"} />
-            <InfoRow
-              label="Refundable"
-              value={refundable ? "Yes" : "No"}
-              accent={refundable}
-            />
+                </div>
+              );
+            })()}
+
             {pricingSnap?.totalAmount != null && (
-              <div className="mt-4 bg-gradient-to-r from-cyan-50 to-teal-50 rounded-xl px-4 py-4 flex justify-between items-center border border-teal-100">
-                <span className="text-sm text-teal-700 font-semibold">
-                  Total Paid Amount
-                </span>
-                <span className="text-2xl font-black text-slate-900">
+              <div className="mt-4 bg-teal-50 rounded-lg p-4 flex justify-between items-center">
+                <span className="font-semibold text-teal-800">Total Paid</span>
+                <span className="text-2xl font-black text-gray-900">
                   ₹{pricingSnap.totalAmount}
                 </span>
               </div>
             )}
-          </BentoCard>
+          </div>
         )}
-
-        {/* ── 6. Invoice Details (role-gated) ── */}
-        <InvoiceSection bookingResult={bookingResult} isEmployee={isEmployee} />
-
-        {/* ── 7. Payment & Booking Status ── */}
-        <BentoCard className="md:col-span-2">
-          <CardLabel icon={FiCreditCard} label="Payment & Booking Status" />
-          <div className="grid grid-cols-3 gap-3">
-            <div
-              className={`rounded-xl p-4 flex flex-col gap-1.5 border ${paymentSuccessful ? "bg-emerald-50 border-emerald-100" : "bg-amber-50 border-amber-100"}`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                {paymentSuccessful ? (
-                  <FiCheckCircle size={16} className="text-emerald-500" />
-                ) : (
-                  <FiAlertCircle size={16} className="text-amber-500" />
-                )}
-                <span
-                  className={`text-[10px] font-black uppercase tracking-widest ${paymentSuccessful ? "text-emerald-600" : "text-amber-600"}`}
-                >
-                  Payment
-                </span>
-              </div>
-              <p
-                className={`text-lg font-black ${paymentSuccessful ? "text-emerald-800" : "text-amber-800"}`}
-              >
-                {paymentSuccessful ? "Successful" : "Pending"}
-              </p>
+        {/* Invoice Section */}
+        {/* <InvoiceSection bookingResult={bookingResult} isEmployee={isEmployee} /> */}
+        {/* Payment & Ticket Status */}
+        <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] overflow-hidden">
+          {/* Header */}
+          <div className="px-5 py-4 flex items-center justify-between border-b border-[#E0D8C8]">
+            <div className="flex items-center gap-2">
+              <FiCreditCard size={13} className="text-[#A07840]" />
+              <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
+                Payment & Booking Status
+              </span>
             </div>
 
-            <div
-              className={`rounded-xl p-4 flex flex-col gap-1.5 border ${executionStatus === "ticketed" ? "bg-emerald-50 border-emerald-100" : executionStatus === "cancelled" ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                {executionStatus === "ticketed" ? (
-                  <FiCheckCircle size={16} className="text-emerald-500" />
-                ) : executionStatus === "cancelled" ? (
-                  <FiAlertCircle size={16} className="text-red-500" />
-                ) : executionStatus === "on_hold" ? (
-                  <FiAlertCircle size={16} className="text-amber-500" />
-                ) : (
-                  <FiRefreshCw
-                    size={16}
-                    className="text-amber-500 animate-spin"
-                  />
-                )}
-                <span
-                  className={`text-[10px] font-black uppercase tracking-widest ${executionStatus === "ticketed" ? "text-emerald-600" : executionStatus === "cancelled" ? "text-red-600" : "text-amber-600"}`}
-                >
-                  Ticket Status
-                </span>
-              </div>
-              <p
-                className={`text-lg font-black ${executionStatus === "ticketed" ? "text-emerald-800" : executionStatus === "cancelled" ? "text-red-800" : "text-amber-800"}`}
+            {/* Retry button — only when pending/on_hold */}
+            {["ticket_pending", "on_hold"].includes(executionStatus) && (
+              <button
+                onClick={async () => {
+                  try {
+                    await dispatch(manualTicketNonLcc(booking._id));
+                    Swal.fire({
+                      icon: "info",
+                      title: "Retrying Ticket",
+                      timer: 2000,
+                      showConfirmButton: false,
+                    });
+                  } catch {
+                    Swal.fire({ icon: "error", title: "Retry Failed" });
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-900 text-white rounded-full text-[11px] font-bold hover:bg-gray-800 transition-all"
               >
-                {executionStatus === "ticketed"
-                  ? "Issued"
-                  : executionStatus === "cancelled"
-                    ? "Cancelled"
-                    : executionStatus === "on_hold"
-                      ? "On Hold"
-                      : "Issuing…"}
+                <FiRefreshCw size={11} /> Retry Ticket
+              </button>
+            )}
+          </div>
+
+          {/* 3-column status grid */}
+          <div className="grid grid-cols-3 divide-x divide-[#E0D8C8]">
+            {!isEmployee && (
+            <div className="px-5 py-4">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">
+                Payment
               </p>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    paymentSuccessful ? "bg-emerald-500" : "bg-amber-400"
+                  }`}
+                />
+                <p
+                  className={`text-[15px] font-bold ${
+                    paymentSuccessful ? "text-emerald-700" : "text-amber-700"
+                  }`}
+                >
+                  {paymentSuccessful ? "Successful" : "Pending"}
+                </p>
+              </div>
+              {paymentSuccessful && (
+                <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-wide">
+                  {booking.payment?.method || "—"}
+                </p>
+              )}
+            </div>
+            )}
+
+            {/* Ticket Status */}
+            <div className="px-5 py-4">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">
+                Ticket Status
+              </p>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    executionStatus === "ticketed"
+                      ? "bg-emerald-500"
+                      : executionStatus === "cancelled"
+                        ? "bg-red-500"
+                        : "bg-amber-400"
+                  }`}
+                />
+                <p
+                  className={`text-[15px] font-bold ${
+                    executionStatus === "ticketed"
+                      ? "text-emerald-700"
+                      : executionStatus === "cancelled"
+                        ? "text-red-700"
+                        : "text-amber-700"
+                  }`}
+                >
+                  {executionStatus === "ticketed"
+                    ? "Issued"
+                    : executionStatus === "cancelled"
+                      ? "Cancelled"
+                      : executionStatus === "on_hold"
+                        ? "On Hold"
+                        : "Issuing…"}
+                </p>
+              </div>
               {executionStatus === "ticket_pending" && (
-                <p className="text-[11px] text-amber-500">
-                  Refreshes every 15s
+                <p className="text-[10px] text-amber-500 mt-1 uppercase tracking-wide flex items-center gap-1">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  Refreshing every 15s
                 </p>
               )}
             </div>
 
-            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 mb-1">
-                <FiBriefcase size={16} className="text-slate-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  Purpose
-                </span>
-              </div>
-              <p className="text-lg font-black text-slate-800">
+            {/* Purpose of Travel */}
+            <div className="px-5 py-4">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">
+                Purpose
+              </p>
+              <p className="text-[15px] font-bold text-gray-900 leading-snug">
                 {booking.purposeOfTravel || "—"}
               </p>
             </div>
-
-            {["ticket_pending", "on_hold"].includes(executionStatus) && (
-              <div className="col-span-3 mt-3 flex justify-end">
-                <button
-                  onClick={async () => {
-                    try {
-                      await dispatch(manualTicketNonLcc(booking._id));
-                      Swal.fire({
-                        icon: "info",
-                        title: "Retrying Ticket",
-                        text: "We are attempting ticket issuance again...",
-                        timer: 2000,
-                        showConfirmButton: false,
-                      });
-                    } catch {
-                      Swal.fire({
-                        icon: "error",
-                        title: "Retry Failed",
-                        text: "Please try again later",
-                      });
-                    }
-                  }}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl text-sm font-bold"
-                >
-                  <FiRefreshCw size={14} />
-                  Retry Ticket
-                </button>
-              </div>
-            )}
           </div>
-        </BentoCard>
-
-        {/* ── 8. Fare Rules (collapsible) ── */}
+        </div>
+        {/* Fare Rules */}
         <FareRulesSection bookingResult={bookingResult} />
-
-        {/* ── 9. Amendment Actions ── */}
+        {/* Amendment actions */}
         {paymentSuccessful &&
           executionStatus === "ticketed" &&
           !isTravelPassed && (
-            <div className="md:col-span-2 rounded-2xl border border-slate-200/80 bg-white overflow-hidden shadow-sm">
-              <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50/60">
-                <span className="w-8 h-8 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
-                  <FiAlertCircle size={14} className="text-red-600" />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 leading-none">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">
                     Amendment actions
                   </p>
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-xs text-gray-500">
                     Ticket is live — changes apply immediately
                   </p>
                 </div>
-
-                <div className="flex items-center gap-2.5 px-5 py-4">
-                  <button
-                    onClick={() => setShowCancellationModal(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-800 border border-red-200 hover:border-red-300 rounded-xl text-sm font-semibold transition-all"
-                  >
-                    <FiXCircle size={14} className="text-red-500" />
-                    Cancellation Charges
-                  </button>
-                  <button
-                    onClick={() => setShowReissueModal(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 hover:border-indigo-300 rounded-xl text-sm font-semibold transition-all"
-                  >
-                    <FiRefreshCw size={14} className="text-indigo-500" />
-                    Request Reissue
-                  </button>
-                </div>
+                <button
+                  onClick={() => setShowCancellationModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-semibold hover:bg-red-100"
+                >
+                  <FiXCircle size={14} /> Cancellation Charges
+                </button>
               </div>
-
-              <p className="px-5 pb-4 text-[11px] text-slate-400">
+              <p className="text-[11px] text-gray-400 mt-3">
                 Charges may apply as per fare rules. Cancellation cannot be
                 undone.
               </p>
             </div>
           )}
+
+        {/* ── Sticky Download Button (bottom-right) ── */}
+        {paymentSuccessful &&
+          (pnrsByJourney.onward || pnrsByJourney.return) && (
+            <div className="fixed bottom-6 right-6 z-30 flex flex-col gap-2 items-end">
+              {isRoundTrip ? (
+                <>
+                  <button
+                    onClick={() => handleDownloadTicket("onward")}
+                    disabled={downloading === "onward"}
+                    className="flex items-center gap-2 px-5 py-3 bg-[#C49B44] text-white rounded-full text-[12px] font-bold shadow-lg hover:bg-[#a8832f] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FiDownload size={14} />
+                    {downloading === "onward"
+                      ? "Downloading…"
+                      : "Download · Onward"}
+                  </button>
+                  {pnrsByJourney.return && (
+                    <button
+                      onClick={() => handleDownloadTicket("return")}
+                      disabled={downloading === "return"}
+                      className="flex items-center gap-2 px-5 py-3 bg-white border border-[#D8CEB8] text-gray-800 rounded-full text-[12px] font-bold shadow-lg hover:bg-[#F5F0E8] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FiDownload size={14} />
+                      {downloading === "return"
+                        ? "Downloading…"
+                        : "Download · Return"}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button
+                  onClick={() => handleDownloadTicket("onward")}
+                  disabled={downloading === "onward"}
+                  className="flex items-center gap-2 px-5 py-3 bg-[#C49B44] text-white rounded-full text-[12px] font-bold shadow-lg hover:bg-[#a8832f] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FiDownload size={14} />
+                  {downloading === "onward"
+                    ? "Downloading…"
+                    : "Download Ticket"}
+                </button>
+              )}
+            </div>
+          )}
       </main>
 
-      {/* ── Modals ── */}
+      {/* Modals – keep your existing modal components */}
+      {showCancellationModal && (
+        <CancellationModal
+          booking={booking}
+          onClose={() => {
+            setShowCancellationModal(false);
+            dispatch(resetAmendmentState());
+          }}
+          onSuccess={() => setShowCancellationModal(false)}
+        />
+      )}
       {amendmentType && (
         <AmendmentModal
           type={amendmentType}
@@ -2718,28 +3224,6 @@ export default function BookingDetails() {
         <PartialCancelModal
           booking={booking}
           onClose={() => setShowPartialCancel(false)}
-        />
-      )}
-
-      {/* ★ NEW Cancellation Charges Modal ── */}
-      {showCancellationModal && (
-        <CancellationModal
-          booking={booking}
-          onClose={() => {
-            setShowCancellationModal(false);
-            dispatch(resetAmendmentState());
-          }}
-          onSuccess={() => {
-            setShowCancellationModal(false);
-          }}
-        />
-      )}
-
-      {/* ★ NEW Reissue Modal ── */}
-      {showReissueModal && (
-        <ReissueModal
-          booking={booking}
-          onClose={() => setShowReissueModal(false)}
         />
       )}
     </div>

@@ -19,7 +19,7 @@ import { formatDateWithYear } from "../../utils/formatter";
 /* ─────────────────────────────────────────────────────────────── */
 /*  Summary Stats                                                  */
 /* ─────────────────────────────────────────────────────────────── */
-function SummaryStats({ trips }) {
+function SummaryStats({ trips, userRole }) {
   const total = trips.length;
   const flights = trips.filter((t) => t.bookingType?.toLowerCase() === "flight").length;
   const hotels = trips.filter((t) => t.bookingType?.toLowerCase() === "hotel").length;
@@ -28,8 +28,10 @@ function SummaryStats({ trips }) {
     0,
   );
 
+  const canSeeSpend = userRole === "travel-admin";
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div className={`grid grid-cols-2 ${canSeeSpend ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-3 mb-6`}>
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">
           Past Trips
@@ -48,14 +50,16 @@ function SummaryStats({ trips }) {
         </p>
         <p className="text-2xl font-black text-teal-700">{hotels}</p>
       </div>
-      <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
-        <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">
-          Total Spent
-        </p>
-        <p className="text-2xl font-black text-slate-800">
-          ₹{totalSpent.toLocaleString("en-IN")}
-        </p>
-      </div>
+      {canSeeSpend && (
+        <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
+          <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">
+            Total Spent
+          </p>
+          <p className="text-2xl font-black text-slate-800">
+            ₹{totalSpent.toLocaleString("en-IN")}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -63,7 +67,7 @@ function SummaryStats({ trips }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  Past Trip Card                                                 */
 /* ─────────────────────────────────────────────────────────────── */
-function PastTripCard({ trip, onView }) {
+function PastTripCard({ trip, onView, userRole }) {
   const snapshot = trip.bookingSnapshot || {};
   const isHotel = trip.bookingType?.toLowerCase() === "hotel";
 
@@ -156,7 +160,7 @@ function PastTripCard({ trip, onView }) {
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-100">
           <div>
-            {trip.pricingSnapshot?.totalAmount && (
+            {( userRole === "travel-admin") && trip.pricingSnapshot?.totalAmount && (
               <>
                 <p className="text-[11px] text-slate-400 mb-0.5">Total spent</p>
                 <p className="text-[17px] font-bold text-slate-800">
@@ -188,6 +192,7 @@ export default function MyPastTrips() {
   const { list: bookings = [], loading } = useSelector(
     (state) => state.bookings,
   );
+  const userRole = useSelector((state) => state.auth?.user?.role);
 
   const [typeFilter, setTypeFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -303,7 +308,7 @@ export default function MyPastTrips() {
         </div>
 
         {/* Summary Stats */}
-        {!loading && <SummaryStats trips={pastTrips} />}
+        {!loading && <SummaryStats trips={pastTrips} userRole={userRole} />}
 
         {/* Filters */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6 shadow-sm">
@@ -381,6 +386,7 @@ export default function MyPastTrips() {
                   <PastTripCard
                     key={trip._id}
                     trip={trip}
+                    userRole={userRole}
                     onView={(t) => navigate(`/my-bookings/${t._id}`)}
                   />
                 ))}

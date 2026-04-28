@@ -273,11 +273,11 @@ export const fetchCancellationQueries = createAsyncThunk(
 ===================================================== */
 export const updateCancellationQueryStatus = createAsyncThunk(
   "cancellation/updateStatus",
-  async ({ id, status, remarks }, { rejectWithValue }) => {
+  async ({ id, status, remarks, resolution }, { rejectWithValue }) => {
     try {
       const res = await api.patch(
         `/corporate-related/cancellation-queries/${id}/status`,
-        { status, remarks }
+        { status, remarks, resolution }
       );
 
       return res.data;

@@ -94,30 +94,30 @@ export default function ReturnInternationalFlightCard({
       firstSeg?.FlightStatus || firstSeg?.Status || "Scheduled";
 
     return (
-      <div className="border border-blue-100 rounded-xl mb-3">
+      <div className="border border-slate-100 rounded-xl mb-3 overflow-hidden">
         {/* ---------- Basic Flight Info Header ---------- */}
-        <div className="flex justify-between w-full items-center px-4 py-3 bg-blue-50/20 rounded-xl">
+        <div className="flex justify-between w-full items-center px-4 py-3 bg-slate-50/50 rounded-xl">
           <div className="flex items-center gap-3">
             <img
               src={airlineLogo(airlineCode)}
               alt={airline}
-              className="w-10 h-10 border border-gray-200 rounded-lg object-contain bg-white p-1"
+              className="w-10 h-10 border border-slate-200 rounded-lg object-contain bg-white p-1"
             />
             <div className="flex flex-col text-left">
-              <div className="font-bold text-gray-800 text-sm">
+              <div className="font-bold text-slate-800 text-sm">
                 {from} → {to}
               </div>
-              <div className="text-xs text-gray-500 font-medium">
+              <div className="text-xs text-slate-500 font-medium">
                 {airlineCode}-{flightNumber}
               </div>
               <div className="flex gap-2 mt-1">
                 {firstSeg?.Origin?.Airport?.Terminal && (
-                  <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-wider">
+                  <span className="text-[10px] font-black text-[#C9A84C] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 uppercase tracking-wider">
                     T-{firstSeg.Origin.Airport.Terminal} (Dep)
                   </span>
                 )}
                 {lastSeg?.Destination?.Airport?.Terminal && (
-                  <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-wider">
+                  <span className="text-[10px] font-black text-[#C9A84C] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 uppercase tracking-wider">
                     T-{lastSeg.Destination.Airport.Terminal} (Arr)
                   </span>
                 )}
@@ -136,8 +136,8 @@ export default function ReturnInternationalFlightCard({
              <div className="text-sm font-bold text-slate-800">
                 {formatTime(segments[0]?.Origin?.DepTime)} - {formatTime(segments[segments.length - 1]?.Destination?.ArrTime)}
              </div>
-             <div className="text-xs font-semibold text-blue-600">
-                <span className="bg-blue-100/50 px-2 py-0.5 rounded-full">{label}</span>
+             <div className="text-xs font-semibold text-[#C9A84C]">
+                <span className="bg-slate-100 px-2 py-0.5 rounded-full">{label}</span>
              </div>
           </div>
         </div>
@@ -146,7 +146,7 @@ export default function ReturnInternationalFlightCard({
   };
 
   return (
-    <div className="max-w-[1060px] bg-white border border-blue-200 rounded-2xl overflow-hidden shadow-sm transition-all duration-300">
+    <div className="max-w-[1060px] bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm transition-all duration-300">
       <div className="p-6">
         {renderFlightLeg(onward, "Onward")}
         {renderFlightLeg(ret, "Return")}
@@ -166,12 +166,12 @@ export default function ReturnInternationalFlightCard({
                     onClick={() => setSelectedResultIndex(fare.resultIndex)}
                     className={`flex flex-col px-4 py-2 rounded-xl border transition-all ${
                       isFareSelected
-                        ? "bg-blue-600 border-blue-600 text-white shadow-md transform scale-[1.02]"
-                        : "bg-white border-blue-200 text-blue-800 hover:border-blue-400 hover:bg-blue-50"
+                        ? "bg-[#C9A84C] border-[#C9A84C] text-[#0A203E] shadow-md transform scale-[1.02]"
+                        : "bg-white border-slate-200 text-slate-800 hover:border-[#C9A84C]/50 hover:bg-slate-50"
                     }`}
                   >
                     <span
-                      className={`text-[11px] font-semibold tracking-wide uppercase ${isFareSelected ? "text-blue-100" : "text-blue-600"}`}
+                      className={`text-[11px] font-extrabold tracking-wide uppercase ${isFareSelected ? "text-[#0A203E]/60" : "text-[#C9A84C]"}`}
                     >
                       {fare.supplierFareClass}
                     </span>
@@ -187,7 +187,7 @@ export default function ReturnInternationalFlightCard({
 
         <div className="flex items-center justify-between mt-6 pt-5 border-t border-gray-100">
           <div className="text-left">
-            <p className="text-2xl md:text-3xl font-bold bg-linear-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent leading-none">
+            <p className="text-2xl md:text-3xl font-extrabold text-[#0A203E] leading-none">
               ₹{finalPrice.toLocaleString()}
             </p>
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-1">
@@ -199,10 +199,10 @@ export default function ReturnInternationalFlightCard({
             {/* ✅ VIEW FARE DETAILS EXPLICITLY */}
             <button
               onClick={() => setShowFareDetails((prev) => !prev)}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-xl border transition-colors ${
                 showFareDetails
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-blue-600 border-blue-300 hover:bg-blue-50"
+                  ? "bg-[#0A203E] text-white border-[#0A203E]"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
               }`}
             >
               View Fare Details
@@ -216,15 +216,15 @@ export default function ReturnInternationalFlightCard({
             {/* ✅ ONLY ONE MORE FARES BUTTON */}
             <button
               onClick={handleMoreFaresClick}
-              className="inline-flex items-center gap-1.5 bg-blue-50 px-4 py-2 text-sm font-semibold rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-100 transition"
+              className="inline-flex items-center gap-1.5 bg-slate-50 px-4 py-2 text-sm font-bold rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 transition"
             >
-              <BiSolidOffer /> More Fares
+              <BiSolidOffer className="text-[#C9A84C]" /> More Fares
             </button>
 
             {/* EXISTING BUTTON */}
             <button
               onClick={() => onContinue(flight)}
-              className="relative group px-6 md:px-8 py-2 md:py-[9px] bg-linear-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]"
+              className="relative group px-10 py-3.5 bg-[#C9A84C] text-[#0A203E] rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] uppercase tracking-wider text-sm"
             >
               Select & Continue
             </button>
@@ -234,7 +234,7 @@ export default function ReturnInternationalFlightCard({
       
       {/* Expanded Fare Details via Generic Dropdown */}
       {showFareDetails && (
-        <div className="border-t border-blue-200">
+        <div className="border-t border-slate-200">
           <FlightDetailsDropdown selectedFlight={flight} />
         </div>
       )}

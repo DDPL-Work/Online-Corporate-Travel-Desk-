@@ -148,7 +148,7 @@ function HotelSearchResults() {
   const isLoadingMore = loading?.loadMore;
 
   return (
-    <div className="bg-gray-100 min-h-screen flex flex-col">
+    <div className="bg-slate-50 min-h-screen flex flex-col">
       <CorporateNavbar />
       <Header />
 
@@ -177,20 +177,21 @@ function HotelSearchResults() {
           <div className="flex-1">
             <div className="  flex flex-col">
               {/* Header */}
-              <div className="border-b border-gray-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
+              <div className="border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3">
+                <h2 className="text-lg sm:text-xl font-semibold" style={{ color: "#1E293B" }}>
                   Found {pagination?.total ?? filteredHotels?.length ?? 0}{" "}
                   hotels
                 </h2>
 
                 {/* Sort Dropdown */}
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">Sort by:</span>
+                  <span className="text-sm text-slate-500">Sort by:</span>
 
                   <select
                     value={sortOrder}
                     onChange={(e) => setSortOrder(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2"
+                    style={{ outlineColor: "#C9A84C" }}
                   >
                     <option value="">Recommended</option>
                     <option value="low">Price: Low → High</option>
@@ -206,9 +207,9 @@ function HotelSearchResults() {
               lg:overflow-y-auto"
               >
                 {isInitialLoading ? (
-                  <p className="text-center py-10">Loading hotels...</p>
+                  <p className="text-center py-10 text-slate-500">Loading hotels...</p>
                 ) : filteredHotels?.length === 0 ? (
-                  <p className="text-center py-10 text-gray-500">
+                  <p className="text-center py-10 text-slate-400">
                     No hotels found
                   </p>
                 ) : (
@@ -223,8 +224,8 @@ function HotelSearchResults() {
                         <button
                           onClick={handleLoadMore}
                           disabled={loading?.search || isLoadingMore}
-                          className="px-6 py-2 bg-blue-600 text-white rounded-lg 
-                       hover:bg-blue-700 transition duration-200 disabled:opacity-60"
+                          className="px-6 py-2 rounded-lg font-semibold transition duration-200 disabled:opacity-60 hover:brightness-110 active:scale-95"
+                          style={{ background: "#C9A84C", color: "#000D26" }}
                         >
                           {isLoadingMore ? "Loading..." : "Load More"}
                         </button>

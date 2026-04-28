@@ -67,7 +67,7 @@ const Lightbox = ({ images, startIndex, onClose }) => {
                 height: 6,
                 borderRadius: 3,
                 background:
-                  i === current % 12 ? "#0d7fe8" : "rgba(255,255,255,0.2)",
+                  i === current % 12 ? "#C9A84C" : "rgba(255,255,255,0.2)",
               }}
             />
           ))}
@@ -130,7 +130,7 @@ const Lightbox = ({ images, startIndex, onClose }) => {
               width: i === current ? 60 : 48,
               height: 40,
               border:
-                i === current ? "2px solid #0d7fe8" : "2px solid transparent",
+                i === current ? "2px solid #C9A84C" : "2px solid transparent",
               opacity: i === current ? 1 : 0.45,
             }}
           >
@@ -336,7 +336,7 @@ const HotelImageGallery = ({ images = [] }) => {
                 }}
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#0d7fe8] animate-pulse" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] animate-pulse" />
                   <span className="text-white text-xs font-bold uppercase tracking-widest opacity-80">
                     Featured Photo
                   </span>
@@ -463,12 +463,12 @@ const HotelImageGallery = ({ images = [] }) => {
             className="flex items-center gap-1.5 sm:gap-2 font-bold text-xs px-2.5 sm:px-4 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl transition-all hover:scale-105 active:scale-95"
             style={{
               background: "rgba(255,255,255,0.95)",
-              color: "#0a2540",
+              color: "#0A203E",
               boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
               border: "1px solid rgba(255,255,255,0.5)",
             }}
           >
-            <MdGridView className="text-[#0d7fe8] text-sm sm:text-base" />
+            <MdGridView className="text-[#C9A84C] text-sm sm:text-base" />
             <span className="hidden sm:inline">View All {total}</span>
             <span className="sm:hidden">{total}</span>
           </button>
@@ -495,7 +495,7 @@ const HotelImageGallery = ({ images = [] }) => {
                   outline: "none",
                 }}
                 onMouseEnter={(e) =>
-                  (e.currentTarget.style.borderColor = "#0d7fe8")
+                  (e.currentTarget.style.borderColor = "#C9A84C")
                 }
                 onMouseLeave={(e) =>
                   (e.currentTarget.style.borderColor = "transparent")

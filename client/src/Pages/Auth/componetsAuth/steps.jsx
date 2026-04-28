@@ -85,7 +85,7 @@ export const Step0 = ({ onNext, onRegister, form, setForm }) => {
       </div>
 
       {/* Email Input */}
-      <div className="space-y-3">
+      {/* <div className="space-y-3">
         <div className="relative">
           <MdEmail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -103,16 +103,16 @@ export const Step0 = ({ onNext, onRegister, form, setForm }) => {
         >
           Continue
         </button>
-      </div>
+      </div> */}
 
       {/* Divider */}
-      <div className="flex items-center gap-4">
+      {/* <div className="flex items-center gap-4">
         <div className="flex-1 h-px bg-slate-100" />
         <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
           Or sign in with
         </span>
         <div className="flex-1 h-px bg-slate-100" />
-      </div>
+      </div> */}
 
       {/* SSO Icon Row */}
       <div className="flex items-center justify-center gap-5">

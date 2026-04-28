@@ -47,7 +47,7 @@ function fmt(dateStr, opts) {
 /* ─── Sub-components ─── */
 function Skeleton({ className = "" }) {
   return (
-    <div className={`animate-pulse bg-slate-200 rounded-xl ${className}`} />
+    <div className={`animate-pulse bg-[#04112F]/10 rounded-xl ${className}`} />
   );
 }
 
@@ -57,7 +57,7 @@ function Stars({ count = 0 }) {
       {Array.from({ length: Math.min(count, 5) }).map((_, i) => (
         <svg
           key={i}
-          className="w-3.5 h-3.5 text-amber-400"
+          className="w-3.5 h-3.5 text-[#C9A84C]"
           fill="currentColor"
           viewBox="0 0 20 20"
         >
@@ -71,14 +71,14 @@ function Stars({ count = 0 }) {
 function GuestField({ icon: Icon, label, value }) {
   return (
     <div className="flex items-start gap-3 py-3 px-4 border-b border-slate-100 last:border-0">
-      <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-        <Icon size={13} className="text-slate-500" />
+      <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center shrink-0 mt-0.5">
+        <Icon size={13} className="text-[#0A203E]" />
       </div>
       <div className="min-w-0">
         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
           {label}
         </p>
-        <p className="text-sm font-semibold text-slate-800 truncate">
+        <p className="text-sm font-semibold text-slate-700 truncate">
           {value || "—"}
         </p>
       </div>
@@ -110,6 +110,7 @@ const HotelBookNow = () => {
   const [bookingRequest, setBookingRequest] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [fetching, setFetching] = useState(true);
+  const [imgIdx, setImgIdx] = useState(0);
 
   useEffect(() => {
     if (!id) {
@@ -143,14 +144,26 @@ const HotelBookNow = () => {
     : [];
   // const rawRoom = selectedRooms.rawRoomData || {};
 
+  const hotelImages = hotelReq?.selectedRoom?.rawRoomData?.[0]?.images || [];
+
+  useEffect(() => {
+    if (hotelImages.length > 1) {
+      const interval = setInterval(() => {
+        setImgIdx((prev) => (prev + 1) % hotelImages.length);
+      }, 2000);
+      return () => clearInterval(interval);
+    }
+  }, [hotelImages.length]);
+
   const hotel = {
     name: selectedHotel.hotelName || "Hotel",
     rating: selectedHotel.starRating || 0,
     address: selectedHotel.address || "",
     city: selectedHotel.city || "",
-    image:
-      selectedRooms[0]?.images?.[0] ||
-      selectedRooms[0]?.rawRoomData?.images?.[0] ||
+    image: hotelImages[imgIdx] || "/placeholder-hotel.jpg",
+    bgImage:
+      hotelImages[(imgIdx + 1) % hotelImages.length] ||
+      hotelImages[imgIdx] ||
       "/placeholder-hotel.jpg",
   };
 
@@ -246,12 +259,12 @@ const HotelBookNow = () => {
     draft: {
       label: "Draft",
       sub: "Not Submitted",
-      className: "text-slate-400 bg-slate-400/10 border-slate-400/20",
+      className: "text-white/40 bg-slate-400/10 border-slate-400/20",
     },
     pending_approval: {
       label: "Pending",
       sub: "Waiting for Approval",
-      className: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+      className: "text-[#C9A84C] bg-amber-400/10 border-amber-400/20",
     },
     approved: {
       label: "Approved",
@@ -301,7 +314,7 @@ const HotelBookNow = () => {
     amber: {
       bg: "bg-amber-500/15",
       border: "border-amber-400/30",
-      text: "text-amber-400",
+      text: "text-[#C9A84C]",
     },
     red: {
       bg: "bg-red-500/15",
@@ -311,7 +324,7 @@ const HotelBookNow = () => {
     slate: {
       bg: "bg-slate-500/15",
       border: "border-slate-400/30",
-      text: "text-slate-400",
+      text: "text-white/40",
     },
   };
 
@@ -321,7 +334,7 @@ const HotelBookNow = () => {
   /* ── Loading ── */
   if (fetching)
     return (
-      <div className="min-h-screen bg-slate-100">
+      <div className="min-h-screen bg-slate-50">
         <CorporateNavbar />
         <div className="h-64 bg-slate-200 animate-pulse" />
         <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -342,7 +355,7 @@ const HotelBookNow = () => {
       <div className="min-h-screen bg-slate-50">
         <CorporateNavbar />
         <div className="max-w-6xl mx-auto px-4 py-24 flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
+          <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-100 flex items-center justify-center">
             <FiAlertCircle size={26} className="text-red-400" />
           </div>
           <p className="text-slate-600 font-semibold">
@@ -350,7 +363,7 @@ const HotelBookNow = () => {
           </p>
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm font-semibold text-slate-600 border border-slate-200 px-5 py-2.5 rounded-xl hover:bg-slate-50 transition"
+            className="flex items-center gap-2 text-sm font-semibold text-slate-600 border border-slate-200 px-5 py-2.5 rounded-xl hover:bg-white transition"
           >
             <MdArrowBack size={16} /> Go Back
           </button>
@@ -360,34 +373,25 @@ const HotelBookNow = () => {
 
   /* ── Main ── */
   return (
-    <div className="min-h-screen bg-slate-100 font-sans">
+    <div className="min-h-screen bg-slate-50 font-sans">
       <CorporateNavbar />
 
       {/* ══════════════════════════════════
-          DARK HERO BAND
+          HERO BAND
       ══════════════════════════════════ */}
-      <div className="relative bg-[#0d1b2a] overflow-hidden">
+      <div className="relative bg-[#0A203E] overflow-hidden">
         {/* Blurred bg image */}
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-20"
-          style={{ backgroundImage: `url(${hotel.image})` }}
+          className="absolute inset-0 bg-cover bg-center opacity-30 transition-all duration-1000 ease-in-out"
+          style={{ backgroundImage: `url(${hotel.bgImage})` }}
         />
-        <div className="absolute inset-0 bg-linear-to-r from-[#0d1b2a] via-[#0d1b2a]/90 to-transparent" />
-        {/* Grid texture */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)",
-            backgroundSize: "48px 48px",
-          }}
-        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0A203E] via-[#0A203E]/80 to-transparent" />
 
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-0">
           {/* Back */}
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-white/50 hover:text-white transition mb-6"
+            className="flex items-center gap-1.5 text-xs font-semibold text-white/60 hover:text-white transition mb-6"
           >
             <MdArrowBack size={14} /> Back to Approvals
           </button>
@@ -398,9 +402,9 @@ const HotelBookNow = () => {
               <img
                 src={hotel.image}
                 alt={hotel.name}
-                className="w-28 h-28 sm:w-32 sm:h-32 object-cover rounded-2xl border-2 border-white/10 shadow-2xl"
+                className="w-28 h-28 sm:w-32 sm:h-32 object-cover rounded-2xl border-2 border-white/20 shadow-2xl transition-all duration-700 ease-in-out"
               />
-              <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-emerald-500 border-2 border-[#0d1b2a] flex items-center justify-center shadow-lg">
+              <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-emerald-500 border-2 border-[#0A203E] flex items-center justify-center shadow-lg">
                 <MdVerifiedUser size={14} className="text-white" />
               </div>
             </div>
@@ -419,7 +423,7 @@ const HotelBookNow = () => {
               <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
                 <Stars count={hotel.rating} />
                 <span className="text-white/30 text-xs">·</span>
-                <span className="flex items-center gap-1 text-xs text-white/55">
+                <span className="flex items-center gap-1 text-xs text-white/80">
                   <MdLocationOn size={12} className="text-emerald-400" />
                   {hotel.address}
                 </span>
@@ -428,35 +432,35 @@ const HotelBookNow = () => {
 
             {/* Date band — right side */}
             <div className="flex gap-2 shrink-0">
-              <div className="bg-white/8 border border-white/12 rounded-xl px-4 py-3 text-center min-w-[90px]">
-                <p className="text-white/40 text-[10px] font-semibold uppercase mb-1">
+              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-3 text-center min-w-[90px]">
+                <p className="text-white/60 text-[10px] font-semibold uppercase mb-1">
                   Check-in
                 </p>
                 <p className="text-white font-black text-sm">
                   {fmt(checkIn, { day: "2-digit", month: "short" })}
                 </p>
-                <p className="text-white/35 text-[10px]">
+                <p className="text-white/50 text-[10px]">
                   {fmt(checkIn, { weekday: "short", year: "numeric" })}
                 </p>
               </div>
               <div className="flex flex-col items-center justify-center px-1 gap-1">
-                <div className="w-px h-4 bg-white/15" />
+                <div className="w-px h-4 bg-white/20" />
                 <span className="text-white font-black text-lg leading-none">
                   {room.nights}
                 </span>
-                <span className="text-white/30 text-[9px] uppercase tracking-widest">
+                <span className="text-white/40 text-[9px] uppercase tracking-widest">
                   Nts
                 </span>
-                <div className="w-px h-4 bg-white/15" />
+                <div className="w-px h-4 bg-white/20" />
               </div>
-              <div className="bg-white/8 border border-white/12 rounded-xl px-4 py-3 text-center min-w-[90px]">
-                <p className="text-white/40 text-[10px] font-semibold uppercase mb-1">
+              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-3 text-center min-w-[90px]">
+                <p className="text-white/60 text-[10px] font-semibold uppercase mb-1">
                   Check-out
                 </p>
                 <p className="text-white font-black text-sm">
                   {fmt(checkOut, { day: "2-digit", month: "short" })}
                 </p>
-                <p className="text-white/35 text-[10px]">
+                <p className="text-white/50 text-[10px]">
                   {fmt(checkOut, { weekday: "short", year: "numeric" })}
                 </p>
               </div>
@@ -466,7 +470,7 @@ const HotelBookNow = () => {
 
         {/* Wave bottom */}
         <div
-          className="h-6 bg-slate-100"
+          className="h-6 bg-slate-50"
           style={{ clipPath: "ellipse(60% 100% at 50% 100%)" }}
         />
       </div>
@@ -488,7 +492,7 @@ const HotelBookNow = () => {
           ${
             isDone
               ? "bg-emerald-500 border-emerald-500 text-white"
-              : "bg-white border-slate-300 text-slate-400"
+              : "bg-white border-slate-200 text-slate-400"
           }`}
                     >
                       {isDone ? <MdCheckCircle size={14} /> : step.num}
@@ -505,7 +509,7 @@ const HotelBookNow = () => {
                   {idx < steps.length - 1 && (
                     <div
                       className={`h-0.5 flex-1 mx-1 rounded-full max-w-20
-          ${step.num < completedStep ? "bg-emerald-400" : "bg-slate-200"}`}
+          ${step.num < completedStep ? "bg-emerald-400" : "bg-slate-100"}`}
                     />
                   )}
                 </React.Fragment>
@@ -523,11 +527,11 @@ const HotelBookNow = () => {
           {/* ─── LEFT (3/5) ─── */}
           <div className="lg:col-span-3 space-y-5">
             {/* Room strip */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/5 overflow-hidden">
               <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-[#0A4D68]/8 flex items-center justify-center">
-                    <MdHotel size={14} className="text-[#0A4D68]" />
+                  <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center">
+                    <MdHotel size={14} className="text-[#0A203E]" />
                   </div>
                   <div>
                     {selectedRooms.map((r, i) => (
@@ -554,7 +558,7 @@ const HotelBookNow = () => {
                   {room.inclusions.slice(0, 6).map((item, i) => (
                     <span
                       key={i}
-                      className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full font-medium"
+                      className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-500/10 border border-emerald-100 px-2.5 py-1 rounded-full font-medium"
                     >
                       <FiCheckCircle size={10} /> {item.trim()}
                     </span>
@@ -566,9 +570,9 @@ const HotelBookNow = () => {
                 <div className="px-5 py-3 border-t border-slate-100 flex items-start gap-2">
                   <MdInfo
                     size={14}
-                    className="text-amber-500 shrink-0 mt-0.5"
+                    className="text-[#C9A84C] shrink-0 mt-0.5"
                   />
-                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                  <p className="text-[11px] text-[#C9A84C] leading-relaxed">
                     {room.cancellationPolicies[0]?.ChargeType
                       ? `From ${room.cancellationPolicies[0].FromDate} - ${room.cancellationPolicies[0].ChargeType} ${room.cancellationPolicies[0].CancellationCharge}`
                       : "Cancellation policy applies"}
@@ -583,9 +587,9 @@ const HotelBookNow = () => {
                 <div className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center">
                   <MdVerifiedUser size={13} className="text-emerald-600" />
                 </div>
-                <h2 className="text-sm font-bold text-slate-700">
+                <h2 className="text-sm font-bold text-slate-800">
                   Verified Guests
-                  <span className="ml-2 text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                  <span className="ml-2 text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 border border-emerald-200 px-2 py-0.5 rounded-full">
                     {travelers.length}{" "}
                     {travelers.length === 1 ? "Guest" : "Guests"}
                   </span>
@@ -601,12 +605,12 @@ const HotelBookNow = () => {
               {travelers.map((t, index) => (
                 <div
                   key={t._id || t.id || index}
-                  className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+                  className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/5 overflow-hidden"
                 >
                   {/* Card header */}
-                  <div className="flex items-center justify-between px-5 py-3 bg-linear-to-r from-slate-50 to-white border-b border-slate-100">
+                  <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-100">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center text-sm font-black text-white shadow-sm">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0A203E] to-[#1a3a5a] flex items-center justify-center text-sm font-black text-white shadow-md">
                         {(t.firstName?.[0] || "G").toUpperCase()}
                       </div>
                       <div>
@@ -614,13 +618,13 @@ const HotelBookNow = () => {
                           {t.title} {t.firstName} {t.middleName || ""}{" "}
                           {t.lastName}
                         </p>
-                        <p className="text-[10px] text-slate-400">
+                        <p className="text-[10px] text-slate-400 font-medium">
                           Guest {index + 1}
                         </p>
                       </div>
                     </div>
                     {t.isLeadPassenger && (
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-[#0A4D68] bg-[#0A4D68]/8 border border-[#0A4D68]/15 px-2.5 py-1 rounded-full">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-[#0A203E] bg-[#0A203E]/5 border border-[#0A203E]/10 px-2.5 py-1 rounded-full">
                         Lead
                       </span>
                     )}
@@ -673,16 +677,16 @@ const HotelBookNow = () => {
 
             {/* Purpose of Travel */}
             {purposeOfTravel && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/5 p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded-lg bg-[#0A4D68]/8 flex items-center justify-center">
-                    <FiShield size={12} className="text-[#0A4D68]" />
+                  <div className="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center">
+                    <FiShield size={12} className="text-[#0A203E]" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-700">
+                  <h3 className="text-sm font-bold text-slate-800">
                     Purpose of Travel
                   </h3>
                 </div>
-                <div className="relative pl-3 border-l-2 border-[#0A4D68]/20">
+                <div className="relative pl-3 border-l-2 border-[#0A203E]/20">
                   <p className="text-sm text-slate-600 leading-relaxed">
                     {purposeOfTravel}
                   </p>
@@ -694,69 +698,54 @@ const HotelBookNow = () => {
           {/* ─── RIGHT (2/5) sticky ─── */}
           <div className="lg:col-span-2">
             <div className="sticky top-20 space-y-4">
-              {/* Dark price + CTA card */}
-              <div className="bg-linear-to-br from-[#0d1b2a] to-[#0A4D68] rounded-2xl p-5 text-white shadow-xl shadow-[#0A4D68]/20 relative overflow-hidden">
-                <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/5" />
-                <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-white/5" />
-
-                <div className="relative">
+              {/* Gold price + CTA card */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xl relative overflow-hidden">
+                <div className="bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] px-5 py-4">
                   {/* Approval header */}
-                  <div className="flex items-center gap-3 mb-5">
+                  <div className="flex items-center gap-3">
                     {/* Icon */}
                     <div
-                      className={`w-11 h-11 rounded-2xl flex items-center justify-center border ${s.bg} ${s.border}`}
+                      className={`w-11 h-11 rounded-2xl flex items-center justify-center border bg-white/20 border-white/30 text-[#0A203E]`}
                     >
-                      <span className={s.text}>{statusUI.icon}</span>
+                      {statusUI.icon}
                     </div>
 
                     {/* Text */}
                     <div className="flex flex-col">
-                      <p
-                        className={`text-[10px] font-bold uppercase tracking-widest ${s.text}`}
-                      >
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-[#0A203E]/70">
                         {currentStatus.label}
                       </p>
-
-                      <p className="text-sm font-extrabold text-white tracking-tight">
+                      <p className="text-sm font-extrabold text-[#0A203E] tracking-tight">
                         {currentStatus.sub}
                       </p>
-
-                      {/* Optional: approver */}
-                      {/* {status === "approved" && approvedBy?.name && (
-                        <p className="text-[11px] text-white/40 mt-0.5">
-                          Approved by{" "}
-                          <span className="text-white/60 font-medium">
-                            {approvedBy.name.firstName}{" "}
-                            {approvedBy.name.lastName}
-                          </span>
-                        </p>
-                      )} */}
                     </div>
                   </div>
+                </div>
 
+                <div className="p-5">
                   {/* Approver info */}
                   {approvedBy && (
-                    <div className="bg-white/8 border border-white/10 rounded-xl px-4 py-3 space-y-1.5 mb-4">
+                    <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 space-y-1.5 mb-4">
                       {approvedBy.name && (
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-white/50">Approved by</span>
-                          <span className="font-bold text-white">
+                          <span className="text-slate-500">Approved by</span>
+                          <span className="font-bold text-slate-800">
                             {`${approvedBy.name?.firstName || ""} ${approvedBy.name?.lastName || ""}`}
                           </span>
                         </div>
                       )}
-                      {approvedBy.role && (
+                      {approvedBy.email && (
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-white/50">Mail ID</span>
-                          <span className="font-semibold text-white/80">
+                          <span className="text-slate-500">Mail ID</span>
+                          <span className="font-semibold text-slate-700">
                             {approvedBy.email}
                           </span>
                         </div>
                       )}
                       {approvedBy.approvedAt && (
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-white/50">Date</span>
-                          <span className="font-semibold text-white/80">
+                          <span className="text-slate-500">Date</span>
+                          <span className="font-semibold text-slate-700">
                             {fmt(approvedBy.approvedAt, {
                               day: "2-digit",
                               month: "short",
@@ -769,29 +758,29 @@ const HotelBookNow = () => {
                   )}
 
                   {/* Fare */}
-                  <div className="space-y-2 mb-4">
+                  <div className="space-y-2 mb-4 pt-2">
                     <div className="flex justify-between text-xs">
-                      <span className="text-white/50">Base Fare</span>
-                      <span className="text-white/80 font-semibold">
+                      <span className="text-slate-500">Base Fare</span>
+                      <span className="text-slate-700 font-semibold">
                         ₹{(baseFare || 0).toLocaleString("en-IN")}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-white/50">Taxes &amp; Fees</span>
-                      <span className="text-white/80 font-semibold">
+                      <span className="text-slate-500">Taxes &amp; Fees</span>
+                      <span className="text-slate-700 font-semibold">
                         ₹{(tax || 0).toLocaleString("en-IN")}
                       </span>
                     </div>
-                    <div className="h-px bg-white/10 my-2" />
+                    <div className="h-px bg-slate-100 my-2" />
                     <div className="flex justify-between items-baseline">
-                      <span className="text-xs font-bold text-white/60 uppercase tracking-wider">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                         Total
                       </span>
                       <div className="text-right">
-                        <span className="text-2xl font-black text-white">
+                        <span className="text-2xl font-black text-[#0A203E]">
                           ₹{totalFare.toLocaleString("en-IN")}
                         </span>
-                        <p className="text-[10px] text-white/35 mt-0.5">
+                        <p className="text-[10px] text-slate-400 mt-0.5">
                           {room.currency} · incl. all taxes
                         </p>
                       </div>
@@ -802,11 +791,11 @@ const HotelBookNow = () => {
                   <button
                     onClick={handleBookNow}
                     disabled={actionLoading || !isApproved}
-                    className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all shadow-lg
+                    className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all shadow-lg
   ${
     isApproved
-      ? "bg-white text-[#0A4D68] hover:bg-emerald-50 active:scale-[0.98]"
-      : "bg-slate-300 text-slate-500 cursor-not-allowed"
+      ? "bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] text-[#0A203E] hover:shadow-[#C9A84C]/20 active:scale-[0.98]"
+      : "bg-slate-100 text-slate-400 cursor-not-allowed"
   }
 `}
                   >
@@ -814,24 +803,24 @@ const HotelBookNow = () => {
                       "Waiting for Approval"
                     ) : actionLoading ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-[#0A4D68]/30 border-t-[#0A4D68] rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-[#0A203E]/30 border-t-[#0A203E] rounded-full animate-spin" />
                         Processing…
                       </>
                     ) : (
                       <>
-                        <MdCheckCircle size={16} className="text-emerald-600" />
+                        <MdCheckCircle size={16} />
                         Confirm & Book Now
                       </>
                     )}
                   </button>
 
-                  <p className="text-[10px] text-white/30 text-center mt-3 leading-relaxed">
+                  <p className="text-[10px] text-slate-400 text-center mt-3 leading-relaxed">
                     By confirming you agree to the{" "}
-                    <span className="text-white/50 hover:text-white cursor-pointer underline decoration-dotted">
+                    <span className="text-slate-500 hover:text-[#C9A84C] cursor-pointer underline decoration-dotted">
                       Terms
                     </span>{" "}
                     &amp;{" "}
-                    <span className="text-white/50 hover:text-white cursor-pointer underline decoration-dotted">
+                    <span className="text-slate-500 hover:text-[#C9A84C] cursor-pointer underline decoration-dotted">
                       Cancellation Policy
                     </span>
                     .
@@ -840,7 +829,7 @@ const HotelBookNow = () => {
               </div>
 
               {/* Quick summary strip */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-100 overflow-hidden">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/5 divide-y divide-slate-100 overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3">
                   <MdCalendarToday
                     size={14}
@@ -850,7 +839,7 @@ const HotelBookNow = () => {
                     <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                       Stay Duration
                     </p>
-                    <p className="text-sm font-bold text-slate-800">
+                    <p className="text-sm font-bold text-slate-700">
                       {fmt(checkIn, { day: "2-digit", month: "short" })} —{" "}
                       {fmt(checkOut, {
                         day: "2-digit",
@@ -859,7 +848,7 @@ const HotelBookNow = () => {
                       })}
                     </p>
                   </div>
-                  <span className="text-xs font-black text-[#0A4D68] bg-[#0A4D68]/8 px-2 py-0.5 rounded-lg">
+                  <span className="text-xs font-black text-[#0A203E] bg-[#0A203E]/5 px-2 py-0.5 rounded-lg">
                     {room.nights}N
                   </span>
                 </div>
@@ -869,7 +858,7 @@ const HotelBookNow = () => {
                     <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                       Guests
                     </p>
-                    <p className="text-sm font-bold text-slate-800">
+                    <p className="text-sm font-bold text-slate-700">
                       {travelers.length} traveller
                       {travelers.length !== 1 ? "s" : ""} · {roomCount} room
                       {roomCount !== 1 ? "s" : ""}
@@ -882,7 +871,7 @@ const HotelBookNow = () => {
                     <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                       Room Type
                     </p>
-                    <p className="text-sm font-bold text-slate-800">
+                    <p className="text-sm font-bold text-slate-700">
                       {room.typeName}
                     </p>
                   </div>

@@ -16,7 +16,11 @@ import {
   FaMinus,
   FaPlus,
   FaGlobe,
+  FaBed,
+  FaHistory,
 } from "react-icons/fa";
+import { BsCalendar4, BsBell } from "react-icons/bs";
+import CustomCalendar from "../../../components/CustomCalendar";
 import { MdArrowForward, MdAltRoute } from "react-icons/md";
 import {
   RiFlightTakeoffLine,
@@ -35,8 +39,12 @@ import {
   RiCheckLine,
 } from "react-icons/ri";
 import { LuPlane } from "react-icons/lu";
-import { BsBell } from "react-icons/bs";
-import { useNavigate, useSearchParams, useParams, useLocation } from "react-router-dom";
+import {
+  useNavigate,
+  useSearchParams,
+  useParams,
+  useLocation,
+} from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import LandingFooter from "../../../layout/LandingFooter";
 import { logoutUser } from "../../../Redux/Slice/authSlice";
@@ -99,9 +107,114 @@ const CABIN_CLASS_MAP = {
   "Premium Business": "premium_business",
 };
 
+// ─── Field Date Component ──────────────────────────────────────────────────────
+const LandingDateField = ({
+  value,
+  valueEnd,
+  range = false,
+  min,
+  onChange,
+  onChangeEnd,
+  placeholder = "Select Date",
+  displayValue,
+  isOpen: controlledOpen,
+  onToggle,
+  focus = "start",
+}) => {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setIsOpen = onToggle || setInternalOpen;
+
+  const containerRef = useRef(null);
+  useEffect(() => {
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        if (controlledOpen !== undefined) {
+          if (isOpen) onToggle(false);
+        } else {
+          setInternalOpen(false);
+        }
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [isOpen, controlledOpen, onToggle]);
+
+  const fmt = (dateStr) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "2-digit",
+    });
+  };
+
+  const handleCalendarChange = (val) => {
+    if (!range) {
+      onChange(val);
+      setIsOpen(false);
+    } else {
+      if (typeof val === "string") {
+        onChange(val);
+      } else {
+        if (val.start !== undefined) onChange(val.start);
+        if (val.end !== undefined) {
+          onChangeEnd(val.end);
+          if (val.end) {
+            setIsOpen(false);
+          }
+        }
+      }
+    }
+  };
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <div
+        className="flex items-center gap-2 rounded-xl px-3 py-3 transition-all border-2 cursor-pointer"
+        style={{
+          background: FIELD_BG,
+          borderColor: isOpen ? FIELD_FOCUS : FIELD_BORDER,
+          boxShadow: isOpen ? `0 0 0 3px ${GOLD_10}` : "none",
+        }}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <BsCalendar4 style={{ color: GOLD, fontSize: 13 }} />
+        <span
+          className="text-sm font-medium"
+          style={{
+            color: (displayValue !== undefined ? displayValue : value)
+              ? FIELD_TEXT
+              : FIELD_MUTED,
+          }}
+        >
+          {fmt(displayValue !== undefined ? displayValue : value) ||
+            placeholder}
+        </span>
+      </div>
+      {isOpen && (
+        <div className="absolute top-full right-0 z-[1000] mt-2 shadow-2xl rounded-xl overflow-hidden">
+          <CustomCalendar
+            range={range}
+            value={range ? { start: value, end: valueEnd } : value}
+            minDate={min}
+            onChange={handleCalendarChange}
+            onClose={() => setIsOpen(false)}
+            focus={focus}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Shared Atoms ──────────────────────────────────────────────────────────────
 const GoldLabel = ({ children }) => (
-  <div className="inline-block w-full md:w-[380px] mb-3 px-2 py-0.5" style={{ background: GOLD }}>
+  <div
+    className="inline-block w-full md:w-[380px] mb-3 px-2 py-0.5"
+    style={{ background: GOLD }}
+  >
     <span
       className="text-[11px] font-bold uppercase tracking-[0.18em]"
       style={{ color: C.black, fontFamily: "'Plus Jakarta Sans',sans-serif" }}
@@ -155,7 +268,6 @@ const FieldBox = ({ label, icon, children, className = "" }) => (
 );
 
 // ─── Airport Autocomplete ──────────────────────────────────────────────────────
-// Full logic from FlightSearch.jsx — only colours changed
 const AirportSearchInput = ({ value, onChange, placeholder, id, error }) => {
   const [query, setQuery] = useState(value || "");
   const [suggestions, setSuggestions] = useState([]);
@@ -321,17 +433,19 @@ const AirportSearchInput = ({ value, onChange, placeholder, id, error }) => {
   );
 };
 
-// NAVBAR Component removed - moved to shared layout/CorporateNavbar.jsx
-
 // ─── HERO + FULL SEARCH MODULE ─────────────────────────────────────────────────
-// Contains ALL real logic from FlightSearch.jsx and HotelSearch.jsx
-const HeroWithSearch = ({ branding, navigate, dispatch }) => {
+const HeroWithSearch = ({
+  branding,
+  navigate,
+  dispatch,
+  activeTab,
+  setActiveTab,
+}) => {
   const { companySlug } = useParams();
   const location = useLocation();
   const { publicBranding } = useSelector((s) => s.landingPage);
-  const [activeTab, setActiveTab] = useState(location.state?.activeTab || "flight");
 
-  // ── FLIGHT STATE (from FlightSearch.jsx) ──────────────────────────────────
+
   const [flightLoading, setFlightLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [tripType, setTripType] = useState("one-way");
@@ -367,12 +481,36 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
     infants = 0,
   } = passengers || {};
 
+  // ─── Dropdown Syncing ───
+  const [openCalendarId, setOpenCalendarId] = useState(null);
+
+  const handleCalendarToggle = (id, state) => {
+    if (state) {
+      setOpenCalendarId(id);
+      if (isModalOpen) closeDropdown();
+      if (showGuestDropdown) setShowGuestDropdown(false);
+    } else {
+      if (openCalendarId === id) setOpenCalendarId(null);
+    }
+  };
+
+  const handleOpenTravellers = (e) => {
+    setOpenCalendarId(null);
+    if (showGuestDropdown) setShowGuestDropdown(false);
+    openDropdown(e);
+  };
+
+  const handleOpenHotelGuests = () => {
+    setOpenCalendarId(null);
+    if (isModalOpen) closeDropdown();
+    setShowGuestDropdown(!showGuestDropdown);
+  };
+
   useEffect(() => {
     if (returnDate && departureDate && returnDate < departureDate)
       setReturnDate(departureDate);
   }, [departureDate]);
 
-  // exact same logic from FlightSearch.jsx
   const validateSearch = () => {
     const e = {};
     if (!fromAirport?.code) e.from = "Please select origin airport";
@@ -497,7 +635,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
     }
   };
 
-  // ── HOTEL STATE (from HotelSearch.jsx) ────────────────────────────────────
   const [hotelLoading, setHotelLoading] = useState(false);
   const [country, setCountry] = useState("IN");
   const [guestNationality, setGuestNationality] = useState("IN");
@@ -537,6 +674,9 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
     : [];
 
   const handleCountryChange = (code) => {
+    setOpenCalendarId(null);
+    if (isModalOpen) closeDropdown();
+    if (showGuestDropdown) setShowGuestDropdown(false);
     setCountry(code);
     setCity("");
     setSelectedCityCode(null);
@@ -603,7 +743,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
     });
   }, [rooms]);
 
-  // exact same logic from HotelSearch.jsx
   const handleHotelSearch = async () => {
     if (!selectedCityCode || !checkIn || !checkOut) {
       alert("Please select a valid city and fill all required fields");
@@ -615,6 +754,7 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
       CheckIn: checkIn,
       CheckOut: checkOut,
       CityCode: selectedCityCode,
+      CityName: city,
       GuestNationality: guestNationality,
       ResponseTime: 23,
       NoOfRooms: rooms,
@@ -658,7 +798,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
       : null;
   const selectedCountry = normalizedCountries.find((c) => c.code === country);
 
-  // ── shared field style util (white card fields) ───────────────────────────
   const fieldBorder = (active) => ({
     background: FIELD_BG,
     borderColor: active ? FIELD_FOCUS : FIELD_BORDER,
@@ -672,7 +811,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
     fontFamily: "'Plus Jakarta Sans',sans-serif",
   };
 
-  // ── search button ──────────────────────────────────────────────────────────
   const SearchBtn = ({ loading, label, onClick, type = "button" }) => (
     <button
       type={type}
@@ -717,7 +855,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
 
   return (
     <section className="relative">
-      {/* ── Split background: navy top half, off-white bottom ── */}
       <div className="absolute inset-0 pointer-events-none flex flex-col">
         <div
           className="flex-none"
@@ -725,7 +862,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
         />
         <div className="flex-1" style={{ background: HERO_SPLIT }} />
       </div>
-      {/* Soft diagonal separator */}
       <div
         className="absolute left-0 right-0 pointer-events-none"
         style={{
@@ -734,14 +870,12 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
           background: `linear-gradient(to bottom right, ${HERO_TOP} 50%, ${HERO_SPLIT} 50%)`,
         }}
       />
-      {/* Gold accent line */}
       <div
         className="absolute left-0 right-0 pointer-events-none"
         style={{ top: "52%", height: 3, background: GOLD, opacity: 0.35 }}
       />
 
       <div className="relative z-10 max-w-6xl mx-auto px-6 md:px-10 pt-16 pb-20">
-        {/* ── Hero text — sits on dark top half ── */}
         <div className="text-center mb-10">
           <div
             className="inline-flex items-center gap-2 mb-5 px-4 py-1.5 rounded-full"
@@ -792,10 +926,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
           </p>
         </div>
 
-        {/* ═══════════════════════════════════════════════
-            FLOATING SEARCH CARD — Large white card
-        ═══════════════════════════════════════════════ */}
-        {/* ── Tabs Container (Separated) ── */}
         <div className="flex justify-center mb-2 relative z-30">
           <div className="flex p-1.5 rounded-2xl border border-white/20 shadow-2xl">
             {[
@@ -824,9 +954,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════
-            FLOATING SEARCH CARD — Large white card
-        ═══════════════════════════════════════════════ */}
         <div
           className="rounded-3xl relative z-20"
           style={{
@@ -838,18 +965,13 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
           }}
         >
           <div className="p-6 md:p-8">
-            {/* ════════════════════════════════════
-                FLIGHT SEARCH FORM
-                Full logic from FlightSearch.jsx
-            ════════════════════════════════════ */}
             {activeTab === "flight" && (
               <>
-                {/* Trip type tabs — clean pills on white */}
                 <div className="flex flex-wrap gap-2 mb-6">
                   {[
                     { key: "one-way", label: "One Way" },
                     { key: "round-trip", label: "Round Trip" },
-                    { key: "multi-city", label: "Multi City" },
+                    // { key: "multi-city", label: "Multi City" },
                   ].map(({ key, label }) => (
                     <button
                       key={key}
@@ -873,7 +995,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                 </div>
 
                 <form onSubmit={handleFlightSearch} className="flex flex-col">
-                  {/* ── Multi-city ── */}
                   {tripType === "multi-city" ? (
                     <div className="space-y-3 mb-5">
                       {multiCityFlights.map((flight, index) => (
@@ -945,20 +1066,19 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                               />
                             </FieldBox>
                             <FieldBox label="Date" icon={<FaCalendarAlt />}>
-                              <div
-                                className="rounded-xl px-3 py-3 transition-all"
-                                style={fieldBorder(!!flight.date)}
-                              >
-                                <input
-                                  type="date"
-                                  value={flight.date}
-                                  onChange={(e) =>
-                                    updateMC(index, "date", e.target.value)
-                                  }
-                                  className="w-full text-sm font-medium outline-none bg-transparent cursor-pointer"
-                                  style={fieldInputStyle}
-                                />
-                              </div>
+                              <LandingDateField
+                                value={flight.date}
+                                min={
+                                  index > 0
+                                    ? multiCityFlights[index - 1].date
+                                    : today
+                                }
+                                onChange={(val) => updateMC(index, "date", val)}
+                                isOpen={openCalendarId === `mc-${index}`}
+                                onToggle={(st) =>
+                                  handleCalendarToggle(`mc-${index}`, st)
+                                }
+                              />
                             </FieldBox>
                             {index === 0 && (
                               <FieldBox
@@ -967,7 +1087,7 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                               >
                                 <button
                                   type="button"
-                                  onClick={(e) => openDropdown(e)}
+                                  onClick={handleOpenTravellers}
                                   className="w-full flex items-center justify-between rounded-xl px-3 py-3 transition-all text-left"
                                   style={fieldBorder(false)}
                                 >
@@ -985,6 +1105,16 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                                     }}
                                   />
                                 </button>
+                                {isModalOpen && (
+                                  <div className="absolute top-full right-0 z-[1000] mt-1 shadow-2xl animate-fade-in block">
+                                    <TravelersClassModal
+                                      className="w-full"
+                                      onClose={closeDropdown}
+                                      onApply={handleApply}
+                                      initialData={{ passengers, travelClass }}
+                                    />
+                                  </div>
+                                )}
                               </FieldBox>
                             )}
                           </div>
@@ -1007,11 +1137,9 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                       )}
                     </div>
                   ) : (
-                    /* ── One Way / Round Trip ── */
                     <div
                       className={`grid grid-cols-1 gap-3 mb-5 ${tripType === "round-trip" ? "md:grid-cols-5" : "md:grid-cols-4"}`}
                     >
-                      {/* From */}
                       <FieldBox label="From" icon={<FaPlaneDeparture />}>
                         <AirportSearchInput
                           value={
@@ -1027,7 +1155,7 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                       </FieldBox>
 
                       {/* Swap + To */}
-                      <div className="relative">
+                      <div className="relative px-3 -pt-0.5">
                         <div className="hidden md:flex absolute -left-5 top-8 z-10">
                           <button
                             type="button"
@@ -1056,60 +1184,37 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                           />
                         </FieldBox>
                       </div>
-
-                      {/* Departure */}
                       <FieldBox label="Departure" icon={<FaCalendarAlt />}>
-                        <div
-                          className="rounded-xl px-3 py-3 transition-all"
-                          style={fieldBorder(!!departureDate)}
-                        >
-                          <input
-                            type="date"
-                            value={departureDate}
-                            min={today}
-                            onChange={(e) => setDepartureDate(e.target.value)}
-                            className="w-full text-sm font-medium outline-none bg-transparent cursor-pointer"
-                            style={fieldInputStyle}
-                          />
-                        </div>
-                        {errors.departureDate && (
-                          <p
-                            className="text-xs mt-1"
-                            style={{ color: "#dc2626" }}
-                          >
-                            {errors.departureDate}
-                          </p>
-                        )}
+                        <LandingDateField
+                          value={departureDate}
+                          valueEnd={
+                            tripType === "round-trip" ? returnDate : null
+                          }
+                          range={tripType === "round-trip"}
+                          min={today}
+                          onChange={setDepartureDate}
+                          onChangeEnd={setReturnDate}
+                          isOpen={openCalendarId === "departure"}
+                          onToggle={(st) => handleCalendarToggle("departure", st)}
+                        />
                       </FieldBox>
-
-                      {/* Return — round-trip only */}
                       {tripType === "round-trip" && (
                         <FieldBox label="Return" icon={<FaExchangeAlt />}>
-                          <div
-                            className="rounded-xl px-3 py-3 transition-all"
-                            style={fieldBorder(!!returnDate)}
-                          >
-                            <input
-                              type="date"
-                              value={returnDate}
-                              min={departureDate}
-                              onChange={(e) => setReturnDate(e.target.value)}
-                              className="w-full text-sm font-medium outline-none bg-transparent cursor-pointer"
-                              style={fieldInputStyle}
-                            />
-                          </div>
-                          {errors.returnDate && (
-                            <p
-                              className="text-xs mt-1"
-                              style={{ color: "#dc2626" }}
-                            >
-                              {errors.returnDate}
-                            </p>
-                          )}
+                          <LandingDateField
+                            value={departureDate}
+                            valueEnd={returnDate}
+                            range={true}
+                            min={today}
+                            onChange={setDepartureDate}
+                            onChangeEnd={setReturnDate}
+                            placeholder="Select Return"
+                            displayValue={returnDate}
+                            isOpen={openCalendarId === "return"}
+                            onToggle={(st) => handleCalendarToggle("return", st)}
+                            focus="end"
+                          />
                         </FieldBox>
                       )}
-
-                      {/* Travelers & Class */}
                       <FieldBox label="Travelers & Class" icon={<FaUser />}>
                         <div className="relative">
                           <button
@@ -1117,7 +1222,7 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                             onMouseDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
                               e.stopPropagation();
-                              openDropdown(e);
+                              handleOpenTravellers(e);
                             }}
                             className="w-full flex items-center justify-between rounded-xl px-3 py-3 transition-all text-left"
                             style={fieldBorder(isModalOpen)}
@@ -1140,9 +1245,8 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                               }}
                             />
                           </button>
-
                           {isModalOpen && (
-                            <div className="absolute top-full left-0 right-0 z-[1000] mt-1 shadow-2xl animate-fade-in block">
+                            <div className="absolute top-full right-0 z-[1000] mt-1 shadow-2xl animate-fade-in block">
                               <TravelersClassModal
                                 className="w-full"
                                 onClose={closeDropdown}
@@ -1155,8 +1259,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                       </FieldBox>
                     </div>
                   )}
-
-                  {/* Search button */}
                   <SearchBtn
                     type="submit"
                     loading={flightLoading}
@@ -1166,13 +1268,8 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
               </>
             )}
 
-            {/* ════════════════════════════════════
-                HOTEL SEARCH FORM
-                Full logic from HotelSearch.jsx
-            ════════════════════════════════════ */}
             {activeTab === "hotel" && (
               <>
-                {/* Hotel sub-header */}
                 <div className="flex items-center gap-3 mb-6">
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center"
@@ -1216,7 +1313,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 items-start mb-5">
-                  {/* Country */}
                   <div className="md:col-span-1 lg:col-span-2">
                     <CountrySelector
                       value={country}
@@ -1224,8 +1320,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                       countries={normalizedCountries}
                     />
                   </div>
-
-                  {/* City */}
                   <div
                     className="md:col-span-1 lg:col-span-4 relative"
                     ref={cityRef}
@@ -1251,7 +1345,12 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                           ? `0 0 0 3px ${GOLD_10}`
                           : "none",
                       }}
-                      onClick={() => setShowCitySuggestions(true)}
+                      onClick={() => {
+                        setOpenCalendarId(null);
+                        if (isModalOpen) closeDropdown();
+                        if (showGuestDropdown) setShowGuestDropdown(false);
+                        setShowCitySuggestions(true);
+                      }}
                     >
                       <FaMapMarkerAlt
                         style={{ color: GOLD, flexShrink: 0, fontSize: 12 }}
@@ -1293,18 +1392,9 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                           </p>
                         </div>
                         {(() => {
-                          const listToRender = city.trim() ? filteredCities : currentCities;
-
-                          if (city.trim() && listToRender.length === 0) {
-                            return (
-                              <div className="px-4 py-8 text-center">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                  No cities found for "{city}"
-                                </p>
-                              </div>
-                            );
-                          }
-
+                          const listToRender = city.trim()
+                            ? filteredCities
+                            : currentCities;
                           return listToRender.map((c, idx) => (
                             <div
                               key={(c.cityName || c.cityCode || idx) + idx}
@@ -1312,32 +1402,15 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                               className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-amber-50 border-b last:border-0"
                               style={{ borderColor: FIELD_BORDER }}
                             >
-                              <div
-                                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                                style={{ background: GOLD_10 }}
-                              >
+                              <div className="flex items-center gap-3">
                                 <FaMapMarkerAlt
-                                  style={{ color: GOLD, fontSize: 11 }}
+                                  style={{ color: FIELD_MUTED, fontSize: 12 }}
                                 />
-                              </div>
-                              <div>
                                 <p
-                                  className="text-sm font-semibold"
-                                  style={{
-                                    color: C.navy,
-                                    fontFamily: "'Plus Jakarta Sans',sans-serif",
-                                  }}
+                                  className="text-sm font-medium"
+                                  style={{ color: C.navy }}
                                 >
-                                  {c.cityName || c.CityName || c.Name || "Unknown"}
-                                </p>
-                                <p
-                                  className="text-xs"
-                                  style={{
-                                    color: FIELD_MUTED,
-                                    fontFamily: "'Plus Jakarta Sans',sans-serif",
-                                  }}
-                                >
-                                  {c.countryName || selectedCountry?.name || "Hotels & Resorts"}
+                                  {c.cityName || c.CityName || c.Name}
                                 </p>
                               </div>
                             </div>
@@ -1346,8 +1419,6 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                       </div>
                     )}
                   </div>
-
-                  {/* Check-in */}
                   <div className="md:col-span-1 lg:col-span-2">
                     <label
                       className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest mb-1.5"
@@ -1359,23 +1430,17 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                       <FaCalendarAlt style={{ color: GOLD, fontSize: 11 }} />{" "}
                       Check-in
                     </label>
-                    <div
-                      className="rounded-xl px-3 py-3 transition-all border-2"
-                      style={fieldBorder(!!checkIn)}
-                    >
-                      <input
-                        type="date"
-                        value={checkIn}
-                        min={today}
-                        onChange={(e) => {
-                          setCheckIn(e.target.value);
-                          if (checkOut && e.target.value >= checkOut)
-                            setCheckOut("");
-                        }}
-                        className="w-full text-sm font-medium outline-none bg-transparent cursor-pointer"
-                        style={fieldInputStyle}
-                      />
-                    </div>
+                    <LandingDateField
+                      value={checkIn}
+                      valueEnd={checkOut}
+                      range={true}
+                      min={today}
+                      onChange={setCheckIn}
+                      onChangeEnd={setCheckOut}
+                      placeholder="Check-in"
+                      isOpen={openCalendarId === "hotel-checkin"}
+                      onToggle={(st) => handleCalendarToggle("hotel-checkin", st)}
+                    />
                   </div>
 
                   {/* Check-out */}
@@ -1390,19 +1455,19 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                       <FaCalendarAlt style={{ color: GOLD, fontSize: 11 }} />{" "}
                       Check-out
                     </label>
-                    <div
-                      className="rounded-xl px-3 py-3 transition-all border-2"
-                      style={fieldBorder(!!checkOut)}
-                    >
-                      <input
-                        type="date"
-                        value={checkOut}
-                        min={checkIn || today}
-                        onChange={(e) => setCheckOut(e.target.value)}
-                        className="w-full text-sm font-medium outline-none bg-transparent cursor-pointer"
-                        style={fieldInputStyle}
-                      />
-                    </div>
+                    <LandingDateField
+                      value={checkIn}
+                      valueEnd={checkOut}
+                      range={true}
+                      min={today}
+                      onChange={setCheckIn}
+                      onChangeEnd={setCheckOut}
+                      placeholder="Check-out"
+                      displayValue={checkOut}
+                      isOpen={openCalendarId === "hotel-checkout"}
+                      onToggle={(st) => handleCalendarToggle("hotel-checkout", st)}
+                      focus="end"
+                    />
                     {nightCount && (
                       <div className="mt-1.5 text-center">
                         <span
@@ -1439,7 +1504,7 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                       onMouseDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setShowGuestDropdown(!showGuestDropdown);
+                        handleOpenHotelGuests();
                       }}
                       className="w-full flex items-center justify-between rounded-xl px-3 py-3 transition-all text-left border-2"
                       style={fieldBorder(showGuestDropdown)}
@@ -1468,23 +1533,18 @@ const HeroWithSearch = ({ branding, navigate, dispatch }) => {
                       />
                     </button>
                     {showGuestDropdown && (
-                      <div className="absolute top-full left-0 right-0 z-[1000] mt-1 shadow-2xl animate-fade-in block">
-                        <div
-                          className="bg-white rounded-2xl border border-slate-100 p-4 shadow-2xl max-h-[450px] overflow-y-auto custom-scrollbar"
-                          style={{ borderColor: FIELD_BORDER }}
-                        >
-                          <HotelGuestSelection
-                            rooms={rooms}
-                            setRooms={setRooms}
-                            guestNationality={guestNationality}
-                            setGuestNationality={setGuestNationality}
-                            roomConfigs={roomConfigs}
-                            setRoomConfigs={setRoomConfigs}
-                            normalizedCountries={normalizedCountries}
-                            onApply={() => setShowGuestDropdown(false)}
-                            CountrySelector={CountrySelector}
-                          />
-                        </div>
+                      <div className="absolute top-full right-0 z-[1000] mt-1 shadow-2xl animate-fade-in block">
+                        <HotelGuestSelection
+                          rooms={rooms}
+                          setRooms={setRooms}
+                          guestNationality={guestNationality}
+                          setGuestNationality={setGuestNationality}
+                          roomConfigs={roomConfigs}
+                          setRoomConfigs={setRoomConfigs}
+                          normalizedCountries={normalizedCountries}
+                          onApply={() => setShowGuestDropdown(false)}
+                          CountrySelector={CountrySelector}
+                        />
                       </div>
                     )}
                   </div>
@@ -2077,8 +2137,6 @@ const SupportSection = ({ branding }) => {
   );
 };
 
-
-// ─── MAIN EXPORT ───────────────────────────────────────────────────────────────
 export default function InternalTravelDeskLanding() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -2092,6 +2150,7 @@ export default function InternalTravelDeskLanding() {
     (s) => s.landingPage,
   );
   const [loading, setLoading] = useState(true);
+  const [landingActiveTab, setLandingActiveTab] = useState("flight");
 
   // We map publicBranding to branding so the rest of the file continues to work unchanged
   const branding = publicBranding;
@@ -2149,13 +2208,15 @@ export default function InternalTravelDeskLanding() {
         branding={branding}
         navigate={navigate}
         dispatch={dispatch}
+        activeTab={landingActiveTab} // ← pass down
+        setActiveTab={setLandingActiveTab}
       />
       <FeatureStrip />
       <HowToBook />
-      <TravelPolicies branding={branding} />
+      {/* <TravelPolicies branding={branding} /> */}
       {/* <Restrictions /> */}
       <SupportSection branding={branding} />
-      <LandingFooter />
+      <LandingFooter onTabChange={setLandingActiveTab} />
 
       {/* Floating contact button */}
       <button

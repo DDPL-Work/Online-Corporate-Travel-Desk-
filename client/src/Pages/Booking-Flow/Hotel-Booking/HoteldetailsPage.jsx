@@ -16,6 +16,7 @@ import { FiPhone, FiMail, FiGlobe, FiCalendar } from "react-icons/fi";
 import { MdCheckCircle } from "react-icons/md";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
+import { FaPlane } from "react-icons/fa";
 
 const fmtDate = (d, opts = { day: "2-digit", month: "short", year: "numeric" }) => {
   if (!d) return "";
@@ -257,7 +258,7 @@ const HotelDetailsPage = () => {
               if (slug) navigate(`/travel`);
               else navigate(-1);
             }}
-            className="px-4 py-2 bg-[#0A4D68] text-white text-sm rounded-lg hover:bg-[#083d52] transition"
+            className="px-4 py-2 bg-[#000D26] text-white text-sm rounded-lg hover:bg-[#0A203E] transition"
           >
             Go Back
           </button>
@@ -309,7 +310,7 @@ const HotelDetailsPage = () => {
             requiredRooms={requiredRooms}
           />
 
-          <div className="mb-4 text-sm font-semibold text-[#0A4D68]">
+          <div className="mb-4 text-sm font-semibold text-[#000D26]">
             {Object.keys(selectedRooms).length > 0 ? (
               <span className="flex items-center gap-2">
                 <MdCheckCircle className="text-emerald-500" /> All {requiredRooms} rooms selected
@@ -346,11 +347,11 @@ const HotelDetailsPage = () => {
           <div className="lg:col-span-1">
                {/* ── Hotel Summary Sidebar ── */}
               <div className="bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
-                <div className="h-2 bg-gradient-to-r from-[#0A4D68] to-[#088395]" />
+                <div className="h-2 bg-gradient-to-r from-[#C9A84C] to-[#C9A84C]" />
                 <div className="p-6 space-y-6">
                   <div>
                     <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                      <FiGlobe className="text-[#0A4D68]" />
+                      <FiGlobe className="text-[#C9A84C]" />
                       Booking Summary
                     </h3>
                     <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wider mt-1">
@@ -362,7 +363,7 @@ const HotelDetailsPage = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-slate-50/80 rounded-2xl p-3.5 border border-slate-100">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <FiCalendar size={10} className="text-[#0A4D68]" />
+                        <FiCalendar size={10} className="text-[#C9A84C]" />
                         Check-in
                       </p>
                       <p className="text-sm font-bold text-slate-700">
@@ -374,7 +375,7 @@ const HotelDetailsPage = () => {
                     </div>
                     <div className="bg-slate-50/80 rounded-2xl p-3.5 border border-slate-100">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <FiCalendar size={10} className="text-[#088395]" />
+                        <FiCalendar size={10} className="text-[#C9A84C]" />
                         Check-out
                       </p>
                       <p className="text-sm font-bold text-slate-700">
@@ -409,7 +410,7 @@ const HotelDetailsPage = () => {
 
                     return (
                       <div
-                        className={`rounded-2xl p-5 border transition-all duration-300 ${isSelected ? "bg-[#0A4D68] border-[#0A4D68] shadow-lg shadow-[#0A4D68]/20" : "bg-slate-50 border-slate-100"}`}
+                        className={`rounded-2xl p-5 border transition-all duration-300 ${isSelected ? "bg-[#C9A84C] border-[#C9A84C] shadow-lg shadow-[#C9A84C]/20" : "bg-slate-50 border-slate-100"}`}
                       >
                         <div className="flex justify-between items-start mb-3">
                           <div>
@@ -420,12 +421,12 @@ const HotelDetailsPage = () => {
                             </p>
                             <div className="flex items-baseline gap-1">
                               <span
-                                className={`text-sm font-bold ${isSelected ? "text-white" : "text-slate-700"}`}
+                                className={`text-sm font-bold ${isSelected ? "text-[#0A203E]" : "text-slate-700"}`}
                               >
                                 ₹
                               </span>
                               <span
-                                className={`text-3xl font-black ${isSelected ? "text-white" : "text-[#0A4D68]"}`}
+                                className={`text-3xl font-black ${isSelected ? "text-[#0A203E]" : "text-[#000D26]"}`}
                               >
                                 {totalPrice.toLocaleString("en-IN")}
                               </span>
@@ -469,7 +470,7 @@ const HotelDetailsPage = () => {
 
                       <button
                         onClick={handleContinue}
-                        className="w-full bg-[#0A4D68] hover:bg-[#083d52] text-white py-4 rounded-2xl font-black text-sm tracking-widest uppercase shadow-xl shadow-[#0A4D68]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-3 cursor-pointer border-none"
+                        className="w-full bg-[#C9A84C] hover:brightness-110 text-[#0A203E] py-4 rounded-2xl font-black text-sm tracking-widest uppercase shadow-xl shadow-[#C9A84C]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-3 cursor-pointer border-none"
                       >
                         Proceed to Booking
                         <svg
@@ -585,6 +586,24 @@ const HotelDetailsPage = () => {
                     </div>
                   </div>
                 )}
+
+                          {/* Flight Search Promo Banner */}
+              <div className="bg-[#C9A84C] rounded-2xl p-6 shadow-xl shadow-[#C9A84C]/20 flex flex-col items-center text-center mt-6">
+                <div className="w-12 h-12 bg-[#04112F] rounded-full flex items-center justify-center mb-4">
+                  <FaPlane className="text-[#C9A84C] text-xl" />
+                </div>
+                <h4 className="text-white font-black text-lg mb-2">Need a flight to this hotel?</h4>
+                <p className="text-white text-xs mb-5 leading-relaxed">
+                  Book your flight easily alongside your hotel stay. Enter your dates and we'll find the best fares for you.
+                </p>
+                <button 
+                  onClick={() => navigate('/travel', { state: { activeTab: 'flight' } })}
+                  className="w-full flex items-center justify-center gap-2 bg-[#04112F] hover:bg-[#04112F] text-[#C9A84C] px-4 py-3.5 rounded-xl font-black text-sm uppercase tracking-widest transition shadow-lg shadow-[#C9A84C]/20 active:scale-[0.98] border-none cursor-pointer"
+                >
+                  Search Flights Now
+                </button>
+              </div>
+
         <MapModal
           open={mapModalOpen}
           onClose={() => setMapModalOpen(false)}
@@ -607,7 +626,7 @@ function ContactRow({ icon: Icon, value, href, external }) {
       href={href}
       target={external ? "_blank" : undefined}
       rel={external ? "noreferrer" : undefined}
-      className="flex items-center gap-2 text-xs text-slate-600 hover:text-[#0A4D68] transition truncate"
+      className="flex items-center gap-2 text-xs text-slate-600 hover:text-[#C9A84C] transition truncate"
     >
       <Icon size={12} className="text-slate-400 shrink-0" />
       <span className="truncate">{value}</span>
@@ -689,7 +708,7 @@ function MapModal({ open, onClose, lat, lng, name, address }) {
             href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}&zoom=15`}
             target="_blank"
             rel="noreferrer"
-            className="text-xs font-semibold text-[#0A4D68] hover:underline"
+            className="text-xs font-semibold text-[#C9A84C] hover:underline"
           >
             Open in OpenStreetMap →
           </a>

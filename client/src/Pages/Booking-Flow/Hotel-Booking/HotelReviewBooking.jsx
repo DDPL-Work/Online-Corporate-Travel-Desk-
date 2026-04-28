@@ -39,7 +39,7 @@ import {
   FiList,
   FiAlertCircle,
 } from "react-icons/fi";
-import { FaUserPlus, FaHotel } from "react-icons/fa";
+import { FaUserPlus, FaHotel, FaPlane } from "react-icons/fa";
 import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import {
   createHotelBookingRequest,
@@ -92,12 +92,12 @@ const Required = () => <span className="text-red-400">*</span>;
 const Divider = () => <hr className="border-slate-100" />;
 const SectionHeading = ({ icon, title, badge }) => (
   <div className="flex items-center gap-2 mb-3">
-    <span className="text-[#0A4D68]">{icon}</span>
-    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+    <span className="text-[#C9A84C]">{icon}</span>
+    <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
       {title}
     </p>
     {badge && (
-      <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+      <span className="text-[9px] font-bold uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 border border-[#C9A84C]/30 px-2 py-0.5 rounded-full">
         {badge}
       </span>
     )}
@@ -118,7 +118,7 @@ function RoomImageGallery({ images = [] }) {
 
   return (
     <div className="mb-5">
-      <div className="relative rounded-xl overflow-hidden bg-slate-100 h-52 sm:h-64 group">
+      <div className="relative rounded-xl overflow-hidden bg-white h-52 sm:h-64 group">
         <img
           src={images[active]}
           alt={`Room image ${active + 1}`}
@@ -155,7 +155,7 @@ function RoomImageGallery({ images = [] }) {
               onClick={() => setActive(i)}
               className={`shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
                 active === i
-                  ? "border-[#0A4D68] scale-105"
+                  ? "border-[#C9A84C] scale-105"
                   : "border-transparent hover:border-slate-300"
               }`}
             >
@@ -172,7 +172,7 @@ function RoomImageGallery({ images = [] }) {
           {!expanded && images.length > 8 && (
             <button
               onClick={() => setExpanded(true)}
-              className="shrink-0 w-14 h-10 rounded-lg bg-slate-100 border-2 border-transparent hover:border-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-500 cursor-pointer border-none"
+              className="shrink-0 w-14 h-10 rounded-lg bg-white border-2 border-transparent hover:border-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-600 cursor-pointer border-none"
             >
               +{images.length - 8}
             </button>
@@ -211,14 +211,14 @@ function CancelPolicyTable({ policies = [] }) {
     <div className="overflow-x-auto rounded-xl border border-slate-200">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-slate-50 border-b border-slate-200">
-            <th className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+          <tr className="bg-white border-b border-slate-200">
+            <th className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
               From Date
             </th>
-            <th className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+            <th className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
               Charge Type
             </th>
-            <th className="text-right px-3 py-2.5 text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+            <th className="text-right px-3 py-2.5 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
               Cancellation Charge
             </th>
           </tr>
@@ -227,14 +227,14 @@ function CancelPolicyTable({ policies = [] }) {
           {policies.map((p, i) => (
             <tr
               key={i}
-              className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition"
+              className="border-b border-slate-100 last:border-0 hover:bg-white transition"
             >
-              <td className="px-3 py-2.5 text-xs text-slate-700 font-medium">
+              <td className="px-3 py-2.5 text-xs text-slate-800 font-medium">
                 {p.FromDate || "—"}
               </td>
               <td className="px-3 py-2.5">
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.CancellationCharge === 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.CancellationCharge === 0 ? "bg-emerald-500/10 text-emerald-700" : "bg-red-500/10 text-red-700"}`}
                 >
                   {typeLabel(p.ChargeType)}
                 </span>
@@ -260,35 +260,35 @@ function RoomPromotions({ promotions = [] }) {
   if (!cleaned.length) return null;
 
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
+    <div className="rounded-xl border border-[#C9A84C]/30 bg-[#C9A84C]/10 overflow-hidden">
       <button
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center justify-between px-4 py-3 cursor-pointer border-none bg-transparent text-left"
       >
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-amber-400/20 flex items-center justify-center">
-            <FiGift size={12} className="text-amber-600" />
+          <div className="w-6 h-6 rounded-full bg-[#C9A84C]/20 flex items-center justify-center">
+            <FiGift size={12} className="text-[#C9A84C]" />
           </div>
-          <span className="text-[12px] font-bold text-amber-800">
+          <span className="text-[12px] font-bold text-[#C9A84C]">
             {cleaned.length} Room Promotion{cleaned.length !== 1 ? "s" : ""}{" "}
             Available
           </span>
         </div>
         {expanded ? (
-          <FiChevronUp size={14} className="text-amber-600" />
+          <FiChevronUp size={14} className="text-[#C9A84C]" />
         ) : (
-          <FiChevronDown size={14} className="text-amber-600" />
+          <FiChevronDown size={14} className="text-[#C9A84C]" />
         )}
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-amber-200">
+        <div className="px-4 pb-4 space-y-3 border-t border-[#C9A84C]/30">
           {cleaned.map((promo, i) => (
             <div
               key={i}
-              className="bg-white rounded-lg border border-amber-100 px-3 py-2.5"
+              className="bg-white rounded-lg border border-[#C9A84C]/20 px-3 py-2.5"
             >
-              <p className="text-[12px] text-slate-700 leading-relaxed">
+              <p className="text-[12px] text-slate-800 leading-relaxed">
                 {promo}
               </p>
             </div>
@@ -317,7 +317,7 @@ function InclusionBadges({ inclusion }) {
       {items.map((item, i) => (
         <span
           key={i}
-          className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full font-medium"
+          className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-500/10 border border-emerald-100 px-2.5 py-1 rounded-full font-medium"
         >
           <MdCheckCircle size={11} /> {item}
         </span>
@@ -337,23 +337,23 @@ function AmenitiesGrid({ amenities = [] }) {
 
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
-        <FiStar size={11} className="text-[#0A4D68]" /> Room Amenities
+      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-1.5">
+        <FiStar size={11} className="text-[#C9A84C]" /> Room Amenities
       </p>
       <div className="flex flex-wrap gap-2">
         {visible.map((item, i) => (
           <span
             key={i}
-            className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full"
+            className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded-full"
           >
-            <MdCheckCircle size={11} className="text-[#0A4D68] shrink-0" />
+            <MdCheckCircle size={11} className="text-[#C9A84C] shrink-0" />
             {item}
           </span>
         ))}
         {!showAll && amenities.length > 12 && (
           <button
             onClick={() => setShowAll(true)}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0A4D68] bg-[#0A4D68]/10 border border-[#0A4D68]/20 px-2.5 py-1 rounded-full hover:bg-[#0A4D68]/15 transition cursor-pointer"
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#C9A84C] bg-[#C9A84C]/10 border border-[#C9A84C]/20 px-2.5 py-1 rounded-full hover:bg-[#C9A84C]/15 transition cursor-pointer"
           >
             +{amenities.length - 12} more
           </button>
@@ -361,7 +361,7 @@ function AmenitiesGrid({ amenities = [] }) {
         {showAll && amenities.length > 12 && (
           <button
             onClick={() => setShowAll(false)}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full hover:bg-slate-200 transition cursor-pointer"
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-full hover:bg-white/10 transition cursor-pointer"
           >
             Show less
           </button>
@@ -389,13 +389,12 @@ function RateConditions({ conditions = [] }) {
   );
 
   return (
-    <div className="rounded-xl border border-blue-200 bg-blue-50/50 overflow-hidden">
+    <div className="rounded-xl border border-slate-200 bg-slate-50/50 overflow-hidden">
       {keyConditions.length > 0 && (
         <div className="px-4 pt-3 pb-2 space-y-1.5">
           {keyConditions.map((cond, i) => (
             <div key={i} className="flex items-start gap-2">
-              <FiClock size={12} className="text-blue-500 mt-0.5 shrink-0" />
-              <p className="text-[12px] text-blue-800 font-medium leading-snug">
+              <p className="text-[12px] text-[#C9A84C] font-medium leading-snug">
                 {cond}
               </p>
             </div>
@@ -407,30 +406,30 @@ function RateConditions({ conditions = [] }) {
         <>
           <button
             onClick={() => setExpanded((v) => !v)}
-            className="w-full flex items-center justify-between px-4 py-2.5 cursor-pointer border-none bg-transparent text-left border-t border-blue-100"
+            className="w-full flex items-center justify-between px-4 py-2.5 cursor-pointer border-none bg-transparent text-left border-t border-[#1E293B]"
           >
             <div className="flex items-center gap-2">
-              <FiList size={12} className="text-blue-500" />
-              <span className="text-[11px] font-bold text-blue-700">
+              <FiList size={12} className="text-[#C9A84C]" />
+              <span className="text-[11px] font-bold text-[#C9A84C]">
                 {expanded ? "Hide" : "View"} {otherConditions.length} more
                 condition{otherConditions.length !== 1 ? "s" : ""}
               </span>
             </div>
             {expanded ? (
-              <FiChevronUp size={13} className="text-blue-500" />
+              <FiChevronUp size={13} className="text-[#C9A84C]" />
             ) : (
-              <FiChevronDown size={13} className="text-blue-500" />
+              <FiChevronDown size={13} className="text-[#C9A84C]" />
             )}
           </button>
           {expanded && (
-            <div className="px-4 pb-4 space-y-2 border-t border-blue-100">
+            <div className="px-4 pb-4 space-y-2 border-t border-[#1E293B]">
               {otherConditions.map((cond, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <FiAlertCircle
                     size={12}
-                    className="text-blue-400 mt-0.5 shrink-0"
+                    className="text-[#C9A84C] mt-0.5 shrink-0"
                   />
-                  <p className="text-[12px] text-slate-600 leading-relaxed">
+                  <p className="text-[12px] text-slate-700 leading-relaxed">
                     {cond}
                   </p>
                 </div>
@@ -459,9 +458,9 @@ function HotelHeroBanner({
   );
 
   return (
-    <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mb-6">
+    <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-md shadow-black/20 overflow-hidden mb-6">
       {/* Hero image strip */}
-      <div className="relative h-48 sm:h-64 w-full overflow-hidden bg-slate-200">
+      <div className="relative h-48 sm:h-64 w-full overflow-hidden bg-white/10">
         <img
           src={displayHotel?.images?.[0] || "/placeholder-hotel.jpg"}
           alt={displayHotel?.name}
@@ -470,11 +469,11 @@ function HotelHeroBanner({
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
         {displayHotel?.rating > 0 && (
-          <div className="absolute top-4 left-4 flex items-center gap-1 bg-black/40 backdrop-blur-sm border border-white/20 px-3 py-1.5 rounded-full">
+          <div className="absolute top-4 left-4 flex items-center gap-1 bg-black/40 backdrop-blur-sm border border-slate-300 px-3 py-1.5 rounded-full">
             {Array.from({ length: displayHotel.rating }).map((_, i) => (
               <svg
                 key={i}
-                className="w-3 h-3 text-amber-400"
+                className="w-3 h-3 text-[#C9A84C]"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -491,7 +490,7 @@ function HotelHeroBanner({
           <h2 className="text-xl sm:text-2xl font-extrabold text-white leading-tight mb-1 drop-shadow">
             {displayHotel?.name}
           </h2>
-          <div className="flex items-center gap-1.5 text-sm text-white/80">
+          <div className="flex items-center gap-1.5 text-sm text-white/90">
             <MdLocationOn size={15} className="text-white/70 shrink-0" />
             <span className="leading-snug">{displayHotel?.address}</span>
           </div>
@@ -501,10 +500,10 @@ function HotelHeroBanner({
       {/* Check-in / out / room strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100 border-t border-slate-100">
         <div className="px-5 py-4 flex flex-col gap-0.5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
             Check-in
           </p>
-          <p className="text-sm font-bold text-slate-800">
+          <p className="text-sm font-bold text-[#0A203E]">
             {displaySearchParams?.checkIn
               ? new Date(displaySearchParams.checkIn).toLocaleDateString(
                   "en-GB",
@@ -512,7 +511,7 @@ function HotelHeroBanner({
                 )
               : "—"}
           </p>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             {displaySearchParams?.checkIn
               ? new Date(displaySearchParams.checkIn).toLocaleDateString(
                   "en-GB",
@@ -522,21 +521,21 @@ function HotelHeroBanner({
           </p>
         </div>
 
-        <div className="px-5 py-4 flex flex-col items-center justify-center gap-0.5 bg-[#0A4D68]/5">
-          <div className="w-8 h-8 rounded-full bg-[#0A4D68]/10 flex items-center justify-center mb-1">
-            <FiClock size={14} className="text-[#0A4D68]" />
+        <div className="px-5 py-4 flex flex-col items-center justify-center gap-0.5 bg-[#C9A84C]/5">
+          <div className="w-8 h-8 rounded-full bg-[#C9A84C]/10 flex items-center justify-center mb-1">
+            <FiClock size={14} className="text-[#C9A84C]" />
           </div>
-          <span className="text-lg font-black text-[#0A4D68]">{nights}</span>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <span className="text-lg font-black text-[#C9A84C]">{nights}</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
             Night{nights !== 1 ? "s" : ""}
           </span>
         </div>
 
         <div className="px-5 py-4 flex flex-col gap-0.5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
             Check-out
           </p>
-          <p className="text-sm font-bold text-slate-800">
+          <p className="text-sm font-bold text-[#0A203E]">
             {displaySearchParams?.checkOut
               ? new Date(displaySearchParams.checkOut).toLocaleDateString(
                   "en-GB",
@@ -544,7 +543,7 @@ function HotelHeroBanner({
                 )
               : "—"}
           </p>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             {displaySearchParams?.checkOut
               ? new Date(displaySearchParams.checkOut).toLocaleDateString(
                   "en-GB",
@@ -555,14 +554,14 @@ function HotelHeroBanner({
         </div>
 
         <div className="px-5 py-4 flex flex-col gap-0.5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
             Room & Guests
           </p>
-          <p className="text-sm font-bold text-slate-800">
+          <p className="text-sm font-bold text-[#0A203E]">
             {displaySearchParams?.rooms?.length || 1} Room · {totalAdults} Adult
             {totalAdults !== 1 ? "s" : ""}
           </p>
-          <p className="text-[11px] text-slate-400 truncate">
+          <p className="text-[11px] text-slate-500 truncate">
             {Array.isArray(selectedRoom)
               ? selectedRoom
                   .map((r) => r.Name?.[0] || r.RoomTypeName)
@@ -623,29 +622,27 @@ function SelectedRoomDetailsCard({
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden mb-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-[#0A4D68] to-[#088395] px-6 py-4 flex items-center gap-2.5">
+      <div className="bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] px-6 py-4 flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
           <MdKingBed size={16} className="text-white" />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-white">
+          <h3 className="text-sm font-bold text-[#0A203E]">
             Selected Room Details
           </h3>
-          <p className="text-[11px] text-blue-100">
+          <p className="text-[11px] text-[#0A203E]/70 font-medium">
             Full breakdown of your chosen room
           </p>
         </div>
       </div>
 
       <div className="p-6 space-y-6">
-        {/* ── Top two-column section ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* LEFT: Image + name + badges + inclusions + promotions */}
-          <div>
-            {images.length > 0 && <RoomImageGallery images={images} />}
-            <h4 className="text-base font-extrabold text-slate-800 leading-snug mb-3">
+        {/* ── Top section: Image, Title, Badges ── */}
+        <div>
+          {images.length > 0 && <RoomImageGallery images={images} />}
+            <h4 className="text-base font-extrabold text-[#0A203E] leading-snug mb-3">
               {roomNameDisplay}
             </h4>
 
@@ -653,12 +650,12 @@ function SelectedRoomDetailsCard({
             <div className="flex flex-wrap gap-2 mb-4">
               {/* Meal type */}
               {mealType ? (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-500/10 border border-emerald-100 px-2.5 py-1 rounded-full">
                   <FiCoffee size={11} />
                   {mealType.replace(/_/g, " ")}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-full">
                   <FiCoffee size={11} /> Meal info unavailable
                 </span>
               )}
@@ -668,7 +665,7 @@ function SelectedRoomDetailsCard({
                 className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
                   isRefundable
                     ? "text-teal-700 bg-teal-50 border-teal-100"
-                    : "text-red-600 bg-red-50 border-red-100"
+                    : "text-red-600 bg-red-500/10 border-red-100"
                 }`}
               >
                 {isRefundable ? (
@@ -683,20 +680,25 @@ function SelectedRoomDetailsCard({
               </span>
 
               {/* Nights */}
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded-full">
                 🌙 {nights} Night{nights !== 1 ? "s" : ""}
               </span>
             </div>
+        </div>
 
+        {/* ── Two-column Details ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          {/* LEFT: Inclusions + Promotions + Fare breakdown */}
+          <div className="flex flex-col gap-5">
             {/* Inclusions */}
             <div className="mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
                 Inclusions
               </p>
               {inclusion ? (
                 <InclusionBadges inclusion={inclusion} />
               ) : (
-                <span className="text-[11px] text-slate-400 italic">
+                <span className="text-[11px] text-slate-500 italic">
                   No inclusions listed
                 </span>
               )}
@@ -706,35 +708,32 @@ function SelectedRoomDetailsCard({
             {promotions.length > 0 ? (
               <RoomPromotions promotions={promotions} />
             ) : (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 flex items-center gap-2">
-                <FiGift size={13} className="text-slate-300" />
-                <span className="text-[11px] text-slate-400">
+              <div className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 flex items-center gap-2">
+                <FiGift size={13} className="text-[#C9A84C]" />
+                <span className="text-[11px] text-slate-500">
                   No promotions available for this room
                 </span>
               </div>
             )}
-          </div>
 
-          {/* RIGHT: Fare breakdown + Cancellation policy */}
-          <div className="flex flex-col gap-5">
             {/* Fare Breakdown */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">
                 Fare Breakdown
               </p>
-              <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <div className="divide-y divide-slate-100">
                   {/* Per-night rates from DayRates */}
                   {dayRates?.[0]?.length > 0 && (
-                    <div className="px-4 py-2 bg-slate-100/60">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    <div className="px-4 py-2 bg-white/60">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                         Per-Night Rates
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {dayRates[0].map((d, i) => (
                           <span
                             key={i}
-                            className="text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-full"
+                            className="text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded-full"
                           >
                             Night {i + 1}: ₹
                             {Number(d.BasePrice).toLocaleString("en-IN")}
@@ -744,18 +743,18 @@ function SelectedRoomDetailsCard({
                     </div>
                   )}
                   <div className="flex justify-between px-4 py-2.5">
-                    <span className="text-[13px] text-slate-500">
+                    <span className="text-[13px] text-slate-600">
                       Base Fare
                     </span>
-                    <span className="text-[13px] font-semibold text-slate-700">
+                    <span className="text-[13px] font-semibold text-slate-800">
                       ₹{Number(baseFare).toLocaleString("en-IN")}
                     </span>
                   </div>
                   <div className="flex justify-between px-4 py-2.5">
-                    <span className="text-[13px] text-slate-500">
+                    <span className="text-[13px] text-slate-600">
                       Taxes & Fees
                     </span>
-                    <span className="text-[13px] font-semibold text-slate-700">
+                    <span className="text-[13px] font-semibold text-slate-800">
                       ₹{Number(totalTax).toLocaleString("en-IN")}
                     </span>
                   </div>
@@ -763,23 +762,26 @@ function SelectedRoomDetailsCard({
                     <span className="text-[14px] font-bold text-teal-700">
                       Total
                     </span>
-                    <span className="text-[18px] font-black text-[#0A4D68]">
+                    <span className="text-[18px] font-black text-[#C9A84C]">
                       ₹{Number(totalFare).toLocaleString("en-IN")}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
 
+          {/* RIGHT: Cancellation policy */}
+          <div className="flex flex-col gap-5">
             {/* Cancellation Policy */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
                 Cancellation Policy
               </p>
               {cancelPolicies.length > 0 ? (
                 <>
                   {freeCancelUntil && (
-                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5 mb-2">
+                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-100 rounded-xl px-3 py-2.5 mb-2">
                       <FiCheckCircle
                         size={14}
                         className="text-emerald-500 shrink-0"
@@ -791,15 +793,15 @@ function SelectedRoomDetailsCard({
                     </div>
                   )}
                   {paidCancelFrom && (
-                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 mb-2">
-                      <MdInfo size={14} className="text-amber-500 shrink-0" />
-                      <p className="text-[12px] text-amber-700 font-semibold">
+                    <div className="flex items-center gap-2 bg-[#C9A84C]/10 border border-[#C9A84C]/20 rounded-xl px-3 py-2.5 mb-2">
+                      <MdInfo size={14} className="text-[#C9A84C] shrink-0" />
+                      <p className="text-[12px] text-[#C9A84C] font-semibold">
                         Charges apply from <strong>{paidCancelFrom}</strong>
                       </p>
                     </div>
                   )}
                   {lastCancelDeadline && (
-                    <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 mb-2">
+                    <div className="flex items-center gap-2 bg-red-500/10 border border-red-100 rounded-xl px-3 py-2.5 mb-2">
                       <FiClock size={14} className="text-red-500 shrink-0" />
                       <p className="text-[12px] text-red-700 font-semibold">
                         Last cancellation deadline:{" "}
@@ -810,9 +812,9 @@ function SelectedRoomDetailsCard({
                   <CancelPolicyTable policies={cancelPolicies} />
                 </>
               ) : (
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
-                  <FiShieldIcon size={13} className="text-slate-400 shrink-0" />
-                  <p className="text-[12px] text-slate-500">
+                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2.5">
+                  <FiShieldIcon size={13} className="text-slate-500 shrink-0" />
+                  <p className="text-[12px] text-slate-600">
                     Cancellation policy not available
                   </p>
                 </div>
@@ -829,10 +831,10 @@ function SelectedRoomDetailsCard({
           <AmenitiesGrid amenities={amenities} />
         ) : (
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
               Room Amenities
             </p>
-            <span className="text-[11px] text-slate-400 italic">
+            <span className="text-[11px] text-slate-500 italic">
               No amenities listed for this room
             </span>
           </div>
@@ -843,8 +845,8 @@ function SelectedRoomDetailsCard({
           <>
             <hr className="border-slate-100" />
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
-                <FiInfo size={11} className="text-[#0A4D68]" /> Rate Conditions
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-1.5">
+                <FiInfo size={11} className="text-[#C9A84C]" /> Rate Conditions
                 & Check-in Info
               </p>
               <RateConditions conditions={rateConditions} />
@@ -863,12 +865,12 @@ function InfoCell({ icon: Icon, label, value }) {
   return (
     <div className="px-4 py-3 flex flex-col gap-0.5 bg-white">
       <div className="flex items-center gap-2.5 mb-0.5">
-        <Icon size={15} className="text-slate-400" />
-        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+        <Icon size={15} className="text-slate-500" />
+        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
           {label}
         </span>
       </div>
-      <span className="text-sm font-medium text-slate-700 truncate">
+      <span className="text-sm font-medium text-slate-800 truncate">
         {value || "—"}
       </span>
     </div>
@@ -1501,7 +1503,7 @@ const HotelReviewBooking = () => {
         text: `Are you sure you want to book ${displayHotel?.name}?`,
         icon: "question",
         showCancelButton: true,
-        confirmButtonColor: "#0A4D68",
+        confirmButtonColor: "#C9A84C",
         cancelButtonColor: "#d33",
         confirmButtonText: "Yes, Confirm & Book",
         showLoaderOnConfirm: true,
@@ -1541,10 +1543,10 @@ const HotelReviewBooking = () => {
 
   if (isBookNowMode && !bookingRequest) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-[#0A4D68] border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-slate-400">Loading booking details…</p>
+          <div className="w-8 h-8 border-2 border-[#C9A84C] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-slate-500">Loading booking details…</p>
         </div>
       </div>
     );
@@ -1563,22 +1565,32 @@ const HotelReviewBooking = () => {
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#0A4D68] transition font-medium"
+            className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-[#C9A84C] transition font-medium"
           >
             <MdArrowBack size={18} />
             Back to Details
           </button>
-          {isApproved && (
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-full">
-              <MdVerifiedUser size={14} />
-              Approved {approvedBy ? `by ${approvedBy?.name || "Manager"}` : ""}
-            </div>
-          )}
+          
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => navigate('/travel', { state: { activeTab: 'flight' } })}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A84C] text-[#000D26] hover:bg-[#C9A84C] transition-colors text-xs font-bold shadow-md shadow-black/20"
+            >
+              <FaPlane className="text-sm" />
+              SEARCH FLIGHT
+            </button>
+            {isApproved && (
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-emerald-500/10 border border-green-200 px-3 py-1.5 rounded-full">
+                <MdVerifiedUser size={14} />
+                Approved {approvedBy ? `by ${approvedBy?.name || "Manager"}` : ""}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-slate-800 tracking-tight mb-6">
+        <h1 className="text-2xl font-bold text-[#0A203E] tracking-tight mb-6">
           Review your Booking
         </h1>
 
@@ -1610,7 +1622,7 @@ const HotelReviewBooking = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* BookNow mode: read-only approved guests */}
             {isBookNowMode ? (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">
                 <div className="bg-gradient-to-r from-green-600 to-emerald-500 px-6 py-4 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
@@ -1629,7 +1641,7 @@ const HotelReviewBooking = () => {
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-white/20 text-white px-3 py-1 rounded-full border border-white/30">
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-white/20 text-white px-3 py-1 rounded-full border border-slate-300">
                     {travelers.length} Guest{travelers.length !== 1 ? "s" : ""}
                   </span>
                 </div>
@@ -1640,23 +1652,23 @@ const HotelReviewBooking = () => {
                       key={t.id || t._id || index}
                       className="rounded-xl border border-slate-100 overflow-hidden"
                     >
-                      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                      <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-100">
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-[#0A4D68]/10 flex items-center justify-center text-[10px] font-bold text-[#0A4D68]">
+                          <div className="w-7 h-7 rounded-full bg-[#C9A84C]/10 flex items-center justify-center text-[10px] font-bold text-[#C9A84C]">
                             {(t.firstName?.[0] || "G").toUpperCase()}
                             {(t.lastName?.[0] || "").toUpperCase()}
                           </div>
-                          <span className="text-xs font-semibold text-slate-600">
+                          <span className="text-xs font-semibold text-slate-700">
                             {t.title} {t.firstName} {t.middleName || ""}{" "}
                             {t.lastName}
                           </span>
                           {t.leadPassenger && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-[#0A4D68] bg-[#0A4D68]/10 px-2 py-0.5 rounded-full">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-0.5 rounded-full">
                               Primary
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[10px] text-slate-500">
                           Guest {index + 1}
                         </span>
                       </div>
@@ -1707,24 +1719,24 @@ const HotelReviewBooking = () => {
               </div>
             ) : (
               /* Non-BookNow mode: editable guest form */
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#0A4D68]/10 text-[#0A4D68]">
+                    <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C]">
                       <FiUser size={15} />
                     </span>
                     <div>
-                      <h3 className="text-sm font-semibold text-slate-700">
+                      <h3 className="text-sm font-semibold text-slate-800">
                         Guest Details
                       </h3>
-                      <p className="text-[11px] text-slate-400">
+                      <p className="text-[11px] text-slate-500">
                         Fill in the traveler information below
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={handleAddGuest}
-                    className="flex items-center gap-1.5 text-xs font-medium text-[#0A4D68] border border-[#0A4D68]/30 bg-[#0A4D68]/5 hover:bg-[#0A4D68]/10 px-3 py-1.5 rounded-lg transition"
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#C9A84C] border border-[#C9A84C]/30 bg-[#C9A84C]/5 hover:bg-[#C9A84C]/10 px-3 py-1.5 rounded-lg transition"
                   >
                     <FaUserPlus size={12} /> Add Guest
                   </button>
@@ -1734,20 +1746,20 @@ const HotelReviewBooking = () => {
                   {travelers.map((t, index) => (
                     <div
                       key={t.id || t._id || index}
-                      className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm"
+                      className="rounded-2xl border border-slate-200 overflow-hidden shadow-md shadow-black/20"
                     >
                       {/* Card Header */}
-                      <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-[#0A4D68]/5 to-[#0A4D68]/10 border-b border-slate-200">
+                      <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-[#C9A84C]/5 to-[#C9A84C]/10 border-b border-slate-200">
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-[#0A4D68] flex items-center justify-center text-white text-xs font-bold">
+                          <div className="w-7 h-7 rounded-full bg-[#C9A84C] flex items-center justify-center text-white text-xs font-bold">
                             {index + 1}
                           </div>
-                          <span className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
-                            <FiUser size={13} className="text-[#0A4D68]" />
+                          <span className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                            <FiUser size={13} className="text-[#C9A84C]" />
                             {t.paxType === 2 ? "Child" : "Adult"} {index + 1}
                           </span>
                           {t.leadPassenger && (
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#0A4D68] bg-[#0A4D68]/10 px-2.5 py-0.5 rounded-full border border-[#0A4D68]/20">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 px-2.5 py-0.5 rounded-full border border-[#C9A84C]/20">
                               Primary Guest
                             </span>
                           )}
@@ -1755,7 +1767,7 @@ const HotelReviewBooking = () => {
                         {travelers.length > 1 && (
                           <button
                             onClick={() => handleRemoveGuest(t.id)}
-                            className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50 transition"
+                            className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-500/10 transition"
                           >
                             <FiX size={12} /> Remove
                           </button>
@@ -1809,7 +1821,7 @@ const HotelReviewBooking = () => {
                             <div className="flex flex-col gap-1">
                               <label className="field-label">
                                 Middle Name{" "}
-                                <span className="text-slate-400 font-normal normal-case">
+                                <span className="text-slate-500 font-normal normal-case">
                                   (optional)
                                 </span>
                               </label>
@@ -1866,7 +1878,7 @@ const HotelReviewBooking = () => {
                                 </label>
                                 <div className="relative">
                                   <FiMail
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
                                     size={14}
                                   />
                                   <input
@@ -1905,7 +1917,7 @@ const HotelReviewBooking = () => {
                                       data?.countryCode?.toUpperCase(),
                                     );
                                   }}
-                                  inputClass="!h-10 !w-full !text-sm !bg-white !border !border-slate-200 !rounded-lg !text-slate-700 focus:!border-[#0A4D68] focus:!ring-2 focus:!ring-[#0A4D68]/10"
+                                  inputClass="!h-10 !w-full !text-sm !bg-white !border !border-slate-200 !rounded-lg !text-slate-800 focus:!border-[#C9A84C] focus:!ring-2 focus:!ring-[#C9A84C]/10"
                                   buttonClass="!border !border-slate-200 !rounded-l-lg !bg-white"
                                   containerClass="w-full"
                                   enableSearch
@@ -1978,7 +1990,7 @@ const HotelReviewBooking = () => {
                             <div className="flex flex-col gap-1">
                               <label className="field-label">
                                 Age{" "}
-                                <span className="text-slate-400 font-normal normal-case">
+                                <span className="text-slate-500 font-normal normal-case">
                                   (auto-calculated)
                                 </span>
                               </label>
@@ -1987,7 +1999,7 @@ const HotelReviewBooking = () => {
                                 value={t.age || ""}
                                 readOnly
                                 placeholder="—"
-                                className="field-input bg-slate-50 text-slate-400 cursor-not-allowed"
+                                className="field-input bg-white text-slate-500 cursor-not-allowed"
                               />
                             </div>
                             {requiredFlags.isPANRequired && (
@@ -1996,7 +2008,7 @@ const HotelReviewBooking = () => {
                                   PAN Card{" "}
                                   {(t.paxType === 2 ||
                                     (t.age && Number(t.age) <= 18)) && (
-                                    <span className="text-slate-400 font-normal normal-case">
+                                    <span className="text-slate-500 font-normal normal-case">
                                       (Not required)
                                     </span>
                                   )}
@@ -2020,7 +2032,7 @@ const HotelReviewBooking = () => {
                                   maxLength={10}
                                   className="field-input font-mono tracking-widest"
                                 />
-                                <p className="text-[10px] text-slate-400">
+                                <p className="text-[10px] text-slate-500">
                                   Required only for adults older than 18.
                                 </p>
                               </div>
@@ -2112,7 +2124,7 @@ const HotelReviewBooking = () => {
                       outline: none; transition: border-color 0.15s, box-shadow 0.15s;
                     }
                     .field-input:focus {
-                      border-color: #0A4D68;
+                      border-color: #C9A84C;
                       box-shadow: 0 0 0 3px rgba(10,77,104,0.08);
                     }
                     .field-input:disabled { background: #f8fafc; color: #94a3b8; cursor: not-allowed; }
@@ -2123,16 +2135,16 @@ const HotelReviewBooking = () => {
             )}
 
             {/* Purpose of Travel */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 p-6">
               <div className="flex items-center gap-2.5 mb-4">
-                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#0A4D68]/10 text-[#0A4D68]">
+                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C]">
                   <FiShield size={15} />
                 </span>
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-700">
+                  <h3 className="text-sm font-semibold text-slate-800">
                     Purpose of Travel
                   </h3>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-500">
                     Required for corporate approval
                   </p>
                 </div>
@@ -2140,27 +2152,27 @@ const HotelReviewBooking = () => {
               <textarea
                 onChange={(e) => setPurposeOfTravel(e.target.value)}
                 placeholder="Describe the reason for this booking…"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 focus:bg-white min-h-[100px] transition resize-none"
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/10 focus:bg-white min-h-[100px] transition resize-none"
               />
             </div>
 
             {/* GST Details */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            {/* <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 text-green-600">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/20 text-green-600">
                     <FiTag size={15} />
                   </span>
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-700">
+                    <h3 className="text-sm font-semibold text-slate-800">
                       GST Details
                     </h3>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-slate-500">
                       Fetched automatically from your corporate profile
                     </p>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded uppercase tracking-wider">
+                <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-1 rounded uppercase tracking-wider">
                   Profile Locked
                 </span>
               </div>
@@ -2188,7 +2200,7 @@ const HotelReviewBooking = () => {
                   },
                 ].map(({ label, key, placeholder }) => (
                   <div key={key} className={key === 'address' ? 'lg:col-span-3' : ''}>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                    <label className="block text-sm font-bold text-slate-800 mb-2">
                       {label}
                     </label>
                     <input
@@ -2196,15 +2208,15 @@ const HotelReviewBooking = () => {
                       value={gstDetails[key] || ""}
                       readOnly
                       placeholder={placeholder}
-                      className="w-full px-4 py-2.5 border border-slate-100 rounded-lg text-sm bg-slate-50 text-slate-500 cursor-not-allowed font-medium"
+                      className="w-full px-4 py-2.5 border border-slate-100 rounded-lg text-sm bg-white text-slate-600 cursor-not-allowed font-medium"
                     />
                   </div>
                 ))}
               </div>
-              <p className="mt-4 text-[11px] text-slate-400 italic">
+              <p className="mt-4 text-[11px] text-slate-500 italic">
                 * Note: To update GST details, please contact your travel administrator.
               </p>
-            </div>
+            </div> */}
           </div>
 
           {/* ── RIGHT: Price Summary ── */}
@@ -2212,25 +2224,25 @@ const HotelReviewBooking = () => {
             <div className="sticky top-20 space-y-4">
                 <ProjectApproverBlock onChange={setProjectApproverData} />
 
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-gradient-to-r from-[#0A4D68] to-[#088395] px-5 py-4">
-                  <h3 className="text-sm font-bold text-white mb-0.5">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">
+                <div className="bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] px-5 py-4">
+                  <h3 className="text-sm font-bold text-[#0A203E] mb-0.5">
                     Price Summary
                   </h3>
-                  <p className="text-[11px] text-blue-100">
+                  <p className="text-[11px] text-[#0A203E]/70 font-medium">
                     Transparent pricing, no hidden fees
                   </p>
                 </div>
                 <div className="p-5 space-y-3">
                   <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
-                    <span className="text-sm font-bold text-slate-800">
+                    <span className="text-sm font-bold text-slate-600">
                       Total
                     </span>
-                    <span className="text-2xl font-black text-[#0A4D68]">
+                    <span className="text-2xl font-black text-[#C9A84C]">
                       ₹{totalFare.toLocaleString("en-IN")}
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-400 text-right">
+                  <p className="text-[10px] text-slate-500 text-right">
                     {displayRoom?.Currency || "INR"} · Incl. all taxes
                   </p>
                 </div>
@@ -2238,13 +2250,13 @@ const HotelReviewBooking = () => {
 
               <div className="space-y-3">
                 {!isBookNowMode && (
-                  <p className="text-[11px] text-slate-400 text-center leading-relaxed px-2">
+                  <p className="text-[11px] text-slate-500 text-center leading-relaxed px-2">
                     By proceeding, I agree to{" "}
-                    <span className="text-[#0A4D68] cursor-pointer hover:underline">
+                    <span className="text-[#C9A84C] cursor-pointer hover:underline">
                       User Agreement
                     </span>{" "}
                     &amp;{" "}
-                    <span className="text-[#0A4D68] cursor-pointer hover:underline">
+                    <span className="text-[#C9A84C] cursor-pointer hover:underline">
                       Cancellation Policy
                     </span>
                     .
@@ -2258,11 +2270,11 @@ const HotelReviewBooking = () => {
                     !projectApproverData.project ||
                     (approvalRequired && !projectApproverData.approver)
                   }
-                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white uppercase tracking-wider bg-gradient-to-r from-[#0A4D68] to-[#088395] hover:from-[#093f54] hover:to-[#066876] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[#0A4D68]/20"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white uppercase tracking-wider bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] hover:from-[#093f54] hover:to-[#066876] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[#C9A84C]/20"
                 >
                   {actionLoading ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-slate-300 border-t-white rounded-full animate-spin" />
                       Processing…
                     </>
                   ) : isBookNowMode ? (

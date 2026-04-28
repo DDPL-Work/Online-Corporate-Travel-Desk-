@@ -36,14 +36,14 @@ import { useNavigate } from "react-router-dom";
 import { airlineLogo, airlineThemes } from "../../../utils/formatter";
 import "./Fares.css"; // custom animation + minor overrides
 
-// Updated color scheme - clean and minimal
-export const orangeText = "text-blue-600";
-export const orangeBg = "bg-blue-600";
-export const blueBg = "bg-gray-800";
-export const blueText = "text-gray-800";
-export const grayText = "text-gray-500";
-export const greenText = "text-green-600";
-export const lightGreenBg = "bg-green-50";
+// Updated color scheme - corporate premium
+export const orangeText = "text-[#C9A84C]";
+export const orangeBg = "bg-[#C9A84C]";
+export const blueBg = "bg-[#0A203E]";
+export const blueText = "text-[#0A203E]";
+export const grayText = "text-slate-500";
+export const greenText = "text-[#C9A84C]";
+export const lightGreenBg = "bg-slate-50";
 
 // Helper functions
 export const formatTime = (dateTimeString) => {
@@ -281,7 +281,7 @@ export const FlightTimeline = ({
   const seatDisabled = isSeatReady !== true;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-12">
+    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-12 shadow-sm">
       {segments.map((segment, idx) => {
         const dep = formatDateTime(segment.dt);
         const arr = formatDateTime(segment.at);
@@ -292,17 +292,17 @@ export const FlightTimeline = ({
             <div className="flex items-center justify-between relative">
               {/* Departure */}
               <div className="flex flex-col items-center text-center w-1/4">
-                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center mb-2 shadow-md">
-                  <FaPlaneDeparture className="text-white text-sm" />
+                <div className="w-10 h-10 rounded-full bg-[#0A203E] flex items-center justify-center mb-2 shadow-md">
+                  <FaPlaneDeparture className="text-[#C9A84C] text-sm" />
                 </div>
-                <p className="text-lg font-bold text-gray-900">{dep.time}</p>
-                <p className="text-xs text-gray-500">{dep.date}</p>
-                <p className="text-xs text-gray-500">{segment.da?.name}</p>
-                <p className="mt-1 font-semibold text-gray-900">
+                <p className="text-lg font-bold text-slate-900">{dep.time}</p>
+                <p className="text-xs text-slate-500">{dep.date}</p>
+                <p className="text-xs text-slate-500">{segment.da?.name}</p>
+                <p className="mt-1 font-bold text-slate-900">
                   {segment.da?.city}
                   {/* ({segment.da?.code}) */}
                 </p>
-                <p className="text-xs text-blue-600 font-medium">
+                <p className="text-[10px] font-black text-[#C9A84C] uppercase tracking-widest mt-1">
                   Terminal {segment.da?.terminal || "N/A"}
                 </p>
               </div>
@@ -314,7 +314,7 @@ export const FlightTimeline = ({
                   <div className="flex justify-center">
                     <div className="bg-white px-6">
                       {/* Flight card in the center */}
-                      <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow duration-300 min-w-[220px]">
+                      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow duration-300 min-w-[220px]">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <img
@@ -345,8 +345,8 @@ export const FlightTimeline = ({
                                     selectedSeats?.[seatKey]?.list || [];
                                   if (!seats.length) return null;
                                   return (
-                                    <div className=" bg-green-50 border border-green-200 rounded-lg p-1.5">
-                                      <p className="text-xs font-semibold text-green-600">
+                                    <div className=" bg-slate-50 border border-slate-200 rounded-lg p-1.5">
+                                      <p className="text-xs font-bold text-[#C9A84C]">
                                         Seats: {seats.join(", ")}
                                       </p>
                                     </div>
@@ -380,11 +380,11 @@ export const FlightTimeline = ({
                                 !seatDisabled && openSeatModal(idx)
                               }
                               disabled={seatDisabled}
-                              className={`mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-lg py-2 transition
+                              className={`mt-3 w-full flex items-center justify-center gap-2 text-sm font-bold rounded-xl py-2.5 transition cursor-pointer uppercase tracking-widest text-[11px]
         ${
           seatDisabled
-            ? "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
-            : "text-blue-600 border border-blue-600 hover:border-[#0A4D68] hover:bg-[#0A4D68] hover:text-white"
+            ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+            : "text-[#C9A84C] border border-[#C9A84C]/30 hover:bg-[#C9A84C] hover:text-[#0A203E]"
         }
       `}
                             >
@@ -401,17 +401,17 @@ export const FlightTimeline = ({
 
               {/* Arrival */}
               <div className="flex flex-col items-center text-center w-1/4">
-                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center mb-2 shadow-md">
-                  <FaPlaneArrival className="text-white text-sm" />
+                <div className="w-10 h-10 rounded-full bg-[#0A203E] flex items-center justify-center mb-2 shadow-md">
+                  <FaPlaneArrival className="text-[#C9A84C] text-sm" />
                 </div>
                 <p className="text-lg font-bold text-gray-900">{arr.time}</p>
                 <p className="text-xs text-gray-500">{arr.date}</p>
                 <p className="text-xs text-gray-500">{segment.aa?.name}</p>
-                <p className="mt-1 font-semibold text-gray-900">
+                <p className="mt-1 font-bold text-slate-900">
                   {segment.aa?.city}
                   {/* ({segment.aa?.code}) */}
                 </p>
-                <p className="text-xs text-blue-600 font-medium">
+                <p className="text-[10px] font-black text-[#C9A84C] uppercase tracking-widest mt-1">
                   Terminal {segment.aa?.terminal || "N/A"}
                 </p>
               </div>
@@ -420,8 +420,8 @@ export const FlightTimeline = ({
             {/* Layover */}
             {idx < segments.length - 1 && (
               <div className="flex justify-center mx-auto mt-14">
-                <div className="flex items-center gap-2 px-6 h-10 rounded-lg bg-blue-50 border border-blue-200 text-sm font-medium text-blue-700 shadow-sm">
-                  <HiOutlineLocationMarker className="text-blue-600" />
+                <div className="flex items-center gap-2 px-6 h-10 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold text-slate-700 shadow-sm uppercase tracking-widest text-[10px]">
+                  <HiOutlineLocationMarker className="text-[#C9A84C]" />
                   <span>
                     Layover at{" "}
                     <span className="font-semibold text-gray-900">
@@ -499,7 +499,7 @@ export const MultiCityFlightTimeline = ({
           className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
         >
           {/* ===== LEG HEADER ===== */}
-          <div className="px-6 py-4 bg-linear-to-r from-blue-50 to-blue-100 border-b border-gray-200">
+          <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">
@@ -569,7 +569,7 @@ const RuleCard = ({ fareRule, theme }) => {
       {/* Card Header */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`w-full flex items-center justify-between px-6 py-5 bg-gradient-to-r ${theme?.gradient || "from-blue-600 to-indigo-700"} text-white group`}
+        className={`w-full flex items-center justify-between px-6 py-5 bg-[#0A203E] text-white group`}
       >
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-[10px] font-black uppercase tracking-wider shrink-0 transition-transform group-hover:scale-105">
@@ -596,9 +596,9 @@ const RuleCard = ({ fareRule, theme }) => {
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50">
           
           {/* Baggage */}
-          <div className="rounded-xl border border-blue-100 bg-white shadow-xs overflow-hidden transition-all hover:border-blue-300 hover:shadow-sm">
-            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-blue-50 bg-gradient-to-r from-blue-50/50 to-transparent">
-               <span className="text-lg">🧳</span><span className="text-xs font-bold uppercase tracking-widest text-blue-800">Baggage Details</span>
+          <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden transition-all hover:border-[#C9A84C]/50 hover:shadow-sm">
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+               <span className="text-lg">🧳</span><span className="text-xs font-bold uppercase tracking-widest text-[#0A203E]">Baggage Details</span>
             </div>
             <div className="px-1 py-1">
                <div className="flex justify-between px-4 py-2.5 items-center group">
@@ -629,9 +629,9 @@ const RuleCard = ({ fareRule, theme }) => {
           </div>
 
           {/* Reissue */}
-          <div className="rounded-xl border border-orange-100 bg-white shadow-xs overflow-hidden transition-all hover:border-orange-300 hover:shadow-sm">
-            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-orange-50 bg-gradient-to-r from-orange-50/50 to-transparent">
-               <span className="text-lg">🔄</span><span className="text-xs font-bold uppercase tracking-widest text-orange-800">Date Change Policy</span>
+          <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden transition-all hover:border-[#C9A84C]/50 hover:shadow-sm">
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+               <span className="text-lg">🔄</span><span className="text-xs font-bold uppercase tracking-widest text-[#0A203E]">Date Change Policy</span>
             </div>
             <div className="px-1 py-1 divide-y divide-slate-50">
                {reissue?.map((c, i) => {
@@ -645,9 +645,9 @@ const RuleCard = ({ fareRule, theme }) => {
           </div>
 
           {/* Meal & Seat */}
-          <div className="rounded-xl border border-amber-100 bg-white shadow-xs overflow-hidden transition-all hover:border-amber-300 hover:shadow-sm">
-            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-amber-50 bg-gradient-to-r from-amber-50/50 to-transparent">
-               <span className="text-lg">🍽️</span><span className="text-xs font-bold uppercase tracking-widest text-amber-800">Meals & Seats</span>
+          <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden transition-all hover:border-[#C9A84C]/50 hover:shadow-sm">
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+               <span className="text-lg">🍽️</span><span className="text-xs font-bold uppercase tracking-widest text-[#0A203E]">Meals & Seats</span>
             </div>
             <div className="px-1 py-1">
                <div className="flex flex-col gap-1.5 px-4 py-2.5">
@@ -707,7 +707,7 @@ export const FareRulesAccordion = ({ parsedRules = [], title = "" }) => {
     <div className="space-y-3">
       {title && <h3 className="font-bold text-lg text-gray-800 mb-2">{title}</h3>}
       {/* Airline Header Banner */}
-      <div className={`flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r ${theme?.gradient || "from-blue-600 to-indigo-600"} text-white shadow`}>
+      <div className={`flex items-center gap-3 px-4 py-3 rounded-xl bg-[#0A203E] text-white shadow`}>
         <img
           src={airlineLogo(airlineCode)}
           alt={name}
@@ -772,7 +772,9 @@ export const PriceSummary = ({
     Object.values(selectedMeals || {}).forEach((meals) => {
       if (!Array.isArray(meals)) return;
       meals.forEach((meal) => {
-        sum += Number(meal.Price || 0);
+        if (meal?.Price) {
+          sum += Number(meal.Price || 0);
+        }
       });
     });
 
@@ -783,8 +785,9 @@ export const PriceSummary = ({
     let sum = 0;
 
     Object.values(selectedBaggage || {}).forEach((bag) => {
-      if (!bag) return;
-      sum += Number(bag.Price || 0) * travelers.length;
+      if (bag?.Price) {
+        sum += Number(bag.Price || 0) * travelers.length;
+      }
     });
 
     return sum;
@@ -798,9 +801,9 @@ export const PriceSummary = ({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className="bg-linear-to-r from-gray-700 to-gray-800 text-white p-5">
-        <h3 className="text-xl font-bold">Fare Summary</h3>
-        <p className="text-xs text-gray-300 mt-1">Complete price breakdown</p>
+      <div className="bg-[#0A203E] text-white p-5 border-b border-[#C9A84C]/20">
+        <h3 className="text-xl font-black uppercase tracking-tight">Fare Summary</h3>
+        <p className="text-[10px] text-[#C9A84C] font-black uppercase tracking-widest mt-1">Complete price breakdown</p>
       </div>
 
       <div className="p-5 space-y-3">
@@ -862,9 +865,9 @@ export const PriceSummary = ({
           </div>
         )}
 
-        <div className="border-t border-gray-200 pt-3 mt-3 flex justify-between">
-          <span className="text-lg font-bold">Total Payable</span>
-          <span className="text-xl font-bold text-blue-600">
+        <div className="border-t border-slate-200 pt-4 mt-2 flex justify-between items-center">
+          <span className="text-base font-black text-slate-900 uppercase tracking-tight">Total Payable</span>
+          <span className="text-2xl font-black text-[#0A203E]">
             ₹{totalAmount.toLocaleString()}
           </span>
         </div>
@@ -873,11 +876,11 @@ export const PriceSummary = ({
           type="button"
           onClick={!loading && !disabled ? onSendForApproval : undefined}
           disabled={loading || disabled}
-          className={`w-full text-white font-bold px-3 py-2 flex items-center justify-center rounded-xl transition-colors
+          className={`w-full text-white font-black px-3 py-4 flex items-center justify-center rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg
             ${
               loading || disabled
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-[#0A4D68]"
+                ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
+                : "bg-[#0A203E] hover:brightness-110 shadow-[#0A203E]/20"
             }`}
         >
           {loading ? "Submitting..." : disabled ? "Complete details to submit" : (approvalRequired ? "Send For Approval" : "Confirm & Book")}
@@ -1076,15 +1079,15 @@ export const TravelerForm = ({
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
       {/* ================= HEADER ================= */}
-      <div className="bg-linear-to-r from-[#1a2957] to-[#24a7c] text-white p-6">
+      <div className="bg-[#0A203E] text-white p-6 border-b border-[#C9A84C]/30">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-blue-900 rounded-full flex items-center justify-center shadow-lg">
-              <FaUser className="text-white text-xl" />
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-[#C9A84C] rounded-full flex items-center justify-center shadow-lg shadow-[#C9A84C]/20">
+              <FaUser className="text-[#0A203E] text-xl" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold">Traveler Details</h2>
-              <p className="text-sm text-blue-100 font-medium">
+              <h2 className="text-2xl font-black uppercase tracking-tight">Traveler Details</h2>
+              <p className="text-[11px] text-[#C9A84C] font-black uppercase tracking-widest mt-0.5">
                 Enter passenger information
               </p>
             </div>
@@ -1095,9 +1098,9 @@ export const TravelerForm = ({
       {/* ================= BODY ================= */}
       <div className="p-6 space-y-6 bg-linear-to-b from-gray-50 to-white">
         {/* ================= PURPOSE OF TRAVEL ================= */}
-        <div className="bg-white border-2 border-blue-200 rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-blue-900 mb-2">
-            Purpose of Travel <span className="text-red-500">*</span>
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h3 className="text-sm font-black text-[#0A203E] uppercase tracking-widest mb-3">
+            Purpose of Travel <span className="text-[#C9A84C]">*</span>
           </h3>
 
           <textarea
@@ -1124,9 +1127,9 @@ export const TravelerForm = ({
         </div>
 
         {/* ================= GST DETAILS ================= */}
-        <div className="bg-white border-2 border-blue-100 rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-blue-900">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-sm font-black text-[#0A203E] uppercase tracking-widest">
               GST Details
             </h3>
             <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded uppercase tracking-wider">
@@ -1203,8 +1206,8 @@ export const TravelerForm = ({
                 </p>
               </div>
               {traveler.type === "INFANT" && (
-                <span className="text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  Infant must be linked to an adult
+                <span className="text-[10px] px-2.5 py-1 rounded-full bg-[#0A203E] text-[#C9A84C] font-black uppercase tracking-widest">
+                  Linked Passenger Required
                 </span>
               )}
             </div>
@@ -1543,16 +1546,16 @@ export const TravelerForm = ({
 
 export const CTABox = () => {
   return (
-    <div className="bg-linear-to-r from-blue-50 to-blue-100 border-l-4 border-blue-900 rounded-lg p-4">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center shrink-0">
-          <BsInfoCircleFill className="text-white text-lg" />
+    <div className="bg-[#0A203E] rounded-2xl p-5 shadow-lg border border-[#C9A84C]/20 overflow-hidden relative">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-[#C9A84C]/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+      <div className="flex items-center gap-4 relative z-10">
+        <div className="w-12 h-12 bg-[#C9A84C] rounded-full flex items-center justify-center shrink-0 shadow-lg shadow-[#C9A84C]/20">
+          <BsInfoCircleFill className="text-[#0A203E] text-xl" />
         </div>
         <div>
-          <p className="text-sm font-bold text-blue-900">Need Help?</p>
-          <p className="text-xs text-gray-700">
-            Call us at{" "}
-            <span className="font-bold text-blue-900">1800-123-4567</span>
+          <p className="text-[10px] font-black text-[#C9A84C] uppercase tracking-widest">Need Assistance?</p>
+          <p className="text-sm font-bold text-white mt-0.5">
+            Call us at <span className="text-[#C9A84C]">1800-123-4567</span>
           </p>
         </div>
       </div>
@@ -1564,9 +1567,11 @@ export const HotelHomeButton = () => {
   const navigate = useNavigate();
   return (
     <div className="bg-white rounded-lg border border-gray-300 p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <RiHotelLine className="text-orange-600 text-xl font-bold" />
-        <span className="text-base font-semibold text-gray-900">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-[#C9A84C] rounded-xl flex items-center justify-center shadow-lg shadow-[#C9A84C]/20">
+          <RiHotelLine className="text-[#0A203E] text-xl font-bold" />
+        </div>
+        <span className="text-base font-black text-[#0A203E] uppercase tracking-tight">
           Need a Hotel?
         </span>
       </div>
@@ -1575,7 +1580,7 @@ export const HotelHomeButton = () => {
       </p>
       <button
         onClick={() => navigate("/search-hotel")}
-        className="w-full py-3 border border-gray-300 text-gray-900 rounded-lg text-sm font-semibold hover:bg-blue-600 hover:text-white transition duration-500 cursor-pointer"
+        className="w-full py-3 border border-[#0A203E] text-[#0A203E] rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#0A203E] hover:text-white transition-all duration-300 cursor-pointer shadow-sm active:scale-95"
       >
         Browse Hotels
       </button>
@@ -1658,7 +1663,7 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
       key: "cancellation",
       title: "Cancellation Charges",
       icon: <span className="text-xl">❌</span>,
-      color: "text-red-600",
+      color: "text-[#0A203E]",
       data: cancellationRules,
       hasData: cancellationRules.length > 0,
     },
@@ -1666,7 +1671,7 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
       key: "dateChange",
       title: "Date Change Charges",
       icon: <span className="text-xl">🔄</span>,
-      color: "text-orange-600",
+      color: "text-[#0A203E]",
       data: reissueRules,
       hasData: reissueRules.length > 0,
     },
@@ -1674,7 +1679,7 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
       key: "important",
       title: "Important Information",
       icon: <span className="text-xl">ℹ️</span>,
-      color: "text-blue-600",
+      color: "text-[#C9A84C]",
       data: { fareBasisCode, airlineRemark, isRefundable },
       hasData: !!(fareBasisCode || airlineRemark || isRefundable !== undefined),
     },
@@ -1770,11 +1775,11 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
                         </div>
                       )}
                       {sec.data.airlineRemark && (
-                        <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs leading-relaxed text-blue-800">
-                          <span className="font-bold uppercase tracking-wider text-[10px] text-blue-500 block mb-1">
+                        <div className="mt-3 p-4 bg-[#0A203E]/5 border border-[#0A203E]/10 rounded-xl text-xs leading-relaxed text-[#0A203E]">
+                          <span className="font-black uppercase tracking-widest text-[10px] text-[#C9A84C] block mb-1">
                             Airline Remark
                           </span>
-                          {sec.data.airlineRemark}
+                          <span className="font-bold">{sec.data.airlineRemark}</span>
                         </div>
                       )}
                     </div>

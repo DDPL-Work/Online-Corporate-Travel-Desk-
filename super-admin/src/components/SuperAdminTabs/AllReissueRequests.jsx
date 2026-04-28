@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchReissueRequests, executeReissue } from "../../Redux/Actions/reissueThunks";
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import Pagination from "../Shared/Pagination";
+import TableActionBar from "../Shared/TableActionBar";
 import { FlightBookingModal } from "../Shared/BookingRequestDetailsModal";
 import {
   FiSearch,
@@ -28,6 +29,7 @@ export default function AllReissueRequests() {
 
   const [page, setPage] = useState(1);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const tableScrollRef = useRef(null);
 
   useEffect(() => {
     // Fetch all requests (large limit for client side filtering like cancellation summary)
@@ -147,9 +149,17 @@ export default function AllReissueRequests() {
            </div>
         </div>
 
+        <TableActionBar
+          scrollRef={tableScrollRef}
+          exportLabel="Export Requests"
+          onExport={() => {}}
+          exportClassName="bg-blue-700 hover:bg-blue-800 shadow-blue-700/20"
+          arrowClassName="border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-200 hover:text-blue-800 disabled:hover:bg-blue-50"
+        />
+
         {/* DATA TABLE */}
         <div className="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden">
-           <div className="overflow-x-auto min-h-[500px]">
+           <div ref={tableScrollRef} className="overflow-x-auto min-h-[500px]">
               {loading ? (
                 <div className="py-20 text-center flex flex-col items-center">
                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700 mb-4"></div>

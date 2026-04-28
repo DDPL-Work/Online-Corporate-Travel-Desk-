@@ -6,7 +6,7 @@ import { LuPlane } from "react-icons/lu";
 import logo from "../../public/logo-traveamer.svg";
 import { useFlightSearch } from "../context/FlightSearchContext";
 
-export default function LandingFooter() {
+export default function LandingFooter({ onTabChange }) {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useSelector((s) => s.auth);
   const { publicBranding } = useSelector((s) => s.landingPage);
@@ -14,8 +14,15 @@ export default function LandingFooter() {
   const { setActiveTab } = useFlightSearch();
 
   const handleSearchClick = (tab) => {
-    setActiveTab(tab);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (onTabChange) {
+      onTabChange(tab); // use the prop if provided
+    } else {
+      setActiveTab(tab); // fallback to context
+    }
+    navigate(`/travel`);
+    if (location.pathname === "/travel") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   const GOLD = "#C9A84C";
@@ -34,9 +41,16 @@ export default function LandingFooter() {
 
   if (isAuthenticated && user) {
     return (
-      <footer style={{ background: C.grayLight, borderTop: `1px solid ${C.border}` }}>
+      <footer
+        style={{ background: C.grayLight, borderTop: `1px solid ${C.border}` }}
+      >
         {/* ── Top brand bar ── */}
-        <div style={{ background: C.navyDark, borderBottom: `1px solid ${C.border}` }}>
+        <div
+          style={{
+            background: C.navyDark,
+            borderBottom: `1px solid ${C.border}`,
+          }}
+        >
           <div className="max-w-7xl mx-auto px-6 md:px-10 py-10 flex flex-col lg:flex-row items-center justify-between gap-8">
             {/* Brand */}
             <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
@@ -105,17 +119,6 @@ export default function LandingFooter() {
               >
                 <FaHotel size={12} /> Book Hotel
               </button>
-              <button
-                className="flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-xs font-bold transition-all hover:shadow-xl active:scale-95"
-                style={{
-                  background: GOLD,
-                  color: C.white,
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                  boxShadow: `0 4px 12px ${GOLD_20}`,
-                }}
-              >
-                <RiPhoneLine size={14} /> Support
-              </button>
             </div>
           </div>
         </div>
@@ -125,33 +128,81 @@ export default function LandingFooter() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-y-12 gap-x-8">
             {/* Brand description column */}
             <div className="col-span-2 sm:col-span-3 lg:col-span-1">
-              <div className="w-10 h-1 mb-6 rounded-full" style={{ background: GOLD }} />
-              <p
-                className="text-sm leading-7 mb-8 max-w-xs"
-                style={{
-                  color: C.muted,
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                }}
-              >
-                Seamless, policy-compliant travel management for modern teams.
-                Powered by Traveamer Technology.
-              </p>
-              {/* Trust badges */}
-              <div className="flex flex-wrap gap-2">
-                {["GST", "ISO", "GDPR"].map((b) => (
-                  <span
-                    key={b}
-                    className="text-[10px] font-black px-3 py-1 rounded-md border"
+              {/* Company logo */}
+              <div className="mb-5">
+                {branding?.branding?.logo?.url ? (
+                  <img
+                    src={branding.branding.logo.url}
+                    alt={branding?.corporateName || "Company Logo"}
+                    className="h-[2rem] object-contain"
+                  />
+                ) : (
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ background: GOLD }}
+                  >
+                    <LuPlane size={18} style={{ color: C.white }} />
+                  </div>
+                )}
+                {branding?.corporateName && (
+                  <p
+                    className="text-[11px] font-bold uppercase tracking-[0.15em] mt-2 opacity-70"
                     style={{
-                      background: C.white,
-                      color: C.navy,
-                      borderColor: C.border,
+                      color: C.muted,
                       fontFamily: "'Plus Jakarta Sans',sans-serif",
                     }}
                   >
-                    {b}
-                  </span>
-                ))}
+                    {branding.corporateName}
+                  </p>
+                )}
+              </div>
+
+              <div
+                className="w-10 h-1 mb-6 rounded-full"
+                style={{ background: GOLD }}
+              />
+
+              {/* IATA logo */}
+              <div className="mb-5">
+                <img
+                  className="h-[3rem]"
+                  src="/iata-logo.svg"
+                  alt="iata-logo"
+                />
+                {/* Fallback IATA badge (hidden by default, shown if img fails) */}
+                <div
+                  style={{ display: "none" }}
+                  className="items-center gap-2 px-3 py-1.5 rounded-lg border w-fit"
+                >
+                  <div
+                    className="flex flex-col items-center leading-none"
+                    style={{
+                      fontFamily: "'Plus Jakarta Sans',sans-serif",
+                    }}
+                  >
+                    <span
+                      className="text-[9px] font-black tracking-[0.3em] uppercase"
+                      style={{ color: C.navy }}
+                    >
+                      IATA
+                    </span>
+                    <span
+                      className="text-[7px] font-semibold tracking-wide uppercase opacity-60"
+                      style={{ color: C.navy }}
+                    >
+                      Accredited Agent
+                    </span>
+                  </div>
+                </div>
+                <p
+                  className="text-[10px] font-semibold mt-1.5 opacity-60"
+                  style={{
+                    color: C.muted,
+                    fontFamily: "'Plus Jakarta Sans',sans-serif",
+                  }}
+                >
+                  IATA Accredited Agent
+                </p>
               </div>
             </div>
 
@@ -160,34 +211,63 @@ export default function LandingFooter() {
               {
                 head: "Quick Links",
                 links: [
-                  { label: "Search Flights", onClick: () => handleSearchClick("flight") },
-                  { label: "Search Hotels", onClick: () => handleSearchClick("hotel") },
+                  {
+                    label: "Search Flights",
+                    onClick: () => handleSearchClick("flight"),
+                  },
+                  {
+                    label: "Search Hotels",
+                    onClick: () => handleSearchClick("hotel"),
+                  },
                   { label: "My Bookings", href: "/my-bookings" },
-                  { label: "Pending Approvals", href: "/pending-approvals" },
+                  { label: "Pending Approvals", href: "/my-pending-approvals" },
                 ],
               },
               {
-                head: "Support",
+                head: "Platform",
                 links: [
-                  { label: "Expense Policy", href: "#" },
-                  { label: "Help Center", href: "#" },
-                  { label: "Emergency Guide", href: "#" },
-                  { label: "Portal FAQ", href: "#" },
+                  {
+                    label: "Flight Booking",
+                    href: "/platform/flight-booking-info",
+                  },
+                  {
+                    label: "Hotel Booking",
+                    href: "/platform/hotel-booking-info",
+                  },
+                  {
+                    label: "Approval & Workflow",
+                    href: "/platform/approval-and-workflow",
+                  },
                 ],
               },
               {
-                head: "Administration",
+                head: "Who It's For",
                 links: [
-                  { label: "Branding", href: "#" },
-                  { label: "User Directory", href: "#" },
-                  { label: "Policy Manager", href: "#" },
-                  { label: "Credit Reports", href: "#" },
+                  {
+                    label: "Indepedent Profetional",
+                    href: "/who-it's-for/independent",
+                  },
+                  {
+                    label: "Small Business",
+                    href: "/who-it's-for/small-business",
+                  },
+                  {
+                    label: "Mid Size Business",
+                    href: "/who-it's-for/mid-size-business",
+                  },
+                  {
+                    label: "Growing Business",
+                    href: "/who-it's-for/growing-business",
+                  },
                 ],
               },
               {
                 head: "Company Legal",
                 links: [
-                  { label: "Terms of Service", href: "/legal/terms-of-service" },
+                  {
+                    label: "Terms of Service",
+                    href: "/legal/terms-of-service",
+                  },
                   { label: "Privacy Center", href: "/legal/privacy-policy" },
                   { label: "User Agreement", href: "/legal/user-agreement" },
                   { label: "Contact Us", href: "/legal/contact-us" },
@@ -248,7 +328,7 @@ export default function LandingFooter() {
     <footer className="w-full border-t border-[#E1E7EF] bg-white py-12 px-6">
       <div className="max-w-[1340px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
         {/* Logo */}
-        <div 
+        <div
           className="cursor-pointer"
           onClick={() => {
             if (isAuthenticated) {

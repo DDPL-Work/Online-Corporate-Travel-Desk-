@@ -518,11 +518,11 @@ const Amenities = ({ amenities = [] }) => {
       {/* Header - Responsive */}
       <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2 sm:gap-3">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-[#0a2540] flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-[#0A203E] flex items-center justify-center shrink-0">
             <BsStars className="text-white text-sm sm:text-base" />
           </div>
           <div className="min-w-0">
-            <h2 className="font-black text-[#0a2540] text-sm sm:text-base leading-none">
+            <h2 className="font-black text-[#0A203E] text-sm sm:text-base leading-none">
               Amenities
             </h2>
             <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 whitespace-nowrap">
@@ -567,7 +567,7 @@ const Amenities = ({ amenities = [] }) => {
         {grouped.length > 3 && (
           <button
             onClick={() => setShowAll((v) => !v)}
-            className="flex items-center justify-center gap-2 py-2 sm:py-2.5 rounded-lg sm:rounded-xl border-2 border-dashed border-slate-200 text-[#0d7fe8] font-bold text-xs sm:text-sm hover:border-[#0d7fe8] hover:bg-blue-50 transition w-full"
+            className="flex items-center justify-center gap-2 py-2 sm:py-2.5 rounded-lg sm:rounded-xl border-2 border-dashed border-slate-200 text-[#C9A84C] font-bold text-xs sm:text-sm hover:border-[#C9A84C] hover:bg-blue-50 transition w-full"
           >
             {showAll ? (
               <>

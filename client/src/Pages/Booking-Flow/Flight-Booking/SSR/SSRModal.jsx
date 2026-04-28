@@ -8,6 +8,9 @@ import { MealSelectionCards } from "./MealsSelection";
 import { BaggageTable } from "./BaggageSelection";
 import SeatPanel from "./SeatSelectionModal"; 
 import { normalizeSSRList } from "../CommonComponents";
+import { useDispatch } from "react-redux";
+import { fetchMySSRPolicy } from "../../../../Redux/Actions/ssrPolicy.thunks";
+import { ToastWithTimer } from "../../../../utils/ToastConfirm";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Tab config                                                     */
@@ -24,7 +27,7 @@ const TABS = [
 function TabBadge({ count }) {
   if (!count) return null;
   return (
-    <span className="ml-1.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-white text-blue-600 text-[9px] font-black leading-none">
+    <span className="ml-1.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-white text-[#0A203E] text-[9px] font-black leading-none">
       {count}
     </span>
   );
@@ -56,8 +59,21 @@ export default function SSRModal({
   ssrErrorMessage,
 }) {
   const [activeTab, setActiveTab] = useState("seat");
+  const dispatch = useDispatch();
 
   const ssr = useSelector((state) => state.flights.ssr);
+  const ssrPolicy = useSelector((s) => s.ssrPolicy?.myPolicy);
+
+  React.useEffect(() => {
+    dispatch(fetchMySSRPolicy());
+  }, [dispatch]);
+
+  const policyAllowSeat    = ssrPolicy?.allowSeat    ?? true;
+  const policyAllowMeal    = ssrPolicy?.allowMeal    ?? true;
+  const policyAllowBaggage = ssrPolicy?.allowBaggage ?? true;
+  const seatPriceRange     = ssrPolicy?.seatPriceRange    || { min: 0, max: 99999 };
+  const mealPriceRange     = ssrPolicy?.mealPriceRange    || { min: 0, max: 99999 };
+  const baggagePriceRange  = ssrPolicy?.baggagePriceRange || { min: 0, max: 99999 };
 
   /* ── Derive per-segment SSR data (same logic as before) ── */
   const segmentSSR = useMemo(() => {
@@ -129,7 +145,7 @@ export default function SSRModal({
           <p className="text-gray-600 mb-4">{ssrErrorMessage}</p>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+            className="px-4 py-2 bg-[#0A203E] text-white rounded-lg font-bold uppercase tracking-wider text-xs"
           >
             Close
           </button>
@@ -149,9 +165,9 @@ export default function SSRModal({
       >
 
         {/* ── HEADER ── */}
-        <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-blue-700 to-blue-600 text-white shrink-0">
-          <div className="flex items-center gap-3 font-semibold text-lg">
-            <FaConciergeBell /> Add-ons &amp; Extras
+        <div className="flex items-center justify-between px-5 py-4 bg-[#0A203E] text-white shrink-0">
+          <div className="flex items-center gap-3 font-bold text-lg uppercase tracking-widest">
+            <FaConciergeBell className="text-[#C9A84C]" /> Selection Center
           </div>
           <button
             onClick={onClose}
@@ -162,15 +178,15 @@ export default function SSRModal({
         </div>
 
         {/* ── TAB BAR ── */}
-        <div className="flex items-center justify-center gap-3 bg-blue-50 py-2.5 border-b border-blue-100 shrink-0">
+        <div className="flex items-center justify-center gap-4 bg-slate-50 py-3 border-b border-slate-200 shrink-0">
           {TABS.map(({ key, label, Icon }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
               className={`flex items-center gap-2 px-5 py-1.5 rounded-full font-medium text-sm transition-all ${
                 activeTab === key
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "bg-white text-blue-600 border border-blue-200 hover:bg-blue-100"
+                  ? "bg-[#0A203E] text-white shadow-md"
+                  : "bg-white text-[#0A203E] border border-slate-200 hover:bg-slate-100"
               }`}
             >
               <Icon className="text-base" />
@@ -198,11 +214,27 @@ export default function SSRModal({
 
           {/* MEALS — uses your existing MealSelectionCards component untouched */}
           {activeTab === "meal" && (
-            <div className="flex-1 overflow-auto p-4 bg-sky-50">
+            <div className="flex-1 overflow-auto p-4 bg-slate-50">
               <MealSelectionCards
                 meals={normalizedMeals}
                 selectedMeals={selectedMeals}
-                onToggleMeal={onToggleMeal}
+                onToggleMeal={(j, si, meal, tc) => {
+                  const price = Number(meal.Price || 0);
+                  if (price > 0) {
+                    if (!policyAllowMeal) {
+                      ToastWithTimer({ type: "error", message: "Paid meal selection is not allowed for your account." });
+                      return;
+                    }
+                    if (price < mealPriceRange.min || price > mealPriceRange.max) {
+                      ToastWithTimer({
+                        type: "error",
+                        message: `Meal price ₹${price} exceeds your allowed range (₹${mealPriceRange.min}–₹${mealPriceRange.max}).`,
+                      });
+                      return;
+                    }
+                  }
+                  onToggleMeal(j, si, meal, tc);
+                }}
                 journeyType={journeyType}
                 flightIndex={segmentIndex}
                 travelersCount={travelers.length}
@@ -214,16 +246,30 @@ export default function SSRModal({
 
           {/* BAGGAGE — uses your existing BaggageTable component untouched */}
           {activeTab === "baggage" && (
-            <div className="flex-1 overflow-auto p-4 bg-sky-50">
+            <div className="flex-1 overflow-auto p-4 bg-slate-50">
               <BaggageTable
                 baggage={normalizedBaggage}
                 selectable
                 selectedBaggage={
                   selectedBaggage?.[`${journeyType}|${segmentIndex}`]
                 }
-                onAddBaggage={(bag) =>
-                  onSelectBaggage(journeyType, segmentIndex, bag)
-                }
+                onAddBaggage={(bag) => {
+                  const price = Number(bag.Price || 0);
+                  if (price > 0) {
+                    if (!policyAllowBaggage) {
+                      ToastWithTimer({ type: "error", message: "Paid baggage selection is restricted for your account." });
+                      return;
+                    }
+                    if (price < baggagePriceRange.min || price > baggagePriceRange.max) {
+                      ToastWithTimer({
+                        type: "error",
+                        message: `Baggage price ₹${price} exceeds your allowed range (₹${baggagePriceRange.min}–₹${baggagePriceRange.max}).`,
+                      });
+                      return;
+                    }
+                  }
+                  onSelectBaggage(journeyType, segmentIndex, bag);
+                }}
                 onClearBaggage={() =>
                   onSelectBaggage(journeyType, segmentIndex, null)
                 }
@@ -239,7 +285,7 @@ export default function SSRModal({
           {/* Selection summary chips */}
           <div className="flex items-center gap-3 flex-wrap">
             {seatCount > 0 && (
-              <span className="flex items-center gap-1.5 bg-sky-50 border border-sky-200 px-3 py-1 rounded-full text-xs font-semibold text-sky-700">
+              <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full text-xs font-semibold text-[#0A203E]">
                 <MdEventSeat /> {seatCount} Seat{seatCount > 1 ? "s" : ""}
               </span>
             )}
@@ -249,7 +295,7 @@ export default function SSRModal({
               </span>
             )}
             {baggageCount > 0 && (
-              <span className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 px-3 py-1 rounded-full text-xs font-semibold text-blue-700">
+              <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full text-xs font-semibold text-[#0A203E]">
                 <BsLuggage /> Baggage Added
               </span>
             )}
@@ -260,7 +306,7 @@ export default function SSRModal({
 
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors shrink-0"
+            className="px-8 py-2.5 bg-[#0A203E] hover:bg-[#0A203E]/90 text-white rounded-xl text-sm font-bold transition-all shadow-lg uppercase tracking-widest"
           >
             Done
           </button>
