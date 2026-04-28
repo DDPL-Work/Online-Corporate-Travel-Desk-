@@ -444,7 +444,7 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6"
-      style={{ background: "rgba(2,8,32,0.82)", backdropFilter: "blur(12px)" }}
+      style={{ background: "rgba(0,13,38,0.85)", backdropFilter: "blur(12px)" }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -531,7 +531,7 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
                 <button
                   onClick={goNext}
                   disabled={onboardingLoading}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-linear-to-r from-blue-600 to-cyan-500 text-white font-black text-sm shadow-lg shadow-blue-300/30 hover:shadow-blue-400/50 hover:-translate-y-0.5 disabled:opacity-60 disabled:translate-y-0 transition-all"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-linear-to-r from-[#C9A240] to-[#E5C572] text-[#000D26] font-black text-sm shadow-lg shadow-[#C9A240]/20 hover:shadow-[#C9A240]/40 hover:-translate-y-0.5 disabled:opacity-60 disabled:translate-y-0 transition-all"
                 >
                   {onboardingLoading ? (
                     <>

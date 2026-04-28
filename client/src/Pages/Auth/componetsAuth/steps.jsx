@@ -140,7 +140,7 @@ export const Step0 = ({ onNext, onRegister, form, setForm }) => {
           New company?
           <button
             onClick={onRegister}
-            className="ml-2 font-bold text-blue-600 hover:text-blue-800 transition-colors"
+            className="ml-2 font-bold text-[#C9A240] hover:text-[#C9A240] transition-colors"
           >
             Register your company
           </button>
@@ -174,7 +174,7 @@ export const Step1 = ({ form, setForm, errors }) => (
         value={form.corporateType}
         onChange={(v) => setForm({ ...form, corporateType: v })}
         options={[
-          { value: "pvt-ltd", label: "Private Limited", icon: <MdBusiness className="text-blue-500" /> },
+          { value: "pvt-ltd", label: "Private Limited", icon: <MdCorporateFare className="text-[#C9A240]" /> },
           { value: "public-ltd", label: "Public Limited / Corp", icon: <MdCorporateFare className="text-orange-500" /> },
           { value: "government", label: "Government Entity", icon: <MdAccountBalance className="text-emerald-500" /> },
           { value: "proprietorship", label: "Sole Proprietorship", icon: <MdPerson className="text-slate-500" /> },
@@ -264,7 +264,7 @@ export const Step1 = ({ form, setForm, errors }) => (
 export const Step2 = ({ form, setForm, errors }) => (
   <div className="space-y-4">
     <ContactGroup
-      color="bg-gradient-to-r from-blue-600 to-blue-700"
+      color="bg-gradient-to-r from-[#000D26] to-[#04112F]"
       title="Primary Contact"
       fields={
         <div className="space-y-3">
@@ -293,11 +293,11 @@ export const Step2 = ({ form, setForm, errors }) => (
               <label className="flex items-center gap-1.5 mt-1.5 ml-1 cursor-pointer group">
                 <input 
                   type="checkbox" 
-                  className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-[#C9A240] focus:ring-[#C9A240] cursor-pointer"
                   checked={form.gstEmail === form.primaryEmail && !!form.primaryEmail}
                   onChange={(e) => setForm({ ...form, gstEmail: e.target.checked ? form.primaryEmail : "" })}
                 />
-                <span className="text-[10px] font-bold text-slate-400 group-hover:text-blue-600 transition-colors uppercase tracking-tight">Set as GST Email</span>
+                <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#C9A240] transition-colors uppercase tracking-tight">Set as GST Email</span>
               </label>
             </F>
             <F label="Mobile" required>
@@ -384,11 +384,11 @@ export const Step2 = ({ form, setForm, errors }) => (
               <label className="flex items-center gap-1.5 mt-1.5 ml-1 cursor-pointer group">
                 <input 
                   type="checkbox" 
-                  className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-[#C9A240] focus:ring-[#C9A240] cursor-pointer"
                   checked={form.gstEmail === form.billingEmail && !!form.billingEmail}
                   onChange={(e) => setForm({ ...form, gstEmail: e.target.checked ? form.billingEmail : "" })}
                 />
-                <span className="text-[10px] font-bold text-slate-400 group-hover:text-blue-600 transition-colors uppercase tracking-tight">Set as GST Email</span>
+                <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#C9A240] transition-colors uppercase tracking-tight">Set as GST Email</span>
               </label>
             </F>
             <F label="Mobile">
@@ -490,7 +490,7 @@ export const Step3 = ({ form, setForm, errors }) => {
           }}
         />
         <div className="relative z-10 flex flex-col items-center">
-          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-300/50 mb-1">
+          <div className="w-8 h-8 rounded-full bg-[#C9A240] flex items-center justify-center shadow-lg shadow-[#C9A240]/30 mb-1">
             <MdLocationOn className="text-white text-lg" />
           </div>
           <div className="bg-white rounded-xl px-3 py-1.5 shadow-md text-xs font-bold text-slate-700 text-center max-w-[200px]">
@@ -556,14 +556,14 @@ export const Step4 = ({ form, setForm, errors }) => {
             key={p.value}
             type="button"
             onClick={() => setForm({ ...form, ssoType: p.value })}
-            className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl border-2 text-left transition-all ${form.ssoType === p.value ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100" : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"}`}
+            className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl border-2 text-left transition-all ${form.ssoType === p.value ? "border-[#C9A240] bg-amber-50 shadow-lg shadow-amber-100" : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"}`}
           >
             <div className="flex items-center justify-between w-full">
               <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">
                 {p.icon}
               </div>
               <div
-                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${form.ssoType === p.value ? "border-blue-500 bg-blue-500" : "border-slate-200"}`}
+                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${form.ssoType === p.value ? "border-[#C9A240] bg-[#C9A240]" : "border-slate-200"}`}
               >
                 {form.ssoType === p.value && (
                   <div className="w-1.5 h-1.5 rounded-full bg-white" />
@@ -572,7 +572,7 @@ export const Step4 = ({ form, setForm, errors }) => {
             </div>
             <div>
               <p
-                className={`font-black text-xs ${form.ssoType === p.value ? "text-blue-700" : "text-slate-700"}`}
+                className={`font-black text-xs ${form.ssoType === p.value ? "text-amber-700" : "text-slate-700"}`}
               >
                 {p.label}
               </p>

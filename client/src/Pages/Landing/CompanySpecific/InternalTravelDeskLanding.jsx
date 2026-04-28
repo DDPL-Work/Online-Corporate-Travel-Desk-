@@ -2219,7 +2219,7 @@ export default function InternalTravelDeskLanding() {
       <LandingFooter onTabChange={setLandingActiveTab} />
 
       {/* Floating contact button */}
-      <button
+      {/* <button
         className="fixed bottom-8 right-8 w-14 h-14 rounded-full flex items-center justify-center z-50 shadow-2xl transition-all hover:scale-110 active:scale-95"
         style={{
           background: GOLD,
@@ -2228,7 +2228,7 @@ export default function InternalTravelDeskLanding() {
         }}
       >
         <RiPhoneLine size={22} />
-      </button>
+      </button> */}
     </div>
   );
 }

@@ -69,15 +69,13 @@ export const ZohoIcon = ({ size = 22 }) => (
 
 // ── Images ────────────────────────────────────────────────────────────────────
 export const PANEL_IMAGES = [
-  "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800&q=85", // aircraft
-  "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=85", // hotel lobby
-  "https://images.unsplash.com/photo-1578574577315-3fbeb0cecdc2?w=800&q=85", // airport terminal
-  "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=85", // office
-  "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=800&q=85", // team meeting
-  "https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&q=85", // hotel room
-  "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=800&q=85", // handshake
-  "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&q=85", // globe
-  "https://images.unsplash.com/photo-1556388158-158ea5ccacbd?w=800&q=85", // plane window
+  "https://images.unsplash.com/photo-1530521954074-e64f6810b32d?w=800&q=85", // Step 0: Welcome (Plane at Sunset)
+  "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=85", // Step 1: Company (Modern Office)
+  "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=800&q=85", // Step 2: Contacts (Handshake/Collaboration)
+  "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&q=85", // Step 3: Address (Global/Location)
+  "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=800&q=85", // Step 4: SSO (Secure Tech)
+  "https://images.unsplash.com/photo-1618044619489-1149350d248d?w=800&q=85", // Step 5: Documents (Paperwork/Verification)
+  "https://images.unsplash.com/photo-1517400508447-f8dd518b86db?w=800&q=85", // Step 6: Done (Night Flight Takeoff)
 ];
 
 export const LEFT_PANEL_CONTENT = [
@@ -220,7 +218,7 @@ export const Inp = ({
         ${
           error
             ? "border-red-400 bg-red-50 focus:ring-red-200"
-            : "border-slate-200 bg-white focus:ring-blue-500/20 focus:border-blue-500"
+            : "border-slate-200 bg-white focus:ring-[#C9A240]/20 focus:border-[#C9A240]"
         }
         ${disabled ? "opacity-40 cursor-not-allowed bg-slate-50" : "hover:border-slate-300"}
       `}
@@ -273,7 +271,7 @@ export const RichSelect = ({ value, onChange, options, icon }) => {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between pl-3.5 pr-3 py-3 rounded-xl border border-slate-200 bg-white text-sm hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+        className="w-full flex items-center justify-between pl-3.5 pr-3 py-3 rounded-xl border border-slate-200 bg-white text-sm hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#C9A240]/20 transition-all"
       >
         <div className="flex items-center gap-2">
           {icon && <span className="text-slate-500">{icon}</span>}
@@ -313,7 +311,7 @@ export const RichSelect = ({ value, onChange, options, icon }) => {
                 }}
                 className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-all ${
                   active
-                    ? "bg-blue-50 text-blue-700"
+                    ? "bg-amber-50 text-amber-700"
                     : "text-slate-600 hover:bg-slate-50"
                 }`}
               >
@@ -321,7 +319,7 @@ export const RichSelect = ({ value, onChange, options, icon }) => {
                   {o.icon && <span>{o.icon}</span>}
                   <span className="font-medium">{label}</span>
                 </div>
-                {active && <BsCheckLg className="text-blue-600 text-xs" />}
+                {active && <BsCheckLg className="text-amber-600 text-xs" />}
               </button>
             );
           })}
@@ -365,7 +363,7 @@ export const Toggle = ({ checked, onChange, label }) => (
     onClick={() => onChange(!checked)}
   >
     <div
-      className={`relative w-11 h-6 rounded-full transition-all duration-200 ${checked ? "bg-blue-600" : "bg-slate-200"}`}
+      className={`relative w-11 h-6 rounded-full transition-all duration-200 ${checked ? "bg-[#C9A240]" : "bg-slate-200"}`}
     >
       <div
         className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-200 ${checked ? "left-6" : "left-1"}`}
@@ -423,36 +421,15 @@ export const LeftPanel = ({ step }) => {
         className="absolute inset-0 w-full h-full object-cover transition-all duration-700"
       />
       {/* Gradient overlays */}
-      <div className="absolute inset-0 bg-linear-to-br from-blue-950/90 via-blue-900/80 to-slate-900/90" />
-      <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-transparent to-transparent" />
-      {/* Grid texture */}
-      <div
-        className="absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage:
-            "linear-gradient(white 1px,transparent 1px),linear-gradient(90deg,white 1px,transparent 1px)",
-          backgroundSize: "40px 40px",
-        }}
-      />
+      <div className="absolute inset-0 bg-linear-to-br from-[#000D26]/95 via-[#000D26]/85 to-slate-900/90" />
+      <div className="absolute inset-0 bg-linear-to-t from-[#000D26]/90 via-transparent to-transparent" />
+
 
       {/* Content */}
       <div className="relative z-10 h-full flex flex-col justify-between p-8">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center backdrop-blur-sm">
-            <MdFlightTakeoff className="text-white text-lg" />
-          </div>
-          <div>
-            <div
-              className="font-black text-white text-base leading-none"
-              style={{ fontFamily: "'Outfit',sans-serif" }}
-            >
-              COTD
-            </div>
-            <div className="text-cyan-300 text-[8px] font-bold tracking-[0.2em] mt-0.5">
-              CORPORATE TRAVEL DESK
-            </div>
-          </div>
+          <img src="/logo-traveamer.svg" alt="Traveamer Logo" className="w-20 h-auto object-contain" />
         </div>
 
         {/* Middle content */}
@@ -494,29 +471,7 @@ export const LeftPanel = ({ step }) => {
 
         {/* Trust badges */}
         <div className="space-y-2">
-          {[
-            {
-              icon: <MdShield className="text-green-400 text-sm" />,
-              text: "ISO 27001 Certified & RBI Compliant",
-            },
-            {
-              icon: <MdVerified className="text-blue-400 text-sm" />,
-              text: "GST Invoice on every booking",
-            },
-            {
-              icon: <MdStar className="text-yellow-400 text-sm" />,
-              text: "4.9★ rated by 2,000+ companies",
-            },
-          ].map((b, i) => (
-            <div key={i} className="flex items-center gap-2.5">
-              <div className="w-6 h-6 rounded-lg bg-white/8 border border-white/10 flex items-center justify-center shrink-0">
-                {b.icon}
-              </div>
-              <span className="text-white/55 text-xs font-medium">
-                {b.text}
-              </span>
-            </div>
-          ))}
+          {/* Trust badges removed as per user request */}
         </div>
       </div>
     </div>
@@ -540,7 +495,7 @@ export const StepTracker = ({ step }) => {
           return (
             <div key={s.id} className="flex items-center gap-1 shrink-0">
               <div
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-black transition-all ${done ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : active ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : "bg-slate-50 text-slate-500 border border-slate-100"}`}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-black transition-all ${done ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : active ? "bg-[#C9A240] text-[#000D26] shadow-lg shadow-[#C9A240]/30" : "bg-slate-50 text-slate-500 border border-slate-100"}`}
               >
                 <span
                   className={`text-xs ${done ? "text-emerald-500" : active ? "text-white" : "text-slate-500"}`}
@@ -561,7 +516,7 @@ export const StepTracker = ({ step }) => {
       {/* Progress bar */}
       <div className="mt-3 h-1 bg-slate-100 rounded-full overflow-hidden">
         <div
-          className="h-full bg-linear-to-r from-blue-600 to-cyan-500 rounded-full transition-all duration-500"
+          className="h-full bg-linear-to-r from-[#C9A240] to-[#E5C572] rounded-full transition-all duration-500"
           style={{ width: `${progress}%` }}
         />
       </div>
