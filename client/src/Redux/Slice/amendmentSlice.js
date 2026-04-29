@@ -7,6 +7,8 @@ import {
   fetchChangeStatus,
   releasePNR,
   createCancellationQuery,
+  fetchCancellationQueries,
+  fetchCancellationQueryDetails,
 } from "../Actions/amendmentThunks";
 
 const initialState = {
@@ -22,6 +24,14 @@ const initialState = {
   queryError: null,
   querySuccess: false,
   queryData: null,
+
+  queries: [],
+  queriesLoading: false,
+  queriesError: null,
+
+  currentQuery: null,
+  currentQueryLoading: false,
+  currentQueryError: null,
 };
 
 const amendmentSlice = createSlice({
@@ -96,6 +106,32 @@ const amendmentSlice = createSlice({
         state.queryLoading = false;
         state.queryError = action.payload;
         state.querySuccess = false;
+      })
+      
+      .addCase(fetchCancellationQueries.pending, (state) => {
+        state.queriesLoading = true;
+        state.queriesError = null;
+      })
+      .addCase(fetchCancellationQueries.fulfilled, (state, action) => {
+        state.queriesLoading = false;
+        state.queries = action.payload || [];
+      })
+      .addCase(fetchCancellationQueries.rejected, (state, action) => {
+        state.queriesLoading = false;
+        state.queriesError = action.payload;
+      })
+      
+      .addCase(fetchCancellationQueryDetails.pending, (state) => {
+        state.currentQueryLoading = true;
+        state.currentQueryError = null;
+      })
+      .addCase(fetchCancellationQueryDetails.fulfilled, (state, action) => {
+        state.currentQueryLoading = false;
+        state.currentQuery = action.payload;
+      })
+      .addCase(fetchCancellationQueryDetails.rejected, (state, action) => {
+        state.currentQueryLoading = false;
+        state.currentQueryError = action.payload;
       });
   },
 });

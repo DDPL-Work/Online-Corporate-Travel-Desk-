@@ -77,8 +77,15 @@ router.get(
 // Get all cancellation queries
 router.get(
   "/cancellation-queries",
-  authorizeRoles("super-admin", "ops-member"),
+  authorizeRoles("super-admin", "ops-member", "employee", "manager", "travel-admin"),
   corporateController.fetchCancellationQueries
+);
+
+// Get single cancellation query details
+router.get(
+  "/cancellation-queries/:id",
+  authorizeRoles("super-admin", "ops-member", "employee", "manager", "travel-admin"),
+  corporateController.fetchCancellationQueryById
 );
 
 // --------------------------------------------------
@@ -136,7 +143,7 @@ router.get(
 // Update cancellation query status
 router.patch(
   "/cancellation-queries/:id/status",
-  authorizeRoles("super-admin", "ops-member"),
+  authorizeRoles("super-admin", "ops-member", "travel-admin"),
   corporateController.updateCancellationQueryStatus
 );
 
