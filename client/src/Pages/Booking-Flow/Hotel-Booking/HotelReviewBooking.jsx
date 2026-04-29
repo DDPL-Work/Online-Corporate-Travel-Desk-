@@ -877,6 +877,8 @@ const HotelReviewBooking = () => {
   const { selectedRequest, loading, error, preBookData, preBookLoading } =
     useSelector((state) => state.hotelBookings);
 
+  const [formErrors, setFormErrors] = useState({});
+
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
   const isTravelAdmin = user?.role === "travel-admin";
   const approvalRequired = !isTravelAdmin && myPolicy?.approvalRequired !== false;
@@ -1221,80 +1223,104 @@ const HotelReviewBooking = () => {
   const search = searchParams;
 
   const validateTravellers = (travellers) => {
-    const errors = [];
+    const errors = {}; // { travelerId: { field: "message" } }
 
     const nameRegex = /^[A-Za-z]{2,30}$/;
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[a-zA-Z0-9.]+@[a-zA-Z0-9.]+\.[a-zA-Z]{2,}$/; // Simplified as requested
     const allowedTitles = ["Mr", "Ms", "Mrs", "Miss", "Master"];
 
     const fullNameSet = new Set();
     const firstNameSet = new Set();
 
     travellers.forEach((t, index) => {
-      const gLabel = `${t.paxType === 2 ? "Child" : "Adult"} ${index + 1}`;
+      const tErrors = {};
       const fName = t.firstName?.trim();
       const lName = t.lastName?.trim();
 
       // TITLE
       if (!allowedTitles.includes(t.title)) {
-        errors.push(`Invalid title for ${gLabel}`);
+        tErrors.title = "Invalid title";
       }
 
       // FIRST NAME
       if (!fName || !nameRegex.test(fName)) {
-        errors.push(`First Name for ${gLabel} must be 2-30 alphabets only`);
+        tErrors.firstName = "First name must be 2-30 alphabets";
+      } else if (firstNameSet.has(fName.toLowerCase())) {
+        tErrors.firstName = "First name must be unique";
+      } else {
+        firstNameSet.add(fName.toLowerCase());
       }
 
       // LAST NAME
       if (!lName || !nameRegex.test(lName)) {
-        errors.push(`Last Name for ${gLabel} must be 2-30 alphabets only`);
-      }
-
-      // DUPLICATE FIRST NAME CHECK
-      if (fName && firstNameSet.has(fName.toLowerCase())) {
-        errors.push(
-          `Guest ${index + 1}: Duplicate First Name "${fName}" found. Each guest must have a unique first name.`,
-        );
-      } else if (fName) {
-        firstNameSet.add(fName.toLowerCase());
+        tErrors.lastName = "Last name must be 2-30 alphabets";
       }
 
       // DUPLICATE FULL NAME CHECK
       const mName = t.middleName?.trim() || "";
       const fullName = `${fName}-${mName}-${lName}`.toLowerCase();
-      if (fName && lName && fullNameSet.has(fullName)) {
-        errors.push(
-          `Guest ${index + 1}: Duplicate full name "${fName} ${
-            mName ? mName + " " : ""
-          }${lName}" already exists.`,
-        );
-      } else if (fName && lName) {
-        fullNameSet.add(fullName);
+      if (fName && lName) {
+        if (fullNameSet.has(fullName)) {
+          tErrors.lastName = "Duplicate full name detected";
+        } else {
+          fullNameSet.add(fullName);
+        }
       }
 
-      // EMAIL (Adults only usually, or if provided)
-      if (t.paxType === 1 && (!t.email || !emailRegex.test(t.email))) {
-        errors.push(`Valid email is required for ${gLabel}`);
+      // EMAIL
+      if (t.paxType === 1) {
+        if (!t.email) {
+          tErrors.email = "Email is required";
+        } else if (!emailRegex.test(t.email)) {
+          tErrors.email = "Invalid email format";
+        }
       }
 
       // AGE VALIDATION
       const ageNum = Number(t.age);
       if (t.paxType === 2) {
-        // Child validation
         if (isNaN(ageNum) || ageNum < 0 || ageNum > 18) {
-          errors.push(`Child age for ${gLabel} must be between 0 and 18 years`);
+          tErrors.age = "Child age must be 0-18";
         }
       } else {
-        // Adult validation
         if (isNaN(ageNum) || ageNum <= 18) {
-          errors.push(`Adult ${index + 1} age must be above 18 years`);
+          tErrors.age = "Adult age must be above 18";
         }
       }
 
       // PAN CARD
       const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-      if (t.panCard && !panRegex.test(t.panCard)) {
-        errors.push(`Invalid PAN card format for ${gLabel}. (Example: ABCDE1234F)`);
+      const isAdult = t.paxType === 1 && Number(t.age) > 18;
+      
+      if (requiredFlags.isPANRequired && isAdult) {
+        if (!t.panCard) {
+          tErrors.panCard = "PAN Card is mandatory";
+        } else if (!panRegex.test(t.panCard)) {
+          tErrors.panCard = "Invalid PAN format (ABCDE1234F)";
+        }
+      } else if (t.panCard && !panRegex.test(t.panCard)) {
+        tErrors.panCard = "Invalid PAN format";
+      }
+
+      // PASSPORT
+      if (isInternationalBooking && requiredFlags.isPassportRequired) {
+        if (!t.PassportNo) tErrors.PassportNo = "Passport number is required";
+        if (!t.PassportIssueDate) tErrors.PassportIssueDate = "Issue date is required";
+        if (!t.PassportExpDate) tErrors.PassportExpDate = "Expiry date is required";
+      }
+
+      // PHONE (Lead only)
+      if (t.leadPassenger && !t.phoneWithCode) {
+        tErrors.phoneWithCode = "Phone number is required";
+      }
+
+      // EMAIL (Lead only - ensuring it's always checked for lead)
+      if (t.leadPassenger && !t.email) {
+        tErrors.email = "Email is required for lead traveler";
+      }
+
+      if (Object.keys(tErrors).length > 0) {
+        errors[t.id] = tErrors;
       }
     });
 
@@ -1310,16 +1336,30 @@ const HotelReviewBooking = () => {
       });
       return;
     }
+    
+    let hasGlobalErrors = false;
+    const newGlobalErrors = {};
+
     if (!purposeOfTravel) {
-      ToastWithTimer({
-        type: "error",
-        message: "Please enter purpose of travel",
-      });
-      return;
+      newGlobalErrors.purposeOfTravel = "Please enter purpose of travel";
+      hasGlobalErrors = true;
     }
+
+    if (approvalRequired && !isTravelAdmin) {
+       if (!projectApproverData.project) {
+         newGlobalErrors.project = "Please select a project";
+         hasGlobalErrors = true;
+       }
+       if (!projectApproverData.approver) {
+         newGlobalErrors.approver = "Please select an approver";
+         hasGlobalErrors = true;
+       }
+    }
+
     const errors = validateTravellers(travelers);
-    if (errors.length > 0) {
-      ToastWithTimer({ type: "error", message: errors[0] });
+    setFormErrors({ ...errors, ...newGlobalErrors });
+
+    if (Object.keys(errors).length > 0 || hasGlobalErrors) {
       return;
     }
     if (!selectedRoom.length) {
@@ -1453,25 +1493,41 @@ const HotelReviewBooking = () => {
     };
 
     try {
+      let hasGlobalErrors = false;
+      const newGlobalErrors = {};
+
+      if (!purposeOfTravel) {
+        newGlobalErrors.purposeOfTravel = "Please enter purpose of travel";
+        hasGlobalErrors = true;
+      }
+
       if (approvalRequired && !isTravelAdmin) {
-        await dispatch(
-          selectManager({
-            approverId: projectApproverData.approver?.id,
-            approverEmail: projectApproverData.approver?.email,
-            projectCodeId: projectApproverData.project?.id,
-            projectName: projectApproverData.project?.name,
-            projectClient: projectApproverData.project?.client,
-          }),
-        ).unwrap();
+        if (!projectApproverData.project) {
+          newGlobalErrors.project = "Please select a project";
+          hasGlobalErrors = true;
+        }
+        if (!projectApproverData.approver) {
+          newGlobalErrors.approver = "Please select an approver";
+          hasGlobalErrors = true;
+        }
+
+        if (!hasGlobalErrors) {
+          await dispatch(
+            selectManager({
+              approverId: projectApproverData.approver?.id,
+              approverEmail: projectApproverData.approver?.email,
+              projectCodeId: projectApproverData.project?.id,
+              projectName: projectApproverData.project?.name,
+              projectClient: projectApproverData.project?.client,
+            }),
+          ).unwrap();
+        }
       }
 
       const errors = validateTravellers(travelers);
+      setFormErrors({ ...errors, ...newGlobalErrors });
 
-      if (errors.length) {
-        ToastWithTimer({
-          type: "error",
-          message: errors[0],
-        });
+      if (Object.keys(errors).length > 0 || hasGlobalErrors) {
         return;
       }
 
@@ -1759,12 +1815,7 @@ const HotelReviewBooking = () => {
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={handleAddGuest}
-                    className="flex items-center gap-1.5 text-xs font-medium text-[#C9A84C] border border-[#C9A84C]/30 bg-[#C9A84C]/5 hover:bg-[#C9A84C]/10 px-3 py-1.5 rounded-lg transition"
-                  >
-                    <FaUserPlus size={12} /> Add Guest
-                  </button>
+
                 </div>
 
                 <div className="p-6 space-y-5">
@@ -1789,14 +1840,7 @@ const HotelReviewBooking = () => {
                             </span>
                           )}
                         </div>
-                        {travelers.length > 1 && (
-                          <button
-                            onClick={() => handleRemoveGuest(t.id)}
-                            className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-500/10 transition"
-                          >
-                            <FiX size={12} /> Remove
-                          </button>
-                        )}
+
                       </div>
 
                       <div className="p-5 space-y-6 bg-white">
@@ -1837,8 +1881,11 @@ const HotelReviewBooking = () => {
                                   const val = e.target.value.replace(/[^A-Za-z]/g, "");
                                   updateTraveler(t.id, "firstName", val);
                                 }}
-                                className="field-input"
+                                className={`field-input ${formErrors[t.id]?.firstName ? "border-red-500 ring-1 ring-red-500" : ""}`}
                               />
+                              {formErrors[t.id]?.firstName && (
+                                <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].firstName}</p>
+                              )}
                             </div>
                             <div className="flex flex-col gap-1">
                               <label className="field-label">
@@ -1872,8 +1919,11 @@ const HotelReviewBooking = () => {
                                   const val = e.target.value.replace(/[^A-Za-z]/g, "");
                                   updateTraveler(t.id, "lastName", val);
                                 }}
-                                className="field-input"
+                                className={`field-input ${formErrors[t.id]?.lastName ? "border-red-500 ring-1 ring-red-500" : ""}`}
                               />
+                              {formErrors[t.id]?.lastName && (
+                                <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].lastName}</p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1909,8 +1959,11 @@ const HotelReviewBooking = () => {
                                         e.target.value,
                                       )
                                     }
-                                    className="field-input pl-9"
+                                    className={`field-input pl-9 ${formErrors[t.id]?.email ? "border-red-500 ring-1 ring-red-500" : ""}`}
                                   />
+                                  {formErrors[t.id]?.email && (
+                                    <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].email}</p>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex flex-col gap-1">
@@ -1933,11 +1986,14 @@ const HotelReviewBooking = () => {
                                       data?.countryCode?.toUpperCase(),
                                     );
                                   }}
-                                  inputClass="!h-10 !w-full !text-sm !bg-white !border !border-slate-200 !rounded-lg !text-slate-800 focus:!border-[#C9A84C] focus:!ring-2 focus:!ring-[#C9A84C]/10"
+                                  inputClass={`!h-10 !w-full !text-sm !bg-white !border !rounded-lg !text-slate-800 focus:!border-[#C9A84C] focus:!ring-2 focus:!ring-[#C9A84C]/10 ${formErrors[t.id]?.phoneWithCode ? "!border-red-500 !ring-1 !ring-red-500" : "!border-slate-200"}`}
                                   buttonClass="!border !border-slate-200 !rounded-l-lg !bg-white"
                                   containerClass="w-full"
                                   enableSearch
                                 />
+                                {formErrors[t.id]?.phoneWithCode && (
+                                  <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].phoneWithCode}</p>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1998,17 +2054,7 @@ const HotelReviewBooking = () => {
                                   )
                                     age--;
 
-                                  if (t.paxType === 2 && (age < 0 || age > 18)) {
-                                    ToastWithTimer({
-                                      type: "error",
-                                      message: "Child age must be between 0 and 18 years",
-                                    });
-                                  } else if (t.paxType === 1 && age <= 18) {
-                                     ToastWithTimer({
-                                      type: "warning",
-                                      message: "Adult age must be above 18 years",
-                                    });
-                                  }
+
 
                                   updateTraveler(t.id, "dob", dob);
                                   updateTraveler(t.id, "age", age);
@@ -2023,18 +2069,22 @@ const HotelReviewBooking = () => {
                                   (auto-calculated)
                                 </span>
                               </label>
+
                               <input
                                 type="number"
                                 value={t.age || ""}
                                 readOnly
                                 placeholder="—"
-                                className="field-input bg-white text-slate-500 cursor-not-allowed"
+                                className={`field-input bg-white text-slate-500 cursor-not-allowed ${formErrors[t.id]?.age ? "border-red-500 ring-1 ring-red-500" : ""}`}
                               />
+                              {formErrors[t.id]?.age && (
+                                <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].age}</p>
+                              )}
                             </div>
                             {requiredFlags.isPANRequired && (
                               <div className="flex flex-col gap-1">
                                 <label className="field-label">
-                                  PAN Card{" "}
+                                  PAN Card {t.paxType === 1 && Number(t.age) > 18 && <Required />}
                                   {(t.paxType === 2 ||
                                     (t.age && Number(t.age) <= 18)) && (
                                     <span className="text-slate-500 font-normal normal-case">
@@ -2059,8 +2109,11 @@ const HotelReviewBooking = () => {
                                   }
                                   placeholder="ABCDE1234F"
                                   maxLength={10}
-                                  className="field-input font-mono tracking-widest"
+                                  className={`field-input font-mono tracking-widest ${formErrors[t.id]?.panCard ? "border-red-500 ring-1 ring-red-500" : ""}`}
                                 />
+                                {formErrors[t.id]?.panCard && (
+                                  <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].panCard}</p>
+                                )}
                                 <p className="text-[10px] text-slate-500">
                                   Required only for adults older than 18.
                                 </p>
@@ -2096,8 +2149,11 @@ const HotelReviewBooking = () => {
                                           e.target.value,
                                         )
                                       }
-                                      className="field-input font-mono tracking-widest"
+                                      className={`field-input font-mono tracking-widest ${formErrors[t.id]?.PassportNo ? "border-red-500 ring-1 ring-red-500" : ""}`}
                                     />
+                                    {formErrors[t.id]?.PassportNo && (
+                                      <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].PassportNo}</p>
+                                    )}
                                   </div>
                                   <div className="flex flex-col gap-1">
                                     <label className="field-label">
@@ -2113,8 +2169,11 @@ const HotelReviewBooking = () => {
                                           e.target.value,
                                         )
                                       }
-                                      className="field-input"
+                                      className={`field-input ${formErrors[t.id]?.PassportIssueDate ? "border-red-500 ring-1 ring-red-500" : ""}`}
                                     />
+                                    {formErrors[t.id]?.PassportIssueDate && (
+                                      <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].PassportIssueDate}</p>
+                                    )}
                                   </div>
                                   <div className="flex flex-col gap-1">
                                     <label className="field-label">
@@ -2130,8 +2189,11 @@ const HotelReviewBooking = () => {
                                           e.target.value,
                                         )
                                       }
-                                      className="field-input"
+                                      className={`field-input ${formErrors[t.id]?.PassportExpDate ? "border-red-500 ring-1 ring-red-500" : ""}`}
                                     />
+                                    {formErrors[t.id]?.PassportExpDate && (
+                                      <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].PassportExpDate}</p>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -2181,8 +2243,12 @@ const HotelReviewBooking = () => {
               <textarea
                 onChange={(e) => setPurposeOfTravel(e.target.value)}
                 placeholder="Describe the reason for this booking…"
-                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/10 focus:bg-white min-h-[100px] transition resize-none"
+                value={purposeOfTravel}
+                className={`w-full bg-white border ${formErrors.purposeOfTravel ? "border-red-500 ring-1 ring-red-500" : "border-slate-200"} rounded-xl px-4 py-3 text-sm text-slate-800 outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/10 focus:bg-white min-h-[100px] transition resize-none`}
               />
+              {formErrors.purposeOfTravel && (
+                <p className="text-[11px] text-red-500 mt-2 font-medium">{formErrors.purposeOfTravel}</p>
+              )}
             </div>
 
             {/* GST Details */}
