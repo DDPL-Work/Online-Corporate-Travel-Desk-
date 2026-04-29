@@ -1,4 +1,4 @@
-//HotelReviewBooking.jsx  — Full Updated (PreBook fields: Promotions, Inclusions, MealType, CancelPolicy, RateConditions, Amenities)
+//\src\Pages\Booking-Flow\Hotel-Booking\HotelReviewBooking.jsx
 
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -254,47 +254,24 @@ function CancelPolicyTable({ policies = [] }) {
 /*  NEW ▶ Room Promotions Panel                                    */
 /* ─────────────────────────────────────────────────────────────── */
 function RoomPromotions({ promotions = [] }) {
-  const [expanded, setExpanded] = useState(false);
-
   const cleaned = promotions.map(sanitizeHtml).filter(Boolean);
   if (!cleaned.length) return null;
 
   return (
-    <div className="rounded-xl border border-[#C9A84C]/30 bg-[#C9A84C]/10 overflow-hidden">
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 cursor-pointer border-none bg-transparent text-left"
-      >
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-[#C9A84C]/20 flex items-center justify-center">
-            <FiGift size={12} className="text-[#C9A84C]" />
+    <div className="flex flex-wrap gap-2">
+      {cleaned.map((promo, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-2 px-3 py-2 bg-[#C9A84C]/10 border border-[#C9A84C]/30 rounded-xl shadow-sm animate-fade-in"
+        >
+          <div className="w-5 h-5 rounded-full bg-[#C9A84C] flex items-center justify-center shadow-lg shadow-[#C9A84C]/30">
+            <FiGift size={10} className="text-white" />
           </div>
           <span className="text-[12px] font-bold text-[#C9A84C]">
-            {cleaned.length} Room Promotion{cleaned.length !== 1 ? "s" : ""}{" "}
-            Available
+            {promo}
           </span>
         </div>
-        {expanded ? (
-          <FiChevronUp size={14} className="text-[#C9A84C]" />
-        ) : (
-          <FiChevronDown size={14} className="text-[#C9A84C]" />
-        )}
-      </button>
-
-      {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-[#C9A84C]/30">
-          {cleaned.map((promo, i) => (
-            <div
-              key={i}
-              className="bg-white rounded-lg border border-[#C9A84C]/20 px-3 py-2.5"
-            >
-              <p className="text-[12px] text-slate-800 leading-relaxed">
-                {promo}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -451,6 +428,7 @@ function HotelHeroBanner({
   displayRoom,
   selectedRoom,
   totalAdults,
+  totalChildren,
 }) {
   const nights = calculateNights(
     displaySearchParams?.checkIn,
@@ -560,12 +538,11 @@ function HotelHeroBanner({
           <p className="text-sm font-bold text-[#0A203E]">
             {displaySearchParams?.rooms?.length || 1} Room · {totalAdults} Adult
             {totalAdults !== 1 ? "s" : ""}
+            {totalChildren > 0 && ` · ${totalChildren} Child${totalChildren !== 1 ? "ren" : ""}`}
           </p>
           <p className="text-[11px] text-slate-500 truncate">
             {Array.isArray(selectedRoom)
-              ? selectedRoom
-                  .map((r) => r.Name?.[0] || r.RoomTypeName)
-                  .join(", ")
+              ? [...new Set(selectedRoom.map((r) => r.RoomTypeName || r.Name?.[0] || r.name))].join(", ")
               : "—"}
           </p>
         </div>
@@ -586,10 +563,11 @@ function SelectedRoomDetailsCard({
   const room = selectedRoom || displayRoom || {};
 
   const images = room?.images || room?.rawRoomData?.images || [];
-  const roomNames = room?.Name || room?.name || [];
-  const roomNameDisplay = Array.isArray(roomNames)
-    ? [...new Set(roomNames)].join(", ")
-    : roomNames || displayRoom?.RoomTypeName || "Room";
+  const roomNameDisplay = 
+    room?.RoomTypeName || 
+    (Array.isArray(room?.Name) ? [...new Set(room.Name)].join(", ") : room?.Name) ||
+    (Array.isArray(room?.name) ? [...new Set(room.name)].join(", ") : room?.name) ||
+    "Room";
 
   const totalFare = room?.TotalFare || room?.Price?.TotalFare || 0;
   const totalTax = room?.TotalTax || room?.Price?.Tax || 0;
@@ -1222,6 +1200,10 @@ const HotelReviewBooking = () => {
     (sum, r) => sum + (r.Adults || r.adults || 0),
     0,
   );
+  const totalChildren = (displaySearchParams?.rooms || []).reduce(
+    (sum, r) => sum + (r.Children || r.children || 0),
+    0,
+  );
   const countries = Country.getAllCountries();
   const selectedRooms = rooms || [];
   const totalFare = selectedRooms.reduce(
@@ -1241,34 +1223,78 @@ const HotelReviewBooking = () => {
   const validateTravellers = (travellers) => {
     const errors = [];
 
-    const nameRegex = /^[A-Za-z]{3,30}$/;
+    const nameRegex = /^[A-Za-z]{2,30}$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const allowedTitles = ["Mr", "Ms", "Mrs", "Miss", "Master"];
 
-    const nameSet = new Set();
+    const fullNameSet = new Set();
+    const firstNameSet = new Set();
 
     travellers.forEach((t, index) => {
-      const fullName = `${t.firstName}-${t.lastName}`.toLowerCase();
+      const gLabel = `${t.paxType === 2 ? "Child" : "Adult"} ${index + 1}`;
+      const fName = t.firstName?.trim();
+      const lName = t.lastName?.trim();
 
       // TITLE
       if (!allowedTitles.includes(t.title)) {
-        errors.push(`Invalid title for guest ${index + 1}`);
+        errors.push(`Invalid title for ${gLabel}`);
       }
 
       // FIRST NAME
-      if (!nameRegex.test(t.firstName)) {
-        errors.push(`Invalid first name for guest ${index + 1}`);
+      if (!fName || !nameRegex.test(fName)) {
+        errors.push(`First Name for ${gLabel} must be 2-30 alphabets only`);
       }
 
       // LAST NAME
-      if (!nameRegex.test(t.lastName)) {
-        errors.push(`Invalid last name for guest ${index + 1}`);
+      if (!lName || !nameRegex.test(lName)) {
+        errors.push(`Last Name for ${gLabel} must be 2-30 alphabets only`);
       }
 
-      // DUPLICATE
-      if (nameSet.has(fullName)) {
-        errors.push(`Duplicate guest name: ${t.firstName} ${t.lastName}`);
+      // DUPLICATE FIRST NAME CHECK
+      if (fName && firstNameSet.has(fName.toLowerCase())) {
+        errors.push(
+          `Guest ${index + 1}: Duplicate First Name "${fName}" found. Each guest must have a unique first name.`,
+        );
+      } else if (fName) {
+        firstNameSet.add(fName.toLowerCase());
+      }
+
+      // DUPLICATE FULL NAME CHECK
+      const mName = t.middleName?.trim() || "";
+      const fullName = `${fName}-${mName}-${lName}`.toLowerCase();
+      if (fName && lName && fullNameSet.has(fullName)) {
+        errors.push(
+          `Guest ${index + 1}: Duplicate full name "${fName} ${
+            mName ? mName + " " : ""
+          }${lName}" already exists.`,
+        );
+      } else if (fName && lName) {
+        fullNameSet.add(fullName);
+      }
+
+      // EMAIL (Adults only usually, or if provided)
+      if (t.paxType === 1 && (!t.email || !emailRegex.test(t.email))) {
+        errors.push(`Valid email is required for ${gLabel}`);
+      }
+
+      // AGE VALIDATION
+      const ageNum = Number(t.age);
+      if (t.paxType === 2) {
+        // Child validation
+        if (isNaN(ageNum) || ageNum < 0 || ageNum > 18) {
+          errors.push(`Child age for ${gLabel} must be between 0 and 18 years`);
+        }
       } else {
-        nameSet.add(fullName);
+        // Adult validation
+        if (isNaN(ageNum) || ageNum <= 18) {
+          errors.push(`Adult ${index + 1} age must be above 18 years`);
+        }
+      }
+
+      // PAN CARD
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (t.panCard && !panRegex.test(t.panCard)) {
+        errors.push(`Invalid PAN card format for ${gLabel}. (Example: ABCDE1234F)`);
       }
     });
 
@@ -1291,22 +1317,10 @@ const HotelReviewBooking = () => {
       });
       return;
     }
-    for (let t of travelers) {
-      const isChild = t.paxType === 2;
-      if (!t.firstName || !t.lastName || !t.nationality) {
-        ToastWithTimer({
-          type: "error",
-          message: "Please fill all guest details",
-        });
-        return;
-      }
-      if (!isChild && (!t.email || !t.phoneWithCode)) {
-        ToastWithTimer({
-          type: "error",
-          message: "Email and phone required for adults",
-        });
-        return;
-      }
+    const errors = validateTravellers(travelers);
+    if (errors.length > 0) {
+      ToastWithTimer({ type: "error", message: errors[0] });
+      return;
     }
     if (!selectedRoom.length) {
       ToastWithTimer({
@@ -1579,12 +1593,12 @@ const HotelReviewBooking = () => {
               <FaPlane className="text-sm" />
               SEARCH FLIGHT
             </button>
-            {isApproved && (
+            {/* {isApproved && (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-emerald-500/10 border border-green-200 px-3 py-1.5 rounded-full">
                 <MdVerifiedUser size={14} />
                 Approved {approvedBy ? `by ${approvedBy?.name || "Manager"}` : ""}
               </div>
-            )}
+            )} */}
           </div>
         </div>
       </div>
@@ -1601,6 +1615,7 @@ const HotelReviewBooking = () => {
           displayRoom={displayRoom}
           selectedRoom={selectedRoom}
           totalAdults={totalAdults}
+          totalChildren={totalChildren}
         />
 
         {/* ── FULL-WIDTH ROOM DETAILS (with all PreBook fields) ── */}
@@ -1729,9 +1744,19 @@ const HotelReviewBooking = () => {
                       <h3 className="text-sm font-semibold text-slate-800">
                         Guest Details
                       </h3>
-                      <p className="text-[11px] text-slate-500">
-                        Fill in the traveler information below
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                          Search Criteria:
+                        </p>
+                        <span className="text-[10px] font-bold text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-0.5 rounded-full border border-[#C9A84C]/20">
+                          {totalAdultsFromSearch} Adult{totalAdultsFromSearch !== 1 ? "s" : ""}
+                        </span>
+                        {totalChildrenFromSearch > 0 && (
+                          <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-100">
+                            {totalChildrenFromSearch} Child{totalChildrenFromSearch !== 1 ? "ren" : ""}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <button
@@ -1808,13 +1833,10 @@ const HotelReviewBooking = () => {
                                 placeholder="e.g. Rahul"
                                 value={t.firstName}
                                 disabled={isBookNowMode}
-                                onChange={(e) =>
-                                  updateTraveler(
-                                    t.id,
-                                    "firstName",
-                                    e.target.value,
-                                  )
-                                }
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^A-Za-z]/g, "");
+                                  updateTraveler(t.id, "firstName", val);
+                                }}
                                 className="field-input"
                               />
                             </div>
@@ -1830,13 +1852,10 @@ const HotelReviewBooking = () => {
                                 placeholder="e.g. Kumar"
                                 value={t.middleName || ""}
                                 disabled={isBookNowMode}
-                                onChange={(e) =>
-                                  updateTraveler(
-                                    t.id,
-                                    "middleName",
-                                    e.target.value,
-                                  )
-                                }
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^A-Za-z]/g, "");
+                                  updateTraveler(t.id, "middleName", val);
+                                }}
                                 className="field-input"
                               />
                             </div>
@@ -1849,13 +1868,10 @@ const HotelReviewBooking = () => {
                                 placeholder="e.g. Singh"
                                 value={t.lastName}
                                 disabled={isBookNowMode}
-                                onChange={(e) =>
-                                  updateTraveler(
-                                    t.id,
-                                    "lastName",
-                                    e.target.value,
-                                  )
-                                }
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^A-Za-z]/g, "");
+                                  updateTraveler(t.id, "lastName", val);
+                                }}
                                 className="field-input"
                               />
                             </div>
@@ -1981,6 +1997,19 @@ const HotelReviewBooking = () => {
                                       today.getDate() < birth.getDate())
                                   )
                                     age--;
+
+                                  if (t.paxType === 2 && (age < 0 || age > 18)) {
+                                    ToastWithTimer({
+                                      type: "error",
+                                      message: "Child age must be between 0 and 18 years",
+                                    });
+                                  } else if (t.paxType === 1 && age <= 18) {
+                                     ToastWithTimer({
+                                      type: "warning",
+                                      message: "Adult age must be above 18 years",
+                                    });
+                                  }
+
                                   updateTraveler(t.id, "dob", dob);
                                   updateTraveler(t.id, "age", age);
                                 }}
@@ -2249,7 +2278,7 @@ const HotelReviewBooking = () => {
               </div>
 
               <div className="space-y-3">
-                {!isBookNowMode && (
+                {/* {!isBookNowMode && (
                   <p className="text-[11px] text-slate-500 text-center leading-relaxed px-2">
                     By proceeding, I agree to{" "}
                     <span className="text-[#C9A84C] cursor-pointer hover:underline">
@@ -2261,7 +2290,7 @@ const HotelReviewBooking = () => {
                     </span>
                     .
                   </p>
-                )}
+                )} */}
 
                 <button
                   onClick={handleAction}
@@ -2270,7 +2299,7 @@ const HotelReviewBooking = () => {
                     !projectApproverData.project ||
                     (approvalRequired && !projectApproverData.approver)
                   }
-                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white uppercase tracking-wider bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] hover:from-[#093f54] hover:to-[#066876] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[#C9A84C]/20"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-[#000D26] uppercase tracking-wider bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] hover:bg-[#B39340] hover:from-[#B39340] hover:to-[#B39340] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[#C9A84C]/20"
                 >
                   {actionLoading ? (
                     <>

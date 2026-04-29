@@ -183,7 +183,7 @@ export default function CancellationQueryDetailsPage({ queryId, onBack }) {
 
   if (currentQueryLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="h-full flex items-center justify-center bg-gray-50">
         <div className="w-8 h-8 border-2 border-gray-300 border-t-[#0A4D68] rounded-full animate-spin" />
       </div>
     );
@@ -207,24 +207,24 @@ export default function CancellationQueryDetailsPage({ queryId, onBack }) {
   const ticketCR = (bd.amendment?.raw?.[0]?.response?.Response?.TicketCRInfo || [])[0] || {};
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Sticky header */}
-      <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
+    <div className="bg-gray-50">
+      {/* Top nav bar — not sticky since Layout header already is */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-4 md:px-8 h-12 flex items-center justify-between">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
           >
-            <FiArrowLeft size={16} /> Back
+            <FiArrowLeft size={16} /> Back to Queries
           </button>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400 font-mono">{currentQuery.queryId}</span>
+            <span className="text-xs text-gray-400 font-mono hidden sm:block">{currentQuery.queryId}</span>
             <StatusPill status={currentQuery.status} />
           </div>
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-5 py-8 pb-24 space-y-6">
+      <main className="px-4 md:px-8 py-6 pb-16 space-y-6">
         {/* Page heading */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

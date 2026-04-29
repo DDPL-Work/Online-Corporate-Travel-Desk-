@@ -381,7 +381,28 @@ export default function TravelAdminProfile() {
           )}
         </SectionCard> */}
 
-       
+        {/* Service Fees Configuration */}
+        <SectionCard title="Service Fees Configuration" icon={FiDollarSign}>
+          <div className="md:col-span-2 space-y-6">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 mb-3 uppercase tracking-wider">Flight Service Fees (per pax)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <InfoRow label="Domestic" value={`₹ ${corporate.serviceCharges?.domesticFlight?.toLocaleString() || "0"}`} />
+                <InfoRow label="Intl One-Way" value={`₹ ${corporate.serviceCharges?.internationalOneWayFlight?.toLocaleString() || "0"}`} />
+                <InfoRow label="Intl Return" value={`₹ ${corporate.serviceCharges?.internationalReturnFlight?.toLocaleString() || "0"}`} />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-50">
+              <p className="text-[11px] font-bold text-slate-500 mb-3 uppercase tracking-wider">Hotel Service Fees (per transaction)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InfoRow label="Domestic Hotel" value={`₹ ${corporate.serviceCharges?.domesticHotel?.toLocaleString() || "0"}`} />
+                <InfoRow label="Intl Hotel" value={`₹ ${corporate.serviceCharges?.internationalHotel?.toLocaleString() || "0"}`} />
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-400 italic font-medium">* These charges are set by the platform super-admin during account activation.</p>
+          </div>
+        </SectionCard>
       </div>
     </div>
   );

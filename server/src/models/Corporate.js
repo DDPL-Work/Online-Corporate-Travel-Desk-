@@ -137,6 +137,15 @@ const corporateSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // ───── SERVICE CHARGES ─────
+    serviceCharges: {
+      domesticFlight: { type: Number, default: 0 }, // per pax
+      internationalOneWayFlight: { type: Number, default: 0 },
+      internationalReturnFlight: { type: Number, default: 0 },
+      domesticHotel: { type: Number, default: 0 }, // per transaction
+      internationalHotel: { type: Number, default: 0 }, // per transaction
+    },
+
     // ───── SYSTEM FIELDS ─────
     status: {
       type: String,

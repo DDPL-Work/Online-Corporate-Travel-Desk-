@@ -189,15 +189,20 @@ export const appRouter = createBrowserRouter([
             element: <Layout />,
             children: [
               { path: "/my-bookings", element: <MyBookings /> },
-              { path: "/my-bookings/:id", element: <BookingDetails /> },
+              { path: "/my-booking/:id", element: <BookingDetails /> },
               {
                 path: "/my-hotel-booking/:id",
+                element: <HotelBookingDetails />,
+              },
+              {
+                path: "/my-cancelled-hotel-booking/:id",
                 element: <HotelBookingDetails />,
               },
               {
                 path: "/my-cancelled-bookings",
                 element: <CancelledFlightsPage />,
               },
+              { path: "/my-cancelled-booking/:id", element: <BookingDetails /> },
               { path: "/my-reissued", element: <MyReissueRequests /> },
               { path: "/my-offline-cancellations", element: <OfflineCancellationQueries /> },
               { path: "/my-upcoming-trips", element: <MyUpcomingTrips /> },

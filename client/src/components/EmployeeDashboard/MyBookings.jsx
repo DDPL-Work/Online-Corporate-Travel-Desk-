@@ -206,7 +206,7 @@ function FlightBookingCard({ b, navigate, userRole }) {
             {( userRole === "travel-admin") ? `₹${Number(b.pricingSnapshot?.totalAmount || 0).toLocaleString("en-IN")}` : ""}
           </span>
           <button
-            onClick={() => navigate(`/my-bookings/${b._id}`)}
+            onClick={() => navigate(`/my-booking/${b._id}`)}
             className="flex items-center gap-1.5 text-xs font-bold text-white bg-[#0A4D68] hover:bg-[#083d52] px-4 py-2 rounded-xl transition-all active:scale-95"
           >
             <FiEye size={13} /> View Details
@@ -652,64 +652,76 @@ export default function MyBookings() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-white outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition"
-            >
-              {statusOptions.map((s) => (
-                <option key={s} value={s}>
-                  {s === "All"
-                    ? "All Statuses"
-                    : s
-                        .replace(/_/g, " ")
-                        .replace(/\b\w/g, (c) => c.toUpperCase())}
-                </option>
-              ))}
-            </select>
-
-            <div className="relative">
-              <FiCalendar
-                size={13}
-                className="absolute left-3 top-3 text-slate-400 pointer-events-none"
-              />
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-700 bg-white w-full outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition"
-              />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-white outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition"
+              >
+                {statusOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {s === "All"
+                      ? "All Statuses"
+                      : s
+                          .replace(/_/g, " ")
+                          .replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="relative">
-              <FiCalendar
-                size={13}
-                className="absolute left-3 top-3 text-slate-400 pointer-events-none"
-              />
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-700 bg-white w-full outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition"
-              />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">From Date</label>
+              <div className="relative">
+                <FiCalendar
+                  size={13}
+                  className="absolute left-3 top-3 text-slate-400 pointer-events-none"
+                />
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-700 bg-white w-full outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition"
+                />
+              </div>
             </div>
 
-            <div className="relative">
-              <FiSearch
-                size={13}
-                className="absolute left-3 top-3 text-slate-400 pointer-events-none"
-              />
-              <input
-                type="text"
-                placeholder={
-                  activeTab === "flight"
-                    ? "Search destination…"
-                    : "Search hotel or city…"
-                }
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-700 bg-white w-full outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition"
-              />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">To Date</label>
+              <div className="relative">
+                <FiCalendar
+                  size={13}
+                  className="absolute left-3 top-3 text-slate-400 pointer-events-none"
+                />
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-700 bg-white w-full outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Search</label>
+              <div className="relative">
+                <FiSearch
+                  size={13}
+                  className="absolute left-3 top-3 text-slate-400 pointer-events-none"
+                />
+                <input
+                  type="text"
+                  placeholder={
+                    activeTab === "flight"
+                      ? "Search destination…"
+                      : "Search hotel or city…"
+                  }
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-700 bg-white w-full outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition"
+                />
+              </div>
             </div>
           </div>
         </div>

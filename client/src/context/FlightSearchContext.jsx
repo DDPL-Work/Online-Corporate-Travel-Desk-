@@ -29,6 +29,7 @@ export const FlightSearchProvider = ({ children }) => {
     adults: 1,
     children: 0,
     infants: 0,
+    childAges: [],
   });
   const [travelClass, setTravelClass] = useState("Economy");
 
@@ -95,6 +96,7 @@ export const FlightSearchProvider = ({ children }) => {
     adults,
     children,
     infants,
+    childAges,
     travelClass: newClass,
   }) => {
     const safeAdults = Math.max(1, Number(adults ?? passengers.adults) || 1);
@@ -108,6 +110,7 @@ export const FlightSearchProvider = ({ children }) => {
       adults: safeAdults,
       children: safeChildren,
       infants: safeInfants,
+      childAges: childAges || [],
     });
 
     if (newClass) setTravelClass(newClass);
