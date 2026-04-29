@@ -1670,7 +1670,7 @@ export default function RoundTripFlightBooking() {
                           rawFlightData.onward.ResultIndex,
                         )
                       }
-                      isSeatReady={isRTSeatReady.onward}
+                      isSeatReady={isRTSSRReady.onward}
                     />
                   </div>
                 </div>
@@ -1728,7 +1728,7 @@ export default function RoundTripFlightBooking() {
                           rawFlightData.return.ResultIndex,
                         )
                       }
-                      isSeatReady={isRTSeatReady.return}
+                      isSeatReady={isRTSSRReady.return}
                     />
                   </div>
                 </div>

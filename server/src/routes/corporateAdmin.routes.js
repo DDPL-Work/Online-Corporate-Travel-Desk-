@@ -7,7 +7,7 @@ const auth = require("../middleware/auth.middleware");
 router.get(
   "/me",
   auth.verifyToken,
-  auth.authorizeRoles("travel-admin"),
+  auth.authorizeRoles("travel-admin", "manager"),
   corpAdminCtrl.getMyCorporateProfile
 );
 

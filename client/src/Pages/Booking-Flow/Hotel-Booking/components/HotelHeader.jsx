@@ -1,6 +1,6 @@
 // components/HotelDetails/HotelHeader.jsx
 import React from "react";
-import { FaStar, FaHeart, FaShareAlt, FaMapMarkerAlt } from "react-icons/fa";
+import { FaStar, FaHeart, FaShareAlt, FaMapMarkerAlt, FaPlane } from "react-icons/fa";
 import { MdArrowBack } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 
@@ -22,10 +22,17 @@ const HotelHeader = ({ name, address, rating, cityName, countryName }) => {
         </button>
 
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-500 hover:bg-slate-50 transition-colors text-xs font-bold">
-            <FaShareAlt className="text-sm" />
-            SHARE
+          <button 
+            onClick={() => navigate('/travel')}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#C9A84C] text-[#0A203E] hover:bg-[#B59640] transition-colors text-xs font-bold shadow-sm"
+          >
+            <FaPlane className="text-sm" />
+            SEARCH FLIGHT
           </button>
+          {/* <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-500 hover:bg-slate-50 transition-colors text-xs font-bold">
+            <FaShareAlt className="text-sm" />
+            SHARE NOW
+          </button> */}
           {/* <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors text-xs font-bold">
             <FaHeart className="text-sm" />
             SAVE
