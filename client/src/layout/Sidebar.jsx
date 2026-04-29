@@ -116,6 +116,11 @@ export default function Sidebar({ isOpen, onClose }) {
             icon: <FaExchangeAlt />,
           },
           {
+            to: "/offline-cancellations",
+            label: "Offline Cancellations",
+            icon: <FaClock />,
+          },
+          {
             to: "/approved-requests",
             label: "Approved Requests",
             icon: <FaCheck />,
@@ -220,6 +225,11 @@ export default function Sidebar({ isOpen, onClose }) {
           label: "My Reissued",
           icon: <FaExchangeAlt />,
         },
+        {
+          to: "/my-offline-cancellations",
+          label: "Offline Cancellations",
+          icon: <FaClock />,
+        },
         { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
         { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },
       ],
@@ -256,6 +266,11 @@ export default function Sidebar({ isOpen, onClose }) {
             to: "/manager/reissue-requests",
             label: "Reissue Requests",
             icon: <FaExchangeAlt />,
+          },
+          {
+            to: "/manager/offline-cancellations",
+            label: "Offline Cancellations",
+            icon: <FaClock />,
           },
           {
             to: "/manager/approved-requests",
@@ -305,6 +320,11 @@ export default function Sidebar({ isOpen, onClose }) {
       to: "/my-reissued",
       label: "My Reissued",
       icon: <FaExchangeAlt />,
+    },
+    {
+      to: "/my-offline-cancellations",
+      label: "Offline Cancellations",
+      icon: <FaClock />,
     },
     { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
     { to: "/travel-documents", label: "Travel Documents", icon: <FaIdCard /> },
