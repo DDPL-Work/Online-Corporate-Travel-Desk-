@@ -282,16 +282,19 @@ export default function MyReissueRequests() {
             </div>
           )}
           
-          <div className="flex gap-2">
-            {["All", "PENDING", "APPROVED", "REJECTED", "COMPLETED"].map((s) => (
-              <button
-                key={s}
-                onClick={() => { setFilter(s); setCurrentPage(1); }}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all border ${filter === s ? "bg-[#0A4D68] text-white border-[#0A4D68] shadow-md shadow-cyan-900/20" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}`}
-              >
-                {s}
-              </button>
-            ))}
+          <div className="flex flex-col md:flex-row md:items-center gap-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Filter by Status</span>
+            <div className="flex gap-2">
+              {["All", "PENDING", "APPROVED", "REJECTED", "COMPLETED"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => { setFilter(s); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all border ${filter === s ? "bg-[#0A4D68] text-white border-[#0A4D68] shadow-md shadow-cyan-900/20" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

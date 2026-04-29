@@ -190,6 +190,7 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
     customBillingDays,
     creditLimit,
     walletBalance,
+    serviceCharges,
   } = req.body;
 
   if (!classification)
@@ -229,6 +230,13 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
   }
 
   corporate.classification = classification;
+  corporate.serviceCharges = {
+    domesticFlight: Number(serviceCharges?.domesticFlight || 0),
+    internationalOneWayFlight: Number(serviceCharges?.internationalOneWayFlight || 0),
+    internationalReturnFlight: Number(serviceCharges?.internationalReturnFlight || 0),
+    domesticHotel: Number(serviceCharges?.domesticHotel || 0),
+    internationalHotel: Number(serviceCharges?.internationalHotel || 0),
+  };
 
   // ----------------------------
   // 🔹 Activate Corporate

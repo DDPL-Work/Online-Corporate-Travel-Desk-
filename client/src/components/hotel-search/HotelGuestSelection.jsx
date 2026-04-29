@@ -66,7 +66,7 @@ const AgeSelect = ({ value, onChange }) => {
     setOpen(!open);
   };
 
-  const ages = Array.from({ length: 18 }, (_, i) => i + 1);
+  const ages = Array.from({ length: 18 }, (_, i) => i); // 🔥 Start from 0
 
   return (
     <div ref={ref} className="relative w-full">
@@ -81,6 +81,7 @@ const AgeSelect = ({ value, onChange }) => {
       {open && createPortal(
         <div
           ref={dropdownRef}
+          onMouseDown={(e) => e.stopPropagation()} // 🔥 Prevent closing parent
           className="absolute bg-white border border-slate-100 rounded-lg shadow-2xl z-[9999] p-2 animate-fade-in"
           style={{ top: coords.top, left: coords.left, width: 200 }}
         >
@@ -89,7 +90,9 @@ const AgeSelect = ({ value, onChange }) => {
             {ages.map((age) => (
               <div
                 key={age}
-                onClick={() => {
+                onMouseDown={(e) => e.stopPropagation()} // 🔥 Added here too
+                onClick={(e) => {
+                  e.stopPropagation(); // 🔥 Added
                   onChange(age);
                   setOpen(false);
                 }}

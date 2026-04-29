@@ -111,12 +111,16 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
   if (!resolvedApproverId && approverEmail) {
     const normalizedEmail = approverEmail.trim().toLowerCase();
-    let approverUser = await (await require("../models/User")).findOne({ email: normalizedEmail });
+    let approverUser = await (
+      await require("../models/User")
+    ).findOne({ email: normalizedEmail });
 
     if (!approverUser) {
       // bootstrap temp manager user
       const firstName = normalizedEmail.split("@")[0] || "Manager";
-      approverUser = await (await require("../models/User")).create({
+      approverUser = await (
+        await require("../models/User")
+      ).create({
         corporateId: corporate._id,
         email: normalizedEmail,
         name: { firstName, lastName: "" },
@@ -130,7 +134,8 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     resolvedApproverName =
       resolvedApproverName ||
       `${approverUser.name?.firstName || ""} ${approverUser.name?.lastName || ""}`.trim();
-    resolvedApproverRole = resolvedApproverRole || approverUser.role || "manager";
+    resolvedApproverRole =
+      resolvedApproverRole || approverUser.role || "manager";
   }
 
   /* ================= TRANSFORM DATA ================= */
@@ -277,6 +282,10 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     nights: transformedHotelRequest.noOfNights,
     amount: pricingSnapshot?.totalAmount || 0,
     currency: pricingSnapshot?.currency || "INR",
+    hotelImage:
+      transformedHotelRequest.selectedHotel?.images?.[0] ||
+      hotelRequest.rawHotelData?.Images?.[0] ||
+      "",
   };
 
   /* ================= SAVE ================= */
@@ -359,7 +368,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
       gstin: gstDetails?.gstin || "",
       legalName: gstDetails?.legalName || "",
       address: gstDetails?.address || "",
-      gstEmail: gstDetails?.gstEmail ||"",
+      gstEmail: gstDetails?.gstEmail || "",
     },
     travellers: transformedTravellers,
 
@@ -549,11 +558,9 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
       );
     }
 
-
     console.log("FRESH BOOKING CODE:", freshBookingCode);
 
     /* ================= STEP 5: BOOK ================= */
-
 
     const travellers = booking.travellers || [];
 
@@ -561,12 +568,16 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     const leadTraveller = travellers.find((t) => t.isLeadPassenger);
 
     const guestNationality = booking.hotelRequest?.guestNationality || "IN";
-    const hotelCountryInfo = booking.hotelRequest?.selectedHotel?.country || "IN";
-    
+    const hotelCountryInfo =
+      booking.hotelRequest?.selectedHotel?.country || "IN";
+
     // TBO considers booking international if the hotel's country does not match the guest's nationality
-    const isInternationalBooking = 
-      guestNationality.toLowerCase() !== hotelCountryInfo.toLowerCase() && 
-      !(guestNationality.toLowerCase() === "in" && hotelCountryInfo.toLowerCase() === "india");
+    const isInternationalBooking =
+      guestNationality.toLowerCase() !== hotelCountryInfo.toLowerCase() &&
+      !(
+        guestNationality.toLowerCase() === "in" &&
+        hotelCountryInfo.toLowerCase() === "india"
+      );
 
     if (isInternationalBooking && (!leadTraveller || !leadTraveller.panCard)) {
       throw new ApiError(
@@ -645,7 +656,6 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
         roomGuests[i].noOfChild += 1;
       }
     }
-
 
     // ✅ ADD THIS BLOCK HERE (EXACT PLACE)
 
@@ -768,8 +778,11 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
           GSTNumber: booking.gstDetails.gstin || "",
           GSTCompanyName: booking.gstDetails.legalName || "NA",
           GSTCompanyAddress: booking.gstDetails.address || "NA",
-          GSTCompanyEmail: booking.gstDetails.gstEmail || leadTraveller?.email || "info@domain.com"
-        }
+          GSTCompanyEmail:
+            booking.gstDetails.gstEmail ||
+            leadTraveller?.email ||
+            "info@domain.com",
+        },
       }),
     });
 
@@ -1071,7 +1084,62 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
 
   /* ================= IMAGES ================= */
 
-  const images = rooms.flatMap((r) => r?.images || r?.Images || []);
+  let images = rooms.flatMap((r) => r?.images || r?.Images || []);
+
+  // 🔥 Fallback 1: Hit the DB for saved hotel images
+  if (images.length === 0) {
+    images = booking.hotelRequest?.selectedHotel?.images || 
+             booking.hotelRequest?.rawHotelData?.Images || 
+             booking.hotelRequest?.rawHotelData?.images || [];
+  }
+
+  // 🔥 Fallback 2: Check the snapshot image
+  if (images.length === 0 && booking.bookingSnapshot?.hotelImage) {
+    images = [booking.bookingSnapshot.hotelImage];
+  }
+
+  // 🔥 Fallback 3: LAST RESORT - FETCH STATIC DETAILS FROM TBO
+  if (images.length === 0) {
+    const possibleCodes = [
+      result?.TBOHotelCode,
+      result?.HotelCode,
+      booking.hotelRequest?.selectedHotel?.hotelCode,
+      booking.hotelRequest?.hotelCode,
+    ].filter(Boolean);
+
+    for (const hCode of possibleCodes) {
+      try {
+        const staticDetails = await hotelService.getStaticHotelDetails(hCode);
+        const hotelInfo =
+          staticDetails?.HotelDetails?.[0] ||
+          staticDetails?.[0] ||
+          staticDetails;
+        const foundImages =
+          hotelInfo?.Images || hotelInfo?.HotelImages || hotelInfo?.images || [];
+
+        if (foundImages && foundImages.length > 0) {
+          images = foundImages;
+          // 🔥 Save back to DB for future hits
+          try {
+            await HotelBookingRequest.findByIdAndUpdate(booking._id, {
+              $set: {
+                "hotelRequest.selectedHotel.images": foundImages,
+                "bookingSnapshot.hotelImage": foundImages[0],
+              },
+            });
+          } catch (dbErr) {
+            console.error("FAILED TO SAVE RECOVERED IMAGES TO DB:", dbErr.message);
+          }
+          break; // Success!
+        }
+      } catch (err) {
+        console.error(
+          `STATIC IMAGE FETCH FAILED for code ${hCode}:`,
+          err.message,
+        );
+      }
+    }
+  }
 
   const heroImage = images[0] || null;
 

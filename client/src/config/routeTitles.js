@@ -47,7 +47,7 @@ export const routeTitles = {
   "/hotel-review-booking": "Hotel Review & Booking",
   "/hotel-booking/:id": "Hotel Booking",
   "/bookings/:id/book": "Book Flight",
-  "/my-bookings/:id": "Booking Details",
+  "/my-booking/:id": "Booking Details",
   "/my-hotel-booking/:id": "Hotel Booking Details",
 
   // Landing Routes

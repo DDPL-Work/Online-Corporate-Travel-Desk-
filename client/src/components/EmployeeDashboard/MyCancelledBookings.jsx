@@ -648,15 +648,13 @@ export default function CancelledFlightsPage() {
     return matchSearch && matchRefund && matchReason;
   });
 
-  // ── View details handler — routes to the right modal by tab
+  // ── View details handler — routes to the right page by tab
   const handleViewDetails = (item) => {
     if (activeTab === "hotels") {
-      setSelectedHotelId(item._id);
-      setIsHotelModalOpen(true);
+      navigate(`/my-cancelled-hotel-booking/${item._id}`, { state: { hideCancellation: true } });
     } else {
       // Flight: use the raw booking _id to fetch full details
-      setSelectedFlightId(item.id);
-      setIsFlightModalOpen(true);
+      navigate(`/my-cancelled-booking/${item.id}`, { state: { hideCancellation: true } });
     }
   };
 
@@ -791,58 +789,70 @@ export default function CancelledFlightsPage() {
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="relative">
-              <FiSearch
-                size={13}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Search</label>
+              <div className="relative">
+                <FiSearch
+                  size={13}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="text"
+                  placeholder={
+                    activeTab === "flights"
+                      ? "Search airline, route, PNR..."
+                      : "Search hotel, city, ref..."
+                  }
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Refund Status</label>
+              <select
+                value={refundFilter}
+                onChange={(e) => setRefundFilter(e.target.value)}
+                className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition text-slate-700"
+              >
+                <option value="all">All Refund Statuses</option>
+                <option value="processed">Refund Processed</option>
+                <option value="pending">Refund Pending</option>
+                <option value="nonrefundable">Non-Refundable</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Reason</label>
+              <select
+                value={reasonFilter}
+                onChange={(e) => setReasonFilter(e.target.value)}
+                className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition text-slate-700"
+              >
+                <option value="all">All Cancellation Reasons</option>
+                {activeTab === "flights" ? (
+                  <>
+                    <option value="airline">Airline Initiated</option>
+                    <option value="user">User Requested</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="hotel">Property Initiated</option>
+                    <option value="user">User Requested</option>
+                    <option value="policy">Policy Based</option>
+                  </>
+                )}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">From Date</label>
               <input
-                type="text"
-                placeholder={
-                  activeTab === "flights"
-                    ? "Search airline, route, PNR..."
-                    : "Search hotel, city, ref..."
-                }
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition text-slate-500"
               />
             </div>
-            <select
-              value={refundFilter}
-              onChange={(e) => setRefundFilter(e.target.value)}
-              className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition text-slate-700"
-            >
-              <option value="all">All Refund Statuses</option>
-              <option value="processed">Refund Processed</option>
-              <option value="pending">Refund Pending</option>
-              <option value="nonrefundable">Non-Refundable</option>
-            </select>
-            <select
-              value={reasonFilter}
-              onChange={(e) => setReasonFilter(e.target.value)}
-              className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition text-slate-700"
-            >
-              <option value="all">All Cancellation Reasons</option>
-              {activeTab === "flights" ? (
-                <>
-                  <option value="airline">Airline Initiated</option>
-                  <option value="user">User Requested</option>
-                </>
-              ) : (
-                <>
-                  <option value="hotel">Property Initiated</option>
-                  <option value="user">User Requested</option>
-                  <option value="policy">Policy Based</option>
-                </>
-              )}
-            </select>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition text-slate-500"
-            />
           </div>
         </div>
 

@@ -180,13 +180,13 @@ const OfflineCancellationQueries = () => {
   const [search, setSearch] = useState("");
   const [selectedQueryId, setSelectedQueryId] = useState(null);
 
-  const handleOpenModal = (id) => {
-    setSelectedQueryId(id);
-  };
-
   useEffect(() => {
     dispatch(fetchCancellationQueries());
   }, [dispatch]);
+
+  const handleOpenModal = (id) => {
+    setSelectedQueryId(id);
+  };
 
   const stats = useMemo(() => {
     const list = queries || [];
@@ -228,6 +228,16 @@ const OfflineCancellationQueries = () => {
     }
     return list;
   }, [queries, activeTab, search, currentUser]);
+
+  // If a query is selected, show the detail page inline (no overlay)
+  if (selectedQueryId) {
+    return (
+      <CancellationQueryDetailsPage
+        queryId={selectedQueryId}
+        onBack={() => setSelectedQueryId(null)}
+      />
+    );
+  }
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto font-sans text-slate-900">
@@ -435,16 +445,6 @@ const OfflineCancellationQueries = () => {
               <button disabled className="px-3 py-1 rounded border border-slate-200 text-[10px] font-bold text-slate-400 bg-white">Next</button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* DETAILS PAGE (inline slide-in) */}
-      {selectedQueryId && (
-        <div className="fixed inset-0 z-40 bg-gray-50 overflow-y-auto">
-          <CancellationQueryDetailsPage
-            queryId={selectedQueryId}
-            onBack={() => setSelectedQueryId(null)}
-          />
         </div>
       )}
     </div>

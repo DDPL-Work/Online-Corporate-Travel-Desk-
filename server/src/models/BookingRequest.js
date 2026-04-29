@@ -191,7 +191,13 @@ const bookingRequestSchema = new mongoose.Schema(
       },
       cabinClass: {
         type: String,
-        enum: ["Economy", "Premium Economy", "Business", "Premium Business", "First Class"],
+        enum: [
+          "Economy",
+          "Premium Economy",
+          "Business",
+          "Premium Business",
+          "First Class",
+        ],
         index: true,
       },
       amount: Number,

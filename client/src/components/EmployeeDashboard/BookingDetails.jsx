@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import {
@@ -29,6 +29,7 @@ import {
   FiMessageSquare,
   FiGlobe,
   FiPhone,
+  FiInfo,
 } from "react-icons/fi";
 import {
   downloadTicketPdf,
@@ -2443,7 +2444,8 @@ export default function BookingDetails() {
   const cancelRequested =
     sessionStorage.getItem(`cancelRequested_${booking?._id}`) === "true";
   const isCancelled =
-    booking?.executionStatus === "cancelled" || (isEmployee && cancelRequested);
+    ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase()) ||
+    (isEmployee && cancelRequested);
 
   useEffect(() => {
     if (id) dispatch(fetchMyBookingById(id));
@@ -2556,11 +2558,38 @@ export default function BookingDetails() {
           >
             <FiArrowLeft size={16} /> Back
           </button>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500 font-mono">
-              {booking.bookingReference}
-            </span>
-            <StatusPill status={executionStatus} />
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-500 font-mono">
+                {booking.bookingReference}
+              </span>
+              <StatusPill status={executionStatus} />
+            </div>
+
+            {paymentSuccessful && !isCancelled && (
+              <div className="flex items-center gap-2 border-l border-gray-200 pl-4 ml-1">
+                {pnrsByJourney.onward && (
+                  <button
+                    onClick={() => handleDownloadTicket("onward")}
+                    disabled={downloading === "onward"}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition disabled:opacity-50 shadow-sm"
+                  >
+                    <FiDownload size={13} className="text-teal-400" />
+                    {downloading === "onward" ? "Downloading" : isRoundTrip ? "Ticket (Onward)" : "Download Ticket"}
+                  </button>
+                )}
+                {isRoundTrip && pnrsByJourney.return && (
+                  <button
+                    onClick={() => handleDownloadTicket("return")}
+                    disabled={downloading === "return"}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition disabled:opacity-50 shadow-sm"
+                  >
+                    <FiDownload size={13} className="text-teal-400" />
+                    {downloading === "return" ? "Downloading" : "Ticket (Return)"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -2573,7 +2602,7 @@ export default function BookingDetails() {
               Reservation
             </p>
             <h1 className="text-[36px] font-black text-gray-900 tracking-tight leading-none mb-3">
-              Your trip is confirmed.
+              {isCancelled ? "Your trip is cancelled." : "Your trip is confirmed."}
             </h1>
             <p className="text-sm text-gray-500  leading-relaxed">
               A clean, single-page record of your itinerary, passengers and
@@ -3129,9 +3158,207 @@ export default function BookingDetails() {
         </div>
         {/* Fare Rules */}
         <FareRulesSection bookingResult={bookingResult} />
+
+        {/* Cancellation Details (Bottom) */}
+        {isCancelled && (() => {
+          const raw = booking.amendment?.raw;
+          let totalRefund = 0;
+          let totalCharge = 0;
+          let creditNotes = [];
+          let providerRemarks = [];
+          
+          const onwardBookingId = booking.bookingResult?.onwardResponse?.Response?.Response?.BookingId || booking.bookingResult?.providerResponse?.Response?.Response?.BookingId;
+          const returnBookingId = booking.bookingResult?.returnResponse?.Response?.Response?.BookingId;
+
+          const sectorBreakdown = [];
+
+          const getSectorLabel = (bId) => {
+            if (bId && bId === onwardBookingId) {
+              const segs = booking.flightRequest?.segments?.filter(s => s.journeyType === "onward") || [];
+              if (segs.length > 0) {
+                return `Onward: ${segs[0].origin?.airportCode} → ${segs[segs.length-1].destination?.airportCode}`;
+              }
+              return "Onward Journey";
+            }
+            if (bId && bId === returnBookingId) {
+              const segs = booking.flightRequest?.segments?.filter(s => s.journeyType === "return") || [];
+              if (segs.length > 0) {
+                return `Return: ${segs[0].origin?.airportCode} → ${segs[segs.length-1].destination?.airportCode}`;
+              }
+              return "Return Journey";
+            }
+            return "Booking Segment";
+          };
+
+          if (Array.isArray(raw)) {
+            raw.forEach(item => {
+              const info = item.response?.Response?.TicketCRInfo?.[0];
+              if (info) {
+                totalRefund += Number(info.RefundedAmount || 0);
+                totalCharge += Number(info.CancellationCharge || 0);
+                if (info.CreditNoteNo && info.CreditNoteNo !== "—") creditNotes.push(info.CreditNoteNo);
+                if (info.Remarks && info.Remarks !== "Successful") providerRemarks.push(info.Remarks);
+                
+                sectorBreakdown.push({
+                  label: getSectorLabel(item.bookingId),
+                  refund: info.RefundedAmount,
+                  charge: info.CancellationCharge,
+                  creditNote: info.CreditNoteNo,
+                  remarks: info.Remarks
+                });
+              }
+            });
+          } else {
+            const info = raw?.Response?.TicketCRInfo?.[0];
+            totalRefund = Number(info?.RefundedAmount || booking.amendment?.refundedAmount || 0);
+            totalCharge = Number(info?.CancellationCharge || booking.amendment?.cancellationCharge || 0);
+            if (info?.CreditNoteNo) creditNotes.push(info.CreditNoteNo);
+            if (info?.Remarks) providerRemarks.push(info.Remarks);
+          }
+
+          const displayRefund = totalRefund || booking.amendment?.refundedAmount || "—";
+          const displayCharge = totalCharge || booking.amendment?.cancellationCharge || "—";
+          const displayCreditNote = creditNotes.length > 0 ? creditNotes.join(", ") : "—";
+          const displayRemarks = providerRemarks.length > 0 ? providerRemarks.join(" | ") : (Array.isArray(raw) ? "Successful" : "");
+
+          return (
+            <div className="space-y-6 mt-8">
+              {/* Total Aggregated Summary */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#8B7355]">
+                    Overall Cancellation Summary
+                  </p>
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 border border-red-100">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-[9px] font-bold uppercase text-red-600 tracking-wider">
+                      {booking.amendment?.status || "Cancelled"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                        Cancelled On
+                      </p>
+                      <p className="text-[15px] font-bold text-gray-900">
+                        {new Date(booking.updatedAt || booking.amendment?.requestedAt).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                        Total Refund
+                      </p>
+                      <p className="text-[15px] font-bold text-emerald-600">
+                        ₹{displayRefund}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                        Total Charges
+                      </p>
+                      <p className="text-[15px] font-bold text-red-500">
+                        ₹{displayCharge}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                        Credit Note(s)
+                      </p>
+                      <p className="text-[15px] font-bold text-gray-900 font-mono">
+                        {displayCreditNote}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sector Breakdown Breakdown */}
+              {sectorBreakdown.length > 1 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {sectorBreakdown.map((sector, idx) => (
+                    <div key={idx} className="bg-slate-50 rounded-xl border border-slate-200 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-[11px] font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          {sector.label}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+                        <div>
+                          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Refund</p>
+                          <p className="text-sm font-bold text-emerald-600">₹{sector.refund || "0"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Charge</p>
+                          <p className="text-sm font-bold text-red-500">₹{sector.charge || "0"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Credit Note</p>
+                          <p className="text-sm font-mono font-bold text-slate-700">{sector.creditNote || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Remarks</p>
+                          <p className="text-xs font-semibold text-blue-600 truncate" title={sector.remarks}>
+                            {sector.remarks || "Successful"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Remarks Section */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
+                      <FiAlertCircle size={14} className="text-slate-400" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                        Cancellation Reason
+                      </p>
+                      <p className="text-sm text-gray-600 italic">
+                        "{booking.cancellation?.reason || booking.amendment?.remarks || "User Requested"}"
+                      </p>
+                    </div>
+                  </div>
+
+                  {(displayRemarks || (Array.isArray(raw) && raw.length > 0)) && (
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                        <FiInfo size={14} className="text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                          Provider Remarks
+                        </p>
+                        <p className="text-sm text-blue-600 font-medium">
+                          {displayRemarks || "Successful"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         {/* Amendment actions */}
         {paymentSuccessful &&
           executionStatus === "ticketed" &&
+          !isCancelled &&
           !isTravelPassed && (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -3158,7 +3385,7 @@ export default function BookingDetails() {
           )}
 
         {/* ── Sticky Download Button (bottom-right) ── */}
-        {paymentSuccessful &&
+        {/* {paymentSuccessful && !isCancelled &&
           (pnrsByJourney.onward || pnrsByJourney.return) && (
             <div className="fixed bottom-6 right-6 z-30 flex flex-col gap-2 items-end">
               {isRoundTrip ? (
@@ -3199,7 +3426,7 @@ export default function BookingDetails() {
                 </button>
               )}
             </div>
-          )}
+          )} */}
       </main>
 
       {/* Modals – keep your existing modal components */}

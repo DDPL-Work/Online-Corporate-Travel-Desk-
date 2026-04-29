@@ -75,15 +75,19 @@ function PastTripCard({ trip, onView, userRole }) {
     .map((s) => s.replace("-", " → "))
     .join("  |  ");
 
-  const dates = [snapshot.travelDate, snapshot.returnDate]
-    .filter(Boolean)
-    .map((d) => formatDateWithYear(d))
-    .join("  →  ");
+  const dates = isHotel
+    ? [snapshot.checkInDate, snapshot.checkOutDate]
+        .filter(Boolean)
+        .map((d) => formatDateWithYear(d))
+        .join("  →  ")
+    : [snapshot.travelDate, snapshot.returnDate]
+        .filter(Boolean)
+        .map((d) => formatDateWithYear(d))
+        .join("  →  ");
 
-  const daysAgo = snapshot.travelDate
-    ? Math.floor(
-        (new Date() - new Date(snapshot.travelDate)) / (1000 * 60 * 60 * 24),
-      )
+  const travelDate = isHotel ? snapshot.checkInDate : snapshot.travelDate;
+  const daysAgo = travelDate
+    ? Math.floor((new Date() - new Date(travelDate)) / (1000 * 60 * 60 * 24))
     : null;
 
   return (
@@ -208,18 +212,30 @@ export default function MyPastTrips() {
     today.setHours(0, 0, 0, 0);
     return bookings
       .filter((b) => {
-        const travelDate = b.bookingSnapshot?.travelDate;
-        return (
-          travelDate &&
-          b.executionStatus === "ticketed" &&
-          new Date(travelDate) < today
-        );
+        const isHotel = b.bookingType?.toLowerCase() === "hotel";
+        const dateStr = isHotel
+          ? b.bookingSnapshot?.checkInDate
+          : b.bookingSnapshot?.travelDate;
+
+        const isSuccess = isHotel
+          ? ["voucher_generated", "confirmed"].includes(
+              b.executionStatus?.toLowerCase(),
+            )
+          : b.executionStatus?.toLowerCase() === "ticketed";
+
+        return dateStr && isSuccess && new Date(dateStr) < today;
       })
-      .sort(
-        (a, b) =>
-          new Date(b.bookingSnapshot.travelDate) -
-          new Date(a.bookingSnapshot.travelDate),
-      );
+      .sort((a, b) => {
+        const dateA =
+          a.bookingType?.toLowerCase() === "hotel"
+            ? a.bookingSnapshot?.checkInDate
+            : a.bookingSnapshot?.travelDate;
+        const dateB =
+          b.bookingType?.toLowerCase() === "hotel"
+            ? b.bookingSnapshot?.checkInDate
+            : b.bookingSnapshot?.travelDate;
+        return new Date(dateB) - new Date(dateA);
+      });
   }, [bookings]);
 
   const filteredTrips = useMemo(() => {
@@ -227,17 +243,18 @@ export default function MyPastTrips() {
       const snapshot = trip.bookingSnapshot || {};
       const destination = (snapshot.city || "").toLowerCase();
       const sectors = (snapshot.sectors || []).join(" ").toLowerCase();
-      const travelDate = snapshot.travelDate
-        ? new Date(snapshot.travelDate)
-        : null;
+      const isHotel = trip.bookingType?.toLowerCase() === "hotel";
+      const travelDateObj = isHotel ? snapshot.checkInDate : snapshot.travelDate;
+      const travelDate = travelDateObj ? new Date(travelDateObj) : null;
 
       const matchType =
-        typeFilter === "all" ||
-        trip.bookingType?.toLowerCase() === typeFilter;
+        typeFilter === "all" || trip.bookingType?.toLowerCase() === typeFilter;
       const matchSearch =
         !searchTerm ||
         destination.includes(searchTerm.toLowerCase()) ||
-        sectors.includes(searchTerm.toLowerCase());
+        sectors.includes(searchTerm.toLowerCase()) ||
+        (snapshot.hotelName || "").toLowerCase().includes(searchTerm.toLowerCase());
+
       const matchStart =
         !startDate ||
         (travelDate && travelDate >= new Date(startDate + "T00:00:00"));
@@ -322,31 +339,40 @@ export default function MyPastTrips() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="relative">
-              <FiSearch
-                size={13}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Search Destination</label>
+              <div className="relative">
+                <FiSearch
+                  size={13}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="text"
+                  placeholder="Search destination, sector…"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">From Date</label>
               <input
-                type="text"
-                placeholder="Search destination, sector…"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition text-slate-500"
               />
             </div>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition text-slate-500"
-            />
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition text-slate-500"
-            />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">To Date</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition text-slate-500"
+              />
+            </div>
           </div>
 
           {hasFilters && (
@@ -387,7 +413,7 @@ export default function MyPastTrips() {
                     key={trip._id}
                     trip={trip}
                     userRole={userRole}
-                    onView={(t) => navigate(`/my-bookings/${t._id}`)}
+                    onView={(t) => navigate(`/my-booking/${t._id}`)}
                   />
                 ))}
               </div>
