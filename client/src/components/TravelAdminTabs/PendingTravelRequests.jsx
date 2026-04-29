@@ -7,6 +7,7 @@ import {
   approveApproval,
   rejectApproval,
 } from "../../Redux/Actions/approval.thunks";
+import { fetchCorporateAdmin } from "../../Redux/Slice/corporateAdminSlice";
 import Swal from "sweetalert2";
 import PendingHotelDetailsModal, {
   PendingFlightDetailsModal,
@@ -36,6 +37,7 @@ export default function PendingTravelRequests() {
 
   useEffect(() => {
     dispatch(fetchApprovals({ status: "pending_approval" }));
+    dispatch(fetchCorporateAdmin());
   }, [dispatch]);
 
   const requests = useMemo(() => {
@@ -162,8 +164,63 @@ export default function PendingTravelRequests() {
         r.bookingRef.toLowerCase().includes(searchTerm.toLowerCase())),
   );
 
+  const { corporate } = useSelector((state) => state.corporateAdmin);
+
   const handleAction = async (id, type, action) => {
     const isApprove = action === "approve";
+
+    // 💰 CREDIT CHECK LOGIC
+    if (isApprove) {
+      const request = requests.find((r) => r.id === id);
+      const estimatedCost = request?.estimatedCost || 0;
+
+      let currentCorp = corporate;
+      if (!currentCorp) {
+        try {
+          const res = await dispatch(fetchCorporateAdmin()).unwrap();
+          currentCorp = res;
+        } catch (err) {
+          Swal.fire("Error", "Could not verify corporate balance. Please try again.", "error");
+          return;
+        }
+      }
+
+      if (currentCorp) {
+        const { classification, walletBalance, creditLimit, creditUtilization } = currentCorp;
+
+        if (classification === "prepaid") {
+          const balance = walletBalance || 0;
+          if (balance < estimatedCost) {
+            await Swal.fire({
+              title: "Insufficient Wallet Balance",
+              text: `Wallet balance (₹${balance.toLocaleString()}) is less than the booking amount (₹${estimatedCost.toLocaleString()}). Please recharge your wallet to proceed.`,
+              icon: "error",
+              confirmButtonColor: "#0A4D68",
+            });
+            return;
+          }
+        } else if (classification === "postpaid") {
+          const limit = creditLimit || 0;
+          const utilization = creditUtilization || 0;
+          const usedCredit = (limit * utilization) / 100;
+          const availableCredit = limit - usedCredit;
+
+          if (availableCredit < estimatedCost) {
+            await Swal.fire({
+              title: "Insufficient Credit Limit",
+              text: `Available credit limit (₹${availableCredit.toLocaleString()}) is less than the booking amount (₹${estimatedCost.toLocaleString()}). Approval blocked.`,
+              icon: "error",
+              confirmButtonColor: "#0A4D68",
+            });
+            return;
+          }
+        }
+      } else {
+        Swal.fire("Error", "Corporate financial data not found. Approval blocked.", "error");
+        return;
+      }
+    }
+
     const result = await Swal.fire({
       title: `${isApprove ? "Approve" : "Reject"} Request`,
       text: isApprove ? "Confirm approval?" : "Provide a reason for rejection",

@@ -236,15 +236,15 @@ export function ProjectApproverBlock({ onChange }) {
             <>
               <SearchDropdown
                 placeholder="Search by project name, ID or client…"
-                items={projects.map(p => ({ name: p.projectName, id: p.projectCodeId, client: p.clientName, _id: p._id }))}
+                items={projects?.map(p => ({ name: p.projectName, id: p.projectCodeId, client: p.clientName, _id: p._id })) || []}
                 selectedItem={selectedProject}
                 onSelect={setSelectedProject}
                 getLabel={(item) => item.name || item.id || ""}
                 showAllOnEmpty={true}
                 filterFn={(item, q) =>
-                  item.name.toLowerCase().includes(q.toLowerCase()) ||
-                  item.id.toLowerCase().includes(q.toLowerCase()) ||
-                  item.client.toLowerCase().includes(q.toLowerCase())
+                  (item.name?.toLowerCase() || "").includes(q.toLowerCase()) ||
+                  (item.id?.toLowerCase() || "").includes(q.toLowerCase()) ||
+                  (item.client?.toLowerCase() || "").includes(q.toLowerCase())
                 }
                 renderItem={(item) => (
                   <div className="flex flex-col gap-0.5 min-w-0">
@@ -351,14 +351,14 @@ export function ProjectApproverBlock({ onChange }) {
               <>
                 <SearchDropdown
                   placeholder="Search manager by name or email…"
-                  items={employees.map(e => ({
+                  items={employees?.map(e => ({
                     id: e.userId || e._id,
                     userId: e.userId,
                     employeeId: e._id,
                     name: e.name,
                     email: e.email,
                     role: e.role,
-                  }))}
+                  })) || []}
                   selectedItem={selectedApprover}
                   onSelect={setSelectedApprover}
                   getLabel={(item) => `${getDisplayName(item)} (${item.email || ""})`}
