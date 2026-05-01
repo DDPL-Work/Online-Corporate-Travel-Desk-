@@ -420,15 +420,16 @@ exports.getTeamBookedHotelRequests = async (req, res) => {
       bookingType: "hotel",
       requestStatus: "approved",
 
-      // 🔥 ONLY EXECUTED BOOKINGS
-      // executionStatus: { $in: ["booked", "cancelled"] },
-
       // 🔥 I am approver OR I approved
       $or: [
         { approverId: userId },
         { approvedBy: userId },
       ],
     })
+      .populate({
+        path: "userId",
+        select: "name email role",
+      })
       .populate({
         path: "approvedBy",
         select: "name email role",
@@ -598,6 +599,7 @@ exports.getTeamBookedFlightRequests = async (req, res) => {
       corporateId,
       $or: [{ approverId: { $in: [userId, userId.toString()] } }, { approvedBy: userId }],
     })
+      .populate({ path: "userId", select: "name email role" })
       .populate({ path: "approvedBy", select: "name email role" })
       .sort({ updatedAt: -1 })
       .lean();
@@ -626,3 +628,69 @@ exports.getTeamBookedFlightRequests = async (req, res) => {
   }
 };
 
+exports.getTeamExecutedFlightRequestById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    const corporateId = req.user.corporateId;
+
+    const request = await BookingRequest.findOne({
+      _id: id,
+      corporateId,
+      bookingType: "flight",
+      requestStatus: "approved",
+      $or: [
+        { approverId: { $in: [userId, userId.toString()] } },
+        { approvedBy: userId },
+      ],
+    })
+      .populate({ path: "userId", select: "name email role" })
+      .populate({ path: "approvedBy", select: "name email role" })
+      .populate({ path: "rejectedBy", select: "name email role" })
+      .lean();
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Flight booking not found or you are not authorized to view it",
+      });
+    }
+
+    return res.status(200).json({ success: true, data: request });
+  } catch (error) {
+    console.error("Error fetching team flight request details:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+exports.getTeamExecutedHotelRequestById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    const corporateId = req.user.corporateId;
+
+    const request = await HotelBookingRequest.findOne({
+      _id: id,
+      corporateId,
+      bookingType: "hotel",
+      requestStatus: "approved",
+      $or: [{ approverId: userId }, { approvedBy: userId }],
+    })
+      .populate({ path: "userId", select: "name email role" })
+      .populate({ path: "approvedBy", select: "name email role" })
+      .populate({ path: "rejectedBy", select: "name email role" })
+      .lean();
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Hotel booking not found or you are not authorized to view it",
+      });
+    }
+
+    return res.status(200).json({ success: true, data: request });
+  } catch (error) {
+    console.error("Error fetching team hotel request details:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};

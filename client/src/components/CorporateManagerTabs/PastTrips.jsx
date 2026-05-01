@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import {
   FiSearch,
@@ -24,20 +25,20 @@ import {
   RatingStars,
 } from "./Shared/CommonComponents";
 import {
-  getAllHotelBookingsAdmin,
-} from "../../Redux/Actions/travelAdmin.thunks";
-import { getTeamExecutedFlightRequests } from "../../Redux/Actions/manager.thunk";
+  getTeamExecutedFlightRequests,
+  getTeamExecutedHotelRequests,
+} from "../../Redux/Actions/manager.thunk";
 import { useDispatch, useSelector } from "react-redux";
 import { FlightBookingModal } from "./Modal/BookingRequestDetailsModal";
 
 // ── FLIGHT SECTION ────────────────────────────────────────────────────────────
 function FlightSection() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
-  const [selectedBooking, setSelectedBooking] = useState(null);
 
   const { teamExecutedFlightRequests: flightBookings } = useSelector(
     (state) => state.manager,
@@ -60,12 +61,22 @@ function FlightSection() {
         const travelKey = departureDate
           ? new Date(departureDate).toISOString().slice(0, 10)
           : null;
+
         const exec = (b.executionStatus || "").toLowerCase();
         const req = (b.requestStatus || "").toLowerCase();
+        const isAmended =
+          b.amendment &&
+          (b.amendment.status === "requested" ||
+            b.amendment.status === "in_progress");
+
         const status =
-          exec === "cancel_requested" || req === "cancelled"
+          exec === "cancelled" ||
+          exec === "cancel_requested" ||
+          req === "cancelled"
             ? "Cancelled"
-            : exec === "ticketed" || exec === "confirmed" || req === "approved"
+            : (exec === "ticketed" || exec === "confirmed") &&
+                exec !== "failed" &&
+                !isAmended
               ? "Completed"
               : "Pending";
         return {
@@ -89,9 +100,10 @@ function FlightSection() {
           travelKey,
         };
       })
-      .filter((t) => t.travelKey && t.travelKey < today && t.status !== "Cancelled");
+      .filter(
+        (t) => t.travelKey && t.travelKey < today && t.status === "Completed",
+      );
   }, [flightBookings, today]);
-  const departments = ["All", ...new Set(flightTrips.map((t) => t.department))];
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -100,13 +112,12 @@ function FlightSection() {
       const dateOk =
         (!startDate || depDate >= new Date(startDate)) &&
         (!endDate || depDate <= new Date(endDate));
-      const deptOk = deptFilter === "All" || t.department === deptFilter;
       const searchOk =
         !q ||
         t.employee.toLowerCase().includes(q) ||
         t.destination.toLowerCase().includes(q) ||
         t.id.toString().includes(q);
-      return dateOk && deptOk && searchOk;
+      return dateOk && searchOk;
     });
   }, [search, startDate, endDate, deptFilter, flightTrips]);
 
@@ -137,22 +148,6 @@ function FlightSection() {
           iconBgCls="bg-emerald-50"
           iconColorCls="text-emerald-600"
         />
-        {/* <StatCard
-          label="Avg. Rating"
-          value={avgRating}
-          Icon={FiStar}
-          borderCls="border-amber-500"
-          iconBgCls="bg-amber-50"
-          iconColorCls="text-amber-600"
-        /> */}
-        {/* <StatCard
-          label="Departments"
-          value={new Set(filtered.map((t) => t.department)).size}
-          Icon={FiUser}
-          borderCls="border-violet-500"
-          iconBgCls="bg-violet-50"
-          iconColorCls="text-violet-600"
-        /> */}
       </div>
 
       {/* Filters */}
@@ -199,23 +194,6 @@ function FlightSection() {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiFilter size={10} /> Department
-              </>
-            }
-          >
-            <select
-              value={deptFilter}
-              onChange={(e) => setDept(e.target.value)}
-              className={selectCls}
-            >
-              {departments.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
-          </LabeledField>
         </div>
       </div>
 
@@ -227,11 +205,9 @@ function FlightSection() {
               <tr className="bg-[#0A4D68] text-[#bfdbfe]">
                 <Th>Booking ID</Th>
                 <Th>Employee</Th>
-                {/* <Th>Department</Th> */}
                 <Th>Destination</Th>
                 <Th>Departure Date</Th>
                 <Th>Airline</Th>
-                {/* <Th>Rating</Th> */}
                 <Th>Status</Th>
                 <Th>Action</Th>
               </tr>
@@ -305,7 +281,11 @@ function FlightSection() {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setSelectedBooking(t.raw)}
+                        onClick={() =>
+                          navigate(`/manager/team-booking/${t.id}`, {
+                            state: { isPastTrip: true },
+                          })
+                        }
                         className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] flex items-center gap-1"
                       >
                         <FiEye size={12} /> View
@@ -326,12 +306,6 @@ function FlightSection() {
           </span>
         </div>
       </div>
-      {selectedBooking && (
-        <FlightBookingModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-        />
-      )}
     </div>
   );
 }
@@ -340,16 +314,16 @@ function FlightSection() {
 function HotelSection() {
   const dispatch = useDispatch();
   const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState("2023-01-01");
-  const [endDate, setEndDate] = useState("2024-01-01");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
 
-  const hotelBookings = useSelector(
-    (state) => state.adminBooking.hotelBookings,
+  const { teamExecutedHotelRequests: hotelBookings } = useSelector(
+    (state) => state.manager,
   );
 
   useEffect(() => {
-    dispatch(getAllHotelBookingsAdmin());
+    dispatch(getTeamExecutedHotelRequests());
   }, [dispatch]);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -365,16 +339,36 @@ function HotelSection() {
         if (!checkIn) return false;
 
         const ci = new Date(checkIn).toISOString().slice(0, 10);
-
         const validStatuses = ["confirmed", "booked", "voucher_generated"];
+        const exec = (b.executionStatus || "").toLowerCase();
+        const req = (b.requestStatus || "").toLowerCase();
+        const isCancelled =
+          exec === "cancelled" ||
+          exec === "cancel_requested" ||
+          req === "cancelled" ||
+          (b.amendment &&
+            ["requested", "success"].includes(b.amendment?.status)) ||
+          b.isCancelled === true;
 
-        return validStatuses.includes(b.executionStatus) && ci < today;
+        const isFailed = exec === "failed";
+
+        const isAmended = b.amendment && (b.amendment.status === "requested" || b.amendment.status === "in_progress");
+
+        return (
+          validStatuses.includes(exec) &&
+          ci < today &&
+          !isCancelled &&
+          !isFailed &&
+          !isAmended
+        );
       })
       .map((b) => ({
         id: b._id,
         raw: b,
         employee:
-          `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim(),
+          `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim() ||
+          b.userId?.email ||
+          "N/A",
         employeeId: b.userId?._id || "N/A",
         destination: b.hotelRequest?.selectedHotel?.hotelName || "N/A",
         departureDate:
@@ -388,7 +382,6 @@ function HotelSection() {
         status: "Completed",
       }));
   }, [hotelBookings]);
-  const departments = ["All", ...new Set(hotelTrips.map((t) => t.department))];
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -397,13 +390,12 @@ function HotelSection() {
       const dateOk =
         (!startDate || depDate >= new Date(startDate)) &&
         (!endDate || depDate <= new Date(endDate));
-      const deptOk = deptFilter === "All" || t.department === deptFilter;
       const searchOk =
         !q ||
         t.employee.toLowerCase().includes(q) ||
         t.destination.toLowerCase().includes(q) ||
         t.id.toString().includes(q);
-      return dateOk && deptOk && searchOk;
+      return dateOk && searchOk;
     });
   }, [search, startDate, endDate, deptFilter, hotelTrips]);
 
@@ -433,22 +425,6 @@ function HotelSection() {
           borderCls="border-emerald-500"
           iconBgCls="bg-emerald-50"
           iconColorCls="text-emerald-600"
-        />
-        <StatCard
-          label="Avg. Rating"
-          value={avgRating}
-          Icon={FiStar}
-          borderCls="border-amber-500"
-          iconBgCls="bg-amber-50"
-          iconColorCls="text-amber-600"
-        />
-        <StatCard
-          label="Departments"
-          value={new Set(filtered.map((t) => t.department)).size}
-          Icon={FiUser}
-          borderCls="border-violet-500"
-          iconBgCls="bg-violet-50"
-          iconColorCls="text-violet-600"
         />
       </div>
 
@@ -496,23 +472,6 @@ function HotelSection() {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiFilter size={10} /> Department
-              </>
-            }
-          >
-            <select
-              value={deptFilter}
-              onChange={(e) => setDept(e.target.value)}
-              className={selectCls}
-            >
-              {departments.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
-          </LabeledField>
         </div>
       </div>
 
@@ -524,11 +483,9 @@ function HotelSection() {
               <tr className="bg-[#088395] text-[#ccfbf1]">
                 <Th>Trip ID</Th>
                 <Th>Employee</Th>
-                <Th>Department</Th>
                 <Th>Destination</Th>
                 <Th>Check-in Date</Th>
                 <Th>Check-out Date</Th>
-                <Th>Rating</Th>
                 <Th>Status</Th>
                 <Th>Action</Th>
               </tr>
@@ -569,11 +526,7 @@ function HotelSection() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="px-2.5 py-0.5 text-xs rounded-full bg-teal-50 text-[#088395] font-medium">
-                        {t.department}
-                      </span>
-                    </td>
+
                     <td className="px-4 py-3 text-[13px] text-slate-700 font-medium">
                       {t.destination}
                     </td>
@@ -590,23 +543,29 @@ function HotelSection() {
                         : "—"}
                     </td>
                     <td className="px-4 py-3 text-[13px] text-slate-500">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-slate-800 text-[13px]">
-                          {t.airlineName || "N/A"}
-                        </span>
-                        <span className="text-[11px] text-slate-500">
-                          {t.flightNumber ? `Flight ${t.flightNumber}` : "—"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <RatingStars rating={t.rating} />
+                      {t.returnDate
+                        ? new Date(t.returnDate).toLocaleDateString(
+                            "en-IN",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            },
+                          )
+                        : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={t.status || "Completed"} />
                     </td>
                     <td className="px-4 py-3">
-                      <button className="px-3 py-1 text-xs font-semibold bg-[#088395] text-white rounded-md hover:bg-[#066b78] flex items-center gap-1">
+                      <button
+                        onClick={() =>
+                          navigate(`/manager/team-hotel-booking/${t.id}`, {
+                            state: { isPastTrip: true },
+                          })
+                        }
+                        className="px-3 py-1 text-xs font-semibold bg-[#088395] text-white rounded-md hover:bg-[#066b78] flex items-center gap-1"
+                      >
                         <FiEye size={12} /> View
                       </button>
                     </td>
@@ -643,7 +602,7 @@ export default function PastTripsForManager() {
       dispatch(getTeamExecutedFlightRequests());
       return;
     }
-    dispatch(getAllHotelBookingsAdmin());
+    dispatch(getTeamExecutedHotelRequests());
   };
 
   const tabs = [
@@ -682,9 +641,13 @@ export default function PastTripsForManager() {
           <button
             onClick={handleRefresh}
             disabled={loadingActive}
-            className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-slate-800 hover:border-slate-300 disabled:opacity-50"
+            className="ml-auto inline-f
+           lex items-center gap-2 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-slate-800 hover:border-slate-300 disabled:opacity-50"
           >
-            <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
+            <FiRefreshCw
+              size={14}
+              className={loadingActive ? "animate-spin" : ""}
+            />
             Refresh
           </button>
         </div>

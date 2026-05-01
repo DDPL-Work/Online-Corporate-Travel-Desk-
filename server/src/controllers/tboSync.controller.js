@@ -332,185 +332,584 @@ let hotelDetailsSyncState = {
  * Hierarchical Background Processor: Country > City > Hotel > Details
  * This refactored version processes details city-by-city to ensure hierarchy and better tracking.
  */
+// exports.processHotelDetailsSync = async (targetCityCode = null) => {
+//   if (hotelDetailsSyncState.isSyncing) return;
+//   hotelDetailsSyncState.isSyncing = true;
+
+//   try {
+//     // 1. Get cities to process - PRIORITIZE INDIA
+//     let cities;
+//     if (targetCityCode) {
+//       cities = await TBOCity.find({ cityCode: targetCityCode });
+//     } else {
+//       logger.info("[HOTEL DETAILS SYNC] Fetching India cities first...");
+//       const indiaCities = await TBOCity.find({ countryCode: "IN" }).sort({ cityName: 1 });
+//       const otherCities = await TBOCity.find({ countryCode: { $ne: "IN" } }).sort({ countryName: 1, cityName: 1 });
+//       cities = [...indiaCities, ...otherCities];
+//     }
+    
+//     hotelDetailsSyncState.totalCities = cities.length;
+//     hotelDetailsSyncState.processedCities = 0;
+//     hotelDetailsSyncState.totalDetailsSaved = await TBOHotelDetails.countDocuments({});
+//     hotelDetailsSyncState.errors = [];
+//     hotelDetailsSyncState.startTime = new Date();
+
+//     logger.info(`[HOTEL DETAILS SYNC] Started optimized sync for ${cities.length} cities (India prioritized).`);
+
+//     for (const city of cities) {
+//       hotelDetailsSyncState.lastCity = `${city.cityName}, ${city.countryName}`;
+      
+//       // 2. Get all hotels for this city from our local DB
+//       const hotels = await TBOHotel.find({ cityCode: city.cityCode }).lean();
+//       if (hotels.length > 0) {
+//         // Find hotel codes in this city that already have details
+//         const hotelCodesInCity = hotels.map(h => h.hotelCode);
+//         const existingDetailsCodes = await TBOHotelDetails.find({ 
+//           hotelCode: { $in: hotelCodesInCity } 
+//         }).distinct("hotelCode");
+
+//         // Filter out hotels that already have details
+//         const hotelsToSync = hotels.filter(h => !existingDetailsCodes.includes(h.hotelCode));
+
+//         if (hotelsToSync.length === 0) {
+//           logger.info(`[HOTEL DETAILS SYNC] ⏭️ Skipping ${city.cityName} - All ${hotels.length} hotels already have details.`);
+//           hotelDetailsSyncState.processedCities++;
+//           hotelDetailsSyncState.processedHotelsInCity = hotels.length;
+//           continue;
+//         }
+
+//         logger.info(`[HOTEL DETAILS SYNC] 🔄 Processing ${city.cityName}: ${hotelsToSync.length} new/missing out of ${hotels.length} total.`);
+//         hotelDetailsSyncState.totalHotelsInCity = hotels.length;
+//         hotelDetailsSyncState.processedHotelsInCity = hotels.length - hotelsToSync.length;
+
+//         // OPTIMIZATION: Process hotels in batches of 10 (TBO Static API can struggle with larger batches)
+//         const batchSize = 10;
+//         for (let i = 0; i < hotelsToSync.length; i += batchSize) {
+//           const batch = hotelsToSync.slice(i, i + batchSize);
+//           const hotelCodes = batch.map(h => h.hotelCode).join(",");
+
+//           try {
+//             hotelDetailsSyncState.lastHotel = `Batch: ${batch[0].hotelName || batch[0].hotelCode} (+${batch.length - 1} more)`;
+
+//             const res = await hotelService.getStaticHotelDetails(hotelCodes);
+
+//             if (res && res.HotelDetails && Array.isArray(res.HotelDetails)) {
+// // ... (rest of the logic remains same)
+//               if (detailOps.length > 0) {
+//                 await TBOHotelDetails.bulkWrite(detailOps, { ordered: false });
+//                 await TBOHotel.bulkWrite(enrichmentOps, { ordered: false });
+//                 hotelDetailsSyncState.totalDetailsSaved += detailOps.length;
+//               }
+//             }
+
+//             hotelDetailsSyncState.processedHotelsInCity += batch.length;
+            
+//             logger.info(`[HOTEL DETAILS SYNC] ✅ ${city.cityName} (Batch ${Math.floor(i / batchSize) + 1}): Processed ${batch.length} | DB Total: ${hotelDetailsSyncState.totalDetailsSaved}`);
+
+//             // Respect TBO rate limits - with batching we can afford a smaller delay
+//             await new Promise(r => setTimeout(r, 500));
+//           } catch (error) {
+//             logger.warn(`[HOTEL DETAILS SYNC] ⚠️ Batch failed starting ${batch[0].hotelCode} (${error.message}). Retrying individually...`);
+            
+//             for (const hotel of batch) {
+//               try {
+//                 const res = await hotelService.getStaticHotelDetails(hotel.hotelCode);
+                
+//                 if (res && res.HotelDetails && Array.isArray(res.HotelDetails) && res.HotelDetails.length > 0) {
+//                   const d = res.HotelDetails[0];
+                  
+//                   // Save individual record
+//                   await TBOHotelDetails.findOneAndUpdate(
+//                     { hotelCode: d.HotelCode },
+//                     {
+//                       $set: {
+//                         hotelCode:       d.HotelCode,
+//                         hotelName:       d.HotelName        || "",
+//                         description:     d.Description      || "",
+//                         address:         d.Address          || "",
+//                         pinCode:         d.PinCode          || "",
+//                         cityId:          d.CityId           || "",
+//                         cityName:        d.CityName         || "",
+//                         countryName:     d.CountryName      || "",
+//                         countryCode:     d.CountryCode      || "",
+//                         phoneNumber:     d.PhoneNumber      || "",
+//                         email:           d.Email            || "",
+//                         faxNumber:       d.FaxNumber        || "",
+//                         hotelWebsiteUrl: d.HotelWebsiteUrl  || "",
+//                         map:             d.Map              || "",
+//                         hotelRating:     d.HotelRating      || 0,
+//                         checkInTime:     d.CheckInTime      || "",
+//                         checkOutTime:    d.CheckOutTime     || "",
+//                         image:           d.Image            || "",
+//                         images:          Array.isArray(d.Images) ? d.Images : [],
+//                         hotelFacilities: Array.isArray(d.HotelFacilities) ? d.HotelFacilities : [],
+//                         attractions:     d.Attractions ? JSON.stringify(d.Attractions) : "",
+//                         hotelFees: {
+//                           optional:  d.HotelFees?.Optional  || [],
+//                           mandatory: d.HotelFees?.Mandatory || [],
+//                         },
+//                         roomDetails: Array.isArray(d.RoomDetails)
+//                           ? d.RoomDetails.map(r => ({
+//                               roomId:          r.RoomId          || 0,
+//                               roomName:        r.RoomName        || "",
+//                               roomSize:        r.RoomSize        || "",
+//                               roomDescription: r.RoomDescription || "",
+//                               imageURL:        Array.isArray(r.imageURL) ? r.imageURL : [],
+//                             }))
+//                           : [],
+//                       },
+//                     },
+//                     { upsert: true }
+//                   );
+
+//                   // Individual Enrichment
+//                   await TBOHotel.updateOne(
+//                     { hotelCode: d.HotelCode },
+//                     {
+//                       $set: {
+//                         hotelAddress: d.Address || "",
+//                         starRating: d.HotelRating ? d.HotelRating.toString() : "",
+//                         thumbnail: d.Image || "",
+//                       },
+//                     }
+//                   );
+
+//                   hotelDetailsSyncState.totalDetailsSaved++;
+//                   logger.info(`[HOTEL DETAILS SYNC] ✅ Individual Retry Success: ${d.HotelCode}`);
+//                 }
+//               } catch (retryError) {
+//                 logger.error(`[HOTEL DETAILS SYNC] ❌ Individual Retry Failed for ${hotel.hotelCode}: ${retryError.message}`);
+//                 hotelDetailsSyncState.errors.push({ hotelCode: hotel.hotelCode, error: retryError.message });
+//               }
+              
+//               // Small delay between individual retries to be safe
+//               await new Promise(r => setTimeout(r, 200));
+//             }
+//             hotelDetailsSyncState.processedHotelsInCity += batch.length;
+//           }
+//         }
+//       }
+
+//       hotelDetailsSyncState.processedCities++;
+      
+//       // Save progress checkpoint at city level
+//       await TBOSyncProgress.findOneAndUpdate(
+//         { syncType: "hotelDetails" },
+//         { 
+//           lastProcessedId: city._id,
+//           processedCount: hotelDetailsSyncState.processedCities,
+//           totalToProcess: hotelDetailsSyncState.totalCities,
+//           status: "running",
+//           lastUpdateTime: new Date()
+//         },
+//         { upsert: true }
+//       );
+//     }
+
+//     hotelDetailsSyncState.endTime = new Date();
+//     await TBOSyncProgress.findOneAndUpdate({ syncType: "hotelDetails" }, { status: "completed" });
+//     logger.info(`[HOTEL DETAILS SYNC] 🎉 OPTIMIZED COMPLETE! Saved ${hotelDetailsSyncState.totalDetailsSaved} total hotel details.`);
+//   } catch (error) {
+//     logger.error("[HOTEL DETAILS SYNC] Critical failure:", error.message);
+//   } finally {
+//     hotelDetailsSyncState.isSyncing = false;
+//   }
+// };
+
 exports.processHotelDetailsSync = async (targetCityCode = null) => {
   if (hotelDetailsSyncState.isSyncing) return;
   hotelDetailsSyncState.isSyncing = true;
 
   try {
-    // 1. Get cities to process - PRIORITIZE INDIA
+    const priorityCountries = [
+      { label: "Singapore", codes: ["SG"], names: ["singapore"] },
+      { label: "Malaysia", codes: ["MY"], names: ["malaysia"] },
+      { label: "Indonesia", codes: ["ID"], names: ["indonesia"] },
+      { label: "Japan", codes: ["JP"], names: ["japan"] },
+      { label: "Sri Lanka", codes: ["LK"], names: ["sri lanka"] },
+      { label: "Maldives", codes: ["MV"], names: ["maldives"] },
+      { label: "Thailand", codes: ["TH"], names: ["thailand"] },
+      {
+        label: "Philippines",
+        codes: ["PH"],
+        names: ["philippines", "phillippines"],
+      },
+      { label: "Cambodia", codes: ["KH"], names: ["cambodia"] },
+      {
+        label: "Laos",
+        codes: ["LA"],
+        names: [
+          "laos",
+          "lao pdr",
+          "lao people's democratic republic",
+          "lao peoples democratic republic",
+        ],
+      },
+      {
+        label: "China",
+        codes: ["CN"],
+        names: ["china", "people s republic of china", "peoples republic of china"],
+      },
+      {
+        label: "Saudi Arabia",
+        codes: ["SA"],
+        names: ["saudi arabia", "kingdom of saudi arabia"],
+      },
+      { label: "Kazakhstan", codes: ["KZ"], names: ["kazakhstan"] },
+    ];
+
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const normalizeCountryValue = (value = "") =>
+      value
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const getPriorityIndex = (countryCode = "", countryName = "") => {
+      const normalizedCode = countryCode.toString().trim().toUpperCase();
+      const normalizedName = normalizeCountryValue(countryName);
+
+      const index = priorityCountries.findIndex(
+        (country) =>
+          country.codes.includes(normalizedCode) ||
+          country.names.includes(normalizedName),
+      );
+
+      return index === -1 ? priorityCountries.length : index;
+    };
+
+    const sortCitiesByPriority = (cities = []) =>
+      [...cities].sort((left, right) => {
+        const priorityDiff =
+          getPriorityIndex(left.countryCode, left.countryName) -
+          getPriorityIndex(right.countryCode, right.countryName);
+
+        if (priorityDiff !== 0) return priorityDiff;
+
+        const countryCompare = (left.countryName || "").localeCompare(
+          right.countryName || "",
+        );
+        if (countryCompare !== 0) return countryCompare;
+
+        return (left.cityName || "").localeCompare(right.cityName || "");
+      });
+
+    const buildHotelDetailsPayload = (detail = {}) => ({
+      hotelCode: detail.HotelCode || "",
+      hotelName: detail.HotelName || "",
+      description: detail.Description || "",
+      address: detail.Address || "",
+      pinCode: detail.PinCode || "",
+      cityId: detail.CityId || "",
+      cityName: detail.CityName || "",
+      countryName: detail.CountryName || "",
+      countryCode: detail.CountryCode || "",
+      phoneNumber: detail.PhoneNumber || "",
+      email: detail.Email || "",
+      faxNumber: detail.FaxNumber || "",
+      hotelWebsiteUrl: detail.HotelWebsiteUrl || "",
+      map: detail.Map || "",
+      hotelRating: detail.HotelRating || 0,
+      checkInTime: detail.CheckInTime || "",
+      checkOutTime: detail.CheckOutTime || "",
+      image: detail.Image || "",
+      images: Array.isArray(detail.Images) ? detail.Images : [],
+      hotelFacilities: Array.isArray(detail.HotelFacilities)
+        ? detail.HotelFacilities
+        : [],
+      attractions: detail.Attractions
+        ? JSON.stringify(detail.Attractions)
+        : "",
+      hotelFees: {
+        optional: detail.HotelFees?.Optional || [],
+        mandatory: detail.HotelFees?.Mandatory || [],
+      },
+      roomDetails: Array.isArray(detail.RoomDetails)
+        ? detail.RoomDetails.map((room) => ({
+            roomId: room.RoomId || 0,
+            roomName: room.RoomName || "",
+            roomSize: room.RoomSize || "",
+            roomDescription: room.RoomDescription || "",
+            imageURL: Array.isArray(room.imageURL) ? room.imageURL : [],
+          }))
+        : [],
+    });
+
+    const buildHotelEnrichmentPayload = (detail = {}) => ({
+      hotelAddress: detail.Address || "",
+      starRating: detail.HotelRating ? detail.HotelRating.toString() : "",
+      thumbnail: detail.Image || "",
+    });
+
+    const saveCityProgress = async (cityId, status = "running") => {
+      await TBOSyncProgress.findOneAndUpdate(
+        { syncType: "hotelDetails" },
+        {
+          lastProcessedId: cityId ? cityId.toString() : null,
+          processedCount: hotelDetailsSyncState.processedCities,
+          totalToProcess: hotelDetailsSyncState.totalCities,
+          status,
+          lastUpdateTime: new Date(),
+        },
+        { upsert: true },
+      );
+    };
+
+    const saveSingleHotelDetails = async (hotel) => {
+      hotelDetailsSyncState.lastHotel = hotel.hotelName || hotel.hotelCode || "";
+
+      const res = await hotelService.getStaticHotelDetails(hotel.hotelCode);
+      const details = Array.isArray(res?.HotelDetails) ? res.HotelDetails : [];
+      const matchedDetail =
+        details.find(
+          (detail) => String(detail?.HotelCode || "") === String(hotel.hotelCode),
+        ) || details[0];
+
+      if (!matchedDetail?.HotelCode) {
+        logger.warn(
+          `[HOTEL DETAILS SYNC] No details returned for ${hotel.hotelCode}.`,
+        );
+        return false;
+      }
+
+      await TBOHotelDetails.findOneAndUpdate(
+        { hotelCode: matchedDetail.HotelCode },
+        { $set: buildHotelDetailsPayload(matchedDetail) },
+        { upsert: true },
+      );
+
+      await TBOHotel.updateOne(
+        { hotelCode: matchedDetail.HotelCode },
+        { $set: buildHotelEnrichmentPayload(matchedDetail) },
+      );
+
+      hotelDetailsSyncState.totalDetailsSaved += 1;
+      logger.info(
+        `[HOTEL DETAILS SYNC] Individual save success: ${matchedDetail.HotelCode}`,
+      );
+
+      return true;
+    };
+
     let cities;
     if (targetCityCode) {
-      cities = await TBOCity.find({ cityCode: targetCityCode });
+      cities = await TBOCity.find({ cityCode: targetCityCode }).lean();
     } else {
-      logger.info("[HOTEL DETAILS SYNC] Fetching India cities first...");
-      const indiaCities = await TBOCity.find({ countryCode: "IN" }).sort({ cityName: 1 });
-      const otherCities = await TBOCity.find({ countryCode: { $ne: "IN" } }).sort({ countryName: 1, cityName: 1 });
-      cities = [...indiaCities, ...otherCities];
+      const allCities = await TBOCity.find({}).lean();
+      cities = sortCitiesByPriority(allCities);
     }
-    
+
     hotelDetailsSyncState.totalCities = cities.length;
     hotelDetailsSyncState.processedCities = 0;
-    hotelDetailsSyncState.totalDetailsSaved = await TBOHotelDetails.countDocuments({});
+    hotelDetailsSyncState.totalHotelsInCity = 0;
+    hotelDetailsSyncState.processedHotelsInCity = 0;
+    hotelDetailsSyncState.totalDetailsSaved =
+      await TBOHotelDetails.countDocuments({});
     hotelDetailsSyncState.errors = [];
     hotelDetailsSyncState.startTime = new Date();
+    hotelDetailsSyncState.endTime = null;
 
-    logger.info(`[HOTEL DETAILS SYNC] Started optimized sync for ${cities.length} cities (India prioritized).`);
+    await saveCityProgress(null, "running");
+
+    logger.info(
+      `[HOTEL DETAILS SYNC] Started sync for ${cities.length} cities. Priority countries: ${priorityCountries
+        .map((country) => country.label)
+        .join(", ")}.`,
+    );
 
     for (const city of cities) {
       hotelDetailsSyncState.lastCity = `${city.cityName}, ${city.countryName}`;
-      
-      // 2. Get all hotels for this city from our local DB
+      hotelDetailsSyncState.lastHotel = "";
+
       const hotels = await TBOHotel.find({ cityCode: city.cityCode }).lean();
-      if (hotels.length > 0) {
-        // Find hotel codes in this city that already have details
-        const hotelCodesInCity = hotels.map(h => h.hotelCode);
-        const existingDetailsCodes = await TBOHotelDetails.find({ 
-          hotelCode: { $in: hotelCodesInCity } 
-        }).distinct("hotelCode");
+      hotelDetailsSyncState.totalHotelsInCity = hotels.length;
+      hotelDetailsSyncState.processedHotelsInCity = 0;
 
-        // Filter out hotels that already have details
-        const hotelsToSync = hotels.filter(h => !existingDetailsCodes.includes(h.hotelCode));
+      if (hotels.length === 0) {
+        logger.info(
+          `[HOTEL DETAILS SYNC] Skipping ${city.cityName} - No hotels found in TBOHotel.`,
+        );
+        hotelDetailsSyncState.processedCities++;
+        await saveCityProgress(city._id);
+        continue;
+      }
 
-        if (hotelsToSync.length === 0) {
-          logger.info(`[HOTEL DETAILS SYNC] ⏭️ Skipping ${city.cityName} - All ${hotels.length} hotels already have details.`);
-          hotelDetailsSyncState.processedCities++;
-          hotelDetailsSyncState.processedHotelsInCity = hotels.length;
+      const hotelCodesInCity = hotels
+        .map((hotel) => String(hotel.hotelCode || ""))
+        .filter(Boolean);
+      const existingDetailsCodes = await TBOHotelDetails.find({
+        hotelCode: { $in: hotelCodesInCity },
+      }).distinct("hotelCode");
+      const existingDetailsCodeSet = new Set(
+        existingDetailsCodes.map((code) => String(code)),
+      );
+
+      const hotelsToSync = hotels.filter(
+        (hotel) =>
+          hotel.hotelCode &&
+          !existingDetailsCodeSet.has(String(hotel.hotelCode)),
+      );
+
+      hotelDetailsSyncState.processedHotelsInCity =
+        hotels.length - hotelsToSync.length;
+
+      if (hotelsToSync.length === 0) {
+        logger.info(
+          `[HOTEL DETAILS SYNC] Skipping ${city.cityName} - All ${hotels.length} hotels already have details.`,
+        );
+        hotelDetailsSyncState.processedCities++;
+        await saveCityProgress(city._id);
+        continue;
+      }
+
+      logger.info(
+        `[HOTEL DETAILS SYNC] Processing ${city.cityName}: ${hotelsToSync.length} missing out of ${hotels.length} total.`,
+      );
+
+      const batchSize = 10;
+      for (let index = 0; index < hotelsToSync.length; index += batchSize) {
+        const batch = hotelsToSync.slice(index, index + batchSize);
+        const hotelCodes = batch
+          .map((hotel) => hotel.hotelCode)
+          .filter(Boolean)
+          .join(",");
+
+        if (!hotelCodes) {
+          hotelDetailsSyncState.processedHotelsInCity += batch.length;
           continue;
         }
 
-        logger.info(`[HOTEL DETAILS SYNC] 🔄 Processing ${city.cityName}: ${hotelsToSync.length} new/missing out of ${hotels.length} total.`);
-        hotelDetailsSyncState.totalHotelsInCity = hotels.length;
-        hotelDetailsSyncState.processedHotelsInCity = hotels.length - hotelsToSync.length;
+        try {
+          hotelDetailsSyncState.lastHotel =
+            batch[0].hotelName || batch[0].hotelCode || "";
 
-        // OPTIMIZATION: Process hotels in batches of 10 (TBO Static API can struggle with larger batches)
-        const batchSize = 10;
-        for (let i = 0; i < hotelsToSync.length; i += batchSize) {
-          const batch = hotelsToSync.slice(i, i + batchSize);
-          const hotelCodes = batch.map(h => h.hotelCode).join(",");
+          const res = await hotelService.getStaticHotelDetails(hotelCodes);
+          const returnedDetails = Array.isArray(res?.HotelDetails)
+            ? res.HotelDetails.filter((detail) => detail?.HotelCode)
+            : [];
+          const batchHotelCodes = new Set(
+            batch.map((hotel) => String(hotel.hotelCode)),
+          );
 
-          try {
-            hotelDetailsSyncState.lastHotel = `Batch: ${batch[0].hotelName || batch[0].hotelCode} (+${batch.length - 1} more)`;
+          const matchedDetails = returnedDetails.filter((detail) =>
+            batchHotelCodes.has(String(detail.HotelCode)),
+          );
 
-            const res = await hotelService.getStaticHotelDetails(hotelCodes);
+          const detailOps = matchedDetails.map((detail) => ({
+            updateOne: {
+              filter: { hotelCode: detail.HotelCode },
+              update: { $set: buildHotelDetailsPayload(detail) },
+              upsert: true,
+            },
+          }));
 
-            if (res && res.HotelDetails && Array.isArray(res.HotelDetails)) {
-// ... (rest of the logic remains same)
-              if (detailOps.length > 0) {
-                await TBOHotelDetails.bulkWrite(detailOps, { ordered: false });
-                await TBOHotel.bulkWrite(enrichmentOps, { ordered: false });
-                hotelDetailsSyncState.totalDetailsSaved += detailOps.length;
-              }
-            }
+          const enrichmentOps = matchedDetails.map((detail) => ({
+            updateOne: {
+              filter: { hotelCode: detail.HotelCode },
+              update: { $set: buildHotelEnrichmentPayload(detail) },
+            },
+          }));
 
-            hotelDetailsSyncState.processedHotelsInCity += batch.length;
-            
-            logger.info(`[HOTEL DETAILS SYNC] ✅ ${city.cityName} (Batch ${Math.floor(i / batchSize) + 1}): Processed ${batch.length} | DB Total: ${hotelDetailsSyncState.totalDetailsSaved}`);
-
-            // Respect TBO rate limits - with batching we can afford a smaller delay
-            await new Promise(r => setTimeout(r, 500));
-          } catch (error) {
-            logger.warn(`[HOTEL DETAILS SYNC] ⚠️ Batch failed starting ${batch[0].hotelCode} (${error.message}). Retrying individually...`);
-            
-            for (const hotel of batch) {
-              try {
-                const res = await hotelService.getStaticHotelDetails(hotel.hotelCode);
-                
-                if (res && res.HotelDetails && Array.isArray(res.HotelDetails) && res.HotelDetails.length > 0) {
-                  const d = res.HotelDetails[0];
-                  
-                  // Save individual record
-                  await TBOHotelDetails.findOneAndUpdate(
-                    { hotelCode: d.HotelCode },
-                    {
-                      $set: {
-                        hotelCode:       d.HotelCode,
-                        hotelName:       d.HotelName        || "",
-                        description:     d.Description      || "",
-                        address:         d.Address          || "",
-                        pinCode:         d.PinCode          || "",
-                        cityId:          d.CityId           || "",
-                        cityName:        d.CityName         || "",
-                        countryName:     d.CountryName      || "",
-                        countryCode:     d.CountryCode      || "",
-                        phoneNumber:     d.PhoneNumber      || "",
-                        email:           d.Email            || "",
-                        faxNumber:       d.FaxNumber        || "",
-                        hotelWebsiteUrl: d.HotelWebsiteUrl  || "",
-                        map:             d.Map              || "",
-                        hotelRating:     d.HotelRating      || 0,
-                        checkInTime:     d.CheckInTime      || "",
-                        checkOutTime:    d.CheckOutTime     || "",
-                        image:           d.Image            || "",
-                        images:          Array.isArray(d.Images) ? d.Images : [],
-                        hotelFacilities: Array.isArray(d.HotelFacilities) ? d.HotelFacilities : [],
-                        attractions:     d.Attractions ? JSON.stringify(d.Attractions) : "",
-                        hotelFees: {
-                          optional:  d.HotelFees?.Optional  || [],
-                          mandatory: d.HotelFees?.Mandatory || [],
-                        },
-                        roomDetails: Array.isArray(d.RoomDetails)
-                          ? d.RoomDetails.map(r => ({
-                              roomId:          r.RoomId          || 0,
-                              roomName:        r.RoomName        || "",
-                              roomSize:        r.RoomSize        || "",
-                              roomDescription: r.RoomDescription || "",
-                              imageURL:        Array.isArray(r.imageURL) ? r.imageURL : [],
-                            }))
-                          : [],
-                      },
-                    },
-                    { upsert: true }
-                  );
-
-                  // Individual Enrichment
-                  await TBOHotel.updateOne(
-                    { hotelCode: d.HotelCode },
-                    {
-                      $set: {
-                        hotelAddress: d.Address || "",
-                        starRating: d.HotelRating ? d.HotelRating.toString() : "",
-                        thumbnail: d.Image || "",
-                      },
-                    }
-                  );
-
-                  hotelDetailsSyncState.totalDetailsSaved++;
-                  logger.info(`[HOTEL DETAILS SYNC] ✅ Individual Retry Success: ${d.HotelCode}`);
-                }
-              } catch (retryError) {
-                logger.error(`[HOTEL DETAILS SYNC] ❌ Individual Retry Failed for ${hotel.hotelCode}: ${retryError.message}`);
-                hotelDetailsSyncState.errors.push({ hotelCode: hotel.hotelCode, error: retryError.message });
-              }
-              
-              // Small delay between individual retries to be safe
-              await new Promise(r => setTimeout(r, 200));
-            }
-            hotelDetailsSyncState.processedHotelsInCity += batch.length;
+          if (detailOps.length > 0) {
+            await TBOHotelDetails.bulkWrite(detailOps, { ordered: false });
           }
+
+          if (enrichmentOps.length > 0) {
+            await TBOHotel.bulkWrite(enrichmentOps, { ordered: false });
+          }
+
+          hotelDetailsSyncState.totalDetailsSaved += detailOps.length;
+
+          const returnedHotelCodeSet = new Set(
+            matchedDetails.map((detail) => String(detail.HotelCode)),
+          );
+          const missingHotels = batch.filter(
+            (hotel) => !returnedHotelCodeSet.has(String(hotel.hotelCode)),
+          );
+
+          if (missingHotels.length > 0) {
+            logger.warn(
+              `[HOTEL DETAILS SYNC] Batch returned ${matchedDetails.length}/${batch.length} details for ${city.cityName}. Retrying ${missingHotels.length} missing hotels individually.`,
+            );
+
+            for (const hotel of missingHotels) {
+              try {
+                await saveSingleHotelDetails(hotel);
+              } catch (retryError) {
+                logger.error(
+                  `[HOTEL DETAILS SYNC] Individual retry failed for ${hotel.hotelCode}: ${retryError.message}`,
+                );
+                hotelDetailsSyncState.errors.push({
+                  city: city.cityName,
+                  hotelCode: hotel.hotelCode,
+                  error: retryError.message,
+                });
+              }
+
+              await wait(200);
+            }
+          }
+
+          hotelDetailsSyncState.processedHotelsInCity += batch.length;
+
+          logger.info(
+            `[HOTEL DETAILS SYNC] ${city.cityName} (Batch ${Math.floor(index / batchSize) + 1}): processed ${batch.length}, total saved ${hotelDetailsSyncState.totalDetailsSaved}.`,
+          );
+
+          await wait(500);
+        } catch (error) {
+          logger.warn(
+            `[HOTEL DETAILS SYNC] Batch failed for ${city.cityName} starting with ${batch[0].hotelCode} (${error.message}). Retrying individually.`,
+          );
+
+          for (const hotel of batch) {
+            try {
+              await saveSingleHotelDetails(hotel);
+            } catch (retryError) {
+              logger.error(
+                `[HOTEL DETAILS SYNC] Individual retry failed for ${hotel.hotelCode}: ${retryError.message}`,
+              );
+              hotelDetailsSyncState.errors.push({
+                city: city.cityName,
+                hotelCode: hotel.hotelCode,
+                error: retryError.message,
+              });
+            }
+
+            await wait(200);
+          }
+
+          hotelDetailsSyncState.processedHotelsInCity += batch.length;
         }
       }
 
       hotelDetailsSyncState.processedCities++;
-      
-      // Save progress checkpoint at city level
-      await TBOSyncProgress.findOneAndUpdate(
-        { syncType: "hotelDetails" },
-        { 
-          lastProcessedId: city._id,
-          processedCount: hotelDetailsSyncState.processedCities,
-          totalToProcess: hotelDetailsSyncState.totalCities,
-          status: "running",
-          lastUpdateTime: new Date()
-        },
-        { upsert: true }
-      );
+      await saveCityProgress(city._id);
     }
 
     hotelDetailsSyncState.endTime = new Date();
-    await TBOSyncProgress.findOneAndUpdate({ syncType: "hotelDetails" }, { status: "completed" });
-    logger.info(`[HOTEL DETAILS SYNC] 🎉 OPTIMIZED COMPLETE! Saved ${hotelDetailsSyncState.totalDetailsSaved} total hotel details.`);
+    hotelDetailsSyncState.totalDetailsSaved =
+      await TBOHotelDetails.countDocuments({});
+    await saveCityProgress(null, "completed");
+    logger.info(
+      `[HOTEL DETAILS SYNC] Complete. Total hotel details in DB: ${hotelDetailsSyncState.totalDetailsSaved}.`,
+    );
   } catch (error) {
     logger.error("[HOTEL DETAILS SYNC] Critical failure:", error.message);
+    await TBOSyncProgress.findOneAndUpdate(
+      { syncType: "hotelDetails" },
+      {
+        processedCount: hotelDetailsSyncState.processedCities,
+        totalToProcess: hotelDetailsSyncState.totalCities,
+        status: "failed",
+        lastUpdateTime: new Date(),
+      },
+      { upsert: true },
+    );
   } finally {
     hotelDetailsSyncState.isSyncing = false;
   }

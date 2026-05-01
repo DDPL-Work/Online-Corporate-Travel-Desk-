@@ -96,6 +96,8 @@ export const searchHotels = createAsyncThunk(
       return {
         hotels,
         pagination,
+        filterMeta: data?.data?.filterMeta || null,
+        searchMeta: data?.data?.searchMeta || null,
         traceId: data?.data?.traceId || data?.data?.TraceId || null,
         page,
         limit,

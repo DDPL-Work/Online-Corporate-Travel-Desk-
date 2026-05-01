@@ -10,7 +10,9 @@ const {
   getPendingFlightRequestsForApprover,
   getApprovedFlightRequestsForApprover,
   getRejectedFlightRequestsForApprover,
-  getTeamBookedFlightRequests,
+   getTeamBookedFlightRequests,
+  getTeamExecutedFlightRequestById,
+  getTeamExecutedHotelRequestById,
 } = require("../controllers/manager.controller");
 const {
   verifyToken,
@@ -74,6 +76,16 @@ router.get(
   "/flight/team-executed-requests",
   authorizeRoles("manager"),
   getTeamBookedFlightRequests
+);
+router.get(
+  "/flight/team-executed-requests/:id",
+  authorizeRoles("manager"),
+  getTeamExecutedFlightRequestById
+);
+router.get(
+  "/hotel/team-executed-requests/:id",
+  authorizeRoles("manager"),
+  getTeamExecutedHotelRequestById
 );
 
 module.exports = router;

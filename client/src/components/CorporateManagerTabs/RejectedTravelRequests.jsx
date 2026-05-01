@@ -58,7 +58,6 @@ function normalize(rejectedRequests) {
       employee: employeeName,
       employeeMail: employeeEmail,
 
-      department: "N/A",
       type:
         r.bookingType === "flight" || r.flightRequest ? "Flight" : "Hotel",
 
@@ -95,10 +94,7 @@ function FlightSection({ allRequests, loading }) {
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   const flightRequests = allRequests.filter((r) => r.type === "Flight");
-  const departments = [
-    "All",
-    ...new Set(flightRequests.map((r) => r.department)),
-  ];
+  
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -106,14 +102,13 @@ function FlightSection({ allRequests, loading }) {
       const rejDate = new Date(r.rejectedDate);
       const dateOk =
         rejDate >= new Date(startDate) && rejDate <= new Date(endDate);
-      const deptOk = deptFilter === "All" || r.department === deptFilter;
       const searchOk =
         !q ||
         r.employee.toLowerCase().includes(q) ||
         r.destination.toLowerCase().includes(q) ||
         r.rejectedBy.toLowerCase().includes(q) ||
         r.id.toString().includes(q);
-      return dateOk && deptOk && searchOk;
+      return dateOk && searchOk;
     });
   }, [search, startDate, endDate, deptFilter, flightRequests]);
 
@@ -147,14 +142,7 @@ function FlightSection({ allRequests, loading }) {
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
         />
-        <StatCard
-          label="Departments"
-          value={new Set(filtered.map((r) => r.department)).size}
-          Icon={FiUser}
-          borderCls="border-amber-500"
-          iconBgCls="bg-amber-50"
-          iconColorCls="text-amber-600"
-        />
+      
       </div>
 
       {/* Filters */}
@@ -201,23 +189,7 @@ function FlightSection({ allRequests, loading }) {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiFilter size={10} /> Department
-              </>
-            }
-          >
-            <select
-              value={deptFilter}
-              onChange={(e) => setDept(e.target.value)}
-              className={selectCls}
-            >
-              {departments.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
-          </LabeledField>
+         
         </div>
       </div>
 
@@ -229,7 +201,6 @@ function FlightSection({ allRequests, loading }) {
               <tr className="bg-red-700 text-red-100">
                 <Th>Request ID</Th>
                 <Th>Employee</Th>
-                <Th>Department</Th>
                 <Th>Destination</Th>
                 <Th>Rejected Date</Th>
                 <Th>Rejected By</Th>
@@ -280,11 +251,7 @@ function FlightSection({ allRequests, loading }) {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="px-2.5 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600 font-medium">
-                        {r.department}
-                      </span>
-                    </td>
+                    
                     <td className="px-4 py-3 text-[13px] text-slate-700 font-medium">
                       {r.destination}
                     </td>
@@ -365,10 +332,7 @@ function HotelSection({ allRequests, loading }) {
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   const hotelRequests = allRequests.filter((r) => r.type === "Hotel");
-  const departments = [
-    "All",
-    ...new Set(hotelRequests.map((r) => r.department)),
-  ];
+ 
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -376,14 +340,13 @@ function HotelSection({ allRequests, loading }) {
       const rejDate = new Date(r.rejectedDate);
       const dateOk =
         rejDate >= new Date(startDate) && rejDate <= new Date(endDate);
-      const deptOk = deptFilter === "All" || r.department === deptFilter;
       const searchOk =
         !q ||
         r.employee.toLowerCase().includes(q) ||
         r.destination.toLowerCase().includes(q) ||
         r.rejectedBy.toLowerCase().includes(q) ||
         r.id.toString().includes(q);
-      return dateOk && deptOk && searchOk;
+      return dateOk && searchOk;
     });
   }, [search, startDate, endDate, deptFilter, hotelRequests]);
 
@@ -417,14 +380,7 @@ function HotelSection({ allRequests, loading }) {
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
         />
-        <StatCard
-          label="Departments"
-          value={new Set(filtered.map((r) => r.department)).size}
-          Icon={FiUser}
-          borderCls="border-amber-500"
-          iconBgCls="bg-amber-50"
-          iconColorCls="text-amber-600"
-        />
+        
       </div>
 
       {/* Filters */}
@@ -471,23 +427,7 @@ function HotelSection({ allRequests, loading }) {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiFilter size={10} /> Department
-              </>
-            }
-          >
-            <select
-              value={deptFilter}
-              onChange={(e) => setDept(e.target.value)}
-              className={selectCls}
-            >
-              {departments.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
-          </LabeledField>
+          
         </div>
       </div>
 

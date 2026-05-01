@@ -18,8 +18,8 @@ const dedupeHotels = (existing = [], incoming = []) => {
   const addList = (list = []) =>
     list.forEach((hotel) => {
       const key =
-        hotel?._index ??
         hotel?.HotelCode ??
+        hotel?._index ??
         `${(hotel?.HotelName || "").trim().toLowerCase()}|${(hotel?.CityName || "").trim().toLowerCase()}|${(hotel?.Address || "").trim().toLowerCase()}`;
 
       if (seen.has(key)) return;
@@ -40,6 +40,8 @@ const hotelSlice = createSlice({
     citiesByCountry: {},
     hotels: [],
     pagination: { total: 0, page: 1, limit: 10, hasMore: false },
+    filterMeta: null,
+    searchMeta: null,
     traceId: null,
     selectedHotel: null,
     searchPayload: null,
@@ -70,6 +72,8 @@ const hotelSlice = createSlice({
     clearHotels: (state) => {
       state.hotels = [];
       state.pagination = { total: 0, page: 1, limit: 10, hasMore: false };
+      state.filterMeta = null;
+      state.searchMeta = null;
       state.traceId = null;
     },
     clearSelectedHotel: (state) => {
@@ -140,6 +144,8 @@ const hotelSlice = createSlice({
           : dedupeHotels(state.hotels, incomingHotels);
 
         state.pagination = pagination;
+        state.filterMeta = action.payload?.filterMeta || state.filterMeta;
+        state.searchMeta = action.payload?.searchMeta || state.searchMeta;
 
         const metaArg = action.meta?.arg;
         const payloadForStore =

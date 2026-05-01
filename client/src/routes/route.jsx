@@ -77,6 +77,8 @@ import TermsOfService from "../Pages/Legal/TermsOfService";
 import PrivacyPolicy from "../Pages/Legal/PrivacyPolicy";
 import ContactUs from "../Pages/Legal/ContactUs";
 import MyReissueRequests from "../components/EmployeeDashboard/MyReissuedRequests";
+import TeamBookingDetails from "../components/CorporateManagerTabs/TeamBookingDetails";
+import TeamHotelBookingDetails from "../components/CorporateManagerTabs/TeamHotelBookingDetails";
 // import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 
 export const appRouter = createBrowserRouter([
@@ -149,6 +151,14 @@ export const appRouter = createBrowserRouter([
               {
                 path: "/manager/total-bookings",
                 element: <BookingsDashboardForManager />,
+              },
+              {
+                path: "/manager/team-booking/:id",
+                element: <TeamBookingDetails />,
+              },
+              {
+                path: "/manager/team-hotel-booking/:id",
+                element: <TeamHotelBookingDetails />,
               },
               {
                 path: "/manager/total-cancelled-bookings",

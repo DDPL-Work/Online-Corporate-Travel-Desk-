@@ -1,4 +1,5 @@
-﻿import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import {
   FiSearch,
@@ -31,13 +32,11 @@ import {
 } from "./Modal/BookingRequestDetailsModal";
 import { Pagination } from "./Shared/Pagination";
 
-// â”€â”€ FLIGHT SECTION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function FlightSection() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
-  const [selectedBooking, setSelectedBooking] = useState(null);
-
   const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
 
@@ -90,7 +89,6 @@ function FlightSection() {
             `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim() ||
             b.userId?.email ||
             "N/A",
-          department: b.corporateId || "N/A",
           destination:
             lastOnward?.destination?.city ||
             lastOnward?.destination?.airportCode ||
@@ -115,7 +113,6 @@ function FlightSection() {
       );
   }, [flightBookings, today]);
 
-  const departments = ["All", ...new Set(flightTrips.map((t) => t.department))];
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -124,13 +121,12 @@ function FlightSection() {
       const dateOk =
         (!startDate || depDate >= new Date(startDate)) &&
         (!endDate || depDate <= new Date(endDate));
-      const deptOk = deptFilter === "All" || t.department === deptFilter;
       const searchOk =
         !q ||
         t.employee.toLowerCase().includes(q) ||
         t.destination.toLowerCase().includes(q) ||
         t.id.toString().includes(q);
-      return dateOk && deptOk && searchOk;
+      return dateOk && searchOk;
     });
   }, [search, startDate, endDate, deptFilter, flightTrips]);
 
@@ -171,14 +167,7 @@ function FlightSection() {
           iconBgCls="bg-amber-50"
           iconColorCls="text-amber-600"
         />
-        <StatCard
-          label="Departments"
-          value={new Set(filtered.map((t) => t.department)).size}
-          Icon={FiUser}
-          borderCls="border-violet-500"
-          iconBgCls="bg-violet-50"
-          iconColorCls="text-violet-600"
-        />
+        
       </div>
 
       {/* Filters */}
@@ -225,23 +214,7 @@ function FlightSection() {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiFilter size={10} /> Department
-              </>
-            }
-          >
-            <select
-              value={deptFilter}
-              onChange={(e) => setDept(e.target.value)}
-              className={selectCls}
-            >
-              {departments.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
-          </LabeledField>
+        
         </div>
       </div>
 
@@ -253,7 +226,6 @@ function FlightSection() {
               <tr className="bg-[#0A4D68] text-[#bfdbfe]">
                 <Th>Trip ID</Th>
                 <Th>Employee</Th>
-                {/* <Th>Destination</Th> */}
                 <Th>Departure Date</Th>
                 <Th>Airline</Th>
                 <Th>Status</Th>
@@ -295,20 +267,10 @@ function FlightSection() {
                           <span className="font-semibold text-[13px] text-slate-800">
                             {t.employee}
                           </span>
-                          <span className="text-xs text-[#0A4D68] font-medium">
-                            {t.department}
-                          </span>
                         </div>
                       </div>
                     </td>
-                    {/* <td className="px-4 py-3">
-                      <span className="px-2.5 py-0.5 text-xs rounded-full bg-blue-50 text-[#0A4D68] font-medium">
-                        {t.department}
-                      </span>
-                    </td> */}
-                    {/* <td className="px-4 py-3 text-[13px] text-slate-700 font-medium">
-                      {t.destination}
-                    </td> */}
+                    
                     <td className="px-4 py-3 text-[13px] text-slate-500">
                       {t.departureDate
                         ? new Date(t.departureDate).toLocaleDateString(
@@ -336,7 +298,7 @@ function FlightSection() {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setSelectedBooking(t.raw)}
+                        onClick={() => navigate(`/manager/team-booking/${t.id}`)}
                         className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] flex items-center gap-1"
                       >
                         <FiEye size={12} /> View
@@ -371,24 +333,18 @@ function FlightSection() {
           onPageChange={setCurrentPage}
         />
       </div>
-      {selectedBooking && (
-        <FlightBookingModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-        />
-      )}
     </div>
   );
 }
 
-// â”€â”€ HOTEL SECTION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————————————————————————————————————————————————————————
 function HotelSection() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
-  const [selectedBooking, setSelectedBooking] = useState(null);
 
   const {
     teamExecutedHotelRequests: hotelBookings,
@@ -440,7 +396,6 @@ function HotelSection() {
           id: b._id,
           employee: employeeName,
           employeeId: traveller.email || traveller._id || "—",
-          department: b.corporateId || "N/A",
           destination:
             b.hotelRequest?.selectedHotel?.hotelName ||
             b.bookingSnapshot?.hotelName ||
@@ -454,7 +409,6 @@ function HotelSection() {
       .sort((a, b) => new Date(a.departureDate) - new Date(b.departureDate));
   }, [hotelBookings, today]);
 
-  const departments = ["All", ...new Set(hotelTrips.map((t) => t.department))];
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -463,13 +417,12 @@ function HotelSection() {
       const dateOk =
         (!startDate || depDate >= new Date(startDate)) &&
         (!endDate || depDate <= new Date(endDate));
-      const deptOk = deptFilter === "All" || t.department === deptFilter;
       const searchOk =
         !q ||
         t.employee.toLowerCase().includes(q) ||
         t.destination.toLowerCase().includes(q) ||
         t.id.toString().includes(q);
-      return dateOk && deptOk && searchOk;
+      return dateOk && searchOk;
     });
   }, [search, startDate, endDate, deptFilter, hotelTrips]);
 
@@ -508,14 +461,6 @@ function HotelSection() {
           iconBgCls="bg-amber-50"
           iconColorCls="text-amber-600"
         />
-        {/* <StatCard
-          label="Departments"
-          value={new Set(filtered.map((t) => t.department)).size}
-          Icon={FiUser}
-          borderCls="border-violet-500"
-          iconBgCls="bg-violet-50"
-          iconColorCls="text-violet-600"
-        /> */}
       </div>
 
       {/* Filters */}
@@ -531,7 +476,7 @@ function HotelSection() {
             <SearchBar
               value={search}
               onChange={setSearch}
-              placeholder="Name, destination, trip IDâ€¦"
+              placeholder="Name, destination, trip ID…"
             />
           </LabeledField>
           <LabeledField
@@ -561,23 +506,6 @@ function HotelSection() {
               onChange={(e) => setEndDate(e.target.value)}
               className={dateCls}
             />
-          </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiFilter size={10} /> Department
-              </>
-            }
-          >
-            <select
-              value={deptFilter}
-              onChange={(e) => setDept(e.target.value)}
-              className={selectCls}
-            >
-              {departments.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
           </LabeledField>
         </div>
       </div>
@@ -658,7 +586,7 @@ function HotelSection() {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setSelectedBooking(t.raw)}
+                        onClick={() => navigate(`/manager/team-hotel-booking/${t.id}`)}
                         className="px-3 py-1 text-xs font-semibold bg-[#088395] text-white rounded-md hover:bg-[#066b78] flex items-center gap-1"
                       >
                         <FiEye size={12} /> View
@@ -679,12 +607,6 @@ function HotelSection() {
           </span>
         </div>
       </div>
-      {selectedBooking && (
-        <HotelBookingModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-        />
-      )}
     </div>
   );
 }
