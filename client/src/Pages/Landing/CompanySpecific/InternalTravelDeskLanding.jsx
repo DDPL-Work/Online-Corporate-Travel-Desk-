@@ -53,6 +53,7 @@ import { airportDatabase } from "../../../data/airportDatabase";
 import { useFlightSearch } from "../../../context/FlightSearchContext";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
 import { searchFlightsMC } from "../../../Redux/Actions/flight.thunks.MC";
+import { resetFlights } from "../../../Redux/Slice/flightSearchSlice";
 import {
   getPublicBrandingBySlug,
   getPublicBrandingById,
@@ -447,7 +448,6 @@ const HeroWithSearch = ({
   const { publicBranding } = useSelector((s) => s.landingPage);
 
 
-  const [flightLoading, setFlightLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [tripType, setTripType] = useState("one-way");
   const [returnDate, setReturnDate] = useState("");
@@ -567,9 +567,14 @@ const HeroWithSearch = ({
       };
     }
     try {
-      setFlightLoading(true);
-      if (journeyType === 3) await dispatch(searchFlightsMC(payload)).unwrap();
-      else await dispatch(searchFlights(payload)).unwrap();
+      // ✅ Step 1: Clear old results and trigger loading state immediately
+      dispatch(resetFlights());
+      
+      // ✅ Step 2: Trigger the search without waiting (async)
+      if (journeyType === 3) dispatch(searchFlightsMC(payload));
+      else dispatch(searchFlights(payload));
+
+      // ✅ Step 3: Navigate immediately to the results page
       navigate("/search-flight-results", {
         state: {
           searchPayload: payload,
@@ -577,15 +582,7 @@ const HeroWithSearch = ({
         },
       });
     } catch (err) {
-      ToastWithTimer({
-        message:
-          typeof err === "string"
-            ? err
-            : "Flight search failed. Please try again.",
-        type: "error",
-      });
-    } finally {
-      setFlightLoading(false);
+      console.error("Flight Search Trigger Error:", err);
     }
   };
 
@@ -1255,7 +1252,6 @@ const HeroWithSearch = ({
                   )}
                   <SearchBtn
                     type="submit"
-                    loading={flightLoading}
                     label="Search Flights"
                   />
                 </form>

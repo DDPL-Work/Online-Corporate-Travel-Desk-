@@ -1,7 +1,7 @@
 // FlightSearchResults.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import FlightFilterSidebar from "./Filter-Sidebar";
 import OneWayFlightCard from "./One-wayFlightCard";
@@ -9,9 +9,9 @@ import MultiCityFlightCard from "./Multi-cityFlightCard";
 import SelectedTripSummary from "./ReturnFlight/SelectedTripSummary";
 import OnwardFlightList from "./ReturnFlight/OnwardFlightList";
 import ReturnFlightList from "./ReturnFlight/ReturnFlightList";
-import { useLocation } from "react-router-dom";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
 import { searchFlightsMC } from "../../../Redux/Actions/flight.thunks.MC";
+import SearchLoadingModal from "../../../components/common/SearchLoadingModal";
 import ReturnInternationalFlightCard from "./ReturnFlight/ReturnInternationalFlightCard";
 import ResearchableFlightHeader from "./ResearchableFlightHeader";
 
@@ -964,6 +964,15 @@ export default function FlightSearchResults() {
     <div className="min-h-screen bg-gray-50 font-sans">
       <CorporateNavbar />
 
+      {loading && (
+        <SearchLoadingModal
+          type="flight"
+          origin={searchPayload?.origin || fromCity || "Origin"}
+          destination={searchPayload?.destination || toCity || "Destination"}
+          date={departureDate || (searchPayload?.departureDate ? new Date(searchPayload.departureDate).toLocaleDateString("en-IN", { day: '2-digit', month: 'short' }) : "")}
+        />
+      )}
+
       {/* ================= RE-SEARCH STICKY HEADER ================= */}
       <ResearchableFlightHeader
         routeHeader={routeHeader}
@@ -976,9 +985,7 @@ export default function FlightSearchResults() {
         searchPayload={currentSearchPayload || searchPayload}
         onSearch={handleReSearch}
         onBack={() => {
-          const slug = location.state?.companySlug || publicBranding?.companySlug;
-          if (slug) navigate(`/travel`);
-          else window.history.back();
+         navigate(`/travel`, { state: { activeTab: "flight" } });
         }}
       />
 
@@ -1071,12 +1078,6 @@ export default function FlightSearchResults() {
 
           {/* RESULTS */}
           <section className="lg:col-span-9 space-y-4">
-            {loading && (
-              <div className="p-6 text-center text-gray-500">
-                Searching flights…
-              </div>
-            )}
-
             {!loading && noFlightsAfterFilters && (
               <div className="bg-white p-6 rounded-lg text-center text-gray-500">
                 No flights match your filters
