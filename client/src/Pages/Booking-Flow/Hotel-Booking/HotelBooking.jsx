@@ -144,10 +144,12 @@ const HotelBookNow = () => {
     : [];
   // const rawRoom = selectedRooms.rawRoomData || {};
 
-  const hotelImages = 
-    (hotelReq?.selectedHotel?.images?.length > 0 ? hotelReq.selectedHotel.images : null) ||
+  const hotelImages =
+    (hotelReq?.selectedHotel?.images?.length > 0
+      ? hotelReq.selectedHotel.images
+      : null) ||
     (snapshot?.hotelImage ? [snapshot.hotelImage] : null) ||
-    (hotelReq?.selectedRoom?.rawRoomData?.[0]?.images) || 
+    hotelReq?.selectedRoom?.rawRoomData?.[0]?.images ||
     [];
 
   useEffect(() => {

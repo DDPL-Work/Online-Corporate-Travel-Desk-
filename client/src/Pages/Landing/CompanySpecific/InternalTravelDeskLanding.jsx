@@ -53,6 +53,7 @@ import { airportDatabase } from "../../../data/airportDatabase";
 import { useFlightSearch } from "../../../context/FlightSearchContext";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
 import { searchFlightsMC } from "../../../Redux/Actions/flight.thunks.MC";
+import { resetFlights } from "../../../Redux/Slice/flightSearchSlice";
 import {
   getPublicBrandingBySlug,
   getPublicBrandingById,
@@ -63,6 +64,7 @@ import {
   fetchCountries,
   searchHotels,
 } from "../../../Redux/Actions/hotelThunks";
+import { setSearchPayload } from "../../../Redux/Slice/hotelSlice";
 import { CountrySelector } from "../../../components/hotel-search/HotelSearchSubComponents";
 import HotelGuestSelection from "../../../components/hotel-search/HotelGuestSelection";
 import TravelersClassModal from "../../../components/FlightSearchComponents/TravelersClassModal";
@@ -446,7 +448,6 @@ const HeroWithSearch = ({
   const { publicBranding } = useSelector((s) => s.landingPage);
 
 
-  const [flightLoading, setFlightLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [tripType, setTripType] = useState("one-way");
   const [returnDate, setReturnDate] = useState("");
@@ -566,9 +567,14 @@ const HeroWithSearch = ({
       };
     }
     try {
-      setFlightLoading(true);
-      if (journeyType === 3) await dispatch(searchFlightsMC(payload)).unwrap();
-      else await dispatch(searchFlights(payload)).unwrap();
+      // ✅ Step 1: Clear old results and trigger loading state immediately
+      dispatch(resetFlights());
+      
+      // ✅ Step 2: Trigger the search without waiting (async)
+      if (journeyType === 3) dispatch(searchFlightsMC(payload));
+      else dispatch(searchFlights(payload));
+
+      // ✅ Step 3: Navigate immediately to the results page
       navigate("/search-flight-results", {
         state: {
           searchPayload: payload,
@@ -576,15 +582,7 @@ const HeroWithSearch = ({
         },
       });
     } catch (err) {
-      ToastWithTimer({
-        message:
-          typeof err === "string"
-            ? err
-            : "Flight search failed. Please try again.",
-        type: "error",
-      });
-    } finally {
-      setFlightLoading(false);
+      console.error("Flight Search Trigger Error:", err);
     }
   };
 
@@ -743,18 +741,18 @@ const HeroWithSearch = ({
     });
   }, [rooms]);
 
-  const handleHotelSearch = async () => {
+  const handleHotelSearch = () => {
     if (!selectedCityCode || !checkIn || !checkOut) {
       alert("Please select a valid city and fill all required fields");
       return;
     }
-    setHotelLoading(true);
-    setNoResults(false);
+
     const payload = {
       CheckIn: checkIn,
       CheckOut: checkOut,
       CityCode: selectedCityCode,
       CityName: city,
+      CountryCode: country,
       GuestNationality: guestNationality,
       ResponseTime: 23,
       NoOfRooms: rooms,
@@ -767,22 +765,14 @@ const HeroWithSearch = ({
       Filters: { Refundable: false, MealType: "All" },
       SearchFilters: { sortBy: "priceAsc" },
     };
-    try {
-      const result = await dispatch(
-        searchHotels({ payload, page: 1, limit: 10 }),
-      ).unwrap();
-      if (result?.hotels?.length > 0) {
-        navigate("/search-hotel-results", {
-          state: {
-            companySlug: companySlug || publicBranding?.companySlug,
-          },
-        });
-      } else setNoResults(true);
-    } catch (err) {
-      console.error("Hotel search failed:", err);
-    } finally {
-      setHotelLoading(false);
-    }
+
+    dispatch(setSearchPayload(payload));
+    navigate("/search-hotel-results", { 
+      state: { 
+        searchPayload: payload,
+        companySlug: companySlug || publicBranding?.companySlug 
+      } 
+    });
   };
 
   const totalGuests = roomConfigs.reduce(
@@ -1262,7 +1252,6 @@ const HeroWithSearch = ({
                   )}
                   <SearchBtn
                     type="submit"
-                    loading={flightLoading}
                     label="Search Flights"
                   />
                 </form>
@@ -2151,7 +2140,7 @@ export default function InternalTravelDeskLanding() {
     (s) => s.landingPage,
   );
   const [loading, setLoading] = useState(true);
-  const [landingActiveTab, setLandingActiveTab] = useState("flight");
+  const [landingActiveTab, setLandingActiveTab] = useState(location.state?.activeTab || "flight");
 
   // We map publicBranding to branding so the rest of the file continues to work unchanged
   const branding = publicBranding;
@@ -2160,6 +2149,12 @@ export default function InternalTravelDeskLanding() {
     dispatch(logoutUser());
     navigate("/login");
   };
+
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setLandingActiveTab(location.state.activeTab);
+    }
+  }, [location.state?.activeTab]);
 
   useEffect(() => {
     const fetchBranding = async () => {

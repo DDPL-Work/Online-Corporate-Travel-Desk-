@@ -540,11 +540,11 @@ function HotelHeroBanner({
             {totalAdults !== 1 ? "s" : ""}
             {totalChildren > 0 && ` · ${totalChildren} Child${totalChildren !== 1 ? "ren" : ""}`}
           </p>
-          <p className="text-[11px] text-slate-500 truncate">
+          {/* <p className="text-[11px] text-slate-500 truncate">
             {Array.isArray(selectedRoom)
               ? [...new Set(selectedRoom.map((r) => r.RoomTypeName || r.Name?.[0] || r.name))].join(", ")
               : "—"}
-          </p>
+          </p> */}
         </div>
       </div>
     </div>
@@ -569,9 +569,9 @@ function SelectedRoomDetailsCard({
     (Array.isArray(room?.name) ? [...new Set(room.name)].join(", ") : room?.name) ||
     "Room";
 
-  const totalFare = room?.TotalFare || room?.Price?.TotalFare || 0;
-  const totalTax = room?.TotalTax || room?.Price?.Tax || 0;
-  const baseFare = totalFare - totalTax;
+  const baseFare = room?.NetAmount || 0;
+  const totalTax = room?.NetTax || 0;
+  const totalFare = baseFare + totalTax;
 
   const cancelPolicies =
     room?.CancelPolicies || displayRoom?.CancelPolicies || [];
@@ -693,6 +693,41 @@ function SelectedRoomDetailsCard({
                 </span>
               </div>
             )}
+
+            {/* Supplements */}
+            <div className="mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                Supplements
+              </p>
+              {room?.Supplements?.[0]?.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  {room.Supplements[0].map((sup, idx) => (
+                    <div key={idx} className="rounded-xl border border-slate-200 bg-white p-3 flex justify-between items-center shadow-sm hover:border-[#C9A84C]/50 transition-all">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-slate-800 capitalize">
+                          {sup.Description?.replace(/_/g, " ")}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {sup.Type?.replace(/([A-Z])/g, " $1").trim()}
+                        </span>
+                      </div>
+                      <div className="text-right flex flex-col">
+                        <span className="text-sm font-black text-[#C9A84C]">
+                          {sup.Price === 0 ? "Included" : `${sup.Currency} ${sup.Price}`}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 flex items-center gap-2">
+                  <FiInfo size={13} className="text-[#C9A84C]" />
+                  <span className="text-[11px] text-slate-500">
+                    No supplements are available for this room
+                  </span>
+                </div>
+              )}
+            </div>
 
             {/* Fare Breakdown */}
             <div>
@@ -1208,25 +1243,50 @@ const HotelReviewBooking = () => {
   );
   const countries = Country.getAllCountries();
   const selectedRooms = rooms || [];
-  const totalFare = selectedRooms.reduce(
-    (sum, r) => sum + (r.TotalFare || r.Price?.TotalFare || 0),
+  
+  const preBookBaseFare = preBookRooms.reduce(
+    (sum, r) => sum + (r.NetAmount || r.TotalFare || r.Price?.TotalFare || 0),
     0,
   );
-  const totalTax = selectedRooms.reduce(
-    (sum, r) => sum + (r.TotalTax || r.Price?.Tax || 0),
+  const preBookTax = preBookRooms.reduce(
+    (sum, r) => sum + (r.NetTax || r.TotalTax || r.Price?.Tax || 0),
     0,
   );
+
+  let baseFare = preBookBaseFare > 0 
+    ? preBookBaseFare 
+    : selectedRooms.reduce(
+        (sum, r) => sum + (r.NetAmount || r.TotalFare || r.Price?.TotalFare || 0),
+        0,
+      );
+
+  let tax = preBookBaseFare > 0
+    ? preBookTax
+    : selectedRooms.reduce(
+        (sum, r) => sum + (r.NetTax || r.TotalTax || r.Price?.Tax || 0),
+        0,
+      );
+
+  const totalFare = baseFare + tax;
   const price = displayRoom?.Price || displayRoom || {};
-  let baseFare = price.BaseFare;
-  let tax = price.Tax || displayRoom?.Price?.Tax || 0;
-  if (!baseFare && totalFare) baseFare = totalFare - tax;
   const search = searchParams;
 
   const validateTravellers = (travellers) => {
     const errors = {}; // { travelerId: { field: "message" } }
 
-    const nameRegex = /^[A-Za-z]{2,30}$/;
-    const emailRegex = /^[a-zA-Z0-9.]+@[a-zA-Z0-9.]+\.[a-zA-Z]{2,}$/; // Simplified as requested
+    const minLen = validation?.PaxNameMinLength || 2;
+    const maxLen = validation?.PaxNameMaxLength || 50;
+    const allowSpace = validation?.SpaceAllowed ?? true;
+    const allowSpecial = validation?.SpecialCharAllowed ?? false;
+    const allowSameName = validation?.SamePaxNameAllowed ?? true;
+
+    let namePattern = "^[A-Za-z";
+    if (allowSpace) namePattern += "\\s";
+    if (allowSpecial) namePattern += ".,'-";
+    namePattern += `]{${minLen},${maxLen}}$`;
+    const nameRegex = new RegExp(namePattern);
+
+    const emailRegex = /^[a-zA-Z0-9.]+@[a-zA-Z0-9.]+\.[a-zA-Z]{2,}$/; 
     const allowedTitles = ["Mr", "Ms", "Mrs", "Miss", "Master"];
 
     const fullNameSet = new Set();
@@ -1244,8 +1304,8 @@ const HotelReviewBooking = () => {
 
       // FIRST NAME
       if (!fName || !nameRegex.test(fName)) {
-        tErrors.firstName = "First name must be 2-30 alphabets";
-      } else if (firstNameSet.has(fName.toLowerCase())) {
+        tErrors.firstName = `First name must be ${minLen}-${maxLen} characters${!allowSpace ? " (no spaces)" : ""}`;
+      } else if (!allowSameName && firstNameSet.has(fName.toLowerCase())) {
         tErrors.firstName = "First name must be unique";
       } else {
         firstNameSet.add(fName.toLowerCase());
@@ -1253,14 +1313,19 @@ const HotelReviewBooking = () => {
 
       // LAST NAME
       if (!lName || !nameRegex.test(lName)) {
-        tErrors.lastName = "Last name must be 2-30 alphabets";
+        tErrors.lastName = `Last name must be ${minLen}-${maxLen} characters${!allowSpace ? " (no spaces)" : ""}`;
+      }
+
+      // SAME NAME CHECK
+      if (!allowSameName && fName && lName && fName.toLowerCase() === lName.toLowerCase()) {
+        tErrors.lastName = "First and Last name cannot be identical";
       }
 
       // DUPLICATE FULL NAME CHECK
       const mName = t.middleName?.trim() || "";
       const fullName = `${fName}-${mName}-${lName}`.toLowerCase();
       if (fName && lName) {
-        if (fullNameSet.has(fullName)) {
+        if (!allowSameName && fullNameSet.has(fullName)) {
           tErrors.lastName = "Duplicate full name detected";
         } else {
           fullNameSet.add(fullName);
@@ -1291,8 +1356,18 @@ const HotelReviewBooking = () => {
       // PAN CARD
       const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
       const isAdult = t.paxType === 1 && Number(t.age) > 18;
+      const panRequiredCount = validation?.PanCountRequired || 0;
       
-      if (requiredFlags.isPANRequired && isAdult) {
+      let isPanMandatoryForThisTraveller = false;
+      if (validation?.PanMandatory) {
+        if (panRequiredCount > 0) {
+          isPanMandatoryForThisTraveller = index < panRequiredCount;
+        } else {
+          isPanMandatoryForThisTraveller = isAdult;
+        }
+      }
+
+      if (isPanMandatoryForThisTraveller) {
         if (!t.panCard) {
           tErrors.panCard = "PAN Card is mandatory";
         } else if (!panRegex.test(t.panCard)) {
@@ -1473,7 +1548,7 @@ const HotelReviewBooking = () => {
       purposeOfTravel,
       gstDetails,
       pricingSnapshot: {
-        totalAmount: displayRoom?.TotalFare,
+        totalAmount: totalFare,
         currency: displayRoom?.Currency || "INR",
       },
       bookingSnapshot: {
@@ -1487,7 +1562,7 @@ const HotelReviewBooking = () => {
           displaySearchParams?.checkIn,
           displaySearchParams?.checkOut,
         ),
-        amount: displayRoom?.TotalFare,
+        amount: totalFare,
         currency: displayRoom?.Currency || "INR",
       },
     };

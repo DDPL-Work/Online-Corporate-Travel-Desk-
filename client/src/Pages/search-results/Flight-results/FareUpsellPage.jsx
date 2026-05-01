@@ -923,7 +923,23 @@ export default function FareUpsellPage() {
 
   function handleSelect(fare) {
     if (!isDomesticRT) {
-      dispatch(selectFareFamily(fare));
+      // For non-domestic RT, navigate to booking details page
+      const isInternational = isInternationalFlight(fare.rawResult);
+      const journeyType = activeJourneyType || 1; // 1 = one-way, 2 = round-trip
+      
+      const bookingPath = journeyType === 2 
+        ? "/round-trip-flight/booking"
+        : "/one-way-flight/booking";
+      
+      navigate(bookingPath, {
+        state: {
+          selectedFlight: fare.rawResult,
+          rawFlightData: fare.rawResult,
+          searchParams: { traceId, passengers: getPassengerCounts(searchPayload) },
+          tripType: journeyType === 2 ? "round-trip" : "one-way",
+          isInternational,
+        },
+      });
       return;
     }
 
