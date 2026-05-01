@@ -93,8 +93,8 @@ const hotelBookingRequestSchema = new mongoose.Schema(
 
         panCard: String,
         PassportNo: String,
-        	PassportIssueDate: Date,
-          PassportExpDate: Date,
+        PassportIssueDate: Date,
+        PassportExpDate: Date,
 
         isLeadPassenger: Boolean,
         paxType: String, // lead | adult | child
@@ -141,6 +141,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
         address: String,
         city: String,
         country: String,
+        images: [String],
       },
 
       rawHotelData: mongoose.Schema.Types.Mixed,
@@ -229,6 +230,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
 
     bookingSnapshot: {
       hotelName: String,
+      hotelImage: String,
       city: String,
       checkInDate: Date,
       checkOutDate: Date,

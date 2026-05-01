@@ -1,9 +1,11 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const SuperAdmin = require("../models/SuperAdmin.model"); // ✅ REQUIRED
+const SuperAdmin = require("../models/SuperAdmin.model");
 const ApiError = require("../utils/ApiError");
+const cache = require("../utils/cache");
 
 const SECRET = process.env.JWT_SECRET;
+const USER_CACHE_TTL = 10 * 60; // 10 minutes
 
 exports.verifyToken = async (req, res, next) => {
   try {
@@ -29,74 +31,80 @@ exports.verifyToken = async (req, res, next) => {
 
     // ✅ ✅ HANDLE SUPER ADMIN SEPARATELY
     if (decoded.role === "super-admin") {
-      account = await SuperAdmin.findById(decoded.id);
+      const cacheKey = `user:super-admin:${decoded.id}`;
+      let userData = await cache.get(cacheKey);
 
-      if (!account) {
-        return res.status(401).json({
-          success: false,
-          message: "Super Admin not found",
-        });
+      if (!userData) {
+        account = await SuperAdmin.findById(decoded.id);
+        if (!account) {
+          return res.status(401).json({ success: false, message: "Super Admin not found" });
+        }
+        userData = {
+          _id: account._id,
+          id: account._id.toString(),
+          role: "super-admin",
+          roles: ["super-admin"],
+          email: account.email,
+          name: account.name,
+        };
+        await cache.set(cacheKey, userData, USER_CACHE_TTL);
       }
 
-      req.user = {
-        _id: account._id,
-        id: account._id.toString(),
-        role: "super-admin",
-        roles: ["super-admin"],
-        email: account.email,
-        name: account.name,
-      };
-
-      return next(); // ✅ IMPORTANT: STOP HERE
+      req.user = userData;
+      return next();
     }
 
     // ✅ ✅ HANDLE OPS MEMBER
     if (decoded.role === "ops-member") {
-      const OpsMember = require("../models/OpsMember");
-      account = await OpsMember.findById(decoded.id);
+      const cacheKey = `user:ops-member:${decoded.id}`;
+      let userData = await cache.get(cacheKey);
 
-      if (!account || account.status !== "Active" || account.isDeleted) {
-        return res.status(401).json({
-          success: false,
-          message: "OPS Member not found, inactive, or suspended",
-        });
+      if (!userData) {
+        const OpsMember = require("../models/OpsMember");
+        account = await OpsMember.findById(decoded.id);
+        if (!account || account.status !== "Active" || account.isDeleted) {
+          return res.status(401).json({ success: false, message: "OPS Member not found, inactive, or suspended" });
+        }
+        userData = {
+          _id: account._id,
+          id: account._id.toString(),
+          role: "ops-member",
+          specificRole: account.role,
+          department: account.department,
+          permissions: account.permissions,
+          email: account.email,
+          name: account.name,
+        };
+        await cache.set(cacheKey, userData, USER_CACHE_TTL);
       }
 
-      req.user = {
-        _id: account._id,
-        id: account._id.toString(),
-        role: "ops-member",
-        specificRole: account.role,
-        department: account.department,
-        permissions: account.permissions,
-        email: account.email,
-        name: account.name,
-      };
-
+      req.user = userData;
       return next();
     }
 
-    // ✅ ✅ NORMAL USER FLOW (Travel Admin / Employee)
-    const user = await User.findById(decoded.id);
+    // Normal user flow (Travel Admin / Employee / Manager)
+    const cacheKey = `user:${decoded.role}:${decoded.id}`;
+    let userData = await cache.get(cacheKey);
 
-    if (!user || !user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: "User not found or inactive",
-      });
+    if (!userData) {
+      const user = await User.findById(decoded.id);
+      if (!user || !user.isActive) {
+        return res.status(401).json({ success: false, message: "User not found or inactive" });
+      }
+      userData = {
+        _id: user._id,
+        id: user._id.toString(),
+        role: user.role,
+        roles: [user.role],
+        corporateId: user.corporateId ? user.corporateId.toString() : null,
+        managerRequestStatus: user.managerRequestStatus || "none",
+        email: user.email,
+        name: user.name,
+      };
+      await cache.set(cacheKey, userData, USER_CACHE_TTL);
     }
 
-    req.user = {
-      _id: user._id,
-      id: user._id.toString(),
-      role: user.role,
-      roles: [user.role],
-      corporateId: user.corporateId ? user.corporateId.toString() : null,
-      managerRequestStatus: user.managerRequestStatus || "none",
-      email: user.email,
-      name: user.name,
-    };
-
+    req.user = userData;
     return next();
   } catch (err) {
     return res.status(401).json({

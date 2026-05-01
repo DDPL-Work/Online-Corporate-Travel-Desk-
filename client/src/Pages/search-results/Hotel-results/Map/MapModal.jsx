@@ -1,7 +1,13 @@
 // client\src\Pages\search-results\Hotel-results\Map\MapModal.jsx
 
 // components/MapModal.jsx
-import React, { useEffect, useState, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { FiX, FiSearch, FiMapPin } from "react-icons/fi";
@@ -13,11 +19,9 @@ import {
   MdRemove,
   MdBreakfastDining,
 } from "react-icons/md";
-import { FaCheck } from "react-icons/fa";
 import L from "leaflet";
 import { useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
-import { searchHotels } from "../../../../Redux/Actions/hotelThunks";
+import api from "../../../../API/axios";
 
 /* ── Price Marker Icon ── */
 const createPriceIcon = (price, isActive = false) =>
@@ -56,14 +60,6 @@ const createPriceIcon = (price, isActive = false) =>
     iconAnchor: [35, 34],
   });
 
-const debounce = (fn, delay = 600) => {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), delay);
-  };
-};
-
 /* ── Star Row ── */
 const Stars = ({ rating }) =>
   Array.from({ length: 5 }, (_, i) =>
@@ -74,15 +70,102 @@ const Stars = ({ rating }) =>
     ),
   );
 
+/* Map data helpers */
+const MAP_PAGE_SIZE = 50;
+const DEFAULT_MAP_PAGINATION = {
+  total: 0,
+  page: 1,
+  limit: MAP_PAGE_SIZE,
+  hasMore: false,
+};
+
+const toNumber = (value, fallback = 0) => {
+  if (value === null || value === undefined || value === "") return fallback;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getCheapestRoom = (hotel = {}) => {
+  const rooms = Array.isArray(hotel.Rooms) ? hotel.Rooms.filter(Boolean) : [];
+  if (!rooms.length) return null;
+
+  return rooms.reduce((bestRoom, currentRoom) => {
+    const currentPrice = toNumber(currentRoom?.TotalFare, Number.MAX_SAFE_INTEGER) + toNumber(currentRoom?.TotalTax, 0);
+    const bestPrice = toNumber(bestRoom?.TotalFare, Number.MAX_SAFE_INTEGER) + toNumber(bestRoom?.TotalTax, 0);
+    return currentPrice < bestPrice ? currentRoom : bestRoom;
+  });
+};
+
+const normalizeHotelForMap = (hotel = {}) => {
+  const mapCoords = String(hotel.Map || hotel.map || "");
+  const [rawLat, rawLng] = mapCoords.split("|");
+  const latitude = toNumber(hotel.latitude ?? rawLat, null);
+  const longitude = toNumber(hotel.longitude ?? rawLng, null);
+
+  if (latitude === null || longitude === null) return null;
+
+  const cheapestRoom = getCheapestRoom(hotel);
+  const id = hotel.id || hotel.HotelCode || hotel.hotelCode;
+
+  if (!id) return null;
+
+  const cityName = hotel.cityName || hotel.CityName || "";
+  const countryName = hotel.countryName || hotel.CountryName || "";
+  const address =
+    hotel.address ||
+    hotel.Address ||
+    [cityName, countryName].filter(Boolean).join(", ") ||
+    "Location not available";
+  const existingImages = Array.isArray(hotel.images) ? hotel.images : [];
+  const rawImages = Array.isArray(hotel.Images) ? hotel.Images : [];
+  const images =
+    existingImages.length > 0
+      ? existingImages
+      : rawImages.length > 0
+        ? rawImages
+        : hotel.Image
+          ? [hotel.Image]
+          : [
+              "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800",
+            ];
+
+  return {
+    id,
+    name: hotel.name || hotel.HotelName || "Hotel",
+    address,
+    price: toNumber(hotel.price ?? (toNumber(cheapestRoom?.TotalFare, 0) + toNumber(cheapestRoom?.TotalTax, 0)), 0),
+    rating: toNumber(hotel.rating ?? hotel.StarRating, 0),
+    nights: hotel.nights || cheapestRoom?.DayRates?.[0]?.length || 1,
+    images,
+    refundable:
+      typeof hotel.refundable === "boolean"
+        ? hotel.refundable
+        : Boolean(cheapestRoom?.IsRefundable),
+    meal: hotel.meal || cheapestRoom?.MealType?.replaceAll("_", " ") || "",
+    position: [latitude, longitude],
+    lookupText:
+      `${hotel.name || hotel.HotelName || ""} ${address} ${cityName} ${countryName}`.toLowerCase(),
+  };
+};
+
+const dedupeMapHotels = (existing = [], incoming = []) => {
+  const seen = new Set();
+  const result = [];
+
+  [...existing, ...incoming].forEach((hotel) => {
+    const key = String(hotel?.id || "").trim();
+    if (!key || seen.has(key)) return;
+
+    seen.add(key);
+    result.push(hotel);
+  });
+
+  return result;
+};
+
 /* ── Hotel Card (left panel) ── */
-const HotelListCard = ({
-  hotel,
-  isActive,
-  onEnter,
-  onLeave,
-  onPin,
-  onClick,
-}) => (
+const HotelListCard = ({ hotel, isActive, onEnter, onLeave, onClick }) => (
   <div
     onClick={onClick}
     onMouseEnter={onEnter}
@@ -135,17 +218,7 @@ const HotelListCard = ({
           )}
         </div>
 
-        <div className="flex items-end justify-between mt-1">
-          {/* <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPin?.();
-            }}
-            className="flex items-center gap-1 text-[10px] font-bold text-[#0d7fe8] bg-blue-50 border border-blue-200 rounded px-2 py-0.5 hover:bg-blue-100 transition"
-          >
-            <FiMapPin className="text-[10px]" />
-            PIN
-          </button> */}
+        <div className="flex items-end justify-end mt-1">
           <div className="text-right">
             <div className="text-[9px] text-slate-400 uppercase tracking-wider">
               Starts from
@@ -166,17 +239,30 @@ const HotelListCard = ({
 /* ── Main Modal ── */
 const MapModal = ({ open, onClose, hotels = [] }) => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const { pagination, searchPayload, loading: hotelLoading } = useSelector(
-    (state) => state.hotel,
-  );
   const [hoveredHotel, setHoveredHotel] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMarker, setSearchMarker] = useState(null);
   const [searching, setSearching] = useState(false);
   const mapRef = useRef(null);
   const listRef = useRef(null);
-  const totalHotels = pagination?.total ?? hotels.length;
+
+  const sourceHotels = useMemo(
+    () => hotels.map(normalizeHotelForMap).filter(Boolean),
+    [hotels],
+  );
+
+  const transformedHotels = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (!normalizedQuery) return sourceHotels;
+
+    return sourceHotels.filter((hotel) =>
+      (hotel.lookupText || `${hotel.name} ${hotel.address}`)
+        .toLowerCase()
+        .includes(normalizedQuery),
+    );
+  }, [sourceHotels, searchQuery]);
+
+  const totalHotels = sourceHotels.length;
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "auto";
@@ -185,7 +271,7 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
     };
   }, [open]);
 
-  const searchLocation = async (query) => {
+  const searchLocation = useCallback(async (query) => {
     if (!query.trim() || !mapRef.current) return;
     setSearching(true);
     try {
@@ -209,39 +295,38 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
     } finally {
       setSearching(false);
     }
-  };
+  }, []);
 
-  const debouncedSearch = useRef(debounce(searchLocation, 700)).current;
+  useEffect(() => {
+    if (!open) {
+      setHoveredHotel(null);
+      setSearchMarker(null);
+      setSearchQuery("");
+      return;
+    }
 
-  const transformedHotels = hotels
-    ?.map((hotel) => {
-      if (hotel?.latitude == null || hotel?.longitude == null) return null;
+    const query = searchQuery.trim();
+    const timer = setTimeout(
+      () => {
+        if (query) {
+          searchLocation(query);
+        } else {
+          setSearchMarker(null);
+        }
+      },
+      query ? 500 : 0,
+    );
 
-      return {
-        id: hotel.id,
-        name: hotel.name,
-        address: hotel.address,
-        price: hotel.price,
-        rating: hotel.rating,
-        nights: hotel.nights,
-        images:
-          hotel.images?.length > 0
-            ? hotel.images
-            : [
-                "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800",
-              ],
-        refundable: hotel.refundable,
-        position: [parseFloat(hotel.latitude), parseFloat(hotel.longitude)],
-      };
-    })
-    .filter(Boolean)
-    .filter((hotel) => {
-      if (!searchQuery) return true;
+    return () => clearTimeout(timer);
+  }, [open, searchQuery, searchLocation]);
 
-      const text = `${hotel.name} ${hotel.address}`.toLowerCase();
+  const firstHotelPosition = transformedHotels[0]?.position;
 
-      return text.includes(searchQuery.toLowerCase());
-    });
+  useEffect(() => {
+    if (!open || !mapRef.current || !firstHotelPosition || searchMarker) return;
+
+    mapRef.current.flyTo(firstHotelPosition, 12, { duration: 0.8 });
+  }, [open, firstHotelPosition, searchMarker]);
 
   const resetMap = () => {
     if (!mapRef.current) return;
@@ -253,25 +338,11 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
     setSearchQuery("");
   };
 
-  const handleLoadMore = () => {
-    if (!pagination?.hasMore) return;
-    if (hotelLoading?.search || hotelLoading?.loadMore) return;
-    if (!searchPayload) return;
-
-    dispatch(
-      searchHotels({
-        payload: searchPayload,
-        page: (pagination?.page || 1) + 1,
-        limit: pagination?.limit || 10,
-      }),
-    );
-  };
-
   if (!open) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-9999 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       style={{ background: "rgba(10,37,64,0.75)", backdropFilter: "blur(4px)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
@@ -302,16 +373,13 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
           {/* Search bar in header */}
           <div className="flex-1 max-w-sm mx-8 relative">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
-            {searching && (
+            {(searching || mapLoading) && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-[#0d7fe8] border-t-transparent rounded-full animate-spin" />
             )}
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                debouncedSearch(e.target.value);
-              }}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search Hotel name, city, area or landmark..."
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
             />
@@ -344,36 +412,47 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
             </div>
 
             <div className="p-3 flex flex-col gap-2.5">
-              {transformedHotels.map((hotel) => (
-                <div key={hotel.id} id={`hotel-${hotel.id}`}>
-                  <HotelListCard
-                    hotel={hotel}
-                    onClick={() => {
-                      navigate("/one-hotel-details", {
-                        state: {
-                          hotelCode: hotel.id,
-                        },
-                      });
-                    }}
-                    isActive={hoveredHotel === hotel.id}
-                    onEnter={() => setHoveredHotel(hotel.id)}
-                    onLeave={() => setHoveredHotel(null)}
-                    onPin={() => {
-                      const t = transformedHotels.find((h) => h.id === hotel.id);
-                      if (t && mapRef.current)
-                        mapRef.current.flyTo(t.position, 15, { duration: 1 });
-                    }}
-                  />
-                </div>
-              ))}
+              {mapError && (
+                <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  {mapError}
+                </p>
+              )}
 
-              {pagination?.hasMore && (
+              {mapLoading && transformedHotels.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-8">
+                  Loading map hotels...
+                </p>
+              ) : transformedHotels.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-8">
+                  No hotels found on map
+                </p>
+              ) : (
+                transformedHotels.map((hotel) => (
+                  <div key={hotel.id} id={`hotel-${hotel.id}`}>
+                    <HotelListCard
+                      hotel={hotel}
+                      onClick={() => {
+                        navigate("/one-hotel-details", {
+                          state: {
+                            hotelCode: hotel.id,
+                          },
+                        });
+                      }}
+                      isActive={hoveredHotel === hotel.id}
+                      onEnter={() => setHoveredHotel(hotel.id)}
+                      onLeave={() => setHoveredHotel(null)}
+                    />
+                  </div>
+                ))
+              )}
+
+              {mapPagination?.hasMore && (
                 <button
                   onClick={handleLoadMore}
-                  disabled={hotelLoading?.search || hotelLoading?.loadMore}
+                  disabled={mapLoading}
                   className="mt-2 w-full bg-[#0d7fe8] text-white text-sm font-semibold py-2.5 rounded-lg shadow hover:bg-[#0a66c2] transition disabled:opacity-60"
                 >
-                  {hotelLoading?.loadMore ? "Loading..." : "Load More Hotels"}
+                  {mapLoading ? "Loading..." : "Load More Hotels"}
                 </button>
               )}
             </div>
@@ -494,11 +573,15 @@ const MapModal = ({ open, onClose, hotels = [] }) => {
             {/* ── Hovered hotel tooltip ── */}
             {hoveredHotel &&
               (() => {
-                const h = hotels.find((x) => x.id === hoveredHotel);
+                const h = transformedHotels.find((x) => x.id === hoveredHotel);
                 if (!h) return null;
                 return (
                   <div className="absolute bottom-16 left-4 z-1000 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 flex items-center gap-3 max-w-xs">
-                    <img src={h.images?.[0]} />
+                    <img
+                      src={h.images?.[0]}
+                      alt={h.name}
+                      className="w-16 h-12 rounded-lg object-cover"
+                    />
                     <div className="min-w-0">
                       <p className="text-sm font-black text-[#0a2540] truncate">
                         {h.name}

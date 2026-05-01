@@ -10,6 +10,8 @@ import {
   getRejectedFlightRequests,
   getTeamExecutedHotelRequests,
   getTeamExecutedFlightRequests,
+  getTeamExecutedFlightRequestById,
+  getTeamExecutedHotelRequestById,
 } from "../Actions/manager.thunk";
 
 const initialState = {
@@ -69,6 +71,11 @@ const initialState = {
   myEmployeesCount: 0,
   loadingEmployees: false,
   errorEmployees: null,
+  
+  // single request details
+  teamBookingDetail: null,
+  loadingTeamBookingDetail: false,
+  errorTeamBookingDetail: null,
 };
 
 const managerSlice = createSlice({
@@ -245,8 +252,38 @@ const managerSlice = createSlice({
       })
       .addCase(getMyEmployees.rejected, (state, action) => {
         state.loadingEmployees = false;
-        state.errorEmployees =
+          state.errorEmployees =
           action.payload?.message || "Failed to fetch employees";
+      })
+
+      // TEAM FLIGHT DETAIL BY ID
+      .addCase(getTeamExecutedFlightRequestById.pending, (state) => {
+        state.loadingTeamBookingDetail = true;
+        state.errorTeamBookingDetail = null;
+        state.teamBookingDetail = null;
+      })
+      .addCase(getTeamExecutedFlightRequestById.fulfilled, (state, action) => {
+        state.loadingTeamBookingDetail = false;
+        state.teamBookingDetail = action.payload?.data;
+      })
+      .addCase(getTeamExecutedFlightRequestById.rejected, (state, action) => {
+        state.loadingTeamBookingDetail = false;
+        state.errorTeamBookingDetail = action.payload?.message || "Failed to fetch details";
+      })
+
+      // TEAM HOTEL DETAIL BY ID
+      .addCase(getTeamExecutedHotelRequestById.pending, (state) => {
+        state.loadingTeamBookingDetail = true;
+        state.errorTeamBookingDetail = null;
+        state.teamBookingDetail = null;
+      })
+      .addCase(getTeamExecutedHotelRequestById.fulfilled, (state, action) => {
+        state.loadingTeamBookingDetail = false;
+        state.teamBookingDetail = action.payload?.data;
+      })
+      .addCase(getTeamExecutedHotelRequestById.rejected, (state, action) => {
+        state.loadingTeamBookingDetail = false;
+        state.errorTeamBookingDetail = action.payload?.message || "Failed to fetch details";
       });
   },
 });

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import {
   FiSearch,
@@ -16,10 +17,10 @@ import {
   getTeamExecutedHotelRequests,
   getTeamExecutedFlightRequests,
 } from "../../Redux/Actions/manager.thunk";
-import {
-  FlightBookingModal,
-  HotelBookingModal,
-} from "./Modal/BookingRequestDetailsModal";
+// import {
+//   FlightBookingModal,
+//   HotelBookingModal,
+// } from "./Modal/BookingRequestDetailsModal";
 import { Pagination } from "./Shared/Pagination";
 import {
   LabeledField,
@@ -45,7 +46,6 @@ function FlightSection() {
   const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatus] = useState("All");
   const [corpFilter, setCorp] = useState("All");
-  const [selectedBooking, setSelectedBooking] = useState(null);
   const [travelDate, setTravelDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
@@ -55,6 +55,7 @@ function FlightSection() {
   const { teamExecutedFlightRequests: flightBookings } = useSelector(
     (state) => state.manager,
   );
+  const navigate = useNavigate();
 
   useEffect(() => {
     dispatch(getTeamExecutedFlightRequests());
@@ -74,12 +75,15 @@ function FlightSection() {
 
     const employeeId = b.userId?._id;
 
+    const executionStatus = (b.executionStatus || "").toLowerCase();
     const status =
-      b.executionStatus === "ticketed"
+      executionStatus === "ticketed" || executionStatus === "confirmed"
         ? "Confirmed"
-        : b.executionStatus === "cancel_requested"
+        : ["cancelled", "cancel_requested"].includes(executionStatus)
           ? "Cancelled"
-          : "Pending";
+          : executionStatus === "failed"
+            ? "Failed"
+            : "Pending";
 
     const pnr =
       b.bookingResult?.pnr ||
@@ -91,9 +95,7 @@ function FlightSection() {
       "-";
 
     const amount =
-      b.pricingSnapshot?.totalAmount ??
-      b.bookingSnapshot?.amount ??
-      0;
+      b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
 
     return {
       ...b,
@@ -145,6 +147,8 @@ function FlightSection() {
             return new Date(raw).toISOString().slice(0, 10) === travelDate;
           });
         })();
+
+      if (b.status === "Failed") return false;
 
       return searchOk && bookedDateOk && statusOk && travelDateOk;
     });
@@ -387,7 +391,7 @@ function FlightSection() {
                     </td> */}
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setSelectedBooking(b)}
+                        onClick={() => navigate(`/manager/team-booking/${b._id}`)}
                         className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50]"
                       >
                         View
@@ -423,12 +427,6 @@ function FlightSection() {
           onPageChange={setCurrentPage}
         />
       </div>
-      {selectedBooking && (
-        <FlightBookingModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-        />
-      )}
     </div>
   );
 }
@@ -440,7 +438,6 @@ function HotelSection() {
   const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatus] = useState("All");
   const [corpFilter, setCorp] = useState("All");
-  const [selectedBooking, setSelectedBooking] = useState(null);
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -448,19 +445,20 @@ function HotelSection() {
 
   const dispatch = useDispatch();
 
-const hotelBookings = useSelector(
-  (state) => state.manager.teamExecutedHotelRequests
-);
+  const hotelBookings = useSelector(
+    (state) => state.manager.teamExecutedHotelRequests,
+  );
 
-const loading = useSelector(
-  (state) => state.manager.loadingTeamExecutedRequests
-);
+  const loading = useSelector(
+    (state) => state.manager.loadingTeamExecutedRequests,
+  );
+  const navigate = useNavigate();
 
   console.log(hotelBookings);
 
-useEffect(() => {
-  dispatch(getTeamExecutedHotelRequests());
-}, [dispatch]);
+  useEffect(() => {
+    dispatch(getTeamExecutedHotelRequests());
+  }, [dispatch]);
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
@@ -476,12 +474,22 @@ useEffect(() => {
 
     const employeeId = b.userId?._id;
 
-    const status =
-      b.executionStatus === "voucher_generated"
-        ? "Confirmed"
-        : b.executionStatus === "cancel_requested"
-          ? "Cancelled"
-          : "Pending";
+    const executionStatus = (b.executionStatus || "").toLowerCase();
+    const amendmentStatus = (b.amendment?.status || "").toLowerCase();
+
+    let status = "Pending";
+    if (["requested", "in_progress"].includes(amendmentStatus)) {
+      status = "Cancelled";
+    } else if (
+      executionStatus === "voucher_generated" ||
+      executionStatus === "confirmed"
+    ) {
+      status = "Confirmed";
+    } else if (["cancelled", "cancel_requested"].includes(executionStatus)) {
+      status = "Cancelled";
+    } else if (executionStatus === "failed") {
+      status = "Failed";
+    }
 
     const bookResult = b.bookingResult?.providerResponse?.BookResult || {};
 
@@ -489,9 +497,7 @@ useEffect(() => {
     const providerBookingId = bookResult.BookingId || "-";
 
     const amount =
-      b.pricingSnapshot?.totalAmount ??
-      b.bookingSnapshot?.amount ??
-      0;
+      b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
 
     return {
       ...b,
@@ -509,24 +515,30 @@ useEffect(() => {
     const q = search.toLowerCase();
 
     return hotelBookings.map(formatHotel).filter((b) => {
-      // Base visibility rules
-      const isConfirmed = b.executionStatus === "voucher_generated";
-      const isCancelled =
-        b.executionStatus === "cancel_requested" ||
-        b.executionStatus === "cancelled" ||
-        b.requestStatus === "cancelled";
-      const isFailedOrNotStarted =
-        b.executionStatus === "failed" || b.executionStatus === "not_started";
+      // Base visibility rules - Allow showing cancelled/failed if requested or All
+      const isConfirmed = b.status === "Confirmed";
+      const isCancelled = b.status === "Cancelled";
+      const isFailed = b.status === "Failed";
+      const isPending = b.status === "Pending";
       const amendmentRequested = b.amendment?.status === "requested";
 
-      if (
-        !isConfirmed ||
-        isCancelled ||
-        isFailedOrNotStarted ||
-        amendmentRequested
-      ) {
+      // If status filter is "All", we might want to show everything. 
+      // But looking at the existing logic, it seems it was trying to only show "Confirmed" by default?
+      // Given the user's request, we should probably allow showing what the statusFilter says.
+      
+      if (statusFilter !== "All" && b.status !== statusFilter) {
         return false;
       }
+      
+      // If it's "All", maybe we should still hide some things? 
+      // Actually, the user said "total bookings", so it should probably show everything that is NOT discarded.
+      const rawExecutionStatus = (b.executionStatus || "").toLowerCase();
+      if (
+        b.requestStatus === "discarded" ||
+        rawExecutionStatus === "failed" ||
+        rawExecutionStatus === "not_started"
+      )
+        return false;
 
       // Search
       const searchOk =
@@ -810,7 +822,7 @@ useEffect(() => {
                     </td> */}
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setSelectedBooking(b)}
+                        onClick={() => navigate(`/manager/team-hotel-booking/${b._id}`)}
                         className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50]"
                       >
                         View
@@ -846,12 +858,6 @@ useEffect(() => {
           onPageChange={setCurrentPage}
         />
       </div>
-      {selectedBooking && (
-        <HotelBookingModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-        />
-      )}
     </div>
   );
 }
@@ -914,7 +920,10 @@ export default function BookingsDashboardForManager() {
             disabled={loadingActive}
             className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-slate-800 hover:border-slate-300 disabled:opacity-50"
           >
-            <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
+            <FiRefreshCw
+              size={14}
+              className={loadingActive ? "animate-spin" : ""}
+            />
             Refresh
           </button>
         </div>
@@ -949,4 +958,3 @@ export default function BookingsDashboardForManager() {
     </div>
   );
 }
-

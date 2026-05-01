@@ -19,7 +19,7 @@ export default function GuestsRoomsDropdown({ value, onChange }) {
         children: 0,
         childAges: [],
       },
-    ]
+    ],
   );
 
   /* ---------------- outside click ---------------- */
@@ -47,10 +47,7 @@ export default function GuestsRoomsDropdown({ value, onChange }) {
 
   const addRoom = () => {
     if (rooms.length < 5) {
-      setRooms([
-        ...rooms,
-        { adults: 2, children: 0, childAges: [] },
-      ]);
+      setRooms([...rooms, { adults: 2, children: 0, childAges: [] }]);
     }
   };
 
@@ -60,10 +57,7 @@ export default function GuestsRoomsDropdown({ value, onChange }) {
     }
   };
 
-  const totalGuests = rooms.reduce(
-    (sum, r) => sum + r.adults + r.children,
-    0
-  );
+  const totalGuests = rooms.reduce((sum, r) => sum + r.adults + r.children, 0);
 
   const summary = `${totalGuests} Guest${
     totalGuests > 1 ? "s" : ""
@@ -87,9 +81,7 @@ export default function GuestsRoomsDropdown({ value, onChange }) {
           <LuUsers className="text-gray-500" />
           <span className="text-gray-700">{summary}</span>
         </div>
-        <LuChevronDown
-          className={`transition ${open ? "rotate-180" : ""}`}
-        />
+        <LuChevronDown className={`transition ${open ? "rotate-180" : ""}`} />
       </button>
 
       {/* Dropdown */}
@@ -101,9 +93,7 @@ export default function GuestsRoomsDropdown({ value, onChange }) {
                 <div className="flex justify-between items-center mb-3">
                   <div className="flex items-center gap-2">
                     <LuBedDouble className="text-blue-600" />
-                    <span className="font-semibold">
-                      Room {i + 1}
-                    </span>
+                    <span className="font-semibold">Room {i + 1}</span>
                   </div>
                   {rooms.length > 1 && (
                     <button
@@ -132,6 +122,32 @@ export default function GuestsRoomsDropdown({ value, onChange }) {
                   min={0}
                   onChange={(v) => updateRoom(i, "children", v)}
                 />
+
+                {/* 🔥 Child Age Selectors */}
+                {room.children > 0 && (
+                  <div className="grid grid-cols-2 gap-2 mt-2 ml-7">
+                    {room.childAges.map((age, idx) => (
+                      <div key={idx} className="flex flex-col gap-1">
+                        <label className="text-[10px] text-gray-500 uppercase font-bold">Child {idx + 1} Age</label>
+                        <select
+                          value={age}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const newAges = [...room.childAges];
+                            newAges[idx] = Number(e.target.value);
+                            updateRoom(i, "childAges", newAges);
+                          }}
+                          className="text-xs border rounded-lg p-1 outline-none focus:border-blue-800"
+                        >
+                          {Array.from({ length: 18 }, (_, a) => (
+                            <option key={a} value={a}>{a} years</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
 

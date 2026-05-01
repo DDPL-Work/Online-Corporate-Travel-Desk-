@@ -161,6 +161,8 @@ export default function HotelSearchPage() {
       CheckIn: checkIn,
       CheckOut: checkOut,
       CityCode: selectedCityCode,
+      CountryCode: country, // Add destination country code
+      CityName: city, // Add city name for better header display
       GuestNationality: guestNationality,
       ResponseTime: 23,
       NoOfRooms: rooms,

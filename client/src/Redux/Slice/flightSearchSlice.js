@@ -81,8 +81,15 @@ const flightSlice = createSlice({
         state.ssr = action.payload;
       })
       /* FARE UP SHELL */
+      .addCase(getFareUpsell.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(getFareUpsell.fulfilled, (state, action) => {
+        state.loading = false;
         state.fareUpsell = action.payload;
+      })
+      .addCase(getFareUpsell.rejected, (state) => {
+        state.loading = false;
       })
 
       /* BOOK */

@@ -1,5 +1,6 @@
 // SelectedTripSummary.jsx (Enhanced – MakeMyTrip Style)
 import { MdOutlineFlight } from "react-icons/md";
+import { useState } from "react";
 import {
   airlineLogo,
   formatDate,
@@ -39,6 +40,8 @@ const getJourney = (flight) => {
 export default function SelectedTripSummary({ onward, ret, onContinue }) {
   const dispatch = useDispatch();
   const { traceId, journeyType } = useSelector((state) => state.flights);
+  const [isLoadingMoreFares, setIsLoadingMoreFares] = useState(false);
+
   if (!onward) return null;
 
   const onwardData = getJourney(onward);
@@ -185,69 +188,83 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
             </div>
 
             <button
-              disabled={!ret}
+              disabled={!ret || isLoadingMoreFares}
               onClick={async () => {
-                console.log("CLICK WORKING");
-                const isDomesticRoundTrip =
-                  onward?.Segments?.[0]?.length === 1 &&
-                  ret?.Segments?.[0]?.length === 1;
+                if (!ret || isLoadingMoreFares) return;
+                setIsLoadingMoreFares(true);
+                try {
+                  const isDomesticRoundTrip =
+                    onward?.Segments?.[0]?.length === 1 &&
+                    ret?.Segments?.[0]?.length === 1;
 
-                // ✅ CASE 1: DOMESTIC ROUND TRIP → DUAL API
-                if (isDomesticRoundTrip) {
-                  if (!onward?.ResultIndex || !ret?.ResultIndex) return;
+                  // ✅ CASE 1: DOMESTIC ROUND TRIP → DUAL API
+                  if (isDomesticRoundTrip) {
+                    if (!onward?.ResultIndex || !ret?.ResultIndex) return;
 
-                  const onwardRes = await dispatch(
-                    getFareUpsell({
-                      traceId,
-                      resultIndex: onward.ResultIndex,
-                    }),
-                  );
+                    const onwardRes = await dispatch(
+                      getFareUpsell({
+                        traceId,
+                        resultIndex: onward.ResultIndex,
+                      }),
+                    );
 
-                  const returnRes = await dispatch(
-                    getFareUpsell({
-                      traceId,
-                      resultIndex: ret.ResultIndex,
-                    }),
-                  );
+                    const returnRes = await dispatch(
+                      getFareUpsell({
+                        traceId,
+                        resultIndex: ret.ResultIndex,
+                      }),
+                    );
 
-                  localStorage.setItem(
-                    "fareUpsellPayload",
-                    JSON.stringify({
-                      onward: onwardRes.payload,
-                      return: returnRes.payload,
-                      traceId,
-                      journeyType: 2,
-                      type: "domesticRT", // 🔥 IMPORTANT FLAG
-                    }),
-                  );
+                    localStorage.setItem(
+                      "fareUpsellPayload",
+                      JSON.stringify({
+                        onward: onwardRes.payload,
+                        return: returnRes.payload,
+                        traceId,
+                        journeyType: 2,
+                        type: "domesticRT", // 🔥 IMPORTANT FLAG
+                      }),
+                    );
+                  }
+
+                  // ✅ CASE 2: ALL OTHER → KEEP OLD FLOW
+                  else {
+                    const res = await dispatch(
+                      getFareUpsell({
+                        traceId,
+                        resultIndex: onward.ResultIndex,
+                      }),
+                    );
+
+                    localStorage.setItem(
+                      "fareUpsellPayload",
+                      JSON.stringify({
+                        fareUpsellData: res.payload,
+                        traceId,
+                        journeyType,
+                      }),
+                    );
+                  }
 
                   window.open("/fare-upsell", "_blank");
-                }
-
-                // ✅ CASE 2: ALL OTHER → KEEP OLD FLOW
-                else {
-                  const res = await dispatch(
-                    getFareUpsell({
-                      traceId,
-                      resultIndex: onward.ResultIndex,
-                    }),
-                  );
-
-                  localStorage.setItem(
-                    "fareUpsellPayload",
-                    JSON.stringify({
-                      fareUpsellData: res.payload,
-                      traceId,
-                      journeyType,
-                    }),
-                  );
-
-                  window.open("/fare-upsell", "_blank");
+                } finally {
+                  setIsLoadingMoreFares(false);
                 }
               }}
-              className="px-6 py-3 bg-white text-slate-600 font-black rounded-xl border border-slate-200 hover:text-[#0A203E] hover:border-[#0A203E]/30 transition-all cursor-pointer disabled:opacity-50 uppercase tracking-widest text-xs"
+              className={`px-6 py-3 font-black rounded-xl border uppercase tracking-widest text-xs transition-all ${
+                isLoadingMoreFares
+                  ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60"
+                  : "bg-white text-slate-600 border-slate-200 hover:text-[#0A203E] hover:border-[#0A203E]/30 cursor-pointer"
+              }`}
             >
-              More Fares
+              {isLoadingMoreFares ? (
+                <>
+                  <span className="inline-block animate-spin w-3 h-3 border-2 border-slate-400 border-t-slate-600 rounded-full mr-1.5" />
+                  Loading...
+                </>
+              ) : (
+                "More Fares"
+              )}
             </button>
 
             <button

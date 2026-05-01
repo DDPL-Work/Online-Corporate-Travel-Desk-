@@ -1,20 +1,20 @@
-// // Redis temporarily disabled for deployment push. Original implementation kept below.
+const Redis = require("ioredis");
+const logger = require("../utils/logger");
 
-// const Redis = require("ioredis");
+const redis = new Redis(process.env.REDIS_URL, {
+  maxRetriesPerRequest: 2,
+  connectTimeout: 10000,
+  enableReadyCheck: false,
+  retryStrategy: (times) => {
+    if (times > 5) return null;
+    return Math.min(times * 500, 3000);
+  }
+});
 
-// const redis = new Redis({
-//   host: process.env.REDIS_HOST || "127.0.0.1",
-//   port: Number(process.env.REDIS_PORT) || 6379,
-// });
+// NO tls config here
 
-// redis.on("connect", () => {
-//   console.log("[redis] connected to", redis.options.host, redis.options.port);
-// });
+redis.on("connect", () => logger.info("[Redis] Connected"));
+redis.on("ready", () => logger.info("[Redis] Ready"));
+redis.on("error", (err) => logger.error("[Redis] Error:", err.message));
 
-// redis.on("error", (err) => {
-//   console.error("[redis] connection error:", err?.message || err);
-// });
-
-// module.exports = redis;
-
-
+module.exports = redis;

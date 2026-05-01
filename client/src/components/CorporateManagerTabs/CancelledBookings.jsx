@@ -1,5 +1,6 @@
-﻿import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import {
   FiSearch,
@@ -72,8 +73,8 @@ function CancelledFlightSection() {
   const [travelDate, setTravelDate] = useState("");
   const [cancelStatusFilter, setCancelStatus] = useState("All");
   const [corpFilter, setCorp] = useState("All");
-  const [selectedBooking, setSelectedBooking] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const navigate = useNavigate();
   const PAGE_SIZE = 10;
 
   const dispatch = useDispatch();
@@ -163,10 +164,18 @@ function CancelledFlightSection() {
 
       return statusOk && fromOk && toOk && travelOk && searchOk;
     });
-  }, [search, startDate, endDate, cancelStatusFilter, travelDate, cancelledFlights]);
+  }, [
+    search,
+    startDate,
+    endDate,
+    cancelStatusFilter,
+    travelDate,
+    cancelledFlights,
+  ]);
 
   const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    () =>
+      filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
     [filtered, currentPage],
   );
 
@@ -237,7 +246,13 @@ function CancelledFlightSection() {
               placeholder="Name, PNR, booking ID…"
             />
           </LabeledField>
-          <LabeledField label={<><FiCalendar size={10} /> From Date</>}>
+          <LabeledField
+            label={
+              <>
+                <FiCalendar size={10} /> From Date
+              </>
+            }
+          >
             <input
               type="date"
               value={startDate}
@@ -245,7 +260,13 @@ function CancelledFlightSection() {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField label={<><FiCalendar size={10} /> To Date</>}>
+          <LabeledField
+            label={
+              <>
+                <FiCalendar size={10} /> To Date
+              </>
+            }
+          >
             <input
               type="date"
               value={endDate}
@@ -253,7 +274,13 @@ function CancelledFlightSection() {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField label={<><FiCalendar size={10} /> Travel Date</>}>
+          <LabeledField
+            label={
+              <>
+                <FiCalendar size={10} /> Travel Date
+              </>
+            }
+          >
             <input
               type="date"
               value={travelDate}
@@ -261,7 +288,13 @@ function CancelledFlightSection() {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField label={<><FiFilter size={10} /> Cancel Status</>}>
+          <LabeledField
+            label={
+              <>
+                <FiFilter size={10} /> Cancel Status
+              </>
+            }
+          >
             <select
               value={cancelStatusFilter}
               onChange={(e) => setCancelStatus(e.target.value)}
@@ -362,7 +395,9 @@ function CancelledFlightSection() {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setSelectedBooking(b)}
+                        onClick={() =>
+                          navigate(`/manager/team-booking/${b._id}`)
+                        }
                         className="px-3 py-1 text-xs font-semibold bg-red-700 text-white rounded-md hover:bg-red-800"
                       >
                         View
@@ -386,12 +421,6 @@ function CancelledFlightSection() {
           onPageChange={setCurrentPage}
         />
       </div>
-      {selectedBooking && (
-        <FlightBookingModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-        />
-      )}
     </div>
   );
 }
@@ -404,8 +433,8 @@ function CancelledHotelSection() {
   const [checkInDate, setCheckInDate] = useState("");
   const [checkOutDate, setCheckOutDate] = useState("");
   const [cancelStatusFilter, setCancelStatus] = useState("All");
-  const [selectedBooking, setSelectedBooking] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const navigate = useNavigate();
   const PAGE_SIZE = 10;
 
   const dispatch = useDispatch();
@@ -420,7 +449,14 @@ function CancelledHotelSection() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, startDate, endDate, cancelStatusFilter, checkInDate, checkOutDate]);
+  }, [
+    search,
+    startDate,
+    endDate,
+    cancelStatusFilter,
+    checkInDate,
+    checkOutDate,
+  ]);
 
   const formatHotel = (b) => {
     const guest = b.travellers?.length
@@ -474,7 +510,13 @@ function CancelledHotelSection() {
       const amendStatus = (b.cancelStatus || "").toLowerCase();
       const execStatus = (b.executionStatus || "").toLowerCase();
       return (
-        ["requested", "approved", "success", "refunded", "refund_pending"].includes(amendStatus) ||
+        [
+          "requested",
+          "approved",
+          "success",
+          "refunded",
+          "refund_pending",
+        ].includes(amendStatus) ||
         ["cancel_requested", "cancelled"].includes(execStatus)
       );
     });
@@ -483,7 +525,9 @@ function CancelledHotelSection() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return cancelledHotels.filter((b) => {
-      const displayStatus = mapCancelStatus(b.cancelStatus || b.executionStatus);
+      const displayStatus = mapCancelStatus(
+        b.cancelStatus || b.executionStatus,
+      );
       const statusOk =
         cancelStatusFilter === "All" || displayStatus === cancelStatusFilter;
 
@@ -494,8 +538,12 @@ function CancelledHotelSection() {
         !endDate ||
         new Date(b.cancelledDate || b.bookedDate) <= new Date(endDate);
 
-      const ciStr = b.checkIn ? new Date(b.checkIn).toISOString().slice(0, 10) : "";
-      const coStr = b.checkOut ? new Date(b.checkOut).toISOString().slice(0, 10) : "";
+      const ciStr = b.checkIn
+        ? new Date(b.checkIn).toISOString().slice(0, 10)
+        : "";
+      const coStr = b.checkOut
+        ? new Date(b.checkOut).toISOString().slice(0, 10)
+        : "";
       const checkInOk = !checkInDate || (ciStr && ciStr >= checkInDate);
       const checkOutOk = !checkOutDate || (coStr && coStr <= checkOutDate);
 
@@ -507,10 +555,19 @@ function CancelledHotelSection() {
 
       return statusOk && fromOk && toOk && checkInOk && checkOutOk && searchOk;
     });
-  }, [search, startDate, endDate, cancelStatusFilter, checkInDate, checkOutDate, cancelledHotels]);
+  }, [
+    search,
+    startDate,
+    endDate,
+    cancelStatusFilter,
+    checkInDate,
+    checkOutDate,
+    cancelledHotels,
+  ]);
 
   const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    () =>
+      filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
     [filtered, currentPage],
   );
 
@@ -522,7 +579,8 @@ function CancelledHotelSection() {
     (b) => mapCancelStatus(b.cancelStatus || b.executionStatus) === "Refunded",
   ).length;
   const refundPending = filtered.filter(
-    (b) => mapCancelStatus(b.cancelStatus || b.executionStatus) === "Refund Pending",
+    (b) =>
+      mapCancelStatus(b.cancelStatus || b.executionStatus) === "Refund Pending",
   ).length;
 
   return (
@@ -569,14 +627,26 @@ function CancelledHotelSection() {
 
       <div className="bg-white rounded-xl shadow-sm p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <LabeledField label={<><FiSearch size={10} /> Search Guest</>}>
+          <LabeledField
+            label={
+              <>
+                <FiSearch size={10} /> Search Guest
+              </>
+            }
+          >
             <SearchBar
               value={search}
               onChange={setSearch}
               placeholder="Name, booking ID…"
             />
           </LabeledField>
-          <LabeledField label={<><FiCalendar size={10} /> From Date</>}>
+          <LabeledField
+            label={
+              <>
+                <FiCalendar size={10} /> From Date
+              </>
+            }
+          >
             <input
               type="date"
               value={startDate}
@@ -584,7 +654,13 @@ function CancelledHotelSection() {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField label={<><FiCalendar size={10} /> To Date</>}>
+          <LabeledField
+            label={
+              <>
+                <FiCalendar size={10} /> To Date
+              </>
+            }
+          >
             <input
               type="date"
               value={endDate}
@@ -592,7 +668,13 @@ function CancelledHotelSection() {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField label={<><FiCalendar size={10} /> CheckIn Date</>}>
+          <LabeledField
+            label={
+              <>
+                <FiCalendar size={10} /> CheckIn Date
+              </>
+            }
+          >
             <input
               type="date"
               value={checkInDate}
@@ -600,7 +682,13 @@ function CancelledHotelSection() {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField label={<><FiCalendar size={10} /> CheckOut Date</>}>
+          <LabeledField
+            label={
+              <>
+                <FiCalendar size={10} /> CheckOut Date
+              </>
+            }
+          >
             <input
               type="date"
               value={checkOutDate}
@@ -608,7 +696,13 @@ function CancelledHotelSection() {
               className={dateCls}
             />
           </LabeledField>
-          <LabeledField label={<><FiFilter size={10} /> Cancel Status</>}>
+          <LabeledField
+            label={
+              <>
+                <FiFilter size={10} /> Cancel Status
+              </>
+            }
+          >
             <select
               value={cancelStatusFilter}
               onChange={(e) => setCancelStatus(e.target.value)}
@@ -698,7 +792,9 @@ function CancelledHotelSection() {
                     </td>
                     <td className="px-4 py-3">
                       <CancelStatusBadge
-                        status={mapCancelStatus(b.cancelStatus || b.executionStatus)}
+                        status={mapCancelStatus(
+                          b.cancelStatus || b.executionStatus,
+                        )}
                       />
                     </td>
                     <td className="px-4 py-3 text-[13px] text-slate-700">
@@ -709,7 +805,9 @@ function CancelledHotelSection() {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setSelectedBooking(b)}
+                        onClick={() =>
+                          navigate(`/manager/team-hotel-booking/${b._id}`)
+                        }
                         className="px-3 py-1 text-xs font-semibold bg-red-700 text-white rounded-md hover:bg-red-800"
                       >
                         View
@@ -733,12 +831,6 @@ function CancelledHotelSection() {
           onPageChange={setCurrentPage}
         />
       </div>
-      {selectedBooking && (
-        <HotelBookingModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-        />
-      )}
     </div>
   );
 }
@@ -799,7 +891,10 @@ export default function CancelledBookingsForManager() {
             disabled={loadingActive}
             className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-slate-800 hover:border-slate-300 disabled:opacity-50"
           >
-            <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
+            <FiRefreshCw
+              size={14}
+              className={loadingActive ? "animate-spin" : ""}
+            />
             Refresh
           </button>
         </div>
@@ -827,7 +922,11 @@ export default function CancelledBookingsForManager() {
           })}
         </div>
 
-        {activeTab === "flight" ? <CancelledFlightSection /> : <CancelledHotelSection />}
+        {activeTab === "flight" ? (
+          <CancelledFlightSection />
+        ) : (
+          <CancelledHotelSection />
+        )}
       </div>
     </div>
   );

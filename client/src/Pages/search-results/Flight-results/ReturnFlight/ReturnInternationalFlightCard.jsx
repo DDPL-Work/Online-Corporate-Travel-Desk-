@@ -28,6 +28,7 @@ export default function ReturnInternationalFlightCard({
 }) {
   const dispatch = useDispatch();
   const [showFareDetails, setShowFareDetails] = useState(false);
+  const [isLoadingMoreFares, setIsLoadingMoreFares] = useState(false);
   const [selectedResultIndex, setSelectedResultIndex] = useState(
     group.flightInfo.ResultIndex,
   );
@@ -47,38 +48,43 @@ export default function ReturnInternationalFlightCard({
     setOpenSection(openSection === key ? null : key);
 
   const handleMoreFaresClick = async () => {
-    if (selectedResultIndex == null) return;
+    if (selectedResultIndex == null || isLoadingMoreFares) return;
 
-    // ✅ STEP 1: OPEN TAB IMMEDIATELY (IMPORTANT)
-    const newTab = window.open("/fare-upsell", "_blank");
+    setIsLoadingMoreFares(true);
+    try {
+      // ✅ STEP 1: OPEN TAB IMMEDIATELY (IMPORTANT)
+      const newTab = window.open("/fare-upsell", "_blank");
 
-    // ❗ If blocked → stop
-    if (!newTab) {
-      alert("Popup blocked! Please allow popups.");
-      return;
-    }
+      // ❗ If blocked → stop
+      if (!newTab) {
+        alert("Popup blocked! Please allow popups.");
+        return;
+      }
 
-    // ✅ STEP 2: CALL API
-    const res = await dispatch(
-      getFareUpsell({
-        traceId,
-        resultIndex: selectedResultIndex,
-      }),
-    );
-
-    // ✅ STEP 3: STORE DATA
-    if (res?.payload) {
-      localStorage.setItem(
-        "fareUpsellPayload",
-        JSON.stringify({
-          fareUpsellData: res.payload,
+      // ✅ STEP 2: CALL API
+      const res = await dispatch(
+        getFareUpsell({
           traceId,
-          journeyType: 2,
+          resultIndex: selectedResultIndex,
         }),
       );
 
-      // ✅ OPTIONAL: refresh tab after data ready
-      newTab.location.reload();
+      // ✅ STEP 3: STORE DATA
+      if (res?.payload) {
+        localStorage.setItem(
+          "fareUpsellPayload",
+          JSON.stringify({
+            fareUpsellData: res.payload,
+            traceId,
+            journeyType: 2,
+          }),
+        );
+
+        // ✅ OPTIONAL: refresh tab after data ready
+        newTab.location.reload();
+      }
+    } finally {
+      setIsLoadingMoreFares(false);
     }
   };
 
@@ -216,9 +222,23 @@ export default function ReturnInternationalFlightCard({
             {/* ✅ ONLY ONE MORE FARES BUTTON */}
             <button
               onClick={handleMoreFaresClick}
-              className="inline-flex items-center gap-1.5 bg-slate-50 px-4 py-2 text-sm font-bold rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 transition"
+              disabled={isLoadingMoreFares}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-xl border transition ${
+                isLoadingMoreFares
+                  ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60"
+                  : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+              }`}
             >
-              <BiSolidOffer className="text-[#C9A84C]" /> More Fares
+              {isLoadingMoreFares ? (
+                <>
+                  <span className="inline-block animate-spin w-3 h-3 border-2 border-slate-400 border-t-slate-600 rounded-full" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <BiSolidOffer className="text-[#C9A84C]" /> More Fares
+                </>
+              )}
             </button>
 
             {/* EXISTING BUTTON */}

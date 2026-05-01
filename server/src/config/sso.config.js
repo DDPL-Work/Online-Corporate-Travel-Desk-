@@ -11,6 +11,14 @@ const axios = require("axios");
 
 console.log("✅ SSO CONFIG loaded");
 
+
+const googleCallbackURL1 = process.env.GOOGLE_CALLBACK_URL;
+const googleCallbackURL2 = process.env.GOOGLE_CALLBACK_URL_2;
+const azureCallbackURL1 = process.env.AZURE_CALLBACK_URL;
+const azureCallbackURL2 = process.env.AZURE_CALLBACK_URL_2;
+const zohoCallbackURL1 = process.env.ZOHO_CALLBACK_URL;
+const zohoCallbackURL2 = process.env.ZOHO_CALLBACK_URL_2;
+
 const ensureEmployeeForUser = async (user, corporateId) => {
   if (!user) return;
   try {
@@ -140,7 +148,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: process.env.GOOGLE_CALLBACK_URL || process.env.GOOGLE_CALLBACK_URL_2,
+        callbackURL: googleCallbackURL1 || googleCallbackURL2,
         passReqToCallback: true,
       },
       async (req, accessToken, refreshToken, profile, done) => {
@@ -310,7 +318,7 @@ if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET) {
         clientSecret: process.env.AZURE_CLIENT_SECRET,
         responseType: "code id_token",
         responseMode: "form_post",
-        redirectUrl: process.env.AZURE_CALLBACK_URL,
+        redirectUrl: azureCallbackURL1 || azureCallbackURL2,
         allowHttpForRedirectUrl: true,
         validateIssuer: true,
         passReqToCallback: true,
@@ -440,7 +448,7 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
         tokenURL: "https://accounts.zoho.com/oauth/v2/token",
         clientID: process.env.ZOHO_CLIENT_ID,
         clientSecret: process.env.ZOHO_CLIENT_SECRET,
-        callbackURL: process.env.ZOHO_CALLBACK_URL || process.env.ZOHO_CALLBACK_URL_2,
+        callbackURL: zohoCallbackURL1 || zohoCallbackURL2,
         scope: ["aaaserver.profile.READ"],
         passReqToCallback: true,
       },

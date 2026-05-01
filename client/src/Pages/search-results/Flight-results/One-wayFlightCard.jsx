@@ -74,7 +74,40 @@ const normalizeFareOptions = (fareOptions, fallbackFlightInfo) => {
   );
 };
 
+
 // ─── Flight Details Dropdown ────────────────────────────────────────────────
+
+function getCancellationPolicy(selectedFlight, apiRules) {
+  const rulesSource = Array.isArray(apiRules)
+    ? apiRules
+    : Array.isArray(selectedFlight?.MiniFareRules?.[0])
+      ? selectedFlight.MiniFareRules[0]
+      : [];
+
+  const cancellationRules = rulesSource
+    .filter((rule) => rule && rule.Type === "Cancellation" && rule.Details)
+    .map((rule) => ({
+      From: rule.From ?? "",
+      To: rule.To ?? "",
+      Unit: rule.Unit ?? "",
+      Details: String(rule.Details ?? "").trim(),
+      Type: rule.Type ?? "Cancellation",
+    }))
+    .filter((rule) => rule.Details.length > 0);
+
+  const isRefundable = selectedFlight?.IsRefundable === true;
+
+  if (cancellationRules.length > 0) {
+    return { cancellationRules, cancellationMessage: "" };
+  }
+
+  return {
+    cancellationRules: [],
+    cancellationMessage: isRefundable
+      ? "Cancellation policy is currently unavailable from the airline. Final charges will be shown during booking or by the airline directly."
+      : "This ticket is non-refundable as per airline policy.",
+  };
+}
 
 export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
   const [activeTab, setActiveTab] = useState("flight");
@@ -99,37 +132,27 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
     { id: "rules", label: "Fare Rules" },
   ];
 
-  let cancellationRules = miniFareRules.filter(
-    (r) => r.Type === "Cancellation",
+  const { cancellationRules, cancellationMessage } = getCancellationPolicy(
+    selectedFlight,
+    miniFareRules,
   );
-  let reissueRules = miniFareRules.filter((r) => r.Type === "Reissue");
-
   const isCancellationFallback = cancellationRules.length === 0;
+
+  let reissueRules = miniFareRules.filter((r) => r.Type === "Reissue");
   const isReissueFallback = reissueRules.length === 0;
 
-  if (isCancellationFallback) {
-    if (selectedFlight?.IsRefundable) {
-      cancellationRules = [
-        { From: "0", To: "72", Unit: "Hours", Details: "Approx. ₹3,500 (Subject to Airline)", Type: "Cancellation" },
-        { From: "72", To: "Any", Unit: "Hours", Details: "Approx. ₹3,000 (Subject to Airline)", Type: "Cancellation" }
-      ];
-    } else {
-      cancellationRules = [
-        { From: "0", To: "Any", Unit: "Hours", Details: "Non-Refundable as per Airline", Type: "Cancellation" }
-      ];
-    }
-  }
-
   if (isReissueFallback) {
-    const isChangeable = !selectedFlight?.FareInclusions?.some(v => v.toLowerCase().includes("non-changeable"));
+    const isChangeable = !selectedFlight?.FareInclusions?.some((v) =>
+      String(v ?? "").toLowerCase().includes("non-changeable"),
+    );
     if (isChangeable) {
       reissueRules = [
         { From: "0", To: "72", Unit: "Hours", Details: "Approx. ₹3,250 + Fare Diff.", Type: "Reissue" },
-        { From: "72", To: "Any", Unit: "Hours", Details: "Approx. ₹2,750 + Fare Diff.", Type: "Reissue" }
+        { From: "72", To: "Any", Unit: "Hours", Details: "Approx. ₹2,750 + Fare Diff.", Type: "Reissue" },
       ];
     } else {
       reissueRules = [
-        { From: "0", To: "Any", Unit: "Hours", Details: "Fixed Dates / Non-Changeable", Type: "Reissue" }
+        { From: "0", To: "Any", Unit: "Hours", Details: "Fixed Dates / Non-Changeable", Type: "Reissue" },
       ];
     }
   }
@@ -446,7 +469,11 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
                           </div>
                         ))}
                       </div>
-                   ) : <p className="p-4 text-xs text-slate-400 italic">No specific fee details available from airline.</p>}
+                   ) : (
+                     <p className="p-4 text-xs text-slate-400 italic">
+                       {cancellationMessage}
+                     </p>
+                   )}
                 </div>
 
                 {/* Date Change */}
@@ -530,6 +557,7 @@ export default function OneWayFlightCard({
   const dispatch = useDispatch();
 
   const [showFlightDetails, setShowFlightDetails] = useState(false);
+  const [isLoadingMoreFares, setIsLoadingMoreFares] = useState(false);
 
   const groupedFlight = flight?.flightInfo
     ? flight
@@ -580,15 +608,21 @@ export default function OneWayFlightCard({
   }
 
   const handleFareOptionsClick = async () => {
-    if (selectedResultIndex == null) return;
-    const res = await dispatch(
-      getFareUpsell({
-        traceId,
-        resultIndex: selectedResultIndex,
-      }),
-    );
-    if (res?.payload && typeof onOpenFareUpsell === "function") {
-      onOpenFareUpsell(res.payload);
+    if (selectedResultIndex == null || isLoadingMoreFares) return;
+    
+    setIsLoadingMoreFares(true);
+    try {
+      const res = await dispatch(
+        getFareUpsell({
+          traceId,
+          resultIndex: selectedResultIndex,
+        }),
+      );
+      if (res?.payload && typeof onOpenFareUpsell === "function") {
+        onOpenFareUpsell(res.payload);
+      }
+    } finally {
+      setIsLoadingMoreFares(false);
     }
   };
 
@@ -826,9 +860,23 @@ export default function OneWayFlightCard({
 
                 <button
                   onClick={handleFareOptionsClick}
-                  className="flex items-center gap-1.5 bg-slate-50 px-4 py-2 text-[11px] font-black rounded-xl border border-slate-200 text-slate-600 hover:text-[#C9A84C] hover:border-[#C9A84C]/50 transition-all cursor-pointer uppercase tracking-widest shadow-sm"
+                  disabled={isLoadingMoreFares}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-[11px] font-black rounded-xl border uppercase tracking-widest shadow-sm transition-all ${
+                    isLoadingMoreFares
+                      ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60"
+                      : "bg-slate-50 border-slate-200 text-slate-600 hover:text-[#C9A84C] hover:border-[#C9A84C]/50 cursor-pointer"
+                  }`}
                 >
-                  <BiSolidOffer className="text-[#C9A84C] text-sm" /> More Fares
+                  {isLoadingMoreFares ? (
+                    <>
+                      <span className="animate-spin inline-block w-3 h-3 border-2 border-slate-400 border-t-slate-600 rounded-full" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <BiSolidOffer className="text-[#C9A84C] text-sm" /> More Fares
+                    </>
+                  )}
                 </button>
               </div>
 

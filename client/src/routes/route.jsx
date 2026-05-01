@@ -21,6 +21,7 @@ import CreditUtilizationPostpaid from "../components/TravelAdminTabs/CreditUtili
 import CorporateWallet from "../components/TravelAdminTabs/CorporateWalletStatusPrepaid";
 import BrandingSettings from "../components/TravelAdminTabs/BrandingSettings";
 import ReissueRequests from "../components/TravelAdminTabs/ReissueRequests";
+import OfflineCancellationQueries from "../components/TravelAdminTabs/OfflineCancellationQueries";
 
 // Employee
 import MyBookings from "../components/EmployeeDashboard/MyBookings";
@@ -75,6 +76,9 @@ import UserAgreement from "../Pages/Legal/UserAgreement";
 import TermsOfService from "../Pages/Legal/TermsOfService";
 import PrivacyPolicy from "../Pages/Legal/PrivacyPolicy";
 import ContactUs from "../Pages/Legal/ContactUs";
+import MyReissueRequests from "../components/EmployeeDashboard/MyReissuedRequests";
+import TeamBookingDetails from "../components/CorporateManagerTabs/TeamBookingDetails";
+import TeamHotelBookingDetails from "../components/CorporateManagerTabs/TeamHotelBookingDetails";
 // import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 
 export const appRouter = createBrowserRouter([
@@ -130,6 +134,7 @@ export const appRouter = createBrowserRouter([
               { path: "/ssr-management", element: <SsrManagement /> },
               { path: "/branding-settings", element: <BrandingSettings /> },
               { path: "/reissue-requests", element: <ReissueRequests /> },
+              { path: "/offline-cancellations", element: <OfflineCancellationQueries /> },
             ],
           },
         ],
@@ -146,6 +151,14 @@ export const appRouter = createBrowserRouter([
               {
                 path: "/manager/total-bookings",
                 element: <BookingsDashboardForManager />,
+              },
+              {
+                path: "/manager/team-booking/:id",
+                element: <TeamBookingDetails />,
+              },
+              {
+                path: "/manager/team-hotel-booking/:id",
+                element: <TeamHotelBookingDetails />,
               },
               {
                 path: "/manager/total-cancelled-bookings",
@@ -167,6 +180,7 @@ export const appRouter = createBrowserRouter([
               { path: "/manager/past-trips", element: <PastTripsForManager /> },
               { path: "/manager/team-management", element: <MyTeam /> },
               { path: "/manager/reissue-requests", element: <ReissueRequests /> },
+              { path: "/manager/offline-cancellations", element: <OfflineCancellationQueries /> },
             ],
           },
         ],
@@ -185,16 +199,22 @@ export const appRouter = createBrowserRouter([
             element: <Layout />,
             children: [
               { path: "/my-bookings", element: <MyBookings /> },
-              { path: "/my-bookings/:id", element: <BookingDetails /> },
+              { path: "/my-booking/:id", element: <BookingDetails /> },
               {
                 path: "/my-hotel-booking/:id",
+                element: <HotelBookingDetails />,
+              },
+              {
+                path: "/my-cancelled-hotel-booking/:id",
                 element: <HotelBookingDetails />,
               },
               {
                 path: "/my-cancelled-bookings",
                 element: <CancelledFlightsPage />,
               },
-              { path: "/my-reissued", element: <ReissueRequests /> },
+              { path: "/my-cancelled-booking/:id", element: <BookingDetails /> },
+              { path: "/my-reissued", element: <MyReissueRequests /> },
+              { path: "/my-offline-cancellations", element: <OfflineCancellationQueries /> },
               { path: "/my-upcoming-trips", element: <MyUpcomingTrips /> },
               { path: "/my-past-trips", element: <MyPastTrips /> },
               {

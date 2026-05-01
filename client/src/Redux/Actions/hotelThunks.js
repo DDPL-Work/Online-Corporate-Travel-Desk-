@@ -1,6 +1,5 @@
 // client\src\Redux\Actions\hotelThunks.js
 
-
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../API/axios";
 
@@ -14,9 +13,7 @@ export const fetchCountries = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await api.get("/hotels/country-list");
-
       console.log("COUNTRY API RESPONSE:", response.data);
-
       return response.data.data;
     } catch (err) {
       console.log("COUNTRY API ERROR:", err);
@@ -36,7 +33,6 @@ export const fetchCities = createAsyncThunk(
       
       const rawCities = Array.isArray(data.data) ? data.data : data.data?.CityList || [];
       
-      // EXPLICIT MAPPING to ensure structure is consistent
       const mappedCities = rawCities.map(c => ({
         cityName: c.cityName || c.CityName || c.Name || c.name || "",
         cityCode: c.cityCode || c.CityCode || c.Code || c.code || "",
@@ -45,8 +41,6 @@ export const fetchCities = createAsyncThunk(
       }));
 
       console.log(`🏙️ [Thunk] Cities for ${countryCode}:`, mappedCities.length);
-      if (mappedCities.length > 0) console.table(mappedCities.slice(0, 5));
-
       return {
         countryCode,
         cities: mappedCities,
@@ -64,11 +58,9 @@ export const searchHotels = createAsyncThunk(
     try {
       const hasWrapper = params && typeof params === "object" && "payload" in params;
       const payload = hasWrapper ? params.payload : params;
-      const page = hasWrapper ? params.page || 1 : 1;
-      const limit = hasWrapper ? params.limit || 10 : 10;
 
       const { data } = await api.post(
-        `/hotels/search?page=${page}&limit=${limit}`,
+        `/hotels/search`,
         payload,
       );
 
@@ -81,14 +73,12 @@ export const searchHotels = createAsyncThunk(
       const pagination =
         data?.data?.pagination || {
           total: hotels.length,
-          page,
-          limit,
+          page: 1,
+          limit: hotels.length,
           hasMore: false,
         };
 
       console.log("🏨 HOTEL SEARCH RESPONSE:", {
-        page,
-        limit,
         total: pagination.total,
         hotels: hotels.length,
       });
@@ -96,9 +86,9 @@ export const searchHotels = createAsyncThunk(
       return {
         hotels,
         pagination,
+        filterMeta: data?.data?.filterMeta || null,
+        searchMeta: data?.data?.searchMeta || null,
         traceId: data?.data?.traceId || data?.data?.TraceId || null,
-        page,
-        limit,
       };
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
@@ -146,6 +136,7 @@ export const fetchRoomInfo = createAsyncThunk(
     }
   },
 );
+
 /* ---------- BOOKING DETAILS (Post-Booking) ---------- */
 export const fetchBookingDetails = createAsyncThunk(
   "hotel/fetchBookingDetails",

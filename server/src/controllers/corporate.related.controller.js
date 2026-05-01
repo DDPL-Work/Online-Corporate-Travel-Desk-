@@ -190,6 +190,7 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
     customBillingDays,
     creditLimit,
     walletBalance,
+    serviceCharges,
   } = req.body;
 
   if (!classification)
@@ -229,6 +230,13 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
   }
 
   corporate.classification = classification;
+  corporate.serviceCharges = {
+    domesticFlight: Number(serviceCharges?.domesticFlight || 0),
+    internationalOneWayFlight: Number(serviceCharges?.internationalOneWayFlight || 0),
+    internationalReturnFlight: Number(serviceCharges?.internationalReturnFlight || 0),
+    domesticHotel: Number(serviceCharges?.domesticHotel || 0),
+    internationalHotel: Number(serviceCharges?.internationalHotel || 0),
+  };
 
   // ----------------------------
   // 🔹 Activate Corporate
@@ -726,14 +734,41 @@ exports.getCancelledOrRequestedHotels = async (req, res) => {
 exports.fetchCancellationQueries = async (req, res) => {
   try {
     const {
-      // page = 1,
-      // limit = 500,
       status,
       bookingReference,
       queryId,
     } = req.query;
 
-    const query = {};
+    const userRole = req.user?.role;
+    const userId = req.user?._id;
+    const corporateId = req.user?.corporateId;
+
+    let query = {};
+
+    /* ─────────────────────────────
+       🔥 ROLE-BASED FILTERING
+    ───────────────────────────── */
+    if (userRole === "employee") {
+      // Employee sees only their own requests
+      query["user.id"] = userId;
+    } else if (userRole === "manager") {
+      // Manager sees their own + their team's requests
+      const Employee = require("../models/Employee");
+      const teamEmployees = await Employee.find({ managerId: userId }).select("userId").lean();
+      const teamUserIds = teamEmployees.map(e => e.userId);
+      query["user.id"] = { $in: [...teamUserIds, userId] };
+    } else if (userRole === "travel-admin") {
+      // Travel Admin sees all requests for their corporate
+      query["corporate.companyId"] = corporateId;
+    } else if (userRole === "super-admin" || userRole === "ops-member") {
+      // Super Admin sees everything or filtered by query params
+      if (req.query.corporateId) {
+        query["corporate.companyId"] = req.query.corporateId;
+      }
+    } else {
+      // Unauthorized or unknown role
+      return res.status(403).json({ success: false, message: "Unauthorized role for this action" });
+    }
 
     if (status) query.status = status;
 
@@ -745,13 +780,9 @@ exports.fetchCancellationQueries = async (req, res) => {
       query.queryId = { $regex: queryId, $options: "i" };
     }
 
-    // const skip = (page - 1) * limit;
-
     const [queries, total] = await Promise.all([
       CancellationQuery.find(query)
         .sort({ createdAt: -1 })
-        // .skip(skip)
-        // .limit(Number(limit))
         .lean(),
 
       CancellationQuery.countDocuments(query),
@@ -887,6 +918,53 @@ exports.fetchCancellationQueries = async (req, res) => {
       message: "Failed to fetch cancellation queries",
       error: error.message,
     });
+  }
+};
+
+// Get single cancellation query details with booking info
+exports.fetchCancellationQueryById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = await CancellationQuery.findById(id).lean();
+
+    if (!query) {
+      return res.status(404).json({ success: false, message: "Query not found" });
+    }
+
+    // Role-based access check
+    const userRole = req.user?.role;
+    const userId = req.user?._id?.toString();
+    const corporateId = req.user?.corporateId?.toString();
+
+    if (userRole === "employee" && query.user?.id?.toString() !== userId) {
+      return res.status(403).json({ success: false, message: "Unauthorized access to this query" });
+    }
+
+    if (userRole === "travel-admin" && query.corporate?.companyId?.toString() !== corporateId) {
+      return res.status(403).json({ success: false, message: "Unauthorized access to this company's query" });
+    }
+
+    let bookingData = null;
+    if (query.bookingId) {
+      // 1. Try Flight Booking Model
+      bookingData = await BookingRequest.findById(query.bookingId).lean();
+      
+      // 2. If not found, try Hotel Booking Model
+      if (!bookingData) {
+        bookingData = await HotelBookingRequest.findById(query.bookingId).lean();
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        ...query,
+        bookingDetails: bookingData
+      }
+    });
+  } catch (error) {
+    console.error("Fetch Query Details Error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to fetch query details" });
   }
 };
 

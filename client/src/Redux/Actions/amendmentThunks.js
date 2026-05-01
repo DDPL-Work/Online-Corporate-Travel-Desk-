@@ -1,3 +1,4 @@
+import api from '../../API/axios';
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import flightApi from "../../API/flightAPI";
 
@@ -127,3 +128,47 @@ export const createCancellationQuery = createAsyncThunk(
     }
   }
 );
+export const fetchCancellationQueries = createAsyncThunk(
+  "cancellationQuery/fetchAll",
+  async (params, { rejectWithValue }) => {
+    try {
+      const res = await api.get("/corporate-related/cancellation-queries", { params });
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch queries"
+      );
+    }
+  }
+);
+
+export const updateCancellationQueryStatus = createAsyncThunk(
+  "cancellationQuery/updateStatus",
+  async ({ id, status, remarks, resolution }, { rejectWithValue }) => {
+    try {
+      const res = await api.patch(`/corporate-related/cancellation-queries/${id}/status`, {
+        status,
+        remarks,
+        resolution
+      });
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to update status"
+      );
+    }
+  }
+);
+
+export const fetchCancellationQueryDetails = createAsyncThunk(
+  'cancellationQuery/fetchDetails',
+  async (id, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/corporate-related/cancellation-queries/${id}`);
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to fetch query details');
+    }
+  }
+);
+
