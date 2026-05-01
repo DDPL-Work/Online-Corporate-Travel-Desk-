@@ -1,6 +1,4 @@
-// client\src\Pages\search-results\Hotel-results\Hotel-Search-Results.jsx
-
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Header from "./Hotel-Header";
 import FilterSidebar from "./Filter-Sidebar";
 import HotelCard from "./Hotel-Card";
@@ -8,43 +6,153 @@ import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import { useDispatch, useSelector } from "react-redux";
 import { searchHotels } from "../../../Redux/Actions/hotelThunks";
 
+const DEFAULT_FILTERS = {
+  minPrice: null,
+  maxPrice: null,
+  starRating: [],
+  mealType: null,
+  location: "",
+  amenities: [],
+  refundable: null,
+};
+
 function HotelSearchResults() {
   const dispatch = useDispatch();
-  const { hotels, loading, traceId, pagination, searchPayload } = useSelector(
-    (state) => state.hotel,
+  const {
+    hotels,
+    loading,
+    traceId,
+    pagination,
+    searchPayload,
+    filterMeta,
+  } = useSelector((state) => state.hotel);
+
+  const [filters, setFilters] = useState(() => ({ ...DEFAULT_FILTERS }));
+  const [searchText, setSearchText] = useState("");
+  const [sortOrder, setSortOrder] = useState("low");
+
+  const availablePriceRange = filterMeta?.priceRange || { min: 0, max: 0 };
+  const pageSize = pagination?.limit || 10;
+
+  const baseSearchPayload = useMemo(() => {
+    if (!searchPayload) return null;
+    const { SearchFilters: _ignored, ...rest } = searchPayload;
+    return rest;
+  }, [searchPayload]);
+
+  const backendSearchFilters = useMemo(() => {
+    const payload = {
+      sortBy: sortOrder === "high" ? "priceDesc" : "priceAsc",
+    };
+
+    if (searchText.trim()) {
+      payload.hotelName = searchText.trim();
+    }
+
+    if (filters.location.trim()) {
+      payload.location = filters.location.trim();
+    }
+
+    if (Array.isArray(filters.starRating) && filters.starRating.length > 0) {
+      payload.starRating = filters.starRating;
+    }
+
+    if (filters.mealType) {
+      payload.mealType = filters.mealType;
+    }
+
+    if (Array.isArray(filters.amenities) && filters.amenities.length > 0) {
+      payload.amenities = filters.amenities;
+    }
+
+    if (filters.refundable !== null) {
+      payload.refundable = filters.refundable;
+    }
+
+    if (
+      filters.minPrice !== null &&
+      filters.minPrice > availablePriceRange.min
+    ) {
+      payload.minPrice = filters.minPrice;
+    }
+
+    if (
+      filters.maxPrice !== null &&
+      availablePriceRange.max > 0 &&
+      filters.maxPrice < availablePriceRange.max
+    ) {
+      payload.maxPrice = filters.maxPrice;
+    }
+
+    return payload;
+  }, [
+    sortOrder,
+    searchText,
+    filters.location,
+    filters.starRating,
+    filters.mealType,
+    filters.amenities,
+    filters.refundable,
+    filters.minPrice,
+    filters.maxPrice,
+    availablePriceRange.min,
+    availablePriceRange.max,
+  ]);
+
+  const requestKey = useMemo(
+    () =>
+      JSON.stringify({
+        base: baseSearchPayload,
+        filters: backendSearchFilters,
+        limit: pageSize,
+      }),
+    [baseSearchPayload, backendSearchFilters, pageSize],
   );
 
-  const [filters, setFilters] = useState({
-    minPrice: 0,
-    maxPrice: 100000,
-    starRating: [],
-    mealType: null,
-    location: "",
-    amenities: [],
-    refundable: null,
-  });
-  const [searchText, setSearchText] = useState("");
-  const [sortOrder, setSortOrder] = useState("");
+  const lastSearchRef = useRef("");
+
+  useEffect(() => {
+    if (!baseSearchPayload) return;
+    
+    // Skip if we already searched for this exact key
+    if (lastSearchRef.current === requestKey) return;
+
+    const timer = setTimeout(() => {
+      dispatch(
+        searchHotels({
+          payload: {
+            ...baseSearchPayload,
+            SearchFilters: backendSearchFilters,
+          },
+          page: 1,
+          limit: pageSize,
+        }),
+      );
+      lastSearchRef.current = requestKey;
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [dispatch, requestKey, baseSearchPayload, backendSearchFilters, pageSize]);
 
   const transformedHotels = useMemo(
     () =>
       hotels?.map((hotel) => {
-        const cheapestRoom = hotel.Rooms?.reduce((prev, curr) =>
-          curr.TotalFare < prev.TotalFare ? curr : prev,
-        );
+        const rooms = Array.isArray(hotel.Rooms) ? hotel.Rooms : [];
+        const cheapestRoom = rooms.length
+          ? rooms.reduce((prev, curr) =>
+              curr.TotalFare < prev.TotalFare ? curr : prev,
+            )
+          : null;
 
         const nights = cheapestRoom?.DayRates?.[0]?.length || 1;
-
         const perNight =
           nights > 0
             ? cheapestRoom?.TotalFare / nights
             : cheapestRoom?.TotalFare;
-
         const inclusions =
-          cheapestRoom?.Inclusion?.split(",")?.map((i) =>
-            i.replaceAll("_", " "),
+          cheapestRoom?.Inclusion?.split(",")?.map((item) =>
+            item.replaceAll("_", " ").trim(),
           ) || [];
-
         const mapCoords = hotel.Map || "";
         const [lat, lng] = mapCoords.split("|");
 
@@ -65,8 +173,8 @@ function HotelSearchResults() {
           rating: hotel.StarRating || 0,
           address: hotel.Address || "Location not available",
           roomType: cheapestRoom?.Name?.[0] || "Standard",
-          roomsLeft: hotel.Rooms?.length || 1,
-          traceId: traceId,
+          roomsLeft: rooms.length || 1,
+          traceId,
           images:
             hotel.Images?.length > 0
               ? hotel.Images
@@ -82,64 +190,19 @@ function HotelSearchResults() {
     [hotels, traceId],
   );
 
-  const filteredHotels = transformedHotels?.filter((hotel) => {
-    const searchLoc = filters.location?.toLowerCase() || "";
-    const locationMatch =
-      !searchLoc ||
-      hotel.address?.toLowerCase().includes(searchLoc) ||
-      hotel.name?.toLowerCase().includes(searchLoc);
-    
-    const priceMatch =
-      hotel.price >= filters.minPrice && hotel.price <= filters.maxPrice;
-
-    const starMatch =
-      filters.starRating.length === 0 ||
-      filters.starRating.includes(hotel.rating);
-
-    const nameMatch = hotel.name
-      ?.toLowerCase()
-      .includes(searchText.toLowerCase());
-
-    const mealMatch = !filters.mealType || hotel.meal === filters.mealType;
-
-    // const propertyMatch =
-    //   filters.propertyType.length === 0 ||
-    //   filters.propertyType.includes(hotel.propertyType);
-
-    const amenityMatch =
-      filters.amenities.length === 0 ||
-      filters.amenities.every((amenity) => hotel.amenities?.includes(amenity));
-
-    const refundableMatch =
-      filters.refundable === null || hotel.refundable === filters.refundable;
-
-    return (
-      locationMatch &&
-      priceMatch &&
-      starMatch &&
-      nameMatch &&
-      mealMatch &&
-      // propertyMatch &&
-      amenityMatch &&
-      refundableMatch
-    );
-  });
-
-  const sortedHotels = [...filteredHotels].sort((a, b) => {
-    if (sortOrder === "low") return a.price - b.price;
-    if (sortOrder === "high") return b.price - a.price;
-    return 0;
-  });
-
   const handleLoadMore = () => {
     if (!pagination?.hasMore) return;
     if (loading?.search || loading?.loadMore) return;
-    if (!searchPayload) return;
+    if (!baseSearchPayload) return;
+
     dispatch(
       searchHotels({
-        payload: searchPayload,
+        payload: {
+          ...baseSearchPayload,
+          SearchFilters: backendSearchFilters,
+        },
         page: (pagination?.page || 1) + 1,
-        limit: pagination?.limit || 10,
+        limit: pageSize,
       }),
     );
   };
@@ -154,36 +217,30 @@ function HotelSearchResults() {
 
       <div className="w-full px-3 sm:px-4 lg:px-6 py-4">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Sidebar */}
           <div className="w-full lg:w-80">
-            <div
-              className="
-                          lg:sticky lg:top-4 
-                          lg:max-h-[calc(100vh-120px)] 
-                          lg:overflow-y-auto"
-            >
+            <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
               <FilterSidebar
                 hotels={transformedHotels}
-                filteredHotels={filteredHotels}
+                filterMeta={filterMeta}
                 filters={filters}
                 setFilters={setFilters}
                 searchText={searchText}
                 setSearchText={setSearchText}
+                mapSearchPayload={baseSearchPayload}
               />
             </div>
           </div>
 
-          {/* Main Content */}
           <div className="flex-1">
-            <div className="  flex flex-col">
-              {/* Header */}
+            <div className="flex flex-col">
               <div className="border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3">
-                <h2 className="text-lg sm:text-xl font-semibold" style={{ color: "#1E293B" }}>
-                  Found {pagination?.total ?? filteredHotels?.length ?? 0}{" "}
-                  hotels
+                <h2
+                  className="text-lg sm:text-xl font-semibold"
+                  style={{ color: "#1E293B" }}
+                >
+                  Found {pagination?.total ?? transformedHotels?.length ?? 0} hotels
                 </h2>
 
-                {/* Sort Dropdown */}
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-slate-500">Sort by:</span>
 
@@ -193,32 +250,27 @@ function HotelSearchResults() {
                     className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2"
                     style={{ outlineColor: "#C9A84C" }}
                   >
-                    <option value="">Recommended</option>
-                    <option value="low">Price: Low → High</option>
-                    <option value="high">Price: High → Low</option>
+                    <option value="low">Price: Low to High</option>
+                    <option value="high">Price: High to Low</option>
                   </select>
                 </div>
               </div>
 
-              {/* Hotel Cards */}
-              <div
-                className=" py-4 space-y-4 
-              lg:max-h-[calc(100vh-180px)] 
-              lg:overflow-y-auto"
-              >
+              <div className="py-4 space-y-4 lg:max-h-[calc(100vh-180px)] lg:overflow-y-auto">
                 {isInitialLoading ? (
-                  <p className="text-center py-10 text-slate-500">Loading hotels...</p>
-                ) : filteredHotels?.length === 0 ? (
+                  <p className="text-center py-10 text-slate-500">
+                    Loading hotels...
+                  </p>
+                ) : transformedHotels?.length === 0 ? (
                   <p className="text-center py-10 text-slate-400">
                     No hotels found
                   </p>
                 ) : (
                   <>
-                    {sortedHotels?.map((hotel) => (
+                    {transformedHotels.map((hotel) => (
                       <HotelCard key={hotel.id} hotel={hotel} />
                     ))}
 
-                    {/* Load More Button */}
                     {pagination?.hasMore && (
                       <div className="flex justify-center pt-6">
                         <button

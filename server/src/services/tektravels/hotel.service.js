@@ -381,11 +381,18 @@ class HotelService {
           GuestNationality: params.GuestNationality || "IN",
           NoOfRooms: params.NoOfRooms,
           PaxRooms: params.PaxRooms,
-          IsDetailedResponse: true,
-          Filters: {
-            Refundable: false,
-            MealType: "All",
-          },
+          IsDetailedResponse:
+            params.IsDetailedResponse === undefined
+              ? true
+              : Boolean(params.IsDetailedResponse),
+          Filters:
+            params.Filters && typeof params.Filters === "object"
+              ? params.Filters
+              : {
+                  Refundable: false,
+                  MealType: "All",
+                },
+          ResponseTime: params.ResponseTime,
         },
         {
           auth: {

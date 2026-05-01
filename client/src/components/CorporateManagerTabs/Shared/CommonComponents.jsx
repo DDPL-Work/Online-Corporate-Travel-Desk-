@@ -44,12 +44,14 @@ export const statusStyles = {
   voucher_generated: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
   Pending: "bg-amber-50  text-amber-700  ring-1 ring-amber-200",
   Cancelled: "bg-red-50    text-red-700    ring-1 ring-red-200",
+  Failed: "bg-red-50    text-red-700    ring-1 ring-red-200",
 };
 export const dotStyles = {
   Confirmed: "bg-emerald-500",
   voucher_generated: "bg-emerald-500",
   Pending: "bg-amber-500",
   Cancelled: "bg-red-500",
+  Failed: "bg-red-500",
 };
 
 export const StatCard = ({

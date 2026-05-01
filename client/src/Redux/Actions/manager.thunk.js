@@ -206,3 +206,38 @@ export const getTeamExecutedFlightRequests = createAsyncThunk(
     }
   }
 );
+
+export const getTeamExecutedFlightRequestById = createAsyncThunk(
+  "manager/getTeamExecutedFlightRequestById",
+  async (id, { rejectWithValue }) => {
+    try {
+      const res = await api.get(
+        `/corporate-manager/flight/team-executed-requests/${id}`,
+        { withCredentials: true }
+      );
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data || { message: "Failed to fetch flight details" }
+      );
+    }
+  }
+);
+
+export const getTeamExecutedHotelRequestById = createAsyncThunk(
+  "manager/getTeamExecutedHotelRequestById",
+  async (id, { rejectWithValue }) => {
+    try {
+      const res = await api.get(
+        `/corporate-manager/hotel/team-executed-requests/${id}`,
+        { withCredentials: true }
+      );
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data || { message: "Failed to fetch hotel details" }
+      );
+    }
+  }
+);
+

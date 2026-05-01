@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
-import { searchHotels, fetchCities } from "../../../Redux/Actions/hotelThunks";
+import { searchHotels, fetchCities, fetchCountries } from "../../../Redux/Actions/hotelThunks";
 import { MdArrowBack, MdLocationOn, MdPerson, MdSearch, MdBed } from "react-icons/md";
 import { CountrySelector, SearchableSelect } from "../../../components/hotel-search/HotelSearchSubComponents";
 import HotelGuestSelection from "../../../components/hotel-search/HotelGuestSelection";
@@ -64,6 +64,12 @@ const Header = () => {
   const { searchPayload, countries, citiesByCountry, loading } = useSelector((state) => state.hotel);
   const { publicBranding } = useSelector((state) => state.landingPage);
 
+  useEffect(() => {
+    if (!countries || (Array.isArray(countries) && countries.length === 0)) {
+      dispatch(fetchCountries());
+    }
+  }, [dispatch, countries]);
+
   const [form, setForm] = useState({ country: "IN", cityCode: "", cityName: "", checkIn: "", checkOut: "", rooms: 1, guestNationality: "IN" });
   const [roomConfigs, setRoomConfigs] = useState([{ adults: 2, children: 0, childrenAges: [] }]);
   const [openCalendar, setOpenCalendar] = useState(null);
@@ -76,13 +82,38 @@ const Header = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // Sync form with searchPayload ONLY on initial mount or if cityCode changes externally
+  const hasSynced = useRef(false);
   useEffect(() => {
-    if (searchPayload) {
-      setForm({ country: searchPayload.GuestNationality || "IN", guestNationality: searchPayload.GuestNationality || "IN", cityCode: searchPayload.CityCode || "", cityName: searchPayload.CityName || "", checkIn: searchPayload.CheckIn || "", checkOut: searchPayload.CheckOut || "", rooms: searchPayload.NoOfRooms || 1 });
-      if (searchPayload.PaxRooms) setRoomConfigs(searchPayload.PaxRooms.map(r => ({ adults: r.Adults, children: r.Children, childrenAges: r.ChildrenAges || [] })));
-      dispatch(fetchCities(searchPayload.GuestNationality || "IN"));
+    if (searchPayload && !hasSynced.current) {
+      const destCountry = searchPayload.CountryCode || searchPayload.countryCode || searchPayload.GuestNationality || "IN";
+      const cityName = searchPayload.CityName || searchPayload.cityName || "";
+      const cityCode = searchPayload.CityCode || searchPayload.cityCode || "";
+
+      setForm({
+        country: destCountry,
+        guestNationality: searchPayload.GuestNationality || "IN",
+        cityCode: cityCode,
+        cityName: cityName,
+        checkIn: searchPayload.CheckIn || "",
+        checkOut: searchPayload.CheckOut || "",
+        rooms: searchPayload.NoOfRooms || 1
+      });
+
+      if (searchPayload.PaxRooms) {
+        setRoomConfigs(searchPayload.PaxRooms.map(r => ({
+          adults: r.Adults !== undefined ? r.Adults : (r.adults !== undefined ? r.adults : 1),
+          children: r.Children !== undefined ? r.Children : (r.children !== undefined ? r.children : 0),
+          childrenAges: r.ChildrenAges || r.childrenAges || []
+        })));
+      }
+      
+      if (!citiesByCountry?.[destCountry]) {
+        dispatch(fetchCities(destCountry));
+      }
+      hasSynced.current = true;
     }
-  }, [searchPayload, dispatch]);
+  }, [searchPayload, dispatch, citiesByCountry]);
 
   const currentCities = citiesByCountry?.[form.country] || [];
 
@@ -143,22 +174,47 @@ const Header = () => {
 
         {/* Search Bar */}
         <div className="flex flex-col md:flex-row items-stretch bg-white rounded-2xl overflow-visible shadow-2xl py-3">
-          <div className="flex-1 min-w-0 px-2 py-0.5 border-r border-gray-100 bg-amber-50/30">
-            <CountrySelector label="Country" value={form.country} countries={normalizedCountries} onChange={(code) => { setForm({ ...form, country: code, cityCode: "", cityName: "" }); dispatch(fetchCities(code)); }} />
+          <div className="flex-1 min-w-0 px-2 py-0.5 border-b md:border-b-0 md:border-r border-gray-100 bg-amber-50/30">
+            <CountrySelector 
+              label="Country" 
+              value={form.country} 
+              countries={normalizedCountries} 
+              onChange={(code) => { 
+                setForm({ ...form, country: code, cityCode: "", cityName: "" }); 
+                if (!citiesByCountry?.[code]) {
+                  dispatch(fetchCities(code)); 
+                }
+              }} 
+            />
           </div>
-          <div className="flex-[1.5] min-w-0 border-r border-gray-100 bg-amber-50/30">
-            <SearchableSelect label="City / Area" icon={<MdLocationOn className="lg" style={{ color: ORANGE }} />} value={form.cityCode} options={currentCities} displayKey="cityName" valueKey="cityCode" onChange={(item) => setForm({ ...form, cityCode: item.cityCode, cityName: item.cityName })} placeholder="Where are you going?" />
+          <div className="flex-[1.5] min-w-0 px-2 py-0.5 border-b md:border-b-0 md:border-r border-gray-100 bg-amber-50/30">
+            <SearchableSelect 
+              label="City / Area" 
+              icon={<MdLocationOn className="text-lg" style={{ color: ORANGE }} />} 
+              value={form.cityCode} 
+              options={currentCities} 
+              displayKey="cityName" 
+              valueKey="cityCode" 
+              onChange={(item) => setForm({ ...form, cityCode: item.cityCode, cityName: item.cityName })} 
+              placeholder="Where are you going?" 
+            />
           </div>
-          <div className="flex-1 min-w-0 border-r border-gray-100">
+          <div className="flex-1 min-w-0 px-2 py-0.5 border-b md:border-b-0 md:border-r border-gray-100">
             <DateField label="Check-In" value={form.checkIn} min={today} open={openCalendar === "checkIn"} setOpen={(val) => setOpenCalendar(val ? "checkIn" : null)} onChange={(val) => setForm({ ...form, checkIn: val, checkOut: form.checkOut && form.checkOut <= val ? "" : form.checkOut })} />
           </div>
-          {nights > 0 && (<div className="hidden md:flex items-center justify-center px-1 shrink-0"><span className="text-xs font-black px-2 py-1 rounded-full whitespace-nowrap border" style={{ background: `${ORANGE}1A`, color: ORANGE, borderColor: `${ORANGE}50` }}>{nights}N</span></div>)}
+          {nights > 0 && (
+            <div className="hidden md:flex items-center justify-center px-1 shrink-0">
+              <span className="text-xs font-black px-2 py-1 rounded-full whitespace-nowrap border" style={{ background: `${ORANGE}1A`, color: ORANGE, borderColor: `${ORANGE}50` }}>
+                {nights}N
+              </span>
+            </div>
+          )}
           <Divider />
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 px-2 py-0.5 border-b md:border-b-0 md:border-r border-gray-100">
             <DateField label="Check-Out" value={form.checkOut} min={form.checkIn || today} open={openCalendar === "checkOut"} setOpen={(val) => setOpenCalendar(val ? "checkOut" : null)} align="right" onChange={(val) => setForm({ ...form, checkOut: val })} />
           </div>
           <Divider />
-          <div className="flex-[1.3] min-w-0 relative" ref={guestRef}>
+          <div className="flex-[1.3] min-w-0 relative px-2 py-0.5 border-b md:border-b-0 border-gray-100" ref={guestRef}>
             <button type="button" onClick={() => setShowGuestDropdown((v) => !v)} className="w-full h-full flex items-center gap-2 px-4 py-3 bg-amber-50/40 border border-amber-100/60 text-left transition-colors rounded-xl cursor-pointer hover:bg-amber-50">
               <MdPerson className="shrink-0 text-lg" style={{ color: ORANGE }} />
               <span className="flex flex-col flex-1 min-w-0">
@@ -167,7 +223,21 @@ const Header = () => {
               </span>
               <svg className={`w-3 h-3 shrink-0 transition-transform ${showGuestDropdown ? "rotate-180" : ""}`} style={{ color: ORANGE }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
             </button>
-            {showGuestDropdown && (<div className="absolute top-full right-0 z-[1000] mt-2 shadow-2xl"><HotelGuestSelection rooms={form.rooms} setRooms={(val) => setForm({ ...form, rooms: val })} guestNationality={form.guestNationality} setGuestNationality={(val) => setForm({ ...form, guestNationality: val })} roomConfigs={roomConfigs} setRoomConfigs={setRoomConfigs} normalizedCountries={normalizedCountries} onApply={() => setShowGuestDropdown(false)} CountrySelector={CountrySelector} /></div>)}
+            {showGuestDropdown && (
+              <div className="absolute top-full right-0 z-[1000] mt-2 shadow-2xl">
+                <HotelGuestSelection 
+                  rooms={form.rooms} 
+                  setRooms={(val) => setForm({ ...form, rooms: val })} 
+                  guestNationality={form.guestNationality} 
+                  setGuestNationality={(val) => setForm({ ...form, guestNationality: val })} 
+                  roomConfigs={roomConfigs} 
+                  setRoomConfigs={setRoomConfigs} 
+                  normalizedCountries={normalizedCountries} 
+                  onApply={() => setShowGuestDropdown(false)} 
+                  CountrySelector={CountrySelector} 
+                />
+              </div>
+            )}
           </div>
           <div className="px-3 flex items-center shrink-0">
             <button type="button" onClick={handleSearch} disabled={loading?.search || !form.cityCode || !form.checkIn || !form.checkOut} className="flex items-center justify-center gap-2 px-8 h-12 font-black text-xs uppercase tracking-widest transition-all rounded-xl cursor-pointer shadow-md active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: loading?.search ? AZURE : ORANGE, color: loading?.search ? "#fff" : DARK }}>

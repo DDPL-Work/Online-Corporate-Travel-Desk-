@@ -764,7 +764,8 @@ const HeroWithSearch = ({
         ChildrenAges: (r.childrenAges || []).slice(0, r.children),
       })),
       IsDetailedResponse: true,
-      Filters: { Refundable: true, MealType: "All" },
+      Filters: { Refundable: false, MealType: "All" },
+      SearchFilters: { sortBy: "priceAsc" },
     };
     try {
       const result = await dispatch(
