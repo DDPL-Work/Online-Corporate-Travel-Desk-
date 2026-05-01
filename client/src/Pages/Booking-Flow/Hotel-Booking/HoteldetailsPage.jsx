@@ -160,11 +160,7 @@ const HotelDetailsPage = () => {
     }
 
     const normalizedRooms = Object.values(selectedRooms)
-      .flatMap((r) =>
-        Array.from({ length: r.count }, () => ({
-          ...r.room, // ✅ create new object
-        })),
-      )
+      .map((r) => ({ ...r.room }))
       .map((room) => {
         const totalFare = room.TotalFare || room.Price?.TotalFare || 0;
         const tax = room.TotalTax || room.Price?.Tax || 0;
@@ -178,10 +174,10 @@ const HotelDetailsPage = () => {
           BookingCode:
             room.BookingCode || room.RoomTypeCode || room.RatePlanCode,
           Price: {
-            totalFare,
+            totalFare: totalFare + tax,
             tax,
-            baseFare: totalFare - tax,
-            perNight: totalFare / nights,
+            baseFare: totalFare,
+            perNight: (totalFare + tax) / nights,
             nights,
             currency: room.Currency || "INR",
           },
@@ -268,11 +264,11 @@ const HotelDetailsPage = () => {
   }
 
   const cheapestRoom = mergedHotel.rooms?.reduce(
-    (prev, curr) =>
-      (curr.Price?.TotalFare || curr.TotalFare) <
-      (prev.Price?.TotalFare || prev.TotalFare)
-        ? curr
-        : prev,
+    (prev, curr) => {
+      const currTotal = (curr.Price?.TotalFare || curr.TotalFare || 0) + (curr.Price?.Tax || curr.TotalTax || 0);
+      const prevTotal = (prev.Price?.TotalFare || prev.TotalFare || 0) + (prev.Price?.Tax || prev.TotalTax || 0);
+      return currTotal < prevTotal ? curr : prev;
+    },
     mergedHotel.rooms[0],
   );
 
@@ -400,13 +396,12 @@ const HotelDetailsPage = () => {
                       ? Object.values(selectedRooms).reduce(
                           (sum, r) =>
                             sum +
-                            r.count *
-                              (r.room.TotalFare || r.room.Price?.TotalFare || 0),
+                              ((r.room.TotalFare || r.room.Price?.TotalFare || 0) + (r.room.TotalTax || r.room.Price?.Tax || 0)),
                           0,
                         )
-                      : cheapestRoom?.Price?.TotalFare ||
+                      : (cheapestRoom?.Price?.TotalFare ||
                         cheapestRoom?.TotalFare ||
-                        0;
+                        0) + (cheapestRoom?.Price?.Tax || cheapestRoom?.TotalTax || 0);
 
                     return (
                       <div

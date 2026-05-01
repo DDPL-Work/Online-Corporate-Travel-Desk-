@@ -63,6 +63,7 @@ import {
   fetchCountries,
   searchHotels,
 } from "../../../Redux/Actions/hotelThunks";
+import { setSearchPayload } from "../../../Redux/Slice/hotelSlice";
 import { CountrySelector } from "../../../components/hotel-search/HotelSearchSubComponents";
 import HotelGuestSelection from "../../../components/hotel-search/HotelGuestSelection";
 import TravelersClassModal from "../../../components/FlightSearchComponents/TravelersClassModal";
@@ -743,18 +744,18 @@ const HeroWithSearch = ({
     });
   }, [rooms]);
 
-  const handleHotelSearch = async () => {
+  const handleHotelSearch = () => {
     if (!selectedCityCode || !checkIn || !checkOut) {
       alert("Please select a valid city and fill all required fields");
       return;
     }
-    setHotelLoading(true);
-    setNoResults(false);
+
     const payload = {
       CheckIn: checkIn,
       CheckOut: checkOut,
       CityCode: selectedCityCode,
       CityName: city,
+      CountryCode: country,
       GuestNationality: guestNationality,
       ResponseTime: 23,
       NoOfRooms: rooms,
@@ -767,22 +768,14 @@ const HeroWithSearch = ({
       Filters: { Refundable: false, MealType: "All" },
       SearchFilters: { sortBy: "priceAsc" },
     };
-    try {
-      const result = await dispatch(
-        searchHotels({ payload, page: 1, limit: 10 }),
-      ).unwrap();
-      if (result?.hotels?.length > 0) {
-        navigate("/search-hotel-results", {
-          state: {
-            companySlug: companySlug || publicBranding?.companySlug,
-          },
-        });
-      } else setNoResults(true);
-    } catch (err) {
-      console.error("Hotel search failed:", err);
-    } finally {
-      setHotelLoading(false);
-    }
+
+    dispatch(setSearchPayload(payload));
+    navigate("/search-hotel-results", { 
+      state: { 
+        searchPayload: payload,
+        companySlug: companySlug || publicBranding?.companySlug 
+      } 
+    });
   };
 
   const totalGuests = roomConfigs.reduce(
@@ -2151,7 +2144,7 @@ export default function InternalTravelDeskLanding() {
     (s) => s.landingPage,
   );
   const [loading, setLoading] = useState(true);
-  const [landingActiveTab, setLandingActiveTab] = useState("flight");
+  const [landingActiveTab, setLandingActiveTab] = useState(location.state?.activeTab || "flight");
 
   // We map publicBranding to branding so the rest of the file continues to work unchanged
   const branding = publicBranding;
@@ -2160,6 +2153,12 @@ export default function InternalTravelDeskLanding() {
     dispatch(logoutUser());
     navigate("/login");
   };
+
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setLandingActiveTab(location.state.activeTab);
+    }
+  }, [location.state?.activeTab]);
 
   useEffect(() => {
     const fetchBranding = async () => {

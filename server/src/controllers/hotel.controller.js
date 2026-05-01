@@ -287,6 +287,7 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     Filters,
     ResponseTime,
     SearchFilters,
+    forceRefresh,
   } = req.body;
 
   if (!CheckIn || !CheckOut) {
@@ -318,9 +319,13 @@ exports.searchHotels = asyncHandler(async (req, res) => {
   };
   const searchFilters = normalizeSearchFilters(SearchFilters, Filters);
   const cacheKey = cacheService.buildSearchCacheKey(baseSearchPayload);
+  let dataset = null;
 
-  let dataset = await cacheService.getSearchResults(cacheKey);
-  const cacheHit = Array.isArray(dataset?.hotels);
+  if (!forceRefresh) {
+    dataset = await cacheService.getSearchResults(cacheKey);
+  }
+
+  const cacheHit = dataset && Array.isArray(dataset?.hotels);
   let backgroundRefreshTriggered = false;
 
   if (!cacheHit) {
@@ -342,34 +347,22 @@ exports.searchHotels = asyncHandler(async (req, res) => {
   const rawHotels = Array.isArray(dataset?.hotels) ? dataset.hotels : [];
   const preparedHotels = prepareHotelsForFiltering(rawHotels);
   const filterMeta = buildHotelFilterMeta(preparedHotels);
-  const filteredHotels = applyHotelFilters(preparedHotels, searchFilters);
-  const sortedHotels = sortPreparedHotels(
-    filteredHotels,
-    searchFilters.sortBy || DEFAULT_SORT_BY,
-  );
-  const paginatedHotels = sortedHotels
-    .slice(offset, offset + limit)
-    .map(({ hotel }) => hotel);
-  const total = sortedHotels.length;
-  const failedChunks = Array.isArray(dataset?.failedChunks)
-    ? dataset.failedChunks.map((chunk) => ({
-        chunkNumber: chunk.chunkNumber,
-        error: chunk.error,
-      }))
-    : [];
+  const allHotels = preparedHotels.map(({ hotel }) => hotel);
+  const total = allHotels.length;
+  const failedChunks = Array.isArray(dataset?.failedChunks) ? dataset.failedChunks : [];
 
   return res.status(200).json(
     new ApiResponse(
       200,
       {
-        hotels: paginatedHotels,
-        HotelResult: paginatedHotels,
+        hotels: allHotels,
+        HotelResult: allHotels,
         pagination: {
           total,
-          page,
-          limit,
-          offset,
-          hasMore: offset + limit < total,
+          page: 1,
+          limit: total,
+          offset: 0,
+          hasMore: false,
         },
         filterMeta,
         traceId: dataset?.traceId || null,
@@ -382,12 +375,9 @@ exports.searchHotels = asyncHandler(async (req, res) => {
           failedChunks,
           partialResults: failedChunks.length > 0,
           elapsedMs: dataset?.elapsedMs || 0,
-          appliedSort: searchFilters.sortBy || DEFAULT_SORT_BY,
         },
       },
-      failedChunks.length > 0
-        ? "Hotel search completed with partial chunk failures"
-        : "Hotel search completed with full dataset filtering",
-    ),
+      "Hotel search results returned with full data"
+    )
   );
 });

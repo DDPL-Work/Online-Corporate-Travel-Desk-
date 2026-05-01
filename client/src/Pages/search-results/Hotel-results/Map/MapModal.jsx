@@ -1,7 +1,13 @@
 // client\src\Pages\search-results\Hotel-results\Map\MapModal.jsx
 
 // components/MapModal.jsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { FiX, FiSearch, FiMapPin } from "react-icons/fi";
@@ -84,12 +90,11 @@ const getCheapestRoom = (hotel = {}) => {
   const rooms = Array.isArray(hotel.Rooms) ? hotel.Rooms.filter(Boolean) : [];
   if (!rooms.length) return null;
 
-  return rooms.reduce((bestRoom, currentRoom) =>
-    toNumber(currentRoom?.TotalFare, Number.MAX_SAFE_INTEGER) <
-    toNumber(bestRoom?.TotalFare, Number.MAX_SAFE_INTEGER)
-      ? currentRoom
-      : bestRoom,
-  );
+  return rooms.reduce((bestRoom, currentRoom) => {
+    const currentPrice = toNumber(currentRoom?.TotalFare, Number.MAX_SAFE_INTEGER) + toNumber(currentRoom?.TotalTax, 0);
+    const bestPrice = toNumber(bestRoom?.TotalFare, Number.MAX_SAFE_INTEGER) + toNumber(bestRoom?.TotalTax, 0);
+    return currentPrice < bestPrice ? currentRoom : bestRoom;
+  });
 };
 
 const normalizeHotelForMap = (hotel = {}) => {
@@ -129,7 +134,7 @@ const normalizeHotelForMap = (hotel = {}) => {
     id,
     name: hotel.name || hotel.HotelName || "Hotel",
     address,
-    price: toNumber(hotel.price ?? cheapestRoom?.TotalFare, 0),
+    price: toNumber(hotel.price ?? (toNumber(cheapestRoom?.TotalFare, 0) + toNumber(cheapestRoom?.TotalTax, 0)), 0),
     rating: toNumber(hotel.rating ?? hotel.StarRating, 0),
     nights: hotel.nights || cheapestRoom?.DayRates?.[0]?.length || 1,
     images,
@@ -139,7 +144,8 @@ const normalizeHotelForMap = (hotel = {}) => {
         : Boolean(cheapestRoom?.IsRefundable),
     meal: hotel.meal || cheapestRoom?.MealType?.replaceAll("_", " ") || "",
     position: [latitude, longitude],
-    lookupText: `${hotel.name || hotel.HotelName || ""} ${address} ${cityName} ${countryName}`.toLowerCase(),
+    lookupText:
+      `${hotel.name || hotel.HotelName || ""} ${address} ${cityName} ${countryName}`.toLowerCase(),
   };
 };
 
@@ -159,13 +165,7 @@ const dedupeMapHotels = (existing = [], incoming = []) => {
 };
 
 /* ── Hotel Card (left panel) ── */
-const HotelListCard = ({
-  hotel,
-  isActive,
-  onEnter,
-  onLeave,
-  onClick,
-}) => (
+const HotelListCard = ({ hotel, isActive, onEnter, onLeave, onClick }) => (
   <div
     onClick={onClick}
     onMouseEnter={onEnter}
@@ -237,29 +237,20 @@ const HotelListCard = ({
 );
 
 /* ── Main Modal ── */
-const MapModal = ({ open, onClose, hotels = [], searchPayload = null }) => {
+const MapModal = ({ open, onClose, hotels = [] }) => {
   const navigate = useNavigate();
   const [hoveredHotel, setHoveredHotel] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMarker, setSearchMarker] = useState(null);
   const [searching, setSearching] = useState(false);
-  const [mapHotels, setMapHotels] = useState([]);
-  const [mapPagination, setMapPagination] = useState(DEFAULT_MAP_PAGINATION);
-  const [mapLoading, setMapLoading] = useState(false);
-  const [mapError, setMapError] = useState("");
-  const [mapLoaded, setMapLoaded] = useState(false);
   const mapRef = useRef(null);
   const listRef = useRef(null);
-  const mapRequestIdRef = useRef(0);
-  const payloadKey = useMemo(
-    () => (searchPayload ? JSON.stringify(searchPayload) : ""),
-    [searchPayload],
-  );
-  const fallbackHotels = useMemo(
+
+  const sourceHotels = useMemo(
     () => hotels.map(normalizeHotelForMap).filter(Boolean),
     [hotels],
   );
-  const sourceHotels = searchPayload || mapLoaded ? mapHotels : fallbackHotels;
+
   const transformedHotels = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     if (!normalizedQuery) return sourceHotels;
@@ -270,9 +261,8 @@ const MapModal = ({ open, onClose, hotels = [], searchPayload = null }) => {
         .includes(normalizedQuery),
     );
   }, [sourceHotels, searchQuery]);
-  const totalHotels = searchPayload
-    ? mapPagination.total
-    : fallbackHotels.length;
+
+  const totalHotels = sourceHotels.length;
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "auto";
@@ -280,13 +270,6 @@ const MapModal = ({ open, onClose, hotels = [], searchPayload = null }) => {
       document.body.style.overflow = "auto";
     };
   }, [open]);
-
-  useEffect(() => {
-    setMapHotels([]);
-    setMapPagination(DEFAULT_MAP_PAGINATION);
-    setMapLoaded(false);
-    setMapError("");
-  }, [payloadKey]);
 
   const searchLocation = useCallback(async (query) => {
     if (!query.trim() || !mapRef.current) return;
@@ -314,96 +297,28 @@ const MapModal = ({ open, onClose, hotels = [], searchPayload = null }) => {
     }
   }, []);
 
-  const fetchMapHotels = useCallback(
-    async ({ page = 1, query = "" } = {}) => {
-      if (!searchPayload) return;
-
-      const requestId = ++mapRequestIdRef.current;
-      const trimmedQuery = query.trim();
-
-      setMapLoading(true);
-      setMapError("");
-
-      try {
-        const searchFilters = {
-          sortBy: "priceAsc",
-        };
-
-        if (trimmedQuery) {
-          searchFilters.mapSearch = trimmedQuery;
-        }
-
-        const { data } = await api.post(
-          `/hotels/search?page=${page}&limit=${MAP_PAGE_SIZE}`,
-          {
-            ...searchPayload,
-            SearchFilters: searchFilters,
-          },
-        );
-        const rawHotels =
-          data?.data?.hotels ||
-          data?.data?.HotelResult ||
-          data?.data?.HotelResult?.HotelResult ||
-          [];
-        const nextHotels = rawHotels.map(normalizeHotelForMap).filter(Boolean);
-        const pagination =
-          data?.data?.pagination || {
-            total: nextHotels.length,
-            page,
-            limit: MAP_PAGE_SIZE,
-            hasMore: false,
-          };
-
-        if (requestId !== mapRequestIdRef.current) return;
-
-        setMapHotels((prev) =>
-          page <= 1 ? nextHotels : dedupeMapHotels(prev, nextHotels),
-        );
-        setMapPagination(pagination);
-        setMapLoaded(true);
-      } catch (err) {
-        if (requestId !== mapRequestIdRef.current) return;
-
-        setMapError(
-          err?.response?.data?.message ||
-            err?.response?.data?.error ||
-            err.message ||
-            "Unable to load map hotels",
-        );
-        setMapLoaded(true);
-      } finally {
-        if (requestId === mapRequestIdRef.current) {
-          setMapLoading(false);
-        }
-      }
-    },
-    [searchPayload],
-  );
-
   useEffect(() => {
     if (!open) {
       setHoveredHotel(null);
       setSearchMarker(null);
       setSearchQuery("");
-      setMapError("");
       return;
     }
 
-    if (!searchPayload) return;
-
     const query = searchQuery.trim();
-    const timer = setTimeout(() => {
-      fetchMapHotels({ page: 1, query });
-
-      if (query) {
-        searchLocation(query);
-      } else {
-        setSearchMarker(null);
-      }
-    }, query ? 500 : 0);
+    const timer = setTimeout(
+      () => {
+        if (query) {
+          searchLocation(query);
+        } else {
+          setSearchMarker(null);
+        }
+      },
+      query ? 500 : 0,
+    );
 
     return () => clearTimeout(timer);
-  }, [open, payloadKey, searchQuery, searchPayload, fetchMapHotels, searchLocation]);
+  }, [open, searchQuery, searchLocation]);
 
   const firstHotelPosition = transformedHotels[0]?.position;
 
@@ -423,22 +338,11 @@ const MapModal = ({ open, onClose, hotels = [], searchPayload = null }) => {
     setSearchQuery("");
   };
 
-  const handleLoadMore = () => {
-    if (!searchPayload) return;
-    if (!mapPagination?.hasMore) return;
-    if (mapLoading) return;
-
-    fetchMapHotels({
-      page: (mapPagination?.page || 1) + 1,
-      query: searchQuery.trim(),
-    });
-  };
-
   if (!open) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-9999 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       style={{ background: "rgba(10,37,64,0.75)", backdropFilter: "blur(4px)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >

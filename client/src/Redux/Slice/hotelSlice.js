@@ -76,6 +76,9 @@ const hotelSlice = createSlice({
       state.searchMeta = null;
       state.traceId = null;
     },
+    setSearchPayload: (state, action) => {
+      state.searchPayload = { ...action.payload, timestamp: Date.now() };
+    },
     clearSelectedHotel: (state) => {
       state.selectedHotel = null;
     },
@@ -116,12 +119,19 @@ const hotelSlice = createSlice({
       })
 
       /* ---------------- SEARCH ---------------- */
-      .addCase(searchHotels.pending, (state, action) => {
-        const page = action.meta?.arg?.page || 1;
-        const isLoadMore = page > 1;
-        state.loading.search = !isLoadMore;
-        state.loading.loadMore = isLoadMore;
+      .addCase(searchHotels.pending, (state) => {
+        state.loading.search = true;
+
+
+        state.loading.loadMore = false;
         state.error.search = null;
+
+          state.hotels = [];
+          state.pagination = { total: 0, page: 1, limit: 10, hasMore: false };
+          state.filterMeta = null;
+          state.searchMeta = null;
+          state.traceId = null;
+
       })
       .addCase(searchHotels.fulfilled, (state, action) => {
         const page =
@@ -134,14 +144,14 @@ const hotelSlice = createSlice({
         const pagination = action.payload?.pagination || {
           total: incomingHotels.length,
           page,
-          limit: action.meta?.arg?.limit || 10,
+          limit: incomingHotels.length,
           hasMore: false,
         };
 
-        const isFirstPage = page <= 1;
-        state.hotels = isFirstPage
-          ? dedupeHotels([], incomingHotels)
-          : dedupeHotels(state.hotels, incomingHotels);
+
+        state.hotels = incomingHotels;
+
+
 
         state.pagination = pagination;
         state.filterMeta = action.payload?.filterMeta || state.filterMeta;
@@ -209,5 +219,5 @@ const hotelSlice = createSlice({
   },
 });
 
-export const { clearHotels, clearSelectedHotel } = hotelSlice.actions;
+export const { clearHotels, clearSelectedHotel, setSearchPayload } = hotelSlice.actions;
 export default hotelSlice.reducer;

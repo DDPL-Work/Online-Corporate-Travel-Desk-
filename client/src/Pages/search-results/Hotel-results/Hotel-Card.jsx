@@ -45,8 +45,13 @@ const HotelCard = ({ hotel }) => {
     >
       <div className="flex flex-col md:flex-row">
         {/* 🖼 Image Section */}
-        <div className="relative w-full md:w-72 h-52 md:h-52 shrink-0">
-          <img src={images[imgIndex]} alt={hotel.name} className="w-full h-full object-cover transition-transform duration-500" />
+        <div className="relative w-full md:w-72 h-52 md:h-52 shrink-0 bg-slate-100">
+          <img 
+            src={images[imgIndex]} 
+            alt={hotel.name} 
+            loading="lazy"
+            className="w-full h-full object-cover transition-transform duration-500" 
+          />
 
           {totalImages > 1 && (
             <>
@@ -135,7 +140,7 @@ const HotelCard = ({ hotel }) => {
           <div className="text-[15px] font-bold" style={{ color: AZURE }}>Starts From</div>
           <div className="w-full text-center">
             <div className="text-xl font-black" style={{ color: AZURE }}>
-              ₹{Math.round(hotel.perNight)?.toLocaleString()} / night
+              ₹{Math.round(hotel.perNight)?.toLocaleString()} <span className="text-sm font-normal">/ room / night</span>
             </div>
 
             <div className="bg-white border border-slate-200 rounded-lg p-2 mt-3">
