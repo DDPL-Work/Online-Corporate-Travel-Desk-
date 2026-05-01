@@ -182,9 +182,29 @@ exports.deletePolicy = asyncHandler(async (req, res) => {
 /* ─────────────────────────────────────────────────────────────────────────────
    EMPLOYEE — Fetch own SSR policy (called when SSR modal opens)
    GET /api/v1/ssr-policies/my-policy
-   Access: any authenticated user
+   Access: any authenticated user (travel-admin is exempt from policy restrictions)
 ───────────────────────────────────────────────────────────────────────────── */
 exports.getMyPolicy = asyncHandler(async (req, res) => {
+  // Travel-admin users are exempt from SSR policy restrictions
+  if (req.user.role === "travel-admin") {
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          allowSeat: true,
+          allowMeal: true,
+          allowBaggage: true,
+          seatPriceRange: { min: 0, max: 999999 },
+          mealPriceRange: { min: 0, max: 999999 },
+          baggagePriceRange: { min: 0, max: 999999 },
+          approvalRequired: false,
+          isTravelAdmin: true,
+        },
+        "SSR policy fetched (travel-admin — no restrictions)"
+      )
+    );
+  }
+
   let policy = await EmployeeSsrPolicy.findOne({
     corporateId: req.user.corporateId,
     employeeEmail: req.user.email.toLowerCase().trim(),
@@ -213,9 +233,16 @@ exports.getMyPolicy = asyncHandler(async (req, res) => {
    VALIDATE SSR SELECTIONS (Backend enforcement — called before booking save)
    POST /api/v1/ssr-policies/validate-ssr
    Body: { seats: [...], meals: [...], baggage: [...] }
-   Access: any authenticated user
+   Access: any authenticated user (travel-admin is exempt from restrictions)
 ───────────────────────────────────────────────────────────────────────────── */
 exports.validateSsrSelections = asyncHandler(async (req, res) => {
+  // Travel-admin users bypass all SSR policy validations
+  if (req.user.role === "travel-admin") {
+    return res.status(200).json(
+      new ApiResponse(200, { valid: true, isTravelAdmin: true }, "SSR valid (travel-admin — no restrictions)")
+    );
+  }
+
   const { seats = [], meals = [], baggage = [] } = req.body;
 
   const policy = await EmployeeSsrPolicy.findOne({
