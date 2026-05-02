@@ -52,15 +52,23 @@ exports.getAllApprovals = asyncHandler(async (req, res) => {
     .populate("approverId", "name email role");
 
   // 🔥 Add type (VERY IMPORTANT)
-  const taggedFlights = flightRequests.map((r) => ({
-    ...r.toObject(),
-    bookingType: "flight",
-  }));
+  const taggedFlights = flightRequests.map((r) => {
+    const obj = r.toObject();
+    return {
+      ...obj,
+      orderId: obj.orderId || "N/A",
+      bookingType: "flight",
+    };
+  });
 
-  const taggedHotels = hotelRequests.map((r) => ({
-    ...r.toObject(),
-    bookingType: "hotel",
-  }));
+  const taggedHotels = hotelRequests.map((r) => {
+    const obj = r.toObject();
+    return {
+      ...obj,
+      orderId: obj.orderId || "N/A",
+      bookingType: "hotel",
+    };
+  });
 
   // 🔹 Merge + sort
   const allRequests = [...taggedFlights, ...taggedHotels].sort(
@@ -109,12 +117,15 @@ exports.getApproval = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Not authorized");
   }
 
+  const responseData = bookingRequest.toObject();
+  responseData.orderId = responseData.orderId || responseData.bookingReference;
+
   res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        bookingRequest,
+        responseData,
         "Booking request fetched successfully",
       ),
     );
@@ -325,12 +336,15 @@ exports.getHotelApproval = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Not authorized");
   }
 
+  const responseData = bookingRequest.toObject();
+  responseData.orderId = responseData.orderId || responseData.bookingReference;
+
   res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        bookingRequest,
+        responseData,
         "Hotel booking request fetched successfully",
       ),
     );

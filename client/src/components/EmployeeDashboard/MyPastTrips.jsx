@@ -15,6 +15,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { fetchMyBookings } from "../../Redux/Actions/booking.thunks";
 import { formatDateWithYear } from "../../utils/formatter";
+import api from "../../API/axios";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Summary Stats                                                  */
@@ -76,7 +77,7 @@ function PastTripCard({ trip, onView, userRole }) {
     .join("  |  ");
 
   const dates = isHotel
-    ? [snapshot.checkInDate, snapshot.checkOutDate]
+    ? [snapshot.checkInDate || trip.checkInDate || trip.CheckInDate, snapshot.checkOutDate || trip.checkOutDate || trip.CheckOutDate]
         .filter(Boolean)
         .map((d) => formatDateWithYear(d))
         .join("  →  ")
@@ -85,7 +86,7 @@ function PastTripCard({ trip, onView, userRole }) {
         .map((d) => formatDateWithYear(d))
         .join("  →  ");
 
-  const travelDate = isHotel ? snapshot.checkInDate : snapshot.travelDate;
+  const travelDate = isHotel ? (snapshot.checkInDate || trip.checkInDate || trip.CheckInDate) : snapshot.travelDate;
   const daysAgo = travelDate
     ? Math.floor((new Date() - new Date(travelDate)) / (1000 * 60 * 60 * 24))
     : null;
@@ -112,10 +113,12 @@ function PastTripCard({ trip, onView, userRole }) {
             </div>
             <div>
               <p className="text-[14px] font-semibold text-slate-800 leading-tight">
-                {isHotel ? "Hotel Stay" : "Flight Trip"}
+                {isHotel
+                  ? trip.hotelRequest?.selectedHotel?.hotelName || snapshot.hotelName || "Hotel Stay"
+                  : "Flight Trip"}
               </p>
               <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
-                #{trip._id?.slice(-8).toUpperCase()}
+                {trip.orderId || `#${trip._id?.slice(-8).toUpperCase()}`}
               </p>
             </div>
           </div>
@@ -130,7 +133,9 @@ function PastTripCard({ trip, onView, userRole }) {
         <div className="flex items-center gap-2 mb-3">
           <FiMapPin size={12} className="text-slate-400 shrink-0" />
           <p className="text-[14px] font-bold text-slate-800 leading-snug">
-            {snapshot.city || sectors || "N/A"}
+            {isHotel
+              ? trip.hotelRequest?.selectedHotel?.address || snapshot.address || snapshot.city || "N/A"
+              : snapshot.city || trip.cityName || trip.CityName || sectors || "N/A"}
           </p>
         </div>
 
@@ -198,45 +203,79 @@ export default function MyPastTrips() {
   );
   const userRole = useSelector((state) => state.auth?.user?.role);
 
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("flight");
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [hotelBookings, setHotelBookings] = useState([]);
+  const [isHotelLoading, setIsHotelLoading] = useState(false);
 
   useEffect(() => {
     dispatch(fetchMyBookings());
   }, [dispatch]);
 
+  useEffect(() => {
+    const fetchHotelPastTrips = async () => {
+      setIsHotelLoading(true);
+      try {
+        const { data } = await api.get("/hotel-booking/my/completed");
+        setHotelBookings(Array.isArray(data.data?.bookings) ? data.data.bookings : []);
+      } catch (err) {
+        console.error("Failed to fetch hotel past trips:", err);
+      } finally {
+        setIsHotelLoading(false);
+      }
+    };
+    fetchHotelPastTrips();
+  }, []);
+
   const pastTrips = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return bookings
+
+    // Merge and deduplicate by _id
+    const combined = [
+      ...(Array.isArray(bookings) ? bookings : []),
+      ...(Array.isArray(hotelBookings) ? hotelBookings : [])
+    ];
+    const uniqueBookings = Array.from(new Map(combined.map(b => [b?._id, b])).values()).filter(Boolean);
+
+    return uniqueBookings
       .filter((b) => {
         const isHotel = b.bookingType?.toLowerCase() === "hotel";
-        const dateStr = isHotel
-          ? b.bookingSnapshot?.checkInDate
-          : b.bookingSnapshot?.travelDate;
+        
+        if (isHotel) {
+          // User specific criteria for hotels
+          const snapshot = b.bookingSnapshot || {};
+          const checkIn = snapshot.checkInDate || b.checkInDate || b.CheckInDate;
+          const checkOut = snapshot.checkOutDate || b.checkOutDate || b.CheckOutDate;
+          const status = (b.executionStatus || b.status || "").toLowerCase();
+          const amendmentRequested = b.amendment?.status === "requested";
 
-        const isSuccess = isHotel
-          ? ["voucher_generated", "confirmed"].includes(
-              b.executionStatus?.toLowerCase(),
-            )
-          : b.executionStatus?.toLowerCase() === "ticketed";
-
-        return dateStr && isSuccess && new Date(dateStr) < today;
+          return (
+            checkIn && checkOut &&
+            new Date(checkIn) < today &&
+            new Date(checkOut) < today &&
+            status === "voucher_generated" &&
+            !amendmentRequested
+          );
+        } else {
+          // Flight logic
+          const dateStr = b.bookingSnapshot?.travelDate;
+          const isSuccess = b.executionStatus?.toLowerCase() === "ticketed";
+          return dateStr && isSuccess && new Date(dateStr) < today;
+        }
       })
       .sort((a, b) => {
-        const dateA =
-          a.bookingType?.toLowerCase() === "hotel"
-            ? a.bookingSnapshot?.checkInDate
-            : a.bookingSnapshot?.travelDate;
-        const dateB =
-          b.bookingType?.toLowerCase() === "hotel"
-            ? b.bookingSnapshot?.checkInDate
-            : b.bookingSnapshot?.travelDate;
+        const dateA = a.bookingType?.toLowerCase() === "hotel"
+          ? (a.bookingSnapshot?.checkInDate || a.checkInDate || a.CheckInDate)
+          : a.bookingSnapshot?.travelDate;
+        const dateB = b.bookingType?.toLowerCase() === "hotel"
+          ? (b.bookingSnapshot?.checkInDate || b.checkInDate || b.CheckInDate)
+          : b.bookingSnapshot?.travelDate;
         return new Date(dateB) - new Date(dateA);
       });
-  }, [bookings]);
+  }, [bookings, hotelBookings]);
 
   const filteredTrips = useMemo(() => {
     return pastTrips.filter((trip) => {
@@ -244,7 +283,7 @@ export default function MyPastTrips() {
       const destination = (snapshot.city || "").toLowerCase();
       const sectors = (snapshot.sectors || []).join(" ").toLowerCase();
       const isHotel = trip.bookingType?.toLowerCase() === "hotel";
-      const travelDateObj = isHotel ? snapshot.checkInDate : snapshot.travelDate;
+      const travelDateObj = isHotel ? (trip.bookingSnapshot?.checkInDate || trip.checkInDate || trip.CheckInDate) : snapshot.travelDate;
       const travelDate = travelDateObj ? new Date(travelDateObj) : null;
 
       const matchType =
@@ -252,8 +291,9 @@ export default function MyPastTrips() {
       const matchSearch =
         !searchTerm ||
         destination.includes(searchTerm.toLowerCase()) ||
+        (snapshot.city || trip.cityName || trip.CityName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         sectors.includes(searchTerm.toLowerCase()) ||
-        (snapshot.hotelName || "").toLowerCase().includes(searchTerm.toLowerCase());
+        (snapshot.hotelName || trip.hotelName || trip.HotelName || "").toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchStart =
         !startDate ||
@@ -284,7 +324,7 @@ export default function MyPastTrips() {
 
         {/* Type toggle */}
         <div className="flex items-center gap-1 ml-4 bg-slate-100 rounded-xl p-1">
-          {["all", "flight", "hotel"].map((tab) => (
+          {["flight", "hotel"].map((tab) => (
             <button
               key={tab}
               onClick={() => setTypeFilter(tab)}
@@ -379,7 +419,7 @@ export default function MyPastTrips() {
             <div className="mt-3 flex justify-end">
               <button
                 onClick={() => {
-                  setTypeFilter("all");
+                  setTypeFilter("flight");
                   setSearchTerm("");
                   setStartDate("");
                   setEndDate("");
@@ -393,7 +433,7 @@ export default function MyPastTrips() {
         </div>
 
         {/* Loading */}
-        {loading ? (
+        {loading || isHotelLoading ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="w-10 h-10 rounded-full border-2 border-slate-200 border-t-teal-500 animate-spin mb-4" />
             <p className="text-slate-400 text-sm">Loading your trips…</p>
@@ -413,7 +453,13 @@ export default function MyPastTrips() {
                     key={trip._id}
                     trip={trip}
                     userRole={userRole}
-                    onView={(t) => navigate(`/my-booking/${t._id}`)}
+                    onView={(t) => {
+                      if (t.bookingType?.toLowerCase() === "hotel") {
+                        navigate(`/my-hotel-booking/${t._id}`);
+                      } else {
+                        navigate(`/my-booking/${t._id}`);
+                      }
+                    }}
                   />
                 ))}
               </div>
@@ -431,7 +477,7 @@ export default function MyPastTrips() {
                 {hasFilters && (
                   <button
                     onClick={() => {
-                      setTypeFilter("all");
+                      setTypeFilter("flight");
                       setSearchTerm("");
                       setStartDate("");
                       setEndDate("");

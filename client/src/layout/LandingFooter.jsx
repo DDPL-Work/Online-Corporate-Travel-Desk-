@@ -61,13 +61,7 @@ export default function LandingFooter({ onTabChange }) {
                   className="h-12 object-contain"
                 />
               ) : (
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 cursor-pointer"
-                  style={{ background: GOLD }}
-                  onClick={() => navigate("/travel")}
-                >
-                  <LuPlane size={22} style={{ color: C.white }} />
-                </div>
+                <img src={logo} alt="Traveamer" className="h-7" />
               )}
               <div className="space-y-1">
                 <h4
@@ -137,12 +131,7 @@ export default function LandingFooter({ onTabChange }) {
                     className="h-[2rem] object-contain"
                   />
                 ) : (
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{ background: GOLD }}
-                  >
-                    <LuPlane size={18} style={{ color: C.white }} />
-                  </div>
+                  <img src={logo} alt="Traveamer" className="h-7" />
                 )}
                 {branding?.corporateName && (
                   <p

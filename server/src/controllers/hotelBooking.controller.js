@@ -6,7 +6,9 @@ const pdfService = require("../services/pdf.service");
 const hotelService = require("../services/tektravels/hotel.service");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
+const ApiResponse = require("../utils/ApiResponse");
 const { generateBookingReference } = require("../utils/helpers");
+const { generateSequentialOrderId } = require("../utils/orderIdGenerator");
 
 // @desc    PreBook Hotel (TBO)
 // @route   POST /api/v1/hotel-bookings/prebook
@@ -345,8 +347,11 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     // Safe fallback — keep pending_approval
   }
 
+  const orderId = await generateSequentialOrderId("hotel");
+
   const bookingRequest = await HotelBookingRequest.create({
     bookingReference: generateBookingReference(),
+    orderId,
     corporateId: corporate._id,
     userId: user._id,
 
@@ -387,6 +392,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     data: {
       bookingRequestId: bookingRequest._id,
       bookingReference: bookingRequest.bookingReference,
+      orderId: bookingRequest.orderId,
       requestStatus: bookingRequest.requestStatus,
       autoApproved: isAutoApproved,
     },
@@ -1310,4 +1316,26 @@ exports.generateHotelVoucher = asyncHandler(async (req, res) => {
   ====================================================== */
 
   return res.download(filePath);
+});
+
+
+exports.getProjectHotelExpenses = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+
+  if (!projectId) {
+    throw new ApiError(400, "Project ID is required");
+  }
+
+  const expenses = await HotelBookingRequest.find({ 
+    projectId,
+    corporateId: req.user.corporateId,
+    executionStatus: "voucher_generated"
+  })
+    .populate("userId", "name email")
+    .populate("approvedBy", "name email role")
+    .sort({ createdAt: -1 });
+
+  res.status(200).json(
+    new ApiResponse(200, expenses, "Project hotel expenses fetched successfully")
+  );
 });

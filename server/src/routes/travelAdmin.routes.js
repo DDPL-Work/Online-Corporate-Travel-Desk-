@@ -28,6 +28,7 @@ router.use(authorizeRoles("travel-admin", "corporate-admin", "employee", "manage
  * ============================================================
  */
 router.get("/flights", adminBookingCtrl.getAllFlightBookingsAdmin);
+router.get("/flights/:id", adminBookingCtrl.getFlightBookingByIdAdmin);
 
 /**
  * ============================================================
@@ -35,10 +36,8 @@ router.get("/flights", adminBookingCtrl.getAllFlightBookingsAdmin);
  * ============================================================
  */
 router.get("/hotels", adminBookingCtrl.getAllHotelBookingsAdmin);
-router.get(
-  "/hotels/cancelled",
-  adminBookingCtrl.getCancelledHotelBookingsAdmin,
-);
+router.get("/hotels/cancelled", adminBookingCtrl.getCancelledHotelBookingsAdmin);
+router.get("/hotels/:id", adminBookingCtrl.getHotelBookingByIdAdmin);
 
 router.post('/review', adminBookingCtrl.reviewManagerRequest);
 router.post('/all/managers', adminBookingCtrl.getManagerRequests);

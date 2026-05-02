@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { FiClock, FiDollarSign, FiCheck, FiX, FiList, FiRefreshCw } from "react-icons/fi";
+import { FiClock, FiDollarSign, FiCheck, FiX, FiList, FiRefreshCw, FiAlertCircle } from "react-icons/fi";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import {
   approveApproval,
@@ -11,6 +11,7 @@ import {
   getPendingFlightRequests,
 } from "../../Redux/Actions/manager.thunk";
 import { fetchCorporateAdmin } from "../../Redux/Slice/corporateAdminSlice";
+import TableScrollWrapper from "../common/TableScrollWrapper";
 
 import Swal from "sweetalert2";
 import PendingHotelDetailsModal, {
@@ -108,6 +109,7 @@ export default function PendingTravelRequestsForManager() {
 
       const common = {
         id: b._id,
+        orderId: b.orderId,
         bookingRef: b.bookingReference,
         type: bookingType,
         status: b.requestStatus || "pending_approval",
@@ -186,6 +188,7 @@ export default function PendingTravelRequestsForManager() {
     (r) =>
       r.type === activeTab &&
       (r.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (r.orderId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.bookingRef.toLowerCase().includes(searchTerm.toLowerCase())),
   );
 
@@ -327,7 +330,7 @@ export default function PendingTravelRequestsForManager() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-2 gap-3">
           <StatCard
             label={`Pending ${activeTab}s`}
             value={filteredData.length}
@@ -344,36 +347,20 @@ export default function PendingTravelRequestsForManager() {
           />
           <StatCard
             label="Awaiting Review"
-            value={filteredData.length}
+            value={filteredData.filter(r => !r.isTravelPassed).length}
             Icon={FiClock}
             borderCls="border-amber-500"
             iconBgCls="bg-amber-50"
             iconColorCls="text-amber-600"
           />
-          <StatCard
-            label="Urgent"
-            value="0"
-            Icon={FiCheck}
-            borderCls="border-emerald-500"
-            iconBgCls="bg-emerald-50"
-            iconColorCls="text-emerald-600"
-          />
-          <StatCard
-            label="Estimated Spend"
-            value={`₹${filteredData.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}`}
-            Icon={FiDollarSign}
-            borderCls="border-violet-500"
-            iconBgCls="bg-violet-50"
-            iconColorCls="text-violet-600"
-          />
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+        <div className="bg-white rounded-xl shadow-sm">
+          <TableScrollWrapper>
             <table className="w-full border-collapse min-w-[860px]">
               <thead>
                 <tr className="bg-[#dac448]">
-                  <Th>Request ID</Th>
+                  <Th>Order ID</Th>
                   <Th>Traveller Name</Th>
                   <Th>Requested Date</Th>
                   <Th>Est. Amount</Th>
@@ -410,7 +397,7 @@ export default function PendingTravelRequestsForManager() {
                       } ${isDiscarded ? "opacity-60 grayscale-[50%]" : ""}`}
                     >
                       <td className="px-4 py-3">
-                        <IdCell id={r.id} />
+                        <IdCell id={r.orderId || "N/A"} />
                       </td>
 
                       <td className="px-4 py-3">
@@ -491,7 +478,7 @@ export default function PendingTravelRequestsForManager() {
                 )}
               </tbody>
             </table>
-          </div>
+          </TableScrollWrapper>
         </div>
       </div>
 

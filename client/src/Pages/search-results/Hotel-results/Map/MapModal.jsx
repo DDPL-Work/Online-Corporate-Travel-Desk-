@@ -237,7 +237,15 @@ const HotelListCard = ({ hotel, isActive, onEnter, onLeave, onClick }) => (
 );
 
 /* ── Main Modal ── */
-const MapModal = ({ open, onClose, hotels = [] }) => {
+const MapModal = ({
+  open,
+  onClose,
+  hotels = [],
+  mapLoading = false,
+  mapError = null,
+  mapPagination = null,
+  handleLoadMore = () => {},
+}) => {
   const navigate = useNavigate();
   const [hoveredHotel, setHoveredHotel] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");

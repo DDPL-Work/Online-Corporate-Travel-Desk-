@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { FiClock, FiDollarSign, FiCheck, FiX, FiList } from "react-icons/fi";
+import { FiClock, FiDollarSign, FiCheck, FiList } from "react-icons/fi";
 import { FaHotel, FaPlane } from "react-icons/fa";
+import TableScrollWrapper from "../common/TableScrollWrapper";
 import {
   fetchApprovals,
   approveApproval,
@@ -78,6 +79,7 @@ export default function PendingTravelRequests() {
 
       const common = {
         id: b._id,
+        orderId: b.orderId || "N/A",
         bookingRef: b.bookingReference,
         type: b.bookingType,
         status: b.requestStatus || "pending_approval",
@@ -315,12 +317,12 @@ export default function PendingTravelRequests() {
           />
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[860px]">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+          <TableScrollWrapper>
+            <table className="w-full text-left min-w-[860px]">
               <thead>
                 <tr className="bg-[#dac448]">
-                  <Th>Request ID</Th>
+                  <Th>Order ID</Th>
                   <Th>Traveller Name</Th>
                   <Th>Requested Date</Th>
                   <Th>Est. Amount</Th>
@@ -357,7 +359,7 @@ export default function PendingTravelRequests() {
                       } ${isDiscarded ? "opacity-60 grayscale-[50%]" : ""}`}
                     >
                       <td className="px-4 py-3">
-                        <IdCell id={r.id} />
+                        <IdCell id={r.orderId} />
                       </td>
 
                       <td className="px-4 py-3">
@@ -438,7 +440,7 @@ export default function PendingTravelRequests() {
                 )}
               </tbody>
             </table>
-          </div>
+          </TableScrollWrapper>
         </div>
       </div>
 

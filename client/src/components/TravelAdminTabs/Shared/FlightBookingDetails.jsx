@@ -32,7 +32,7 @@ import {
   FiInfo,
   FiHash,
 } from "react-icons/fi";
-import { getTeamExecutedFlightRequestById } from "../../Redux/Actions/manager.thunk";
+import { getFlightBookingByIdAdmin } from "../../../Redux/Actions/travelAdmin.thunks";
 import {
   fetchCancellationCharges,
   fullCancellation,
@@ -40,8 +40,8 @@ import {
   amendBooking,
   fetchChangeStatus,
   createCancellationQuery,
-} from "../../Redux/Actions/amendmentThunks";
-import { resetAmendmentState } from "../../Redux/Slice/amendmentSlice";
+} from "../../../Redux/Actions/amendmentThunks";
+import { resetAmendmentState } from "../../../Redux/Slice/amendmentSlice";
 import {
   formatDate,
   formatTime,
@@ -50,9 +50,9 @@ import {
   getCabinClassLabel,
   airlineLogo,
   FLIGHT_STATUS_MAP,
-} from "../../utils/formatter";
+} from "../../../utils/formatter";
 import Swal from "sweetalert2";
-import ReissueModal from "../EmployeeDashboard/ReissueModal";
+import ReissueModal from "../../EmployeeDashboard/ReissueModal";
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Utility helpers (unchanged)                                   */
@@ -1088,404 +1088,28 @@ function FareRulesSection({ bookingResult }) {
   );
 }
 
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Legacy Amendment Modals (unchanged)                           */
-/* ─────────────────────────────────────────────────────────────── */
-// function AmendmentModal({ type, booking, onClose }) {
-//   return (
-//     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-//       <div className="bg-white rounded-2xl w-full max-w-xl p-6 shadow-2xl">
-//         <div className="flex justify-between items-center mb-6">
-//           <h2 className="text-lg font-extrabold">
-//             {type === "cancel" && "Cancel Ticket"}
-//             {type === "reschedule" && "Reschedule Flight"}
-//             {type === "modify" && "Modify Traveller"}
-//           </h2>
-//           <button
-//             onClick={onClose}
-//             className="text-slate-400 hover:text-slate-600"
-//           >
-//             ✕
-//           </button>
-//         </div>
-//         {type === "cancel" && (
-//           <CancelScreen booking={booking} onClose={onClose} />
-//         )}
-//         {type === "reschedule" && (
-//           <RescheduleScreen booking={booking} onClose={onClose} />
-//         )}
-//         {type === "modify" && (
-//           <ModifyTravellerScreen booking={booking} onClose={onClose} />
-//         )}
-//       </div>
-//     </div>
-//   );
-// }
-
-// function CancelScreen({ booking, onClose }) {
-//   const dispatch = useDispatch();
-//   const navigate = useNavigate();
-//   const [loading, setLoading] = useState(false);
-//   const [confirm, setConfirm] = useState(false);
-//   const [charges, setCharges] = useState(null);
-
-//   useEffect(() => {
-//     const isCancelled = sessionStorage.getItem(
-//       `cancelRequested_${booking._id}`,
-//     );
-
-//     if (isCancelled === "true") return;
-
-//     const fetchCharges = async () => {
-//       const res = await dispatch(fetchCancellationCharges(booking._id));
-//       if (res.payload) setCharges(res.payload);
-//     };
-
-//     fetchCharges();
-//   }, [booking._id, dispatch]);
-
-//   const handleCancel = async () => {
-//     if (!confirm) return;
-//     try {
-//       setLoading(true);
-//       const res = await dispatch(fullCancellation({ bookingId: booking._id }));
-//       let changeRequestIds = [];
-
-//       if (res.payload?.isRoundTrip) {
-//         changeRequestIds = res.payload.data
-//           ?.map(
-//             (item) =>
-//               item?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId,
-//           )
-//           .filter(Boolean);
-//       } else {
-//         const singleId =
-//           res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
-//           res.payload?.Response?.ChangeRequestId;
-
-//         if (singleId) changeRequestIds = [singleId];
-//       }
-
-//       if (!changeRequestIds.length) {
-//         throw new Error("No ChangeRequestId");
-//       }
-//       let status = "requested";
-//       let attempts = 0;
-//       while (
-//         (status === "requested" || status === "in_progress") &&
-//         attempts < 2
-//       ) {
-//         attempts++;
-//         await new Promise((r) => setTimeout(r, 4000));
-//         const statusResponses = await Promise.all(
-//           changeRequestIds.map((id) =>
-//             dispatch(
-//               fetchChangeStatus({
-//                 changeRequestId: id,
-//                 bookingId: booking._id,
-//               }),
-//             ),
-//           ),
-//         );
-//         let allCompleted = true;
-
-//         for (const resItem of statusResponses) {
-//           const apiStatus =
-//             resItem.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus;
-
-//           if (apiStatus !== 4) {
-//             allCompleted = false;
-//           }
-//         }
-
-//         status = allCompleted ? "completed" : "in_progress";
-//       }
-//       if (status === "failed")
-//         throw new Error("Cancellation failed by airline/supplier");
-
-//       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
-
-//       if (status !== "completed") {
-//         Swal.fire({
-//           icon: "info",
-//           title: "Cancellation in Progress",
-//           text: "The cancellation request is being processed. Please check status later.",
-//         });
-//         navigate("/manager/total-cancelled-bookings");
-//         onClose();
-//         return;
-//       }
-//       await dispatch(getTeamExecutedFlightRequestById(booking._id));
-//       navigate("/manager/total-cancelled-bookings");
-//       onClose();
-//     } catch (err) {
-//       console.error(err);
-//     } finally {
-//       setLoading(false);
-//       dispatch(getTeamExecutedFlightRequestById(booking._id));
-//     }
-//   };
-
-//   return (
-//     <div className="space-y-5">
-//       {charges && (
-//         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm space-y-2">
-//           <p className="font-semibold text-amber-800">Cancellation Charges</p>
-//           <div className="flex justify-between">
-//             <span>Airline Charges</span>
-//             <span>₹{charges?.AirlineCharge || 0}</span>
-//           </div>
-//           <div className="flex justify-between">
-//             <span>Service Fee</span>
-//             <span>₹{charges?.ServiceCharge || 0}</span>
-//           </div>
-//         </div>
-//       )}
-//       <label className="flex items-start gap-2 text-sm text-slate-600">
-//         <input
-//           type="checkbox"
-//           checked={confirm}
-//           onChange={(e) => setConfirm(e.target.checked)}
-//         />
-//         I confirm cancellation
-//       </label>
-//       <div className="flex justify-end gap-3">
-//         <button onClick={onClose} className="px-4 py-2 bg-slate-100 rounded-lg">
-//           Close
-//         </button>
-//         <button
-//           onClick={handleCancel}
-//           disabled={!confirm || loading}
-//           className="px-4 py-2 bg-red-600 text-white rounded-lg"
-//         >
-//           {loading ? "Processing..." : "Cancel Ticket"}
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
-
-// function RescheduleScreen({ booking, onClose }) {
-//   const [newDate, setNewDate] = useState("");
-//   return (
-//     <div className="space-y-4">
-//       <label className="text-sm font-semibold">Select New Date</label>
-//       <input
-//         type="date"
-//         value={newDate}
-//         onChange={(e) => setNewDate(e.target.value)}
-//         className="w-full border border-slate-200 rounded-lg px-3 py-2"
-//       />
-//       <div className="flex justify-end gap-3">
-//         <button
-//           onClick={onClose}
-//           className="px-4 py-2 text-sm font-semibold bg-slate-100 rounded-lg"
-//         >
-//           Close
-//         </button>
-//         <button
-//           onClick={onClose}
-//           className="px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-lg"
-//         >
-//           Confirm Reschedule
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
-
-// function ModifyTravellerScreen({ booking, onClose }) {
-//   const traveller = booking.travellers?.[0];
-//   const [phone, setPhone] = useState(traveller?.phoneWithCode || "");
-//   return (
-//     <div className="space-y-4">
-//       <label className="text-sm font-semibold">Update Phone</label>
-//       <input
-//         value={phone}
-//         onChange={(e) => setPhone(e.target.value)}
-//         className="w-full border border-slate-200 rounded-lg px-3 py-2"
-//       />
-//       <div className="flex justify-end gap-3">
-//         <button
-//           onClick={onClose}
-//           className="px-4 py-2 text-sm font-semibold bg-slate-100 rounded-lg"
-//         >
-//           Close
-//         </button>
-//         <button className="px-4 py-2 text-sm font-bold bg-indigo-600 text-white rounded-lg">
-//           Save Changes
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
-
-// function PartialCancelModal({ booking, onClose }) {
-//   const dispatch = useDispatch();
-//   const navigate = useNavigate();
-//   const [selectedJourney, setSelectedJourney] = useState(null);
-//   const [remarks, setRemarks] = useState("User requested partial cancellation");
-//   const [loading, setLoading] = useState(false);
-
-//   const segments = booking?.flightRequest?.segments || [];
-//   const journeyTypeOf = (seg) => {
-//     const jt = (seg?.journeyType || "").toString().toLowerCase();
-//     return jt === "return" ? "return" : "onward";
-//   };
-//   const onwardSegments = segments.filter((s) => journeyTypeOf(s) === "onward");
-//   const returnSegments = segments.filter((s) => journeyTypeOf(s) === "return");
-//   const hasReturn = returnSegments.length > 0;
-
-//   useEffect(() => {
-//     if (!hasReturn) setSelectedJourney("onward");
-//   }, [hasReturn]);
-
-//   const sectorLabel = (segList) => {
-//     if (!segList.length) return "N/A";
-//     const first = segList[0];
-//     const last = segList[segList.length - 1];
-//     return `${first?.origin?.airportCode || "-"} → ${last?.destination?.airportCode || "-"}`;
-//   };
-
-//   const buildSectors = () => {
-//     const pick = selectedJourney === "return" ? returnSegments : onwardSegments;
-//     return pick.map((seg) => ({
-//       Origin: seg?.origin?.airportCode,
-//       Destination: seg?.destination?.airportCode,
-//     }));
-//   };
-
-//   const handleSubmit = async () => {
-//     if (!selectedJourney) return;
-//     const sectors = buildSectors().filter((s) => s.Origin && s.Destination);
-//     if (!sectors.length) return;
-//     try {
-//       setLoading(true);
-//       const res = await dispatch(
-//         partialCancellation({
-//           bookingId: booking._id,
-//           segments: sectors,
-//           remarks,
-//         }),
-//       );
-//       if (res.error)
-//         throw new Error(res.payload || "Partial cancellation failed");
-//       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
-//       // 🔥 CLOSE MODAL IMMEDIATELY
-//       onClose();
-//       await dispatch(getTeamExecutedFlightRequestById(booking._id));
-//       Swal.fire({
-//         icon: "success",
-//         title: "Cancellation request submitted successfully",
-//         timer: 2000,
-//         showConfirmButton: false,
-//       });
-//       navigate("/my-cancelled-bookings");
-//       onClose();
-//     } catch (err) {
-//       Swal.fire({
-//         icon: "error",
-//         title: "Failed to submit cancellation",
-//         text: err.message,
-//       });
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   return (
-//     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-//       <div className="bg-white rounded-2xl w-full max-w-xl p-6 shadow-2xl">
-//         <div className="flex justify-between items-center mb-6">
-//           <h2 className="text-lg font-extrabold">Partial Cancellation</h2>
-//           <button
-//             onClick={onClose}
-//             className="text-slate-400 hover:text-slate-600"
-//           >
-//             ✕
-//           </button>
-//         </div>
-//         <div className="space-y-4">
-//           <div>
-//             <p className="text-xs font-bold uppercase text-slate-400 mb-2">
-//               Select Route
-//             </p>
-//             <div className="space-y-2">
-//               <label className="flex items-center gap-2 text-sm">
-//                 <input
-//                   type="radio"
-//                   name="route"
-//                   disabled={!onwardSegments.length}
-//                   checked={selectedJourney === "onward"}
-//                   onChange={() => setSelectedJourney("onward")}
-//                 />
-//                 <span>Onward ({sectorLabel(onwardSegments)})</span>
-//               </label>
-//               {hasReturn && (
-//                 <label className="flex items-center gap-2 text-sm">
-//                   <input
-//                     type="radio"
-//                     name="route"
-//                     checked={selectedJourney === "return"}
-//                     onChange={() => setSelectedJourney("return")}
-//                   />
-//                   <span>Return ({sectorLabel(returnSegments)})</span>
-//                 </label>
-//               )}
-//             </div>
-//           </div>
-//           <div>
-//             <p className="text-xs font-bold uppercase text-slate-400 mb-2">
-//               Remarks (optional)
-//             </p>
-//             <textarea
-//               className="w-full border border-slate-200 rounded-lg p-2 text-sm"
-//               rows={3}
-//               value={remarks}
-//               onChange={(e) => setRemarks(e.target.value)}
-//             />
-//           </div>
-//           <div className="flex justify-end gap-2 pt-2">
-//             <button
-//               onClick={onClose}
-//               className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100"
-//               disabled={loading}
-//             >
-//               Close
-//             </button>
-//             <button
-//               onClick={handleSubmit}
-//               disabled={!selectedJourney || loading}
-//               className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
-//             >
-//               {loading ? "Submitting..." : "Submit Cancellation"}
-//             </button>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
 /* ─────────────────────────────────────────────────────────────── */
 /*  Main page component                                            */
 /* ─────────────────────────────────────────────────────────────── */
-export default function TeamBookingDetails() {
+export default function FlightBookingDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
-  const { teamBookingDetail: booking, loadingTeamBookingDetail: loading } =
-    useSelector((s) => s.manager);
+
+  // Detect where we came from: cancelled bookings table or total bookings table
+  const searchParams = new URLSearchParams(location.search);
+  const source = searchParams.get("source"); // "cancelled" | null
+  const backPath = source === "cancelled" ? "/total-cancelled-bookings" : source === "past" ? "/past-trips" : source === "upcoming" ? "/upcoming-trips" : "/total-bookings";
+  const backLabel = source === "cancelled" ? "Cancelled Bookings" : source === "past" ? "Past Trips" : source === "upcoming" ? "Upcoming Trips" : "Total Bookings";
+
+  const {
+    singleBooking: booking,
+    loadingSingleBooking: loading,
+    errorSingleBooking: error,
+  } = useSelector((s) => s.adminBooking);
   const userRole = useSelector((s) => s.auth?.user?.role);
-  const sessionRole =
-    sessionStorage.getItem("userRole") || sessionStorage.getItem("role");
-  const isEmployee =
-    userRole === "employee" ||
-    userRole === "manager" ||
-    sessionRole === "employee" ||
-    sessionRole === "manager";
+  const isEmployee = false; // Admin view — always false
 
   const [amendmentType, setAmendmentType] = useState(null);
   const [showPartialCancel, setShowPartialCancel] = useState(false);
@@ -1496,11 +1120,10 @@ export default function TeamBookingDetails() {
   const isCancelled =
     ["cancelled", "cancel_requested"].includes(
       booking?.executionStatus?.toLowerCase(),
-    ) ||
-    (isEmployee && cancelRequested);
+    ) || cancelRequested;
 
   useEffect(() => {
-    if (id) dispatch(getTeamExecutedFlightRequestById(id));
+    if (id) dispatch(getFlightBookingByIdAdmin(id));
   }, [id, dispatch]);
 
   useEffect(() => {
@@ -1510,7 +1133,7 @@ export default function TeamBookingDetails() {
     )
       return;
     const iv = setInterval(
-      () => dispatch(getTeamExecutedFlightRequestById(booking._id)),
+      () => dispatch(getFlightBookingByIdAdmin(booking._id)),
       15000,
     );
     return () => clearInterval(iv);
@@ -1598,15 +1221,15 @@ export default function TeamBookingDetails() {
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(backPath)}
             className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
-            <FiArrowLeft size={16} /> Back
+            <FiArrowLeft size={16} /> {backLabel}
           </button>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-500 font-mono">
-                {booking.bookingReference}
+                {booking.orderId}
               </span>
               <StatusPill status={executionStatus} />
             </div>
@@ -1624,7 +1247,7 @@ export default function TeamBookingDetails() {
             <h1 className="text-[36px] font-black text-gray-900 tracking-tight leading-none mb-3">
               {isCancelled
                 ? "The trip is cancelled."
-                : location.state?.isPastTrip
+                : (location.state?.isPastTrip || source === "past")
                   ? "The trip is completed."
                   : "The trip is confirmed."}
             </h1>
@@ -2595,7 +2218,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
       setShouldFetchCharges(false);
       toast.success("Cancellation request submitted successfully");
       onClose();
-      await dispatch(getTeamExecutedFlightRequestById(booking._id));
+      await dispatch(getFlightBookingByIdAdmin(booking._id));
       navigate("/manager/total-cancelled-bookings");
     } catch (err) {
       setChargesError(err?.message || "Cancellation failed. Please try again.");
@@ -2632,7 +2255,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
       setShouldFetchCharges(false);
       toast.success("Partial cancellation request submitted successfully");
       onClose();
-      await dispatch(getTeamExecutedFlightRequestById(booking._id));
+      await dispatch(getFlightBookingByIdAdmin(booking._id));
       navigate("/manager/total-cancelled-bookings");
     } catch (err) {
       setChargesError(err?.message || "Partial cancellation failed.");
@@ -2655,7 +2278,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
       if (res.error) throw new Error(res.payload || "Reissue failed");
       toast.success("Reissue request submitted successfully");
       onClose();
-      await dispatch(getTeamExecutedFlightRequestById(booking._id));
+      await dispatch(getFlightBookingByIdAdmin(booking._id));
     } catch (err) {
       setChargesError(err?.message || "Reissue failed. Please try again.");
       setStep("error");
@@ -2726,7 +2349,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
       }
       toast.success("Cancellation query created successfully");
       onClose();
-      await dispatch(getTeamExecutedFlightRequestById(booking._id));
+      await dispatch(getFlightBookingByIdAdmin(booking._id));
     } catch (err) {
       setChargesError(err?.message || "Failed to create query");
       setStep("error");
@@ -3071,7 +2694,7 @@ function CancelScreen({ booking, onClose }) {
       const res = await dispatch(fullCancellation({ bookingId: booking._id }));
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
       toast.success("Cancellation request submitted successfully");
-      await dispatch(getTeamExecutedFlightRequestById(booking._id));
+      await dispatch(getFlightBookingByIdAdmin(booking._id));
       navigate("/manager/total-cancelled-bookings");
       onClose();
     } catch (err) {
@@ -3191,7 +2814,7 @@ function PartialCancelModal({ booking, onClose }) {
       await dispatch(partialCancellation({ bookingId: booking._id, segments: sectors, remarks }));
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
       onClose();
-      await dispatch(getTeamExecutedFlightRequestById(booking._id));
+      await dispatch(getFlightBookingByIdAdmin(booking._id));
       navigate("/manager/total-cancelled-bookings");
     } catch (err) {
       console.error(err);

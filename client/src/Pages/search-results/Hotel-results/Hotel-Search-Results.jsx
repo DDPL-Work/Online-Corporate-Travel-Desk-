@@ -213,6 +213,8 @@ function HotelSearchResults() {
                 searchText={searchText}
                 setSearchText={setSearchText}
                 mapSearchPayload={baseSearchPayload}
+                loading={loading}
+                pagination={pagination}
               />
             </div>
           </div>

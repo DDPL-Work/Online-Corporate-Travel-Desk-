@@ -37,6 +37,8 @@ router.get(
 // common / admin
 // router.get("/", bookingsController.getAllBookings);
 // router.get("/:id", bookingsController.getBooking);
+router.get("/get-project-flight-expenses/:projectId", bookingsController.getProjectFlightExpenses);
+
 router.post("/:id/cancel", bookingsController.cancelBooking);
 
 module.exports = router;

@@ -26,9 +26,9 @@ const searchChunkWithRetry = async ({
       });
 
       const latencyMs = Date.now() - startedAt;
-      logger.info(
-        `[hotel-search] chunk ${chunkNumber} success (${hotelCodes.length} codes, attempt ${attempt + 1}, ${latencyMs}ms)`,
-      );
+      // logger.info(
+      //   `[hotel-search] chunk ${chunkNumber} success (${hotelCodes.length} codes, attempt ${attempt + 1}, ${latencyMs}ms)`,
+      // );
 
       return {
         success: true,
@@ -40,9 +40,9 @@ const searchChunkWithRetry = async ({
       const latencyMs = Date.now() - startedAt;
       attempt += 1;
 
-      logger.warn(
-        `[hotel-search] chunk ${chunkNumber} failed on attempt ${attempt} (${latencyMs}ms): ${error.message}`,
-      );
+      // logger.warn(
+      //   `[hotel-search] chunk ${chunkNumber} failed on attempt ${attempt} (${latencyMs}ms): ${error.message}`,
+      // );
 
       if (attempt > maxRetries) {
         return {

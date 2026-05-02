@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import {
@@ -15,10 +16,10 @@ import {
   getAllFlightBookingsAdmin,
   getAllHotelBookingsAdmin,
 } from "../../Redux/Actions/travelAdmin.thunks";
-import {
-  FlightBookingModal,
-  HotelBookingModal,
-} from "./Modal/BookingRequestDetailsModal";
+// import {
+//   FlightBookingModal,
+//   HotelBookingModal,
+// } from "./Modal/BookingRequestDetailsModal";
 import { Pagination } from "./Shared/Pagination";
 import {
   LabeledField,
@@ -44,11 +45,12 @@ function FlightSection() {
   const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatus] = useState("All");
   const [corpFilter, setCorp] = useState("All");
-  const [selectedBooking, setSelectedBooking] = useState(null);
+  // const [selectedBooking, setSelectedBooking] = useState(null);
   const [travelDate, setTravelDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
+  const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const flightBookings = useSelector(
@@ -334,10 +336,9 @@ function FlightSection() {
           <table className="w-full border-collapse min-w-[860px]">
             <thead>
               <tr className="bg-[#0f9041] text-[#ffffff]">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Traveller Name</Th>
                 <Th>Booked Date</Th>
-                <Th>Amount</Th>
                 <Th>Status</Th>
                 {/* <Th>PNR / Provider Booking ID</Th> */}
                 <Th>Action</Th>
@@ -365,7 +366,7 @@ function FlightSection() {
                     className={`transition-colors hover:bg-sky-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={b._id} />
+                      <IdCell id={b.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -391,9 +392,7 @@ function FlightSection() {
                         year: "numeric",
                       })}
                     </td>
-                    <td className="px-4 py-3 font-bold text-slate-900">
-                      ₹{b.amount.toLocaleString()}
-                    </td>
+
                     <td className="px-4 py-3">
                       <StatusBadge status={b.status} />
                     </td>
@@ -405,7 +404,7 @@ function FlightSection() {
                     </td> */}
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setSelectedBooking(b)}
+                        onClick={() => navigate(`/employee-flight-booking/${b._id}`)}
                         className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50]"
                       >
                         View
@@ -441,12 +440,12 @@ function FlightSection() {
           onPageChange={setCurrentPage}
         />
       </div>
-      {selectedBooking && (
+      {/* {selectedBooking && (
         <FlightBookingModal
           booking={selectedBooking}
           onClose={() => setSelectedBooking(null)}
         />
-      )}
+      )} */}
     </div>
   );
 }
@@ -458,12 +457,13 @@ function HotelSection() {
   const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatus] = useState("All");
   const [corpFilter, setCorp] = useState("All");
-  const [selectedBooking, setSelectedBooking] = useState(null);
+  // const [selectedBooking, setSelectedBooking] = useState(null);
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
+  const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const hotelBookings = useSelector(
@@ -751,10 +751,9 @@ function HotelSection() {
           <table className="w-full border-collapse min-w-[860px]">
             <thead>
               <tr className="bg-[#0f9041] text-[#ccfbf1]">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Guest Name</Th>
                 <Th>Booked Date</Th>
-                <Th>Amount</Th>
                 <Th>Status</Th>
                 {/* <Th>Invoice No. / Provider Booking ID</Th> */}
                 <Th>Action</Th>
@@ -782,7 +781,7 @@ function HotelSection() {
                     className={`transition-colors hover:bg-teal-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={b._id} />
+                      <IdCell id={b.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -808,9 +807,7 @@ function HotelSection() {
                         year: "numeric",
                       })}
                     </td>
-                    <td className="px-4 py-3 font-bold text-slate-900">
-                      ₹{b.amount.toLocaleString()}
-                    </td>
+
                     <td className="px-4 py-3">
                       <StatusBadge status={b.status} />
                     </td>
@@ -822,7 +819,7 @@ function HotelSection() {
                     </td> */}
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setSelectedBooking(b)}
+                        onClick={() => navigate(`/employee-hotel-booking/${b._id}`)}
                         className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50]"
                       >
                         View
@@ -858,12 +855,12 @@ function HotelSection() {
           onPageChange={setCurrentPage}
         />
       </div>
-      {selectedBooking && (
+      {/* {selectedBooking && (
         <HotelBookingModal
           booking={selectedBooking}
           onClose={() => setSelectedBooking(null)}
         />
-      )}
+      )} */}
     </div>
   );
 }
