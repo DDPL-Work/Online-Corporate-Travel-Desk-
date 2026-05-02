@@ -26,17 +26,20 @@ import {
   getAllFlightBookingsAdmin,
   getAllHotelBookingsAdmin,
 } from "../../Redux/Actions/travelAdmin.thunks";
+import { useNavigate } from "react-router-dom";
+import { Pagination } from "./Shared/Pagination";
 import { useDispatch, useSelector } from "react-redux";
-import { FlightBookingModal } from "./Modal/BookingRequestDetailsModal";
 
 // ── FLIGHT SECTION ────────────────────────────────────────────────────────────
 function FlightSection() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
-  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const flightBookings = useSelector(
     (state) => state.adminBooking.flightBookings,
@@ -70,6 +73,7 @@ function FlightSection() {
         return {
           raw: b,
           id: b._id,
+          orderId: b.orderId || "N/A",
           employee:
             `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim() ||
             b.userId?.email ||
@@ -108,6 +112,11 @@ function FlightSection() {
       return dateOk && deptOk && searchOk;
     });
   }, [search, startDate, endDate, deptFilter, flightTrips]);
+
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage],
+  );
 
   const avgRating =
     filtered.length > 0
@@ -224,7 +233,7 @@ function FlightSection() {
           <table className="w-full border-collapse min-w-[920px]">
             <thead>
               <tr className="bg-[#0A4D68] text-[#bfdbfe]">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 {/* <Th>Department</Th> */}
                 <Th>Destination</Th>
@@ -251,7 +260,7 @@ function FlightSection() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((t, i) => (
+                paginated.map((t, i) => (
                   <tr
                     key={t.id}
                     className={`transition-colors hover:bg-sky-50 ${
@@ -259,7 +268,7 @@ function FlightSection() {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={t.id} />
+                      <IdCell id={t.orderId} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -304,7 +313,7 @@ function FlightSection() {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setSelectedBooking(t.raw)}
+                        onClick={() => navigate(`/employee-flight-booking/${t.id}?source=past`)}
                         className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] flex items-center gap-1"
                       >
                         <FiEye size={12} /> View
@@ -319,18 +328,23 @@ function FlightSection() {
         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
           <span>
             Showing{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> of{" "}
-            <strong className="text-slate-600">{flightTrips.length}</strong>{" "}
-            flight trips
+            <strong className="text-slate-600">
+              {filtered.length === 0
+                ? 0
+                : `${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, filtered.length)}`}
+            </strong>{" "}
+            of{" "}
+            <strong className="text-slate-600">{filtered.length}</strong> flight
+            trips
           </span>
         </div>
-      </div>
-      {selectedBooking && (
-        <FlightBookingModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
         />
-      )}
+      </div>
     </div>
   );
 }
@@ -338,10 +352,13 @@ function FlightSection() {
 // ── HOTEL SECTION ─────────────────────────────────────────────────────────────
 function HotelSection() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState("2023-01-01");
-  const [endDate, setEndDate] = useState("2024-01-01");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const hotelBookings = useSelector(
     (state) => state.adminBooking.hotelBookings,
@@ -369,23 +386,36 @@ function HotelSection() {
 
         return validStatuses.includes(b.executionStatus) && ci < today;
       })
-      .map((b) => ({
-        id: b._id,
-        raw: b,
-        employee:
-          `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim(),
-        employeeId: b.userId?._id || "N/A",
-        destination: b.hotelRequest?.selectedHotel?.hotelName || "N/A",
-        departureDate:
+      .map((b) => {
+        const checkIn =
           b.bookingSnapshot?.checkInDate ||
           b.hotelRequest?.checkInDate ||
-          b.checkInDate,
-        returnDate:
+          b.checkInDate;
+        const checkOut =
           b.bookingSnapshot?.checkOutDate ||
           b.hotelRequest?.checkOutDate ||
-          b.checkOutDate,
-        status: "Completed",
-      }));
+          b.checkOutDate;
+        const travellers = b.travellers || [];
+        const employeeName =
+          `${travellers[0]?.firstName || ""} ${travellers[0]?.lastName || ""}`.trim() ||
+          `${b.userId?.name?.firstName || ""} ${b.userId?.name?.lastName || ""}`.trim() ||
+          b.userId?.email ||
+          "N/A";
+
+        return {
+          id: b._id,
+          orderId: b.orderId || "N/A",
+          raw: b,
+          employee: employeeName,
+          employeeId: b.userId?._id || "N/A",
+          department: b.corporateId || "N/A",
+          destination: b.hotelRequest?.selectedHotel?.hotelName || b.bookingSnapshot?.hotelName || "N/A",
+          departureDate: checkIn,
+          returnDate: checkOut,
+          status: "Completed",
+          rating: b.rating || 0,
+        };
+      });
   }, [hotelBookings]);
   const departments = ["All", ...new Set(hotelTrips.map((t) => t.department))];
 
@@ -405,6 +435,11 @@ function HotelSection() {
       return dateOk && deptOk && searchOk;
     });
   }, [search, startDate, endDate, deptFilter, hotelTrips]);
+
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage],
+  );
 
   const avgRating =
     filtered.length > 0
@@ -433,14 +468,7 @@ function HotelSection() {
           iconBgCls="bg-emerald-50"
           iconColorCls="text-emerald-600"
         />
-        <StatCard
-          label="Avg. Rating"
-          value={avgRating}
-          Icon={FiStar}
-          borderCls="border-amber-500"
-          iconBgCls="bg-amber-50"
-          iconColorCls="text-amber-600"
-        />
+        
         <StatCard
           label="Departments"
           value={new Set(filtered.map((t) => t.department)).size}
@@ -521,13 +549,11 @@ function HotelSection() {
           <table className="w-full border-collapse min-w-[920px]">
             <thead>
               <tr className="bg-[#088395] text-[#ccfbf1]">
-                <Th>Trip ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
-                <Th>Department</Th>
                 <Th>Destination</Th>
                 <Th>Check-in Date</Th>
                 <Th>Check-out Date</Th>
-                <Th>Rating</Th>
                 <Th>Status</Th>
                 <Th>Action</Th>
               </tr>
@@ -548,7 +574,7 @@ function HotelSection() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((t, i) => (
+                paginated.map((t, i) => (
                   <tr
                     key={t.id}
                     className={`transition-colors hover:bg-teal-50 ${
@@ -556,23 +582,22 @@ function HotelSection() {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={t.id} />
+                      <IdCell id={t.orderId} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-[#088395]/10 flex items-center justify-center text-[11px] font-black text-[#088395] shrink-0">
-                          {t.employee[0]}
+                       
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-[13px] text-slate-800">
+                            {t.employee}
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            {t.employeeId}
+                          </span>
                         </div>
-                        <span className="font-semibold text-[13px] text-slate-800">
-                          {t.employee}
-                        </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="px-2.5 py-0.5 text-xs rounded-full bg-teal-50 text-[#088395] font-medium">
-                        {t.department}
-                      </span>
-                    </td>
+                    
                     <td className="px-4 py-3 text-[13px] text-slate-700 font-medium">
                       {t.destination}
                     </td>
@@ -589,23 +614,26 @@ function HotelSection() {
                         : "—"}
                     </td>
                     <td className="px-4 py-3 text-[13px] text-slate-500">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-slate-800 text-[13px]">
-                          {t.airlineName || "N/A"}
-                        </span>
-                        <span className="text-[11px] text-slate-500">
-                          {t.flightNumber ? `Flight ${t.flightNumber}` : "—"}
-                        </span>
-                      </div>
+                      {t.returnDate
+                        ? new Date(t.returnDate).toLocaleDateString(
+                            "en-IN",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            },
+                          )
+                        : "—"}
                     </td>
-                    <td className="px-4 py-3">
-                      <RatingStars rating={t.rating} />
-                    </td>
+                   
                     <td className="px-4 py-3">
                       <StatusBadge status={t.status || "Completed"} />
                     </td>
                     <td className="px-4 py-3">
-                      <button className="px-3 py-1 text-xs font-semibold bg-[#088395] text-white rounded-md hover:bg-[#066b78] flex items-center gap-1">
+                      <button 
+                        onClick={() => navigate(`/employee-hotel-booking/${t.id}?source=past`)}
+                        className="px-3 py-1 text-xs font-semibold bg-[#088395] text-white rounded-md hover:bg-[#066b78] flex items-center gap-1"
+                      >
                         <FiEye size={12} /> View
                       </button>
                     </td>
@@ -618,11 +646,22 @@ function HotelSection() {
         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
           <span>
             Showing{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> of{" "}
-            <strong className="text-slate-600">{hotelTrips.length}</strong>{" "}
-            hotel trips
+            <strong className="text-slate-600">
+              {filtered.length === 0
+                ? 0
+                : `${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, filtered.length)}`}
+            </strong>{" "}
+            of{" "}
+            <strong className="text-slate-600">{filtered.length}</strong> hotel
+            trips
           </span>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

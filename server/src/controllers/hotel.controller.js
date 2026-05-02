@@ -129,9 +129,9 @@ const fetchFullHotelSearchDataset = async ({
     .map((hotel) => String(hotel.hotelCode || "").trim())
     .filter(Boolean);
 
-  logger.info(
-    `[hotel-search] Starting full search for ${hotelCodes.length} hotel codes in city ${CityCode}`,
-  );
+  // logger.info(
+  //   `[hotel-search] Starting full search for ${hotelCodes.length} hotel codes in city ${CityCode}`,
+  // );
 
   const tboResult = await tboSearchService.searchHotelsByCodeChunks({
     hotelCodes,

@@ -1,6 +1,4 @@
-// HotelBookingDetails.jsx
-// Hotel booking details page — redesigned with luxury editorial aesthetic.
-// All original logic preserved. Only UI/layout/design replaced.
+// client\src\components\TravelAdminTabs\Shared\HotelBookingDetails.jsx
 
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
@@ -33,6 +31,8 @@ import {
   FiXCircle,
   FiUsers,
   FiHash,
+  FiFileText,
+  FiTag,
 } from "react-icons/fi";
 import {
   MdHotel,
@@ -44,12 +44,11 @@ import {
   MdCancel,
   MdKingBed,
 } from "react-icons/md";
-import { generateHotelVoucher } from "../../Redux/Actions/hotelBooking.thunks";
-import { getTeamExecutedHotelRequestById } from "../../Redux/Actions/manager.thunk";
+import { getHotelBookingByIdAdmin } from "../../../Redux/Actions/travelAdmin.thunks";
 import {
   sendHotelAmendment,
   getHotelAmendmentStatus,
-} from "../../Redux/Actions/hotelAmendment.thunks";
+} from "../../../Redux/Actions/hotelAmendment.thunks";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Design tokens Mapping (for reference during conversion)        */
@@ -166,6 +165,9 @@ function SectionHeader({ num, title }) {
 /*  Hero / Confirmation Block                                      */
 /* ─────────────────────────────────────────────────────────────── */
 function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const source = searchParams.get("source");
   const [activeIndex, setActiveIndex] = useState(0);
   const hotelReq = booking?.hotelRequest || {};
   const snapshot = booking?.bookingSnapshot || {};
@@ -257,7 +259,7 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
             <h1 className="font-['Cormorant_Garamond'] text-[36px] font-bold leading-[1.1] text-[#1A1714] mb-2">
               {isCancelled
                 ? "Your trip was cancelled."
-                : location.state?.isPastTrip
+                : (location.state?.isPastTrip || source === "past")
                   ? "Your trip is completed."
                   : hotelName}
             </h1>
@@ -1005,7 +1007,7 @@ function CancellationSection({
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const { amendmentStatus } = useSelector((state) => state.hotelAmendment);
+  const { amendmentStatus, statusLoading } = useSelector((state) => state.hotelAmendment);
 
   const providerStatusRaw =
     amendmentStatus?.response?.HotelChangeRequestStatusResult ||
@@ -1161,149 +1163,215 @@ function CancellationSection({
     booking.amendment?.providerResponse?.HotelChangeRequestStatusResult ||
     booking.amendment?.providerResponse?.HotelChangeRequestResult;
 
+  // New: deeper extraction based on the provided JSON structure
+  const hotelChangeResult = providerStatusObj?.HotelChangeRequestResult || providerStatusObj;
+  
   const cancelStatusRaw = booking.raw?.CancellationStatus?.[0] || {};
 
   const totalRefund = Number(
-    cancelStatusRaw.RefundAmount ??
-      providerStatusObj?.RefundedAmount ??
+    hotelChangeResult?.RefundedAmount ??
       booking.amendment?.refundedAmount ??
       0,
   );
   const totalCharge = Number(
-    cancelStatusRaw.CancellationCharge ??
-      providerStatusObj?.CancellationCharge ??
+    hotelChangeResult?.CancellationCharge ??
       booking.amendment?.cancellationCharge ??
       0,
   );
-  const creditNote =
-    cancelStatusRaw.CreditNoteNo || providerStatusObj?.CreditNoteNo || "";
-  const providerRemarks = providerStatusObj?.Remarks || "Successful";
+
+  const cancellationFees = hotelChangeResult?.CancellationChargeBreakUp?.CancellationFees || 0;
+  const serviceCharge = hotelChangeResult?.CancellationChargeBreakUp?.CancellationServiceCharge || 0;
+  const totalServiceCharge = hotelChangeResult?.TotalServiceCharge || 0;
+  const totalPrice = hotelChangeResult?.TotalPrice || 0;
+  
+  const creditNote = hotelChangeResult?.CreditNoteNo || "";
+  const creditNoteDate = hotelChangeResult?.CreditNoteCreatedOn || "";
+  const zendeskId = hotelChangeResult?.ZendeskTicketId || "";
+  
+  const gst = hotelChangeResult?.GST || {};
+
+  const providerRemarks = hotelChangeResult?.Remarks || hotelChangeResult?.Error?.ErrorMessage || "Successful";
+  
   const cancelledOn =
     booking.cancellation?.cancelledAt ||
-    booking.updatedAt ||
-    booking.amendment?.requestedAt;
+    booking.amendment?.requestedAt ||
+    booking.updatedAt;
+    
   const changeRequestId =
-    cancelStatusRaw.ChangeRequestId ||
-    providerStatusObj?.ChangeRequestId ||
+    hotelChangeResult?.ChangeRequestId ||
     booking.amendment?.changeRequestId ||
     "—";
 
-  let displayStatus = booking.amendment?.status || "Cancelled";
+  let displayStatusLabel = booking.amendment?.status || "Cancelled";
   if (
-    cancelStatusRaw.ChangeRequestStatus === 3 ||
-    providerStatusObj?.ChangeRequestStatus === 3
+    hotelChangeResult?.ChangeRequestStatus === 3
   )
-    displayStatus = "Approved";
+    displayStatusLabel = "Approved";
   if (
-    cancelStatusRaw.ChangeRequestStatus === 4 ||
-    providerStatusObj?.ChangeRequestStatus === 4
+    hotelChangeResult?.ChangeRequestStatus === 4
   )
-    displayStatus = "Rejected";
+    displayStatusLabel = "Rejected";
 
   // ── Already cancelled ──
-  if (isCancelled) {
+  if (isCancelled || cancelRequest) {
     return (
-      <div className="flex flex-col gap-[1px] bg-[#EAE4D9]">
-        {/* Summary header */}
-        <div className="bg-white p-[16px_24px] flex justify-between items-center">
-          <span className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
-            Overall Cancellation Summary
-          </span>
-          <span className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#B5341A] bg-[#FDF1EE] border border-[#F0C4BA] px-[10px] py-[3px]">
-            <span className="w-[6px] h-[6px] rounded-full bg-[#B5341A] animate-pulse" />
-            {displayStatus}
-          </span>
-        </div>
+      <div className="flex flex-col gap-6">
+        {/* Main Status Banner */}
+        <div className={`${mappedStatus === 'approved' ? 'bg-[#EDF7F2] border-[#C3E4D2]' : 'bg-[#FDF8EE] border-[#F0E0A8]'} border p-6 flex flex-col gap-4`}>
+           <div className="flex justify-between items-center flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <FiClock size={16} className={mappedStatus === 'approved' ? 'text-[#2C7A4B]' : 'text-[#8A6200]'} />
+                <span className={`text-[16px] font-bold ${mappedStatus === 'approved' ? 'text-[#2C7A4B]' : 'text-[#8A6200]'}`}>
+                  {mappedStatus === 'approved' ? "Cancellation Approved" : "Cancellation In Progress"}
+                </span>
+              </div>
+              <div className="flex items-center gap-4">
+                 <div className="text-right">
+                    <div className="text-[9px] font-semibold tracking-[0.1em] uppercase text-gray-400">Request ID</div>
+                    <div className="text-[13px] font-mono font-bold text-gray-800">#{changeRequestId}</div>
+                 </div>
+                 <button
+                    onClick={() => dispatch(getHotelAmendmentStatus({ bookingId: booking?.bookingId || booking?._id }))}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded text-[11px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors shadow-sm"
+                  >
+                    <FiRefreshCw size={12} className={statusLoading ? "animate-spin" : ""} />
+                    Sync Status
+                  </button>
+              </div>
+           </div>
 
-        <div className="bg-white p-6">
-          <div className="grid grid-cols-5 gap-6">
-            {[
-              {
-                label: "Cancelled On",
-                val: cancelledOn
-                  ? `${fmtDate(cancelledOn)} · ${fmtTime(cancelledOn)}`
-                  : "—",
-                color: "text-[#1A1714]",
-              },
-              {
-                label: "Total Refund",
-                val: totalRefund ? `₹${totalRefund}` : "—",
-                color: "text-[#2C7A4B]",
-              },
-              {
-                label: "Total Charges",
-                val: totalCharge !== undefined ? `₹${totalCharge}` : "—",
-                color: "text-[#B5341A]",
-              },
-              {
-                label: "Credit Note",
-                val: creditNote || "—",
-                color: "text-[#1A1714]",
-                mono: true,
-              },
-              {
-                label: "Change Req ID",
-                val: changeRequestId || "—",
-                color: "text-[#1A1714]",
-                mono: true,
-              },
-            ].map((item, i) => (
-              <div key={i}>
-                <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
-                  {item.label}
-                </div>
-                <div
-                  className={`text-[15px] font-semibold ${
-                    item.mono ? "font-['DM_Mono']" : ""
-                  } ${item.color}`}
-                >
-                  {item.val}
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+              <div className="bg-white/50 p-4 rounded-lg">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Requested On</div>
+                <div className="text-[13px] font-medium text-gray-700">
+                   {cancelledOn ? `${fmtDate(cancelledOn)} at ${fmtTime(cancelledOn)}` : "—"}
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="bg-white/50 p-4 rounded-lg">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Reason / Remarks</div>
+                <div className="text-[13px] font-medium text-gray-700 italic line-clamp-2">
+                   "{booking.amendment?.remarks || booking.cancellation?.reason || "User Requested"}"
+                </div>
+              </div>
+              <div className="bg-white/50 p-4 rounded-lg">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Provider Status</div>
+                <div className="text-[13px] font-bold text-[#B5862A] uppercase tracking-tight">
+                   {displayStatusLabel}
+                </div>
+              </div>
+           </div>
         </div>
 
-        <div className="bg-white p-6 grid grid-cols-2 gap-6">
-          <div className="flex gap-3 items-start">
-            <div className="w-8 h-8 bg-[#FAF8F4] border border-[#EAE4D9] flex items-center justify-center shrink-0">
-              <FiAlertCircle
-                size={14}
-                className="text-[#A89F94]"
-              />
-            </div>
-            <div>
-              <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
-                Cancellation Reason
+        {/* Detailed Breakdown Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+           {/* Financial Details */}
+           <div className="bg-white border border-[#EAE4D9] p-6">
+              <h3 className="text-[12px] font-bold uppercase tracking-widest text-[#1A1714] mb-6 flex items-center gap-2">
+                <FiCreditCard size={14} className="text-[#B5862A]" />
+                Financial Settlement
+              </h3>
+              
+              <div className="space-y-4">
+                 <div className="flex justify-between items-center pb-3 border-b border-gray-50">
+                    <span className="text-[13px] text-gray-500">Original Total Price</span>
+                    <span className="text-[14px] font-bold text-gray-800">₹{totalPrice.toLocaleString('en-IN')}</span>
+                 </div>
+                 
+                 <div className="grid grid-cols-2 gap-4 pb-3 border-b border-gray-50">
+                    <div>
+                       <span className="text-[11px] text-gray-400 uppercase block mb-1">Cancel Fees</span>
+                       <span className="text-[14px] font-bold text-red-600">₹{cancellationFees.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div>
+                       <span className="text-[11px] text-gray-400 uppercase block mb-1">Service Charges</span>
+                       <span className="text-[14px] font-bold text-red-600">₹{serviceCharge.toLocaleString('en-IN')}</span>
+                    </div>
+                 </div>
+
+                 <div className="flex justify-between items-center p-4 bg-[#EDF7F2] rounded-lg border border-[#C3E4D2]">
+                    <div>
+                       <span className="text-[11px] text-[#2C7A4B] font-bold uppercase tracking-wider block mb-1">Final Refund Amount</span>
+                       <span className="text-[22px] font-bold text-[#2C7A4B]">₹{totalRefund.toLocaleString('en-IN')}</span>
+                    </div>
+                    <FiCheckCircle size={24} className="text-[#2C7A4B] opacity-20" />
+                 </div>
               </div>
-              <p className="text-[13px] text-[#7A7068] italic">
-                "
-                {booking.cancellation?.reason ||
-                  booking.amendment?.remarks ||
-                  "User Requested"}
-                "
-              </p>
-            </div>
-          </div>
-          {providerRemarks && (
-            <div className="flex gap-3 items-start">
-              <div className="w-8 h-8 bg-[#EEF4FD] border border-[#C0D4F0] flex items-center justify-center shrink-0">
-                <FiInfo
-                  size={14}
-                  className="text-[#1A4A7A]"
-                />
-              </div>
+           </div>
+
+           {/* Admin & Documents */}
+           <div className="bg-white border border-[#EAE4D9] p-6 flex flex-col justify-between">
               <div>
-                <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
-                  Provider Remarks
+                <h3 className="text-[12px] font-bold uppercase tracking-widest text-[#1A1714] mb-6 flex items-center gap-2">
+                  <FiFileText size={14} className="text-[#B5862A]" />
+                  Reference Documents
+                </h3>
+
+                <div className="grid grid-cols-2 gap-y-6">
+                   <div>
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Credit Note No</div>
+                      <div className="text-[13px] font-mono font-bold text-gray-800">{creditNote || "—"}</div>
+                   </div>
+                   <div>
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Document Date</div>
+                      <div className="text-[13px] font-medium text-gray-700">
+                         {creditNoteDate ? fmtDate(creditNoteDate) : "—"}
+                      </div>
+                   </div>
+                   <div>
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Zendesk Ticket</div>
+                      <div className="text-[13px] font-mono font-bold text-[#1A4A7A]">{zendeskId ? `#${zendeskId}` : "—"}</div>
+                   </div>
+                   <div>
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Provider Message</div>
+                      <div className="text-[12px] font-medium text-gray-500 italic truncate max-w-[150px]" title={providerRemarks}>
+                         {providerRemarks}
+                      </div>
+                   </div>
                 </div>
-                <p className="text-[13px] text-[#1A4A7A] font-medium">
-                  {providerRemarks}
-                </p>
               </div>
-            </div>
-          )}
+           </div>
         </div>
+
+        {/* GST Breakdown Section */}
+        {gst?.IGSTAmount > 0 || gst?.CGSTAmount > 0 ? (
+           <div className="bg-white border border-[#EAE4D9] overflow-hidden">
+              <div className="bg-gray-50 p-4 border-b border-[#EAE4D9]">
+                 <h3 className="text-[11px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-2">
+                    <FiTag size={13} /> GST Breakdown on Cancellation
+                 </h3>
+              </div>
+              <div className="p-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                 {gst.IGSTAmount > 0 && (
+                    <div>
+                       <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">IGST ({gst.IGSTRate}%)</div>
+                       <div className="text-[14px] font-bold text-gray-800">₹{gst.IGSTAmount}</div>
+                    </div>
+                 )}
+                 {gst.CGSTAmount > 0 && (
+                    <div>
+                       <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">CGST ({gst.CGSTRate}%)</div>
+                       <div className="text-[14px] font-bold text-gray-800">₹{gst.CGSTAmount}</div>
+                    </div>
+                 )}
+                 {gst.SGSTAmount > 0 && (
+                    <div>
+                       <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">SGST ({gst.SGSTRate}%)</div>
+                       <div className="text-[14px] font-bold text-gray-800">₹{gst.SGSTAmount}</div>
+                    </div>
+                 )}
+                 {gst.CessAmount > 0 && (
+                    <div>
+                       <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">Cess ({gst.CessRate}%)</div>
+                       <div className="text-[14px] font-bold text-gray-800">₹{gst.CessAmount}</div>
+                    </div>
+                 )}
+                 <div>
+                    <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">Taxable Amount</div>
+                    <div className="text-[14px] font-bold text-gray-800">₹{gst.TaxableAmount || "0"}</div>
+                 </div>
+              </div>
+           </div>
+        ) : null}
       </div>
     );
   }
@@ -1689,17 +1757,26 @@ function TotalPriceBar({ totalFare, onDownload, isCancelled }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  Main Page                                                      */
 /* ─────────────────────────────────────────────────────────────── */
-export default function TeamHotelBookingDetails() {
+export default function HotelBookingDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
 
-  const { teamBookingDetail: booking, loadingTeamBookingDetail: loading, errorTeamBookingDetail: error } = useSelector(
-    (s) => s.manager,
-  );
+  const {
+    singleBooking: booking,
+    loadingSingleBooking: loading,
+    errorSingleBooking: error,
+  } = useSelector((s) => s.adminBooking);
   const user = useSelector((state) => state.auth?.user);
   const isTravelAdmin = user?.role === "travel-admin";
+
+  // Detect source: cancelled table or total bookings table
+  const searchParams = new URLSearchParams(location.search);
+  const source = searchParams.get("source");
+  const backPath = source === "cancelled" ? "/total-cancelled-bookings" : source === "past" ? "/past-trips" : source === "upcoming" ? "/upcoming-trips" : "/total-bookings";
+  const backLabel = source === "cancelled" ? "Cancelled Bookings" : source === "past" ? "Past Trips" : source === "upcoming" ? "Upcoming Trips" : "Total Bookings";
+
   const rooms = (Array.isArray(booking?.rooms) && booking.rooms.length > 0)
     ? booking.rooms
     : (booking?.hotelRequest?.selectedRoom?.rawRoomData || []);
@@ -1712,7 +1789,7 @@ export default function TeamHotelBookingDetails() {
   } = useSelector((state) => state.hotelAmendment);
 
   useEffect(() => {
-    if (id) dispatch(getTeamExecutedHotelRequestById(id));
+    if (id) dispatch(getHotelBookingByIdAdmin(id));
   }, [id, dispatch]);
 
   if (loading || (!booking && !error)) {
@@ -1731,13 +1808,13 @@ export default function TeamHotelBookingDetails() {
         <h2 className="text-[16px] font-semibold text-[#1A1714]">Failed to load booking</h2>
         <p className="text-[13px] text-[#A89F94] max-w-xs">{error}</p>
         <button 
-          onClick={() => dispatch(getTeamExecutedHotelRequestById(id))}
+          onClick={() => dispatch(getHotelBookingByIdAdmin(id))}
           className="mt-2 px-6 py-2 bg-[#B5862A] text-white text-[12px] font-semibold uppercase tracking-wider hover:bg-[#966b1d] transition-colors"
         >
           Retry
         </button>
         <button 
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(backPath)}
           className="text-[12px] text-[#7A7068] hover:underline"
         >
           Go Back
@@ -1802,11 +1879,11 @@ export default function TeamHotelBookingDetails() {
       {/* ── Sticky nav ── */}
       <header className="sticky top-0 z-40 bg-white border-b border-[#EAE4D9] h-14 px-8 flex items-center gap-4">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(backPath)}
           className="flex items-center gap-[6px] bg-none border-none cursor-pointer text-[12px] font-semibold text-[#B5862A] font-['DM_Sans'] tracking-[0.05em] uppercase hover:opacity-80 transition-opacity"
         >
           <FiArrowLeft size={14} />
-          Back
+          {backLabel}
         </button>
         <span className="w-[1px] h-4 bg-[#EAE4D9]" />
         <h1 className="text-[13px] font-semibold text-[#1A1714] font-['DM_Sans'] tracking-[0.04em]">
@@ -1819,11 +1896,11 @@ export default function TeamHotelBookingDetails() {
               <MdVerifiedUser size={11} /> Voucher Issued
             </span>
           )}
-          {booking.bookingReference && (
+          { (booking.orderId || booking.bookingReference) && (
             <span className="text-[11px] text-[#A89F94]">
               Ref:{" "}
               <strong className="text-[#1A1714] font-['DM_Mono']">
-                {booking.bookingReference}
+                {booking.orderId || booking.bookingReference}
               </strong>
             </span>
           )}
@@ -1867,28 +1944,6 @@ export default function TeamHotelBookingDetails() {
             />
           </section>
         )}
-
-        {/* 02 Amenities */}
-        {/* {amenities.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={2}
-              title="Amenities"
-            />
-            <AmenitiesSection amenities={amenities} />
-          </section>
-        )} */}
-
-        {/* 03 Check-in Instructions */}
-        {/* {rateConditions.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={3}
-              title="Check-in Instructions"
-            />
-            <CheckInInstructions conditions={rateConditions} />
-          </section>
-        )} */}
 
         {/* 04 Cancellation Policy */}
         {cancelPolicies.length > 0 && (
@@ -1959,13 +2014,6 @@ export default function TeamHotelBookingDetails() {
           />
         </section>
       </main>
-
-      {/* Sticky bottom total price bar */}
-      {/* <TotalPriceBar
-        totalFare={totalFare}
-        isCancelled={isCancelled}
-        onDownload={() => dispatch(generateHotelVoucher(booking.bookingId))}
-      /> */}
     </div>
   );
 }

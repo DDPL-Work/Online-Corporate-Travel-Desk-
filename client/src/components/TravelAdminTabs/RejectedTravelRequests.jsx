@@ -39,6 +39,7 @@ function normalize(rejectedRequests) {
     const segments = r.flightRequest?.segments || [];
     return {
       id: r._id,
+      orderId: r.orderId || "N/A",
       raw: r,
       employee: r.userId?.name
         ? `${r.userId.name.firstName} ${r.userId.name.lastName}`
@@ -206,7 +207,7 @@ function FlightSection({ allRequests, loading }) {
           <table className="w-full border-collapse min-w-[960px]">
             <thead>
               <tr className="bg-red-700 text-red-100">
-                <Th>Request ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Department</Th>
                 <Th>Destination</Th>
@@ -245,7 +246,7 @@ function FlightSection({ allRequests, loading }) {
                     className={`transition-colors hover:bg-red-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={r.id} />
+                      <IdCell id={r.orderId} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -476,7 +477,7 @@ function HotelSection({ allRequests, loading }) {
           <table className="w-full border-collapse min-w-[960px]">
             <thead>
               <tr className="bg-red-700 text-red-100">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Rejected Date</Th>
                 <Th>Rejected By</Th>
@@ -513,13 +514,10 @@ function HotelSection({ allRequests, loading }) {
                     className={`transition-colors hover:bg-red-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={r.id} />
+                      <IdCell id={r.orderId} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-red-100 flex items-center justify-center text-[11px] font-black text-red-600 shrink-0">
-                          {r.employee[0]}
-                        </div>
                         <div className="flex flex-col">
                           <span className="font-semibold text-[13px] text-slate-800">
                             {r.employee}

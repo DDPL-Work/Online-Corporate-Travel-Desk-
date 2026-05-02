@@ -259,9 +259,7 @@ const RequestCard = ({ req, onApprove, onReject, loading }) => {
                 <p className="text-[12px] font-bold text-slate-700 leading-tight">
                   {employeeName || "�"}
                 </p>
-                <p className="text-[10px] text-slate-400">
-                  {employeeEmail}
-                </p>
+                <p className="text-[10px] text-slate-400">{employeeEmail}</p>
               </div>
             </div>
           </div>
@@ -309,10 +307,32 @@ const RequestCard = ({ req, onApprove, onReject, loading }) => {
               </p>
             </div>
           </div>
+
+          {managerEmail && managerEmail !== "—" && (
+            <div className="bg-slate-50 rounded-xl px-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                Manager / Approver
+              </p>
+              <div className="flex items-center gap-2">
+                <Avatar name={managerName} size="sm" />
+                <div>
+                  <p className="text-[13px] font-semibold text-slate-700">
+                    {managerName}
+                  </p>
+                  <p className="text-[11px] text-slate-400">{managerEmail}</p>
+                  {/* {managerRole && (
+                          <p className="text-[11px] text-slate-400 mt-1">
+                            Role: {managerRole}
+                          </p>
+                        )} */}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Expand for purpose / more details ── */}
-        {(req.purposeOfTravel || (managerEmail && managerEmail !== "—")) && (
+        {/* {(req.purposeOfTravel || (managerEmail && managerEmail !== "—")) && (
           <>
             <button
               onClick={() => setExpanded((v) => !v)}
@@ -350,33 +370,11 @@ const RequestCard = ({ req, onApprove, onReject, loading }) => {
                       : "—"}
                   </p>
                 </div>
-                {managerEmail && managerEmail !== "—" && (
-                  <div className="bg-slate-50 rounded-xl px-4 py-3">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Manager / Approver
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Avatar name={managerName} size="sm" />
-                      <div>
-                        <p className="text-[13px] font-semibold text-slate-700">
-                          {managerName}
-                        </p>
-                        <p className="text-[11px] text-slate-400">
-                          {managerEmail}
-                        </p>
-                        {managerRole && (
-                          <p className="text-[11px] text-slate-400 mt-1">
-                            Role: {managerRole}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                
               </div>
             )}
           </>
-        )}
+        )} */}
       </div>
     </div>
   );
@@ -449,7 +447,8 @@ const ManagerRequestsPage = () => {
         const emp = r.employeeId || r.employee || {};
         const empName = (() => {
           if (!emp) return "";
-          if (typeof emp.name === "string") return emp.name.trim().toLowerCase();
+          if (typeof emp.name === "string")
+            return emp.name.trim().toLowerCase();
           if (emp.name?.firstName || emp.name?.lastName) {
             return `${emp.name.firstName || ""} ${emp.name.lastName || ""}`
               .trim()
@@ -665,7 +664,3 @@ const ManagerRequestsPage = () => {
 };
 
 export default ManagerRequestsPage;
-
-
-
-

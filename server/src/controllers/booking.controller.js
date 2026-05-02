@@ -9,7 +9,7 @@ const Ledger = require("../models/Ledger");
 const tboService = require("../services/tektravels/flight.service");
 const pdfService = require("../services/pdf.service");
 const notificationService = require("../services/notification.service");
-const { generateBookingReference } = require("../utils/helpers");
+const { generateBookingReference, generateOrderId } = require("../utils/helpers");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
@@ -17,6 +17,7 @@ const { getAgencyBalance } = require("../services/tboBalance.service");
 const logger = require("../utils/logger");
 const paymentService = require("../services/payment.service");
 const BookingIntent = require("../models/BookingIntent");
+const { generateSequentialOrderId } = require("../utils/orderIdGenerator");
 
 // @desc    Create booking request (Approval-first)
 // @route   POST /api/v1/bookings
@@ -308,6 +309,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   }
 
   /* ================= CREATE BOOKING REQUEST ================= */
+  const orderId = await generateSequentialOrderId("flight");
 
   let freshFareQuote;
 
@@ -360,6 +362,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
   const bookingRequest = await BookingRequest.create({
     bookingReference: generateBookingReference(),
+    orderId,
     bookingType,
     corporateId: corporate._id,
     userId: user._id,
@@ -475,6 +478,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
       {
         bookingRequestId: bookingRequest._id,
         bookingReference: bookingRequest.bookingReference,
+        orderId: bookingRequest.orderId,
         requestStatus: bookingRequest.requestStatus,
         autoApproved: isAutoApproved,
       },
@@ -502,7 +506,7 @@ exports.getMyRequests = asyncHandler(async (req, res) => {
     .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 })
     .select(
-      "bookingType requestStatus executionStatus flightRequest pricingSnapshot createdAt",
+      "bookingType orderId requestStatus executionStatus flightRequest pricingSnapshot createdAt",
     );
 
   res
@@ -1941,6 +1945,27 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, booking, "Booking cancelled successfully"));
 });
 
+exports.getProjectFlightExpenses = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+
+  if (!projectId) {
+    throw new ApiError(400, "Project ID is required");
+  }
+
+  const expenses = await BookingRequest.find({ 
+    projectId,
+    corporateId: req.user.corporateId,
+    executionStatus: "ticketed"
+  })
+    .populate("userId", "name email")
+    .populate("approvedBy", "name email role")
+    .sort({ createdAt: -1 });
+
+  res.status(200).json(
+    new ApiResponse(200, expenses, "Project flight expenses fetched successfully")
+  );
+});
+
 module.exports = {
   createBookingRequest: exports.createBookingRequest,
   getMyRequests: exports.getMyRequests,
@@ -1954,4 +1979,5 @@ module.exports = {
   getAllBookings: exports.getAllBookings,
   getBooking: exports.getBooking,
   cancelBooking: exports.cancelBooking,
+  getProjectFlightExpenses: exports.getProjectFlightExpenses,
 };

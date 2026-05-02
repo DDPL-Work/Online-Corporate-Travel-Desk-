@@ -85,6 +85,7 @@ function FlightSection() {
 
         return {
           id: b._id,
+          orderId: b.orderId,
           employee:
             `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim() ||
             b.userId?.email ||
@@ -124,6 +125,7 @@ function FlightSection() {
       const searchOk =
         !q ||
         t.employee.toLowerCase().includes(q) ||
+        (t.orderId || "").toLowerCase().includes(q) ||
         t.destination.toLowerCase().includes(q) ||
         t.id.toString().includes(q);
       return dateOk && searchOk;
@@ -142,7 +144,7 @@ function FlightSection() {
   return (
     <div className="space-y-4">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <StatCard
           label="Total Flights"
           value={filtered.length}
@@ -224,7 +226,7 @@ function FlightSection() {
           <table className="w-full border-collapse min-w-[860px]">
             <thead>
               <tr className="bg-[#0A4D68] text-[#bfdbfe]">
-                <Th>Trip ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Departure Date</Th>
                 <Th>Airline</Th>
@@ -256,7 +258,7 @@ function FlightSection() {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={t.id} />
+                      <IdCell id={t.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -394,6 +396,7 @@ function HotelSection() {
         return {
           raw: b,
           id: b._id,
+          orderId: b.orderId,
           employee: employeeName,
           employeeId: traveller.email || traveller._id || "—",
           destination:
@@ -420,6 +423,7 @@ function HotelSection() {
       const searchOk =
         !q ||
         t.employee.toLowerCase().includes(q) ||
+        (t.orderId || "").toLowerCase().includes(q) ||
         t.destination.toLowerCase().includes(q) ||
         t.id.toString().includes(q);
       return dateOk && searchOk;
@@ -436,7 +440,7 @@ function HotelSection() {
   return (
     <div className="space-y-4">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <StatCard
           label="Total Hotels"
           value={filtered.length}
@@ -516,7 +520,7 @@ function HotelSection() {
           <table className="w-full border-collapse min-w-[860px]">
             <thead>
               <tr className="bg-[#088395] text-[#ccfbf1]">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Hotel Name</Th>
                 <Th>Check-in Date</Th>
@@ -549,7 +553,7 @@ function HotelSection() {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={t.id} />
+                      <IdCell id={t.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">

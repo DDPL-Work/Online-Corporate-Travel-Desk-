@@ -79,6 +79,8 @@ import ContactUs from "../Pages/Legal/ContactUs";
 import MyReissueRequests from "../components/EmployeeDashboard/MyReissuedRequests";
 import TeamBookingDetails from "../components/CorporateManagerTabs/TeamBookingDetails";
 import TeamHotelBookingDetails from "../components/CorporateManagerTabs/TeamHotelBookingDetails";
+import FlightBookingDetails from "../components/TravelAdminTabs/Shared/FlightBookingDetails";
+import HotelBookingDetails1 from "../components/TravelAdminTabs/Shared/HotelBookingDetails";
 // import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 
 export const appRouter = createBrowserRouter([
@@ -106,6 +108,15 @@ export const appRouter = createBrowserRouter([
             children: [
               { path: "/update-profile", element: <ProfileSettings /> },
               { path: "total-bookings", element: <BookingsDashboard /> },
+
+                {
+                path: "/employee-flight-booking/:id",
+                element: <FlightBookingDetails />,
+              },
+               {
+                path: "/employee-hotel-booking/:id",
+                element: <HotelBookingDetails1 />,
+              },
               {
                 path: "/total-cancelled-bookings",
                 element: <CancelledBookings />,

@@ -159,6 +159,7 @@ function CancelledFlightSection() {
       const searchOk =
         !q ||
         b.travellerName?.toLowerCase().includes(q) ||
+        (b.orderId || "").toLowerCase().includes(q) ||
         b.pnr?.toLowerCase().includes(q) ||
         b.providerBookingId?.toString().toLowerCase().includes(q);
 
@@ -195,7 +196,7 @@ function CancelledFlightSection() {
   return (
     <div className="space-y-4">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           label="Total Cancelled"
           value={filtered.length}
@@ -228,7 +229,7 @@ function CancelledFlightSection() {
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
         />
-      </div>
+      </div> */}
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-4">
@@ -314,7 +315,7 @@ function CancelledFlightSection() {
           <table className="w-full border-collapse min-w-[960px]">
             <thead>
               <tr className="bg-red-800 text-red-100">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Traveller Name</Th>
                 <Th>Booked Date</Th>
                 <Th>Cancelled Date</Th>
@@ -348,7 +349,7 @@ function CancelledFlightSection() {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={b._id} />
+                      <IdCell id={b.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
@@ -550,6 +551,7 @@ function CancelledHotelSection() {
       const searchOk =
         !q ||
         b.guestName?.toLowerCase().includes(q) ||
+        (b.orderId || "").toLowerCase().includes(q) ||
         b.providerBookingId?.toString().toLowerCase().includes(q) ||
         b.hotelName?.toLowerCase().includes(q);
 
@@ -585,12 +587,12 @@ function CancelledHotelSection() {
 
   return (
     <div className="space-y-4">
-      {loadingHotels && (
+      {/* {loadingHotels && (
         <div className="bg-white rounded-xl shadow-sm p-3 text-sm text-slate-500">
           Loading cancelled hotel bookings…
         </div>
-      )}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      )} */}
+      {/* <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           label="Total Cancelled"
           value={filtered.length}
@@ -623,7 +625,7 @@ function CancelledHotelSection() {
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
         />
-      </div>
+      </div> */}
 
       <div className="bg-white rounded-xl shadow-sm p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -721,7 +723,7 @@ function CancelledHotelSection() {
           <table className="w-full border-collapse min-w-[960px]">
             <thead>
               <tr className="bg-red-800 text-red-100">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Guest Name</Th>
                 <Th>Booked Date</Th>
                 <Th>Cancelled Date</Th>
@@ -756,7 +758,7 @@ function CancelledHotelSection() {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={b._id} />
+                      <IdCell id={b.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col">

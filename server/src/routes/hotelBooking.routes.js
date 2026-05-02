@@ -10,17 +10,7 @@ const {
 
 const corporateContext = require("../middleware/corporate.middleware");
 
-const {
-  createHotelBookingRequest,
-  getMyHotelRequests,
-  getMyHotelRequestById,
-  getMyRejectedHotelRequests,
-  executeApprovedHotelBooking,
-  getBookedHotelDetails,
-  getMyHotelBookings,
-  generateHotelVoucher,
-  preBookHotel,
-} = require("../controllers/hotelBooking.controller");
+const hotelBookingController = require("../controllers/hotelBooking.controller");
 
 router.use(verifyToken);
 
@@ -31,7 +21,7 @@ router.post(
   "/prebook",
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
   corporateContext,
-  preBookHotel
+  hotelBookingController.preBookHotel,
 );
 
 /* ======================================================
@@ -41,7 +31,7 @@ router.post(
   "/create-request",
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
   corporateContext,
-  createHotelBookingRequest
+  hotelBookingController.createHotelBookingRequest,
 );
 
 /* ======================================================
@@ -52,20 +42,20 @@ router.post(
 router.get(
   "/my",
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  getMyHotelRequests
+  hotelBookingController.getMyHotelRequests,
 );
 
 // ✅ Specific routes FIRST (VERY IMPORTANT)
 router.get(
   "/my/rejected",
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  getMyRejectedHotelRequests
+  hotelBookingController.getMyRejectedHotelRequests,
 );
 
 router.get(
   "/my/completed",
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  getMyHotelBookings
+  hotelBookingController.getMyHotelBookings,
   // OR use: getMyCompletedHotelBookings (if separate logic exists)
 );
 
@@ -73,7 +63,7 @@ router.get(
 router.get(
   "/my/:id",
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  getMyHotelRequestById
+  hotelBookingController.getMyHotelRequestById,
 );
 
 /* ======================================================
@@ -83,20 +73,25 @@ router.get(
 router.post(
   "/:bookingId/execute",
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  executeApprovedHotelBooking
+  hotelBookingController.executeApprovedHotelBooking,
 );
 
 // ✅ Keep this AFTER /my routes to avoid conflicts
 router.get(
   "/:id/details",
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  getBookedHotelDetails
+  hotelBookingController.getBookedHotelDetails,
 );
 
 router.post(
   "/:id/voucher",
   authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
-  generateHotelVoucher
+  hotelBookingController.generateHotelVoucher,
+);
+
+router.get(
+  "/get-project-hotel-expenses/:projectId",
+  hotelBookingController.getProjectHotelExpenses,
 );
 
 module.exports = router;

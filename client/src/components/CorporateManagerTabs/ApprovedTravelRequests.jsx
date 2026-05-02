@@ -30,6 +30,8 @@ import {
   ExecStatusBadge,
 } from "./Shared/CommonComponents";
 import { formatDate } from "../../utils/formatter";
+import { Pagination } from "./Shared/Pagination";
+import TableScrollWrapper from "../common/TableScrollWrapper";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STATUS FILTERING
@@ -55,13 +57,20 @@ const calculateNights = (checkIn, checkOut) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // FLIGHT APPROVALS SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
+function FlightApprovalsSection({
+  rawApprovals,
+  traceTimers,
+  loading,
+  onCountChange,
+}) {
   const [search, setSearch] = useState("");
   const [startDate, setStart] = useState("");
   const [endDate, setEnd] = useState("");
   const [travelDate, setTravelDate] = useState("");
   const [execFilter, setExec] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
   const [selected, setSelected] = useState(null);
+  const PAGE_SIZE = 10;
 
   const flightRaw = useMemo(
     () =>
@@ -93,6 +102,7 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
       const tOk = !endDate || new Date(a.approvedAt) <= new Date(endDate);
       const qOk =
         !q ||
+        a.orderId?.toLowerCase().includes(q) ||
         a.bookingReference?.toLowerCase().includes(q) ||
         a.purposeOfTravel?.toLowerCase().includes(q) ||
         route.toLowerCase().includes(q) ||
@@ -102,6 +112,18 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
       return eOk && fOk && tOk && qOk;
     });
   }, [search, startDate, endDate, execFilter, flightRaw]);
+
+  const paginated = useMemo(() => {
+    return filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, startDate, endDate, execFilter]);
+
+  useEffect(() => {
+    onCountChange(filtered.length);
+  }, [filtered.length, onCountChange]);
 
   const totalCost = filtered.reduce(
     (s, a) => s + (a.pricingSnapshot?.totalAmount || 0),
@@ -114,7 +136,7 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <StatCard
           label="Total Flights"
           value={filtered.length}
@@ -139,14 +161,14 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
           iconBgCls="bg-red-50"
           iconColorCls="text-red-600"
         />
-        <StatCard
+        {/* <StatCard
           label="Est. Cost"
           value={`₹${totalCost.toLocaleString()}`}
           Icon={FiDollarSign}
           borderCls="border-violet-500"
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
-        />
+        /> */}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm p-4">
@@ -196,31 +218,31 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-xl shadow-sm">
+        <TableScrollWrapper>
           <table className="w-full border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-[#0A4D68] text-blue-100">
-                <Th>Request ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Route</Th>
                 <Th>Airline</Th>
                 <Th>Travel Date</Th>
                 <Th>Amount</Th>
                 <Th>Exec Status</Th>
-                <Th>Fare Timer</Th>
+                {/* <Th>Fare Timer</Th> */}
                 <Th>Action</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
+              {paginated.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="py-16 text-center text-slate-400">
                     <div className="flex justify-center mb-3">
                       <FaPlane size={32} className="opacity-20" />
                     </div>
                     <p className="font-semibold text-sm">
-                      No approved hotel bookings found 
+                      No approved flight bookings found
                     </p>
                     <p className="text-xs mt-1">
                       Try adjusting the filters or search query
@@ -228,7 +250,7 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
                   </td>
                 </tr>
               ) : (
-                filtered.map((a, i) => {
+                paginated.map((a, i) => {
                   const segs = a.flightRequest?.segments || [];
                   const route =
                     segs.length > 0
@@ -249,7 +271,7 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
                       className={`hover:bg-sky-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}
                     >
                       <td className="px-4 py-3">
-                        <IdCell id={a.bookingReference} />
+                        <IdCell id={a.orderId || "N/A"} />
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-semibold text-[13px] text-slate-800">
@@ -278,13 +300,13 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
                       <td className="px-4 py-3">
                         <ExecStatusBadge status={a.executionStatus} />
                       </td>
-                      <td className="px-4 py-3">
+                      {/* <td className="px-4 py-3">
                         {a.flightRequest?.traceId ? (
                           <TraceTimer timer={traceTimers[a._id]} />
                         ) : (
                           <span className="text-[11px] text-slate-300">—</span>
                         )}
-                      </td>
+                      </td> */}
                       <td className="px-4 py-3">
                         <button
                           onClick={() => setSelected(a)}
@@ -299,18 +321,24 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
               )}
             </tbody>
           </table>
-        </div>
+        </TableScrollWrapper>
         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
           <span>
             Showing{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> of{" "}
-            <strong className="text-slate-600">{flightRaw.length}</strong>{" "}
-            flights
+            <strong className="text-slate-600">{paginated.length}</strong> of{" "}
+            <strong className="text-slate-600">{filtered.length}</strong>{" "}
+            flights (filtered)
           </span>
-          <span className="text-red-400 text-[11px]">
+          {/* <span className="text-red-400 text-[11px]">
             ✕ ticketed &amp; cancelled excluded
-          </span>
+          </span> */}
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {selected && (
@@ -327,14 +355,16 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // HOTEL APPROVALS SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-function HotelApprovalsSection({ rawApprovals, loading }) {
+function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
   const [search, setSearch] = useState("");
   const [startDate, setStart] = useState("");
   const [endDate, setEnd] = useState("");
   const [checkInDate, setCheckInDate] = useState("");
   const [checkOutDate, setCheckOutDate] = useState("");
   const [execFilter, setExec] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
   const [selected, setSelected] = useState(null);
+  const PAGE_SIZE = 10;
 
   const hotelRaw = useMemo(
     () =>
@@ -362,6 +392,7 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
       const tOk = !endDate || new Date(a.approvedAt) <= new Date(endDate);
       const qOk =
         !q ||
+        a.orderId?.toLowerCase().includes(q) ||
         a.bookingReference?.toLowerCase().includes(q) ||
         hotelName.toLowerCase().includes(q) ||
         a.purposeOfTravel?.toLowerCase().includes(q) ||
@@ -371,6 +402,18 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
       return eOk && fOk && tOk && qOk;
     });
   }, [search, startDate, endDate, execFilter, hotelRaw]);
+
+  const paginated = useMemo(() => {
+    return filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, startDate, endDate, execFilter]);
+
+  useEffect(() => {
+    onCountChange(filtered.length);
+  }, [filtered.length, onCountChange]);
 
   const totalCost = filtered.reduce(
     (s, a) => s + (a.pricingSnapshot?.totalAmount || 0),
@@ -383,7 +426,7 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <StatCard
           label="Total Hotels"
           value={filtered.length}
@@ -408,14 +451,14 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
           iconBgCls="bg-red-50"
           iconColorCls="text-red-600"
         />
-        <StatCard
+        {/* <StatCard
           label="Est. Cost"
           value={`₹${totalCost.toLocaleString()}`}
           Icon={FiDollarSign}
           borderCls="border-violet-500"
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
-        />
+        /> */}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm p-4">
@@ -473,31 +516,31 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-xl shadow-sm">
+        <TableScrollWrapper>
           <table className="w-full border-collapse min-w-[950px]">
             <thead>
               <tr className="bg-[#088395] text-teal-100">
-                <Th>Ref. ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Hotel</Th>
                 <Th>Check-In</Th>
                 <Th>Check-Out</Th>
-                <Th>Nights</Th>
+                {/* <Th>Nights</Th> */}
                 <Th>Amount</Th>
                 <Th>Exec Status</Th>
                 <Th>Action</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
+              {paginated.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="py-16 text-center text-slate-400">
                     <div className="flex justify-center mb-3">
-                      <FaPlane size={32} className="opacity-20" />
+                      <FaHotel size={32} className="opacity-20" />
                     </div>
                     <p className="font-semibold text-sm">
-                      No cancelled flight bookings found
+                      No approved hotel bookings found
                     </p>
                     <p className="text-xs mt-1">
                       Try adjusting the filters or search query
@@ -505,7 +548,7 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
                   </td>
                 </tr>
               ) : (
-                filtered.map((a, i) => {
+                paginated.map((a, i) => {
                  const hotel = a.hotelRequest?.selectedHotel || {};
 const snap = a.bookingSnapshot || {};
 
@@ -535,7 +578,7 @@ const amount =
                       className={`hover:bg-teal-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}
                     >
                       <td className="px-4 py-3">
-                        <IdCell id={a.bookingReference} />
+                        <IdCell id={a.orderId || "N/A"} />
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-semibold text-[13px] text-slate-800">
@@ -559,9 +602,9 @@ const amount =
                       <td className="px-4 py-3 text-[13px] text-slate-500">
                         {formatDate(a.hotelRequest?.checkOutDate)}
                       </td>
-                      <td className="px-4 py-3 font-bold text-center text-slate-700">
+                      {/* <td className="px-4 py-3 font-bold text-center text-slate-700">
                         {nights}
-                      </td>
+                      </td> */}
                       <td className="px-4 py-3 font-bold text-slate-900">
                        ₹{amount.toLocaleString()}
                       </td>
@@ -582,17 +625,23 @@ const amount =
               )}
             </tbody>
           </table>
-        </div>
+        </TableScrollWrapper>
         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
           <span>
             Showing{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> of{" "}
-            <strong className="text-slate-600">{hotelRaw.length}</strong> hotels
+            <strong className="text-slate-600">{paginated.length}</strong> of{" "}
+            <strong className="text-slate-600">{filtered.length}</strong> hotels (filtered)
           </span>
-          <span className="text-red-400 text-[11px]">
+          {/* <span className="text-red-400 text-[11px]">
             ✕ voucher-generated &amp; cancelled excluded
-          </span>
+          </span> */}
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {selected && (
@@ -620,6 +669,9 @@ export default function ApprovedTravelRequestsForManager() {
     loadingApprovedFlightRequests,
   } = useSelector((state) => state.manager);
 
+  const [flightCount, setFlightCount] = useState(0);
+  const [hotelCount, setHotelCount] = useState(0);
+
   useEffect(() => {
     if (activeTab === "flight") {
       dispatch(getApprovedFlightRequests());
@@ -627,6 +679,23 @@ export default function ApprovedTravelRequestsForManager() {
       dispatch(getApprovedHotelRequests());
     }
   }, [activeTab, dispatch]);
+
+  // Initial count calculation (optional, but good for UX)
+  useEffect(() => {
+    setFlightCount(
+      (approvedFlightRequests || []).filter(
+        (a) => !FLIGHT_EXCLUDE.has(a.executionStatus),
+      ).length,
+    );
+  }, [approvedFlightRequests]);
+
+  useEffect(() => {
+    setHotelCount(
+      (approvedHotelRequests || []).filter(
+        (a) => !HOTEL_EXCLUDE.has(a.executionStatus),
+      ).length,
+    );
+  }, [approvedHotelRequests]);
 
   useEffect(() => {
     if (!approvedFlightRequests?.length) {
@@ -652,10 +721,6 @@ export default function ApprovedTravelRequestsForManager() {
     }, 1000);
     return () => clearInterval(interval);
   }, [approvedFlightRequests]);
-
-  const flightCount = approvedFlightRequests.length;
-
-  const hotelCount = approvedHotelRequests.length;
 
   const loadingActive =
     activeTab === "flight"
@@ -702,9 +767,9 @@ export default function ApprovedTravelRequestsForManager() {
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
               Approved bookings pending execution &nbsp;·&nbsp;
-              <span className="text-red-500">
+              {/* <span className="text-red-500">
                 Ticketed flights &amp; voucher-generated hotels are excluded
-              </span>
+              </span> */}
             </p>
           </div>
           <button
@@ -738,18 +803,21 @@ export default function ApprovedTravelRequestsForManager() {
           })}
         </div>
 
-        {activeTab === "flight" ? (
+        <div className={activeTab === "flight" ? "block" : "hidden"}>
           <FlightApprovalsSection
             rawApprovals={approvedFlightRequests}
             traceTimers={traceTimers}
             loading={loadingApprovedFlightRequests}
+            onCountChange={setFlightCount}
           />
-        ) : (
+        </div>
+        <div className={activeTab === "hotel" ? "block" : "hidden"}>
           <HotelApprovalsSection
             rawApprovals={approvedHotelRequests}
             loading={loadingApprovedRequests}
+            onCountChange={setHotelCount}
           />
-        )}
+        </div>
       </div>
     </div>
   );

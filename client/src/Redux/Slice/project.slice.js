@@ -1,7 +1,7 @@
 // Redux/Slice/project.slice.js
 
 import { createSlice } from "@reduxjs/toolkit";
-import { uploadProjectsExcel, fetchProjects, deleteProject } from "../Actions/project.thunk";
+import { uploadProjectsExcel, fetchProjects, deleteProject, getProjectFlightExpenses, getProjectHotelExpenses } from "../Actions/project.thunk";
 
 const initialState = {
   // =========================
@@ -26,6 +26,16 @@ const initialState = {
 
   deleteLoading: false,
   deleteError: null,
+
+  // =========================
+  // 💰 EXPENSES STATE
+  // =========================
+  expenses: {
+    flight: [],
+    hotel: [],
+    loading: false,
+    error: null,
+  },
 };
 
 const projectSlice = createSlice({
@@ -119,6 +129,38 @@ const projectSlice = createSlice({
         state.deleteLoading = false;
 
         state.deleteError = action.payload?.message || "Delete failed";
+      })
+
+      // =========================
+      // 💰 PROJECT EXPENSES
+      // =========================
+      
+      // FLIGHT
+      .addCase(getProjectFlightExpenses.pending, (state) => {
+        state.expenses.loading = true;
+        state.expenses.error = null;
+      })
+      .addCase(getProjectFlightExpenses.fulfilled, (state, action) => {
+        state.expenses.loading = false;
+        state.expenses.flight = action.payload.data || [];
+      })
+      .addCase(getProjectFlightExpenses.rejected, (state, action) => {
+        state.expenses.loading = false;
+        state.expenses.error = action.payload?.message || "Failed to fetch flight expenses";
+      })
+
+      // HOTEL
+      .addCase(getProjectHotelExpenses.pending, (state) => {
+        state.expenses.loading = true;
+        state.expenses.error = null;
+      })
+      .addCase(getProjectHotelExpenses.fulfilled, (state, action) => {
+        state.expenses.loading = false;
+        state.expenses.hotel = action.payload.data || [];
+      })
+      .addCase(getProjectHotelExpenses.rejected, (state, action) => {
+        state.expenses.loading = false;
+        state.expenses.error = action.payload?.message || "Failed to fetch hotel expenses";
       });
   },
 });

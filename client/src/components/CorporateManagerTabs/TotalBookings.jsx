@@ -116,6 +116,7 @@ function FlightSection() {
       const searchOk =
         !q ||
         b.travellerName?.toLowerCase().includes(q) ||
+        (b.orderId || "").toLowerCase().includes(q) ||
         b.pnr?.toLowerCase().includes(q) ||
         (b.providerBookingId || "").toString().toLowerCase().includes(q);
 
@@ -183,7 +184,7 @@ function FlightSection() {
   return (
     <div className="space-y-4">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <StatCard
           label="Total Flights"
           value={filtered.length}
@@ -208,14 +209,14 @@ function FlightSection() {
           iconBgCls="bg-amber-50"
           iconColorCls="text-amber-600"
         />
-        <StatCard
+        {/* <StatCard
           label="Total Spend"
           value={`₹${total.toLocaleString()}`}
           Icon={FiDollarSign}
           borderCls="border-violet-500"
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
-        />
+        /> */}
       </div>
 
       {/* Filters */}
@@ -320,7 +321,7 @@ function FlightSection() {
           <table className="w-full border-collapse min-w-[860px]">
             <thead>
               <tr className="bg-[#0f9041] text-[#ffffff]">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Traveller Name</Th>
                 <Th>Booked Date</Th>
                 <Th>Amount</Th>
@@ -351,7 +352,7 @@ function FlightSection() {
                     className={`transition-colors hover:bg-sky-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={b._id} />
+                      <IdCell id={b.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -544,6 +545,7 @@ function HotelSection() {
       const searchOk =
         !q ||
         b.guestName?.toLowerCase().includes(q) ||
+        (b.orderId || "").toLowerCase().includes(q) ||
         b.invoiceNo?.toLowerCase().includes(q) ||
         (b.providerBookingId || "").toString().toLowerCase().includes(q);
 
@@ -599,7 +601,7 @@ function HotelSection() {
   return (
     <div className="space-y-4">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <StatCard
           label="Total Hotels"
           value={filtered.length}
@@ -624,14 +626,14 @@ function HotelSection() {
           iconBgCls="bg-amber-50"
           iconColorCls="text-amber-600"
         />
-        <StatCard
+        {/* <StatCard
           label="Total Spend"
           value={`₹${total.toLocaleString()}`}
           Icon={FiDollarSign}
           borderCls="border-violet-500"
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
-        />
+        /> */}
       </div>
 
       {/* Filters */}
@@ -751,7 +753,7 @@ function HotelSection() {
           <table className="w-full border-collapse min-w-[860px]">
             <thead>
               <tr className="bg-[#0f9041] text-[#ccfbf1]">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Guest Name</Th>
                 <Th>Booked Date</Th>
                 <Th>Amount</Th>
@@ -782,7 +784,7 @@ function HotelSection() {
                     className={`transition-colors hover:bg-teal-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={b._id} />
+                      <IdCell id={b.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">

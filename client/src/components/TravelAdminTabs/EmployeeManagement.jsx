@@ -576,9 +576,6 @@ export default function EmployeeManagement() {
                               <span className="font-semibold text-[13px] text-slate-800">
                                 {fullName}
                               </span>
-                              <span className="text-[11px] text-slate-400">
-                                #{emp._id}
-                              </span>
                             </div>
                           </div>
                         </td>
@@ -671,15 +668,6 @@ export default function EmployeeManagement() {
                   employees
                 </>
               )}
-            </span>
-            <span>
-              Last refreshed:{" "}
-              <strong className="text-[#0A4D68]">
-                {new Date().toLocaleTimeString("en-IN", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </strong>
             </span>
           </div>
 
