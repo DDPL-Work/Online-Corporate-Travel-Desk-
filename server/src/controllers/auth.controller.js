@@ -125,6 +125,7 @@ exports.login = asyncHandler(async (req, res) => {
     role: foundUser.role,
     name: foundUser.user.name || "User",
     email: foundUser.user.email,
+    phone: foundUser.user.phone || foundUser.user.mobile || "",
   };
 
   if (foundUser.role === "ops-member") {
@@ -138,6 +139,7 @@ exports.login = asyncHandler(async (req, res) => {
     id: foundUser.user._id,
     email: foundUser.user.email,
     name: foundUser.user.name || "User",
+    phone: foundUser.user.phone || foundUser.user.mobile || "",
     managerRequestStatus: foundUser.user.managerRequestStatus || "none",
   };
 
@@ -190,8 +192,11 @@ exports.updateProfile = asyncHandler(async (req, res) => {
   // Update mobile/phone
   if (req.user.role === "ops-member") {
     if (req.body.phone || mobile) user.phone = req.body.phone || mobile;
-  } else {
+  } else if (req.user.role === "employee") {
     if (mobile) user.mobile = mobile;
+  } else {
+    // For travel-admin, manager, super-admin
+    if (mobile || req.body.phone) user.phone = mobile || req.body.phone;
   }
 
   // Handle Password Update

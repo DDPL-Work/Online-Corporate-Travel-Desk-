@@ -340,7 +340,7 @@ function FlightSection() {
                 <Th>Traveller Name</Th>
                 <Th>Booked Date</Th>
                 <Th>Status</Th>
-                {/* <Th>PNR / Provider Booking ID</Th> */}
+                <Th>PNR</Th>
                 <Th>Action</Th>
               </tr>
             </thead>
@@ -396,12 +396,9 @@ function FlightSection() {
                     <td className="px-4 py-3">
                       <StatusBadge status={b.status} />
                     </td>
-                    {/* <td className="px-4 py-3">
-                      <DualCell
-                        primary={b.pnr}
-                        secondary={b.providerBookingId}
-                      />
-                    </td> */}
+                    <td className="px-4 py-3">
+                      <span className="text-sm font-medium text-blue-700">{b.pnr}</span>
+                    </td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => navigate(`/employee-flight-booking/${b._id}`)}

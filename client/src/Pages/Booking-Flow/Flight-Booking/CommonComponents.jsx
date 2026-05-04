@@ -1575,11 +1575,11 @@ export const HotelHomeButton = () => {
           Need a Hotel?
         </span>
       </div>
-      <p className="text-xs text-gray-600">
+      {/* <p className="text-xs text-gray-600">
         Save up to 20% when booking hotel with your flight
-      </p>
+      </p> */}
       <button
-        onClick={() => navigate("/search-hotel")}
+        onClick={() => navigate("/travel", { state: { activeTab: "hotel" } })}
         className="w-full py-3 border border-[#0A203E] text-[#0A203E] rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#0A203E] hover:text-white transition-all duration-300 cursor-pointer shadow-sm active:scale-95"
       >
         Browse Hotels
@@ -1779,7 +1779,12 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
                           <span className="font-black uppercase tracking-widest text-[10px] text-[#C9A84C] block mb-1">
                             Airline Remark
                           </span>
-                          <span className="font-bold">{sec.data.airlineRemark}</span>
+                          <span className="font-bold">
+                            {(() => {
+                              const remark = sec.data.airlineRemark || "";
+                              return remark.replace(/(.+?)\1{3,}/g, "$1");
+                            })()}
+                          </span>
                         </div>
                       )}
                     </div>

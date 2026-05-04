@@ -325,13 +325,46 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     );
 
     freshFareQuote = {
-      Results: [onwardFare.Response.Results, returnFare.Response.Results],
+      Results: [
+        onwardFare?.Response?.Results || onwardFare?.Results,
+        returnFare?.Response?.Results || returnFare?.Results,
+      ],
     };
   } else {
-    freshFareQuote = await tboService.getFareQuote(
+    const quote = await tboService.getFareQuote(
       flightRequest.traceId,
       flightRequest.resultIndex,
     );
+    freshFareQuote = quote?.Response || quote;
+  }
+
+  // Enrich segments with SupplierFareClass and FareRules from the quote
+  if (bookingType === "flight" && flightRequest.segments) {
+    const results = freshFareQuote.Results || [];
+    const fareRules = (results[0]?.FareRules || []).concat(results[1]?.FareRules || []);
+    const quoteSegments = (results[0]?.Segments || []).flat().concat((results[1]?.Segments || []).flat());
+
+    flightRequest.segments = flightRequest.segments.map((seg) => {
+      const match = quoteSegments.find(
+        (qs) =>
+          qs.Origin?.Airport?.AirportCode === seg.origin.airportCode &&
+          qs.Destination?.Airport?.AirportCode === seg.destination.airportCode &&
+          qs.Airline?.FlightNumber === String(seg.flightNumber)
+      );
+
+      const rule = fareRules.find(
+        (r) =>
+          r.Origin === seg.origin.airportCode &&
+          r.Destination === seg.destination.airportCode
+      );
+
+      return {
+        ...seg,
+        supplierFareClass: match?.SupplierFareClass || seg.supplierFareClass,
+        fareBasisCode: rule?.FareBasisCode || seg.fareBasisCode,
+        fareRuleDetail: rule?.FareRuleDetail || seg.fareRuleDetail,
+      };
+    });
   }
 
   /* ================= SSR POLICY: AUTO-APPROVE CHECK ================= */

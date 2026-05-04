@@ -26,6 +26,7 @@ import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
 import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { approveApproval } from "../../../Redux/Actions/approval.thunks";
 import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
+import { fetchMyProfile } from "../../../Redux/Slice/employeeActionSlice";
 import { FareDetailsModal } from "./FareDetailsModal";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { mapSSRData } from "../../../utils/parseReturnFlight";
@@ -33,6 +34,7 @@ import { getMyTravelAdmin } from "../../../Redux/Actions/employee.thunks";
 import api from "../../../API/axios";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
+import Swal from "sweetalert2";
 
 export default function RoundTripFlightBooking() {
   const location = useLocation();
@@ -129,6 +131,7 @@ export default function RoundTripFlightBooking() {
   // const traceId = useSelector((state) => state.flightsRT.traceId);
   const reduxTraceId = useSelector((state) => state.flightsRT.traceId);
   const { user } = useSelector((state) => state.auth);
+  const { myProfile } = useSelector((state) => state.employeeAction || {});
   const {
     approver,
     loading: approverLoading,
@@ -148,6 +151,7 @@ export default function RoundTripFlightBooking() {
   useEffect(() => {
     if (user?.role === "employee" || user?.role === "manager") {
       dispatch(fetchMySSRPolicy());
+      dispatch(fetchMyProfile());
     }
   }, [dispatch, user]);
   const infantCount = passengerCounts?.infants ?? searchParams?.infants ?? 0;
@@ -260,27 +264,30 @@ export default function RoundTripFlightBooking() {
       });
     }
 
-    // Pre-fill first traveler if user is logged in
-    if (user && initial[0]) {
-      if (user.name && typeof user.name === "object") {
-        initial[0].firstName = (user.name.firstName || "").toUpperCase();
-        initial[0].lastName = (user.name.lastName || "").toUpperCase();
+    // Pre-fill first traveler if user/profile is logged in
+    const sourceProfile = myProfile || user;
+    if (sourceProfile && initial[0]) {
+      const rawName = sourceProfile.name || sourceProfile.displayName || "";
+      let firstName = "";
+      let lastName = "";
+      
+      if (typeof sourceProfile.name === "object") {
+         firstName = (sourceProfile.name.firstName || "").toUpperCase();
+         lastName = (sourceProfile.name.lastName || "").toUpperCase();
       } else {
-        const rawName = user.name || user.displayName || "";
-        const fullName = typeof rawName === "string" ? rawName : "";
-        const names = fullName.trim().split(/\s+/);
-
-        initial[0].firstName = (names[0] || "").toUpperCase();
-        initial[0].lastName = (names.slice(1).join(" ") || "").toUpperCase();
+         const names = (typeof rawName === "string" ? rawName : "").trim().split(/\s+/);
+         firstName = (names[0] || "").toUpperCase();
+         lastName = (names.slice(1).join(" ") || "").toUpperCase();
       }
 
-      initial[0].email = user.email || "";
-      initial[0].phoneWithCode =
-        user.phone || user.mobile || user.phoneWithCode || "";
+      initial[0].firstName = firstName;
+      initial[0].lastName = lastName;
+      initial[0].email = sourceProfile.email || "";
+      initial[0].phoneWithCode = sourceProfile.phone || sourceProfile.mobile || sourceProfile.phoneWithCode || "";
     }
 
     setTravelers(initial);
-  }, [user, searchParams, adultCount, childCount, infantCount]);
+  }, [user, myProfile, searchParams, adultCount, childCount, infantCount]);
 
   useEffect(() => {
     console.log("🟢 SSR Ready Check", {
@@ -526,6 +533,35 @@ export default function RoundTripFlightBooking() {
       );
     }
   }, [traceId, rawFlightData, dispatch]);
+
+  useEffect(() => {
+    const checkExpiration = (quote) => {
+      const quoteResponse = quote?.Response;
+      if (quoteResponse?.ResponseStatus === 2) {
+        const errorMsg = quoteResponse?.Error?.ErrorMessage || "";
+        return (
+          errorMsg.toLowerCase().includes("traceid") ||
+          errorMsg.toLowerCase().includes("expired") ||
+          errorMsg.toLowerCase().includes("invalid")
+        );
+      }
+      return false;
+    };
+
+    if (
+      checkExpiration(fareQuote?.onward) ||
+      checkExpiration(fareQuote?.return)
+    ) {
+      Swal.fire({
+        title: "Session Expired",
+        text: "Your search session has expired. Please search again.",
+        icon: "warning",
+        confirmButtonColor: "#0A4D68",
+      }).then(() => {
+        navigate("/travel");
+      });
+    }
+  }, [fareQuote, navigate]);
 
   useEffect(() => {
     if (!traceId || !rawFlightData?.onward || !rawFlightData?.return) return;

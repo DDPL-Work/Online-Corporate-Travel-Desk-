@@ -237,7 +237,7 @@ export default function HotelGuestSelection({
       <div className="flex flex-col sm:flex-row overflow-y-auto custom-scrollbar max-h-[50vh] sm:max-h-[380px]">
         {/* Left Side: Management */}
         <div className="flex-1 p-4 bg-slate-50/40 border-b sm:border-b-0 sm:border-r border-slate-100 space-y-5">
-           <div>
+           {/* <div>
               <div className="flex items-center gap-1.5 mb-2.5">
                 <div className="w-1 h-1 rounded-full bg-amber-500" />
                 <h4 className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Nationality</h4>
@@ -245,7 +245,7 @@ export default function HotelGuestSelection({
               <div className="bg-white p-0.5 rounded-lg border border-slate-100 shadow-sm">
                  <CountrySelector value={guestNationality} onChange={setGuestNationality} countries={normalizedCountries} />
               </div>
-           </div>
+           </div> */}
 
            <div className="pt-4 border-t border-slate-100">
               <div className="p-3 rounded-xl bg-white border border-slate-100 shadow-sm space-y-2">
@@ -272,8 +272,8 @@ export default function HotelGuestSelection({
               <div className="w-1 h-1 rounded-full bg-amber-500" />
               <h4 className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Details</h4>
             </div>
-            <button onClick={() => { if (rooms < 6) { setRooms(rooms + 1); setRoomConfigs([...roomConfigs, { adults: 1, children: 0, childrenAges: [] }]); } }} className="text-[8px] font-black text-amber-600 uppercase tracking-widest hover:text-amber-700 transition-colors">+ Add</button>
-          </div>
+            {/* <button onClick={() => { if (rooms < 6) { setRooms(rooms + 1); setRoomConfigs([...roomConfigs, { adults: 1, children: 0, childrenAges: [] }]); } }} className="text-[8px] font-black text-amber-600 uppercase tracking-widest hover:text-amber-700 transition-colors">+ Add</button>*/}
+          </div> 
           <div className="space-y-2.5">{roomConfigs.map((room, idx) => renderRoomConfig(room, idx))}</div>
         </div>
       </div>

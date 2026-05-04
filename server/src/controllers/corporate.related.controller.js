@@ -9,7 +9,7 @@ const Ledger = require("../models/Ledger");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
-const { calculateNextBillingDate } = require("../utils/helpers");
+const { calculateNextBillingDate, slugify } = require("../utils/helpers");
 const emailService = require("../services/email.service");
 const crypto = require("crypto");
 const cloudinary = require("../config/cloudinary");
@@ -249,10 +249,12 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
   corporate.ssoConfig.verifiedAt = new Date();
 
   corporate.primaryContact.role = "travel-admin";
-
-  // if (corporate.secondaryContact?.email) {
-  //   corporate.secondaryContact.role = "travel-admin";
-  // }
+  
+  // 🔹 Generate Corporate Specific URL Slug & Full URL
+  if (!corporate.corporateSlug) {
+    corporate.corporateSlug = slugify(corporate.corporateName);
+    corporate.corporateUrl = `https://traveamer.com/${corporate.corporateSlug}`;
+  }
 
   await corporate.save();
 
@@ -283,19 +285,15 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
         mobile: contact.mobile || "",
         corporateId: corporate._id,
         role,
-        passwordResetToken: hashedToken,
-        passwordResetExpires: Date.now() + 24 * 60 * 60 * 1000,
         isActive: true,
       });
     } else {
       user.role = role;
-      user.passwordResetToken = hashedToken;
-      user.passwordResetExpires = Date.now() + 24 * 60 * 60 * 1000;
       user.isActive = true;
       await user.save();
     }
 
-    return { user, token };
+    return { user };
   };
 
   const primaryAdmin = await createOrUpdateUserWithRole(
@@ -310,9 +308,9 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
 
   try {
     if (primaryAdmin) {
+      console.log(`[APPROVAL] Triggering onboarding email for ${corporate.corporateName} to ${corporate.primaryContact.email}`);
       await emailService.sendCorporateOnboarding(
         corporate,
-        primaryAdmin.token,
         primaryAdmin.user,
       );
     }

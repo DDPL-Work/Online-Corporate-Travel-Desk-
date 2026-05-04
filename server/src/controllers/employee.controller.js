@@ -162,16 +162,32 @@ exports.updateProfile = async (req, res, next) => {
     if (!emp) {
         const user = await User.findById(req.user.id);
         if (["travel-admin", "manager"].includes(user?.role)) {
-            // Updated User name if provided
+            const userUpdates = {};
             if (updates.name) {
                 const parts = updates.name.split(" ");
-                await User.findByIdAndUpdate(req.user.id, {
-                    "name.firstName": parts[0],
-                    "name.lastName": parts.slice(1).join(" "),
-                    phone: updates.mobile
-                });
+                userUpdates["name.firstName"] = parts[0];
+                userUpdates["name.lastName"] = parts.slice(1).join(" ");
             }
-            return res.json({ success: true, message: "Profile updated" });
+            if (updates.mobile !== undefined) {
+                userUpdates.phone = updates.mobile;
+            }
+            
+            await User.findByIdAndUpdate(req.user.id, userUpdates);
+            
+            // Re-fetch to return the synthesized employee object
+            const updatedUser = await User.findById(req.user.id).populate("corporateId");
+            const synthesizedEmployee = {
+                userId: updatedUser._id,
+                name: `${updatedUser.name?.firstName || ""} ${updatedUser.name?.lastName || ""}`.trim() || updatedUser.username,
+                email: updatedUser.email,
+                corporateId: updatedUser.corporateId,
+                designation: updatedUser.role,
+                department: "Administration",
+                phone: updatedUser.phone || "",
+                employeeCode: "ADMIN",
+            };
+            
+            return res.json({ success: true, message: "Profile updated", employee: synthesizedEmployee });
         }
         return next(new ApiError(404, "Employee profile not found"));
     }

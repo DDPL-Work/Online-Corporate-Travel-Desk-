@@ -160,6 +160,20 @@ const createPaginationMeta = (total, page, limit) => {
   };
 };
 
+/**
+ * Slugify text
+ */
+const slugify = (text) => {
+  if (!text) return '';
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '')
+    .replace(/--+/g, '-');
+};
+
 module.exports = {
   generateBookingReference,
   generateVoucherNumber,
@@ -175,5 +189,6 @@ module.exports = {
   isValidPAN,
   parseSearchFilters,
   paginate,
-  createPaginationMeta
+  createPaginationMeta,
+  slugify
 };
