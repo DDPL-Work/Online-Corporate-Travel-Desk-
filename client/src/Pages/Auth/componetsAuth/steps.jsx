@@ -284,7 +284,13 @@ export const Step2 = ({ form, setForm, errors }) => (
                 value={form.primaryEmail}
                 onChange={(v) => {
                   const domain = v.includes("@") ? v.split("@")[1] : "";
-                  setForm({ ...form, primaryEmail: v, ssoDomain: domain });
+                  const isLinked = form.gstEmailSource === "primary";
+                  setForm({ 
+                    ...form, 
+                    primaryEmail: v, 
+                    ssoDomain: domain,
+                    ...(isLinked ? { gstEmail: v } : {})
+                  });
                 }}
                 placeholder="rajesh@company.com"
                 type="email"
@@ -294,8 +300,15 @@ export const Step2 = ({ form, setForm, errors }) => (
                 <input 
                   type="checkbox" 
                   className="w-3.5 h-3.5 rounded border-slate-300 text-[#C9A240] focus:ring-[#C9A240] cursor-pointer"
-                  checked={form.gstEmail === form.primaryEmail && !!form.primaryEmail}
-                  onChange={(e) => setForm({ ...form, gstEmail: e.target.checked ? form.primaryEmail : "" })}
+                  checked={form.gstEmailSource === "primary"}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setForm({ 
+                      ...form, 
+                      gstEmailSource: checked ? "primary" : "manual",
+                      ...(checked ? { gstEmail: form.primaryEmail } : {})
+                    });
+                  }}
                 />
                 <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#C9A240] transition-colors uppercase tracking-tight">Set as GST Email</span>
               </label>
@@ -316,47 +329,6 @@ export const Step2 = ({ form, setForm, errors }) => (
       }
     />
 
-    {/* <ContactGroup
-      color="bg-gradient-to-r from-slate-500 to-slate-600"
-      title="Secondary Contact"
-      optional
-      fields={
-        <div className="space-y-3">
-          <F label="Full Name">
-            <Inp
-              icon={<MdPerson />}
-              value={form.secondaryName}
-              onChange={(v) => setForm({ ...form, secondaryName: v })}
-              placeholder="Priya Sharma"
-              error={errors.secondaryName}
-            />
-          </F>
-          <Grid>
-            <F label="Email">
-              <Inp
-                icon={<MdEmail />}
-                value={form.secondaryEmail}
-                onChange={(v) => setForm({ ...form, secondaryEmail: v })}
-                placeholder="priya@company.com"
-                type="email"
-                error={errors.secondaryEmail}
-              />
-            </F>
-            <F label="Mobile">
-              <Inp
-                icon={<MdPhone />}
-                value={form.secondaryMobile}
-                onChange={(v) => setForm({ ...form, secondaryMobile: v })}
-                placeholder="+91 98765 43211"
-                type="tel"
-                error={errors.secondaryMobile}
-              />
-            </F>
-          </Grid>
-        </div>
-      }
-    /> */}
-
     <ContactGroup
       color="bg-gradient-to-r from-orange-500 to-orange-600"
       title="Billing Department (Optional)"
@@ -376,7 +348,14 @@ export const Step2 = ({ form, setForm, errors }) => (
               <Inp
                 icon={<MdEmail />}
                 value={form.billingEmail}
-                onChange={(v) => setForm({ ...form, billingEmail: v })}
+                onChange={(v) => {
+                  const isLinked = form.gstEmailSource === "billing";
+                  setForm({ 
+                    ...form, 
+                    billingEmail: v,
+                    ...(isLinked ? { gstEmail: v } : {})
+                  });
+                }}
                 placeholder="billing@company.com"
                 type="email"
                 error={errors.billingEmail}
@@ -385,8 +364,15 @@ export const Step2 = ({ form, setForm, errors }) => (
                 <input 
                   type="checkbox" 
                   className="w-3.5 h-3.5 rounded border-slate-300 text-[#C9A240] focus:ring-[#C9A240] cursor-pointer"
-                  checked={form.gstEmail === form.billingEmail && !!form.billingEmail}
-                  onChange={(e) => setForm({ ...form, gstEmail: e.target.checked ? form.billingEmail : "" })}
+                  checked={form.gstEmailSource === "billing"}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setForm({ 
+                      ...form, 
+                      gstEmailSource: checked ? "billing" : "manual",
+                      ...(checked ? { gstEmail: form.billingEmail } : {})
+                    });
+                  }}
                 />
                 <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#C9A240] transition-colors uppercase tracking-tight">Set as GST Email</span>
               </label>
@@ -972,7 +958,7 @@ export const Step5 = ({ form, setForm, errors, gstAutoFilled, ...props }) => (
       <Inp
         icon={<MdEmail />}
         value={form.gstEmail}
-        onChange={(v) => setForm({ ...form, gstEmail: v })}
+        onChange={(v) => setForm({ ...form, gstEmail: v, gstEmailSource: "manual" })}
         placeholder="finance@company.com"
         error={errors.gstEmail}
       />

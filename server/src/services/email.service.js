@@ -8,10 +8,13 @@ class EmailService {
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT),
-      secure: process.env.SMTP_SECURE === 'true',
+      secure: process.env.SMTP_SECURE?.trim() === 'true',
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD
+      },
+      tls: {
+        rejectUnauthorized: false
       }
     });
   }
@@ -124,49 +127,64 @@ class EmailService {
   // -----------------------------------------------------
   // CORPORATE ONBOARDING (AFTER APPROVAL)
   // -----------------------------------------------------
-  async sendCorporateOnboarding(corporate, token) {
+  async sendCorporateOnboarding(corporate) {
     const subject = "Welcome to Corporate Travel Desk";
-    const setPasswordUrl = `${process.env.FRONTEND_URL}/set-password/${token}`;
+    const to = corporate.primaryContact?.email;
+
+    if (!to) {
+      logger.error("Cannot send onboarding email: primaryContact email missing");
+      return;
+    }
 
     const html = `
-      <div style="font-family: Arial; max-width: 600px; margin: 0 auto;">
-        <h2>Welcome to Corporate Travel Desk!</h2>
-
-        <p>Dear ${corporate.primaryContact.name},</p>
-
-        <p>Your corporate account has now been <strong>activated</strong>.</p>
-
-        <div style="background:#f5f5f5;padding:15px;margin:20px 0;">
-          <h3>Corporate Details</h3>
-          <p><strong>Name:</strong> ${corporate.corporateName}</p>
-          <p><strong>Classification:</strong> ${corporate.classification}</p>
-          <p><strong>SSO Domain:</strong> ${corporate.ssoConfig.domain}</p>
+      <div style="font-family: Arial; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
+        <div style="background: #000D26; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+           <h1 style="color: #C9A240; margin: 0; font-family: 'Outfit', sans-serif;">Welcome to Traveamer</h1>
         </div>
 
-        <p>Your employees may login using:</p>
-        <ul>
-          <li>✔ SSO (${corporate.ssoConfig.type})</li>
-          <li>✔ Password (after setting it)</li>
-        </ul>
+        <div style="padding: 30px; border: 1px solid #eee; border-radius: 0 0 10px 10px;">
+          <h2 style="color: #000D26;">Activation Successful!</h2>
 
-        <p><strong>Your account requires password setup before login:</strong></p>
+          <p>Dear ${corporate.primaryContact.name},</p>
 
-        <a href="${setPasswordUrl}" 
-           style="background:#4CAF50;color:white;padding:10px 20px;
-                  text-decoration:none;border-radius:5px;display:inline-block;margin-top:10px;">
-          Set Password
-        </a>
+          <p>Your corporate account for <strong>${corporate.corporateName}</strong> has been successfully <strong>activated</strong> by our team.</p>
 
-        <p style="margin-top:10px;color:#888;">
-          This link will expire in 24 hours.
-        </p>
+          <div style="background: #f9fafb; padding: 20px; margin: 20px 0; border-radius: 12px; border: 1px solid #e5e7eb;">
+            <h3 style="color: #000D26; margin-top: 0; font-size: 16px;">Portal Configuration</h3>
+            <p style="margin: 5px 0;"><strong>Classification:</strong> ${corporate.classification.toUpperCase()}</p>
+            <p style="margin: 5px 0;"><strong>SSO System:</strong> ${corporate.ssoConfig.type.toUpperCase()}</p>
+            <p style="margin: 5px 0;"><strong>Allowed Domain:</strong> @${corporate.ssoConfig.domain}</p>
+          </div>
 
-        <p>If you prefer, you may log in directly using your corporate SSO system.</p>
+          <p>Your employees can now log in to the portal using their corporate SSO credentials.</p>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <p style="margin-bottom: 15px; font-weight: bold; color: #000D26;">Access your branded portal at:</p>
+            <a href="${corporate.corporateUrl}" 
+               style="background: #C9A240; color: #000D26; padding: 14px 30px; 
+                      text-decoration: none; border-radius: 8px; display: inline-block; 
+                      font-weight: 800; font-size: 16px; border: 1px solid #b38e36;">
+              Open Corporate Portal
+            </a>
+            <p style="margin-top: 15px; font-size: 12px; color: #666;">
+              URL: <a href="${corporate.corporateUrl}" style="color: #C9A240;">${corporate.corporateUrl}</a>
+            </p>
+          </div>
+
+          <div style="background: #fffbeb; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; font-size: 14px;">
+            <strong>Note:</strong> Logins are restricted to your corporate domain (@${corporate.ssoConfig.domain}).
+          </div>
+
+          <p style="margin-top: 25px; font-size: 14px; color: #666;">
+            If you have any questions, please contact our support team.
+          </p>
+        </div>
       </div>
     `;
 
+    logger.info(`Attempting to send onboarding email to: ${to}`);
     return await this.sendEmail({
-      to: corporate.primaryContact.email,
+      to,
       subject,
       html
     });

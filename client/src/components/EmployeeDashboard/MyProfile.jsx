@@ -25,11 +25,20 @@ import {
 import { ToastWithTimer } from "../../utils/ToastConfirm";
 import { fetchProjects } from "../../Redux/Actions/project.thunk";
 import { jwtDecode } from "jwt-decode";
+import PhoneInput from "react-phone-input-2";
+import "react-phone-input-2/lib/style.css";
 
 const PERSONAL_FIELDS = [
   {
-    key: "name",
-    label: "Full Name",
+    key: "firstName",
+    label: "First Name",
+    icon: FiUser,
+    type: "text",
+    editable: true,
+  },
+  {
+    key: "lastName",
+    label: "Last Name",
     icon: FiUser,
     type: "text",
     editable: true,
@@ -62,13 +71,10 @@ const CORPORATE_FIELDS = [
   },
 ];
 
-function getInitials(name = "") {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join("");
+function getInitials(firstName = "", lastName = "") {
+  const f = firstName.trim()[0]?.toUpperCase() || "";
+  const l = lastName.trim()[0]?.toUpperCase() || "";
+  return f + l;
 }
 
 export default function MyProfile() {
@@ -101,9 +107,15 @@ export default function MyProfile() {
   
   useEffect(() => {
     if (myProfile) {
+      // Split stored name into firstName / lastName for the two fields
+      const nameParts = (myProfile.name || "").trim().split(/\s+/);
+      const firstName = nameParts[0] || "";
+      const lastName  = nameParts.slice(1).join(" ") || "";
       setLocalProfile({
         ...myProfile,
-        managerId: myProfile.manager?._id || myProfile.managerId
+        firstName,
+        lastName,
+        managerId: myProfile.manager?._id || myProfile.managerId,
       });
     }
   }, [myProfile]);
@@ -112,8 +124,9 @@ export default function MyProfile() {
     setLocalProfile((prev) => ({ ...prev, [key]: value }));
 
   const handleSave = async () => {
+    const fullName = `${localProfile.firstName || ""} ${localProfile.lastName || ""}`.trim();
     const payload = {
-      name: localProfile.name,
+      name: fullName,
       email: localProfile.email,
       phone: localProfile.phone,
       employeeId: localProfile.employeeId,
@@ -166,7 +179,9 @@ export default function MyProfile() {
 
   if (!localProfile) return null;
 
-  const initials = getInitials(localProfile.name);
+  const initials = getInitials(localProfile.firstName, localProfile.lastName);
+  const fullName  = `${localProfile.firstName || ""} ${localProfile.lastName || ""}`.trim();
+
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-10 pb-24">
@@ -185,7 +200,11 @@ export default function MyProfile() {
               <div className="w-24 h-24 rounded-[2rem] bg-white border-8 border-white shadow-xl flex items-center justify-center text-[#0A4D68] text-2xl font-black">
                 {initials || <FiUser size={32} />}
               </div>
-              <h2 className="mt-4 text-lg font-black text-slate-800 leading-tight">{localProfile.name || "—"}</h2>
+              <h2 className="mt-4 text-lg font-black text-slate-800 leading-tight">
+                {localProfile.firstName || localProfile.lastName
+                  ? <><span>{localProfile.firstName}</span>{localProfile.lastName && <> <span className="text-[#0A4D68]">{localProfile.lastName}</span></>}</>
+                  : "—"}
+              </h2>
               <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-wider">{localProfile.designation || "—"}</p>
               
               <div className="mt-4 w-full">
@@ -197,7 +216,7 @@ export default function MyProfile() {
               <div className="mt-8 w-full border-t border-slate-100 pt-6 space-y-4 text-left">
                 <InfoRow icon={FiHash} value={localProfile.employeeId || "—"} label="Employee ID" />
                 <InfoRow icon={FiMail} value={localProfile.email || "—"} label="Email Address" />
-                <InfoRow icon={FiPhone} value={localProfile.phone || "—"} label="Mobile Number" />
+                <InfoRow icon={FiPhone} value={localProfile.phone && !localProfile.phone.toString().startsWith("+") ? `+${localProfile.phone}` : localProfile.phone || "—"} label="Mobile Number" />
               </div>
             </div>
           </div>
@@ -451,15 +470,54 @@ function Field({ field, value, editing, onChange }) {
         {field.label}
       </label>
       {editing ? (
-        <input
-          type={field.type}
-          value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full px-5 py-3 text-sm text-slate-900 bg-slate-50 border-2 border-transparent rounded-[1.25rem] outline-none focus:border-[#0A4D68] focus:bg-white transition-all font-bold shadow-xs shadow-inner"
-        />
+        field.key === "phone" ? (
+          <div className="phone-input-container">
+            <PhoneInput
+              country={"in"}
+              value={value || ""}
+              onChange={(v) => onChange(v)}
+              inputStyle={{
+                width: "100%",
+                height: "46px",
+                fontSize: "14px",
+                fontWeight: "700",
+                color: "#0f172a",
+                backgroundColor: "#f8fafc",
+                border: "2px solid transparent",
+                borderRadius: "1.25rem",
+                outline: "none",
+                paddingLeft: "55px",
+                fontFamily: "inherit",
+              }}
+              buttonStyle={{
+                backgroundColor: "transparent",
+                border: "none",
+                borderRadius: "1.25rem 0 0 1.25rem",
+                paddingLeft: "10px",
+              }}
+              dropdownStyle={{
+                borderRadius: "1rem",
+                marginTop: "5px",
+                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+              }}
+              containerStyle={{
+                width: "100%",
+              }}
+              onFocus={(e) => (e.target.parentElement.parentElement.style.borderColor = "#0A4D68")}
+              onBlur={(e) => (e.target.parentElement.parentElement.style.borderColor = "transparent")}
+            />
+          </div>
+        ) : (
+          <input
+            type={field.type}
+            value={value || ""}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full px-5 py-3 text-sm text-slate-900 bg-slate-50 border-2 border-transparent rounded-[1.25rem] outline-none focus:border-[#0A4D68] focus:bg-white transition-all font-bold shadow-xs shadow-inner"
+          />
+        )
       ) : (
         <div className="px-5 py-3 text-sm font-black text-slate-900 bg-slate-50 border border-slate-100 rounded-[1.25rem] min-h-[46px] flex items-center">
-          {value || (
+          {field.key === "phone" && value && !value.toString().startsWith("+") ? `+${value}` : value || (
             <span className="text-slate-400 italic font-bold">
               Not configured
             </span>

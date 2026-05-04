@@ -1294,234 +1294,186 @@ export default function FlightBookingDetails() {
             </p>
           </div>
 
-          {/* Cards grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {travellers.map((trav, idx) => {
-              const seatSSR = ssrSnapshot?.seats?.find(
-                (s) => s.travelerIndex === idx,
-              );
-              const seatNo = seatSSR?.seatNo;
+          {/* Travelers Table */}
+          <div className="bg-white rounded-xl border border-[#E8E0D0] overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[900px]">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-[#E8E0D0] text-[10px] font-bold uppercase tracking-widest text-[#8B7355]">
+                    <th className="px-6 py-4">Passenger Name</th>
+                    <th className="px-4 py-4">Type</th>
+                    <th className="px-4 py-4">Gender</th>
+                    <th className="px-4 py-4">Date of Birth</th>
+                    <th className="px-4 py-4">Ticket Details</th>
+                    <th className="px-4 py-4">Add-ons</th>
+                    <th className="px-6 py-4 text-right">Contact/Identity</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {travellers.map((trav, idx) => {
+                    const seatSSR = ssrSnapshot?.seats?.find(
+                      (s) => s.travelerIndex === idx,
+                    );
+                    const seatNo = seatSSR?.seatNo;
 
-              // ── Extract per-passenger ticket number from bookingResult ──
-              const onwardPassengers =
-                safeGet(
-                  bookingResult,
-                  "onwardResponse",
-                  "Response",
-                  "Response",
-                  "FlightItinerary",
-                  "Passenger",
-                ) || [];
-              const returnPassengers =
-                safeGet(
-                  bookingResult,
-                  "returnResponse",
-                  "Response",
-                  "Response",
-                  "FlightItinerary",
-                  "Passenger",
-                ) || [];
+                    const onwardPassengers =
+                      safeGet(
+                        bookingResult,
+                        "onwardResponse",
+                        "Response",
+                        "Response",
+                        "FlightItinerary",
+                        "Passenger",
+                      ) || [];
+                    const returnPassengers =
+                      safeGet(
+                        bookingResult,
+                        "returnResponse",
+                        "Response",
+                        "Response",
+                        "FlightItinerary",
+                        "Passenger",
+                      ) || [];
+                    const singleTripPassengers =
+                      safeGet(
+                        bookingResult,
+                        "providerResponse",
+                        "Response",
+                        "Response",
+                        "FlightItinerary",
+                        "Passenger",
+                      ) || [];
 
-              // One-way: lives directly under providerResponse.Response.Response.FlightItinerary.Passenger
-              const singleTripPassengers =
-                safeGet(
-                  bookingResult,
-                  "providerResponse",
-                  "Response",
-                  "Response",
-                  "FlightItinerary",
-                  "Passenger",
-                ) || [];
+                    const isRoundTripBooking =
+                      onwardPassengers.length > 0 || returnPassengers.length > 0;
+                    const resolvedOnwardPax = isRoundTripBooking
+                      ? onwardPassengers
+                      : singleTripPassengers;
+                    const resolvedReturnPax = isRoundTripBooking
+                      ? returnPassengers
+                      : [];
 
-              // Resolve correct passenger list for this trip type
-              const isRoundTripBooking =
-                onwardPassengers.length > 0 || returnPassengers.length > 0;
+                    const TicketId = resolvedOnwardPax[idx]?.Ticket?.TicketId;
+                    const onwardTicket =
+                      resolvedOnwardPax[idx]?.Ticket?.TicketNumber || null;
+                    const returnTicket =
+                      resolvedReturnPax[idx]?.Ticket?.TicketNumber || null;
 
-              const resolvedOnwardPax = isRoundTripBooking
-                ? onwardPassengers
-                : singleTripPassengers;
-              const resolvedReturnPax = isRoundTripBooking
-                ? returnPassengers
-                : [];
-
-              const TicketId = resolvedOnwardPax[idx]?.Ticket?.TicketId;
-              const onwardTicket =
-                resolvedOnwardPax[idx]?.Ticket?.TicketNumber || null;
-              const returnTicket =
-                resolvedReturnPax[idx]?.Ticket?.TicketNumber || null;
-              // Show onward PNR per passenger card
-              const cardPnr = pnrsByJourney?.onward || null;
-
-              return (
-                <div
-                  key={trav._id || idx}
-                  className="bg-white rounded-xl border border-[#E8E0D0] p-4"
-                >
-                  {/* Top: name + seat — unchanged */}
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-[15px] font-bold text-gray-900">
-                        {trav.title} {trav.firstName} {trav.lastName}
-                      </p>
-                      {trav.isLeadPassenger && (
-                        <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          <FiStar size={9} className="text-amber-500" />
-                          Lead
-                        </span>
-                      )}
-                    </div>
-                    {seatNo && (
-                      <p className="text-[13px] font-bold text-gray-900 whitespace-nowrap">
-                        Seat {seatNo}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Pax type + Ticket Id pill — unchanged */}
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                      {formatPaxType(trav.paxType)}
-                      {seatSSR?.type ? ` · ${seatSSR.type}` : ""}
-                    </p>
-                    {TicketId && (
-                      <span className="inline-flex items-center gap-1.5 bg-gray-900 text-white rounded-full px-3 py-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
-                        <span className="text-[9px] font-bold uppercase tracking-widest opacity-60">
-                          Ticket Id
-                        </span>
-                        <span className="font-mono text-[12px] font-bold">
-                          {TicketId}
-                        </span>
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Divider */}
-                  <div className="border-t border-gray-100 my-3" />
-
-                  {/* Detail grid — 2 columns */}
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                    {/* ── Phone: lead only ── */}
-                    {trav.isLeadPassenger && (
-                      <div>
-                        <div className="flex items-center gap-1 mb-1">
-                          <FiPhone size={9} className="text-gray-400" />
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
-                            Phone
-                          </span>
-                        </div>
-                        <p className="text-[13px] font-semibold text-gray-800">
-                          {trav.phoneWithCode || "—"}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Gender */}
-                    <div>
-                      <div className="flex items-center gap-1 mb-1">
-                        <FiUser size={9} className="text-gray-400" />
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
-                          Gender
-                        </span>
-                      </div>
-                      <p className="text-[13px] font-semibold text-gray-800">
-                        {trav.gender || "—"}
-                      </p>
-                    </div>
-
-                    {/* DOB */}
-                    <div>
-                      <div className="flex items-center gap-1 mb-1">
-                        <FiCalendar size={9} className="text-gray-400" />
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
-                          DOB
-                        </span>
-                      </div>
-                      <p className="text-[13px] font-semibold text-gray-800">
-                        {trav.dateOfBirth
-                          ? formatDateWithYear(trav.dateOfBirth)
-                          : "—"}
-                      </p>
-                    </div>
-
-                    {/* Nationality */}
-                    <div>
-                      <div className="flex items-center gap-1 mb-1">
-                        <FiGlobe size={9} className="text-gray-400" />
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
-                          Nationality
-                        </span>
-                      </div>
-                      <p className="text-[13px] font-semibold text-gray-800">
-                        {trav.nationality || "—"}
-                      </p>
-                    </div>
-
-                    {/* Passport (if present) */}
-                    {trav.passportNumber && (
-                      <div className="col-span-2">
-                        <div className="flex items-center gap-1 mb-1">
-                          <FiCreditCard size={9} className="text-gray-400" />
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
-                            Passport
-                          </span>
-                        </div>
-                        <p className="text-[13px] font-mono font-semibold text-gray-800">
-                          {trav.passportNumber}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* ── Email: lead only, spans full width ── */}
-                    {trav.isLeadPassenger && trav.email && (
-                      <div className="col-span-2">
-                        <div className="flex items-center gap-1 mb-1">
-                          <FiMail size={9} className="text-gray-400" />
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
-                            Email
-                          </span>
-                        </div>
-                        <p className="text-[13px] font-semibold text-gray-800 break-all">
-                          {trav.email}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Ticket Numbers — unchanged */}
-                  {(onwardTicket || returnTicket) && (
-                    <div className="mt-3 pt-3 border-t border-[#F0EBE0] space-y-2">
-                      {onwardTicket && (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <FiTag size={10} className="text-[#A07840]" />
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355]">
-                              PNR · Onward
-                            </span>
+                    return (
+                      <tr key={trav._id || idx} className="hover:bg-slate-50/50 transition-colors">
+                        {/* Name Column */}
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-[#F5F0E8] flex items-center justify-center shrink-0 border border-[#E0D8C8]">
+                              <FiUser size={16} className="text-[#A07840]" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-[14px] font-bold text-gray-900 leading-none">
+                                  {trav.title} {trav.firstName} {trav.lastName}
+                                </p>
+                                {trav.isLeadPassenger && (
+                                  <FiStar size={12} className="text-amber-500" title="Lead Passenger" />
+                                )}
+                              </div>
+                              <p className="text-[11px] text-gray-400 font-mono mt-1 uppercase tracking-tight">
+                                {trav.nationality || "Nationality N/A"}
+                              </p>
+                            </div>
                           </div>
-                          <span className="font-mono text-[11px] font-bold text-gray-800 bg-[#F5F0E8] px-2 py-0.5 rounded-md">
-                            {onwardTicket}
+                        </td>
+
+                        {/* Type Column */}
+                        <td className="px-4 py-5">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+                            {formatPaxType(trav.paxType)}
                           </span>
-                        </div>
-                      )}
-                      {returnTicket && returnTicket !== onwardTicket && (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <FiTag size={10} className="text-[#A07840]" />
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355]">
-                              PNR · Return
-                            </span>
+                        </td>
+
+                        {/* Gender Column */}
+                        <td className="px-4 py-5">
+                          <p className="text-[13px] font-semibold text-gray-700 capitalize">
+                            {trav.gender || "—"}
+                          </p>
+                        </td>
+
+                        {/* DOB Column */}
+                        <td className="px-4 py-5">
+                          <p className="text-[12px] font-medium text-gray-600">
+                            {trav.dateOfBirth ? formatDateWithYear(trav.dateOfBirth) : "—"}
+                          </p>
+                        </td>
+
+                        {/* Ticket Details Column */}
+                        <td className="px-4 py-5">
+                          <div className="space-y-1.5">
+                            {TicketId && (
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">ID:</span>
+                                <span className="text-[11px] font-mono font-bold bg-gray-900 text-white px-2 py-0.5 rounded shadow-sm">
+                                  {TicketId}
+                                </span>
+                              </div>
+                            )}
+                            {onwardTicket && (
+                              <div className="flex items-center gap-2">
+                                <FiTag size={10} className="text-emerald-500" />
+                                <span className="text-[11px] font-mono text-gray-700">{onwardTicket}</span>
+                              </div>
+                            )}
+                            {returnTicket && returnTicket !== onwardTicket && (
+                              <div className="flex items-center gap-2">
+                                <FiTag size={10} className="text-blue-500" />
+                                <span className="text-[11px] font-mono text-gray-700">{returnTicket}</span>
+                              </div>
+                            )}
+                            {!onwardTicket && !returnTicket && <p className="text-[11px] text-gray-400 italic">No tickets issued</p>}
                           </div>
-                          <span className="font-mono text-[11px] font-bold text-gray-800 bg-[#F5F0E8] px-2 py-0.5 rounded-md">
-                            {returnTicket}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                        </td>
+
+                        {/* Add-ons Column */}
+                        <td className="px-4 py-5">
+                          {seatNo ? (
+                            <div className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-100 text-amber-700 px-2.5 py-1 rounded-lg">
+                              <span className="text-[10px] font-bold uppercase">Seat</span>
+                              <span className="text-[12px] font-black">{seatNo}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-gray-400">—</span>
+                          )}
+                        </td>
+
+                        {/* Contact/Identity Column */}
+                        <td className="px-6 py-5 text-right">
+                          <div className="flex flex-col items-end gap-1">
+                            {trav.phoneWithCode && (
+                              <div className="flex items-center gap-1.5 text-gray-600">
+                                <span className="text-[12px] font-semibold">{trav.phoneWithCode}</span>
+                                <FiPhone size={11} className="text-gray-400" />
+                              </div>
+                            )}
+                            {trav.email && (
+                              <div className="flex items-center gap-1.5 text-gray-500 max-w-[180px] truncate">
+                                <span className="text-[11px] break-all">{trav.email}</span>
+                                <FiMail size={11} className="text-gray-400" />
+                              </div>
+                            )}
+                            {trav.passportNumber && (
+                              <div className="flex items-center gap-1.5 text-slate-500 mt-0.5">
+                                <span className="text-[11px] font-mono bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">
+                                  {trav.passportNumber}
+                                </span>
+                                <FiCreditCard size={11} className="text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
         {/* Two-column block: Passenger + Booking Summary */}

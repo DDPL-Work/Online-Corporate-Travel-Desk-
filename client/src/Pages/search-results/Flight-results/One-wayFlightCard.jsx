@@ -75,6 +75,91 @@ const normalizeFareOptions = (fareOptions, fallbackFlightInfo) => {
 };
 
 
+
+// ─── Fare Rule Formatters ────────────────────────────────────────────────────
+
+/** Converts raw API fee string to a display-friendly label */
+function formatFeeAmount(details = "") {
+  const raw = String(details).trim();
+  // Convert "INR 3950" → "₹3,950"
+  const inrMatch = raw.match(/INR\s*([\d,.]+)/i);
+  if (inrMatch) {
+    const num = parseFloat(inrMatch[1].replace(/,/g, ""));
+    return { label: `₹${num.toLocaleString("en-IN")}`, type: "fee" };
+  }
+  // "100%" → "100% of Fare"
+  const pctMatch = raw.match(/^(\d+(?:\.\d+)?)%$/);
+  if (pctMatch) {
+    return { label: `${pctMatch[1]}% of Fare`, type: "percent" };
+  }
+  // "Nil" / "NIL" / "0" → No Charge
+  if (/^(nil|0)$/i.test(raw)) {
+    return { label: "No Charge", type: "free" };
+  }
+  // "Non-Refundable"
+  if (/non.refundable/i.test(raw)) {
+    return { label: "Non-Refundable", type: "blocked" };
+  }
+  // "Airline Discretion" / "Not Permitted"
+  if (/discretion|not permitted|not allowed/i.test(raw)) {
+    return { label: "Airline Discretion", type: "discretion" };
+  }
+  return { label: raw, type: "info" };
+}
+
+/** Converts From/To/Unit triplet to a human-readable time window */
+function formatTimeWindow(from, to, unit = "HOURS") {
+  const u = String(unit).toUpperCase() === "HOURS" ? "hrs" : unit?.toLowerCase() || "hrs";
+  const f = from?.toString().trim();
+  const t = to?.toString().trim();
+  if (f && t && t !== "" && t !== "Any") {
+    return `${f} – ${t} ${u} before departure`;
+  }
+  if (f && (!t || t === "" || t === "Any")) {
+    return `More than ${f} ${u} before departure`;
+  }
+  if (!f && t) {
+    return `Within ${t} ${u} of departure`;
+  }
+  return "As per airline policy";
+}
+
+/** Fee badge — colored by type */
+function FeeBadge({ details }) {
+  const { label, type } = formatFeeAmount(details);
+  const colorMap = {
+    fee:        "bg-red-50 text-red-700 border-red-200",
+    percent:    "bg-orange-50 text-orange-700 border-orange-200",
+    free:       "bg-emerald-50 text-emerald-700 border-emerald-200",
+    blocked:    "bg-red-100 text-red-800 border-red-300",
+    discretion: "bg-slate-100 text-slate-600 border-slate-300",
+    info:       "bg-[#C9A84C]/10 text-[#7a5f1a] border-[#C9A84C]/30",
+  };
+  return (
+    <span className={`text-xs font-black px-3 py-1.5 rounded-xl border ${colorMap[type] || colorMap.info}`}>
+      {label}
+    </span>
+  );
+}
+
+/** Single rule row used by both cancel & reissue sections */
+function RuleRow({ rule, index }) {
+  const timeLabel = formatTimeWindow(rule.From, rule.To, rule.Unit);
+  return (
+    <div className={`flex items-center justify-between gap-4 px-5 py-4 ${
+      index % 2 === 0 ? "bg-white" : "bg-slate-50/60"
+    } border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors`}>
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+          <span className="text-slate-500 text-[10px] font-black">{index + 1}</span>
+        </div>
+        <p className="text-xs font-semibold text-slate-600 leading-snug">{timeLabel}</p>
+      </div>
+      <FeeBadge details={rule.Details} />
+    </div>
+  );
+}
+
 // ─── Flight Details Dropdown ────────────────────────────────────────────────
 
 function getCancellationPolicy(selectedFlight, apiRules) {
@@ -115,8 +200,12 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
   const segmentsArrays = selectedFlight?.Segments || [];
   const fare = selectedFlight?.Fare;
   const fareBreakdown = selectedFlight?.FareBreakdown?.[0];
-  const miniFareRules = selectedFlight?.MiniFareRules?.[0] || [];
+  // All leg rule groups — MiniFareRules is array-of-arrays (one per leg)
+  const allMiniFareRuleGroups = selectedFlight?.MiniFareRules || [];
+  // Flat merged array for backward-compat (cancellation policy helper)
+  const miniFareRules = allMiniFareRuleGroups.flat();
   const fareInclusions = selectedFlight?.FareInclusionsNew || [];
+  const isMultiLeg = allMiniFareRuleGroups.length > 1;
 
   if (segmentsArrays.length === 0) return null;
 
@@ -404,7 +493,12 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
                     <span className="w-2 h-2 rounded-full bg-[#C9A84C] animate-pulse" />
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] opacity-90">Important Airline Remark</p>
                  </div>
-                 <p className="text-sm font-bold leading-relaxed">{selectedFlight.AirlineRemark}</p>
+                 <p className="text-sm font-bold leading-relaxed">
+                   {(() => {
+                     const remark = selectedFlight.AirlineRemark || "";
+                     return remark.replace(/(.+?)\1{3,}/g, "$1");
+                   })()}
+                 </p>
               </section>
             )}
 
@@ -442,90 +536,99 @@ export function FlightDetailsDropdown({ selectedFlight, selectedFare }) {
               );
             })()}
 
-            {/* 3. Modification & Cancellation Charges (The ONLY place for fee numbers) */}
+            {/* 3. Modification & Cancellation Charges — grouped per leg for layover flights */}
             <section>
               <div className="flex items-center gap-2 mb-4">
                  <div className="w-1.5 h-6 bg-[#C9A84C] rounded-full" />
                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Modification & Cancellation Schedule</h4>
+                 {isMultiLeg && (
+                   <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 ml-auto">
+                     Rules shown per segment
+                   </span>
+                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Cancellation */}
-                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                      <span className="text-[11px] font-black text-slate-600 uppercase">Cancellation Fee</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isCancellationFallback ? "text-slate-600 bg-slate-50 border-slate-200" : "text-red-600 bg-red-50 border-red-100"}`}>
-                        {isCancellationFallback ? "Policy Guidance" : "Official"}
-                      </span>
-                   </div>
-                   {cancellationRules.length > 0 ? (
-                      <div className="divide-y divide-slate-50">
-                        {cancellationRules.map((rule, i) => (
-                          <div key={i} className="px-4 py-4 flex justify-between items-start">
-                             <span className="text-xs font-bold text-slate-600 pr-4">
-                                {rule.From && rule.To ? `${rule.From}–${rule.To} ${rule.Unit?.toLowerCase()}` : (rule.From ? `> ${rule.From} ${rule.Unit?.toLowerCase()}` : `< ${rule.To} ${rule.Unit?.toLowerCase()}`)}
-                             </span>
-                             <span className="text-xs font-black text-slate-800 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">{rule.Details}</span>
-                          </div>
-                        ))}
-                      </div>
-                   ) : (
-                     <p className="p-4 text-xs text-slate-400 italic">
-                       {cancellationMessage}
-                     </p>
-                   )}
-                </div>
+              {allMiniFareRuleGroups.map((legRules, legIdx) => {
+                // Derive the route label from the segments array for this leg
+                const legSegments = segmentsArrays[legIdx] || [];
+                const legFrom = legSegments[0]?.Origin?.Airport?.AirportCode;
+                const legTo = legSegments[legSegments.length - 1]?.Destination?.Airport?.AirportCode;
+                const legLabel = legFrom && legTo ? `${legFrom} → ${legTo}` : `Segment ${legIdx + 1}`;
 
-                {/* Date Change */}
-                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                      <span className="text-[11px] font-black text-slate-600 uppercase">Date Change Fee</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isReissueFallback ? "text-slate-600 bg-slate-50 border-slate-200" : "text-[#C9A84C] bg-slate-50 border-[#C9A84C]/30"}`}>
-                        {isReissueFallback ? "Policy Guidance" : "Official"}
-                      </span>
-                   </div>
-                   {reissueRules.length > 0 ? (
-                      <div className="divide-y divide-slate-50">
-                        {reissueRules.map((rule, i) => (
-                          <div key={i} className="px-4 py-4 flex justify-between items-start">
-                             <span className="text-xs font-bold text-slate-600 pr-4">
-                                {rule.From && rule.To ? `${rule.From}–${rule.To} ${rule.Unit?.toLowerCase()}` : (rule.From ? `> ${rule.From} ${rule.Unit?.toLowerCase()}` : `< ${rule.To} ${rule.Unit?.toLowerCase()}`)}
-                             </span>
-                             <span className="text-xs font-black text-slate-800 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">{rule.Details}</span>
-                          </div>
-                        ))}
+                // Extract journey points from the rules themselves if available
+                const journeyPoint = legRules[0]?.JourneyPoints || legLabel;
+
+                const legCancelRules = legRules.filter(r => r.Type === "Cancellation");
+                let legReissueRules = legRules.filter(r => r.Type === "Reissue");
+
+                const legCancellationFallback = legCancelRules.length === 0;
+                const legReissueFallback = legReissueRules.length === 0;
+
+                if (legReissueFallback) {
+                  legReissueRules = [
+                    { From: "0", To: "72", Unit: "Hours", Details: "Approx. ₹3,250 + Fare Diff.", Type: "Reissue" },
+                    { From: "72", To: "Any", Unit: "Hours", Details: "Approx. ₹2,750 + Fare Diff.", Type: "Reissue" },
+                  ];
+                }
+
+                return (
+                  <div key={legIdx} className="mb-6">
+                    {isMultiLeg && (
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#C9A84C]" />
+                        <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
+                          {journeyPoint}
+                        </p>
+                        <div className="flex-1 h-px bg-slate-100" />
                       </div>
-                   ) : <p className="p-4 text-xs text-slate-400 italic">No specific fee details available from airline.</p>}
-                </div>
-              </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Cancellation */}
+                      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                          <span className="text-[11px] font-black text-slate-600 uppercase">Cancellation Fee</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${legCancellationFallback ? "text-slate-600 bg-slate-50 border-slate-200" : "text-red-600 bg-red-50 border-red-100"}`}>
+                            {legCancellationFallback ? "Policy Guidance" : "Official"}
+                          </span>
+                        </div>
+                        {legCancelRules.length > 0 ? (
+                          <div className="divide-y-0">
+                            {legCancelRules.map((rule, i) => (
+                              <RuleRow key={i} rule={rule} index={i} />
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="p-4 text-xs text-slate-400 italic">
+                            {selectedFlight?.IsRefundable
+                              ? "Cancellation policy is currently unavailable. Final charges will be shown during booking."
+                              : "This ticket is non-refundable as per airline policy."}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Date Change */}
+                      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                          <span className="text-[11px] font-black text-slate-600 uppercase">Date Change Fee</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${legReissueFallback ? "text-slate-600 bg-slate-50 border-slate-200" : "text-[#C9A84C] bg-slate-50 border-[#C9A84C]/30"}`}>
+                            {legReissueFallback ? "Policy Guidance" : "Official"}
+                          </span>
+                        </div>
+                        {legReissueRules.length > 0 ? (
+                          <div className="divide-y-0">
+                            {legReissueRules.map((rule, i) => (
+                              <RuleRow key={i} rule={rule} index={i} />
+                            ))}
+                          </div>
+                        ) : <p className="p-4 text-xs text-slate-400 italic">No specific fee details available from airline.</p>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </section>
 
-            {/* 4. Detailed Official Fare Rules */}
-            {miniFareRules.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-4">
-                   <div className="w-1.5 h-6 bg-slate-400 rounded-full" />
-                   <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Supplemental Airline Terms</h4>
-                </div>
-
-                <div className="space-y-4">
-                    {miniFareRules.map((rule, idx) => (
-                      <div key={idx} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs hover:border-[#C9A84C]/50 transition-colors">
-                         <button className="w-full px-5 py-4 flex justify-between items-center bg-slate-50/50 text-left border-b border-slate-100 group">
-                            <span className="text-[11px] font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                               <div className="w-1.5 h-1.5 rounded-full bg-[#C9A84C]" />
-                               {rule.Type}
-                            </span>
-                            <FaChevronDown className="text-[10px] text-slate-300 group-hover:text-[#C9A84C] transition-colors" />
-                         </button>
-                         <div className="p-5 text-xs text-slate-600 leading-relaxed font-semibold bg-white whitespace-pre-wrap select-text">
-                            {rule.Details}
-                         </div>
-                      </div>
-                    ))}
-                </div>
-              </section>
-            )}
 
             {/* Final Notice */}
             <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6">

@@ -20,6 +20,7 @@ exports.signAccessToken = (user) => {
     role: user.role,
     email: user.email,
     name: user.name || {},
+    phone: user.phone || user.mobile || "",
     managerRequestStatus: user.managerRequestStatus || "none",
   };
   return jwt.sign(payload, SECRET, { expiresIn: ACCESS_EXP });
@@ -59,6 +60,7 @@ exports.generateSSOToken = async (req, res) => {
       role: user.role,
       email: user.email,
       name: user.name || {},
+      phone: user.phone || user.mobile || "",
       managerRequestStatus: user.managerRequestStatus || "none",
     };
 

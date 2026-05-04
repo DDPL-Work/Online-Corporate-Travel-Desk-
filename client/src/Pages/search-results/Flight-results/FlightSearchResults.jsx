@@ -14,6 +14,7 @@ import { searchFlightsMC } from "../../../Redux/Actions/flight.thunks.MC";
 import SearchLoadingModal from "../../../components/common/SearchLoadingModal";
 import ReturnInternationalFlightCard from "./ReturnFlight/ReturnInternationalFlightCard";
 import ResearchableFlightHeader from "./ResearchableFlightHeader";
+import Swal from "sweetalert2";
 
 const extractRoutes = (flights, journeyType) => {
   if (!Array.isArray(flights) || flights.length === 0) return [];
@@ -339,6 +340,26 @@ export default function FlightSearchResults() {
     loading,
     error,
   } = useSelector((state) => state.flights);
+
+  useEffect(() => {
+    if (error) {
+      const errorMsg = typeof error === "string" ? error : error?.message || "";
+      if (
+        errorMsg.toLowerCase().includes("traceid") ||
+        errorMsg.toLowerCase().includes("expired") ||
+        errorMsg.toLowerCase().includes("invalid")
+      ) {
+        Swal.fire({
+          title: "Session Expired",
+          text: "Your search session has expired. Please search again.",
+          icon: "warning",
+          confirmButtonColor: "#0A4D68",
+        }).then(() => {
+          navigate("/travel");
+        });
+      }
+    }
+  }, [error, navigate]);
 
   const [selectedOnward, setSelectedOnward] = useState(null);
   const [selectedReturn, setSelectedReturn] = useState(null);
@@ -770,6 +791,27 @@ export default function FlightSearchResults() {
           selectedAirlines.includes(s?.Airline?.AirlineName),
         ),
       );
+    }
+
+    /* ---------------- DEPARTURE TIME ---------------- */
+    if (selectedTime) {
+      result = result.filter((f) => {
+        const depTime = new Date(getSegments(f)[0]?.Origin?.DepTime);
+        const hour = depTime.getHours();
+
+        switch (selectedTime) {
+          case "Morning":
+            return hour >= 6 && hour < 12;
+          case "Afternoon":
+            return hour >= 12 && hour < 18;
+          case "Evening":
+            return hour >= 18 && hour < 24;
+          case "Night":
+            return hour >= 0 && hour < 6;
+          default:
+            return true;
+        }
+      });
     }
 
     /* ---------------- ARRIVAL TIME REMOVED ---------------- */

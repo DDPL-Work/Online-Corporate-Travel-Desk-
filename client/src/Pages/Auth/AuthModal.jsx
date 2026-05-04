@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { MdClose, MdArrowForward, MdArrowBack } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
+import { useParams } from "react-router-dom";
 import { onboardCorporate } from "../../Redux/Actions/registrationThunks";
 import { ToastWithTimer } from "../../utils/ToastConfirm";
 import {
@@ -17,6 +18,7 @@ import { LeftPanel, STEPS, StepTracker } from "./componetsAuth/components";
 
 // ── MAIN MODAL ────────────────────────────────────────────────────────────────
 export default function AuthModal({ onClose, initialStep = 0 }) {
+  const { slug } = useParams();
   const [step, setStep] = useState(initialStep || 0);
   const scrollRef = useRef(null);
   const dispatch = useDispatch();
@@ -55,7 +57,9 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     gstin: "",
     gstLegalName: "",
     gstAddress: "",
+    gstAddress: "",
     gstEmail: "",
+    gstEmailSource: "manual", // linked source: manual, primary, billing
     corporateType: "pvt-ltd",
   });
 
@@ -255,7 +259,6 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
           gstin: data.data.gstin || "",
           gstLegalName: data.data.legalName || "",
           gstAddress: data.data.address || "",
-          gstEmail: data.data.gstEmail || "",
         }));
 
         setGstAutoFilled(true);
@@ -392,8 +395,8 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
             setForm={setForm}
             onNext={(provider) => {
               if (provider) {
-                // OAuth redirect
-                window.location.href = `${import.meta.env.VITE_API_BASE_URL}/auth/sso/${provider}`;
+                // OAuth redirect with optional slug
+                window.location.href = `${import.meta.env.VITE_API_BASE_URL}/auth/sso/${provider}${slug ? `?slug=${slug}` : ""}`;
               } else {
                 goNext(); // Email flow → move to Step1
               }

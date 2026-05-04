@@ -57,6 +57,7 @@ import api from "../../../API/axios";
 import { ProjectApproverBlock } from "./components/ProjectApproverBlock";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
+import { fetchMyProfile } from "../../../Redux/Slice/employeeActionSlice";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Utility: calculateNights                                       */
@@ -905,6 +906,7 @@ const HotelReviewBooking = () => {
   });
 
   const { user } = useSelector((state) => state.auth);
+  const { myProfile } = useSelector((state) => state.employeeAction || {});
   const { loading: actionLoading } = useSelector(
     (state) => state.hotelBookings,
   );
@@ -957,10 +959,10 @@ const HotelReviewBooking = () => {
     if (id) dispatch(fetchHotelRequestById(id));
   }, [dispatch, id]);
 
-  // ── Fetch SSR Policy ──
   useEffect(() => {
     if (user?.role === "employee" || user?.role === "manager") {
       dispatch(fetchMySSRPolicy());
+      dispatch(fetchMyProfile());
     }
   }, [dispatch, user]);
 
@@ -1008,18 +1010,40 @@ const HotelReviewBooking = () => {
 
         for (let a = 0; a < adults; a++) {
           const isLead = generatedTravelers.length === 0;
+          let fName = "";
+          let lName = "";
+          let email = "";
+          let phone = "";
+          
+          if (isLead) {
+             const sourceProfile = myProfile || user;
+             if (sourceProfile) {
+                if (typeof sourceProfile.name === "object") {
+                   fName = sourceProfile.name.firstName || "";
+                   lName = sourceProfile.name.lastName || "";
+                } else {
+                   const rawName = sourceProfile.name || sourceProfile.displayName || "";
+                   const names = (typeof rawName === "string" ? rawName : "").trim().split(/\s+/);
+                   fName = names[0] || "";
+                   lName = names.slice(1).join(" ") || "";
+                }
+                email = sourceProfile.email || "";
+                phone = sourceProfile.phone || sourceProfile.mobile || sourceProfile.phoneWithCode || "";
+             }
+          }
+          
           generatedTravelers.push({
             id: generatedTravelers.length + 1,
             title: "Mr",
-            firstName: isLead ? user?.name?.firstName || "" : "",
-            lastName: isLead ? user?.name?.lastName || "" : "",
+            firstName: fName,
+            lastName: lName,
             paxType: 1,
             age: "",
             dob: "",
             gender: "Male",
             leadPassenger: isLead,
-            email: isLead ? user?.email || "" : "",
-            phoneWithCode: isLead ? user?.phone || "" : "",
+            email: email,
+            phoneWithCode: phone,
             countryCode: "IN",
             nationality: "IN",
             panCard: "",
@@ -1049,18 +1073,38 @@ const HotelReviewBooking = () => {
       });
 
       if (generatedTravelers.length === 0) {
+          let fName = "";
+          let lName = "";
+          let email = "";
+          let phone = "";
+          
+          const sourceProfile = myProfile || user;
+          if (sourceProfile) {
+             if (typeof sourceProfile.name === "object") {
+                fName = sourceProfile.name.firstName || "";
+                lName = sourceProfile.name.lastName || "";
+             } else {
+                const rawName = sourceProfile.name || sourceProfile.displayName || "";
+                const names = (typeof rawName === "string" ? rawName : "").trim().split(/\s+/);
+                fName = names[0] || "";
+                lName = names.slice(1).join(" ") || "";
+             }
+             email = sourceProfile.email || "";
+             phone = sourceProfile.phone || sourceProfile.mobile || sourceProfile.phoneWithCode || "";
+          }
+          
         generatedTravelers.push({
           id: 1,
           title: "Mr",
-          firstName: user?.name?.firstName || "",
-          lastName: user?.name?.lastName || "",
+          firstName: fName,
+          lastName: lName,
           paxType: 1,
           age: "",
           dob: "",
           gender: "Male",
           leadPassenger: true,
-          email: user?.email || "",
-          phoneWithCode: user?.phone || "",
+          email: email,
+          phoneWithCode: phone,
           countryCode: "IN",
           nationality: "IN",
           panCard: "",
@@ -1071,6 +1115,7 @@ const HotelReviewBooking = () => {
     }
   }, [
     user,
+    myProfile,
     isBookNowMode,
     totalAdultsFromSearch,
     totalChildrenFromSearch,

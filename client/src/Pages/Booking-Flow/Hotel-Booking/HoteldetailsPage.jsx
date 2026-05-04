@@ -291,7 +291,7 @@ const HotelDetailsPage = () => {
       </div>
 
       {/* ── Main Content ── */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className={`max-w-7xl mx-auto px-4 pt-6 ${Object.keys(selectedRooms).length > 0 ? "pb-32" : "pb-6"}`}>
         {/* Gallery — full width */}
         <div className="mb-6">
           <HotelImageGallery images={mergedHotel.images} />
@@ -341,174 +341,7 @@ const HotelDetailsPage = () => {
 
           {/* ── Right: sticky summary sidebar ── */}
           <div className="lg:col-span-1">
-               {/* ── Hotel Summary Sidebar ── */}
-              <div className="bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
-                <div className="h-2 bg-gradient-to-r from-[#C9A84C] to-[#C9A84C]" />
-                <div className="p-6 space-y-6">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                      <FiGlobe className="text-[#C9A84C]" />
-                      Booking Summary
-                    </h3>
-                    <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wider mt-1">
-                      {mergedHotel.cityName}, {mergedHotel.countryName}
-                    </p>
-                  </div>
-
-                  {/* Dates Section */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-50/80 rounded-2xl p-3.5 border border-slate-100">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <FiCalendar size={10} className="text-[#C9A84C]" />
-                        Check-in
-                      </p>
-                      <p className="text-sm font-bold text-slate-700">
-                        {fmtDate(searchPayload?.CheckIn) || "—"}
-                      </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        {mergedHotel.checkIn}
-                      </p>
-                    </div>
-                    <div className="bg-slate-50/80 rounded-2xl p-3.5 border border-slate-100">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <FiCalendar size={10} className="text-[#C9A84C]" />
-                        Check-out
-                      </p>
-                      <p className="text-sm font-bold text-slate-700">
-                        {fmtDate(searchPayload?.CheckOut) || "—"}
-                      </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        {mergedHotel.checkOut}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Price Section — Dynamic */}
-                  {(() => {
-                    const isSelected = Object.keys(selectedRooms).length > 0;
-                    const selectedRoom = isSelected
-                      ? Object.values(selectedRooms)[0]
-                      : null;
-                    const displayRoom = selectedRoom
-                      ? selectedRoom.room
-                      : cheapestRoom;
-                    const totalPrice = isSelected
-                      ? Object.values(selectedRooms).reduce(
-                          (sum, r) =>
-                            sum +
-                              ((r.room.TotalFare || r.room.Price?.TotalFare || 0) + (r.room.TotalTax || r.room.Price?.Tax || 0)),
-                          0,
-                        )
-                      : (cheapestRoom?.Price?.TotalFare ||
-                        cheapestRoom?.TotalFare ||
-                        0) + (cheapestRoom?.Price?.Tax || cheapestRoom?.TotalTax || 0);
-
-                    return (
-                      <div
-                        className={`rounded-2xl p-5 border transition-all duration-300 ${isSelected ? "bg-[#C9A84C] border-[#C9A84C] shadow-lg shadow-[#C9A84C]/20" : "bg-slate-50 border-slate-100"}`}
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <p
-                              className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isSelected ? "text-white/60" : "text-slate-400"}`}
-                            >
-                              {isSelected ? "Total Amount" : "Starting from"}
-                            </p>
-                            <div className="flex items-baseline gap-1">
-                              <span
-                                className={`text-sm font-bold ${isSelected ? "text-[#0A203E]" : "text-slate-700"}`}
-                              >
-                                ₹
-                              </span>
-                              <span
-                                className={`text-3xl font-black ${isSelected ? "text-[#0A203E]" : "text-[#000D26]"}`}
-                              >
-                                {totalPrice.toLocaleString("en-IN")}
-                              </span>
-                            </div>
-                          </div>
-                          {isSelected && (
-                            <div className="bg-white/20 backdrop-blur-md rounded-lg p-2 text-white">
-                              <MdCheckCircle size={20} />
-                            </div>
-                          )}
-                        </div>
-
-                        <div
-                          className={`text-[11px] font-medium ${isSelected ? "text-white/80" : "text-slate-500"}`}
-                        >
-                          {isSelected ? (
-                            <div className="space-y-1">
-                              <p className="font-bold line-clamp-1">
-                                {selectedRoom.room.RoomTypeName || "Selected Room"}
-                              </p>
-                              <p>Includes {requiredRooms} rooms for full stay</p>
-                            </div>
-                          ) : (
-                            <p>Inclusive of all taxes</p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Selected Rooms List / Info */}
-                  {Object.keys(selectedRooms).length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-slate-400 px-1">
-                        <div className="flex-1 h-px bg-slate-100" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">
-                          Next Step
-                        </span>
-                        <div className="flex-1 h-px bg-slate-100" />
-                      </div>
-
-                      <button
-                        onClick={handleContinue}
-                        className="w-full bg-[#C9A84C] hover:brightness-110 text-[#0A203E] py-4 rounded-2xl font-black text-sm tracking-widest uppercase shadow-xl shadow-[#C9A84C]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-3 cursor-pointer border-none"
-                      >
-                        Proceed to Booking
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <line x1="5" y1="12" x2="19" y2="12" />
-                          <polyline points="12 5 19 12 12 19" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Contact info simplified */}
-                  <div className="pt-6 border-t border-slate-100 space-y-3">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                      Support Contact
-                    </p>
-                    <div className="flex flex-wrap gap-3">
-                      {mergedHotel.contact.phone && (
-                        <ContactRow
-                          icon={FiPhone}
-                          value={mergedHotel.contact.phone}
-                          href={`tel:${mergedHotel.contact.phone}`}
-                        />
-                      )}
-                      {mergedHotel.contact.email && (
-                        <ContactRow
-                          icon={FiMail}
-                          value="Email Support"
-                          href={`mailto:${mergedHotel.contact.email}`}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {/* ── Booking Summary Section Removed ── */}
 
               {/* Map card */}
               {/* {mergedHotel.map && (
@@ -531,11 +364,11 @@ const HotelDetailsPage = () => {
               {mergedHotel?.latitude != null &&
                 mergedHotel?.longitude != null && (
                   <div
-                    className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden cursor-pointer group"
+                    className="z-0 rounded-2xl border border-slate-200 shadow-sm overflow-hidden  cursor-pointer group"
                     onClick={() => setMapModalOpen(true)}
                   >
                     {/* Thumbnail map — non-interactive overlay to capture click */}
-                    <div className="relative h-48">
+                    <div className="relative z-0 h-48">
                       <MapContainer
                         center={[mergedHotel.latitude, mergedHotel.longitude]}
                         zoom={15}
@@ -598,8 +431,68 @@ const HotelDetailsPage = () => {
                   Search Flights Now
                 </button>
               </div>
+      </div>
 
-        <MapModal
+      {/* Sticky Bottom Bar for Selected Room */}
+      {Object.keys(selectedRooms).length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] z-[9000] px-6 py-4 flex items-center justify-between">
+          <div className="flex flex-col max-w-[50%]">
+            <span className="text-sm font-black text-[#0A203E] truncate">
+              {(() => {
+                const r = Object.values(selectedRooms)[0]?.room;
+                if (!r) return "Selected Room";
+                return typeof r.RoomTypeName === "string" && r.RoomTypeName.trim() !== ""
+                  ? r.RoomTypeName
+                  : Array.isArray(r.Name) && r.Name.length > 0
+                    ? r.Name[0]
+                    : typeof r.Name === "string" && r.Name.trim() !== ""
+                      ? r.Name
+                      : "Selected Room";
+              })()}
+            </span>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-0.5">
+              {requiredRooms} Room{requiredRooms > 1 ? "s" : ""} Selected
+            </span>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
+                Total Price
+              </span>
+              <span className="text-xl font-black text-[#000D26]">
+                ₹{Object.values(selectedRooms).reduce(
+                  (sum, r) =>
+                    sum +
+                    ((r.room.TotalFare || r.room.Price?.TotalFare || 0) +
+                      (r.room.TotalTax || r.room.Price?.Tax || 0)),
+                  0
+                ).toLocaleString("en-IN")}
+              </span>
+            </div>
+            <button
+              onClick={handleContinue}
+              className="bg-[#C9A84C] hover:brightness-110 text-[#0A203E] px-8 py-3.5 rounded-xl font-black text-[11px] tracking-widest uppercase shadow-xl shadow-[#C9A84C]/30 active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer border-none"
+            >
+              Proceed to Review
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      <MapModal
           open={mapModalOpen}
           onClose={() => setMapModalOpen(false)}
           lat={mergedHotel?.latitude}
@@ -610,7 +503,6 @@ const HotelDetailsPage = () => {
       </div>
     </div>
   </div>
-</div>
   );
 };
 
@@ -642,7 +534,7 @@ function MapModal({ open, onClose, lat, lng, name, address }) {
 
   return (
     <div
-      className="fixed inset-0 z-9999 flex items-center justify-center"
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
       onClick={onClose}
     >
       {/* Backdrop */}
@@ -685,7 +577,7 @@ function MapModal({ open, onClose, lat, lng, name, address }) {
             scrollWheelZoom={true}
           >
             <TileLayer
-              attribution="&copy; OpenStreetMap contributors"
+              // attribution="&copy; OpenStreetMap contributors"
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <Marker position={[lat, lng]}>

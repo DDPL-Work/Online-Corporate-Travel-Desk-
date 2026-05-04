@@ -5,7 +5,6 @@ import RootLayout from "../layout/RootLayout";
 import ProtectedRoute from "./ProtectedRoute";
 
 // Auth Pages
-import SSOLogin from "../Pages/Auth/SSOLogin";
 import Unauthorized from "../Pages/Auth/Unauthorized";
 
 // Travel Admin
@@ -88,7 +87,7 @@ export const appRouter = createBrowserRouter([
     element: <RootLayout />, // ✅ Root layout with PageTitleHandler
     children: [
       // PUBLIC ROUTES
-      { path: "/iapindia", element: <LandingPage /> },
+      { path: "/:slug", element: <FlightBookingInfo /> },
       {
         path: "/sso/callback",
         element: <SSOCallback />,
