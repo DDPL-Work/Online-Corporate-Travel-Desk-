@@ -616,6 +616,8 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
       );
 
     const roomsCount =
+      booking.hotelRequest?.noOfRooms ||
+      booking.hotelRequest?.NoOfRooms ||
       countCodes(freshBookingCode) ||
       countCodes(bookingCodes) ||
       selectedRooms.length ||
