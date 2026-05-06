@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const compression = require("compression");
+const mongoSanitize = require("express-mongo-sanitize");
 const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 const session = require("express-session");
@@ -62,8 +63,29 @@ app.use(
 // ------------------------------
 // BODY PARSERS
 // ------------------------------
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+const captureRawBody = (req, res, buffer) => {
+  if (buffer?.length) {
+    req.rawBody = buffer.toString("utf8");
+  }
+};
+
+app.use(express.json({ limit: "10mb", verify: captureRawBody }));
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: "10mb",
+    verify: captureRawBody,
+  }),
+);
+app.use((req, res, next) => {
+  ["body", "params", "headers", "query"].forEach((key) => {
+    if (req[key] && typeof req[key] === "object") {
+      mongoSanitize.sanitize(req[key]);
+    }
+  });
+
+  next();
+});
 
 app.use(cookieParser());
 app.use(compression());

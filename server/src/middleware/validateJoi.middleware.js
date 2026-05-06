@@ -4,7 +4,11 @@ exports.validateJoi = (schema) => {
   return (req, res, next) => {
     if (!schema) return next();
 
-    const joiSchema = schema.isJoi ? schema : Joi.object(schema);
+    const isSchema =
+      (typeof Joi.isSchema === "function" && Joi.isSchema(schema)) ||
+      typeof schema?.validate === "function";
+
+    const joiSchema = isSchema ? schema : Joi.object(schema);
 
     const { error, value } = joiSchema.validate(req.body, {
       abortEarly: false,

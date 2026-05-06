@@ -79,6 +79,7 @@ import ContactUs from "../Pages/Legal/ContactUs";
 import MyReissueRequests from "../components/EmployeeDashboard/MyReissuedRequests";
 import TeamBookingDetails from "../components/CorporateManagerTabs/TeamBookingDetails";
 import TeamHotelBookingDetails from "../components/CorporateManagerTabs/TeamHotelBookingDetails";
+import WalletPhonePeStatusPage from "../Pages/Payments/WalletPhonePeStatusPage";
 // import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 
 export const appRouter = createBrowserRouter([
@@ -130,6 +131,10 @@ export const appRouter = createBrowserRouter([
                 element: <TravelAdminProfile />,
               },
               { path: "/corporate-wallet", element: <CorporateWallet /> },
+              {
+                path: "/corporate-wallet/phonepe-status",
+                element: <WalletPhonePeStatusPage />,
+              },
               { path: "/credit-utilization", element: <CreditUtilizationPostpaid /> },
               { path: "/ssr-management", element: <SsrManagement /> },
               { path: "/branding-settings", element: <BrandingSettings /> },

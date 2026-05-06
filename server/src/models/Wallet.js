@@ -52,6 +52,9 @@ const walletTransactionSchema = new mongoose.Schema(
       orderId: String,
       paymentId: String,
       signature: String,
+      providerOrderId: String,
+      state: String,
+      eventType: String,
     },
     processedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -74,6 +77,10 @@ const walletTransactionSchema = new mongoose.Schema(
 walletTransactionSchema.index({ corporateId: 1, createdAt: -1 });
 walletTransactionSchema.index({ corporateId: 1, type: 1, status: 1 });
 walletTransactionSchema.index({ transactionId: 1 });
+walletTransactionSchema.index({
+  "paymentGateway.name": 1,
+  "paymentGateway.orderId": 1,
+});
 
 // ------------------ EXPORT ------------------
 module.exports = mongoose.model("WalletTransaction", walletTransactionSchema);

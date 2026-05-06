@@ -54,5 +54,7 @@ module.exports = {
     enabled: process.env.ENABLE_CRON_JOBS === "true",
     creditAlertSchedule: process.env.CREDIT_ALERT_CRON || "0 */6 * * *",
     bookingReminderSchedule: process.env.BOOKING_REMINDER_CRON || "0 8 * * *",
+    phonePeRecoverySchedule:
+      process.env.PHONEPE_RECOVERY_CRON || "*/5 * * * *",
   }
 };

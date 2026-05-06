@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   FiFilter,
   FiDownload,
@@ -14,9 +14,9 @@ import { FaRupeeSign } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchWalletBalance,
+  fetchWalletPaymentStatus,
   fetchWalletTransactions,
   initiateWalletRecharge,
-  verifyWalletPayment,
 } from "../../Redux/Slice/walletSlice";
 import { Pagination } from "./Shared/Pagination";
 
@@ -120,6 +120,7 @@ export default function CorporateWallet() {
     loading,
     rechargeOrder,
     pagination,
+    error,
   } = useSelector((state) => state.wallet);
 
   // Original filter states
@@ -138,6 +139,7 @@ export default function CorporateWallet() {
 
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const pendingStatusSyncRef = useRef(new Map());
 
   // INITIAL LOAD (preserved)
   useEffect(() => {
@@ -168,6 +170,92 @@ export default function CorporateWallet() {
     // If no status field, assume success
     return "success";
   };
+
+  useEffect(() => {
+    const pendingPhonePeOrderIds = [
+      ...new Set(
+        (transactions || [])
+          .filter(
+            (tx) =>
+              getTransactionStatus(tx) === "pending" &&
+              tx.type === "credit" &&
+              tx.paymentGateway?.name === "phonepe" &&
+              tx.paymentGateway?.orderId,
+          )
+          .map((tx) => tx.paymentGateway.orderId),
+      ),
+    ];
+
+    if (!pendingPhonePeOrderIds.length) {
+      return undefined;
+    }
+
+    const now = Date.now();
+    const orderIdsToSync = pendingPhonePeOrderIds.filter((orderId) => {
+      const lastCheckedAt = pendingStatusSyncRef.current.get(orderId) || 0;
+      return now - lastCheckedAt >= 15000;
+    });
+
+    if (!orderIdsToSync.length) {
+      return undefined;
+    }
+
+    orderIdsToSync.forEach((orderId) => {
+      pendingStatusSyncRef.current.set(orderId, now);
+    });
+
+    let cancelled = false;
+
+    const syncPendingStatuses = async () => {
+      let shouldRefreshWallet = false;
+
+      for (const orderId of orderIdsToSync) {
+        try {
+          const statusResult = await dispatch(
+            fetchWalletPaymentStatus({
+              orderId,
+              gateway: "phonepe",
+            }),
+          ).unwrap();
+
+          if (["SUCCESS", "FAILED"].includes(statusResult?.status)) {
+            shouldRefreshWallet = true;
+          }
+        } catch (error) {
+          pendingStatusSyncRef.current.delete(orderId);
+        }
+      }
+
+      if (cancelled || !shouldRefreshWallet) {
+        return;
+      }
+
+      dispatch(fetchWalletBalance());
+      dispatch(
+        fetchWalletTransactions({
+          page: pagination?.page || 1,
+          limit: pagination?.limit || 10,
+          type: filterType !== "All" ? filterType.toLowerCase() : undefined,
+          dateFrom: startDate || undefined,
+          dateTo: endDate || undefined,
+        }),
+      );
+    };
+
+    syncPendingStatuses();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    dispatch,
+    transactions,
+    pagination?.page,
+    pagination?.limit,
+    filterType,
+    startDate,
+    endDate,
+  ]);
 
   // Combine filters: server-side filtered data from Redux + client-side search + status + tab
   const filteredTransactions = useMemo(() => {
@@ -248,57 +336,19 @@ export default function CorporateWallet() {
     URL.revokeObjectURL(url);
   };
 
-  // Razorpay logic (preserved exactly as original)
-  const loadRazorpayScript = () => {
-    return new Promise((resolve) => {
-      if (window.Razorpay) return resolve(true);
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  };
-
   useEffect(() => {
     if (!rechargeOrder) return;
 
-    const openRazorpay = async () => {
-      const loaded = await loadRazorpayScript();
-      if (!loaded) {
-        alert("Razorpay SDK failed to load");
+    const redirectToPhonePe = async () => {
+      if (rechargeOrder.gateway === "phonepe" && rechargeOrder.redirectUrl) {
+        window.location.assign(rechargeOrder.redirectUrl);
         return;
       }
-
-      const options = {
-        key: rechargeOrder.keyId,
-        amount: rechargeOrder.amount,
-        currency: rechargeOrder.currency,
-        name: "Corporate Wallet Recharge",
-        description: "Wallet Top-up",
-        order_id: rechargeOrder.orderId,
-        handler: function (response) {
-          dispatch(
-            verifyWalletPayment({
-              orderId: rechargeOrder.orderId,
-              paymentId: response.razorpay_payment_id,
-              signature: response.razorpay_signature,
-              amount: rechargeOrder.amount,
-            }),
-          ).then(() => {
-            dispatch(fetchWalletBalance());
-            dispatch(fetchWalletTransactions());
-          });
-        },
-        theme: { color: colors.primary },
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.open();
+      alert("PhonePe payment link is unavailable. Please try again.");
     };
 
-    openRazorpay();
-  }, [rechargeOrder, dispatch]);
+    redirectToPhonePe();
+  }, [rechargeOrder]);
 
   const handleRecharge = async () => {
     if (!rechargeAmount || rechargeAmount <= 0) {
@@ -306,7 +356,9 @@ export default function CorporateWallet() {
       return;
     }
     const result = await dispatch(
-      initiateWalletRecharge({ amount: Number(rechargeAmount) }),
+      initiateWalletRecharge({
+        amount: Number(rechargeAmount),
+      }),
     );
     if (result.error) return;
     setShowRecharge(false);
@@ -707,6 +759,23 @@ export default function CorporateWallet() {
                 </div>
               </div>
 
+              <div className="mt-5 rounded-2xl border border-[#0A4D68]/20 bg-[#0A4D68]/5 px-4 py-3">
+                <p className="text-xs font-black uppercase tracking-wider text-[#0A4D68]">
+                  Payment gateway
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">PhonePe</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Redirect checkout with backend status verification
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-[#0A4D68] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white">
+                    Active
+                  </span>
+                </div>
+              </div>
+
               {/* Optional: Info note */}
               <div className="mt-5 p-3 bg-blue-50 rounded-lg flex items-start gap-2">
                 <FiCreditCard
@@ -715,10 +784,18 @@ export default function CorporateWallet() {
                 />
                 <p className="text-xs text-blue-800">
                   Minimum recharge amount is ₹100. Funds will be credited
-                  instantly.
+                  only after backend verification completes.
                 </p>
               </div>
             </div>
+
+            {error ? (
+              <div className="px-5 pb-2">
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
+                  {error}
+                </div>
+              </div>
+            ) : null}
 
             {/* Actions Buttons */}
             <div className="flex gap-3 p-5 pt-2 border-t border-gray-100">
@@ -730,11 +807,12 @@ export default function CorporateWallet() {
               </button>
               <button
                 onClick={handleRecharge}
+                disabled={loading}
                 className="flex-1 px-4 py-2.5 rounded-xl text-white font-medium shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
                 style={{ backgroundColor: colors.primary }}
               >
                 <FiPlusCircle size={16} />
-                Proceed to Pay
+                {loading ? "Starting payment..." : "Continue with PhonePe"}
               </button>
             </div>
           </div>
