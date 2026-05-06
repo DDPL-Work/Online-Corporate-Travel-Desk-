@@ -123,6 +123,7 @@ export default function LandingHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobilePlatformOpen, setMobilePlatformOpen] = useState(false);
   const [mobileWhoOpen, setMobileWhoOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [authStep, setAuthStep] = useState(0); // initial step for AuthModal
   const [showInactiveModal, setShowInactiveModal] = useState(false);
@@ -133,6 +134,7 @@ export default function LandingHeader() {
 
   const platformRef = useRef(null);
   const whoForRef = useRef(null);
+  const profileRef = useRef(null);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 8);
@@ -161,10 +163,12 @@ export default function LandingHeader() {
   useEffect(() => {
     function handleClick(e) {
       if (
-        platformRef.current && !platformRef.current.contains(e.target) &&
-        whoForRef.current && !whoForRef.current.contains(e.target)
+        (platformRef.current && !platformRef.current.contains(e.target)) &&
+        (whoForRef.current && !whoForRef.current.contains(e.target)) &&
+        (profileRef.current && !profileRef.current.contains(e.target))
       ) {
         setOpenMenu(null);
+        setProfileDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -242,6 +246,18 @@ export default function LandingHeader() {
             onToggle={() => toggle("whoFor")}
             dropdownRef={whoForRef}
           />
+          <a
+            href="/about-us"
+            className="text-sm font-medium font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors"
+          >
+            About Us
+          </a>
+          <a
+            href="/faq"
+            className="text-sm font-medium font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors"
+          >
+            FAQs
+          </a>
          
         </nav>
       )}
@@ -252,9 +268,10 @@ export default function LandingHeader() {
           <div className="flex items-center gap-3">
             <NotificationBell />
 
-            <div className="relative group">
+            <div className="relative" ref={profileRef}>
               <div
                 className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer font-bold text-sm transition-all"
+                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                 style={{
                   background: GOLD,
                   color: C.navy,
@@ -263,9 +280,9 @@ export default function LandingHeader() {
               >
                 {user?.name?.firstName?.charAt(0)?.toUpperCase() || "E"}
               </div>
-              {/* Hover Dropdown */}
+              {/* Click Dropdown */}
               <div
-                className="absolute right-0 top-full mt-2 w-48 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all overflow-hidden z-50"
+                className={`absolute right-0 top-full mt-2 w-48 rounded-xl shadow-xl transition-all overflow-hidden z-50 ${profileDropdownOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"}`}
                 style={{
                   background: C.white,
                   border: `1px solid ${C.border}`,
@@ -386,6 +403,19 @@ export default function LandingHeader() {
                   ))}
                 </div>
               )}
+
+              <a
+                href="/about-us"
+                className="px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
+              >
+                About Us
+              </a>
+              <a
+                href="/faq"
+                className="px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
+              >
+                FAQ
+              </a>
             </>
           )}
 
