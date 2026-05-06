@@ -2468,6 +2468,14 @@ const HotelReviewBooking = () => {
                   </p>
                 </div>
                 <div className="p-5 space-y-3">
+                  <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
+                    <span>Total Fare</span>
+                    <span>₹{baseFare.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
+                    <span>Total Tax</span>
+                    <span>₹{tax.toLocaleString("en-IN")}</span>
+                  </div>
                   <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
                     <span className="text-sm font-bold text-slate-600">
                       Total

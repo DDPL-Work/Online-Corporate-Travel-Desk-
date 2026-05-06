@@ -1,0 +1,165 @@
+const Notification = require("../models/Notification");
+const User = require("../models/User");
+
+/**
+ * Get all notifications for the logged in user
+ */
+exports.getMyNotifications = async (req, res) => {
+  try {
+    const query = {
+      recipient: req.user.id
+    };
+
+    const notifications = await Notification.find(query)
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    const unreadCount = await Notification.countDocuments({
+      ...query,
+      isRead: false,
+    });
+
+    res.status(200).json({
+      status: "success",
+      results: notifications.length,
+      unreadCount,
+      data: {
+        notifications,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * Mark notification as read
+ */
+exports.markAsRead = async (req, res) => {
+  try {
+    const notification = await Notification.findOneAndUpdate(
+      { 
+        _id: req.params.id, 
+        $or: [
+          { recipient: req.user.id },
+          { recipientRole: req.user.role }
+        ]
+      },
+      { isRead: true },
+      { new: true }
+    );
+
+    if (!notification) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Notification not found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        notification,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * Mark all notifications as read
+ */
+exports.markAllAsRead = async (req, res) => {
+  try {
+    const query = {
+      isRead: false,
+      $or: [
+        { recipient: req.user.id },
+        { recipientRole: req.user.role }
+      ]
+    };
+
+    await Notification.updateMany(query, { isRead: true });
+
+    res.status(200).json({
+      status: "success",
+      message: "All notifications marked as read",
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * Save FCM token for push notifications
+ */
+exports.saveFcmToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Token is required",
+      });
+    }
+
+    // Add token if it doesn't exist
+    await User.findByIdAndUpdate(req.user.id, {
+      $addToSet: { fcmTokens: token },
+    });
+
+    res.status(200).json({
+      status: "success",
+      message: "FCM token saved successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * Delete notification
+ */
+exports.deleteNotification = async (req, res) => {
+  try {
+    const notification = await Notification.findOneAndDelete({
+      _id: req.params.id,
+      $or: [
+        { recipient: req.user.id },
+        { recipientRole: req.user.role }
+      ]
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Notification not found",
+      });
+    }
+
+    res.status(204).json({
+      status: "success",
+      data: null,
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+

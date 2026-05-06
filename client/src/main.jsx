@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import { store } from "./Redux/store.js";
 import { FlightSearchProvider } from "./context/FlightSearchContext";
+import { NotificationProvider } from "./context/NotificationContext";
 import App from "./App";
 import "./index.css";
 
@@ -13,7 +14,9 @@ createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <Provider store={store}>
       <FlightSearchProvider>
-        <App />
+        <NotificationProvider>
+          <App />
+        </NotificationProvider>
       </FlightSearchProvider>
     </Provider>
   </React.StrictMode>,

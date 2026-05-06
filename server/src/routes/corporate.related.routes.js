@@ -154,9 +154,8 @@ router.get("/:id", authorizeRoles("super-admin", "ops-member"), corporateControl
 router.put(
   "/:id",
   authorizeRoles("super-admin", "travel-admin", "ops-member"),
-  corporateValidation.updateCorporate,
   sanitizeBody(["corporateName", "primaryContact.email"]),
-  validate,
+  validate(corporateValidation.updateCorporate),
   corporateController.updateCorporate,
 );
 

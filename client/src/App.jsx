@@ -12,7 +12,7 @@ function App() {
         position="top-right"
         expand
         toastOptions={{
-          unstyled: true, 
+          unstyled: true,
           classNames: {
             toast: "sonner-toast",
             success: "success",

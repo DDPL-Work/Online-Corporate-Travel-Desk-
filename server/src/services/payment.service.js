@@ -5,6 +5,8 @@ const ApiError = require("../utils/ApiError");
 const WalletTransaction = require("../models/Wallet");
 const { getAgencyBalance } = require("./tboBalance.service");
 const Ledger = require("../models/Ledger");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
 
 class PaymentService {
   async createOrder(amount, bookingReference, corporateId) {
@@ -66,6 +68,17 @@ class PaymentService {
       corporate.walletBalance -= amount;
       await corporate.save();
 
+      // ── WALLET LOW ALERT (e.g., if balance falls below 10,000 INR) ──
+      const THRESHOLD = 10000;
+      if (corporate.walletBalance < THRESHOLD && balanceBefore >= THRESHOLD) {
+        notify(EVENTS.WALLET_LOW, {
+          corporateId: corporate._id,
+          corporateName: corporate.corporateName,
+          currentBalance: corporate.walletBalance,
+          threshold: THRESHOLD,
+        });
+      }
+
       await WalletTransaction.create({
         corporateId: corporate._id,
         bookingId: booking._id,
@@ -108,6 +121,31 @@ class PaymentService {
 
       if (balance.availableBalance < amount) {
         throw new ApiError(400, "Insufficient agency balance");
+      }
+      
+      // Update the local currentCredit in Corporate document to match Ledger
+      corporate.currentCredit += amount;
+      await corporate.save();
+
+      const utilizationPercent = Math.round((corporate.currentCredit / corporate.creditLimit) * 100);
+
+      if (utilizationPercent >= 100) {
+        notify(EVENTS.CREDIT_LIMIT_EXCEEDED, {
+          corporateId: corporate._id,
+          corporateName: corporate.corporateName,
+          totalLimit: corporate.creditLimit,
+          usedAmount: corporate.currentCredit,
+        });
+      } else if (utilizationPercent >= 80) { // e.g. 80% threshold
+        // We only notify if we just crossed 80%, to avoid spam. But doing it every time for now or we can assume it's okay.
+        notify(EVENTS.CREDIT_LIMIT_LOW, {
+          corporateId: corporate._id,
+          corporateName: corporate.corporateName,
+          totalLimit: corporate.creditLimit,
+          usedAmount: corporate.currentCredit,
+          availableCredit: corporate.creditLimit - corporate.currentCredit,
+          utilizationPercent,
+        });
       }
 
       await Ledger.create({

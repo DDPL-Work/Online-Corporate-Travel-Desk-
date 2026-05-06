@@ -9,6 +9,10 @@ const asyncHandler = require("../utils/asyncHandler");
 const ApiResponse = require("../utils/ApiResponse");
 const { generateBookingReference } = require("../utils/helpers");
 const { generateSequentialOrderId } = require("../utils/orderIdGenerator");
+const notificationService = require("../services/notification.service");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
+
 
 // @desc    PreBook Hotel (TBO)
 // @route   POST /api/v1/hotel-bookings/prebook
@@ -386,6 +390,40 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
   });
 
   const isAutoApproved = requestStatus === "approved";
+
+  // ── Notify Travel Admin + Manager of new hotel booking request ──
+  const _hotelRequesterName = user.name?.firstName
+    ? `${user.name.firstName} ${user.name.lastName || ''}`.trim()
+    : user.name || 'Employee';
+  const _hotelOrderId = bookingRequest.orderId || bookingRequest.bookingReference;
+
+  notify(EVENTS.BOOKING_REQUEST_CREATED, {
+    corporateId:   corporate._id,
+    employeeId:    user._id,
+    employeeEmail: user.email,
+    employeeName:  _hotelRequesterName,
+    managerId:     approverId || null,
+    orderId:       _hotelOrderId,
+    bookingType:   'hotel',
+    amount:        bookingRequest.pricingSnapshot?.totalAmount,
+    relatedId:     bookingRequest._id,
+  });
+
+  // If a manager is selected, send BOOKING_APPROVAL_REQUIRED to them specifically
+  if (approverId) {
+    notify(EVENTS.BOOKING_APPROVAL_REQUIRED, {
+      corporateId:  corporate._id,
+      managerId:    approverId,
+      employeeName: _hotelRequesterName,
+      orderId:      _hotelOrderId,
+      bookingType:  'hotel',
+      amount:       bookingRequest.pricingSnapshot?.totalAmount,
+      relatedId:    bookingRequest._id,
+    });
+  }
+
+
+
 
   return res.status(201).json({
     success: true,
@@ -868,7 +906,15 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     booking.executionStatus = "voucher_generated";
     await booking.save();
 
+    // Notify User
+    await notificationService.sendBookingNotification(
+      booking,
+      { _id: booking.userId },
+      "confirmation"
+    );
+
     /* ================= SUCCESS ================= */
+
 
     return res.status(200).json({
       success: true,

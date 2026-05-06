@@ -15,7 +15,7 @@ import {
   MdCheckCircle,
   MdKingBed,
 } from "react-icons/md";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchMyBookings } from "../../Redux/Actions/booking.thunks";
 import { fetchMyHotelBookings } from "../../Redux/Actions/hotelBooking.thunks";
@@ -412,6 +412,8 @@ function HotelBookingCard({ b, navigate, userRole }) {
 export default function MyBookings() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
+  const typeQuery = searchParams.get("type");
 
   // Separate Redux slices for flights & hotels
   const { list: flightBookings = [], loading: flightLoading } = useSelector(
@@ -422,17 +424,19 @@ export default function MyBookings() {
   );
   const userRole = useSelector((s) => s.auth?.user?.role);
 
-  const [activeTab, setActiveTab] = useState("flight");
+  const [activeTab, setActiveTab] = useState(typeQuery === "hotel" ? "hotel" : "flight");
   const [statusFilter, setStatusFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  /* Fetch on tab switch */
+  /* Sync activeTab with typeQuery if it changes */
   useEffect(() => {
-    if (activeTab === "flight") dispatch(fetchMyBookings());
-    else dispatch(fetchMyHotelBookings());
-  }, [activeTab, dispatch]);
+    if (typeQuery) {
+      setActiveTab(typeQuery === "hotel" ? "hotel" : "flight");
+    }
+  }, [typeQuery]);
+
 
   const loading = activeTab === "flight" ? flightLoading : hotelLoading;
   const bookings = activeTab === "flight" ? flightBookings : hotelBookings;

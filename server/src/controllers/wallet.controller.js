@@ -7,7 +7,9 @@ const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const { createRechargeLog } = require("../utils/walletLogger");
-const WalletRechargeLog = require("../models/WalletActivityLog")
+const WalletRechargeLog = require("../models/WalletActivityLog");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
 
 // @desc    Get wallet balance
 // @route   GET /api/v1/wallet/balance
@@ -243,6 +245,16 @@ exports.verifyPayment = asyncHandler(async (req, res) => {
       balanceAfter: corporate.walletBalance,
     }
   );
+
+  // ── Notify Travel Admin: Wallet Recharged ──
+  notify(EVENTS.WALLET_RECHARGED, {
+    corporateId: corporate._id,
+    amount: creditAmount,
+    newBalance: corporate.walletBalance,
+    transactionId: paymentId,
+    rechargedBy: req.user?.name?.firstName || req.user?.name || "Admin",
+  });
+
   res.status(200).json(
     new ApiResponse(
       200,

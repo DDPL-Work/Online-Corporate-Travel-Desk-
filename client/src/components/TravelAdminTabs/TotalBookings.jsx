@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+
 import { useDispatch, useSelector } from "react-redux";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import {
@@ -864,7 +865,16 @@ function HotelSection() {
 
 // ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function BookingsDashboard() {
-  const [activeTab, setActiveTab] = useState("flight");
+  const [searchParams] = useSearchParams();
+  const typeQuery = searchParams.get("type");
+  const [activeTab, setActiveTab] = useState(typeQuery === "hotel" ? "hotel" : "flight");
+
+  useEffect(() => {
+    if (typeQuery) {
+      setActiveTab(typeQuery === "hotel" ? "hotel" : "flight");
+    }
+  }, [typeQuery]);
+
 
   const tabs = [
     {

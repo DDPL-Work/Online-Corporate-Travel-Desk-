@@ -32,6 +32,7 @@ const ssrPolicyRoutes = require("./ssrPolicy.routes");
 const landingPageRoutes = require("./landingPage.routes");
 const tboSyncRoutes = require("./tboSync.routes");
 const flightReissueRoutes = require("./flightReissue.routes");
+const notificationRoutes = require("./notificationRoutes");
 
 // ------------------ ✅ IMPORTANT FIX ------------------
 // ✅ SSO MUST BE MOUNTED BEFORE /auth (to avoid JWT blocking)
@@ -69,6 +70,7 @@ router.use("/ops", opsRoutes);
 router.use("/ssr-policies", ssrPolicyRoutes);
 
 router.use("/landing-page", landingPageRoutes);
+router.use("/notifications", notificationRoutes);
 
 // ------------------ API Info ------------------
 router.get("/", (req, res) => {
