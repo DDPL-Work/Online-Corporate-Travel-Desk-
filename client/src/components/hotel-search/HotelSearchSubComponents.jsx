@@ -4,7 +4,7 @@ import { FaGlobe, FaChevronDown, FaSearch } from "react-icons/fa";
 const GOLD = "#C9A240";
 
 /* ─── Shared Country Selector ─── */
-export const CountrySelector = ({ value, onChange, countries, label = "Country", disabled = false }) => {
+export const CountrySelector = ({ value, onChange, countries, label = "Country", disabled = false, variant = "default" }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef(null);
@@ -34,9 +34,10 @@ export const CountrySelector = ({ value, onChange, countries, label = "Country",
         type="button"
         onMouseDown={(e) => disabled && e.preventDefault()}
         onClick={() => !disabled && setOpen(!open)}
-        className={`w-full flex items-center justify-between border-2 rounded-xl px-3 py-3 bg-white transition-all text-left
-          ${disabled ? "bg-gray-50 border-gray-100 cursor-default" : "hover:border-[#C9A240] cursor-pointer"}
-          ${open ? "border-[#C9A240] shadow-sm" : value ? "border-[#C9A240]" : "border-gray-200"}`}
+        className={`w-full flex items-center justify-between rounded-xl px-3 py-3 transition-all text-left
+          ${variant === "minimal" ? "bg-transparent border-none p-0" : "bg-white border-2"}
+          ${disabled ? "bg-gray-50 border-gray-100 cursor-default" : variant === "minimal" ? "" : "hover:border-[#C9A240] cursor-pointer"}
+          ${open && variant !== "minimal" ? "border-[#C9A240] shadow-sm" : value && variant !== "minimal" ? "border-[#C9A240]" : variant !== "minimal" ? "border-gray-200" : ""}`}
       >
         <div className={`flex items-center gap-2 min-w-0 ${disabled ? "opacity-60" : ""}`}>
           {selected ? (
@@ -144,7 +145,8 @@ export const SearchableSelect = ({
   placeholder = "Select", 
   displayKey = "Name", 
   valueKey = "Code",
-  disabled = false
+  disabled = false,
+  variant = "default"
 }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -171,9 +173,10 @@ export const SearchableSelect = ({
         type="button"
         onMouseDown={(e) => disabled && e.preventDefault()}
         onClick={() => !disabled && setOpen((v) => !v)}
-        className={`w-full flex items-center justify-between border-2 rounded-xl px-3 py-3 bg-white transition-all text-left
-          ${disabled ? "bg-gray-50 border-gray-100 cursor-default" : "hover:border-blue-400 cursor-pointer"}
-          ${open ? "border-blue-600 shadow-sm" : value ? "border-blue-300" : "border-gray-200"}`}
+        className={`w-full flex items-center justify-between rounded-xl px-3 py-3 transition-all text-left
+          ${variant === "minimal" ? "bg-transparent border-none p-0 shadow-none" : "bg-white border-2"}
+          ${disabled ? "bg-gray-50 border-gray-100 cursor-default" : variant === "minimal" ? "" : "hover:border-blue-400 cursor-pointer"}
+          ${open && variant !== "minimal" ? "border-blue-600 shadow-sm" : value && variant !== "minimal" ? "border-blue-300" : variant !== "minimal" ? "border-gray-200" : ""}`}
       >
         <div className={`flex flex-col min-w-0 ${disabled ? "opacity-60" : ""}`}>
           <span className={`text-sm font-bold truncate ${selected ? "text-gray-800" : "text-gray-400"}`}>

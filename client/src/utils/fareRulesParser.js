@@ -1,7 +1,7 @@
 export const normalizeCurrencyText = (text) => {
   if (!text) return text;
   return text.replace(/INR\s*(\d+)(?:\/-|\.00|\b)/gi, (match, p1) => {
-    return '₹' + Number(p1).toLocaleString('en-IN');
+    return "₹" + Number(p1).toLocaleString("en-IN");
   });
 };
 
@@ -13,19 +13,27 @@ export const parseFareRuleHtml = (html) => {
   const result = {
     fareHeader: { fareBasisCode: null, fareType: null },
     baggage: { checkIn: "", cabin: "", infant: "" },
-    mealAndSeat: { meal: "As per airline policy", seat: "As per airline policy" },
+    mealAndSeat: {
+      meal: "As per airline policy",
+      seat: "As per airline policy",
+    },
     cancellation: [],
     reissue: [],
-    notes: []
+    notes: [],
   };
 
   // 1. FARE HEADER
   const fbcMatch = html.match(/FareBasisCode is:\s*<\/?\w*>?\s*([A-Z0-9]+)/i);
   if (fbcMatch) result.fareHeader.fareBasisCode = fbcMatch[1];
-  
+
   // Try finding Fare Type from any node
   const textContent = doc.body.textContent || "";
-  if (textContent.includes("Xpress Value")) result.fareHeader.fareType = "Xpress Value";
+  const fareTypeMatch = textContent.match(/It is\s+([^,.<]+?)\s+Fare/i);
+  if (fareTypeMatch) {
+    result.fareHeader.fareType = fareTypeMatch[1].trim();
+  } else if (textContent.includes("Xpress Value")) {
+    result.fareHeader.fareType = "Xpress Value";
+  }
 
   // 2. TABLES
   const rows = doc.querySelectorAll("table tbody tr");
@@ -34,50 +42,61 @@ export const parseFareRuleHtml = (html) => {
   const expandShorthand = (str, category = "") => {
     if (!str) return str;
     const lower = str.toLowerCase().trim();
-    
+
     // Explicit exclusions mapping to full sentences
     if (lower === "not allowed" || lower === "no") {
-       if (category.includes("cancel")) return "Cancellation is strictly not permitted for this fare class.";
-       if (category.includes("change") || category.includes("reissue")) return "Date changes or reissuance are strictly not permitted for this fare class.";
-       return "This service is currently not allowed or excluded under this fare policy.";
+      if (category.includes("cancel")) return "You cannot cancel this flight.";
+      if (category.includes("change") || category.includes("reissue"))
+        return "You cannot change the date for this flight.";
+      return "This is not allowed for this ticket.";
     }
 
     if (lower === "allowed" || lower === "yes") {
-       if (category.includes("cancel")) return "Cancellation is permitted. Standard airline cancellation charges will apply.";
-       if (category.includes("change") || category.includes("reissue")) return "Date changes are permitted. Standard airline modification charges and fare differences will apply.";
-       return "This service is included and permitted under this fare policy.";
+      if (category.includes("cancel"))
+        return "You can cancel this flight. The airline will charge a fee.";
+      if (category.includes("change") || category.includes("reissue"))
+        return "You can change your flight date. You will have to pay a fee and any price difference.";
+      return "This is allowed for this ticket.";
     }
 
     if (lower === "free" || lower === "included") {
-       return "This service is provided complimentary as part of your current fare selection.";
+      return "This is free of charge.";
     }
 
     // Expand fees that start with INR or amount
     if (lower.includes("inr") || lower.includes("rs") || lower.includes("₹")) {
-       if (category.includes("cancel")) return `A cancellation fee of ${str} will be levied by the airline. Additional agency processing fees may apply.`;
-       if (category.includes("change") || category.includes("reissue")) return `A date change fee of ${str} will be levied by the airline, in addition to any applicable fare difference.`;
+      if (category.includes("cancel"))
+        return `The airline charges ${str} for cancellation.`;
+      if (category.includes("change") || category.includes("reissue"))
+        return `The airline charges ${str} to change the date.`;
     }
 
     if (lower.includes("as per airline")) {
-      return "Charges will be levied strictly in accordance with the airline's standard policies at the time of modification.";
+      return "Fees depend on the airline's policy at the time of the change.";
     }
 
     // Wrap small note fragments in a professional wrapper
     if (str.length < 25 && !category) {
-       return `Please note: ${str} applies to this booking segment.`;
+      return `Note: ${str}`;
     }
 
     return str;
   };
 
   rows.forEach((tr) => {
-    const tds = Array.from(tr.querySelectorAll("td, th")).map(el => el.innerText?.trim().replace(/\s+/g, ' '));
+    const tds = Array.from(tr.querySelectorAll("td, th")).map((el) =>
+      el.innerText?.trim().replace(/\s+/g, " "),
+    );
     if (tds.length === 0) return;
 
     if (tr.querySelector("td[rowspan], th[rowspan]")) {
       currentCategory = tds[0].toLowerCase();
       tds.shift();
-    } else if (tds.length === 1 && !tds[0].includes("INR") && !tds[0].toLowerCase().includes("not allowed")) {
+    } else if (
+      tds.length === 1 &&
+      !tds[0].includes("INR") &&
+      !tds[0].toLowerCase().includes("not allowed")
+    ) {
       currentCategory = tds[0].toLowerCase();
       return;
     }
@@ -90,16 +109,28 @@ export const parseFareRuleHtml = (html) => {
 
     if (currentCategory.includes("baggage")) {
       const lowerLab = label.toLowerCase();
-      if (lowerLab.includes("check") || lowerLab.includes("adult") || lowerLab.includes("child")) result.baggage.checkIn = value;
-      else if (lowerLab.includes("cabin") || lowerLab.includes("hand")) result.baggage.cabin = value;
+      if (
+        lowerLab.includes("check") ||
+        lowerLab.includes("adult") ||
+        lowerLab.includes("child")
+      )
+        result.baggage.checkIn = value;
+      else if (lowerLab.includes("cabin") || lowerLab.includes("hand"))
+        result.baggage.cabin = value;
       else if (lowerLab.includes("infant")) result.baggage.infant = value;
-    } else if (currentCategory.includes("meal") || currentCategory.includes("seat")) {
+    } else if (
+      currentCategory.includes("meal") ||
+      currentCategory.includes("seat")
+    ) {
       const lowerLab = label.toLowerCase() || currentCategory;
       if (lowerLab.includes("meal")) result.mealAndSeat.meal = value;
       if (lowerLab.includes("seat")) result.mealAndSeat.seat = value;
     } else if (currentCategory.includes("cancel")) {
       result.cancellation.push({ timeRange: label, fee: value });
-    } else if (currentCategory.includes("change") || currentCategory.includes("reissue")) {
+    } else if (
+      currentCategory.includes("change") ||
+      currentCategory.includes("reissue")
+    ) {
       result.reissue.push({ timeRange: label, fee: value });
     }
   });
@@ -110,7 +141,7 @@ export const parseFareRuleHtml = (html) => {
 
   // 4. NOTES & SHORTCODES
   const lis = doc.querySelectorAll("ol li, ul li");
-  lis.forEach(li => {
+  lis.forEach((li) => {
     let noteText = li.innerText?.trim() || "";
     noteText = normalizeCurrencyText(noteText);
     result.notes.push(expandShorthand(noteText, ""));
@@ -122,36 +153,55 @@ export const parseFareRuleHtml = (html) => {
 export const processFareRulesData = (rawRulesArray, quoteResults) => {
   if (!rawRulesArray || rawRulesArray.length === 0) return [];
 
-  const miniRules = quoteResults?.MiniFareRules || (Array.isArray(quoteResults) && quoteResults[0]?.MiniFareRules) || [];
-  
-  return rawRulesArray.map(rule => {
+  const miniRules =
+    quoteResults?.MiniFareRules ||
+    (Array.isArray(quoteResults) && quoteResults[0]?.MiniFareRules) ||
+    [];
+
+  return rawRulesArray.map((rule) => {
     const rawHtml = rule.FareRuleDetail;
     const parsed = parseFareRuleHtml(rawHtml);
-    
+
     if (parsed && miniRules.length > 0) {
-      const cancelRules = miniRules[0] && Array.isArray(miniRules[0]) ? miniRules[0].filter(m => m.Type === "Cancellation") : miniRules.filter(m => m.Type === "Cancellation");
-      const reissueRules = miniRules[0] && Array.isArray(miniRules[0]) ? miniRules[0].filter(m => m.Type === "Reissue") : miniRules.filter(m => m.Type === "Reissue");
-      
+      const cancelRules =
+        miniRules[0] && Array.isArray(miniRules[0])
+          ? miniRules[0].filter((m) => m.Type === "Cancellation")
+          : miniRules.filter((m) => m.Type === "Cancellation");
+      const reissueRules =
+        miniRules[0] && Array.isArray(miniRules[0])
+          ? miniRules[0].filter((m) => m.Type === "Reissue")
+          : miniRules.filter((m) => m.Type === "Reissue");
+
       if (cancelRules.length > 0 && parsed.cancellation.length === 0) {
-        parsed.cancellation = cancelRules.map(c => ({
+        parsed.cancellation = cancelRules.map((c) => ({
           timeRange: `${c.From} to ${c.To} ${c.Unit}`,
-          fee: normalizeCurrencyText(`INR ${c.Details}`)
+          fee: normalizeCurrencyText(`INR ${c.Details}`),
         }));
       }
 
       if (reissueRules.length > 0 && parsed.reissue.length === 0) {
-        parsed.reissue = reissueRules.map(c => ({
+        parsed.reissue = reissueRules.map((c) => ({
           timeRange: `${c.From} to ${c.To} ${c.Unit}`,
-          fee: normalizeCurrencyText(`INR ${c.Details}`)
+          fee: normalizeCurrencyText(`INR ${c.Details}`),
         }));
       }
     }
 
     if (!parsed.cancellation || parsed.cancellation.length === 0) {
-        parsed.cancellation = [{ timeRange: "Standard Terms", fee: "Cancellation charges will be mapped as per the standard airline cancellation policies in effect at the time of modification." }];
+      parsed.cancellation = [
+        {
+          timeRange: "Standard Terms",
+          fee: "Fees will be charged according to the airline's rules at the time of cancellation.",
+        },
+      ];
     }
     if (!parsed.reissue || parsed.reissue.length === 0) {
-        parsed.reissue = [{ timeRange: "Standard Terms", fee: "Date changes or reissuance of tickets are strictly subject to standard airline policies and fare differences." }];
+      parsed.reissue = [
+        {
+          timeRange: "Standard Terms",
+          fee: "Fees and price differences will be charged according to the airline's rules at the time of the date change.",
+        },
+      ];
     }
 
     return {
@@ -160,7 +210,7 @@ export const processFareRulesData = (rawRulesArray, quoteResults) => {
       destination: rule.Destination,
       fareBasisCode: parsed?.fareHeader?.fareBasisCode || rule.FareBasisCode,
       ...parsed,
-      rawHtml // Keeping raw purely just in case, but won't be rendered.
+      rawHtml, // Keeping raw purely just in case, but won't be rendered.
     };
   });
 };

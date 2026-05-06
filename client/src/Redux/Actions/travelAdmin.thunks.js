@@ -24,6 +24,26 @@ export const getAllFlightBookingsAdmin = createAsyncThunk(
 
 /**
  * ============================================================
+ * ✈️ FETCH SINGLE FLIGHT BOOKING BY ID (ADMIN)
+ * ============================================================
+ */
+export const getFlightBookingByIdAdmin = createAsyncThunk(
+  "adminBooking/getFlightBookingByIdAdmin",
+  async (id, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/travel-admin/flights/${id}`);
+
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch flight booking details",
+      );
+    }
+  },
+);
+
+/**
+ * ============================================================
  * 🏨 FETCH HOTEL BOOKINGS (ADMIN)
  * ============================================================
  */
@@ -37,6 +57,26 @@ export const getAllHotelBookingsAdmin = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(
         err.response?.data?.message || "Failed to fetch hotel bookings",
+      );
+    }
+  },
+);
+
+/**
+ * ============================================================
+ * 🏨 FETCH SINGLE HOTEL BOOKING BY ID (ADMIN)
+ * ============================================================
+ */
+export const getHotelBookingByIdAdmin = createAsyncThunk(
+  "adminBooking/getHotelBookingByIdAdmin",
+  async (id, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/travel-admin/hotels/${id}`);
+
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch hotel booking details",
       );
     }
   },

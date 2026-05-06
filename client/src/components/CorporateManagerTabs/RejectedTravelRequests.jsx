@@ -13,8 +13,11 @@ import {
   FiAlertTriangle,
   FiList,
   FiRefreshCw,
+  FiClock,
+  FiAlertCircle,
 } from "react-icons/fi";
 import { FaPlane, FaHotel } from "react-icons/fa";
+import TableScrollWrapper from "../common/TableScrollWrapper";
 import { useDispatch, useSelector } from "react-redux";
 import {
   getRejectedHotelRequests,
@@ -52,6 +55,7 @@ function normalize(rejectedRequests) {
 
     return {
       id: r._id,
+      orderId: r.orderId,
       raw: r,
 
       // ✅ FIXED
@@ -105,6 +109,7 @@ function FlightSection({ allRequests, loading }) {
       const searchOk =
         !q ||
         r.employee.toLowerCase().includes(q) ||
+        (r.orderId || "").toLowerCase().includes(q) ||
         r.destination.toLowerCase().includes(q) ||
         r.rejectedBy.toLowerCase().includes(q) ||
         r.id.toString().includes(q);
@@ -117,7 +122,7 @@ function FlightSection({ allRequests, loading }) {
   return (
     <div className="space-y-4">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-2 gap-3">
         <StatCard
           label="Total Rejected"
           value={filtered.length}
@@ -134,14 +139,14 @@ function FlightSection({ allRequests, loading }) {
           iconBgCls="bg-[#0A4D68]/10"
           iconColorCls="text-[#0A4D68]"
         />
-        <StatCard
+        {/* <StatCard
           label="Est. Cost Lost"
           value={`₹${totalCost.toLocaleString()}`}
           Icon={FiDollarSign}
           borderCls="border-violet-500"
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
-        />
+        /> */}
       
       </div>
 
@@ -199,7 +204,7 @@ function FlightSection({ allRequests, loading }) {
           <table className="w-full border-collapse min-w-[960px]">
             <thead>
               <tr className="bg-red-700 text-red-100">
-                <Th>Request ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Destination</Th>
                 <Th>Rejected Date</Th>
@@ -237,7 +242,7 @@ function FlightSection({ allRequests, loading }) {
                     className={`transition-colors hover:bg-red-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={r.id} />
+                      <IdCell id={r.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -343,6 +348,7 @@ function HotelSection({ allRequests, loading }) {
       const searchOk =
         !q ||
         r.employee.toLowerCase().includes(q) ||
+        (r.orderId || "").toLowerCase().includes(q) ||
         r.destination.toLowerCase().includes(q) ||
         r.rejectedBy.toLowerCase().includes(q) ||
         r.id.toString().includes(q);
@@ -355,7 +361,7 @@ function HotelSection({ allRequests, loading }) {
   return (
     <div className="space-y-4">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-2 gap-3">
         <StatCard
           label="Total Rejected"
           value={filtered.length}
@@ -372,14 +378,14 @@ function HotelSection({ allRequests, loading }) {
           iconBgCls="bg-[#088395]/10"
           iconColorCls="text-[#088395]"
         />
-        <StatCard
+        {/* <StatCard
           label="Est. Cost Lost"
           value={`₹${totalCost.toLocaleString()}`}
           Icon={FiDollarSign}
           borderCls="border-violet-500"
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
-        />
+        /> */}
         
       </div>
 
@@ -437,7 +443,7 @@ function HotelSection({ allRequests, loading }) {
           <table className="w-full border-collapse min-w-[960px]">
             <thead>
               <tr className="bg-red-700 text-red-100">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Rejected Date</Th>
                 <Th>Rejected By</Th>
@@ -474,7 +480,7 @@ function HotelSection({ allRequests, loading }) {
                     className={`transition-colors hover:bg-red-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={r.id} />
+                      <IdCell id={r.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">

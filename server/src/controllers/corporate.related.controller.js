@@ -9,11 +9,14 @@ const Ledger = require("../models/Ledger");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
-const { calculateNextBillingDate } = require("../utils/helpers");
+const { calculateNextBillingDate, slugify } = require("../utils/helpers");
 const emailService = require("../services/email.service");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
 const crypto = require("crypto");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
+
 
 // -----------------------------------------------------
 // ONBOARD CORPORATE - PUBLIC (Pending Status)
@@ -160,6 +163,15 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
     metadata,
   });
 
+
+  // ── Notify Super Admin: new corporate registered (in-app) ──────
+  notify(EVENTS.CORPORATE_REGISTERED, {
+    corporateId:    corporate._id,
+    corporateName:  corporate.corporateName,
+    classification: corporate.classification,
+    primaryContactEmail: corporate.primaryContact?.email,
+  });
+
   res
     .status(201)
     .json(
@@ -249,10 +261,12 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
   corporate.ssoConfig.verifiedAt = new Date();
 
   corporate.primaryContact.role = "travel-admin";
-
-  // if (corporate.secondaryContact?.email) {
-  //   corporate.secondaryContact.role = "travel-admin";
-  // }
+  
+  // 🔹 Generate Corporate Specific URL Slug & Full URL
+  if (!corporate.corporateSlug) {
+    corporate.corporateSlug = slugify(corporate.corporateName);
+    corporate.corporateUrl = `https://traveamer.com/${corporate.corporateSlug}`;
+  }
 
   await corporate.save();
 
@@ -283,19 +297,15 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
         mobile: contact.mobile || "",
         corporateId: corporate._id,
         role,
-        passwordResetToken: hashedToken,
-        passwordResetExpires: Date.now() + 24 * 60 * 60 * 1000,
         isActive: true,
       });
     } else {
       user.role = role;
-      user.passwordResetToken = hashedToken;
-      user.passwordResetExpires = Date.now() + 24 * 60 * 60 * 1000;
       user.isActive = true;
       await user.save();
     }
 
-    return { user, token };
+    return { user };
   };
 
   const primaryAdmin = await createOrUpdateUserWithRole(
@@ -310,22 +320,35 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
 
   try {
     if (primaryAdmin) {
-      await emailService.sendCorporateOnboarding(
-        corporate,
-        primaryAdmin.token,
-        primaryAdmin.user,
-      );
-    }
+      console.log(`[APPROVAL] Sending activation email to ${corporate.primaryContact.email}`);
 
-    // if (secondaryAdmin) {
-    //   await emailService.sendCorporateOnboarding(
-    //     corporate,
-    //     secondaryAdmin.token,
-    //     secondaryAdmin.user,
-    //   );
-    // }
+      // ── Use orchestrator for email + in-app notification ────────────
+      notify(EVENTS.CORPORATE_APPROVED, {
+        corporateId:         corporate._id,
+        primaryContactEmail: corporate.primaryContact?.email,
+        contactName:         corporate.primaryContact?.name || 'Admin',
+        corporateName:       corporate.corporateName,
+        classification:      corporate.classification,
+        domain:              corporate.ssoConfig?.domain,
+        creditLimit:         corporate.creditLimit,
+        creditCycle:         corporate.billingCycle,
+        serviceCharges:      corporate.serviceCharges?.domesticFlight,
+        corporateUrl:        corporate.corporateUrl ||
+                             `${process.env.FRONTEND_URL}/login?slug=${corporate.corporateSlug}`,
+      });
+
+      // ── Notify Super Admin if approved by OPS member ────────────────
+      if (req.user.role === 'ops-member') {
+        notify(EVENTS.CORPORATE_APPROVED_BY_OPS, {
+          corporateId:   corporate._id,
+          corporateName: corporate.corporateName,
+          opsMemberName: `${req.user.name?.firstName || ''} ${req.user.name?.lastName || ''}`.trim() || req.user.email,
+          classification: corporate.classification,
+        });
+      }
+    }
   } catch (err) {
-    console.error("Email sending failed:", err);
+    console.error("Corporate approval notification failed (non-critical):", err.message);
   }
 
   res
@@ -423,6 +446,15 @@ exports.updateCorporate = asyncHandler(async (req, res) => {
 
   if (!updated) throw new ApiError(404, "Corporate not found");
 
+  // ── Notify Super Admin if updated by OPS member ──────────────────
+  if (req.user.role === 'ops-member') {
+    notify(EVENTS.CORPORATE_UPDATED_BY_OPS, {
+      corporateId:   updated._id,
+      corporateName: updated.corporateName,
+      opsMemberName: `${req.user.name?.firstName || ''} ${req.user.name?.lastName || ''}`.trim() || req.user.email,
+    });
+  }
+
   res.status(200).json(new ApiResponse(200, updated, "Corporate updated"));
 });
 
@@ -439,6 +471,15 @@ exports.toggleCorporateStatus = asyncHandler(async (req, res) => {
   corporate.isActive = corporate.status === "active";
 
   await corporate.save();
+
+  // ── Notify Super Admin if updated by OPS member ──────────────────
+  if (req.user.role === 'ops-member') {
+    notify(EVENTS.CORPORATE_UPDATED_BY_OPS, {
+      corporateId:   corporate._id,
+      corporateName: corporate.corporateName,
+      opsMemberName: `${req.user.name?.firstName || ''} ${req.user.name?.lastName || ''}`.trim() || req.user.email,
+    });
+  }
 
   res
     .status(200)

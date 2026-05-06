@@ -72,3 +72,31 @@ export const deleteProject = createAsyncThunk(
     }
   }
 );
+
+export const getProjectFlightExpenses = createAsyncThunk(
+  "projects/getFlightExpenses",
+  async (projectId, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/bookings/get-project-flight-expenses/${projectId}`);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data || { message: "Failed to fetch flight expenses" }
+      );
+    }
+  }
+);
+
+export const getProjectHotelExpenses = createAsyncThunk(
+  "projects/getHotelExpenses",
+  async (projectId, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/hotel-booking/get-project-hotel-expenses/${projectId}`);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data || { message: "Failed to fetch hotel expenses" }
+      );
+    }
+  }
+);

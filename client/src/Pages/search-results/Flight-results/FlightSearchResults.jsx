@@ -1,7 +1,7 @@
 // FlightSearchResults.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import FlightFilterSidebar from "./Filter-Sidebar";
 import OneWayFlightCard from "./One-wayFlightCard";
@@ -9,11 +9,12 @@ import MultiCityFlightCard from "./Multi-cityFlightCard";
 import SelectedTripSummary from "./ReturnFlight/SelectedTripSummary";
 import OnwardFlightList from "./ReturnFlight/OnwardFlightList";
 import ReturnFlightList from "./ReturnFlight/ReturnFlightList";
-import { useLocation } from "react-router-dom";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
 import { searchFlightsMC } from "../../../Redux/Actions/flight.thunks.MC";
+import SearchLoadingModal from "../../../components/common/SearchLoadingModal";
 import ReturnInternationalFlightCard from "./ReturnFlight/ReturnInternationalFlightCard";
 import ResearchableFlightHeader from "./ResearchableFlightHeader";
+import Swal from "sweetalert2";
 
 const extractRoutes = (flights, journeyType) => {
   if (!Array.isArray(flights) || flights.length === 0) return [];
@@ -339,6 +340,26 @@ export default function FlightSearchResults() {
     loading,
     error,
   } = useSelector((state) => state.flights);
+
+  useEffect(() => {
+    if (error) {
+      const errorMsg = typeof error === "string" ? error : error?.message || "";
+      if (
+        errorMsg.toLowerCase().includes("traceid") ||
+        errorMsg.toLowerCase().includes("expired") ||
+        errorMsg.toLowerCase().includes("invalid")
+      ) {
+        Swal.fire({
+          title: "Session Expired",
+          text: "Your search session has expired. Please search again.",
+          icon: "warning",
+          confirmButtonColor: "#0A4D68",
+        }).then(() => {
+          navigate("/travel");
+        });
+      }
+    }
+  }, [error, navigate]);
 
   const [selectedOnward, setSelectedOnward] = useState(null);
   const [selectedReturn, setSelectedReturn] = useState(null);
@@ -772,6 +793,27 @@ export default function FlightSearchResults() {
       );
     }
 
+    /* ---------------- DEPARTURE TIME ---------------- */
+    if (selectedTime) {
+      result = result.filter((f) => {
+        const depTime = new Date(getSegments(f)[0]?.Origin?.DepTime);
+        const hour = depTime.getHours();
+
+        switch (selectedTime) {
+          case "Morning":
+            return hour >= 6 && hour < 12;
+          case "Afternoon":
+            return hour >= 12 && hour < 18;
+          case "Evening":
+            return hour >= 18 && hour < 24;
+          case "Night":
+            return hour >= 0 && hour < 6;
+          default:
+            return true;
+        }
+      });
+    }
+
     /* ---------------- ARRIVAL TIME REMOVED ---------------- */
 
     /* ---------------- DURATION ---------------- */
@@ -964,6 +1006,15 @@ export default function FlightSearchResults() {
     <div className="min-h-screen bg-gray-50 font-sans">
       <CorporateNavbar />
 
+      {loading && (
+        <SearchLoadingModal
+          type="flight"
+          origin={searchPayload?.origin || fromCity || "Origin"}
+          destination={searchPayload?.destination || toCity || "Destination"}
+          date={departureDate || (searchPayload?.departureDate ? new Date(searchPayload.departureDate).toLocaleDateString("en-IN", { day: '2-digit', month: 'short' }) : "")}
+        />
+      )}
+
       {/* ================= RE-SEARCH STICKY HEADER ================= */}
       <ResearchableFlightHeader
         routeHeader={routeHeader}
@@ -976,9 +1027,7 @@ export default function FlightSearchResults() {
         searchPayload={currentSearchPayload || searchPayload}
         onSearch={handleReSearch}
         onBack={() => {
-          const slug = location.state?.companySlug || publicBranding?.companySlug;
-          if (slug) navigate(`/travel`);
-          else window.history.back();
+         navigate(`/travel`, { state: { activeTab: "flight" } });
         }}
       />
 
@@ -1071,12 +1120,6 @@ export default function FlightSearchResults() {
 
           {/* RESULTS */}
           <section className="lg:col-span-9 space-y-4">
-            {loading && (
-              <div className="p-6 text-center text-gray-500">
-                Searching flights…
-              </div>
-            )}
-
             {!loading && noFlightsAfterFilters && (
               <div className="bg-white p-6 rounded-lg text-center text-gray-500">
                 No flights match your filters
@@ -1185,6 +1228,7 @@ export default function FlightSearchResults() {
                   <OnwardFlightList
                     flights={onwardFlights}
                     selectedFlight={selectedOnward}
+                    traceId={traceId}
                     onSelect={(flight) => {
                       setSelectedOnward(flight);
                       setActiveTab("return");
@@ -1197,6 +1241,7 @@ export default function FlightSearchResults() {
                     flights={returnFlights}
                     enabled={!!selectedOnward}
                     selectedFlight={selectedReturn}
+                    traceId={traceId}
                     onSelect={setSelectedReturn}
                   />
                 )}

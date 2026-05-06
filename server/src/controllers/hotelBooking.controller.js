@@ -6,7 +6,13 @@ const pdfService = require("../services/pdf.service");
 const hotelService = require("../services/tektravels/hotel.service");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
+const ApiResponse = require("../utils/ApiResponse");
 const { generateBookingReference } = require("../utils/helpers");
+const { generateSequentialOrderId } = require("../utils/orderIdGenerator");
+const notificationService = require("../services/notification.service");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
+
 
 // @desc    PreBook Hotel (TBO)
 // @route   POST /api/v1/hotel-bookings/prebook
@@ -345,8 +351,11 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     // Safe fallback — keep pending_approval
   }
 
+  const orderId = await generateSequentialOrderId("hotel");
+
   const bookingRequest = await HotelBookingRequest.create({
     bookingReference: generateBookingReference(),
+    orderId,
     corporateId: corporate._id,
     userId: user._id,
 
@@ -382,11 +391,46 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
   const isAutoApproved = requestStatus === "approved";
 
+  // ── Notify Travel Admin + Manager of new hotel booking request ──
+  const _hotelRequesterName = user.name?.firstName
+    ? `${user.name.firstName} ${user.name.lastName || ''}`.trim()
+    : user.name || 'Employee';
+  const _hotelOrderId = bookingRequest.orderId || bookingRequest.bookingReference;
+
+  notify(EVENTS.BOOKING_REQUEST_CREATED, {
+    corporateId:   corporate._id,
+    employeeId:    user._id,
+    employeeEmail: user.email,
+    employeeName:  _hotelRequesterName,
+    managerId:     approverId || null,
+    orderId:       _hotelOrderId,
+    bookingType:   'hotel',
+    amount:        bookingRequest.pricingSnapshot?.totalAmount,
+    relatedId:     bookingRequest._id,
+  });
+
+  // If a manager is selected, send BOOKING_APPROVAL_REQUIRED to them specifically
+  if (approverId) {
+    notify(EVENTS.BOOKING_APPROVAL_REQUIRED, {
+      corporateId:  corporate._id,
+      managerId:    approverId,
+      employeeName: _hotelRequesterName,
+      orderId:      _hotelOrderId,
+      bookingType:  'hotel',
+      amount:       bookingRequest.pricingSnapshot?.totalAmount,
+      relatedId:    bookingRequest._id,
+    });
+  }
+
+
+
+
   return res.status(201).json({
     success: true,
     data: {
       bookingRequestId: bookingRequest._id,
       bookingReference: bookingRequest.bookingReference,
+      orderId: bookingRequest.orderId,
       requestStatus: bookingRequest.requestStatus,
       autoApproved: isAutoApproved,
     },
@@ -610,6 +654,8 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
       );
 
     const roomsCount =
+      booking.hotelRequest?.noOfRooms ||
+      booking.hotelRequest?.NoOfRooms ||
       countCodes(freshBookingCode) ||
       countCodes(bookingCodes) ||
       selectedRooms.length ||
@@ -860,7 +906,15 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     booking.executionStatus = "voucher_generated";
     await booking.save();
 
+    // Notify User
+    await notificationService.sendBookingNotification(
+      booking,
+      { _id: booking.userId },
+      "confirmation"
+    );
+
     /* ================= SUCCESS ================= */
+
 
     return res.status(200).json({
       success: true,
@@ -1310,4 +1364,26 @@ exports.generateHotelVoucher = asyncHandler(async (req, res) => {
   ====================================================== */
 
   return res.download(filePath);
+});
+
+
+exports.getProjectHotelExpenses = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+
+  if (!projectId) {
+    throw new ApiError(400, "Project ID is required");
+  }
+
+  const expenses = await HotelBookingRequest.find({ 
+    projectId,
+    corporateId: req.user.corporateId,
+    executionStatus: "voucher_generated"
+  })
+    .populate("userId", "name email")
+    .populate("approvedBy", "name email role")
+    .sort({ createdAt: -1 });
+
+  res.status(200).json(
+    new ApiResponse(200, expenses, "Project hotel expenses fetched successfully")
+  );
 });

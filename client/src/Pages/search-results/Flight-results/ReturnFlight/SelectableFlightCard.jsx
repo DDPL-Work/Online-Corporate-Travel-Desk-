@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { parseSingleJourney } from "../../../../utils/parseReturnFlight";
 import { FlightSegment } from "./FlightSegment";
-import { FlightDetailsDropdown } from "../One-wayFlightCard";
-import { FaChevronDown, FaChevronUp } from "react-icons/fa";
+
+import { FlightDetailsModal } from "../FlightDetailsModal";
 
 export default function SelectableFlightCard({
   group,
   selected,
   selectedFlight,
   onSelect,
+  traceId,
 }) {
   const defaultResultIndex = group.flightInfo.ResultIndex;
   const initialResultIndex =
@@ -135,29 +136,26 @@ export default function SelectableFlightCard({
         </div>
       )}
 
+
       {/* View Details Toggle */}
       <div className="px-5 pb-3 pt-3 flex justify-end items-center bg-slate-50/50 border-t border-slate-200">
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setShowDetails(!showDetails);
+            setShowDetails(true);
           }}
           className="text-xs font-bold text-slate-700 hover:text-[#C9A84C] flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-slate-100 transition-colors bg-white border border-slate-200 shadow-sm cursor-pointer"
         >
-          {showDetails ? (
-            <>Hide Details <FaChevronUp className="text-[10px]" /></>
-          ) : (
-            <>View Details <FaChevronDown className="text-[10px]" /></>
-          )}
+          View Details
         </button>
       </div>
 
-      {/* Expanded Flight Details Dropdown */}
-      {showDetails && (
-        <div className="border-t border-slate-200 bg-white">
-          <FlightDetailsDropdown selectedFlight={activeFlight} />
-        </div>
-      )}
+      <FlightDetailsModal 
+        isOpen={showDetails}
+        onClose={() => setShowDetails(false)}
+        selectedFlight={activeFlight} 
+        traceId={traceId}
+      />
 
       {/* Selection Footer */}
       {selected && (

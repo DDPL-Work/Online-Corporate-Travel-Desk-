@@ -4,7 +4,7 @@ import { FiClock, FiSearch } from "react-icons/fi";
 
 export const IdCell = ({ id }) => (
   <span className="font-mono text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded tracking-wide">
-    #{id}
+    {id}
   </span>
 );
 

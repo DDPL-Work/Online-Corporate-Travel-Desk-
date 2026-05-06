@@ -68,6 +68,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
   const user = raw.userId || {};
   const amendment = raw.amendment || {};
   const bookRes = raw.bookingResult || {};
+  const approverDetails = raw.approvedByDetails || {};
   const travellerCountsHotel = travelers.reduce(
     (acc, t) => {
       const cat = getPaxCategory(t);

@@ -32,6 +32,8 @@ const FilterSidebar = ({
   searchText,
   setSearchText,
   mapSearchPayload,
+  loading,
+  pagination,
 }) => {
   const [showMap, setShowMap] = useState(false);
   const [openLocation, setOpenLocation] = useState(false);
@@ -239,6 +241,8 @@ const FilterSidebar = ({
           onClose={() => setShowMap(false)}
           hotels={hotels}
           searchPayload={mapSearchPayload}
+          mapLoading={loading?.search || loading?.loadMore}
+          mapPagination={pagination}
         />
       </div>
 

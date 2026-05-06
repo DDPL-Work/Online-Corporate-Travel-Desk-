@@ -24,20 +24,17 @@ import {
   getAllFlightBookingsAdmin,
   getAllHotelBookingsAdmin,
 } from "../../Redux/Actions/travelAdmin.thunks";
+import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  HotelBookingModal,
-  FlightBookingModal,
-} from "./Modal/BookingRequestDetailsModal";
 import { Pagination } from "./Shared/Pagination";
 
 // ── FLIGHT SECTION ────────────────────────────────────────────────────────────
 function FlightSection() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
-  const [selectedBooking, setSelectedBooking] = useState(null);
-
+  
   const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
 
@@ -86,6 +83,7 @@ function FlightSection() {
 
         return {
           id: b._id,
+          orderId: b.orderId || "N/A",
           employee:
             `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim() ||
             b.userId?.email ||
@@ -251,7 +249,7 @@ function FlightSection() {
           <table className="w-full border-collapse min-w-[860px]">
             <thead>
               <tr className="bg-[#0A4D68] text-[#bfdbfe]">
-                <Th>Trip ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 {/* <Th>Destination</Th> */}
                 <Th>Departure Date</Th>
@@ -284,13 +282,11 @@ function FlightSection() {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={t.id} />
+                      <IdCell id={t.orderId} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-[#0A4D68]/10 flex items-center justify-center text-[11px] font-black text-[#0A4D68] shrink-0">
-                          {t.employee[0]}
-                        </div>
+                       
                         <div className="flex flex-col text-left">
                           <span className="font-semibold text-[13px] text-slate-800">
                             {t.employee}
@@ -336,7 +332,7 @@ function FlightSection() {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setSelectedBooking(t.raw)}
+                        onClick={() => navigate(`/employee-flight-booking/${t.id}?source=upcoming`)}
                         className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] flex items-center gap-1"
                       >
                         <FiEye size={12} /> View
@@ -371,12 +367,6 @@ function FlightSection() {
           onPageChange={setCurrentPage}
         />
       </div>
-      {selectedBooking && (
-        <FlightBookingModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-        />
-      )}
     </div>
   );
 }
@@ -384,11 +374,11 @@ function FlightSection() {
 // ── HOTEL SECTION ─────────────────────────────────────────────────────────────
 function HotelSection() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
-  const [selectedBooking, setSelectedBooking] = useState(null);
 
   const hotelBookings = useSelector(
     (state) => state.adminBooking.hotelBookings,
@@ -433,6 +423,7 @@ function HotelSection() {
       .map((b) => ({
         raw: b,
         id: b._id,
+        orderId: b.orderId || "N/A",
         employee:
           `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim(),
         employeeId: b.userId._id,
@@ -582,7 +573,7 @@ function HotelSection() {
           <table className="w-full border-collapse min-w-[860px]">
             <thead>
               <tr className="bg-[#088395] text-[#ccfbf1]">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Hotel Name</Th>
                 <Th>Check-in Date</Th>
@@ -615,7 +606,7 @@ function HotelSection() {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={t.id} />
+                      <IdCell id={t.orderId} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -652,7 +643,7 @@ function HotelSection() {
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => setSelectedBooking(t.raw)}
+                        onClick={() => navigate(`/employee-hotel-booking/${t.id}?source=upcoming`)}
                         className="px-3 py-1 text-xs font-semibold bg-[#088395] text-white rounded-md hover:bg-[#066b78] flex items-center gap-1"
                       >
                         <FiEye size={12} /> View
@@ -673,12 +664,6 @@ function HotelSection() {
           </span>
         </div>
       </div>
-      {selectedBooking && (
-        <HotelBookingModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-        />
-      )}
     </div>
   );
 }

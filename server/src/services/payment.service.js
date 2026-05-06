@@ -4,10 +4,13 @@ const Corporate = require("../models/Corporate");
 const WalletTransaction = require("../models/Wallet");
 const WalletRechargeLog = require("../models/WalletActivityLog");
 const Ledger = require("../models/Ledger");
+const User = require("../models/User");
 const ApiError = require("../utils/ApiError");
 const logger = require("../utils/logger");
 const redis = require("../config/redis");
 const { getAgencyBalance } = require("./tboBalance.service");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
 const razorpayGateway = require("./payments/gateways/razorpay.gateway");
 const phonepeGateway = require("./payments/gateways/phonepe.gateway");
 const {
@@ -372,6 +375,52 @@ class PaymentService {
     };
   }
 
+  getDisplayName(user) {
+    if (!user) {
+      return "";
+    }
+
+    if (typeof user.name === "string" && user.name.trim()) {
+      return user.name.trim();
+    }
+
+    const parts = [user.name?.firstName, user.name?.lastName].filter(Boolean);
+    if (parts.length) {
+      return parts.join(" ");
+    }
+
+    return user.email || "";
+  }
+
+  async notifyWalletRechargeSuccess({ log, transaction, balance }) {
+    try {
+      const [corporate, initiator] = await Promise.all([
+        Corporate.findById(log.corporateId).select("corporateName"),
+        User.findById(log.initiatedBy).select("email name role"),
+      ]);
+
+      notify(EVENTS.WALLET_RECHARGED, {
+        corporateId: log.corporateId,
+        corporateName: corporate?.corporateName || "Corporate",
+        amount: transaction?.amount ?? log.amount ?? 0,
+        newBalance: balance ?? transaction?.balanceAfter ?? 0,
+        transactionId: transaction?._id || null,
+        paymentId: transaction?.transactionId || log.paymentId || null,
+        orderId: log.orderId,
+        rechargedBy: this.getDisplayName(initiator) || "Travel Admin",
+        initiatorUserId: initiator?._id || log.initiatedBy || null,
+        initiatorEmail: initiator?.email || null,
+        initiatorRole: initiator?.role || "travel-admin",
+        relatedId: transaction?._id || null,
+      });
+    } catch (error) {
+      logger.warn("Wallet recharge success notification failed", {
+        orderId: log.orderId,
+        message: error.message,
+      });
+    }
+  }
+
   async runWithTransaction(task) {
     const session = await mongoose.startSession();
 
@@ -567,7 +616,15 @@ class PaymentService {
       };
 
     try {
-      return await this.runWithTransaction(executeCredit);
+      const result = await this.runWithTransaction(executeCredit);
+      if (!result.alreadyProcessed) {
+        await this.notifyWalletRechargeSuccess({
+          log: result.log,
+          transaction: result.transaction,
+          balance: result.balance,
+        });
+      }
+      return result;
     } catch (error) {
       if (error?.code !== 11000) {
         throw error;
@@ -1446,6 +1503,17 @@ class PaymentService {
       corporate.walletBalance -= amount;
       await corporate.save();
 
+      // ── WALLET LOW ALERT (e.g., if balance falls below 10,000 INR) ──
+      const THRESHOLD = 10000;
+      if (corporate.walletBalance < THRESHOLD && balanceBefore >= THRESHOLD) {
+        notify(EVENTS.WALLET_LOW, {
+          corporateId: corporate._id,
+          corporateName: corporate.corporateName,
+          currentBalance: corporate.walletBalance,
+          threshold: THRESHOLD,
+        });
+      }
+
       await WalletTransaction.create({
         corporateId: corporate._id,
         bookingId: booking._id,
@@ -1495,6 +1563,31 @@ class PaymentService {
 
       if (balance.availableBalance < amount) {
         throw new ApiError(400, "Insufficient agency balance");
+      }
+      
+      // Update the local currentCredit in Corporate document to match Ledger
+      corporate.currentCredit += amount;
+      await corporate.save();
+
+      const utilizationPercent = Math.round((corporate.currentCredit / corporate.creditLimit) * 100);
+
+      if (utilizationPercent >= 100) {
+        notify(EVENTS.CREDIT_LIMIT_EXCEEDED, {
+          corporateId: corporate._id,
+          corporateName: corporate.corporateName,
+          totalLimit: corporate.creditLimit,
+          usedAmount: corporate.currentCredit,
+        });
+      } else if (utilizationPercent >= 80) { // e.g. 80% threshold
+        // We only notify if we just crossed 80%, to avoid spam. But doing it every time for now or we can assume it's okay.
+        notify(EVENTS.CREDIT_LIMIT_LOW, {
+          corporateId: corporate._id,
+          corporateName: corporate.corporateName,
+          totalLimit: corporate.creditLimit,
+          usedAmount: corporate.currentCredit,
+          availableCredit: corporate.creditLimit - corporate.currentCredit,
+          utilizationPercent,
+        });
       }
 
       await Ledger.create({

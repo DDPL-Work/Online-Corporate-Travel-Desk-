@@ -18,12 +18,12 @@ import {
   FiXCircle,
   FiClock,
   FiKey,
-  FiArrowRight,
   FiNavigation,
   FiPackage,
+  FiBriefcase,
+  FiStar,
+  FiMoon,
   FiAlertCircle,
-  FiList,
-  FiRefreshCw,
 } from "react-icons/fi";
 import {
   formatDate,
@@ -32,19 +32,19 @@ import {
 } from "../../../utils/formatter";
 import {
   InfoBadge,
-  InfoRow,
-  MiniStatCard,
   SectionLabel,
 } from "../Shared/CommonComponents";
 
-// Shared traveller helpers
-const formatPaxDob = (pax) =>
-  formatDateWithYear(pax?.dateOfBirth || pax?.dob);
-const formatPaxPhone = (pax) =>
-  pax?.phoneWithCode ? `+${pax.phoneWithCode}` : "N/A";
+// ─────────────────────────────────────────────
+// SHARED HELPERS
+// ─────────────────────────────────────────────
+
+const formatPaxDob = (pax) => formatDateWithYear(pax?.dateOfBirth || pax?.dob);
+const formatPaxPhone = (pax) => (pax?.phoneWithCode ? `+${pax.phoneWithCode}` : "N/A");
 const formatPaxEmail = (pax) => pax?.email || "N/A";
 const formatNationality = (pax) => pax?.nationality || "N/A";
 const formatGender = (pax) => pax?.gender || "N/A";
+
 const calcAge = (pax) => {
   const dobStr = pax?.dateOfBirth || pax?.dob;
   if (!dobStr) return "N/A";
@@ -55,22 +55,10 @@ const calcAge = (pax) => {
   return `${age} yrs`;
 };
 
-// Approver resolver shared by both modals
 const resolveApproverDetails = (booking) => {
-  const approver =
-    booking?.approverId ||
-    booking?.approvedBy ||
-    booking?.approvedByDetails ||
-    {};
-
-  const first =
-    approver?.name?.firstName ||
-    approver?.firstName ||
-    booking?.approverName ||
-    "";
-  const last =
-    approver?.name?.lastName || approver?.lastName || booking?.approverLastName || "";
-
+  const approver = booking?.approverId || booking?.approvedBy || booking?.approvedByDetails || {};
+  const first = approver?.name?.firstName || approver?.firstName || booking?.approverName || "";
+  const last = approver?.name?.lastName || approver?.lastName || booking?.approverLastName || "";
   const name = `${first} ${last}`.trim() || "Not assigned";
 
   return {
@@ -79,6 +67,40 @@ const resolveApproverDetails = (booking) => {
     role: approver?.role || booking?.approverRole || "manager",
   };
 };
+
+const formatTime = (iso) => {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+const TravellerField = ({ icon, label, value }) => (
+  <div className="min-w-0">
+    <p className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-0.5 truncate">
+      {icon} {label}
+    </p>
+    <p className="text-xs font-semibold text-slate-700 truncate">{value || "—"}</p>
+  </div>
+);
+
+const TimelineItem = ({ title, time, status, description, active }) => (
+  <div className="flex gap-4 relative">
+    <div className="flex flex-col items-center">
+      <div className={`w-3.5 h-3.5 rounded-full border-2 z-10 ${
+        status === "completed" ? "bg-emerald-500 border-emerald-100" : 
+        active ? "bg-amber-400 border-amber-100 animate-pulse" : "bg-slate-200 border-slate-100"
+      }`} />
+    </div>
+    <div className="-mt-1 pb-6">
+      <p className={`text-xs font-black ${active ? "text-slate-900" : "text-slate-500"}`}>{title}</p>
+      <p className="text-[10px] text-indigo-600 font-mono font-bold mt-0.5">{time}</p>
+      {description && <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">{description}</p>}
+    </div>
+  </div>
+);
 
 // ─────────────────────────────────────────────
 // HOTEL MODAL
@@ -92,648 +114,285 @@ export const PendingHotelDetailsModal = ({
 }) => {
   if (!booking) return null;
 
-  const hotel = booking.hotelRequest?.selectedHotel || {};
-  const room = booking.hotelRequest?.selectedRoom || {};
-  const rawRooms = Array.isArray(room?.rawRoomData)
-  ? room.rawRoomData
-  : room?.rawRoomData
-  ? [room.rawRoomData]
-  : [];
-  const pricing = booking.pricingSnapshot || {};
-  const bookingSnap = booking.bookingSnapshot || {};
-  const policies = rawRooms?.[0]?.CancelPolicies || [];
+  const hotelRequest = booking.hotelRequest || {};
+  const bookSnap = booking.bookingSnapshot || {};
   const travelers = booking.travellers || [];
-  const roomGuests = booking.hotelRequest?.roomGuests || [];
-  const dayRates = rawRooms.map((r) => r.DayRates?.[0] || []);
-  const images = rawRooms?.images || [];
-  const promotions = rawRooms?.RoomPromotion || [];
-  const price = rawRooms?.Price || {};
-
-  // const baseFare = room.totalFare - room.totalTax;
-
-  const totalFare = rawRooms.reduce(
-  (sum, r) => sum + (r.TotalFare || 0),
-  0
-);
-  const tax = rawRooms.reduce(
-  (sum, r) => sum + (r.TotalTax || 0),
-  0
-);
-  const baseFare = price?.baseFare || totalFare - tax;
-  const perNight = price?.perNight || 0;
-  // ROOMS → number of room objects
-const rooms = rawRooms.length;
-
-// NIGHTS → length of first room DayRates
-const nights =
-  rawRooms?.[0]?.DayRates?.[0]?.length || 0;
-
-// // GUESTS → from roomGuests (NOT travelers)
-// const totalAdults = roomGuests.reduce(
-//   (sum, r) => sum + (r.noOfAdults || 0),
-//   0
-// );
-
-// const totalChildren = roomGuests.reduce(
-//   (sum, r) => sum + (r.noOfChild || 0),
-//   0
-// );
-
-  const finalTotal = baseFare + tax;
-
-  const totalAdults = travelers.filter(
-  (t) => t.paxType === "adult" || t.paxType === "lead"
-).length;
-
-  const totalChildren = travelers.filter((t) => t.paxType === 2).length;
-
-  // const totalChildren = travelers.filter((t) => t.paxType === "child").length;
-
-  const formatPolicyDate = (dateStr) => {
-  if (!dateStr) return "-";
-  const [date] = dateStr.split(" ");
-  return date;
-};
-
+  const roomData = hotelRequest.selectedRoom || {};
+  const rawRooms = Array.isArray(roomData.rawRoomData) ? roomData.rawRoomData : roomData.rawRoomData ? [roomData.rawRoomData] : [];
   const approver = resolveApproverDetails(booking);
-  const project = {
-    name: booking.projectName || booking.project?.name,
-    id: booking.projectId || booking.project?.id,
-    client: booking.projectClient || booking.project?.client,
-  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-4 overflow-hidden flex flex-col">
-        {/* ── Header ── */}
-        <div className="bg-[#088395] px-6 py-5 text-white flex justify-between items-center shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl my-4 overflow-hidden flex flex-col h-[92vh]">
+        {/* Header */}
+        <div className="bg-slate-900 px-6 py-4 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
+            <div className="p-2 bg-[#C9A84C]/20 rounded-lg text-[#C9A84C]">
               <FaHotel size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-black tracking-tight">
-                Hotel Approval Request
-              </h2>
-              <p className="text-xs text-teal-100 font-mono mt-0.5">
-                {booking.bookingReference}
-              </p>
+              <h2 className="text-lg font-black tracking-tight uppercase">Hotel Approval Request</h2>
+              <p className="text-[10px] text-slate-400 font-mono mt-0.5 tracking-widest">{booking.bookingReference}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="hover:bg-white/10 p-2 rounded-full transition-colors"
-          >
+          <button onClick={onClose} className="hover:bg-white/10 p-2 rounded-full transition-colors text-slate-400">
             <FiX size={22} />
           </button>
         </div>
 
-        {/* ── Status Bar ── */}
-        <div className="bg-amber-50 border-b border-amber-100 px-6 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">
+        {/* Sticky Action Bar */}
+        <div className="sticky top-0 z-20 bg-white border-b border-slate-100 px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+          <div className="flex flex-wrap items-center gap-4 text-xs font-bold">
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-100 uppercase tracking-tighter">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
               Pending Approval
-            </span>
-          </div>
-          <div className="flex items-center gap-4 text-xs text-amber-700">
-            <span className="flex items-center gap-1">
-              <FiClock size={11} />
-              Submitted: {formatDateTime(booking.createdAt)}
-            </span>
-            <span className="flex items-center gap-1">
-              <FiTag size={11} />
-              Type: {booking.bookingType?.toUpperCase()}
-            </span>
-          </div>
-        </div>
-
-        <div className="overflow-y-auto p-6 space-y-6">
-          {/* ── Section 1: Hotel + Stay Info ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Hotel Details */}
-            <div className="space-y-3">
-              <SectionLabel icon={<FiHome />} title="Hotel Information" />
-              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-3">
-                <div>
-                  <p className="text-xl font-black text-slate-900">
-                    {hotel.hotelName}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1 flex items-start gap-1.5 leading-relaxed">
-                    <FiMapPin
-                      className="mt-0.5 shrink-0 text-slate-400"
-                      size={11}
-                    />
-                    {hotel.address}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-200">
-                  <InfoBadge color="teal">
-                    {rawRooms?.Name?.[0] || "Executive Room"}
-                  </InfoBadge>
-                  {/* <InfoBadge color="blue">
-                    <FiCoffee size={9} className="mr-1" />
-                    {room.mealType}
-                  </InfoBadge> */}
-                  {/* {room.isRefundable ? (
-                    <InfoBadge color="green">
-                      <FiCheckCircle size={9} className="mr-1" />
-                      Refundable
-                    </InfoBadge>
-                  ) : (
-                    <InfoBadge color="red">
-                      <FiXCircle size={9} className="mr-1" />
-                      Non-Refundable
-                    </InfoBadge>
-                  )} */}
-                  {room.withTransfers ? (
-                    <InfoBadge color="purple">With Transfers</InfoBadge>
-                  ) : (
-                    <InfoBadge color="gray">No Transfers</InfoBadge>
-                  )}
-                  {promotions.map((promo, i) => (
-                    <InfoBadge key={i} color="amber">
-                      <FiTag size={9} className="mr-1" />
-                      {promo}
-                    </InfoBadge>
-                  ))}
-                </div>
-                <InfoRow label="Hotel Code" value={hotel.hotelCode} mono />
-                <InfoRow label="Country" value={hotel.country || "India"} />
-                <InfoRow
-                  label="Star Rating"
-                  value={
-                    hotel.starRating
-                      ? `${"★".repeat(hotel.starRating)}`
-                      : "Unrated"
-                  }
-                />
-              </div>
             </div>
-
-            {/* Stay Details */}
-            <div className="space-y-3">
-              <SectionLabel icon={<FiCalendar />} title="Stay Details" />
-              <div className="grid grid-cols-2 gap-3">
-                <MiniStatCard
-                  label="Check-In"
-                  value={formatDate(booking.hotelRequest?.checkInDate)}
-                  sub={new Date(
-                    booking.hotelRequest?.checkInDate,
-                  ).toLocaleDateString("en-GB", { weekday: "long" })}
-                />
-                <MiniStatCard
-                  label="Check-Out"
-                  value={formatDate(booking.hotelRequest?.checkOutDate)}
-                  sub={new Date(
-                    booking.hotelRequest?.checkOutDate,
-                  ).toLocaleDateString("en-GB", { weekday: "long" })}
-                />
-                <MiniStatCard label="Nights" value={nights} />
-                <MiniStatCard
-                  label="Rooms"
-                  value={rooms}
-                />
-              </div>
-              {roomGuests.map((rg, i) => (
-                <div
-                  key={i}
-                  className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex items-center gap-4 text-sm"
-                >
-                  <div className="flex-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">
-                      Room {i + 1} Guests
-                    </p>
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
-                      <p className="text-sm font-semibold text-slate-700">
-                        {totalAdults} Adult{totalAdults !== 1 ? "s" : ""}
-                        {totalChildren > 0 && `, ${totalChildren} Child`}
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">
-                      Nationality
-                    </p>
-                    <p className="text-slate-700 font-semibold">
-                      {booking.hotelRequest?.guestNationality}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">
-                      Currency
-                    </p>
-                    <p className="text-slate-700 font-semibold">
-                      {booking.hotelRequest?.preferredCurrency}
-                    </p>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center gap-1.5 text-slate-500 border-l border-slate-200 pl-4">
+              <FiClock className="text-slate-400" />
+              <span>{formatDateTime(booking.createdAt)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-500 border-l border-slate-200 pl-4">
+              <FiBriefcase className="text-slate-400" />
+              <span>{booking.projectName || "Internal"}</span>
             </div>
           </div>
-
-          {/* ── Section 2: Room Details ── */}
-          <div className="space-y-3">
-            <SectionLabel icon={<FiKey />} title="Room Details" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
-                {rawRooms.map((r, i) => (
-                  <div key={i} className="mb-4 rounded-lg p-3">
-                    <InfoRow label="Room" value={`Room ${i + 1}`} />
-                    <InfoRow label="Room Name" value={r?.Name?.[0]} />
-                    <InfoRow label="Meal Type" value={r?.MealType} />
-                    <InfoRow
-                      label="Refundable"
-                      value={r?.IsRefundable ? "Yes" : "No"}
-                    />
-                  </div>
-                ))}
-                {/* <InfoRow
-                  label="Total Fare"
-                  value={`${room.currency} ${room.totalFare?.toLocaleString()}`}
-                  padded
-                />
-                <InfoRow
-                  label="Total Tax"
-                  value={`${room.currency} ${room.totalTax?.toLocaleString()}`}
-                  padded
-                /> */}
-              </div>
-
-              {/* Day Rates */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  Per-Night Breakdown
-                </p>
-                {dayRates.map((roomRates, i) => (
-                  //   <div key={i}>
-                  //     <p>Room {i + 1}</p>
-                  //     {roomRates.map((d, j) => (
-                  //       <div key={j}>
-                  //         Night {j + 1}: {d.BasePrice}
-                  //       </div>
-                  //     ))}
-                  //   </div>
-                  // ))}
-                  <div
-                    key={i}
-                    className="flex flex-col items-center justify-between bg-slate-50 border border-slate-100 rounded-lg px-4 py-2.5"
-                  >
-                    <p className="flex text-left w-full font-medium">Room {i + 1}</p>
-                    {roomRates.map((d, j) => (
-                      <div className="flex justify-between items-center w-full">
-                        {" "}
-                        <span
-                          key={j}
-                          className="text-sm text-slate-500 font-medium"
-                        >
-                          Night {j + 1}
-                        </span>
-                        <span className="text-sm font-bold text-slate-800">
-                          {room.currency} {d.BasePrice}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-                {price.perNight && (
-                  <div className="flex items-center justify-between bg-teal-50 border border-teal-100 rounded-lg px-4 py-2.5">
-                    <span className="text-sm text-teal-600 font-bold">
-                      Avg Per Night (Incl. Taxes)
-                    </span>
-                    <span className="text-sm font-black text-teal-700">
-                      {room.currency} {price.perNight?.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Section 3: Inclusions ── */}
-          <div className="space-y-3">
-            <SectionLabel icon={<FiCheckCircle />} title="Inclusions" />
-            <div className="flex flex-wrap gap-2">
-              {room.inclusion?.split(",").map((item, i) => (
-                <span
-                  key={i}
-                  className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5"
-                >
-                  <FiCheckCircle size={10} className="text-green-500" />
-                  {item.trim()}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Section 4: Pricing ── */}
-          <div className="space-y-3">
-            <SectionLabel icon={<FiDollarSign />} title="Pricing Summary" />
-            <div className="bg-slate-900 text-white p-5 rounded-2xl flex flex-wrap gap-6 justify-between items-center">
-              <div>
-                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                  Total Amount (Incl. Tax)
-                </p>
-                <p className="text-3xl font-black mt-1">
-                  {price.currency || "INR"} {finalTotal.toLocaleString()}
-                </p>
-                <p className="text-slate-500 text-[10px] mt-1">
-                  Captured at: {formatDateTime(pricing.capturedAt)}
-                </p>
-              </div>
-              <div className="flex gap-6 text-sm text-slate-400">
-                <div>
-                  <p className="text-[10px] uppercase tracking-widest font-bold mb-1">
-                    Base Fare
-                  </p>
-                  <p className="text-white font-bold">
-                    {pricing.currency} {baseFare?.toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-widest font-bold mb-1">
-                    Tax
-                  </p>
-                  <p className="text-white font-bold">
-                    {pricing.currency} {tax}
-                  </p>
-                </div>
-                {/* <div>
-                  <p className="text-[10px] uppercase tracking-widest font-bold mb-1">
-                    Per Night
-                  </p>
-                  <p className="text-white font-bold">
-                    {pricing.currency} {price.perNight?.toFixed(2)}
-                  </p>
-                </div> 
-               <div>
-                  <p className="text-[10px] uppercase tracking-widest font-bold mb-1">
-                    Nights
-                  </p>
-                  <p className="text-white font-bold">{price.nights}</p>
-                </div> */}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Section 5: Cancellation Policy ── */}
-          <div className="space-y-3">
-            <SectionLabel icon={<FiShield />} title="Cancellation Policy" />
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-                  <tr>
-                    <th className="px-4 py-2.5 text-left">From Date</th>
-                    <th className="px-4 py-2.5 text-left">Charge Type</th>
-                    <th className="px-4 py-2.5 text-right">Penalty</th>
-                    <th className="px-4 py-2.5 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {policies.map((policy, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/50">
-                      <td className="px-4 py-3 text-slate-600 font-mono text-xs">
-                        {formatPolicyDate(policy.FromDate)}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {policy.ChargeType}
-                      </td>
-                      <td className="px-4 py-3 text-right font-black">
-                        {policy.CancellationCharge === 0 ? (
-  <span className="text-green-600 font-bold">FREE</span>
-) : policy.ChargeType === "Percentage" ? (
-  <span className="text-red-600 font-bold">
-    {policy.CancellationCharge}%
-  </span>
-) : (
-  <span className="text-red-600 font-bold">
-    ₹ {policy.CancellationCharge.toFixed(0)}
-  </span>
-)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {policy.CancellationCharge === 0 ? (
-  <span className="px-2 py-0.5 bg-green-50 text-green-700 text-[10px] font-bold rounded border border-green-100">
-    Free Cancellation
-  </span>
-) : policy.ChargeType === "Percentage" &&
-  policy.CancellationCharge === 100 ? (
-  <span className="px-2 py-0.5 bg-red-50 text-red-700 text-[10px] font-bold rounded border border-red-100">
-    Non Refundable
-  </span>
-) : (
-  <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-bold rounded border border-amber-100">
-    Partial Charge
-  </span>
-)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* ── Section 6: Travellers ── */}
-          <div className="space-y-3">
-            <SectionLabel
-              icon={<FiUser />}
-              title={`Travellers (${travelers.length})`}
-            />
-            <div className="space-y-3">
-              {travelers.map((pax, idx) => (
-                <div
-                  key={idx}
-                  className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-3"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#088395]/10 text-[#088395] flex items-center justify-center font-black text-sm shrink-0">
-                        {pax.firstName?.[0]}
-                        {pax.lastName?.[0]}
-                      </div>
-                      <div>
-                        <p className="font-black text-slate-900">
-                          {pax.title} {pax.firstName} {pax.lastName}
-                        </p>
-                        <p className="text-[10px] text-slate-400 uppercase font-bold mt-0.5">
-                          {pax.paxType} passenger
-                        </p>
-                      </div>
-                    </div>
-                    {pax.isLeadPassenger && (
-                      <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 uppercase">
-                        Lead
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-200">
-                    <TravellerField
-                      icon={<FiUser size={10} />}
-                      label="Gender"
-                      value={formatGender(pax)}
-                    />
-                    <TravellerField
-                      icon={<FiCalendar size={10} />}
-                      label="Date of Birth"
-                      value={formatPaxDob(pax)}
-                    />
-                    <TravellerField
-                      icon={<FiInfo size={10} />}
-                      label="Age"
-                      value={calcAge(pax)}
-                    />
-                    <TravellerField
-                      icon={<FiGlobe size={10} />}
-                      label="Nationality"
-                      value={formatNationality(pax)}
-                    />
-                    <TravellerField
-                      icon={<FiMail size={10} />}
-                      label="Email"
-                      value={formatPaxEmail(pax)}
-                    />
-                    <TravellerField
-                      icon={<FiPhone size={10} />}
-                      label="Phone"
-                      value={formatPaxPhone(pax)}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Section 7: Requester Info ── */}
-          <div className="space-y-3">
-            <SectionLabel icon={<FiUser />} title="Requested By" />
-            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-black text-sm shrink-0">
-                {booking.userId?.name?.firstName?.[0]}
-                {booking.userId?.name?.lastName?.[0]}
-              </div>
-              <div>
-                <p className="font-bold text-slate-900">
-                  {booking.userId?.name?.firstName}{" "}
-                  {booking.userId?.name?.lastName}
-                </p>
-                <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                  <FiMail size={10} /> {booking.userId?.email}
-                </p>
-              </div>
-              <div className="ml-auto text-right">
-                <p className="text-[10px] text-slate-400 uppercase font-bold">
-                  Corporate ID
-                </p>
-                <p className="text-xs font-mono text-slate-600 mt-0.5">
-                  {booking.corporateId}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Section 8: Project & Approver ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <SectionLabel icon={<FiInfo />} title="Project Details" />
-              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
-                <InfoRow label="Project Name" value={project.name || "Not provided"} padded />
-                <InfoRow label="Project ID" value={project.id || "Not provided"} padded mono />
-                <InfoRow label="Client" value={project.client || "Not provided"} padded />
-              </div>
-            </div>
-            <div>
-              <SectionLabel icon={<FiShield />} title="Approver Selected" />
-              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
-                <InfoRow label="Approver" value={approver.name} padded />
-                <InfoRow label="Email" value={approver.email} padded />
-                <InfoRow label="Role" value={approver.role} padded capitalize />
-              </div>
-            </div>
-          </div>
-
-          {/* ── Section 9: Purpose + Booking Meta ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <SectionLabel icon={<FiInfo />} title="Purpose of Travel" />
-              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
-                <p className="text-sm text-amber-900 italic">
-                  "{booking.purposeOfTravel}"
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <SectionLabel icon={<FiTag />} title="Booking Meta" />
-              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
-                <InfoRow label="Booking ID" value={booking._id} mono padded />
-                <InfoRow
-                  label="Execution Status"
-                  value={booking.executionStatus?.replace(/_/g, " ")}
-                  padded
-                  capitalize
-                />
-                <InfoRow
-                  label="Request Status"
-                  value={booking.requestStatus?.replace(/_/g, " ")}
-                  padded
-                  capitalize
-                />
-                <InfoRow
-                  label="Updated At"
-                  value={formatDateTime(booking.updatedAt)}
-                  padded
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* ── Section 9: Hotel Images ── */}
-          {images.length > 0 && (
-            <div className="space-y-3">
-              <SectionLabel
-                icon={<FiHome />}
-                title={`Hotel Images (${images.length})`}
-              />
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {images.slice(0, 6).map((url, i) => (
-                  <img
-                    key={i}
-                    src={url}
-                    alt={`Hotel ${i + 1}`}
-                    className="h-24 w-36 object-cover rounded-lg border border-slate-200 shrink-0"
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── Footer ── */}
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
-          <p className="text-xs text-slate-400">
-            Booking Ref:{" "}
-            <span className="font-mono font-bold text-slate-600">
-              {booking.bookingReference}
-            </span>
-          </p>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => onReject(booking._id, "hotel", "reject")}
-              className="px-6 py-2.5 border border-red-200 text-red-600 font-bold text-xs rounded-xl hover:bg-red-50 transition-all"
+              className="px-5 py-2 border border-red-100 text-red-600 font-black text-[11px] rounded-xl hover:bg-red-50 transition-all uppercase tracking-tight"
             >
               Reject Request
             </button>
             <button
               onClick={() => onApprove(booking._id, "hotel", "approve")}
-              className="px-6 py-2.5 bg-[#22C55E] text-white font-bold text-xs rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all"
+              className="px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all flex items-center gap-2 uppercase tracking-tight"
             >
+              <FiCheckCircle size={14} />
               Approve & Proceed
             </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 scroll-smooth bg-slate-50/30">
+          <div className="flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto">
+            {/* Left Column */}
+            <div className="flex-1 space-y-6">
+              {/* Hotel Snapshot */}
+              <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm flex flex-col md:flex-row">
+                <div className="w-full md:w-64 h-48 md:h-auto relative shrink-0">
+                  <img
+                    src={bookSnap.hotelImage || "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500"}
+                    alt={bookSnap.hotelName}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-4 left-4">
+                     <span className="bg-slate-900/80 backdrop-blur-sm text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-white/20 shadow-xl">
+                       Confirmed Rate
+                     </span>
+                  </div>
+                </div>
+                <div className="p-6 flex-1 space-y-5">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-2xl font-black text-slate-900 leading-tight tracking-tighter uppercase italic">{bookSnap.hotelName}</h3>
+                      <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-2 font-medium">
+                        <FiMapPin className="text-indigo-500" /> {hotelRequest?.selectedHotel?.address || "N/A"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-0.5 text-amber-400 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
+                      {[...Array(5)].map((_, i) => (
+                        <FiStar key={i} size={12} fill={i < (hotelRequest?.selectedHotel?.starRating || 4) ? "currentColor" : "none"} />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-slate-50">
+                    <TravellerField icon={<FiCalendar />} label="Check-In" value={formatDate(bookSnap.checkInDate)} />
+                    <TravellerField icon={<FiCalendar />} label="Check-Out" value={formatDate(bookSnap.checkOutDate)} />
+                    <TravellerField icon={<FiMoon />} label="Nights" value={`${bookSnap.nights || 1} Night(s)`} />
+                    <TravellerField icon={<FiHome />} label="Rooms" value={`${bookSnap.roomCount || 1} Room(s)`} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Rooms */}
+              <div className="space-y-4">
+                <SectionLabel icon={<FiKey />} title="Selected Accommodations" />
+                {rawRooms.map((r, i) => (
+                  <div key={i} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-5">
+                    <div className="flex justify-between items-start border-b border-slate-50 pb-5">
+                      <div>
+                        <h4 className="text-lg font-black text-slate-900 tracking-tight uppercase">{r.Name?.[0] || "Standard Room"}</h4>
+                        <div className="flex items-center gap-3 mt-2">
+                           <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full uppercase border border-indigo-100 flex items-center gap-1.5">
+                             <FiCoffee size={10} /> {r.MealType || "Room Only"}
+                           </span>
+                           {r.IsRefundable ? (
+                             <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full uppercase border border-emerald-100 flex items-center gap-1.5">
+                               <FiCheckCircle size={10} /> Refundable
+                             </span>
+                           ) : (
+                             <span className="text-[10px] font-black bg-red-50 text-red-700 px-3 py-1 rounded-full uppercase border border-red-100 flex items-center gap-1.5">
+                               <FiXCircle size={10} /> Non-Refundable
+                             </span>
+                           )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Per Night</p>
+                        <p className="text-2xl font-black text-indigo-700 tracking-tighter">₹{r.Price?.perNight?.toLocaleString() || "—"}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Room Inclusions</p>
+                        <div className="flex flex-wrap gap-2">
+                          {(r.Inclusion || "Taxes Included").split(",").map((inc, j) => (
+                            <span key={j} className="text-[10px] font-bold bg-slate-50 text-slate-600 px-3 py-1 rounded-lg border border-slate-100 shadow-sm">
+                              {inc.trim()}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      {r.RoomPromotion && (
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Special Offer</p>
+                          <div className="bg-emerald-50 text-emerald-700 p-3 rounded-2xl border border-emerald-100 flex items-center gap-2">
+                            <FiTag className="shrink-0" />
+                            <p className="text-[11px] font-black leading-tight">{r.RoomPromotion[0]}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pricing */}
+              <div className="space-y-4">
+                <SectionLabel icon={<FiDollarSign />} title="Fare Summary" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                   <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-2xl relative overflow-hidden md:col-span-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Total Amount (Inc. Tax)</p>
+                      <h4 className="text-4xl font-black text-[#C9A84C] tracking-tighter">INR {booking.pricingSnapshot?.totalAmount?.toLocaleString()}</h4>
+                      <div className="mt-8 space-y-3 pt-6 border-t border-slate-800">
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-slate-500 font-bold uppercase">Base Price</span>
+                          <span className="text-slate-200 font-black">₹{roomData.Price?.baseFare?.toLocaleString() || "—"}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-slate-500 font-bold uppercase">Taxes & Fees</span>
+                          <span className="text-slate-200 font-black">₹{roomData.Price?.tax?.toLocaleString() || "—"}</span>
+                        </div>
+                      </div>
+                      <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+                   </div>
+
+                   <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm md:col-span-2">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-50 pb-3">Cancellation Policies</p>
+                      <div className="space-y-3">
+                         {rawRooms?.[0]?.CancelPolicies?.map((policy, idx) => (
+                           <div key={idx} className="flex items-center justify-between text-xs p-3 bg-slate-50 rounded-xl border border-slate-100">
+                              <span className="font-bold text-slate-600 uppercase tracking-tight">From {policy.FromDate.split(" ")[0]}</span>
+                              <span className={`font-black ${policy.CancellationCharge === 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                {policy.CancellationCharge === 0 ? "FREE CANCELLATION" : `PENALTY: ₹${policy.CancellationCharge.toLocaleString()}`}
+                              </span>
+                           </div>
+                         ))}
+                      </div>
+                   </div>
+                </div>
+              </div>
+
+              {/* Travellers */}
+              <div className="space-y-4">
+                <SectionLabel icon={<FiUser />} title={`Passengers (${travelers.length})`} />
+                <div className="grid grid-cols-1 gap-4">
+                  {travelers.map((pax, idx) => (
+                    <div key={idx} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                      <div className="flex items-center gap-5">
+                         <div className="w-14 h-14 rounded-2xl bg-slate-900 text-[#C9A84C] flex items-center justify-center font-black text-xl shadow-lg uppercase italic">
+                           {pax.firstName?.[0]}{pax.lastName?.[0]}
+                         </div>
+                         <div>
+                            <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">{pax.title} {pax.firstName} {pax.lastName}</p>
+                            <div className="flex gap-2 mt-1">
+                               <span className="text-[9px] font-black bg-slate-900 text-white px-2 py-0.5 rounded uppercase tracking-widest">{pax.paxType || "Adult"}</span>
+                               {pax.isLeadPassenger && <span className="text-[9px] font-black bg-[#C9A84C] text-slate-900 px-2 py-0.5 rounded uppercase tracking-widest">Lead Passenger</span>}
+                            </div>
+                         </div>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-8 pt-6 border-t border-slate-50">
+                        <TravellerField icon={<FiUser />} label="Gender" value={formatGender(pax)} />
+                        <TravellerField icon={<FiCalendar />} label="DOB" value={formatPaxDob(pax)} />
+                        <TravellerField icon={<FiInfo />} label="Age" value={calcAge(pax)} />
+                        <TravellerField icon={<FiGlobe />} label="Nationality" value={formatNationality(pax)} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* GST Details */}
+              {booking.gstDetails && (
+                <div className="space-y-4">
+                  <SectionLabel icon={<FiInfo />} title="GST Information" />
+                  <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Legal Entity</p>
+                          <p className="text-sm font-black text-slate-900 uppercase italic tracking-tighter">{booking.gstDetails.legalName}</p>
+                          <p className="text-[10px] font-bold text-slate-500 mt-1">{booking.gstDetails.gstin}</p>
+                       </div>
+                       <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Billing Email</p>
+                          <p className="text-sm font-black text-slate-700">{booking.gstDetails.gstEmail}</p>
+                       </div>
+                    </div>
+                    <div className="mt-6 pt-6 border-t border-slate-50">
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Registered Address</p>
+                       <p className="text-[11px] font-medium text-slate-600 leading-relaxed">{booking.gstDetails.address}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column (Sidebar) */}
+            <div className="w-full lg:w-80 space-y-6">
+               {/* Requester Card */}
+               <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                  <SectionLabel icon={<FiUser />} title="Requested By" />
+                  <div className="mt-6 flex items-center gap-4">
+                     <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-black text-sm italic">
+                        {booking.userId?.name?.firstName?.[0]}{booking.userId?.name?.lastName?.[0]}
+                     </div>
+                     <div>
+                        <p className="text-sm font-black text-slate-900 uppercase tracking-tighter italic">{booking.userId?.name?.firstName} {booking.userId?.name?.lastName}</p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">{booking.userId?.email}</p>
+                     </div>
+                  </div>
+                  <div className="mt-6 pt-6 border-t border-slate-50">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Reason for Travel</p>
+                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 italic text-xs font-black text-slate-700 leading-relaxed shadow-inner">
+                        "{booking.purposeOfTravel || "Internal business requirement"}"
+                     </div>
+                  </div>
+               </div>
+
+               {/* Audit Timeline */}
+               <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                  <SectionLabel icon={<FiClock />} title="Request Audit" />
+                  <div className="mt-8 relative">
+                     <div className="absolute left-[6.5px] top-2 bottom-2 w-[1px] bg-slate-100" />
+                     <TimelineItem title="Request Submitted" time={formatDateTime(booking.createdAt)} status="completed" description={`By ${booking.userId?.name?.firstName}`} />
+                     <TimelineItem title="Approval Workflow" time={formatDateTime(booking.createdAt)} status="completed" description={`Sent to ${approver.name}`} />
+                     <TimelineItem title="Awaiting Manager" time="Current Status" status="pending" active={true} description={`${approver.name} is reviewing`} />
+                  </div>
+               </div>
+            </div>
           </div>
         </div>
       </div>
@@ -753,745 +412,387 @@ export const PendingFlightDetailsModal = ({
 }) => {
   if (!booking) return null;
 
-  // ── Real API shape ──────────────────────────────────────────────────────────
-  // booking.flightRequest.segments[]          → flight legs
-  // booking.flightRequest.fareSnapshot        → fare summary + miniFareRules
-  // booking.flightRequest.fareQuote.Results[0]→ full fare + FareBreakdown
-  // booking.flightRequest.ssrSnapshot         → seats / meals / baggage SSR
-  // booking.bookingSnapshot                   → quick display fields
-  // ────────────────────────────────────────────────────────────────────────────
   const flightRequest = booking.flightRequest || {};
   const segments = flightRequest.segments || [];
   const fareSnapshot = flightRequest.fareSnapshot || {};
   const fareQuoteResult = flightRequest.fareQuote?.Results?.[0] || {};
   const fareBreakdown = fareQuoteResult.FareBreakdown || [];
-  const miniFareRules = fareSnapshot.miniFareRules?.[0] || [];
-  const ssrSnapshot = flightRequest.ssrSnapshot || {};
-  const pricing = booking.pricingSnapshot || {};
+  const miniFareRules = fareQuoteResult.MiniFareRules || [];
+  const fareRules = fareQuoteResult.FareRules || [];
   const travelers = booking.travellers || [];
   const bookSnap = booking.bookingSnapshot || {};
   const approver = resolveApproverDetails(booking);
-  const project = {
-    name: booking.projectName || booking.project?.name,
-    id: booking.projectId || booking.project?.id,
-    client: booking.projectClient || booking.project?.client,
-  };
+  const pricingSnapshot = booking.pricingSnapshot || {};
 
-  // Journey-level routes (collapse layovers per journey)
-  const routeByJourney = segments.reduce((acc, seg) => {
-    const key = seg.journeyType === "return" ? "return" : "onward";
-    if (!acc[key]) {
-      acc[key] = {
-        from: seg.origin?.airportCode,
-        to: seg.destination?.airportCode,
-      };
-    } else {
-      acc[key].to = seg.destination?.airportCode;
-    }
-    return acc;
-  }, {});
-
-  const displayRoutes = [];
-  if (routeByJourney.onward?.from && routeByJourney.onward?.to) {
-    displayRoutes.push(`${routeByJourney.onward.from}-${routeByJourney.onward.to}`);
-  }
-  if (routeByJourney.return?.from && routeByJourney.return?.to) {
-    displayRoutes.push(`${routeByJourney.return.from}-${routeByJourney.return.to}`);
-  }
-
-  const isRoundTrip =
-    flightRequest.tripType === "roundTrip" || bookSnap.sectors?.length > 1;
-  const isMultiCity = flightRequest.tripType === "multiCity";
-  const onwardSegments = segments.filter(
-    (s) => (s.journeyType || "onward") !== "return",
-  );
-  const returnSegments = segments.filter((s) => s.journeyType === "return");
-
-  // Cabin class label map (TBO numeric codes)
-  const cabinLabel = {
-    1: "All",
-    2: "Economy",
-    3: "Premium Economy",
-    4: "Business",
-    5: "Premium Business",
-    6: "First Class",
-  };
-
+  const cabinLabel = { 1: "All", 2: "Economy", 3: "Premium Economy", 4: "Business", 5: "Premium Business", 6: "First Class" };
+  const paxTypeLabel = { 1: "Adult", 2: "Child", 3: "Infant" };
+  const cabinDisplay = bookSnap.cabinClass || cabinLabel[segments[0]?.cabinClass] || "Economy";
   const baseFare = fareSnapshot.baseFare ?? fareQuoteResult.Fare?.BaseFare ?? 0;
   const totalTax = fareSnapshot.tax ?? fareQuoteResult.Fare?.Tax ?? 0;
+  const onwardSegments = segments.filter((s) => (s.journeyType || "onward") !== "return");
+  const returnSegments = segments.filter((s) => s.journeyType === "return");
 
-  // Pax type label map (TBO numeric)
-  const paxTypeLabel = { 1: "Adult", 2: "Child", 3: "Infant" };
+  // Flatten detailed segments from fareQuote for easy lookup
+  const allDetailedSegments = (fareQuoteResult.Segments || []).flat();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-4 overflow-hidden flex flex-col">
-        {/* ── Header ── */}
-        <div className="bg-indigo-700 px-6 py-5 text-white flex justify-between items-center shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl my-4 overflow-hidden flex flex-col h-[92vh]">
+        {/* Header */}
+        <div className="bg-slate-900 px-6 py-4 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
+            <div className="p-2 bg-[#C9A84C]/20 rounded-lg text-[#C9A84C]">
               <FaPlane size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-black tracking-tight">
-                Flight Approval Request
-              </h2>
-              <p className="text-xs text-indigo-200 font-mono mt-0.5">
-                {booking.bookingReference}
-              </p>
+              <h2 className="text-lg font-black tracking-tight uppercase italic">Flight Approval Request</h2>
+              <p className="text-[10px] text-slate-400 font-mono mt-0.5 tracking-widest">{booking.bookingReference}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="hover:bg-white/10 p-2 rounded-full transition-colors"
-          >
+          <button onClick={onClose} className="hover:bg-white/10 p-2 rounded-full transition-colors text-slate-400">
             <FiX size={22} />
           </button>
         </div>
 
-        {/* ── Status Bar ── */}
-        <div className="bg-amber-50 border-b border-amber-100 px-6 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">
+        {/* Sticky Action Bar */}
+        <div className="sticky top-0 z-20 bg-white border-b border-slate-100 px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+          <div className="flex flex-wrap items-center gap-4 text-[11px] font-black uppercase tracking-tighter">
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-100">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
               Pending Approval
-            </span>
-          </div>
-          <div className="flex items-center gap-4 text-xs text-amber-700">
-            <span className="flex items-center gap-1">
-              <FiClock size={11} />
-              Submitted: {formatDateTime(booking.createdAt)}
-            </span>
-            <span className="flex items-center gap-1">
-              <FiTag size={11} />
-              Route: {displayRoutes.join(", ") || bookSnap.sectors?.join(", ") || "—"}
-            </span>
-            <span className="flex items-center gap-1">
-              <FaPlane size={10} />
-              {bookSnap.airline || fareQuoteResult.AirlineCode || "—"}
-            </span>
-            <span className="flex items-center gap-1">
-              <FiUser size={11} />
-              {bookSnap.cabinClass ||
-                cabinLabel[segments[0]?.cabinClass] ||
-                "—"}
-            </span>
-          </div>
-        </div>
-
-        <div className="overflow-y-auto p-6 space-y-6">
-          {/* ── Section 1: Flight Segments ── */}
-          <div className="space-y-3">
-            <SectionLabel icon={<FaPlane />} title="Flight Itinerary" />
-            <div className="space-y-3">
-              {segments.map((seg, idx) => {
-                // Real API shape: seg.origin / seg.destination are objects
-                // seg.departureDateTime / seg.arrivalDateTime are ISO strings
-                // seg.stopOver (bool), seg.durationMinutes (number)
-                // seg.airlineCode, seg.airlineName, seg.flightNumber, seg.fareClass
-                // seg.baggage.checkIn / seg.baggage.cabin
-                const origin = seg.origin || {};
-                const destination = seg.destination || {};
-                const depDT = seg.departureDateTime
-                  ? new Date(seg.departureDateTime)
-                  : null;
-                const arrDT = seg.arrivalDateTime
-                  ? new Date(seg.arrivalDateTime)
-                  : null;
-                const depTime = depDT
-                  ? depDT.toLocaleTimeString("en-GB", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : "—";
-                const arrTime = arrDT
-                  ? arrDT.toLocaleTimeString("en-GB", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : "—";
-                const depDate = depDT
-                  ? depDT.toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  : "—";
-                const arrDate = arrDT
-                  ? arrDT.toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  : "—";
-                const durationHrs = seg.durationMinutes
-                  ? `${Math.floor(seg.durationMinutes / 60)}h ${seg.durationMinutes % 60}m`
-                  : "—";
-                const isNonStop = seg.stopOver === false;
-                const isRefundable =
-                  fareSnapshot.refundable ??
-                  fareQuoteResult?.IsRefundable ??
-                  fareQuoteResult?.Fare?.IsRefundable ??
-                  false;
-                const cabinDisplay =
-                  cabinLabel[seg.cabinClass] ||
-                  bookSnap.cabinClass ||
-                  flightRequest.cabinClass ||
-                  (seg.cabinClass ? `Class ${seg.cabinClass}` : "Cabin N/A");
-                const journeyKey = seg.journeyType === "return" ? "return" : "onward";
-                const journeyList =
-                  journeyKey === "return" ? returnSegments : onwardSegments;
-                const legIndexWithinJourney = journeyList.indexOf(seg);
-                const legTotal = journeyList.length || 1;
-
-                let segLabel = journeyKey === "return" ? "Return" : "Onward";
-                if (legTotal > 1) {
-                  segLabel += ` · Leg ${legIndexWithinJourney + 1}/${legTotal}`;
-                }
-
-                return (
-                  <div
-                    key={idx}
-                    className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-3"
-                  >
-                    {/* Segment header */}
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded uppercase tracking-wide">
-                          {segLabel}
-                        </span>
-                        <span className="text-xs font-bold text-slate-600">
-                          {seg.airlineName || seg.airlineCode} ·{" "}
-                          {seg.airlineCode}
-                          {seg.flightNumber}
-                        </span>
-                        {seg.aircraft && (
-                          <span className="text-[10px] text-slate-400 font-mono bg-slate-200 px-1.5 py-0.5 rounded">
-                            {seg.aircraft}
-                          </span>
-                        )}
-                      </div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <InfoBadge color="blue">
-                      {cabinLabel[cabinDisplay] || ` ${cabinDisplay}`}
-                    </InfoBadge>
-                    {isRefundable ? (
-                      <InfoBadge color="green">
-                        <FiCheckCircle size={9} className="mr-1" />
-                        Refundable
-                      </InfoBadge>
-                    ) : (
-                      <InfoBadge color="red">
-                        <FiXCircle size={9} className="mr-1" />
-                        Non-Refundable
-                      </InfoBadge>
-                    )}
-                  </div>
-                    </div>
-
-                    {/* Route timeline */}
-                    <div className="flex items-center gap-4">
-                      {/* Origin */}
-                      <div className="text-center min-w-[90px]">
-                        <p className="text-2xl font-black text-slate-900 tracking-tight">
-                          {origin.airportCode}
-                        </p>
-                        <p className="text-[10px] font-bold text-slate-500 mt-0.5 leading-tight">
-                          {origin.city}
-                        </p>
-                        {origin.terminal && (
-                          <p className="text-[10px] text-slate-400">
-                            T{origin.terminal}
-                          </p>
-                        )}
-                        <p className="text-sm text-indigo-700 font-mono font-bold mt-1">
-                          {depTime}
-                        </p>
-                        <p className="text-[10px] text-slate-400">{depDate}</p>
-                      </div>
-
-                      {/* Timeline */}
-                      <div className="flex-1 flex flex-col items-center gap-1">
-                        <p className="text-[10px] text-slate-400 font-semibold">
-                          {durationHrs}
-                        </p>
-                        <div className="w-full flex items-center gap-1">
-                          <div className="w-2 h-2 rounded-full bg-indigo-300 shrink-0" />
-                          <div className="flex-1 border-t-2 border-dashed border-indigo-200" />
-                          <FaPlane
-                            size={12}
-                            className="text-indigo-500 shrink-0"
-                          />
-                          <div className="flex-1 border-t-2 border-dashed border-indigo-200" />
-                          <div className="w-2 h-2 rounded-full bg-indigo-300 shrink-0" />
-                        </div>
-                        <p className="text-[10px] text-slate-400">
-                          {fareSnapshot.fareType}
-                        </p>
-                      </div>
-
-                      {/* Destination */}
-                      <div className="text-center min-w-[90px]">
-                        <p className="text-2xl font-black text-slate-900 tracking-tight">
-                          {destination.airportCode}
-                        </p>
-                        <p className="text-[10px] font-bold text-slate-500 mt-0.5 leading-tight">
-                          {destination.city}
-                        </p>
-                        {destination.terminal && (
-                          <p className="text-[10px] text-slate-400">
-                            T{destination.terminal}
-                          </p>
-                        )}
-                        <p className="text-sm text-indigo-700 font-mono font-bold mt-1">
-                          {arrTime}
-                        </p>
-                        <p className="text-[10px] text-slate-400">{arrDate}</p>
-                      </div>
-                    </div>
-
-                    {/* Segment meta — airport names + baggage */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-200">
-                      <TravellerField
-                        icon={<FiNavigation size={10} />}
-                        label="Origin Airport"
-                        value={origin.airportName}
-                      />
-                      <TravellerField
-                        icon={<FiNavigation size={10} />}
-                        label="Destination Airport"
-                        value={destination.airportName}
-                      />
-                      <TravellerField
-                        icon={<FiPackage size={10} />}
-                        label="Check-In Baggage"
-                        value={seg.baggage?.checkIn}
-                      />
-                      <TravellerField
-                        icon={<FiPackage size={10} />}
-                        label="Cabin Baggage"
-                        value={seg.baggage?.cabin}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-500 border-l border-slate-200 pl-4">
+               <FiClock className="text-slate-400" />
+               <span>Submitted: {formatDateTime(booking.createdAt)}</span>
             </div>
           </div>
-
-          {/* ── Section 2: Fare Breakdown ── */}
-          <div className="space-y-3">
-            <SectionLabel icon={<FiDollarSign />} title="Fare Breakdown" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Dark pricing card */}
-              <div className="bg-slate-900 text-white p-5 rounded-2xl flex flex-col gap-4">
-                <div>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                    Total Amount (Incl. Tax)
-                  </p>
-                  <p className="text-3xl font-black mt-1">
-                    {pricing.currency} {pricing.totalAmount?.toLocaleString()}
-                  </p>
-                  <p className="text-slate-500 text-[10px] mt-1">
-                    Captured at: {formatDateTime(pricing.capturedAt)}
-                  </p>
-                </div>
-                <div className="grid grid-cols-3 gap-4 pt-3 border-t border-slate-700">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">
-                      Base Fare
-                    </p>
-                    <p className="text-white font-bold">
-                      {pricing.currency} {baseFare?.toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">
-                      Taxes & Fees
-                    </p>
-                    <p className="text-white font-bold">
-                      {pricing.currency} {totalTax?.toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">
-                      Passengers
-                    </p>
-                    <p className="text-white font-bold">{travelers.length}</p>
-                  </div>
-                </div>
-                {/* {fareSnapshot.lastTicketDate && (
-                  <p className="text-[10px] text-amber-400 font-bold border-t border-slate-700 pt-3">
-                    ⚠ Last Ticketing Date: {new Date(fareSnapshot.lastTicketDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                  </p>
-                )} */}
-              </div>
-
-              {/* Per-pax fare table from FareBreakdown */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left">Pax Type</th>
-                      <th className="px-4 py-2.5 text-right">Base</th>
-                      <th className="px-4 py-2.5 text-right">Tax</th>
-                      <th className="px-4 py-2.5 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {fareBreakdown.length > 0 ? (
-                      fareBreakdown.map((fb, i) => (
-                        <tr key={i} className="hover:bg-slate-50/50">
-                          <td className="px-4 py-3 text-slate-600 font-medium">
-                            {paxTypeLabel[fb.PassengerType] ||
-                              `Type ${fb.PassengerType}`}{" "}
-                            × {fb.PassengerCount}
-                          </td>
-                          <td className="px-4 py-3 text-right text-slate-600">
-                            {pricing.currency} {fb.BaseFare?.toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right text-slate-600">
-                            {pricing.currency} {fb.Tax?.toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right font-black text-slate-800">
-                            {pricing.currency}{" "}
-                            {(fb.BaseFare + fb.Tax)?.toLocaleString()}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan={4}
-                          className="px-4 py-4 text-center text-slate-400 text-xs"
-                        >
-                          Per-pax breakdown not available
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Section 3: Mini Fare Rules ── */}
-          {miniFareRules.length > 0 && (
-            <div className="space-y-3">
-              <SectionLabel
-                icon={<FiShield />}
-                title="Fare Rules & Penalties"
-              />
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left">Type</th>
-                      <th className="px-4 py-2.5 text-left">Route</th>
-                      <th className="px-4 py-2.5 text-left">Details</th>
-                      <th className="px-4 py-2.5 text-right">Online Allowed</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {miniFareRules.map((rule, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50">
-                        <td className="px-4 py-3 font-bold text-slate-700">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-black border ${
-                              rule.Type === "Cancellation"
-                                ? "bg-red-50 text-red-700 border-red-100"
-                                : rule.Type === "Reissue"
-                                  ? "bg-blue-50 text-blue-700 border-blue-100"
-                                  : "bg-slate-100 text-slate-600 border-slate-200"
-                            }`}
-                          >
-                            {rule.Type}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">
-                          {rule.JourneyPoints}
-                        </td>
-                        <td className="px-4 py-3 text-slate-700 text-xs max-w-[200px]">
-                          {rule.Details || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {(
-                            rule.Type === "Reissue"
-                              ? rule.OnlineReissueAllowed
-                              : rule.OnlineRefundAllowed
-                          ) ? (
-                            <span className="px-2 py-0.5 bg-green-50 text-green-700 text-[10px] font-bold rounded border border-green-100">
-                              Yes
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded border border-slate-200">
-                              Offline Only
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* ── Section 4: SSR Snapshot (Seats / Meals / Baggage Add-ons) ── */}
-          {(ssrSnapshot.seats?.length > 0 ||
-            ssrSnapshot.meals?.length > 0 ||
-            ssrSnapshot.baggage?.length > 0) && (
-            <div className="space-y-3">
-              <SectionLabel icon={<FiList />} title="Selected SSR Add-Ons" />
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {ssrSnapshot.seats?.length > 0 && (
-                  <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
-                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-wide mb-2">
-                      Seats
-                    </p>
-                    {ssrSnapshot.seats.map((s, i) => (
-                      <p
-                        key={i}
-                        className="text-xs text-indigo-800 font-semibold"
-                      >
-                        {s.description || JSON.stringify(s)}
-                      </p>
-                    ))}
-                  </div>
-                )}
-                {ssrSnapshot.meals?.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                    <p className="text-[10px] font-black text-amber-600 uppercase tracking-wide mb-2">
-                      Meals
-                    </p>
-                    {ssrSnapshot.meals.map((m, i) => (
-                      <p
-                        key={i}
-                        className="text-xs text-amber-800 font-semibold"
-                      >
-                        {m.description || JSON.stringify(m)}
-                      </p>
-                    ))}
-                  </div>
-                )}
-                {ssrSnapshot.baggage?.length > 0 && (
-                  <div className="bg-teal-50 border border-teal-100 rounded-xl p-3">
-                    <p className="text-[10px] font-black text-teal-600 uppercase tracking-wide mb-2">
-                      Extra Baggage
-                    </p>
-                    {ssrSnapshot.baggage.map((b, i) => (
-                      <p
-                        key={i}
-                        className="text-xs text-teal-800 font-semibold"
-                      >
-                        {b.description || JSON.stringify(b)}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ── Section 5: Travellers ── */}
-          <div className="space-y-3">
-            <SectionLabel
-              icon={<FiUser />}
-              title={`Travellers (${travelers.length})`}
-            />
-            <div className="space-y-3">
-              {travelers.map((pax, idx) => (
-                <div
-                  key={idx}
-                  className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-3"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-indigo-700/10 text-indigo-700 flex items-center justify-center font-black text-sm shrink-0">
-                        {pax.firstName?.[0]}
-                        {pax.lastName?.[0]}
-                      </div>
-                      <div>
-                        <p className="font-black text-slate-900">
-                          {pax.title} {pax.firstName} {pax.lastName}
-                        </p>
-                        <p className="text-[10px] text-slate-400 uppercase font-bold mt-0.5">
-                          {pax.paxType || "Adult"} passenger
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {pax.isLeadPassenger && (
-                        <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 uppercase">
-                          Lead
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-200">
-                    <TravellerField
-                      icon={<FiUser size={10} />}
-                      label="Gender"
-                      value={formatGender(pax)}
-                    />
-                    <TravellerField
-                      icon={<FiCalendar size={10} />}
-                      label="Date of Birth"
-                      value={formatPaxDob(pax)}
-                    />
-                    <TravellerField
-                      icon={<FiGlobe size={10} />}
-                      label="Nationality"
-                      value={formatNationality(pax)}
-                    />
-                    <TravellerField
-                      icon={<FiMail size={10} />}
-                      label="Email"
-                      value={formatPaxEmail(pax)}
-                    />
-                    <TravellerField
-                      icon={<FiPhone size={10} />}
-                      label="Phone"
-                      value={formatPaxPhone(pax)}
-                    />
-                    {pax.passportNumber && (
-                      <TravellerField
-                        icon={<FiKey size={10} />}
-                        label="Passport No."
-                        value={pax.passportNumber}
-                      />
-                    )}
-                    {pax.passportExpiry && (
-                      <TravellerField
-                        icon={<FiCalendar size={10} />}
-                        label="Passport Expiry"
-                        value={formatDate(pax.passportExpiry)}
-                      />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Section 6: Requester Info ── */}
-          <div className="space-y-3">
-            <SectionLabel icon={<FiUser />} title="Requested By" />
-            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-black text-sm shrink-0">
-                {booking.userId?.name?.firstName?.[0]}
-                {booking.userId?.name?.lastName?.[0]}
-              </div>
-              <div>
-                <p className="font-bold text-slate-900">
-                  {booking.userId?.name?.firstName}{" "}
-                  {booking.userId?.name?.lastName}
-                </p>
-                <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                  <FiMail size={10} /> {booking.userId?.email}
-                </p>
-              </div>
-              <div className="ml-auto text-right">
-                <p className="text-[10px] text-slate-400 uppercase font-bold">
-                  Corporate ID
-                </p>
-                <p className="text-xs font-mono text-slate-600 mt-0.5">
-                  {booking.corporateId}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Section 7: Project & Approver ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <SectionLabel icon={<FiInfo />} title="Project Details" />
-              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
-                <InfoRow label="Project Name" value={project.name || "Not provided"} padded />
-                <InfoRow label="Project ID" value={project.id || "Not provided"} padded mono />
-                <InfoRow label="Client" value={project.client || "Not provided"} padded />
-              </div>
-            </div>
-            <div>
-              <SectionLabel icon={<FiShield />} title="Approver Selected" />
-              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
-                <InfoRow label="Approver" value={approver.name} padded />
-                <InfoRow label="Email" value={approver.email} padded />
-                <InfoRow label="Role" value={approver.role} padded capitalize />
-              </div>
-            </div>
-          </div>
-
-          {/* ── Section 8: Purpose + Booking Meta ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <SectionLabel icon={<FiInfo />} title="Purpose of Travel" />
-              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
-                <p className="text-sm text-amber-900 italic">
-                  "{booking.purposeOfTravel}"
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <SectionLabel icon={<FiTag />} title="Booking Meta" />
-              <div className="bg-slate-50 border border-slate-100 rounded-xl divide-y divide-slate-100 overflow-hidden">
-                <InfoRow label="Booking ID" value={booking._id} mono padded />
-                <InfoRow
-                  label="Execution Status"
-                  value={booking.executionStatus?.replace(/_/g, " ")}
-                  padded
-                  capitalize
-                />
-                <InfoRow
-                  label="Request Status"
-                  value={booking.requestStatus?.replace(/_/g, " ")}
-                  padded
-                  capitalize
-                />
-                <InfoRow
-                  label="Trace ID"
-                  value={flightRequest.traceId}
-                  mono
-                  padded
-                />
-                <InfoRow
-                  label="Fare Expires"
-                  value={formatDateTime(flightRequest.fareExpiry)}
-                  padded
-                />
-                <InfoRow
-                  label="Updated At"
-                  value={formatDateTime(booking.updatedAt)}
-                  padded
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Footer ── */}
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
-          <p className="text-xs text-slate-400">
-            Booking Ref:{" "}
-            <span className="font-mono font-bold text-slate-600">
-              {booking.bookingReference}
-            </span>
-          </p>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => onReject(booking._id, "flight", "reject")}
-              className="px-6 py-2.5 border border-red-200 text-red-600 font-bold text-xs rounded-xl hover:bg-red-50 transition-all"
+              className="px-5 py-2 border border-red-100 text-red-600 font-black text-[11px] rounded-xl hover:bg-red-50 transition-all uppercase tracking-tight"
             >
               Reject Request
             </button>
             <button
               onClick={() => onApprove(booking._id, "flight", "approve")}
-              className="px-6 py-2.5 bg-[#22C55E] text-white font-bold text-xs rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all"
+              className="px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 transition-all flex items-center gap-2 uppercase tracking-tight"
             >
+              <FiCheckCircle size={14} />
               Approve & Proceed
             </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 scroll-smooth bg-slate-50/30">
+          <div className="flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto">
+            {/* Left Column */}
+            <div className="flex-1 space-y-6">
+              {/* Itinerary */}
+              <div className="space-y-4">
+                <SectionLabel icon={<FaPlane />} title="Flight Itinerary" />
+                {segments.map((seg, idx) => {
+                  const detailedSeg = allDetailedSegments.find(ds => 
+                    ds.Airline?.FlightNumber === seg.flightNumber && 
+                    ds.Origin?.Airport?.AirportCode === seg.origin?.airportCode
+                  ) || {};
+
+                  const origin = seg.origin || {};
+                  const destination = seg.destination || {};
+                  const originName = detailedSeg.Origin?.Airport?.AirportName || origin.airportName || origin.city;
+                  const destName = detailedSeg.Destination?.Airport?.AirportName || destination.airportName || destination.city;
+                  const supplierFareClass = detailedSeg.SupplierFareClass || seg.supplierFareClass || "N/A";
+
+                  const isRefundable = fareSnapshot.refundable ?? fareQuoteResult?.IsRefundable ?? false;
+                  const journeyKey = seg.journeyType === "return" ? "return" : "onward";
+                  const journeyList = journeyKey === "return" ? returnSegments : onwardSegments;
+                  const legIdx = journeyList.indexOf(seg);
+                  const legLabel = `${journeyKey === "return" ? "Return" : "Onward"}${journeyList.length > 1 ? ` · Leg ${legIdx + 1}` : ""}`;
+
+                  return (
+                    <div key={idx} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-6">
+                      <div className="flex items-center justify-between border-b border-slate-50 pb-5">
+                         <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-black bg-indigo-600 text-white px-3 py-1 rounded-full uppercase shadow-sm tracking-widest">{legLabel}</span>
+                            <span className="text-sm font-black text-slate-800 tracking-tight uppercase italic">{seg.airlineName} · {seg.airlineCode}{seg.flightNumber} · {supplierFareClass}</span>
+                         </div>
+                         <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 uppercase tracking-widest">{cabinDisplay}</span>
+                            {isRefundable ? (
+                              <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 uppercase tracking-widest flex items-center gap-1.5"><FiCheckCircle size={10} /> Refundable</span>
+                            ) : (
+                              <span className="text-[10px] font-black bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 uppercase tracking-widest flex items-center gap-1.5"><FiXCircle size={10} /> Non-Refundable</span>
+                            )}
+                         </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-12 py-4">
+                         <div className="flex-1 min-w-0">
+                            <h4 className="text-4xl font-black text-slate-900 tracking-tighter italic leading-none">{origin.airportCode}</h4>
+                            <p className="text-[11px] font-black text-slate-800 mt-2 truncate uppercase tracking-tighter">
+                               {originName}
+                            </p>
+                            <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate uppercase">
+                               {origin.city} {origin.terminal ? `· T${origin.terminal}` : ""}
+                            </p>
+                            <div className="mt-4">
+                               <p className="text-xl font-black text-indigo-700 leading-none">{formatTime(seg.departureDateTime)}</p>
+                               <p className="text-[11px] font-black text-slate-900 uppercase mt-1.5 italic">{formatDate(seg.departureDateTime)}</p>
+                            </div>
+                         </div>
+
+                         <div className="flex-1 flex flex-col items-center">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                               {seg.durationMinutes ? `${Math.floor(seg.durationMinutes / 60)}h ${seg.durationMinutes % 60}m` : "—"}
+                            </p>
+                            <div className="w-full flex items-center gap-2">
+                               <div className="w-2 h-2 rounded-full bg-indigo-600 shadow-lg shadow-indigo-100 shrink-0" />
+                               <div className="flex-1 border-t-2 border-dashed border-slate-200 relative">
+                                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-3 py-1 rounded-full border border-slate-100 shadow-sm">
+                                     <FaPlane className="text-indigo-600 rotate-90" size={12} />
+                                  </div>
+                               </div>
+                               <div className="w-2 h-2 rounded-full bg-indigo-600 shadow-lg shadow-indigo-100 shrink-0" />
+                            </div>
+                            <div className="mt-3">
+                               <span 
+                                 className="text-[8px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full border"
+                                 style={{ 
+                                   color: seg.fareClassification?.color || '#94a3b8',
+                                   borderColor: seg.fareClassification?.color ? `${seg.fareClassification.color}60` : '#e2e8f0',
+                                   backgroundColor: seg.fareClassification?.color ? `${seg.fareClassification.color}10` : '#f8fafc'
+                                 }}
+                               >
+                                 {seg.fareClassification?.type || fareQuoteResult.ResultFareType || "Regular Fare"}
+                               </span>
+                            </div>
+                         </div>
+
+                         <div className="flex-1 min-w-0 text-right">
+                            <h4 className="text-4xl font-black text-slate-900 tracking-tighter italic leading-none">{destination.airportCode}</h4>
+                            <p className="text-[11px] font-black text-slate-800 mt-2 truncate uppercase tracking-tighter">
+                               {destName}
+                            </p>
+                            <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate uppercase">
+                               {destination.city} {destination.terminal ? `· T${destination.terminal}` : ""}
+                            </p>
+                            <div className="mt-4">
+                               <p className="text-xl font-black text-indigo-700 leading-none">{formatTime(seg.arrivalDateTime)}</p>
+                               <p className="text-[11px] font-black text-slate-900 uppercase mt-1.5 italic">{formatDate(seg.arrivalDateTime)}</p>
+                            </div>
+                         </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-8 border-t border-slate-50">
+                        <TravellerField icon={<FiPackage />} label="Check-In" value={seg.baggage?.checkIn} />
+                        <TravellerField icon={<FiPackage />} label="Cabin" value={seg.baggage?.cabin} />
+                        <TravellerField icon={<FiShield />} label="Fare Basis" value={seg.fareBasisCode} />
+                        <TravellerField icon={<FiTag />} label="Supplier Class" value={supplierFareClass} />
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Fare Breakdown */}
+              <div className="space-y-4">
+                <SectionLabel icon={<FiDollarSign />} title="Fare Breakdown" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                   <div className="bg-slate-900 text-white rounded-3xl p-7 shadow-2xl relative overflow-hidden md:col-span-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Total Payable Amount</p>
+                      <h4 className="text-4xl font-black text-[#C9A84C] tracking-tighter italic">INR {pricingSnapshot.totalAmount?.toLocaleString()}</h4>
+                      <p className="text-[9px] text-slate-500 font-bold uppercase mt-4 italic tracking-widest">Captured: {formatDateTime(pricingSnapshot.capturedAt)}</p>
+                      
+                      <div className="mt-10 space-y-3 pt-6 border-t border-slate-800">
+                        <div className="flex justify-between items-center text-[11px] font-black uppercase">
+                          <span className="text-slate-500">Base Fare</span>
+                          <span className="text-slate-200">₹{baseFare.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-[11px] font-black uppercase">
+                          <span className="text-slate-500">Taxes & Fees</span>
+                          <span className="text-slate-200">₹{totalTax.toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-[#C9A84C]/5 rounded-full blur-3xl pointer-events-none" />
+                   </div>
+
+                   <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm md:col-span-2 overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">
+                            <th className="pb-4 text-left">Passenger Type</th>
+                            <th className="pb-4 text-right">Base</th>
+                            <th className="pb-4 text-right">Tax</th>
+                            <th className="pb-4 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {fareBreakdown.map((item, i) => (
+                            <tr key={i} className="text-xs font-black text-slate-700">
+                              <td className="py-5 uppercase tracking-tighter">{paxTypeLabel[item.PassengerType] || "Adult"} × {item.PassengerCount}</td>
+                              <td className="py-5 text-right text-slate-400 font-mono">₹{item.BaseFare?.toLocaleString()}</td>
+                              <td className="py-5 text-right text-slate-400 font-mono">₹{item.Tax?.toLocaleString()}</td>
+                              <td className="py-5 text-right text-slate-900 font-mono">₹{(item.BaseFare + item.Tax)?.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t border-slate-100">
+                            <td className="pt-4 text-xs font-black text-slate-400 uppercase italic">Grand Total</td>
+                            <td colSpan={3} className="pt-4 text-right text-2xl font-black text-indigo-700 tracking-tighter italic">₹{pricingSnapshot.totalAmount?.toLocaleString()}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                   </div>
+                </div>
+              </div>
+
+              {/* Cancellation & Fare Rules */}
+              {(miniFareRules.length > 0 || fareRules.length > 0) && (
+                <div className="space-y-4">
+                  <SectionLabel icon={<FiAlertCircle />} title="Cancellation & Date Change Rules" />
+                  <div className="grid grid-cols-1 gap-4">
+                    {miniFareRules.map((group, gIdx) => (
+                      <div key={gIdx} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">
+                                <th className="pb-3 text-left">Type</th>
+                                <th className="pb-3 text-left">Window</th>
+                                <th className="pb-3 text-right">Penalty / Details</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                              {group.map((rule, rIdx) => (
+                                <tr key={rIdx} className="text-[11px] font-bold text-slate-700">
+                                  <td className="py-4">
+                                    <span className={`px-2 py-0.5 rounded-full text-[9px] uppercase tracking-tighter ${
+                                      rule.Type === "Cancellation" ? "bg-red-50 text-red-600 border border-red-100" : "bg-blue-50 text-blue-600 border border-blue-100"
+                                    }`}>
+                                      {rule.Type || "Rule"}
+                                    </span>
+                                  </td>
+                                  <td className="py-4">
+                                    {rule.From || rule.To ? (
+                                      <span>
+                                        {rule.From ? `${rule.From} ` : ""}
+                                        {rule.To ? `to ${rule.To} ` : "onwards "}
+                                        {rule.Unit}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400 italic">Universal</span>
+                                    )}
+                                  </td>
+                                  <td className="py-4 text-right font-black text-slate-900">
+                                    {rule.Details}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+
+                    {fareRules.map((rule, idx) => rule.FareRuleDetail && (
+                      <div key={`fr-${idx}`} className="bg-slate-50 border border-slate-100 rounded-2xl p-5">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                          Rule Detail: {rule.Origin}-{rule.Destination} ({rule.FareBasisCode})
+                        </p>
+                        <div className="text-[11px] text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
+                          {rule.FareRuleDetail}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Travellers */}
+              <div className="space-y-4">
+                <SectionLabel icon={<FiUser />} title={`Passengers (${travelers.length})`} />
+                <div className="grid grid-cols-1 gap-4">
+                  {travelers.map((pax, idx) => (
+                    <div key={idx} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                      <div className="flex items-center gap-5">
+                         <div className="w-16 h-16 rounded-2xl bg-slate-900 text-[#C9A84C] flex items-center justify-center font-black text-2xl shadow-lg uppercase italic">
+                           {pax.firstName?.[0]}{pax.lastName?.[0]}
+                         </div>
+                         <div>
+                            <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">{pax.title} {pax.firstName} {pax.lastName}</p>
+                            <div className="flex gap-2 mt-1">
+                               <span className="text-[9px] font-black bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full uppercase border border-indigo-100 tracking-widest">{pax.paxType || "Adult"}</span>
+                               {pax.isLeadPassenger && <span className="text-[9px] font-black bg-[#C9A84C]/10 text-[#C9A84C] px-3 py-1 rounded-full uppercase border border-[#C9A84C]/20 tracking-widest">Lead Passenger</span>}
+                            </div>
+                         </div>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-8 pt-6 border-t border-slate-50">
+                        <TravellerField icon={<FiUser />} label="Gender" value={formatGender(pax)} />
+                        <TravellerField icon={<FiCalendar />} label="Date of Birth" value={formatPaxDob(pax)} />
+                        <TravellerField icon={<FiGlobe />} label="Nationality" value={formatNationality(pax)} />
+                        <TravellerField icon={<FiMail />} label="Email" value={formatPaxEmail(pax)} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* GST Details */}
+              {booking.gstDetails && (
+                <div className="space-y-4">
+                  <SectionLabel icon={<FiInfo />} title="GST Information" />
+                  <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Legal Entity</p>
+                          <p className="text-sm font-black text-slate-900 uppercase italic tracking-tighter">{booking.gstDetails.legalName}</p>
+                          <p className="text-[10px] font-bold text-slate-500 mt-1">{booking.gstDetails.gstin}</p>
+                       </div>
+                       <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Billing Email</p>
+                          <p className="text-sm font-black text-slate-700">{booking.gstDetails.gstEmail}</p>
+                       </div>
+                    </div>
+                    <div className="mt-6 pt-6 border-t border-slate-50">
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Registered Address</p>
+                       <p className="text-[11px] font-medium text-slate-600 leading-relaxed">{booking.gstDetails.address}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sidebar */}
+            <div className="w-full lg:w-80 space-y-6">
+               <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                  <SectionLabel icon={<FiUser />} title="Requested By" />
+                  <div className="mt-6 flex items-center gap-4">
+                     <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-black text-sm italic">
+                        {booking.userId?.name?.firstName?.[0]}{booking.userId?.name?.lastName?.[0]}
+                     </div>
+                     <div>
+                        <p className="text-sm font-black text-slate-900 uppercase tracking-tighter italic">{booking.userId?.name?.firstName} {booking.userId?.name?.lastName}</p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">{booking.userId?.email}</p>
+                     </div>
+                  </div>
+                  <div className="mt-6 pt-6 border-t border-slate-50 space-y-4">
+                     <div className="bg-slate-900 p-4 rounded-2xl italic text-[11px] font-black text-[#C9A84C] leading-relaxed shadow-xl border border-white/5">
+                        "{booking.purposeOfTravel || "Business travel requirement"}"
+                     </div>
+                  </div>
+               </div>
+
+               <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                  <SectionLabel icon={<FiClock />} title="Request Audit" />
+                  <div className="mt-8 relative">
+                     <div className="absolute left-[6.5px] top-2 bottom-2 w-[1px] bg-slate-100" />
+                     <TimelineItem title="Submission" time={formatDateTime(booking.createdAt)} status="completed" description={`By ${booking.userId?.name?.firstName}`} />
+                     <TimelineItem title="Pending Approval" time="Live Status" status="pending" active={true} description={`Manager: ${approver.name}`} />
+                  </div>
+               </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1499,18 +800,4 @@ export const PendingFlightDetailsModal = ({
   );
 };
 
-// ─────────────────────────────────────────────
-// SHARED HELPERS
-// ─────────────────────────────────────────────
-
-const TravellerField = ({ icon, label, value }) => (
-  <div>
-    <p className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-0.5">
-      {icon} {label}
-    </p>
-    <p className="text-xs font-semibold text-slate-700">{value || "—"}</p>
-  </div>
-);
-
-// Keep default export pointing to the hotel modal for backwards compatibility
 export default PendingHotelDetailsModal;

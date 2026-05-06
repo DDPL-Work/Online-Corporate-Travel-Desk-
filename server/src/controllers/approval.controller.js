@@ -6,6 +6,8 @@ const BookingRequest = require("../models/BookingRequest");
 const Corporate = require("../models/Corporate");
 const User = require("../models/User");
 const notificationService = require("../services/notification.service");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
@@ -52,15 +54,23 @@ exports.getAllApprovals = asyncHandler(async (req, res) => {
     .populate("approverId", "name email role");
 
   // 🔥 Add type (VERY IMPORTANT)
-  const taggedFlights = flightRequests.map((r) => ({
-    ...r.toObject(),
-    bookingType: "flight",
-  }));
+  const taggedFlights = flightRequests.map((r) => {
+    const obj = r.toObject();
+    return {
+      ...obj,
+      orderId: obj.orderId || "N/A",
+      bookingType: "flight",
+    };
+  });
 
-  const taggedHotels = hotelRequests.map((r) => ({
-    ...r.toObject(),
-    bookingType: "hotel",
-  }));
+  const taggedHotels = hotelRequests.map((r) => {
+    const obj = r.toObject();
+    return {
+      ...obj,
+      orderId: obj.orderId || "N/A",
+      bookingType: "hotel",
+    };
+  });
 
   // 🔹 Merge + sort
   const allRequests = [...taggedFlights, ...taggedHotels].sort(
@@ -109,12 +119,15 @@ exports.getApproval = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Not authorized");
   }
 
+  const responseData = bookingRequest.toObject();
+  responseData.orderId = responseData.orderId || responseData.bookingReference;
+
   res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        bookingRequest,
+        responseData,
         "Booking request fetched successfully",
       ),
     );
@@ -238,6 +251,25 @@ exports.approveRequest = asyncHandler(async (req, res) => {
     validUntil,
   });
 
+  // ── Notify Employee: booking approved ──────────────────────
+  const _flightApproveUser = await User.findById(bookingRequest.userId).select('name email').lean();
+  const _flightApproverName = req.user.name?.firstName
+    ? `${req.user.name.firstName} ${req.user.name.lastName || ''}`.trim()
+    : req.user.name || 'Admin';
+  notify(EVENTS.BOOKING_APPROVED, {
+    employeeId:   bookingRequest.userId,
+    employeeEmail: _flightApproveUser?.email,
+    employeeName: _flightApproveUser?.name?.firstName || 'Employee',
+    corporateId:  bookingRequest.corporateId,
+    orderId:      bookingRequest.orderId || bookingRequest.bookingReference,
+    bookingType:  'flight',
+    approverName: _flightApproverName,
+    approverRole: req.user.role,
+    relatedId:    bookingRequest._id,
+  });
+
+
+
   res
     .status(200)
     .json(
@@ -287,6 +319,25 @@ exports.rejectRequest = asyncHandler(async (req, res) => {
 
   await bookingRequest.save();
 
+  // ── Notify Employee: booking rejected ──────────────────────
+  const _flightRejectUser = await User.findById(bookingRequest.userId).select('name email').lean();
+  const _flightRejecterName = req.user.name?.firstName
+    ? `${req.user.name.firstName} ${req.user.name.lastName || ''}`.trim()
+    : req.user.name || 'Admin';
+  notify(EVENTS.BOOKING_REJECTED, {
+    employeeId:      bookingRequest.userId,
+    employeeEmail:   _flightRejectUser?.email,
+    employeeName:    _flightRejectUser?.name?.firstName || 'Employee',
+    corporateId:     bookingRequest.corporateId,
+    orderId:         bookingRequest.orderId || bookingRequest.bookingReference,
+    bookingType:     'flight',
+    approverName:    _flightRejecterName,
+    rejectionReason: comments,
+    relatedId:       bookingRequest._id,
+  });
+
+
+
   res
     .status(200)
     .json(
@@ -325,12 +376,15 @@ exports.getHotelApproval = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Not authorized");
   }
 
+  const responseData = bookingRequest.toObject();
+  responseData.orderId = responseData.orderId || responseData.bookingReference;
+
   res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        bookingRequest,
+        responseData,
         "Hotel booking request fetched successfully",
       ),
     );
@@ -383,9 +437,26 @@ exports.approveHotelRequest = asyncHandler(async (req, res) => {
   bookingRequest.requestStatus = "approved";
   bookingRequest.approvedAt = new Date();
   bookingRequest.approvedBy = req.user._id;
-  bookingRequest.approverComments = comments;
-
   await bookingRequest.save();
+
+  // ── Notify Employee: hotel booking approved ─────────────────
+  const _hotelApproveUser = await User.findById(bookingRequest.userId).select('name email').lean();
+  const _hotelApproverName = req.user.name?.firstName
+    ? `${req.user.name.firstName} ${req.user.name.lastName || ''}`.trim()
+    : req.user.name || 'Admin';
+  notify(EVENTS.BOOKING_APPROVED, {
+    employeeId:   bookingRequest.userId,
+    employeeEmail: _hotelApproveUser?.email,
+    employeeName: _hotelApproveUser?.name?.firstName || 'Employee',
+    corporateId:  bookingRequest.corporateId,
+    orderId:      bookingRequest.orderId || bookingRequest.bookingReference,
+    bookingType:  'hotel',
+    approverName: _hotelApproverName,
+    approverRole: req.user.role,
+    relatedId:    bookingRequest._id,
+  });
+
+
 
   res
     .status(200)
@@ -433,6 +504,25 @@ exports.rejectHotelRequest = asyncHandler(async (req, res) => {
   bookingRequest.approverComments = comments;
 
   await bookingRequest.save();
+
+  // ── Notify Employee: hotel booking rejected ─────────────────
+  const _hotelRejectUser = await User.findById(bookingRequest.userId).select('name email').lean();
+  const _hotelRejecterName = req.user.name?.firstName
+    ? `${req.user.name.firstName} ${req.user.name.lastName || ''}`.trim()
+    : req.user.name || 'Admin';
+  notify(EVENTS.BOOKING_REJECTED, {
+    employeeId:      bookingRequest.userId,
+    employeeEmail:   _hotelRejectUser?.email,
+    employeeName:    _hotelRejectUser?.name?.firstName || 'Employee',
+    corporateId:     bookingRequest.corporateId,
+    orderId:         bookingRequest.orderId || bookingRequest.bookingReference,
+    bookingType:     'hotel',
+    approverName:    _hotelRejecterName,
+    rejectionReason: comments,
+    relatedId:       bookingRequest._id,
+  });
+
+
 
   res
     .status(200)

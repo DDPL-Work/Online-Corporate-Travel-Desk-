@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
-import { FaUserCircle, FaBars, FaChevronDown, FaBell, FaSignOutAlt } from "react-icons/fa";
+import { FaUserCircle, FaBars, FaChevronDown, FaBell, FaSignOutAlt, FaPlane, FaHotel } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { logoutUser } from "../Redux/Slice/authSlice";
 import { useNavigate } from "react-router-dom";
 import { FiSettings } from "react-icons/fi";
+import NotificationBell from "../components/common/NotificationBell";
+
 
 export default function Header({ toggleSidebar, sidebarOpen }) {
   const dispatch = useDispatch();
@@ -96,15 +98,25 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
 
       {/* RIGHT */}
       <div className="flex items-center gap-3">
+        {/* Quick Booking Buttons */}
+        <button
+          onClick={() => navigate("/travel", { state: { activeTab: "flight" } })}
+          className="hidden md:flex items-center gap-2 bg-gray-100  px-3 py-2 rounded text-sm font-medium transition-all hover:bg-gray-200 active:scale-95"
+        >
+          <FaPlane className="text-xs" />
+          Book a flight
+        </button>
+
+        <button
+          onClick={() => navigate("/travel", { state: { activeTab: "hotel" } })}
+          className="hidden md:flex items-center gap-2 bg-gray-100 px-3 py-2 rounded text-sm font-medium transition-all hover:bg-gray-200 active:scale-95"
+        >
+          <FaHotel className="text-xs" />
+          Book a hotel
+        </button>
+
         {/* Notifications */}
-        <div ref={notificationsRef} className="relative">
-          <button
-            className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded"
-            onClick={() => setNotificationsOpen(!notificationsOpen)}
-          >
-            <FaBell size={20} />
-          </button>
-        </div>
+        <NotificationBell />
 
         {/* User Dropdown */}
         <div ref={dropdownRef} className="relative">
@@ -129,13 +141,13 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
                 <p className="text-xs text-gray-400 capitalize">{userRole}</p>
               </div> */}
 
-              <button
+              {/* <button
                 onClick={handleProfileNavigation}
                 className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
               > 
               <FiSettings />
                 Profile Settings
-              </button>
+              </button> */}
 
               <div className="border-t border-gray-300">
                 <button

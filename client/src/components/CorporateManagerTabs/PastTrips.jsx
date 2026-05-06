@@ -24,6 +24,7 @@ import {
   Th,
   RatingStars,
 } from "./Shared/CommonComponents";
+import { Pagination } from "./Shared/Pagination";
 import {
   getTeamExecutedFlightRequests,
   getTeamExecutedHotelRequests,
@@ -39,6 +40,8 @@ function FlightSection() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const { teamExecutedFlightRequests: flightBookings } = useSelector(
     (state) => state.manager,
@@ -82,10 +85,8 @@ function FlightSection() {
         return {
           raw: b,
           id: b._id,
-          employee:
-            `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim() ||
-            b.userId?.email ||
-            "N/A",
+          orderId: b.orderId,
+          employee: b.travellers?.[0] ? `${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim() : b.userId?.email || "N/A",
           employeeId: b.userId?._id || "N/A",
           destination:
             b.bookingSnapshot?.city ||
@@ -115,11 +116,20 @@ function FlightSection() {
       const searchOk =
         !q ||
         t.employee.toLowerCase().includes(q) ||
+        (t.orderId || "").toLowerCase().includes(q) ||
         t.destination.toLowerCase().includes(q) ||
         t.id.toString().includes(q);
       return dateOk && searchOk;
     });
   }, [search, startDate, endDate, deptFilter, flightTrips]);
+
+  const paginated = useMemo(() => {
+    return filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, startDate, endDate]);
 
   const avgRating =
     filtered.length > 0
@@ -131,7 +141,7 @@ function FlightSection() {
   return (
     <div className="space-y-4">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-2 gap-3">
         <StatCard
           label="Total Flights"
           value={filtered.length}
@@ -203,7 +213,7 @@ function FlightSection() {
           <table className="w-full border-collapse min-w-[920px]">
             <thead>
               <tr className="bg-[#0A4D68] text-[#bfdbfe]">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Destination</Th>
                 <Th>Departure Date</Th>
@@ -228,7 +238,7 @@ function FlightSection() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((t, i) => (
+                paginated.map((t, i) => (
                   <tr
                     key={t.id}
                     className={`transition-colors hover:bg-sky-50 ${
@@ -236,7 +246,7 @@ function FlightSection() {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={t.id} />
+                      <IdCell id={t.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -300,11 +310,17 @@ function FlightSection() {
         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
           <span>
             Showing{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> of{" "}
-            <strong className="text-slate-600">{flightTrips.length}</strong>{" "}
-            flight trips
+            <strong className="text-slate-600">{paginated.length}</strong> of{" "}
+            <strong className="text-slate-600">{filtered.length}</strong>{" "}
+            flight trips (filtered)
           </span>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
@@ -313,10 +329,13 @@ function FlightSection() {
 // ── HOTEL SECTION ─────────────────────────────────────────────────────────────
 function HotelSection() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const { teamExecutedHotelRequests: hotelBookings } = useSelector(
     (state) => state.manager,
@@ -364,6 +383,7 @@ function HotelSection() {
       })
       .map((b) => ({
         id: b._id,
+        orderId: b.orderId,
         raw: b,
         employee:
           `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim() ||
@@ -393,11 +413,20 @@ function HotelSection() {
       const searchOk =
         !q ||
         t.employee.toLowerCase().includes(q) ||
+        (t.orderId || "").toLowerCase().includes(q) ||
         t.destination.toLowerCase().includes(q) ||
         t.id.toString().includes(q);
       return dateOk && searchOk;
     });
   }, [search, startDate, endDate, deptFilter, hotelTrips]);
+
+  const paginated = useMemo(() => {
+    return filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, startDate, endDate]);
 
   const avgRating =
     filtered.length > 0
@@ -409,7 +438,7 @@ function HotelSection() {
   return (
     <div className="space-y-4">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-2 gap-3">
         <StatCard
           label="Total Hotels"
           value={filtered.length}
@@ -481,7 +510,7 @@ function HotelSection() {
           <table className="w-full border-collapse min-w-[920px]">
             <thead>
               <tr className="bg-[#088395] text-[#ccfbf1]">
-                <Th>Trip ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Destination</Th>
                 <Th>Check-in Date</Th>
@@ -506,7 +535,7 @@ function HotelSection() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((t, i) => (
+                paginated.map((t, i) => (
                   <tr
                     key={t.id}
                     className={`transition-colors hover:bg-teal-50 ${
@@ -514,13 +543,11 @@ function HotelSection() {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={t.id} />
+                      <IdCell id={t.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-[#088395]/10 flex items-center justify-center text-[11px] font-black text-[#088395] shrink-0">
-                          {t.employee[0]}
-                        </div>
+                        
                         <span className="font-semibold text-[13px] text-slate-800">
                           {t.employee}
                         </span>
@@ -560,9 +587,7 @@ function HotelSection() {
                     <td className="px-4 py-3">
                       <button
                         onClick={() =>
-                          navigate(`/manager/team-hotel-booking/${t.id}`, {
-                            state: { isPastTrip: true },
-                          })
+                          navigate(`/manager/team-hotel-booking/${t.id}`)
                         }
                         className="px-3 py-1 text-xs font-semibold bg-[#088395] text-white rounded-md hover:bg-[#066b78] flex items-center gap-1"
                       >
@@ -578,11 +603,17 @@ function HotelSection() {
         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
           <span>
             Showing{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> of{" "}
-            <strong className="text-slate-600">{hotelTrips.length}</strong>{" "}
-            hotel trips
+            <strong className="text-slate-600">{paginated.length}</strong> of{" "}
+            <strong className="text-slate-600">{filtered.length}</strong>{" "}
+            hotel trips (filtered)
           </span>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

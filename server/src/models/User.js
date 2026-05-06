@@ -22,6 +22,7 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
     name: { type: nameSchema, default: {} },
+    phone: { type: String, default: "" },
     password: { type: String, select: false },
     role: {
       type: String,
@@ -42,6 +43,7 @@ const userSchema = new mongoose.Schema(
     passwordResetToken: String,
     passwordResetExpires: Date,
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    fcmTokens: [{ type: String }],
   },
   { timestamps: true },
 );

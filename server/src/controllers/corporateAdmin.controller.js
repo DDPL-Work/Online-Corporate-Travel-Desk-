@@ -4,7 +4,7 @@
 const bcrypt = require("bcryptjs");
 const Employee = require("../models/Employee");
 const User = require("../models/User"); // TravelAdmin
-const { ApiError } = require("../utils/ApiError");
+const ApiError = require("../utils/ApiError");
 const mongoose = require("mongoose"); // <- add this
 const asyncHandler = require("../utils/asyncHandler");
 const Corporate = require("../models/Corporate");

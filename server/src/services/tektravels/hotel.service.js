@@ -18,7 +18,7 @@ class HotelService {
   ====================================================== */
   getEnv() {
     const env = process.env.NODE_ENV === "production" ? "live" : "dummy";
-    logger.info("[ENV]", env);
+    // logger.info("[ENV]", env);
     return env;
   }
 
@@ -365,7 +365,7 @@ class HotelService {
      HOTEL SEARCH
   ====================================================== */
   async searchHotels(params) {
-    logger.info("[HOTEL SEARCH]", params);
+    // logger.info("[HOTEL SEARCH]", params);
 
     const env = this.getEnv();
     const cfg = config[env];
@@ -403,7 +403,7 @@ class HotelService {
         },
       );
 
-      logger.info("[HOTEL SEARCH RESPONSE]", data);
+      // logger.info("[HOTEL SEARCH RESPONSE]", data);
 
       return data;
     } catch (err) {

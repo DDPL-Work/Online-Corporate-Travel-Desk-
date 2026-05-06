@@ -9,6 +9,9 @@ const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
+
 
 /**
  * ============================================================
@@ -48,10 +51,15 @@ exports.getAllFlightBookingsAdmin = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    const formattedBookings = bookings.map(b => ({
+      ...b,
+      orderId: b.orderId || "N/A"
+    }));
+
     return res.status(200).json({
       success: true,
-      count: bookings.length,
-      data: bookings,
+      count: formattedBookings.length,
+      data: formattedBookings,
     });
   } catch (error) {
     console.error("Flight Admin Fetch Error:", error);
@@ -59,6 +67,46 @@ exports.getAllFlightBookingsAdmin = async (req, res) => {
     return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Failed to fetch flight bookings",
+    });
+  }
+};
+
+/**
+ * ============================================================
+ * ✈️ FETCH SINGLE FLIGHT BOOKING BY ID (ADMIN)
+ * ============================================================
+ */
+exports.getFlightBookingByIdAdmin = async (req, res) => {
+  try {
+    const corporateId = validateTravelAdmin(req);
+    const { id } = req.params;
+
+    const booking = await BookingRequest.findOne({
+      _id: id,
+      corporateId,
+      bookingType: "flight",
+    })
+      .populate("userId", "name email")
+      .populate("approvedBy", "name email role")
+      .lean();
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Flight booking not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: booking,
+    });
+  } catch (error) {
+    console.error("Flight Admin Detail Fetch Error:", error);
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to fetch flight booking details",
     });
   }
 };
@@ -83,10 +131,15 @@ exports.getAllHotelBookingsAdmin = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    const formattedBookings = bookings.map(b => ({
+      ...b,
+      orderId: b.orderId || "N/A"
+    }));
+
     return res.status(200).json({
       success: true,
-      count: bookings.length,
-      data: bookings,
+      count: formattedBookings.length,
+      data: formattedBookings,
     });
   } catch (error) {
     console.error("Hotel Admin Fetch Error:", error);
@@ -94,6 +147,46 @@ exports.getAllHotelBookingsAdmin = async (req, res) => {
     return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Failed to fetch hotel bookings",
+    });
+  }
+};
+
+/**
+ * ============================================================
+ * 🏨 FETCH SINGLE HOTEL BOOKING BY ID (ADMIN)
+ * ============================================================
+ */
+exports.getHotelBookingByIdAdmin = async (req, res) => {
+  try {
+    const corporateId = new mongoose.Types.ObjectId(validateTravelAdmin(req));
+    const { id } = req.params;
+
+    const booking = await HotelBooking.findOne({
+      _id: id,
+      corporateId,
+    })
+      .populate("userId", "name email")
+      .populate("approvedBy", "name email role")
+      .populate("approverId", "name email role")
+      .lean();
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Hotel booking not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: booking,
+    });
+  } catch (error) {
+    console.error("Hotel Admin Detail Fetch Error:", error);
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to fetch hotel booking details",
     });
   }
 };
@@ -129,10 +222,15 @@ exports.getCancelledHotelBookingsAdmin = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    const formattedBookings = bookings.map(b => ({
+      ...b,
+      orderId: b.orderId || "N/A"
+    }));
+
     return res.status(200).json({
       success: true,
-      count: bookings.length,
-      data: bookings,
+      count: formattedBookings.length,
+      data: formattedBookings,
     });
   } catch (error) {
     console.error("Cancelled Hotel Fetch Error:", error);
@@ -226,6 +324,20 @@ exports.promoteToManager = async (req, res) => {
     await user.save();
 
     console.log("UPDATED USER:", user);
+
+    // ── Notify promoted employee ─────────────────────────────────
+    const _corp = user.corporateId
+      ? await Corporate.findById(user.corporateId).select('corporateName').lean()
+      : null;
+    notify(EVENTS.MANAGER_PROMOTION, {
+      userId:        user._id,
+      email:         user.email,
+      name:          user.name?.firstName
+        ? `${user.name.firstName} ${user.name.lastName || ''}`.trim()
+        : user.email,
+      corporateId:   user.corporateId || admin.corporateId,
+      corporateName: _corp?.corporateName || 'Your Company',
+    });
 
     return res.status(200).json({
       success: true,
@@ -664,6 +776,14 @@ exports.reviewManagerRequest = async (req, res) => {
       }
 
       request.status = "approved";
+
+      // ── Notify the Manager: A new employee is assigned to you ──
+      notify(EVENTS.MANAGER_ASSIGNED_TO_EMPLOYEE, {
+        managerId: user._id, // recipient
+        managerName: request.managerName,
+        employeeName: request.employeeEmail || "An Employee",
+        employeeEmail: request.employeeEmail,
+      });
     }
 
     // ❌ REJECT
@@ -675,6 +795,28 @@ exports.reviewManagerRequest = async (req, res) => {
 
     await user.save();
     await request.save();
+
+    // ── Notify the manager/employee whose request was reviewed ───
+    const _reviewedUserName = user.name?.firstName
+      ? `${user.name.firstName} ${user.name.lastName || ''}`.trim()
+      : user.email;
+    notify(EVENTS.MANAGER_REQUEST_REVIEWED, {
+      recipientId:  user._id,
+      employeeId:   user._id,
+      employeeEmail: user.email,
+      corporateId:  request.corporateId,
+      name:         _reviewedUserName,
+      action,
+      relatedId:    request._id,
+    });
+
+    // ── Notify Travel Admin of the completed review ──────────
+    notify(EVENTS.EMPLOYEE_MANAGER_FIRST_APPROVAL, {
+      corporateId:  request.corporateId,
+      employeeName: request.employeeId?.name || _reviewedUserName,
+      managerName:  request.managerName,
+      managerEmail: request.managerEmail,
+    });
 
     return res.json({
       success: true,

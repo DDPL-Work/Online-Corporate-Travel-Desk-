@@ -9,7 +9,9 @@ const Ledger = require("../models/Ledger");
 const tboService = require("../services/tektravels/flight.service");
 const pdfService = require("../services/pdf.service");
 const notificationService = require("../services/notification.service");
-const { generateBookingReference } = require("../utils/helpers");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
+const { generateBookingReference, generateOrderId } = require("../utils/helpers");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
@@ -17,6 +19,7 @@ const { getAgencyBalance } = require("../services/tboBalance.service");
 const logger = require("../utils/logger");
 const paymentService = require("../services/payment.service");
 const BookingIntent = require("../models/BookingIntent");
+const { generateSequentialOrderId } = require("../utils/orderIdGenerator");
 
 // @desc    Create booking request (Approval-first)
 // @route   POST /api/v1/bookings
@@ -308,6 +311,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   }
 
   /* ================= CREATE BOOKING REQUEST ================= */
+  const orderId = await generateSequentialOrderId("flight");
 
   let freshFareQuote;
 
@@ -323,13 +327,46 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     );
 
     freshFareQuote = {
-      Results: [onwardFare.Response.Results, returnFare.Response.Results],
+      Results: [
+        onwardFare?.Response?.Results || onwardFare?.Results,
+        returnFare?.Response?.Results || returnFare?.Results,
+      ],
     };
   } else {
-    freshFareQuote = await tboService.getFareQuote(
+    const quote = await tboService.getFareQuote(
       flightRequest.traceId,
       flightRequest.resultIndex,
     );
+    freshFareQuote = quote?.Response || quote;
+  }
+
+  // Enrich segments with SupplierFareClass and FareRules from the quote
+  if (bookingType === "flight" && flightRequest.segments) {
+    const results = freshFareQuote.Results || [];
+    const fareRules = (results[0]?.FareRules || []).concat(results[1]?.FareRules || []);
+    const quoteSegments = (results[0]?.Segments || []).flat().concat((results[1]?.Segments || []).flat());
+
+    flightRequest.segments = flightRequest.segments.map((seg) => {
+      const match = quoteSegments.find(
+        (qs) =>
+          qs.Origin?.Airport?.AirportCode === seg.origin.airportCode &&
+          qs.Destination?.Airport?.AirportCode === seg.destination.airportCode &&
+          qs.Airline?.FlightNumber === String(seg.flightNumber)
+      );
+
+      const rule = fareRules.find(
+        (r) =>
+          r.Origin === seg.origin.airportCode &&
+          r.Destination === seg.destination.airportCode
+      );
+
+      return {
+        ...seg,
+        supplierFareClass: match?.SupplierFareClass || seg.supplierFareClass,
+        fareBasisCode: rule?.FareBasisCode || seg.fareBasisCode,
+        fareRuleDetail: rule?.FareRuleDetail || seg.fareRuleDetail,
+      };
+    });
   }
 
   /* ================= SSR POLICY: AUTO-APPROVE CHECK ================= */
@@ -360,6 +397,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
   const bookingRequest = await BookingRequest.create({
     bookingReference: generateBookingReference(),
+    orderId,
     bookingType,
     corporateId: corporate._id,
     userId: user._id,
@@ -400,15 +438,39 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   });
 
   /* ================= NOTIFICATION ================= */
+  const _flightRequesterEmail = user.email;
+  const _flightRequesterName = user.name?.firstName
+    ? `${user.name.firstName} ${user.name.lastName || ''}`.trim()
+    : user.name || 'Employee';
+  const _flightOrderId = bookingRequest.orderId || bookingRequest.bookingReference;
 
-  // Only send approval notifications if still pending
-  if (requestStatus === "pending_approval") {
-    await notificationService.sendApprovalNotifications({
-      bookingReference: bookingRequest.bookingReference,
-      requester: user,
-      corporateId: corporate._id,
+  // Notify Travel Admin + Manager of new request
+  notify(EVENTS.BOOKING_REQUEST_CREATED, {
+    corporateId:   corporate._id,
+    employeeId:    user._id,
+    employeeEmail: _flightRequesterEmail,
+    employeeName:  _flightRequesterName,
+    managerId:     approverId || null,
+    orderId:       _flightOrderId,
+    bookingType:   'flight',
+    amount:        bookingRequest.pricingSnapshot?.totalAmount,
+    relatedId:     bookingRequest._id,
+  });
+
+  // If a manager is selected, also send BOOKING_APPROVAL_REQUIRED to them
+  if (approverId) {
+    notify(EVENTS.BOOKING_APPROVAL_REQUIRED, {
+      corporateId:  corporate._id,
+      managerId:    approverId,
+      employeeName: _flightRequesterName,
+      orderId:      _flightOrderId,
+      bookingType:  'flight',
+      amount:       bookingRequest.pricingSnapshot?.totalAmount,
+      relatedId:    bookingRequest._id,
     });
   }
+
+
 
   /* ================= AUTO-APPROVAL: CREATE BOOKING INTENT ================= */
   if (requestStatus === "approved" && bookingType === "flight") {
@@ -467,7 +529,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
   /* ================= RESPONSE ================= */
 
-  const isAutoApproved = requestStatus === "approved";
+  // const isAutoApproved = requestStatus === "approved";
 
   res.status(201).json(
     new ApiResponse(
@@ -475,6 +537,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
       {
         bookingRequestId: bookingRequest._id,
         bookingReference: bookingRequest.bookingReference,
+        orderId: bookingRequest.orderId,
         requestStatus: bookingRequest.requestStatus,
         autoApproved: isAutoApproved,
       },
@@ -502,7 +565,7 @@ exports.getMyRequests = asyncHandler(async (req, res) => {
     .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 })
     .select(
-      "bookingType requestStatus executionStatus flightRequest pricingSnapshot createdAt",
+      "bookingType orderId requestStatus executionStatus flightRequest pricingSnapshot createdAt",
     );
 
   res
@@ -1299,6 +1362,13 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
   booking.executionStatus = "ticketed";
   await booking.save();
 
+  // Notify User
+  await notificationService.sendBookingNotification(
+    booking,
+    { _id: booking.userId },
+    "confirmation"
+  );
+
   /* ✅ RETURN */
   return {
     bookingId: booking._id,
@@ -1546,6 +1616,15 @@ exports.manualTicketNonLcc = asyncHandler(async (req, res) => {
   booking.bookingResult.ticketResponse = ticketResp;
 
   await booking.save();
+
+  if (booking.executionStatus === "ticketed") {
+    // Notify User
+    await notificationService.sendBookingNotification(
+      booking,
+      { _id: booking.userId },
+      "confirmation"
+    );
+  }
 
   return res.status(200).json(
     new ApiResponse(
@@ -1941,6 +2020,27 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, booking, "Booking cancelled successfully"));
 });
 
+exports.getProjectFlightExpenses = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+
+  if (!projectId) {
+    throw new ApiError(400, "Project ID is required");
+  }
+
+  const expenses = await BookingRequest.find({ 
+    projectId,
+    corporateId: req.user.corporateId,
+    executionStatus: "ticketed"
+  })
+    .populate("userId", "name email")
+    .populate("approvedBy", "name email role")
+    .sort({ createdAt: -1 });
+
+  res.status(200).json(
+    new ApiResponse(200, expenses, "Project flight expenses fetched successfully")
+  );
+});
+
 module.exports = {
   createBookingRequest: exports.createBookingRequest,
   getMyRequests: exports.getMyRequests,
@@ -1954,4 +2054,5 @@ module.exports = {
   getAllBookings: exports.getAllBookings,
   getBooking: exports.getBooking,
   cancelBooking: exports.cancelBooking,
+  getProjectFlightExpenses: exports.getProjectFlightExpenses,
 };

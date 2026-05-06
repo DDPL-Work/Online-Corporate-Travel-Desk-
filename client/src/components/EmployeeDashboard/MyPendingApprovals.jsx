@@ -17,7 +17,7 @@ import { MdHotel, MdFlightTakeoff } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchMyBookingRequests } from "../../Redux/Actions/booking.thunks";
 import { fetchMyHotelRequests } from "../../Redux/Actions/hotelBooking.thunks";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Status Config  (mirrors REFUND_CONFIG pattern)                 */
@@ -74,7 +74,7 @@ function SummaryStats({ trips }) {
   const expired = trips.filter((t) => t.fareExpired).length;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">
           Total Requests
@@ -93,12 +93,12 @@ function SummaryStats({ trips }) {
         </p>
         <p className="text-2xl font-black text-amber-700">{pending}</p>
       </div>
-      <div className="bg-red-50 rounded-xl border border-red-100 p-4">
+      {/* <div className="bg-red-50 rounded-xl border border-red-100 p-4">
         <p className="text-[10px] uppercase tracking-widest text-red-400 font-bold mb-1">
           Fare Expired
         </p>
         <p className="text-2xl font-black text-red-600">{expired}</p>
-      </div>
+      </div> */}
     </div>
   );
 }
@@ -151,7 +151,7 @@ function FlightRequestCard({ trip, onView }) {
                 Flight Request
               </p>
               <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
-                #{trip.id}
+                {trip.orderId || `#${trip.id?.slice(-8).toUpperCase()}`}
               </p>
             </div>
           </div>
@@ -294,7 +294,7 @@ function HotelRequestCard({ trip, onView }) {
                 {trip.hotelName || "Hotel Request"}
               </p>
               <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
-                #{trip.id?.slice(-8).toUpperCase()}
+                {trip.orderId || `#${trip.id?.slice(-8).toUpperCase()}`}
               </p>
             </div>
           </div>
@@ -401,6 +401,8 @@ function HotelRequestCard({ trip, onView }) {
 export default function MyPendingApprovals() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const typeQuery = searchParams.get("type");
 
   const { myRequests, loading: flightLoading } = useSelector(
     (state) => state.bookings,
@@ -409,16 +411,26 @@ export default function MyPendingApprovals() {
     (state) => state.hotelBookings,
   );
 
-  const [activeTab, setActiveTab] = useState("flight");
+  const [activeTab, setActiveTab] = useState(typeQuery === "hotel" ? "hotel" : "flight");
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
-    if (activeTab === "flight") dispatch(fetchMyBookingRequests());
-    else dispatch(fetchMyHotelRequests());
-  }, [dispatch, activeTab]);
+    if (typeQuery) {
+      setActiveTab(typeQuery === "hotel" ? "hotel" : "flight");
+    }
+  }, [typeQuery]);
+
+  useEffect(() => {
+    if (activeTab === "flight") {
+      dispatch(fetchMyBookingRequests());
+    } else {
+      dispatch(fetchMyHotelRequests());
+    }
+  }, [activeTab, dispatch]);
+
 
   const sourceData = activeTab === "flight" ? myRequests : hotelRequests;
 
@@ -469,6 +481,7 @@ export default function MyPendingApprovals() {
 
         return {
           id: b._id,
+          orderId: b.orderId,
           type: activeTab === "hotel" ? "Hotel" : "Flight",
           status: b.requestStatus,
           destination,

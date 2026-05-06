@@ -173,6 +173,18 @@ const corporateSchema = new mongoose.Schema(
       supportPhone: { type: String, default: "+1 800 123 4567" },
     },
 
+    corporateSlug: {
+      type: String,
+      unique: true,
+      sparse: true,
+      lowercase: true,
+      trim: true,
+    },
+    corporateUrl: {
+      type: String,
+      trim: true,
+    },
+
     onboardedAt: Date,
     onboardedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },

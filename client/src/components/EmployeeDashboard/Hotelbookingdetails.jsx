@@ -142,9 +142,9 @@ function Stars({ count = 0 }) {
 function SectionHeader({ num, title }) {
   return (
     <div className="flex items-center pb-3 border-b border-[#EAE4D9] mb-6">
-      <span className="font-['DM_Mono'] text-[#B5862A] text-[11px] tracking-wider mr-3">
+      {/* <span className="font-['DM_Mono'] text-[#B5862A] text-[11px] tracking-wider mr-3">
         {String(num).padStart(2, "0")}
-      </span>
+      </span> */}
       <h2 className="font-['Cormorant_Garamond'] text-[22px] font-semibold text-[#1A1714] md:text-[18px]">
         {title}
       </h2>

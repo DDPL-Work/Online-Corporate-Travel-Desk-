@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { FaPlane, FaHotel } from "react-icons/fa";
+import TableScrollWrapper from "../common/TableScrollWrapper";
 import {
   FiHome,
   FiCheckCircle,
@@ -183,12 +184,12 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-xl shadow-sm">
+        <TableScrollWrapper>
           <table className="w-full border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-[#0A4D68] text-blue-100">
-                <Th>Request ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Route</Th>
                 <Th>Airline</Th>
@@ -232,7 +233,7 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
                       className={`hover:bg-sky-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}
                     >
                       <td className="px-4 py-3">
-                        <IdCell id={a.bookingReference} />
+                        <IdCell id={a.orderId || a.bookingReference || "N/A"} />
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-semibold text-[13px] text-slate-800">
@@ -282,7 +283,7 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
               )}
             </tbody>
           </table>
-        </div>
+        </TableScrollWrapper>
         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
           <span>
             Showing{" "}
@@ -456,18 +457,18 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-xl shadow-sm">
+        <TableScrollWrapper>
           <table className="w-full border-collapse min-w-[950px]">
             <thead>
               <tr className="bg-[#088395] text-teal-100">
-                <Th>Ref. ID</Th>
+                <Th>Order ID</Th>
                 <Th>Employee</Th>
                 <Th>Hotel</Th>
                 <Th>Check-In</Th>
                 <Th>Check-Out</Th>
-                <Th>Nights</Th>
-                <Th>Amount</Th>
+                {/* <Th>Nights</Th>
+                <Th>Amount</Th> */}
                 <Th>Exec Status</Th>
                 <Th>Action</Th>
               </tr>
@@ -504,7 +505,7 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
                       className={`hover:bg-teal-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}
                     >
                       <td className="px-4 py-3">
-                        <IdCell id={a.bookingReference} />
+                        <IdCell id={a.orderId || a.bookingReference || "N/A"} />
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-semibold text-[13px] text-slate-800">
@@ -528,13 +529,13 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
                       <td className="px-4 py-3 text-[13px] text-slate-500">
                         {formatDate(a.hotelRequest?.checkOutDate)}
                       </td>
-                      <td className="px-4 py-3 font-bold text-center text-slate-700">
+                      {/* <td className="px-4 py-3 font-bold text-center text-slate-700">
                         {nights}
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-900">
                         ₹
                         {(a.pricingSnapshot?.totalAmount || 0).toLocaleString()}
-                      </td>
+                      </td> */}
                       <td className="px-4 py-3">
                         <ExecStatusBadge status={a.executionStatus} />
                       </td>
@@ -552,7 +553,7 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
               )}
             </tbody>
           </table>
-        </div>
+        </TableScrollWrapper>
         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
           <span>
             Showing{" "}

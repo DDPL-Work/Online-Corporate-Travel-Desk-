@@ -46,6 +46,10 @@ const OpsMemberSchema = new mongoose.Schema(
       required: [true, "Password is required"],
       select: false,
     },
+    fcmTokens: {
+      type: [String],
+      default: [],
+    },
     isDeleted: {
       type: Boolean,
       default: false,

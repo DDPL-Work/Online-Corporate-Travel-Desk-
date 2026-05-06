@@ -41,10 +41,14 @@ const handleSSOCallback = (strategy) => (req, res, next) =>
 // Start Google SSO
 router.get(
   '/google',
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-    session: false
-  })
+  (req, res, next) => {
+    const { slug } = req.query;
+    passport.authenticate('google', {
+      scope: ['profile', 'email'],
+      session: false,
+      state: slug || ''
+    })(req, res, next);
+  }
 );
 
 // Google callback → returns JWT
@@ -58,10 +62,14 @@ router.get('/google/callback', handleSSOCallback('google'));
 // Start Microsoft SSO
 router.get(
   '/microsoft',
-  passport.authenticate('azuread-openidconnect', {
-    session: false,
-    prompt: 'login'
-  })
+  (req, res, next) => {
+    const { slug } = req.query;
+    passport.authenticate('azuread-openidconnect', {
+      session: false,
+      prompt: 'login',
+      customState: slug || ''
+    })(req, res, next);
+  }
 );
 
 // Microsoft callback (POST from Azure)
@@ -75,9 +83,13 @@ router.post('/microsoft/callback', handleSSOCallback('azuread-openidconnect'));
 // Start Zoho SSO
 router.get(
   '/zoho',
-  passport.authenticate('zoho', {
-    session: false
-  })
+  (req, res, next) => {
+    const { slug } = req.query;
+    passport.authenticate('zoho', {
+      session: false,
+      state: slug || ''
+    })(req, res, next);
+  }
 );
 
 // Zoho callback → returns JWT (consistent with others)

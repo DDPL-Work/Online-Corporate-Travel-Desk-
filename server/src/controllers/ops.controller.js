@@ -7,6 +7,9 @@ const asyncHandler = require("../utils/asyncHandler");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const emailService = require("../services/email.service");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
+
 
 // @desc    Create new OPS team member
 // @route   POST /ops/create
@@ -38,9 +41,18 @@ exports.createOpsMember = asyncHandler(async (req, res) => {
     password: actualPassword,
   });
 
-  // Send email with credentials
+  // Send email with credentials via orchestrator
   try {
-    await emailService.sendOpsWelcomeEmail(newMember, actualPassword);
+    notify(EVENTS.OPS_MEMBER_CREATED, {
+      userId: newMember._id,
+      email: newMember.email,
+      name: newMember.name,
+      role: newMember.role,
+      department: newMember.department,
+      permissions: newMember.permissions,
+      password: actualPassword,
+      dashboardUrl: process.env.SUPER_ADMIN_URL || `${process.env.FRONTEND_URL}/ops-login`,
+    });
   } catch (err) {
     console.error("Failed to send welcome email:", err);
   }
@@ -110,9 +122,30 @@ exports.updateOpsMember = asyncHandler(async (req, res) => {
   if (phone) member.phone = phone;
   if (role) member.role = role;
   if (department) member.department = department;
-  if (permissions) member.permissions = permissions;
+  
+  let permissionsChanged = false;
+  let oldPermissions = [...member.permissions];
+  
+  if (permissions) {
+    // Check if permissions actually changed
+    if (JSON.stringify(permissions.sort()) !== JSON.stringify(oldPermissions.sort())) {
+      permissionsChanged = true;
+    }
+    member.permissions = permissions;
+  }
 
   await member.save();
+  
+  if (permissionsChanged) {
+    notify(EVENTS.OPS_PERMISSION_CHANGED, {
+      userId: member._id,
+      email: member.email,
+      name: member.name,
+      oldPermissions: oldPermissions,
+      newPermissions: member.permissions,
+      changedBy: req.user?.name?.firstName || req.user?.name || "Admin",
+    });
+  }
 
   res.status(200).json(new ApiResponse(200, member, "OPS team member updated successfully"));
 });
@@ -177,9 +210,18 @@ exports.resetPassword = asyncHandler(async (req, res) => {
   member.password = actualPassword;
   await member.save();
 
-  // Send email with new password
+  // Send email with new password via orchestrator
   try {
-    await emailService.sendOpsWelcomeEmail(member, actualPassword);
+    notify(EVENTS.OPS_MEMBER_CREATED, {
+      userId: member._id,
+      email: member.email,
+      name: member.name,
+      role: member.role,
+      department: member.department,
+      permissions: member.permissions,
+      password: actualPassword,
+      dashboardUrl: process.env.SUPER_ADMIN_URL || `${process.env.FRONTEND_URL}/ops-login`,
+    });
   } catch (err) {
      console.error("Failed to send reset email:", err);
   }

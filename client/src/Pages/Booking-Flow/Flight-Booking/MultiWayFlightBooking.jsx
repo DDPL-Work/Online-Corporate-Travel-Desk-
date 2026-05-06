@@ -28,9 +28,11 @@ import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { approveApproval } from "../../../Redux/Actions/approval.thunks";
 import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
+import { fetchMyProfile } from "../../../Redux/Slice/employeeActionSlice";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { FareDetailsModal } from "./FareDetailsModal";
+import Swal from "sweetalert2";
 
 export default function MultiCityFlightBooking() {
   const location = useLocation();
@@ -43,6 +45,7 @@ export default function MultiCityFlightBooking() {
 
   const { actionLoading } = useSelector((state) => state.bookings);
   const { user } = useSelector((state) => state.auth);
+  const { myProfile } = useSelector((state) => state.employeeAction || {});
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
   const isTravelAdmin = user?.role === "travel-admin";
   const approvalRequired =
@@ -51,6 +54,7 @@ export default function MultiCityFlightBooking() {
   useEffect(() => {
     if (user?.role === "employee" || user?.role === "manager") {
       dispatch(fetchMySSRPolicy());
+      dispatch(fetchMyProfile());
     }
   }, [dispatch, user]);
 
@@ -140,27 +144,30 @@ export default function MultiCityFlightBooking() {
       });
     }
 
-    // Pre-fill first traveler if user is logged in
-    if (user && initial[0]) {
-      if (user.name && typeof user.name === "object") {
-        initial[0].firstName = (user.name.firstName || "").toUpperCase();
-        initial[0].lastName = (user.name.lastName || "").toUpperCase();
+    // Pre-fill first traveler if user/profile is logged in
+    const sourceProfile = myProfile || user;
+    if (sourceProfile && initial[0]) {
+      const rawName = sourceProfile.name || sourceProfile.displayName || "";
+      let firstName = "";
+      let lastName = "";
+      
+      if (typeof sourceProfile.name === "object") {
+         firstName = (sourceProfile.name.firstName || "").toUpperCase();
+         lastName = (sourceProfile.name.lastName || "").toUpperCase();
       } else {
-        const rawName = user.name || user.displayName || "";
-        const fullName = typeof rawName === "string" ? rawName : "";
-        const names = fullName.trim().split(/\s+/);
-
-        initial[0].firstName = (names[0] || "").toUpperCase();
-        initial[0].lastName = (names.slice(1).join(" ") || "").toUpperCase();
+         const names = (typeof rawName === "string" ? rawName : "").trim().split(/\s+/);
+         firstName = (names[0] || "").toUpperCase();
+         lastName = (names.slice(1).join(" ") || "").toUpperCase();
       }
 
-      initial[0].email = user.email || "";
-      initial[0].phoneWithCode =
-        user.phone || user.mobile || user.phoneWithCode || "";
+      initial[0].firstName = firstName;
+      initial[0].lastName = lastName;
+      initial[0].email = sourceProfile.email || "";
+      initial[0].phoneWithCode = sourceProfile.phone || sourceProfile.mobile || sourceProfile.phoneWithCode || "";
     }
 
     setTravelers(initial);
-  }, [user, searchParams]);
+  }, [user, myProfile, searchParams]);
 
   useEffect(() => {
     const fetchGst = async () => {
@@ -238,6 +245,27 @@ export default function MultiCityFlightBooking() {
     traceId, // ✅ CRITICAL
     selectedFlight?.ResultIndex,
   ]);
+
+  useEffect(() => {
+    const quoteResponse = fareQuote?.Response;
+    if (quoteResponse?.ResponseStatus === 2) {
+      const errorMsg = quoteResponse?.Error?.ErrorMessage || "";
+      if (
+        errorMsg.toLowerCase().includes("traceid") ||
+        errorMsg.toLowerCase().includes("expired") ||
+        errorMsg.toLowerCase().includes("invalid")
+      ) {
+        Swal.fire({
+          title: "Session Expired",
+          text: "Your search session has expired. Please search again.",
+          icon: "warning",
+          confirmButtonColor: "#0A4D68",
+        }).then(() => {
+          navigate("/travel");
+        });
+      }
+    }
+  }, [fareQuote, navigate]);
 
   useEffect(() => {
     const quoteResult = fareQuote?.Response?.Results;

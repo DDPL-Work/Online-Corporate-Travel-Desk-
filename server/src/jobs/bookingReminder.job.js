@@ -4,6 +4,8 @@ const User = require('../models/User');
 const moment = require('moment-timezone');
 const config = require('../config');
 const logger = require('../utils/logger');
+const { notify } = require('../notifications/orchestrator');
+const EVENTS = require('../events/eventConstants');
 
 const sendUpcomingTravelReminders = async () => {
   try {
@@ -32,9 +34,26 @@ const sendUpcomingTravelReminders = async () => {
     }).populate('userId', 'name email');
 
     for (const booking of upcomingBookings) {
-      // Send reminder email
-      logger.info(`Reminder sent for booking ${booking.bookingReference} to ${booking.userId.email}`);
-      // Implement email sending logic here
+      const isFlight = booking.bookingType === "flight";
+      
+      const origin = isFlight ? booking.flightDetails?.origin : "N/A";
+      const dest = isFlight ? booking.flightDetails?.destination : (booking.hotelDetails?.hotelName || "Hotel");
+      const depTime = isFlight 
+        ? moment(booking.flightDetails?.departureDate).format('YYYY-MM-DD HH:mm')
+        : moment(booking.hotelDetails?.checkInDate).format('YYYY-MM-DD');
+
+      notify(EVENTS.UPCOMING_TRIP_REMINDER, {
+        employeeName: booking.userId?.name?.firstName || "Traveler",
+        employeeEmail: booking.userId?.email,
+        employeeId: booking.userId?._id,
+        orderId: booking.bookingReference,
+        origin: origin,
+        destination: dest,
+        departureTime: depTime,
+        pnr: booking.pnr,
+      });
+
+      logger.info(`Reminder sent for booking ${booking.bookingReference} to ${booking.userId?.email}`);
     }
 
     logger.info(`Sent ${upcomingBookings.length} travel reminders`);

@@ -232,7 +232,9 @@ const searchHotel = Joi.object({
     )
     .min(1)
     .required(),
-});
+  SearchFilters: Joi.object().optional(),
+  forceRefresh: Joi.boolean().optional(),
+}).unknown(true);
 
 const ticketFlight = Joi.object({
   bookingId: Joi.string().required(),

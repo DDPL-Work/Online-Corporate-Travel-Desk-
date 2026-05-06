@@ -20,6 +20,7 @@ exports.signAccessToken = (user) => {
     role: user.role,
     email: user.email,
     name: user.name || {},
+    phone: user.phone || user.mobile || "",
     managerRequestStatus: user.managerRequestStatus || "none",
   };
   return jwt.sign(payload, SECRET, { expiresIn: ACCESS_EXP });
@@ -59,6 +60,7 @@ exports.generateSSOToken = async (req, res) => {
       role: user.role,
       email: user.email,
       name: user.name || {},
+      phone: user.phone || user.mobile || "",
       managerRequestStatus: user.managerRequestStatus || "none",
     };
 
@@ -66,7 +68,34 @@ exports.generateSSOToken = async (req, res) => {
       expiresIn: process.env.JWT_EXPIRE || "7d",
     });
 
-    // ✅ Option 1: JSON response (API)
+    // ── Fire-and-forget login success email ───────────────────────────
+    const emailService = require("../services/email.service");
+    const loginName = user.name?.firstName
+      ? `${user.name.firstName} ${user.name.lastName || ""}`.trim()
+      : user.name || user.email;
+
+    console.log(
+      `\n🔑 [SSO LOGIN]`,
+      `\n   Email    : ${user.email}`,
+      `\n   Name     : ${loginName}`,
+      `\n   Role     : ${user.role}`,
+      `\n   Strategy : SSO (${req.query.state || "google/microsoft/zoho"})`,
+      `\n   Time     : ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST\n`
+    );
+
+    emailService
+      .sendLoginSuccessEmail({
+        email: user.email,
+        name: loginName,
+        role: user.role,
+        loginTime: new Date(),
+        ipAddress: req.ip || req.headers["x-forwarded-for"] || "Unknown",
+      })
+      .catch((err) =>
+        console.warn("SSO login email failed (non-critical):", err.message)
+      );
+    // ──────────────────────────────────────────────────────────────────
+
     return res.redirect(
       `${process.env.FRONTEND_URL}/sso/callback?token=${token}`
     );
@@ -82,6 +111,7 @@ exports.generateSSOToken = async (req, res) => {
     });
   }
 };
+
 
 /**
  * Verify JWT token (middleware helper)

@@ -144,10 +144,12 @@ const HotelBookNow = () => {
     : [];
   // const rawRoom = selectedRooms.rawRoomData || {};
 
-  const hotelImages = 
-    (hotelReq?.selectedHotel?.images?.length > 0 ? hotelReq.selectedHotel.images : null) ||
+  const hotelImages =
+    (hotelReq?.selectedHotel?.images?.length > 0
+      ? hotelReq.selectedHotel.images
+      : null) ||
     (snapshot?.hotelImage ? [snapshot.hotelImage] : null) ||
-    (hotelReq?.selectedRoom?.rawRoomData?.[0]?.images) || 
+    hotelReq?.selectedRoom?.rawRoomData?.[0]?.images ||
     [];
 
   useEffect(() => {
@@ -188,7 +190,7 @@ const HotelBookNow = () => {
   const totalAdults =
     hotelReq.roomGuests?.reduce((sum, r) => sum + (r.noOfAdults || 0), 0) ||
     travelers.length;
-  const totalFare = selectedRooms.reduce(
+  const baseFare = selectedRooms.reduce(
     (sum, r) => sum + (r.totalFare || r.price?.totalFare || 0),
     0,
   );
@@ -198,11 +200,7 @@ const HotelBookNow = () => {
     0,
   );
 
-  let baseFare = totalFare - tax;
-  if (!baseFare && !tax && totalFare) {
-    baseFare = Math.round(totalFare * 0.85);
-    tax = totalFare - baseFare;
-  }
+  const totalFare = baseFare + tax;
 
   const isApproved = bookingRequest?.requestStatus === "approved";
 

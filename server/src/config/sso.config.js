@@ -11,7 +11,6 @@ const axios = require("axios");
 
 console.log("✅ SSO CONFIG loaded");
 
-
 const googleCallbackURL1 = process.env.GOOGLE_CALLBACK_URL;
 const googleCallbackURL2 = process.env.GOOGLE_CALLBACK_URL_2;
 const azureCallbackURL1 = process.env.AZURE_CALLBACK_URL;
@@ -92,8 +91,6 @@ const upsertSSOUser = async ({
     options,
   ).lean();
 
-
-
   // If user existed already (not just created), update missing provider/id/picture/name if safe
   // Re-fetch as mongoose doc to allow save, only if we need to mutate more.
   let needSave = false;
@@ -160,13 +157,20 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           if (!email || !emailVerified)
             return done(null, false, { message: "Email not verified" });
 
-          const domain = email.split("@")[1];
+          const domain = email.split("@")[1].toLowerCase();
+          const slug = req.query.state;
 
-          const corporate = await Corporate.findOne({
+          const query = {
             "ssoConfig.domain": domain,
             "ssoConfig.type": "google",
             "ssoConfig.verified": true,
-          });
+          };
+
+          if (slug) {
+            query.corporateSlug = slug;
+          }
+
+          const corporate = await Corporate.findOne(query);
 
           // ✅ BLOCK IF CORPORATE INACTIVE/SUSPENDED/DISABLED
           if (
@@ -175,39 +179,11 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             corporate.status !== "active"
           ) {
             return done(null, false, {
-              message: "Corporate account inactive or suspended",
+              message: slug
+                ? `You are not authorized to access the ${slug} portal.`
+                : "Corporate account inactive or suspended",
             });
           }
-
-          // Check if user already exists
-          // let existingUser = await User.findOne({
-          //   email,
-          //   corporateId: corporate._id
-          // });
-
-          // Preserve role if exists, otherwise default employee
-          // const role = existingUser ? existingUser.role : 'employee';
-
-          // let user = await User.findOneAndUpdate(
-          //   { email, corporateId: corporate._id },
-          //   {
-          //     $setOnInsert: {
-          //       email,
-          //       corporateId: corporate._id,
-          //       role: "employee", // default only on first creation
-          //       ssoProvider: "google",
-          //       ssoId: profile.id,
-          //       profilePicture: profile.photos?.[0]?.value || "",
-          //       isActive: true,
-          //       name: {
-          //         firstName: profile.name?.givenName || "",
-          //         lastName: profile.name?.familyName || "",
-          //       },
-          //     },
-          //     $set: { lastLogin: new Date() },
-          //   },
-          //   { new: true, upsert: true },
-          // );
 
           // 🔥 Determine correct role
           // 🔥 CHECK EXISTING USER FIRST
@@ -249,7 +225,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             { new: true, upsert: true },
           );
 
-          user = await User.findById(user._id); 
+          user = await User.findById(user._id);
 
           // 🔥 Ensure role stays correct even if user existed before
           let expectedRole = "employee";
@@ -329,13 +305,20 @@ if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET) {
           const email = profile._json?.email?.toLowerCase();
           if (!email) return done(null, false, { message: "Email missing" });
 
-          const domain = email.split("@")[1];
+          const domain = email.split("@")[1].toLowerCase();
+          const slug = req.query.state || req.body.state; // Azure uses POST/state
 
-          const corporate = await Corporate.findOne({
+          const query = {
             "ssoConfig.domain": domain,
             "ssoConfig.type": "microsoft",
             "ssoConfig.verified": true,
-          });
+          };
+
+          if (slug) {
+            query.corporateSlug = slug;
+          }
+
+          const corporate = await Corporate.findOne(query);
 
           if (
             !corporate ||
@@ -343,7 +326,9 @@ if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET) {
             corporate.status !== "active"
           ) {
             return done(null, false, {
-              message: "Corporate account inactive or suspended",
+              message: slug
+                ? `You are not authorized to access the ${slug} portal.`
+                : "Corporate account inactive or suspended",
             });
           }
 
@@ -469,12 +454,19 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
             return done(null, false, { message: "Email missing from Zoho" });
 
           const domain = email.split("@")[1].toLowerCase();
+          const slug = req.query.state;
 
-          const corporate = await Corporate.findOne({
+          const query = {
             "ssoConfig.type": "zoho",
             "ssoConfig.verified": true,
             "ssoConfig.domain": domain,
-          });
+          };
+
+          if (slug) {
+            query.corporateSlug = slug;
+          }
+
+          const corporate = await Corporate.findOne(query);
 
           if (
             !corporate ||
@@ -482,7 +474,9 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
             corporate.status !== "active"
           ) {
             return done(null, false, {
-              message: "Corporate account inactive or suspended",
+              message: slug
+                ? `You are not authorized to access the ${slug} portal.`
+                : "Corporate account inactive or suspended",
             });
           }
 
@@ -526,7 +520,7 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
             { new: true, upsert: true },
           );
 
-          user = await User.findById(user._id); 
+          user = await User.findById(user._id);
 
           // 🔥 Ensure role stays correct
           let expectedRole = "employee";

@@ -1062,7 +1062,10 @@ export default function FareUpsellPage() {
             <div className="mx-6 mt-4 flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 border-l-4 border-l-amber-400 rounded-xl">
               <MdInfo className="text-amber-500 shrink-0 mt-0.5" size={16} />
               <p className="text-[11.5px] text-amber-800 leading-relaxed">
-                {airlineRemark}
+                {(() => {
+                  const remark = airlineRemark || "";
+                  return remark.replace(/(.+?)\1{3,}/g, "$1");
+                })()}
               </p>
             </div>
           )}

@@ -32,6 +32,7 @@ import {
   FiClock,
   FiXCircle,
   FiUsers,
+  FiHash,
 } from "react-icons/fi";
 import {
   MdHotel,
@@ -747,6 +748,7 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
 /* ─────────────────────────────────────────────────────────────── */
 function BookingReferencesSection({ booking, bookingDetail, result }) {
   const refs = [
+    { label: "Order ID", val: booking.orderId || "—", hash: true },
     { label: "Booking Ref", val: booking.bookingReference || "—", hash: true },
     {
       label: "Confirmation No.",
@@ -773,7 +775,7 @@ function BookingReferencesSection({ booking, bookingDetail, result }) {
 
   return (
     <div>
-      <div className="grid grid-cols-4 gap-[1px] bg-[#EAE4D9] mb-[1px]">
+      <div className="grid grid-cols-5 gap-[1px] bg-[#EAE4D9] mb-[1px]">
         {refs.map((r, i) => (
           <div key={i} className="bg-white p-5">
             <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-[6px]">
@@ -1867,7 +1869,7 @@ export default function TeamHotelBookingDetails() {
         )}
 
         {/* 02 Amenities */}
-        {amenities.length > 0 && (
+        {/* {amenities.length > 0 && (
           <section className="mb-12">
             <SectionHeader
               num={2}
@@ -1875,10 +1877,10 @@ export default function TeamHotelBookingDetails() {
             />
             <AmenitiesSection amenities={amenities} />
           </section>
-        )}
+        )} */}
 
         {/* 03 Check-in Instructions */}
-        {rateConditions.length > 0 && (
+        {/* {rateConditions.length > 0 && (
           <section className="mb-12">
             <SectionHeader
               num={3}
@@ -1886,13 +1888,13 @@ export default function TeamHotelBookingDetails() {
             />
             <CheckInInstructions conditions={rateConditions} />
           </section>
-        )}
+        )} */}
 
         {/* 04 Cancellation Policy */}
         {cancelPolicies.length > 0 && (
           <section className="mb-12">
             <SectionHeader
-              num={4}
+              num={2}
               title="Cancellation Policy"
             />
             <CancellationPolicySection
@@ -1908,7 +1910,7 @@ export default function TeamHotelBookingDetails() {
         {/* 05 Booking References */}
         <section className="mb-12">
           <SectionHeader
-            num={5}
+            num={3}
             title="Booking References"
           />
           <BookingReferencesSection
@@ -1922,7 +1924,7 @@ export default function TeamHotelBookingDetails() {
         {travellers.length > 0 && (
           <section className="mb-12">
             <SectionHeader
-              num={6}
+              num={4}
               title="Guest"
             />
             <GuestSection travellers={travellers} />
@@ -1933,7 +1935,7 @@ export default function TeamHotelBookingDetails() {
         {isTravelAdmin && priceBreakUp && (
           <section className="mb-12">
             <SectionHeader
-              num={8}
+              num={6}
               title="Fare Breakdown"
             />
             <FareBreakdownSection
@@ -1946,7 +1948,7 @@ export default function TeamHotelBookingDetails() {
         {/* 07 Cancellation Request */}
         <section className="mb-12">
           <SectionHeader
-            num={7}
+            num={5}
             title="Cancellation Request"
           />
           <CancellationSection

@@ -5,14 +5,14 @@ import { useDispatch } from "react-redux";
 import { MdOutlineFlight, MdAirlineSeatReclineNormal } from "react-icons/md";
 import { BsSuitcase } from "react-icons/bs";
 import { BiSolidOffer } from "react-icons/bi";
-import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 import {
   airlineLogo,
   FLIGHT_STATUS_MAP,
   formatDate,
   formatTime,
 } from "../../../utils/formatter";
-import { FlightDetailsDropdown } from "./One-wayFlightCard";
+
+import { FlightDetailsModal } from "./FlightDetailsModal";
 import { getFareUpsell } from "../../../Redux/Actions/flight.thunks";
 
 export default function MultiCityFlightCard({
@@ -229,25 +229,26 @@ export default function MultiCityFlightCard({
           );
         })}
 
+
         {/* --- Global Details Section --- */}
         <div className="mt-4 flex flex-col gap-4">
            <div className="flex justify-between items-center bg-slate-50/50 px-4 py-2 rounded-xl border border-slate-200">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pricing & Policy Center</span>
             <button
-                onClick={() => setShowDetails(!showDetails)}
+                onClick={() => setShowDetails(true)}
                 className="text-[11px] font-black text-[#C9A84C] hover:text-[#0A203E] flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 shadow-sm transition-all uppercase tracking-widest"
               >
-                {showDetails ? "Hide Fare Details" : "View Fare Details"}
-                {showDetails ? <FaChevronUp /> : <FaChevronDown />}
+                Flight Details
               </button>
            </div>
-           
-           {showDetails && (
-              <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-lg animate-in fade-in slide-in-from-top-2 duration-300">
-                 <FlightDetailsDropdown selectedFlight={{ Segments: legs, Fare: fare, ...segments[0] }} />
-              </div>
-           )}
         </div>
+
+        <FlightDetailsModal 
+          isOpen={showDetails}
+          onClose={() => setShowDetails(false)}
+          selectedFlight={{ Segments: legs, Fare: fare, ResultIndex: resultIndex, ...segments[0] }} 
+          traceId={traceId}
+        />
 
         {/* Footer */}
         <div className="flex items-center justify-between mt-6">

@@ -10,6 +10,10 @@ const SuperAdminSchema = new mongoose.Schema(
     mobile: { type: String, required: true, trim: true },
     password: { type: String, required: true, select: false },
     role: { type: String, enum: ["super-admin"], default: "super-admin" },
+    fcmTokens: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true }
 );

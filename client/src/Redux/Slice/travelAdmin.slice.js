@@ -3,7 +3,9 @@
 import { createSlice } from "@reduxjs/toolkit";
 import {
   getAllFlightBookingsAdmin,
+  getFlightBookingByIdAdmin,
   getAllHotelBookingsAdmin,
+  getHotelBookingByIdAdmin,
   getCancelledHotelBookingsAdmin,
   fetchManagerRequests,
   reviewManagerRequest,
@@ -29,6 +31,10 @@ const initialState = {
   errorCancelledHotels: null,
   errorManagerRequests: null,
   errorEmployees: null,
+
+  singleBooking: null,
+  loadingSingleBooking: false,
+  errorSingleBooking: null,
 };
 
 const adminBookingSlice = createSlice({
@@ -59,6 +65,25 @@ const adminBookingSlice = createSlice({
 
       /**
        * ============================================================
+       * ✈️ FETCH SINGLE FLIGHT BOOKING BY ID
+       * ============================================================
+       */
+      .addCase(getFlightBookingByIdAdmin.pending, (state) => {
+        state.loadingSingleBooking = true;
+        state.errorSingleBooking = null;
+        state.singleBooking = null;
+      })
+      .addCase(getFlightBookingByIdAdmin.fulfilled, (state, action) => {
+        state.loadingSingleBooking = false;
+        state.singleBooking = action.payload;
+      })
+      .addCase(getFlightBookingByIdAdmin.rejected, (state, action) => {
+        state.loadingSingleBooking = false;
+        state.errorSingleBooking = action.payload;
+      })
+
+      /**
+       * ============================================================
        * 🏨 HOTEL BOOKINGS
        * ============================================================
        */
@@ -73,6 +98,25 @@ const adminBookingSlice = createSlice({
       .addCase(getAllHotelBookingsAdmin.rejected, (state, action) => {
         state.loadingHotels = false;
         state.errorHotels = action.payload;
+      })
+
+      /**
+       * ============================================================
+       * 🏨 FETCH SINGLE HOTEL BOOKING BY ID
+       * ============================================================
+       */
+      .addCase(getHotelBookingByIdAdmin.pending, (state) => {
+        state.loadingSingleBooking = true;
+        state.errorSingleBooking = null;
+        state.singleBooking = null;
+      })
+      .addCase(getHotelBookingByIdAdmin.fulfilled, (state, action) => {
+        state.loadingSingleBooking = false;
+        state.singleBooking = action.payload;
+      })
+      .addCase(getHotelBookingByIdAdmin.rejected, (state, action) => {
+        state.loadingSingleBooking = false;
+        state.errorSingleBooking = action.payload;
       })
 
       /**

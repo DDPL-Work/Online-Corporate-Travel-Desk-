@@ -12,6 +12,11 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    orderId: {
+      type: String,
+      unique: true,
+      index: true,
+    },
 
     bookingType: {
       type: String,

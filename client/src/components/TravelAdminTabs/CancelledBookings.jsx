@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import {
   FiSearch,
@@ -15,10 +16,6 @@ import {
   getAllFlightBookingsAdmin,
   getCancelledHotelBookingsAdmin,
 } from "../../Redux/Actions/travelAdmin.thunks";
-import {
-  FlightBookingModal,
-  HotelBookingModal,
-} from "./Modal/BookingRequestDetailsModal";
 import {
   LabeledField,
   StatCard,
@@ -74,11 +71,11 @@ function CancelledFlightSection() {
   const [travelDate, setTravelDate] = useState("");
   const [cancelStatusFilter, setCancelStatus] = useState("All");
   const [corpFilter, setCorp] = useState("All");
-  const [selectedBooking, setSelectedBooking] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const flightBookings = useSelector(
     (state) => state.adminBooking.flightBookings,
   );
@@ -308,13 +305,12 @@ function CancelledFlightSection() {
           <table className="w-full border-collapse min-w-[960px]">
             <thead>
               <tr className="bg-red-800 text-red-100">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Traveller Name</Th>
                 <Th>Booked Date</Th>
                 <Th>Cancelled Date</Th>
-                <Th>Refund Amount</Th>
                 <Th>Cancel Status</Th>
-                <Th>PNR / Cancel Request ID</Th>
+                <Th>PNR</Th>
                 <Th>Action</Th>
               </tr>
             </thead>
@@ -342,7 +338,7 @@ function CancelledFlightSection() {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={b._id} />
+                      <IdCell id={b.orderId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
@@ -373,19 +369,14 @@ function CancelledFlightSection() {
                           )
                         : "—"}
                     </td>
-                    <td className="px-4 py-3 font-bold text-slate-900">
-                      ₹{(b.refundAmount ?? b.amount ?? 0).toLocaleString()}
-                    </td>
+
                     <td className="px-4 py-3">
                       <CancelStatusBadge
                         status={mapCancelStatus(b.cancelStatus || b.status)}
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <DualCell
-                        primary={b.pnr}
-                        secondary={b.providerBookingId}
-                      />
+                      {b.pnr}
                     </td>
 
                     {/* <td className="px-4 py-3">
@@ -399,7 +390,7 @@ function CancelledFlightSection() {
                     </td> */}
                     <td>
                       <button
-                        onClick={() => setSelectedBooking(b)}
+                        onClick={() => navigate(`/employee-flight-booking/${b._id}?source=cancelled`)}
                         className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50]"
                       >
                         View
@@ -435,12 +426,6 @@ function CancelledFlightSection() {
           onPageChange={setCurrentPage}
         />
       </div>
-      {selectedBooking && (
-        <FlightBookingModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-        />
-      )}
     </div>
   );
 }
@@ -454,11 +439,11 @@ function CancelledHotelSection() {
   const [checkOutDate, setCheckOutDate] = useState("");
   const [cancelStatusFilter, setCancelStatus] = useState("All");
   const [corpFilter, setCorp] = useState("All");
-  const [selectedBooking, setSelectedBooking] = useState(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const hotelBookings = useSelector(
     (state) => state.adminBooking.cancelledHotelBookings,
   );
@@ -704,11 +689,10 @@ function CancelledHotelSection() {
           <table className="w-full border-collapse min-w-[960px]">
             <thead>
               <tr className="bg-red-800 text-red-100">
-                <Th>Booking ID</Th>
+                <Th>Order ID</Th>
                 <Th>Guest Name</Th>
                 <Th>Booked Date</Th>
                 <Th>Cancelled Date</Th>
-                <Th>Refund Amount</Th>
                 <Th>Cancel Status</Th>
                 <Th>Change Request ID</Th>
                 <Th>Reason</Th>
@@ -770,9 +754,7 @@ function CancelledHotelSection() {
                           )
                         : "—"}
                     </td>
-                    <td className="px-4 py-3 font-bold text-slate-900">
-                      ₹{(b.refundAmount ?? b.amount ?? 0).toLocaleString()}
-                    </td>
+
                     <td className="px-4 py-3">
                       <CancelStatusBadge
                         status={mapCancelStatus(b.cancelStatus || b.status)}
@@ -792,7 +774,7 @@ function CancelledHotelSection() {
                     </td>
                     <td>
                       <button
-                        onClick={() => setSelectedBooking(b)}
+                        onClick={() => navigate(`/employee-hotel-booking/${b._id}?source=cancelled`)}
                         className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50]"
                       >
                         View
@@ -828,12 +810,6 @@ function CancelledHotelSection() {
           onPageChange={setCurrentPage}
         />
       </div>
-      {selectedBooking && (
-        <HotelBookingModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-        />
-      )}
     </div>
   );
 }
