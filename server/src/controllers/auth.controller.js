@@ -12,6 +12,8 @@ const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const emailService = require("../services/email.service");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
 const { default: mongoose } = require("mongoose");
 
 // Map collections to roles
@@ -148,6 +150,32 @@ exports.login = asyncHandler(async (req, res) => {
     userResponse.department = foundUser.user.department;
   }
 
+  // Fire-and-forget login success email (never blocks the login response)
+  const loginName =
+    foundUser.user.name?.firstName
+    ? `${foundUser.user.name.firstName} ${foundUser.user.name.lastName || ''}`.trim()
+    : foundUser.user.name || 'User';
+
+  emailService
+    .sendLoginSuccessEmail({
+      email: foundUser.user.email,
+      name: loginName,
+      role: foundUser.role,
+      loginTime: new Date(),
+      ipAddress: req.ip || req.headers['x-forwarded-for'] || 'Unknown',
+    })
+    .catch((err) => console.warn('Login email failed (non-critical):', err.message));
+
+  // ── Notify Super Admin: OPS Login Alert ──────
+  if (foundUser.role === "ops-member") {
+    notify(EVENTS.OPS_LOGIN_ALERT, {
+      opsMemberName:  loginName,
+      opsMemberEmail: foundUser.user.email,
+      loginTime:      new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+      ipAddress:      req.ip || req.headers['x-forwarded-for'] || 'Unknown',
+    });
+  }
+
   res.status(200).json({
     success: true,
     token,
@@ -155,6 +183,7 @@ exports.login = asyncHandler(async (req, res) => {
     user: userResponse,
   });
 });
+
 
 
 // ----------------------

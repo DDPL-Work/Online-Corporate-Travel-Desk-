@@ -1228,6 +1228,7 @@ export default function FlightSearchResults() {
                   <OnwardFlightList
                     flights={onwardFlights}
                     selectedFlight={selectedOnward}
+                    traceId={traceId}
                     onSelect={(flight) => {
                       setSelectedOnward(flight);
                       setActiveTab("return");
@@ -1240,6 +1241,7 @@ export default function FlightSearchResults() {
                     flights={returnFlights}
                     enabled={!!selectedOnward}
                     selectedFlight={selectedReturn}
+                    traceId={traceId}
                     onSelect={setSelectedReturn}
                   />
                 )}

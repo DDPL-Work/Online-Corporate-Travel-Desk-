@@ -9,6 +9,8 @@ const Ledger = require("../models/Ledger");
 const tboService = require("../services/tektravels/flight.service");
 const pdfService = require("../services/pdf.service");
 const notificationService = require("../services/notification.service");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
 const { generateBookingReference, generateOrderId } = require("../utils/helpers");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
@@ -436,15 +438,39 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   });
 
   /* ================= NOTIFICATION ================= */
+  const _flightRequesterEmail = user.email;
+  const _flightRequesterName = user.name?.firstName
+    ? `${user.name.firstName} ${user.name.lastName || ''}`.trim()
+    : user.name || 'Employee';
+  const _flightOrderId = bookingRequest.orderId || bookingRequest.bookingReference;
 
-  // Only send approval notifications if still pending
-  if (requestStatus === "pending_approval") {
-    await notificationService.sendApprovalNotifications({
-      bookingReference: bookingRequest.bookingReference,
-      requester: user,
-      corporateId: corporate._id,
+  // Notify Travel Admin + Manager of new request
+  notify(EVENTS.BOOKING_REQUEST_CREATED, {
+    corporateId:   corporate._id,
+    employeeId:    user._id,
+    employeeEmail: _flightRequesterEmail,
+    employeeName:  _flightRequesterName,
+    managerId:     approverId || null,
+    orderId:       _flightOrderId,
+    bookingType:   'flight',
+    amount:        bookingRequest.pricingSnapshot?.totalAmount,
+    relatedId:     bookingRequest._id,
+  });
+
+  // If a manager is selected, also send BOOKING_APPROVAL_REQUIRED to them
+  if (approverId) {
+    notify(EVENTS.BOOKING_APPROVAL_REQUIRED, {
+      corporateId:  corporate._id,
+      managerId:    approverId,
+      employeeName: _flightRequesterName,
+      orderId:      _flightOrderId,
+      bookingType:  'flight',
+      amount:       bookingRequest.pricingSnapshot?.totalAmount,
+      relatedId:    bookingRequest._id,
     });
   }
+
+
 
   /* ================= AUTO-APPROVAL: CREATE BOOKING INTENT ================= */
   if (requestStatus === "approved" && bookingType === "flight") {
@@ -503,7 +529,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
   /* ================= RESPONSE ================= */
 
-  const isAutoApproved = requestStatus === "approved";
+  // const isAutoApproved = requestStatus === "approved";
 
   res.status(201).json(
     new ApiResponse(
@@ -1336,6 +1362,13 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
   booking.executionStatus = "ticketed";
   await booking.save();
 
+  // Notify User
+  await notificationService.sendBookingNotification(
+    booking,
+    { _id: booking.userId },
+    "confirmation"
+  );
+
   /* ✅ RETURN */
   return {
     bookingId: booking._id,
@@ -1583,6 +1616,15 @@ exports.manualTicketNonLcc = asyncHandler(async (req, res) => {
   booking.bookingResult.ticketResponse = ticketResp;
 
   await booking.save();
+
+  if (booking.executionStatus === "ticketed") {
+    // Notify User
+    await notificationService.sendBookingNotification(
+      booking,
+      { _id: booking.userId },
+      "confirmation"
+    );
+  }
 
   return res.status(200).json(
     new ApiResponse(

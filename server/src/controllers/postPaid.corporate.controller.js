@@ -2,7 +2,7 @@ const Corporate = require("../models/Corporate");
 const CreditTransaction = require("../models/CreditTransaction");
 const Ledger = require("../models/Ledger");
 const User = require("../models/User");
-const { ApiError } = require("../utils/ApiError");
+const ApiError = require("../utils/ApiError");
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 function computeCycles(onboardedAt, cycleDays) {
@@ -36,7 +36,8 @@ function trackId(corporateId, cycleIndex) {
 // =======================================
 exports.getPostpaidBalance = async (req, res, next) => {
   try {
-    const corporateId = (req.user.role === "super-admin" && req.query.corporateId) 
+    const isAdmin = ["super-admin", "ops-member"].includes(req.user.role);
+    const corporateId = (isAdmin && req.query.corporateId) 
       ? req.query.corporateId 
       : req.user.corporateId;
 
@@ -118,7 +119,8 @@ exports.getPostpaidTransactions = async (req, res, next) => {
   try {
     const { startDate, endDate, department, page = 1, limit = 10 } = req.query;
 
-    const corporateId = (req.user.role === "super-admin" && req.query.corporateId)
+    const isAdmin = ["super-admin", "ops-member"].includes(req.user.role);
+    const corporateId = (isAdmin && req.query.corporateId)
       ? req.query.corporateId
       : req.user.corporateId;
 
@@ -169,7 +171,8 @@ exports.getPostpaidTransactions = async (req, res, next) => {
 // =======================================
 exports.getPreviousCycles = async (req, res, next) => {
   try {
-    const corporateId = (req.user.role === "super-admin" && req.query.corporateId)
+    const isAdmin = ["super-admin", "ops-member"].includes(req.user.role);
+    const corporateId = (isAdmin && req.query.corporateId)
       ? req.query.corporateId
       : req.user.corporateId;
 
@@ -257,7 +260,8 @@ exports.getPreviousCycles = async (req, res, next) => {
 // =======================================
 exports.getCycleTransactions = async (req, res, next) => {
   try {
-    const corporateId = (req.user.role === "super-admin" && req.query.corporateId)
+    const isAdmin = ["super-admin", "ops-member"].includes(req.user.role);
+    const corporateId = (isAdmin && req.query.corporateId)
       ? req.query.corporateId
       : req.user.corporateId;
 

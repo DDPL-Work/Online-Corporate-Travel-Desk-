@@ -1,0 +1,45 @@
+// server/src/events/eventConstants.js
+// Central registry for ALL notification event names
+
+module.exports = {
+  // ── CORPORATE ─────────────────────────────────────────────
+  CORPORATE_APPROVED:              'CORPORATE_APPROVED',
+  CORPORATE_APPROVED_BY_OPS:       'CORPORATE_APPROVED_BY_OPS',
+  CORPORATE_UPDATED_BY_OPS:        'CORPORATE_UPDATED_BY_OPS',
+  CORPORATE_REGISTERED:            'CORPORATE_REGISTERED',
+
+  // ── WALLET / CREDIT ───────────────────────────────────────
+  WALLET_RECHARGED:                'WALLET_RECHARGED',
+  WALLET_LOW:                      'WALLET_LOW',
+  CREDIT_LIMIT_LOW:                'CREDIT_LIMIT_LOW',
+  CREDIT_LIMIT_EXCEEDED:           'CREDIT_LIMIT_EXCEEDED',
+  CREDIT_CYCLE_END:                'CREDIT_CYCLE_END',
+  CREDIT_CYCLE_START:              'CREDIT_CYCLE_START',
+
+  // ── BOOKING ───────────────────────────────────────────────
+  BOOKING_REQUEST_CREATED:         'BOOKING_REQUEST_CREATED',
+  BOOKING_APPROVED:                'BOOKING_APPROVED',
+  BOOKING_REJECTED:                'BOOKING_REJECTED',
+  BOOKING_CONFIRMED:               'BOOKING_CONFIRMED',
+  BOOKING_CANCELLED:               'BOOKING_CANCELLED',
+  BOOKING_REISSUED:                'BOOKING_REISSUED',
+  BOOKING_OFFLINE_CANCELLED:       'BOOKING_OFFLINE_CANCELLED',
+  BOOKING_APPROVAL_REQUIRED:       'BOOKING_APPROVAL_REQUIRED',
+
+  // ── MANAGER ───────────────────────────────────────────────
+  MANAGER_PROMOTION:               'MANAGER_PROMOTION',
+  MANAGER_ASSIGNED_TO_EMPLOYEE:    'MANAGER_ASSIGNED_TO_EMPLOYEE',
+  MANAGER_REQUEST_REVIEWED:        'MANAGER_REQUEST_REVIEWED',
+  MANAGER_BOOKING_ACTION:          'MANAGER_BOOKING_ACTION',
+  TEAM_BOOKING_ACTIVITY:           'TEAM_BOOKING_ACTIVITY',
+  EMPLOYEE_MANAGER_FIRST_APPROVAL: 'EMPLOYEE_MANAGER_FIRST_APPROVAL',
+
+  // ── EMPLOYEE ──────────────────────────────────────────────
+  SSR_POLICY_UPDATED:              'SSR_POLICY_UPDATED',
+  UPCOMING_TRIP_REMINDER:          'UPCOMING_TRIP_REMINDER',
+
+  // ── OPS / SUPER ADMIN ─────────────────────────────────────
+  OPS_MEMBER_CREATED:              'OPS_MEMBER_CREATED',
+  OPS_LOGIN_ALERT:                 'OPS_LOGIN_ALERT',
+  OPS_PERMISSION_CHANGED:          'OPS_PERMISSION_CHANGED',
+};

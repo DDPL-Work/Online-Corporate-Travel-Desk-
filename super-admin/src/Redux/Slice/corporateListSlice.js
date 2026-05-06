@@ -176,16 +176,30 @@ const corporateListSlice = createSlice({
       // ----------------------
       // APPROVE
       // ----------------------
+      .addCase(approveCorporate.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(approveCorporate.fulfilled, (state, action) => {
+        state.loading = false;
         state.corporates = state.corporates.map((c) =>
           c._id === action.payload._id ? action.payload : c
         );
+      })
+      .addCase(approveCorporate.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       })
 
       // ----------------------
       // UPDATE
       // ----------------------
+      .addCase(updateCorporate.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(updateCorporate.fulfilled, (state, action) => {
+        state.loading = false;
         state.corporates = state.corporates.map((c) =>
           c._id === action.payload._id ? action.payload : c
         );
@@ -197,14 +211,27 @@ const corporateListSlice = createSlice({
           state.selectedCorporate = action.payload;
         }
       })
+      .addCase(updateCorporate.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
 
       // ----------------------
       // TOGGLE STATUS
       // ----------------------
+      .addCase(toggleCorporateStatus.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(toggleCorporateStatus.fulfilled, (state, action) => {
+        state.loading = false;
         state.corporates = state.corporates.map((c) =>
           c._id === action.payload._id ? action.payload : c
         );
+      })
+      .addCase(toggleCorporateStatus.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       });
   },
 });

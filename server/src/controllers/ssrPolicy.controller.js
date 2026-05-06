@@ -5,6 +5,9 @@ const User = require("../models/User");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
+
 
 /* ─────────────────────────────────────────────────────────────────────────────
    HELPERS
@@ -93,6 +96,18 @@ exports.upsertPolicy = asyncHandler(async (req, res) => {
       setDefaultsOnInsert: true,
     }
   );
+
+  if (employee && employee._id) {
+    notify(EVENTS.SSR_POLICY_UPDATED, {
+      employeeId: employee._id,
+      employeeName: employee.name?.firstName || "Employee",
+      employeeEmail: employee.email,
+      corporateId: req.user.corporateId,
+      policyName: "SSR Allowances",
+      updatedBy: req.user.name?.firstName || "Admin",
+      effectiveDate: new Date().toLocaleDateString("en-IN"),
+    });
+  }
 
   res.status(200).json(
     new ApiResponse(200, policy, "SSR policy saved successfully")

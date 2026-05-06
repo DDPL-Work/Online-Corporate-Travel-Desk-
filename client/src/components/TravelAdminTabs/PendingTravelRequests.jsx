@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams } from "react-router-dom";
+
 import { FiClock, FiDollarSign, FiCheck, FiList } from "react-icons/fi";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import TableScrollWrapper from "../common/TableScrollWrapper";
@@ -32,14 +34,24 @@ export default function PendingTravelRequests() {
     (state) => state.approvals,
   );
 
-  const [activeTab, setActiveTab] = useState("flight");
+  const [searchParams] = useSearchParams();
+  const typeQuery = searchParams.get("type");
+
+  const [activeTab, setActiveTab] = useState(typeQuery === "hotel" ? "hotel" : "flight");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRequest, setSelectedRequest] = useState(null);
+
+  useEffect(() => {
+    if (typeQuery) {
+      setActiveTab(typeQuery === "hotel" ? "hotel" : "flight");
+    }
+  }, [typeQuery]);
 
   useEffect(() => {
     dispatch(fetchApprovals({ status: "pending_approval" }));
     dispatch(fetchCorporateAdmin());
   }, [dispatch]);
+
 
   const requests = useMemo(() => {
     return list.map((b) => {

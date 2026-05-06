@@ -570,8 +570,8 @@ function SelectedRoomDetailsCard({
     (Array.isArray(room?.name) ? [...new Set(room.name)].join(", ") : room?.name) ||
     "Room";
 
-  const baseFare = room?.NetAmount || 0;
-  const totalTax = room?.NetTax || 0;
+  const baseFare = room?.TotalFare || room?.NetAmount || 0;
+  const totalTax = room?.TotalTax || room?.NetTax || 0;
   const totalFare = baseFare + totalTax;
 
   const cancelPolicies =
@@ -1290,25 +1290,25 @@ const HotelReviewBooking = () => {
   const selectedRooms = rooms || [];
   
   const preBookBaseFare = preBookRooms.reduce(
-    (sum, r) => sum + (r.NetAmount || r.TotalFare || r.Price?.TotalFare || 0),
+    (sum, r) => sum + (r.TotalFare || r.NetAmount || r.Price?.TotalFare || 0),
     0,
   );
   const preBookTax = preBookRooms.reduce(
-    (sum, r) => sum + (r.NetTax || r.TotalTax || r.Price?.Tax || 0),
+    (sum, r) => sum + (r.TotalTax || r.NetTax || r.Price?.Tax || 0),
     0,
   );
 
   let baseFare = preBookBaseFare > 0 
     ? preBookBaseFare 
     : selectedRooms.reduce(
-        (sum, r) => sum + (r.NetAmount || r.TotalFare || r.Price?.TotalFare || 0),
+        (sum, r) => sum + (r.TotalFare || r.NetAmount || r.Price?.TotalFare || 0),
         0,
       );
 
   let tax = preBookBaseFare > 0
     ? preBookTax
     : selectedRooms.reduce(
-        (sum, r) => sum + (r.NetTax || r.TotalTax || r.Price?.Tax || 0),
+        (sum, r) => sum + (r.TotalTax || r.NetTax || r.Price?.Tax || 0),
         0,
       );
 
@@ -1560,17 +1560,36 @@ const HotelReviewBooking = () => {
             noOfChild: r.Children || r.children || 0,
             childAge: r.ChildrenAges || r.ChildAge || r.childAges || [],
           })) || roomGuests,
-        rooms: selectedRoom.map((room) => ({
-          bookingCode:
-            room.BookingCode || room.RoomTypeCode || room.RatePlanCode,
-          price: room.Price,
-          totalFare: room.TotalFare,
-          totalTax: room.TotalTax,
-          roomIndex: room.RoomIndex,
-          name: room.Name,
-          mealType: room.MealType,
-          isRefundable: room.IsRefundable,
-        })),
+        rooms: (() => {
+          const baseRooms = preBookRooms.length > 0 ? preBookRooms : selectedRoom;
+          const noOfRoomsReq = searchParams?.rooms?.length || 1;
+          
+          // If we have fewer room detail objects than requested rooms, 
+          // expand the list by duplicating and distributing the price.
+          const expandedRooms = baseRooms.length < noOfRoomsReq && baseRooms.length > 0
+            ? Array.from({ length: noOfRoomsReq }, (_, i) => ({
+                ...baseRooms[0],
+                // Distribute total price across rooms
+                TotalFare: (baseRooms[0].TotalFare || baseRooms[0].NetAmount || 0) / noOfRoomsReq,
+                TotalTax: (baseRooms[0].TotalTax || baseRooms[0].NetTax || 0) / noOfRoomsReq,
+                NetAmount: (baseRooms[0].NetAmount || 0) / noOfRoomsReq,
+                NetTax: (baseRooms[0].NetTax || 0) / noOfRoomsReq,
+                RoomIndex: i + 1 
+              }))
+            : baseRooms;
+
+          return expandedRooms.map((room) => ({
+            bookingCode:
+              room.BookingCode || room.RoomTypeCode || room.RatePlanCode,
+            price: room.Price,
+            totalFare: room.TotalFare || room.NetAmount,
+            totalTax: room.TotalTax || room.NetTax,
+            roomIndex: room.RoomIndex,
+            name: Array.isArray(room.Name) ? (room.Name[0] || room.Name) : room.Name,
+            mealType: room.MealType,
+            isRefundable: room.IsRefundable,
+          }));
+        })(),
         PaxRooms: buildPaxRooms(searchParams.rooms),
         NoOfRooms: searchParams.rooms.length,
       },
@@ -2449,6 +2468,14 @@ const HotelReviewBooking = () => {
                   </p>
                 </div>
                 <div className="p-5 space-y-3">
+                  <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
+                    <span>Total Fare</span>
+                    <span>₹{baseFare.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-slate-500 font-medium">
+                    <span>Total Tax</span>
+                    <span>₹{tax.toLocaleString("en-IN")}</span>
+                  </div>
                   <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
                     <span className="text-sm font-bold text-slate-600">
                       Total

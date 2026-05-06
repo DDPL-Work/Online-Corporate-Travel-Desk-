@@ -6,6 +6,8 @@ import { BsBell } from "react-icons/bs";
 import logo from '../../public/logo-traveamer.svg';
 import AuthModal from "../Pages/Auth/AuthModal";
 import { LuWorkflow, LuPlane } from "react-icons/lu";
+import NotificationBell from "../components/common/NotificationBell";
+
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { logoutUser } from "../Redux/Slice/authSlice";
@@ -248,12 +250,7 @@ export default function LandingHeader() {
       <div className="hidden md:flex items-center gap-4">
         {isAuthenticated && user ? (
           <div className="flex items-center gap-3">
-            <button
-              className="w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-black/5"
-              style={{ color: C.navy }}
-            >
-              <BsBell size={18} />
-            </button>
+            <NotificationBell />
 
             <div className="relative group">
               <div
@@ -396,13 +393,16 @@ export default function LandingHeader() {
 
           {isAuthenticated && user ? (
             <div className="flex flex-col gap-1">
-              <div className="px-3 py-3 bg-white/40 rounded-xl mb-1">
-                <p className="text-sm font-bold text-gray-800 leading-tight">
-                  {user?.name?.firstName} {user?.name?.lastName}
-                </p>
-                <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider mt-0.5">
-                  {user?.role?.replace("-", " ")}
-                </p>
+              <div className="px-3 py-3 bg-white/40 rounded-xl mb-1 flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-bold text-gray-800 leading-tight">
+                    {user?.name?.firstName} {user?.name?.lastName}
+                  </p>
+                  <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider mt-0.5">
+                    {user?.role?.replace("-", " ")}
+                  </p>
+                </div>
+                <NotificationBell />
               </div>
               <button
                 onClick={() => {

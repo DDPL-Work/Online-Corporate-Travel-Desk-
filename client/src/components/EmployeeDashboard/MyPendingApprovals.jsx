@@ -17,7 +17,7 @@ import { MdHotel, MdFlightTakeoff } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchMyBookingRequests } from "../../Redux/Actions/booking.thunks";
 import { fetchMyHotelRequests } from "../../Redux/Actions/hotelBooking.thunks";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Status Config  (mirrors REFUND_CONFIG pattern)                 */
@@ -401,6 +401,8 @@ function HotelRequestCard({ trip, onView }) {
 export default function MyPendingApprovals() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const typeQuery = searchParams.get("type");
 
   const { myRequests, loading: flightLoading } = useSelector(
     (state) => state.bookings,
@@ -409,16 +411,26 @@ export default function MyPendingApprovals() {
     (state) => state.hotelBookings,
   );
 
-  const [activeTab, setActiveTab] = useState("flight");
+  const [activeTab, setActiveTab] = useState(typeQuery === "hotel" ? "hotel" : "flight");
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
-    if (activeTab === "flight") dispatch(fetchMyBookingRequests());
-    else dispatch(fetchMyHotelRequests());
-  }, [dispatch, activeTab]);
+    if (typeQuery) {
+      setActiveTab(typeQuery === "hotel" ? "hotel" : "flight");
+    }
+  }, [typeQuery]);
+
+  useEffect(() => {
+    if (activeTab === "flight") {
+      dispatch(fetchMyBookingRequests());
+    } else {
+      dispatch(fetchMyHotelRequests());
+    }
+  }, [activeTab, dispatch]);
+
 
   const sourceData = activeTab === "flight" ? myRequests : hotelRequests;
 

@@ -4,8 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { MdOutlineFlight, MdAirlineSeatReclineNormal } from "react-icons/md";
 import { BsSuitcase } from "react-icons/bs";
 import { BiSolidOffer } from "react-icons/bi";
-import { FaChevronDown, FaChevronUp } from "react-icons/fa";
-import { FlightDetailsDropdown } from "../One-wayFlightCard";
+
+import { FlightDetailsModal } from "../FlightDetailsModal";
 import {
   airlineLogo,
   FLIGHT_STATUS_MAP,
@@ -202,24 +202,15 @@ export default function ReturnInternationalFlightCard({
           </div>
 
           <div className="flex items-center gap-2 md:gap-3 flex-wrap justify-end">
-            {/* ✅ VIEW FARE DETAILS EXPLICITLY */}
+
+
             <button
-              onClick={() => setShowFareDetails((prev) => !prev)}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-xl border transition-colors ${
-                showFareDetails
-                  ? "bg-[#0A203E] text-white border-[#0A203E]"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
+              onClick={() => setShowFareDetails(true)}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-xl border transition-colors bg-white text-slate-700 border-slate-200 hover:bg-slate-50`}
             >
-              View Fare Details
-              {showFareDetails ? (
-                <FaChevronUp className="text-[10px]" />
-              ) : (
-                <FaChevronDown className="text-[10px]" />
-              )}
+              Flight Details
             </button>
 
-            {/* ✅ ONLY ONE MORE FARES BUTTON */}
             <button
               onClick={handleMoreFaresClick}
               disabled={isLoadingMoreFares}
@@ -241,7 +232,6 @@ export default function ReturnInternationalFlightCard({
               )}
             </button>
 
-            {/* EXISTING BUTTON */}
             <button
               onClick={() => onContinue(flight)}
               className="relative group px-10 py-3.5 bg-[#C9A84C] text-[#0A203E] rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] uppercase tracking-wider text-sm"
@@ -252,12 +242,12 @@ export default function ReturnInternationalFlightCard({
         </div>
       </div>
       
-      {/* Expanded Fare Details via Generic Dropdown */}
-      {showFareDetails && (
-        <div className="border-t border-slate-200">
-          <FlightDetailsDropdown selectedFlight={flight} />
-        </div>
-      )}
+      <FlightDetailsModal 
+        isOpen={showFareDetails}
+        onClose={() => setShowFareDetails(false)}
+        selectedFlight={flight} 
+        traceId={traceId}
+      />
     </div>
   );
 }
