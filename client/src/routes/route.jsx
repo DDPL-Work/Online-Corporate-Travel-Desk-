@@ -71,6 +71,8 @@ import MidSizeBusiness from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 import InternalTravelDeskLanding from "../Pages/Landing/CompanySpecific/InternalTravelDeskLanding";
 import SsrManagement from "../components/TravelAdminTabs/SsrManagement";
 import ApprovalWorkflow from "../Pages/Landing/Platform/ApprovalWorkflow";
+import AboutUs from "../Pages/Landing/About-Us/AboutUs";
+import FAQs from "../Pages/Landing/FAQ/FAQs";
 import UserAgreement from "../Pages/Legal/UserAgreement";
 import TermsOfService from "../Pages/Legal/TermsOfService";
 import PrivacyPolicy from "../Pages/Legal/PrivacyPolicy";
@@ -80,6 +82,7 @@ import TeamBookingDetails from "../components/CorporateManagerTabs/TeamBookingDe
 import TeamHotelBookingDetails from "../components/CorporateManagerTabs/TeamHotelBookingDetails";
 import FlightBookingDetails from "../components/TravelAdminTabs/Shared/FlightBookingDetails";
 import HotelBookingDetails1 from "../components/TravelAdminTabs/Shared/HotelBookingDetails";
+import WalletPhonePeStatusPage from "../Pages/Payments/WalletPhonePeStatusPage";
 // import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 
 export const appRouter = createBrowserRouter([
@@ -108,11 +111,11 @@ export const appRouter = createBrowserRouter([
               { path: "/update-profile", element: <ProfileSettings /> },
               { path: "total-bookings", element: <BookingsDashboard /> },
 
-                {
+              {
                 path: "/employee-flight-booking/:id",
                 element: <FlightBookingDetails />,
               },
-               {
+              {
                 path: "/employee-hotel-booking/:id",
                 element: <HotelBookingDetails1 />,
               },
@@ -140,11 +143,17 @@ export const appRouter = createBrowserRouter([
                 element: <TravelAdminProfile />,
               },
               { path: "/corporate-wallet", element: <CorporateWallet /> },
-              { path: "/credit-utilization", element: <CreditUtilizationPostpaid /> },
+              {
+                path: "/credit-utilization",
+                element: <CreditUtilizationPostpaid />,
+              },
               { path: "/ssr-management", element: <SsrManagement /> },
               { path: "/branding-settings", element: <BrandingSettings /> },
               { path: "/reissue-requests", element: <ReissueRequests /> },
-              { path: "/offline-cancellations", element: <OfflineCancellationQueries /> },
+              {
+                path: "/offline-cancellations",
+                element: <OfflineCancellationQueries />,
+              },
             ],
           },
         ],
@@ -186,11 +195,20 @@ export const appRouter = createBrowserRouter([
                 path: "/manager/rejected-requests",
                 element: <RejectedTravelRequestsForManager />,
               },
-              { path: "/manager/upcoming-trips", element: <UpcomingTripsForManager /> },
+              {
+                path: "/manager/upcoming-trips",
+                element: <UpcomingTripsForManager />,
+              },
               { path: "/manager/past-trips", element: <PastTripsForManager /> },
               { path: "/manager/team-management", element: <MyTeam /> },
-              { path: "/manager/reissue-requests", element: <ReissueRequests /> },
-              { path: "/manager/offline-cancellations", element: <OfflineCancellationQueries /> },
+              {
+                path: "/manager/reissue-requests",
+                element: <ReissueRequests />,
+              },
+              {
+                path: "/manager/offline-cancellations",
+                element: <OfflineCancellationQueries />,
+              },
             ],
           },
         ],
@@ -222,9 +240,15 @@ export const appRouter = createBrowserRouter([
                 path: "/my-cancelled-bookings",
                 element: <CancelledFlightsPage />,
               },
-              { path: "/my-cancelled-booking/:id", element: <BookingDetails /> },
+              {
+                path: "/my-cancelled-booking/:id",
+                element: <BookingDetails />,
+              },
               { path: "/my-reissued", element: <MyReissueRequests /> },
-              { path: "/my-offline-cancellations", element: <OfflineCancellationQueries /> },
+              {
+                path: "/my-offline-cancellations",
+                element: <OfflineCancellationQueries />,
+              },
               { path: "/my-upcoming-trips", element: <MyUpcomingTrips /> },
               { path: "/my-past-trips", element: <MyPastTrips /> },
               {
@@ -271,13 +295,17 @@ export const appRouter = createBrowserRouter([
       { path: "/who-it's-for/mid-size-business", element: <MidSizeBusiness /> },
       { path: "/platform/flight-booking-info", element: <FlightBookingInfo /> },
       { path: "/platform/hotel-booking-info", element: <HotelBookingInfo /> },
-      { path: "/platform/approval-and-workflow", element: <ApprovalWorkflow /> },
+      {
+        path: "/platform/approval-and-workflow",
+        element: <ApprovalWorkflow />,
+      },
+      { path: "/about-us", element: <AboutUs /> },
+      { path: "/faq", element: <FAQs /> },
+
       { path: "/legal/user-agreement", element: <UserAgreement /> },
       { path: "/legal/terms-of-service", element: <TermsOfService /> },
       { path: "/legal/privacy-policy", element: <PrivacyPolicy /> },
       { path: "/legal/contact-us", element: <ContactUs /> },
-
-
 
       { path: "/travel", element: <InternalTravelDeskLanding /> },
       {

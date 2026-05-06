@@ -97,7 +97,12 @@ const HotelCard = ({ hotel }) => {
             {/* Location */}
             <div className="flex items-center gap-1 text-xs text-slate-500 mb-2">
               <MdLocationOn style={{ color: ORANGE }} />
-              {hotel.address}
+              <span className="flex-1">{hotel.address}</span>
+              {hotel.distance !== undefined && hotel.distance !== Infinity && (
+                <span className="shrink-0 font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                  {hotel.distance.toFixed(1)} km away
+                </span>
+              )}
             </div>
 
             {/* Meal + Cancellation */}

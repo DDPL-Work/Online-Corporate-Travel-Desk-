@@ -1,5 +1,14 @@
 const Notification = require("../models/Notification");
 const User = require("../models/User");
+const OpsMember = require("../models/OpsMember");
+const SuperAdmin = require("../models/SuperAdmin.model");
+const logger = require("../utils/logger");
+
+const getRecipientModel = (role) => {
+  if (role === "ops-member") return OpsMember;
+  if (role === "super-admin") return SuperAdmin;
+  return User;
+};
 
 /**
  * Get all notifications for the logged in user
@@ -114,9 +123,16 @@ exports.saveFcmToken = async (req, res) => {
       });
     }
 
-    // Add token if it doesn't exist
-    await User.findByIdAndUpdate(req.user.id, {
+    const RecipientModel = getRecipientModel(req.user.role);
+
+    await RecipientModel.findByIdAndUpdate(req.user.id, {
       $addToSet: { fcmTokens: token },
+    });
+
+    logger.info("FCM token saved successfully", {
+      userId: req.user.id,
+      role: req.user.role,
+      tokenPreview: `${token.slice(0, 12)}...${token.slice(-8)}`,
     });
 
     res.status(200).json({

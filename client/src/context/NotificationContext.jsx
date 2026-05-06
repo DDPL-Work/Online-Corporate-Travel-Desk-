@@ -1,6 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import { toast } from "sonner";
+import {
+  requestForToken,
+  subscribeToForegroundMessages,
+} from "../config/firebase";
 
 const NotificationContext = createContext();
 
@@ -12,12 +16,14 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
     const token = sessionStorage.getItem("token");
     if (!token) return;
 
     try {
+      setLoading(true);
       const response = await axios.get(`${API_URL}/notifications/my-notifications`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -27,7 +33,36 @@ export const NotificationProvider = ({ children }) => {
       }
     } catch (error) {
       console.error("Error fetching notifications:", error);
+    } finally {
+      setLoading(false);
     }
+  }, []);
+
+  const saveFcmToken = useCallback(async (fcmToken) => {
+    const token = sessionStorage.getItem("token");
+    if (!token || !fcmToken) return;
+
+    try {
+      await axios.post(
+        `${API_URL}/notifications/save-fcm-token`,
+        { token: fcmToken },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      console.info("[FCM:client] FCM token saved to backend");
+    } catch (error) {
+      console.error("Error saving FCM token:", error);
+    }
+  }, []);
+
+  const openDrawer = useCallback(() => {
+    setDrawerOpen(true);
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
   }, []);
 
   const markAsRead = async (id) => {
@@ -77,6 +112,7 @@ export const NotificationProvider = ({ children }) => {
 
   // Helper ref to track previous unread count to show toast
   const prevUnreadCountRef = useRef(0);
+  const suppressUnreadToastRef = useRef(false);
 
   useEffect(() => {
     const authToken = sessionStorage.getItem("token");
@@ -94,7 +130,53 @@ export const NotificationProvider = ({ children }) => {
   }, [fetchNotifications]);
 
   useEffect(() => {
+    const authToken = sessionStorage.getItem("token");
+    if (!authToken) return undefined;
+
+    let unsubscribe = () => {};
+    let mounted = true;
+
+    const setupFirebaseNotifications = async () => {
+      const fcmToken = await requestForToken();
+      if (mounted && fcmToken) {
+        await saveFcmToken(fcmToken);
+      }
+
+      unsubscribe = await subscribeToForegroundMessages((payload) => {
+        console.info("[FCM:client] Foreground notification payload received", payload);
+        suppressUnreadToastRef.current = true;
+        const title =
+          payload?.notification?.title ||
+          payload?.data?.title ||
+          "New notification";
+        const message =
+          payload?.notification?.body ||
+          payload?.data?.body ||
+          "You have a new notification.";
+
+        toast.info(title, {
+          description: message,
+        });
+        fetchNotifications();
+      });
+    };
+
+    setupFirebaseNotifications();
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [fetchNotifications, saveFcmToken]);
+
+  useEffect(() => {
     // Show toast if new notifications arrived
+    if (suppressUnreadToastRef.current) {
+      suppressUnreadToastRef.current = false;
+      prevUnreadCountRef.current = unreadCount;
+      return;
+    }
+
     if (unreadCount > prevUnreadCountRef.current) {
       const newNotificationsCount = unreadCount - prevUnreadCountRef.current;
       toast.info(`You have ${newNotificationsCount} new notification${newNotificationsCount > 1 ? 's' : ''}`);
@@ -108,10 +190,13 @@ export const NotificationProvider = ({ children }) => {
         notifications,
         unreadCount,
         loading,
+        drawerOpen,
         fetchNotifications,
         markAsRead,
         markAllAsRead,
         deleteNotification,
+        openDrawer,
+        closeDrawer,
       }}
     >
       {children}

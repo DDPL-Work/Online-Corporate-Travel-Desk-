@@ -1,21 +1,20 @@
-/// controllers/wallet.controller.js
-
 const Corporate = require("../models/Corporate");
 const WalletTransaction = require("../models/Wallet");
 const paymentService = require("../services/payment.service");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
-const { createRechargeLog } = require("../utils/walletLogger");
-const WalletRechargeLog = require("../models/WalletActivityLog");
-const { notify } = require("../notifications/orchestrator");
-const EVENTS = require("../events/eventConstants");
+const logger = require("../utils/logger");
+const { PAYMENT_GATEWAYS } = require("../config/payment.config");
 
-// @desc    Get wallet balance
-// @route   GET /api/v1/wallet/balance
-// @access  Private (Travel Admin)
 exports.getWalletBalance = asyncHandler(async (req, res) => {
-  const corporate = await Corporate.findById(req.user.corporateId);
+  const corporate = await Corporate.findById(req.user.corporateId).select(
+    "walletBalance",
+  );
+
+  if (!corporate) {
+    throw new ApiError(404, "Corporate not found");
+  }
 
   res.status(200).json(
     new ApiResponse(
@@ -24,41 +23,33 @@ exports.getWalletBalance = asyncHandler(async (req, res) => {
         balance: corporate.walletBalance,
         currency: "INR",
       },
-      "Wallet balance fetched successfully"
-    )
+      "Wallet balance fetched successfully",
+    ),
   );
 });
 
-// @desc    Get wallet transactions (paginated)
-// @route   GET /api/v1/wallet/transactions
-// @access  Private (Travel Admin)
 exports.getWalletTransactions = asyncHandler(async (req, res) => {
-  const {
-    type,
-    dateFrom,
-    dateTo,
-    page = 1,
-    limit = 10,
-  } = req.query;
-
+  const { type, dateFrom, dateTo, page = 1, limit = 10 } = req.query;
   const parsedPage = Number(page);
   const parsedLimit = Number(limit);
 
   const query = { corporateId: req.user.corporateId };
 
-  // 🔍 Filters
-  if (type) query.type = type;
+  if (type) {
+    query.type = type;
+  }
 
   if (dateFrom || dateTo) {
     query.createdAt = {};
-    if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
-    if (dateTo) query.createdAt.$lte = new Date(dateTo);
+    if (dateFrom) {
+      query.createdAt.$gte = new Date(dateFrom);
+    }
+    if (dateTo) {
+      query.createdAt.$lte = new Date(dateTo);
+    }
   }
 
-  // 📊 Total count (for pagination meta)
   const total = await WalletTransaction.countDocuments(query);
-
-  // 📦 Paginated fetch
   const transactions = await WalletTransaction.find(query)
     .populate("bookingId", "bookingReference")
     .sort({ createdAt: -1 })
@@ -77,192 +68,159 @@ exports.getWalletTransactions = asyncHandler(async (req, res) => {
           hasMore: parsedPage * parsedLimit < total,
         },
       },
-      "Wallet transactions fetched successfully"
-    )
+      "Wallet transactions fetched successfully",
+    ),
   );
 });
 
-// @desc    Initiate wallet recharge
-// @route   POST /api/v1/wallet/recharge
-// @access  Private (Travel Admin)
+exports.getPaymentOptions = asyncHandler(async (req, res) => {
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      paymentService.getPaymentOptions(),
+      "Payment options fetched successfully",
+    ),
+  );
+});
+
 exports.initiateRecharge = asyncHandler(async (req, res) => {
   const { amount } = req.body;
-  const corporate = await Corporate.findById(req.user.corporateId);
+  const corporate = await Corporate.findById(req.user.corporateId).select(
+    "classification",
+  );
+
+  if (!corporate) {
+    throw new ApiError(404, "Corporate not found");
+  }
 
   if (corporate.classification !== "prepaid") {
     throw new ApiError(400, "Wallet recharge is only for prepaid accounts");
   }
 
-  const order = await paymentService.createOrder(
+  const paymentSession = await paymentService.initiateWalletRecharge({
     amount,
-    `RECHARGE-${Date.now()}`,
-    corporate._id
-  );
-
-  // 🔔 LOG: PENDING
-  await createRechargeLog({
-    corporateId: corporate._id,
+    gateway: PAYMENT_GATEWAYS.PHONEPE,
+    corporateId: req.user.corporateId,
     userId: req.user.id,
-    amount,
-    status: "PENDING",
-    orderId: order.id,
+    customerPhone:
+      req.user.mobile || req.user.phone || req.user.phoneWithCode || null,
+    customerEmail: req.user.email || null,
+  });
+
+  logger.info("Wallet recharge initiated", {
+    corporateId: req.user.corporateId,
+    userId: req.user.id,
+    gateway: paymentSession.gateway,
+    orderId: paymentSession.orderId,
   });
 
   res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        orderId: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        keyId: process.env.RAZORPAY_KEY_ID,
-      },
-      "Recharge order created successfully"
-    )
+    new ApiResponse(200, paymentSession, "Recharge order created successfully"),
   );
 });
 
-// @desc    Verify payment and credit wallet
-// @route   POST /api/v1/wallet/verify-payment
-// @access  Private (Travel Admin)
-// exports.verifyPayment = asyncHandler(async (req, res) => {
-//   const { orderId, paymentId, signature } = req.body;
-
-//   const isValid = paymentService.verifyPaymentSignature(orderId, paymentId, signature);
-
-//   if (!isValid) {
-//     throw new ApiError(400, 'Invalid payment signature');
-//   }
-
-//   const corporate = await Corporate.findById(req.user.corporateId);
-
-//   // Capture payment
-//   const capture = await paymentService.capturePayment(paymentId, req.body.amount / 100);
-
-//   // Update wallet
-//   const balanceBefore = corporate.walletBalance;
-//   corporate.walletBalance += (req.body.amount / 100);
-//   await corporate.save();
-
-//   // Record transaction
-//   await WalletTransaction.create({
-//     corporateId: corporate._id,
-//     type: 'credit',
-//     amount: req.body.amount / 100,
-//     balanceBefore,
-//     balanceAfter: corporate.walletBalance,
-//     description: 'Wallet recharge',
-//     transactionId: paymentId,
-//     paymentGateway: {
-//       name: 'razorpay',
-//       orderId,
-//       paymentId,
-//       signature
-//     },
-//     processedBy: req.user.id,
-//     status: 'completed'
-//   });
-
-//   res.status(200).json(
-//     new ApiResponse(200, {
-//       balance: corporate.walletBalance,
-//       transaction: paymentId
-//     }, 'Wallet recharged successfully')
-//   );
-// });
-
 exports.verifyPayment = asyncHandler(async (req, res) => {
-  const { orderId, paymentId, signature, amount } = req.body;
+  const { orderId, paymentId, signature } = req.body;
 
-  const isValid = paymentService.verifyPaymentSignature(
+  const result = await paymentService.verifyRazorpayRecharge({
     orderId,
     paymentId,
-    signature
-  );
-
-  if (!isValid) {
-    // ❌ FAILED
-    await WalletRechargeLog.findOneAndUpdate(
-      { orderId },
-      {
-        status: "FAILED",
-        failureReason: "Invalid payment signature",
-      }
-    );
-    throw new ApiError(400, "Invalid payment signature");
-  }
-
-  const corporate = await Corporate.findById(req.user.corporateId);
-
-  const existingTxn = await WalletTransaction.findOne({
-    transactionId: paymentId,
-  });
-
-  if (existingTxn) {
-    return res.status(200).json(
-      new ApiResponse(
-        200,
-        {
-          balance: corporate.walletBalance,
-        },
-        "Payment already processed"
-      )
-    );
-  }
-
-  // ✅ PAYMENT IS ALREADY CAPTURED BY RAZORPAY
-  const creditAmount = amount / 100;
-
-  const balanceBefore = corporate.walletBalance;
-  corporate.walletBalance += creditAmount;
-  await corporate.save();
-
-  await WalletTransaction.create({
-    corporateId: corporate._id,
-    type: "credit",
-    amount: creditAmount,
-    balanceBefore,
-    balanceAfter: corporate.walletBalance,
-    description: "Wallet recharge",
-    transactionId: paymentId,
-    paymentGateway: {
-      name: "razorpay",
-      orderId,
-      paymentId,
-      signature,
-    },
-    processedBy: req.user.id,
-    status: "completed",
-  });
-
-   // ✅ SUCCESS LOG
-  await WalletRechargeLog.findOneAndUpdate(
-    { orderId },
-    {
-      status: "SUCCESS",
-      paymentId,
-      balanceBefore,
-      balanceAfter: corporate.walletBalance,
-    }
-  );
-
-  // ── Notify Travel Admin: Wallet Recharged ──
-  notify(EVENTS.WALLET_RECHARGED, {
-    corporateId: corporate._id,
-    amount: creditAmount,
-    newBalance: corporate.walletBalance,
-    transactionId: paymentId,
-    rechargedBy: req.user?.name?.firstName || req.user?.name || "Admin",
+    signature,
+    corporateId: req.user.corporateId,
+    userId: req.user.id,
   });
 
   res.status(200).json(
     new ApiResponse(
       200,
       {
-        balance: corporate.walletBalance,
-        transaction: paymentId,
+        balance: result.balance,
+        transaction: result.paymentId,
+        orderId: result.orderId,
+        status: result.status,
+        gateway: result.gateway,
       },
-      "Wallet recharged successfully"
-    )
+      result.status === "SUCCESS"
+        ? "Wallet recharged successfully"
+        : "Payment verification completed",
+    ),
   );
+});
+
+exports.verifyPhonePePayment = asyncHandler(async (req, res) => {
+  const { orderId } = req.body;
+
+  const result = await paymentService.verifyPhonePeRecharge({
+    orderId,
+    corporateId: req.user.corporateId,
+    userId: req.user.id,
+    source: "redirect_verification",
+  });
+
+  logger.info("PhonePe redirect verification completed", {
+    orderId,
+    paymentId: result.paymentId,
+    status: result.status,
+    state: result.state,
+    balance: result.balance,
+  });
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      result,
+      result.status === "SUCCESS"
+        ? "PhonePe payment verified successfully"
+        : "PhonePe payment verification completed",
+    ),
+  );
+});
+
+exports.getPaymentStatus = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { gateway } = req.query;
+
+  const status = await paymentService.getRechargeStatus({
+    orderId,
+    gateway,
+    corporateId: req.user.corporateId,
+    userId: req.user.id,
+  });
+
+   // ✅ SUCCESS LOG
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      status,
+      "Payment status fetched successfully",
+    ),
+  );
+});
+
+exports.handlePhonePeWebhook = asyncHandler(async (req, res) => {
+  try {
+    const status = await paymentService.handlePhonePeWebhook({
+      authorization: req.headers.authorization,
+      rawBody: req.rawBody,
+    });
+
+    logger.info("PhonePe webhook processed", {
+      orderId: status.orderId,
+      paymentId: status.paymentId,
+      status: status.status,
+      gateway: status.gateway,
+    });
+
+    return res.status(200).json({
+      success: true,
+      orderId: status.orderId,
+      status: status.status,
+    });
+  } catch (error) {
+    logger.error("PhonePe webhook processing failed", {
+      message: error.message,
+      stack: error.stack,
+    });
+    throw error;
+  }
 });

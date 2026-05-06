@@ -6,7 +6,7 @@ import { AiOutlineInfoCircle } from "react-icons/ai";
 import { BsSuitcase } from "react-icons/bs";
 import { BiSolidOffer } from "react-icons/bi";
 import { FaPlane } from "react-icons/fa";
-import { MdReceiptLong, MdLocalGasStation, MdAccessTime } from "react-icons/md";
+import { MdReceiptLong, MdLocalGasStation, MdAccessTime, MdRefresh } from "react-icons/md";
 
 
 import { airlineLogo, formatDate, formatTime } from "../../../utils/formatter";
@@ -600,6 +600,26 @@ export function FlightDetailsModal({ isOpen, onClose, selectedFlight, selectedFa
                           </div>
                         </div>
 
+                        {/* Date Change Policy */}
+                        {rule.reissue && rule.reissue.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500">
+                                <MdRefresh size={13} className="rotate-90" />
+                              </div>
+                              <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">Date Change Policy</h4>
+                            </div>
+                            <div className="rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+                              {rule.reissue.map((r, i) => (
+                                <div key={i} className={`flex items-center justify-between gap-6 px-5 py-4 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"} border-b border-slate-100 last:border-0`}>
+                                  <p className="text-sm font-semibold text-slate-700 leading-snug flex-1">{r.timeRange}</p>
+                                  <span className="shrink-0 text-xs font-black text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg whitespace-nowrap">{r.fee}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Airline Notes */}
                         {rule.notes && rule.notes.length > 0 && (
                           <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-100/50">
@@ -634,8 +654,8 @@ export function FlightDetailsModal({ isOpen, onClose, selectedFlight, selectedFa
                               <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Cancellation Fee</h4>
                            </div>
                            <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                              {legRules.filter(r => r.Type === "Cancellation").length > 0 ? (
-                                legRules.filter(r => r.Type === "Cancellation").map((rule, i) => (
+                              {legRules.filter(r => r.Type === "Cancellation" || r.Type === 0).length > 0 ? (
+                                legRules.filter(r => r.Type === "Cancellation" || r.Type === 0).map((rule, i) => (
                                   <RuleRow key={i} rule={rule} index={i} />
                                 ))
                               ) : (
@@ -657,8 +677,8 @@ export function FlightDetailsModal({ isOpen, onClose, selectedFlight, selectedFa
                               <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Date Change Fee</h4>
                            </div>
                            <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                              {legRules.filter(r => r.Type === "Reissue").length > 0 ? (
-                                legRules.filter(r => r.Type === "Reissue").map((rule, i) => (
+                              {legRules.filter(r => r.Type === "Reissue" || r.Type === 1).length > 0 ? (
+                                legRules.filter(r => r.Type === "Reissue" || r.Type === 1).map((rule, i) => (
                                   <RuleRow key={i} rule={rule} index={i} />
                                 ))
                               ) : (

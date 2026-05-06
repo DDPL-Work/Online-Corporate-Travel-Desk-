@@ -1,9 +1,12 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { FaSearch, FaMapMarkerAlt } from "react-icons/fa";
 import { BsStarFill } from "react-icons/bs";
 import { MdExpandLess, MdExpandMore } from "react-icons/md";
 import { IoClose } from "react-icons/io5";
 import MapModal from "./Map/MapModal";
+import axios from "axios";
+import { useLocationIntelligence } from "../../../hooks/useLocationIntelligence";
 
 const ORANGE = "#C9A84C";
 const DARK = "#000D26";
@@ -34,9 +37,23 @@ const FilterSidebar = ({
   mapSearchPayload,
   loading,
   pagination,
+  selectedLocation,
+  setSelectedLocation,
 }) => {
+  const inputRef = useRef(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   const [showMap, setShowMap] = useState(false);
   const [openLocation, setOpenLocation] = useState(false);
+
+  const cityName = mapSearchPayload?.CityName || "";
+  
+  const { 
+    query: locationQuery, 
+    setQuery: setLocationQuery, 
+    results: nominatimResults, 
+    loading: searching,
+    clearResults
+  } = useLocationIntelligence(cityName);
   const [expandedSections, setExpandedSections] = useState({
     search: true,
     price: true,
@@ -88,24 +105,12 @@ const FilterSidebar = ({
   );
   const formatPrice = (value) => toSafeNumber(Math.round(value), 0).toLocaleString();
 
-  const locations = useMemo(
-    () =>
-      (filterMeta?.locations || [])
-        .map((item) => item?.value)
-        .filter((value) => typeof value === "string" && value.trim()),
-    [filterMeta?.locations],
-  );
-
-  const locationQuery = currentFilters.location.trim();
-  const filteredLocations = locationQuery
-    ? locations.filter((location) =>
-        location.toLowerCase().includes(locationQuery.toLowerCase()),
-      )
-    : [];
+  // Unused local locations logic removed in favor of professional Intelligence System
 
   const clearAllFilters = () => {
     setSearchText("");
     setFilters({ ...DEFAULT_FILTERS });
+    setSelectedLocation(null);
   };
 
   const toggleSection = (section) => {
@@ -123,7 +128,58 @@ const FilterSidebar = ({
     (currentFilters.location ? 1 : 0) +
     (searchText ? 1 : 0) +
     (selectedMinPrice > dynamicMinPrice ? 1 : 0) +
-    (selectedMaxPrice < sliderMax ? 1 : 0);
+    (selectedMaxPrice < sliderMax ? 1 : 0) +
+    (selectedLocation ? 1 : 0);
+
+  // Fallback local locations from database
+  const localLocations = useMemo(
+    () =>
+      (filterMeta?.locations || [])
+        .map((item) => item?.value)
+        .filter((value) => typeof value === "string" && value.trim()),
+    [filterMeta?.locations],
+  );
+
+  const filteredLocalLocations = useMemo(() => {
+    const q = (filters.location || "").trim().toLowerCase();
+    return q ? localLocations.filter(loc => loc.toLowerCase().includes(q)) : [];
+  }, [localLocations, filters.location]);
+
+  const selectPlace = (place) => {
+    const locationData = {
+      lat: place.lat,
+      lng: place.lng,
+      name: place.name,
+    };
+    setSelectedLocation(locationData);
+    setFilters({ ...currentFilters, location: place.name });
+    clearResults();
+    setOpenLocation(false);
+  };
+
+  // Update dropdown position on scroll or resize
+  useEffect(() => {
+    const updatePos = () => {
+      if (inputRef.current) {
+        const rect = inputRef.current.getBoundingClientRect();
+        setDropdownPos({
+          top: rect.bottom + window.scrollY,
+          left: rect.left + window.scrollX,
+          width: rect.width,
+        });
+      }
+    };
+
+    if (openLocation) {
+      updatePos();
+      window.addEventListener("scroll", updatePos, true);
+      window.addEventListener("resize", updatePos);
+    }
+    return () => {
+      window.removeEventListener("scroll", updatePos, true);
+      window.removeEventListener("resize", updatePos);
+    };
+  }, [openLocation]);
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-4 space-y-2 max-h-[calc(100vh-2rem)] overflow-y-auto">
@@ -169,63 +225,138 @@ const FilterSidebar = ({
             />
           </div>
 
-          <div className="relative">
             <div className="relative">
               <FaMapMarkerAlt
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-xs"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-xs z-10"
                 style={{ color: ORANGE }}
               />
               <input
+                ref={inputRef}
                 type="text"
-                placeholder="Area, landmark or city..."
-                value={currentFilters.location}
+                placeholder={`Search areas in ${cityName || 'city'}...`}
+                value={filters.location}
                 onChange={(e) => {
                   const value = e.target.value;
                   setFilters({ ...currentFilters, location: value });
+                  setLocationQuery(value);
                   setOpenLocation(Boolean(value.trim()));
+                  setSelectedLocation(null); // Revert to text search on manual type
                 }}
-                onFocus={() => setOpenLocation(Boolean(locationQuery))}
-                className="w-full pl-9 pr-8 py-2.5 border rounded-lg text-sm bg-white focus:outline-none"
-                style={{ borderColor: `${ORANGE}40` }}
+                onFocus={() => setOpenLocation(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.preventDefault();
+                }}
+                className="w-full pl-9 pr-8 py-2.5 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2"
+                style={{
+                  borderColor: DARK,
+                  outlineColor: ORANGE,
+                  borderWidth: "2px",
+                }}
               />
+              {searching && (
+                <div className="absolute right-10 top-1/2 -translate-y-1/2">
+                  <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
               {currentFilters.location && (
                 <button
                   onClick={() => {
                     setFilters({ ...currentFilters, location: "" });
+                    setSelectedLocation(null);
+                    clearResults();
                     setOpenLocation(false);
                   }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 p-1"
                 >
                   <IoClose size={14} />
                 </button>
               )}
             </div>
 
-            {openLocation && filteredLocations.length > 0 && (
-              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-100 rounded-xl shadow-xl max-h-48 overflow-y-auto">
-                {filteredLocations.map((location) => (
-                  <div
-                    key={location}
-                    onClick={() => {
-                      setFilters({ ...currentFilters, location });
-                      setOpenLocation(false);
-                    }}
-                    className="flex items-center gap-2 px-3 py-2.5 text-sm cursor-pointer text-gray-700"
-                    onMouseEnter={(event) => {
-                      event.currentTarget.style.background = `${ORANGE}10`;
-                    }}
-                    onMouseLeave={(event) => {
-                      event.currentTarget.style.background = "";
-                    }}
-                  >
-                    <FaMapMarkerAlt style={{ color: ORANGE }} size={12} />
-                    {location}
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Combined Dropdown for Nominatim and Local Areas using Portal */}
+            {(nominatimResults.length > 0 || (openLocation && filteredLocalLocations.length > 0) || (searching && locationQuery.length >= 2)) &&
+              createPortal(
+                <div
+                  className="bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden pointer-events-auto"
+                  style={{
+                    position: "absolute",
+                    top: dropdownPos.top + 4,
+                    left: dropdownPos.left,
+                    width: dropdownPos.width,
+                    zIndex: 99999,
+                    maxHeight: "320px",
+                    overflowY: "auto",
+                  }}
+                >
+                  {searching && (
+                    <div className="px-4 py-3 flex items-center gap-3 bg-slate-50 border-b border-slate-100">
+                      <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-xs text-slate-500 font-medium">Searching for "{locationQuery}"...</span>
+                    </div>
+                  )}
+
+                  {/* Category: Smart Suggestions (OSM) */}
+                  {nominatimResults.map((place) => (
+                    <div
+                      key={place.id}
+                      onClick={() => selectPlace(place)}
+                      className="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-amber-50 border-b border-slate-50 transition-colors"
+                    >
+                      <FaMapMarkerAlt className="mt-1 shrink-0" style={{ color: ORANGE }} size={14} />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-slate-800 line-clamp-1">
+                          {place.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 line-clamp-1">
+                          {place.fullName}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Category: Verified Localities (Database) */}
+                  {filteredLocalLocations.length > 0 && (
+                    <>
+                      <div className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 border-y border-slate-100">
+                        Available Hotel Localities
+                      </div>
+                      {filteredLocalLocations.map((location) => (
+                        <div
+                          key={location}
+                          onClick={() => {
+                            setFilters({ ...currentFilters, location });
+                            setOpenLocation(false);
+                            setSelectedLocation(null);
+                            clearResults();
+                          }}
+                          className="flex items-center gap-3 px-4 py-3 text-sm cursor-pointer text-slate-700 hover:bg-amber-50 transition-colors"
+                        >
+                          <FaMapMarkerAlt
+                            style={{ color: ORANGE }}
+                            size={12}
+                            className="shrink-0"
+                          />
+                          {location}
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {/* No Results Message */}
+                  {nominatimResults.length === 0 &&
+                    (!openLocation || filteredLocalLocations.length === 0) &&
+                    locationQuery.length >= 2 &&
+                    !searching && (
+                      <div className="px-4 py-6 text-center">
+                        <p className="text-sm text-slate-500">No locations found for "{locationQuery}"</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Try a different area or landmark</p>
+                      </div>
+                    )}
+                </div>,
+                document.body
+              )}
           </div>
-        </div>
+        {/* End of mb-3 */}
 
         <button
           onClick={() => setShowMap(true)}

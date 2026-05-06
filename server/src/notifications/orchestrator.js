@@ -8,6 +8,7 @@ const { sendNotification } = require('../utils/notificationService');
 const emailService = require('../services/email.service');
 const EVENTS = require('../events/eventConstants');
 const User = require('../models/User');
+const OpsMember = require('../models/OpsMember');
 const SuperAdmin = require('../models/SuperAdmin.model'); // ✅ ADDED
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ const CHANNEL_MAP = {
   [EVENTS.UPCOMING_TRIP_REMINDER]:          { email: false, inapp: true  },
 
   // MEDIUM — in-app only
-  [EVENTS.WALLET_RECHARGED]:                { email: false, inapp: true  },
+  [EVENTS.WALLET_RECHARGED]:                { email: true,  inapp: true  },
   [EVENTS.CREDIT_CYCLE_START]:              { email: true,  inapp: true  },
   [EVENTS.TEAM_BOOKING_ACTIVITY]:           { email: false, inapp: true  },
   [EVENTS.MANAGER_BOOKING_ACTION]:          { email: false, inapp: true  },
@@ -187,7 +188,32 @@ const resolveRecipients = async (event, data) => {
     }
 
     // ── TO TRAVEL ADMIN (wallet/credit) ─────────────────────
-    case EVENTS.WALLET_RECHARGED:
+    case EVENTS.WALLET_RECHARGED: {
+      if (data.initiatorUserId || data.userId || data.recipientId) {
+        recipients.push({
+          userId: data.initiatorUserId || data.userId || data.recipientId,
+          email: data.initiatorEmail || data.email || null,
+          corporateId: data.corporateId,
+          role: data.initiatorRole || 'travel-admin',
+        });
+      }
+
+      const opsMembers = await OpsMember.find({
+        isDeleted: false,
+        status: 'Active',
+      }).select('_id');
+
+      opsMembers.forEach((member) => {
+        recipients.push({
+          userId: member._id,
+          email: null,
+          corporateId: data.corporateId,
+          role: 'ops-member',
+        });
+      });
+      break;
+    }
+
     case EVENTS.WALLET_LOW:
     case EVENTS.CREDIT_LIMIT_LOW:
     case EVENTS.CREDIT_LIMIT_EXCEEDED:
@@ -352,7 +378,10 @@ const notify = (event, data) => {
           }).then(() =>
             console.log(`\n📧 [NOTIFY EMAIL SENT] event=${event} → ${r.email}`)
           ).catch((err) =>
-            console.error(`\n❌ [NOTIFY EMAIL FAIL] event=${event} → ${r.email}:`, err.email)
+            console.error(
+              `\n❌ [NOTIFY EMAIL FAIL] event=${event} → ${r.email}:`,
+              err?.response?.body?.errors?.[0]?.message || err.message,
+            )
           );
         }
       }

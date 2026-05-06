@@ -1,18 +1,29 @@
 const admin = require("firebase-admin");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
+const OpsMember = require("../models/OpsMember");
+const SuperAdmin = require("../models/SuperAdmin.model");
+const logger = require("../utils/logger");
+
+const getRecipientModel = (role) => {
+  if (role === "ops-member") return OpsMember;
+  if (role === "super-admin") return SuperAdmin;
+  return User;
+};
 
 // Initialize Firebase Admin
 let firebaseInitialized = false;
 try {
   const serviceAccount = require("../config/firebase-service-account.json");
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+  }
   firebaseInitialized = true;
-  console.log("Firebase Admin initialized successfully");
+  logger.info("Firebase Admin initialized successfully");
 } catch (error) {
-  console.warn(
+  logger.warn(
     "Firebase Admin initialization failed. Push notifications will be disabled. " +
     "Please place firebase-service-account.json in src/config/."
   );
@@ -53,9 +64,10 @@ const sendNotification = async (data) => {
     // we would need to find all users with that role and corporateId.
     // For now, we only send push if a specific recipient is provided.
     if (firebaseInitialized && recipient) {
-      const user = await User.findById(recipient).select("fcmTokens");
+      const RecipientModel = getRecipientModel(recipientRole);
+      const recipientAccount = await RecipientModel.findById(recipient).select("fcmTokens");
 
-      if (user && user.fcmTokens && user.fcmTokens.length > 0) {
+      if (recipientAccount && recipientAccount.fcmTokens && recipientAccount.fcmTokens.length > 0) {
         const payload = {
           notification: {
             title,
@@ -67,27 +79,46 @@ const sendNotification = async (data) => {
             link: link || "",
             notificationId: String(notification._id),
           },
-          tokens: user.fcmTokens,
+          tokens: recipientAccount.fcmTokens,
         };
 
         // sendMulticast allows sending to multiple tokens at once
-        const response = await admin.messaging().sendMulticast(payload);
+        const response = await admin.messaging().sendEachForMulticast(payload);
+        logger.info("FCM push notification dispatched", {
+          recipient: String(recipient),
+          recipientRole: recipientRole || "user",
+          successCount: response.successCount,
+          failureCount: response.failureCount,
+          type: type || "general",
+        });
         
         // Handle failed tokens (e.g. expired)
         if (response.failureCount > 0) {
           const failedTokens = [];
           response.responses.forEach((resp, idx) => {
             if (!resp.success) {
-              failedTokens.push(user.fcmTokens[idx]);
+              failedTokens.push(recipientAccount.fcmTokens[idx]);
+              logger.warn("FCM token send failed", {
+                recipient: String(recipient),
+                recipientRole: recipientRole || "user",
+                tokenSuffix: recipientAccount.fcmTokens[idx]?.slice?.(-12) || "unknown",
+                error: resp.error?.message || "Unknown FCM error",
+              });
             }
           });
           
           if (failedTokens.length > 0) {
-            await User.findByIdAndUpdate(recipient, {
+            await RecipientModel.findByIdAndUpdate(recipient, {
               $pull: { fcmTokens: { $in: failedTokens } },
             });
           }
         }
+      } else {
+        logger.info("No FCM tokens found for notification recipient", {
+          recipient: String(recipient),
+          recipientRole: recipientRole || "user",
+          type: type || "general",
+        });
       }
     }
 

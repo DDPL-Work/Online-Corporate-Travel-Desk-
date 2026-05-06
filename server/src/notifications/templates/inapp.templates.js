@@ -35,7 +35,7 @@ const templates = {
   [EVENTS.WALLET_RECHARGED]: (d) => ({
     title: '💰 Wallet Recharged',
     message: `₹${Number(d.amount).toLocaleString()} added to wallet. New balance: ₹${Number(d.newBalance).toLocaleString()}.`,
-    link: '/wallet',
+    link: '/corporate-wallet',
   }),
 
   [EVENTS.WALLET_LOW]: (d) => ({
