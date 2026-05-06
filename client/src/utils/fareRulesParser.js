@@ -5,6 +5,22 @@ export const normalizeCurrencyText = (text) => {
   });
 };
 
+const parseISODuration = (isoString) => {
+  if (!isoString) return "";
+  const match = isoString.match(/P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?/);
+  if (!match) return isoString;
+  const days = match[1] ? parseInt(match[1]) : 0;
+  const hours = match[2] ? parseInt(match[2]) : 0;
+  const minutes = match[3] ? parseInt(match[3]) : 0;
+
+  const parts = [];
+  if (days) parts.push(`${days} Day${days > 1 ? "s" : ""}`);
+  if (hours) parts.push(`${hours} Hour${hours > 1 ? "s" : ""}`);
+  if (minutes) parts.push(`${minutes} Minute${minutes > 1 ? "s" : ""}`);
+
+  return parts.join(" ");
+};
+
 export const parseFareRuleHtml = (html) => {
   if (!html) return null;
   const parser = new DOMParser();
@@ -162,28 +178,54 @@ export const processFareRulesData = (rawRulesArray, quoteResults) => {
     const rawHtml = rule.FareRuleDetail;
     const parsed = parseFareRuleHtml(rawHtml);
 
-    if (parsed && miniRules.length > 0) {
-      const cancelRules =
-        miniRules[0] && Array.isArray(miniRules[0])
-          ? miniRules[0].filter((m) => m.Type === "Cancellation")
-          : miniRules.filter((m) => m.Type === "Cancellation");
-      const reissueRules =
-        miniRules[0] && Array.isArray(miniRules[0])
-          ? miniRules[0].filter((m) => m.Type === "Reissue")
-          : miniRules.filter((m) => m.Type === "Reissue");
+    // ✅ Production API Support: MiniFarRules inside the rule object
+    const prodMiniRules = rule.MiniFarRules?.Rules || [];
 
-      if (cancelRules.length > 0 && parsed.cancellation.length === 0) {
-        parsed.cancellation = cancelRules.map((c) => ({
-          timeRange: `${c.From} to ${c.To} ${c.Unit}`,
-          fee: normalizeCurrencyText(`INR ${c.Details}`),
-        }));
+    if (parsed) {
+      // 1. Process Production MiniFarRules if present
+      if (prodMiniRules.length > 0) {
+        const cancelRules = prodMiniRules.filter((m) => m.Type === 0);
+        const reissueRules = prodMiniRules.filter((m) => m.Type === 1);
+
+        if (cancelRules.length > 0) {
+          parsed.cancellation = cancelRules.map((c) => ({
+            timeRange: `${parseISODuration(c.FromDuration)}${c.ToDuration ? " to " + parseISODuration(c.ToDuration) : " onwards"}`,
+            fee: normalizeCurrencyText(`INR ${c.PaxPenalties?.[0]?.AirlineFee || 0}`),
+          }));
+        }
+
+        if (reissueRules.length > 0) {
+          parsed.reissue = reissueRules.map((c) => ({
+            timeRange: `${parseISODuration(c.FromDuration)}${c.ToDuration ? " to " + parseISODuration(c.ToDuration) : " onwards"}`,
+            fee: normalizeCurrencyText(`INR ${c.PaxPenalties?.[0]?.AirlineFee || 0}`),
+          }));
+        }
       }
 
-      if (reissueRules.length > 0 && parsed.reissue.length === 0) {
-        parsed.reissue = reissueRules.map((c) => ({
-          timeRange: `${c.From} to ${c.To} ${c.Unit}`,
-          fee: normalizeCurrencyText(`INR ${c.Details}`),
-        }));
+      // 2. Process Legacy MiniFareRules from quoteResults if parsed rules still empty
+      else if (miniRules.length > 0) {
+        const cancelRules =
+          miniRules[0] && Array.isArray(miniRules[0])
+            ? miniRules[0].filter((m) => m.Type === "Cancellation")
+            : miniRules.filter((m) => m.Type === "Cancellation");
+        const reissueRules =
+          miniRules[0] && Array.isArray(miniRules[0])
+            ? miniRules[0].filter((m) => m.Type === "Reissue")
+            : miniRules.filter((m) => m.Type === "Reissue");
+
+        if (cancelRules.length > 0 && parsed.cancellation.length === 0) {
+          parsed.cancellation = cancelRules.map((c) => ({
+            timeRange: `${c.From} to ${c.To} ${c.Unit}`,
+            fee: normalizeCurrencyText(`INR ${c.Details}`),
+          }));
+        }
+
+        if (reissueRules.length > 0 && parsed.reissue.length === 0) {
+          parsed.reissue = reissueRules.map((c) => ({
+            timeRange: `${c.From} to ${c.To} ${c.Unit}`,
+            fee: normalizeCurrencyText(`INR ${c.Details}`),
+          }));
+        }
       }
     }
 
