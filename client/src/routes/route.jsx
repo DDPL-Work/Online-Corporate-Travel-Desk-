@@ -83,7 +83,7 @@ import TeamHotelBookingDetails from "../components/CorporateManagerTabs/TeamHote
 import FlightBookingDetails from "../components/TravelAdminTabs/Shared/FlightBookingDetails";
 import HotelBookingDetails1 from "../components/TravelAdminTabs/Shared/HotelBookingDetails";
 import WalletPhonePeStatusPage from "../Pages/Payments/WalletPhonePeStatusPage";
-import CompanyLandingPage from "../Pages/Landing/CompanySpecific/CompanyLandingPage";
+// import CompanyLandingPage from "../Pages/Landing/CompanySpecific/CompanyLandingPage";
 // import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 
 export const appRouter = createBrowserRouter([
@@ -309,7 +309,7 @@ export const appRouter = createBrowserRouter([
       { path: "/legal/contact-us", element: <ContactUs /> },
 
       { path: "/travel", element: <InternalTravelDeskLanding /> },
-      { path: "/company-specific", element: <CompanyLandingPage /> },
+      // { path: "/company-specific", element: <CompanyLandingPage /> },
       {
         path: "*",
         element: <FlightBookingInfo />,
