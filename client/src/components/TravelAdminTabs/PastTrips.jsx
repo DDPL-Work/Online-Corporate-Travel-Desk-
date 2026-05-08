@@ -9,8 +9,9 @@ import {
   FiList,
   FiEye,
   FiUser,
+  FiRefreshCw,
+  FiX,
 } from "react-icons/fi";
-import { pastTripsData } from "../../data/dummyData";
 import {
   LabeledField,
   StatCard,
@@ -18,10 +19,10 @@ import {
   dateCls,
   IdCell,
   SearchBar,
-  selectCls,
   Th,
-  RatingStars,
+  CustomDropdown,
 } from "./Shared/CommonComponents";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import {
   getAllFlightBookingsAdmin,
   getAllHotelBookingsAdmin,
@@ -38,6 +39,7 @@ function FlightSection() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
+  const [empFilter, setEmp] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
@@ -74,11 +76,12 @@ function FlightSection() {
           raw: b,
           id: b._id,
           orderId: b.orderId || "N/A",
-          employee:
-            `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim() ||
-            b.userId?.email ||
-            "N/A",
-          employeeId: b.userId?._id || "N/A",
+          employee: b.userId?.name
+            ? `${b.userId.name.firstName} ${b.userId.name.lastName}`.trim()
+            : b.userId?.email ||
+              `${b.travellers?.[0]?.firstName || ""} ${b.travellers?.[0]?.lastName || ""}`.trim() ||
+              "N/A",
+          employeeId: b.userId?.email || "N/A",
           destination:
             b.bookingSnapshot?.city ||
             firstSeg?.destination?.city ||
@@ -90,11 +93,15 @@ function FlightSection() {
           flightNumber: firstSeg?.flightNumber || "—",
           status,
           travelKey,
+          department: b.corporateId || "N/A",
         };
       })
       .filter((t) => t.travelKey && t.travelKey < today && t.status !== "Cancelled");
   }, [flightBookings, today]);
-  const departments = ["All", ...new Set(flightTrips.map((t) => t.department))];
+
+  const departments = useMemo(() => ["All", ...new Set(flightTrips.map((t) => t.department))], [flightTrips]);
+
+  const employees = useMemo(() => ["All", ...new Set(flightTrips.map((t) => t.employee))], [flightTrips]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -104,31 +111,66 @@ function FlightSection() {
         (!startDate || depDate >= new Date(startDate)) &&
         (!endDate || depDate <= new Date(endDate));
       const deptOk = deptFilter === "All" || t.department === deptFilter;
+      const empOk = empFilter === "All" || t.employee === empFilter;
       const searchOk =
         !q ||
         t.employee.toLowerCase().includes(q) ||
+        t.employeeId.toLowerCase().includes(q) ||
         t.destination.toLowerCase().includes(q) ||
-        t.id.toString().includes(q);
-      return dateOk && deptOk && searchOk;
+        t.orderId.toLowerCase().includes(q);
+      return dateOk && deptOk && empOk && searchOk;
     });
-  }, [search, startDate, endDate, deptFilter, flightTrips]);
+  }, [search, startDate, endDate, deptFilter, empFilter, flightTrips]);
 
   const paginated = useMemo(
     () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
     [filtered, currentPage],
   );
 
-  const avgRating =
-    filtered.length > 0
-      ? (
-          filtered.reduce((s, t) => s + (t.rating || 0), 0) / filtered.length
-        ).toFixed(1)
-      : "—";
+  const handleExportFlights = () => {
+    if (!filtered.length) return;
+    const headers = ["Order ID", "Employee", "Destination", "Departure Date", "Airline", "Status"];
+    const rows = filtered.map((t) => [
+      t.orderId,
+      t.employee,
+      t.destination,
+      t.departureDate ? new Date(t.departureDate).toLocaleDateString("en-IN") : "—",
+      t.airlineName,
+      t.status,
+    ]);
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `past-flights-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="space-y-4">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="space-y-4 min-w-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
         <StatCard
           label="Total Flights"
           value={filtered.length}
@@ -145,27 +187,10 @@ function FlightSection() {
           iconBgCls="bg-emerald-50"
           iconColorCls="text-emerald-600"
         />
-        {/* <StatCard
-          label="Avg. Rating"
-          value={avgRating}
-          Icon={FiStar}
-          borderCls="border-amber-500"
-          iconBgCls="bg-amber-50"
-          iconColorCls="text-amber-600"
-        /> */}
-        {/* <StatCard
-          label="Departments"
-          value={new Set(filtered.map((t) => t.department)).size}
-          Icon={FiUser}
-          borderCls="border-violet-500"
-          iconBgCls="bg-violet-50"
-          iconColorCls="text-violet-600"
-        /> */}
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           <LabeledField
             label={
               <>
@@ -214,137 +239,153 @@ function FlightSection() {
               </>
             }
           >
-            <select
+            <CustomDropdown
               value={deptFilter}
-              onChange={(e) => setDept(e.target.value)}
-              className={selectCls}
-            >
-              {departments.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
+              onChange={setDept}
+              options={departments}
+            />
           </LabeledField>
+          <LabeledField
+            label={
+              <>
+                <FiUser size={10} /> Employee
+              </>
+            }
+          >
+            <CustomDropdown
+              value={empFilter}
+              onChange={setEmp}
+              options={employees}
+            />
+          </LabeledField>
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setSearch("");
+                setStartDate("");
+                setEndDate("");
+                setDept("All");
+                setEmp("All");
+              }}
+              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold text-slate-500 bg-slate-100 rounded-lg hover:bg-slate-200 hover:text-slate-700 transition-colors"
+            >
+              <FiX size={12} /> Reset
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[920px]">
-            <thead>
-              <tr className="bg-[#0A4D68] text-[#bfdbfe]">
-                <Th>Order ID</Th>
-                <Th>Employee</Th>
-                {/* <Th>Department</Th> */}
-                <Th>Destination</Th>
-                <Th>Departure Date</Th>
-                <Th>Airline</Th>
-                {/* <Th>Rating</Th> */}
-                <Th>Status</Th>
-                <Th>Action</Th>
+      <ResponsiveDataTable
+        title="Past Flight Trips"
+        subtitle={`${filtered.length} record${filtered.length !== 1 ? "s" : ""} found`}
+        tableMinWidth="1050px"
+        onExport={handleExportFlights}
+        exportLabel="Export"
+        exportBgClass="bg-[#0A4D68] hover:bg-[#083d52]"
+        arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+        footer={
+          <div className="px-4 py-2.5 flex justify-between text-xs text-slate-400">
+            <span>
+              Showing <strong className="text-slate-600">{filtered.length === 0 ? 0 : `${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, filtered.length)}`}</strong> of <strong className="text-slate-600">{filtered.length}</strong> flight trips
+            </span>
+          </div>
+        }
+        pagination={
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setCurrentPage}
+          />
+        }
+      >
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-[#0f9041] text-[#ffffff]">
+              <Th>Order ID</Th>
+              <Th>Employee</Th>
+              <Th>Destination</Th>
+              <Th>Departure Date</Th>
+              <Th>Airline</Th>
+              <Th>Status</Th>
+              <Th>Action</Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan="7" className="py-16 text-center text-slate-400">
+                  <div className="flex justify-center mb-3">
+                    <FaPlane size={32} className="opacity-20" />
+                  </div>
+                  <p className="font-semibold text-sm">
+                    No past flight trips found
+                  </p>
+                  <p className="text-xs mt-1">
+                    Try adjusting the filters or search query
+                  </p>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="py-16 text-center text-slate-400">
-                    <div className="flex justify-center mb-3">
-                      <FaPlane size={32} className="opacity-20" />
+            ) : (
+              paginated.map((t, i) => (
+                <tr
+                  key={t.id}
+                  className={`transition-colors hover:bg-sky-50 ${
+                    i % 2 === 0 ? "bg-white" : "bg-slate-50/50"
+                  }`}
+                >
+                  <td className="px-4 py-3">
+                    <IdCell id={t.orderId} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-[13px] text-slate-800">
+                        {t.employee}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {t.employeeId}
+                      </span>
                     </div>
-                    <p className="font-semibold text-sm">
-                      No past flight trips found
-                    </p>
-                    <p className="text-xs mt-1">
-                      Try adjusting the filters or search query
-                    </p>
+                  </td>
+                  <td className="px-4 py-3 text-[13px] text-slate-700 font-medium">
+                    {t.destination}
+                  </td>
+                  <td className="px-4 py-3 text-[13px] text-slate-500">
+                    {t.departureDate
+                      ? new Date(t.departureDate).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-[13px] text-slate-500">
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-slate-800 text-[13px]">
+                        {t.airlineName || "N/A"}
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        {t.flightNumber ? `Flight ${t.flightNumber}` : "—"}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={t.status || "Completed"} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => navigate(`/employee-flight-booking/${t.id}?source=past`)}
+                      className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] flex items-center gap-1"
+                    >
+                      <FiEye size={12} /> View
+                    </button>
                   </td>
                 </tr>
-              ) : (
-                paginated.map((t, i) => (
-                  <tr
-                    key={t.id}
-                    className={`transition-colors hover:bg-sky-50 ${
-                      i % 2 === 0 ? "bg-white" : "bg-slate-50/50"
-                    }`}
-                  >
-                    <td className="px-4 py-3">
-                      <IdCell id={t.orderId} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-[13px] text-slate-800">
-                            {t.employee}
-                          </span>
-                          <span className="text-[11px] text-slate-400">
-                            {t.employeeId}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3 text-[13px] text-slate-700 font-medium">
-                      {t.destination}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {t.departureDate
-                        ? new Date(t.departureDate).toLocaleDateString(
-                            "en-IN",
-                            {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            },
-                          )
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-slate-800 text-[13px]">
-                          {t.airlineName || "N/A"}
-                        </span>
-                        <span className="text-[11px] text-slate-500">
-                          {t.flightNumber ? `Flight ${t.flightNumber}` : "—"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={t.status || "Completed"} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => navigate(`/employee-flight-booking/${t.id}?source=past`)}
-                        className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] flex items-center gap-1"
-                      >
-                        <FiEye size={12} /> View
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-          <span>
-            Showing{" "}
-            <strong className="text-slate-600">
-              {filtered.length === 0
-                ? 0
-                : `${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, filtered.length)}`}
-            </strong>{" "}
-            of{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> flight
-            trips
-          </span>
-        </div>
-        <Pagination
-          currentPage={currentPage}
-          totalItems={filtered.length}
-          pageSize={PAGE_SIZE}
-          onPageChange={setCurrentPage}
-        />
-      </div>
+              ))
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
     </div>
   );
 }
@@ -357,6 +398,7 @@ function HotelSection() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [deptFilter, setDept] = useState("All");
+  const [empFilter, setEmp] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
@@ -379,11 +421,8 @@ function HotelSection() {
           b.checkInDate;
 
         if (!checkIn) return false;
-
         const ci = new Date(checkIn).toISOString().slice(0, 10);
-
         const validStatuses = ["confirmed", "booked", "voucher_generated"];
-
         return validStatuses.includes(b.executionStatus) && ci < today;
       })
       .map((b) => {
@@ -396,18 +435,18 @@ function HotelSection() {
           b.hotelRequest?.checkOutDate ||
           b.checkOutDate;
         const travellers = b.travellers || [];
-        const employeeName =
-          `${travellers[0]?.firstName || ""} ${travellers[0]?.lastName || ""}`.trim() ||
-          `${b.userId?.name?.firstName || ""} ${b.userId?.name?.lastName || ""}`.trim() ||
-          b.userId?.email ||
-          "N/A";
+        const employeeName = b.userId?.name
+          ? `${b.userId.name.firstName} ${b.userId.name.lastName}`.trim()
+          : b.userId?.email ||
+            `${travellers[0]?.firstName || ""} ${travellers[0]?.lastName || ""}`.trim() ||
+            "N/A";
 
         return {
           id: b._id,
           orderId: b.orderId || "N/A",
           raw: b,
           employee: employeeName,
-          employeeId: b.userId?._id || "N/A",
+          employeeId: b.userId?.email || "N/A",
           department: b.corporateId || "N/A",
           destination: b.hotelRequest?.selectedHotel?.hotelName || b.bookingSnapshot?.hotelName || "N/A",
           departureDate: checkIn,
@@ -416,8 +455,11 @@ function HotelSection() {
           rating: b.rating || 0,
         };
       });
-  }, [hotelBookings]);
-  const departments = ["All", ...new Set(hotelTrips.map((t) => t.department))];
+  }, [hotelBookings, today]);
+
+  const departments = useMemo(() => ["All", ...new Set(hotelTrips.map((t) => t.department))], [hotelTrips]);
+
+  const employees = useMemo(() => ["All", ...new Set(hotelTrips.map((t) => t.employee))], [hotelTrips]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -427,31 +469,66 @@ function HotelSection() {
         (!startDate || depDate >= new Date(startDate)) &&
         (!endDate || depDate <= new Date(endDate));
       const deptOk = deptFilter === "All" || t.department === deptFilter;
+      const empOk = empFilter === "All" || t.employee === empFilter;
       const searchOk =
         !q ||
         t.employee.toLowerCase().includes(q) ||
+        t.employeeId.toLowerCase().includes(q) ||
         t.destination.toLowerCase().includes(q) ||
-        t.id.toString().includes(q);
-      return dateOk && deptOk && searchOk;
+        t.orderId.toLowerCase().includes(q);
+      return dateOk && deptOk && empOk && searchOk;
     });
-  }, [search, startDate, endDate, deptFilter, hotelTrips]);
+  }, [search, startDate, endDate, deptFilter, empFilter, hotelTrips]);
 
   const paginated = useMemo(
     () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
     [filtered, currentPage],
   );
 
-  const avgRating =
-    filtered.length > 0
-      ? (
-          filtered.reduce((s, t) => s + (t.rating || 0), 0) / filtered.length
-        ).toFixed(1)
-      : "—";
+  const handleExportHotels = () => {
+    if (!filtered.length) return;
+    const headers = ["Order ID", "Employee", "Hotel/Destination", "Check-In", "Check-Out", "Status"];
+    const rows = filtered.map((t) => [
+      t.orderId,
+      t.employee,
+      t.destination,
+      t.departureDate ? new Date(t.departureDate).toLocaleDateString("en-IN") : "—",
+      t.returnDate ? new Date(t.returnDate).toLocaleDateString("en-IN") : "—",
+      t.status,
+    ]);
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `past-hotels-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="space-y-4">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="space-y-4 min-w-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
         <StatCard
           label="Total Hotels"
           value={filtered.length}
@@ -468,20 +545,10 @@ function HotelSection() {
           iconBgCls="bg-emerald-50"
           iconColorCls="text-emerald-600"
         />
-        
-        <StatCard
-          label="Departments"
-          value={new Set(filtered.map((t) => t.department)).size}
-          Icon={FiUser}
-          borderCls="border-violet-500"
-          iconBgCls="bg-violet-50"
-          iconColorCls="text-violet-600"
-        />
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           <LabeledField
             label={
               <>
@@ -530,145 +597,159 @@ function HotelSection() {
               </>
             }
           >
-            <select
+            <CustomDropdown
               value={deptFilter}
-              onChange={(e) => setDept(e.target.value)}
-              className={selectCls}
-            >
-              {departments.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
+              onChange={setDept}
+              options={departments}
+            />
           </LabeledField>
+          <LabeledField
+            label={
+              <>
+                <FiUser size={10} /> Employee
+              </>
+            }
+          >
+            <CustomDropdown
+              value={empFilter}
+              onChange={setEmp}
+              options={employees}
+            />
+          </LabeledField>
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setSearch("");
+                setStartDate("");
+                setEndDate("");
+                setDept("All");
+                setEmp("All");
+              }}
+              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold text-slate-500 bg-slate-100 rounded-lg hover:bg-slate-200 hover:text-slate-700 transition-colors"
+            >
+              <FiX size={12} /> Reset
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[920px]">
-            <thead>
-              <tr className="bg-[#088395] text-[#ccfbf1]">
-                <Th>Order ID</Th>
-                <Th>Employee</Th>
-                <Th>Destination</Th>
-                <Th>Check-in Date</Th>
-                <Th>Check-out Date</Th>
-                <Th>Status</Th>
-                <Th>Action</Th>
+      <ResponsiveDataTable
+        title="Past Hotel Trips"
+        subtitle={`${filtered.length} record${filtered.length !== 1 ? "s" : ""} found`}
+        tableMinWidth="1050px"
+        onExport={handleExportHotels}
+        exportLabel="Export"
+        exportBgClass="bg-[#088395] hover:bg-[#066b78]"
+        arrowBgClass="bg-teal-50 border-teal-200 text-[#088395] hover:bg-teal-100"
+        footer={
+          <div className="px-4 py-2.5 flex justify-between text-xs text-slate-400">
+            <span>
+              Showing <strong className="text-slate-600">{filtered.length === 0 ? 0 : `${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, filtered.length)}`}</strong> of <strong className="text-slate-600">{filtered.length}</strong> hotel trips
+            </span>
+          </div>
+        }
+        pagination={
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setCurrentPage}
+          />
+        }
+      >
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-[#0f9041] text-[#ccfbf1]">
+              <Th>Order ID</Th>
+              <Th>Employee</Th>
+              <Th>Destination</Th>
+              <Th>Check-in Date</Th>
+              <Th>Check-out Date</Th>
+              <Th>Status</Th>
+              <Th>Action</Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan="7" className="py-16 text-center text-slate-400">
+                  <div className="flex justify-center mb-3">
+                    <FaHotel size={32} className="opacity-20" />
+                  </div>
+                  <p className="font-semibold text-sm">
+                    No past hotel trips found
+                  </p>
+                  <p className="text-xs mt-1">
+                    Try adjusting the filters or search query
+                  </p>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="py-16 text-center text-slate-400">
-                    <div className="flex justify-center mb-3">
-                      <FaHotel size={32} className="opacity-20" />
+            ) : (
+              paginated.map((t, i) => (
+                <tr
+                  key={t.id}
+                  className={`transition-colors hover:bg-teal-50 ${
+                    i % 2 === 0 ? "bg-white" : "bg-slate-50/50"
+                  }`}
+                >
+                  <td className="px-4 py-3">
+                    <IdCell id={t.orderId} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-[13px] text-slate-800">
+                        {t.employee}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {t.employeeId}
+                      </span>
                     </div>
-                    <p className="font-semibold text-sm">
-                      No past hotel trips found
-                    </p>
-                    <p className="text-xs mt-1">
-                      Try adjusting the filters or search query
-                    </p>
+                  </td>
+                  <td className="px-4 py-3 text-[13px] text-slate-700 font-medium">
+                    {t.destination}
+                  </td>
+                  <td className="px-4 py-3 text-[13px] text-slate-500">
+                    {t.departureDate
+                      ? new Date(t.departureDate).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-[13px] text-slate-500">
+                    {t.returnDate
+                      ? new Date(t.returnDate).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={t.status || "Completed"} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => navigate(`/employee-hotel-booking/${t.id}?source=past`)}
+                      className="px-3 py-1 text-xs font-semibold bg-[#088395] text-white rounded-md hover:bg-[#066b78] flex items-center gap-1"
+                    >
+                      <FiEye size={12} /> View
+                    </button>
                   </td>
                 </tr>
-              ) : (
-                paginated.map((t, i) => (
-                  <tr
-                    key={t.id}
-                    className={`transition-colors hover:bg-teal-50 ${
-                      i % 2 === 0 ? "bg-white" : "bg-slate-50/50"
-                    }`}
-                  >
-                    <td className="px-4 py-3">
-                      <IdCell id={t.orderId} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                       
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-[13px] text-slate-800">
-                            {t.employee}
-                          </span>
-                          <span className="text-[11px] text-slate-400">
-                            {t.employeeId}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    
-                    <td className="px-4 py-3 text-[13px] text-slate-700 font-medium">
-                      {t.destination}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {t.departureDate
-                        ? new Date(t.departureDate).toLocaleDateString(
-                            "en-IN",
-                            {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            },
-                          )
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {t.returnDate
-                        ? new Date(t.returnDate).toLocaleDateString(
-                            "en-IN",
-                            {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            },
-                          )
-                        : "—"}
-                    </td>
-                   
-                    <td className="px-4 py-3">
-                      <StatusBadge status={t.status || "Completed"} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <button 
-                        onClick={() => navigate(`/employee-hotel-booking/${t.id}?source=past`)}
-                        className="px-3 py-1 text-xs font-semibold bg-[#088395] text-white rounded-md hover:bg-[#066b78] flex items-center gap-1"
-                      >
-                        <FiEye size={12} /> View
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-          <span>
-            Showing{" "}
-            <strong className="text-slate-600">
-              {filtered.length === 0
-                ? 0
-                : `${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, filtered.length)}`}
-            </strong>{" "}
-            of{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> hotel
-            trips
-          </span>
-        </div>
-        <Pagination
-          currentPage={currentPage}
-          totalItems={filtered.length}
-          pageSize={PAGE_SIZE}
-          onPageChange={setCurrentPage}
-        />
-      </div>
+              ))
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
     </div>
   );
 }
 
 // ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function PastTrips() {
+  const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState("flight");
 
   const tabs = [
@@ -688,49 +769,68 @@ export default function PastTrips() {
     },
   ];
 
+  const handleRefresh = () => {
+    if (activeTab === "flight") {
+      dispatch(getAllFlightBookingsAdmin());
+    } else {
+      dispatch(getAllHotelBookingsAdmin());
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-100 font-sans">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Page Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shrink-0">
+    <div className="w-full min-w-0 space-y-6 font-sans">
+      <div className="flex items-center justify-between gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shrink-0 shadow-sm">
             <FiList size={18} className="text-white" />
           </div>
-          <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">
+          <div className="min-w-0">
+            <h1 className="text-xl font-black text-slate-900 tracking-tight truncate">
               Past Trips
             </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5 truncate">
               View all completed business travel records
             </p>
           </div>
         </div>
+        <button
+          onClick={handleRefresh}
+          className={`shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-bold transition-all shadow-sm border ${
+            activeTab === "hotel"
+              ? "bg-teal-50 border-teal-200 text-[#088395] hover:bg-teal-100"
+              : "bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+          }`}
+        >
+          <FiRefreshCw size={14} />
+          Refresh
+        </button>
+      </div>
 
-        {/* Tab Bar */}
-        <div className="flex items-end gap-0 mb-5 border-b-2 border-slate-200">
-          {tabs.map((tab) => {
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 px-5 py-2.5 text-[13px] font-bold transition-all border-b-2 -mb-0.5 rounded-t-lg
-                  ${
-                    active
-                      ? `bg-white ${tab.activeText} ${tab.activeBorder} shadow-sm`
-                      : "text-slate-400 border-transparent hover:text-slate-600 hover:bg-white/60"
-                  }
-                `}
-              >
-                <tab.Icon size={14} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+      {/* Tab Bar */}
+      <div className="flex items-end gap-0 mb-5 border-b-2 border-slate-200">
+        {tabs.map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                flex items-center gap-2 px-5 py-2.5 text-[13px] font-bold transition-all border-b-2 -mb-0.5 rounded-t-lg
+                ${
+                  active
+                    ? `bg-white ${tab.activeText} ${tab.activeBorder} shadow-sm`
+                    : "text-slate-400 border-transparent hover:text-slate-600 hover:bg-white/60"
+                }
+              `}
+            >
+              <tab.Icon size={14} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-        {/* Tab Content */}
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
         {activeTab === "flight" ? <FlightSection /> : <HotelSection />}
       </div>
     </div>

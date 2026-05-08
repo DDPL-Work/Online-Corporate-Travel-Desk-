@@ -17,6 +17,7 @@ import { MdBusiness } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProjects } from "../../../../Redux/Actions/project.thunk";
 import { fetchEmployees } from "../../../../Redux/Slice/employeeActionSlice";
+import { getMyTravelAdmin } from "../../../../Redux/Actions/employee.thunks";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Dropdown with search                                            */
@@ -127,6 +128,7 @@ export function ProjectApproverBlock({ onChange }) {
   const { employees } = useSelector((state) => state.employee);
   const { user } = useSelector((state) => state.auth);
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
+  const { approver: travelAdmin } = useSelector((state) => state.employee);
   const corporateId = user?.corporateId;
 
   const isTravelAdmin = user?.role === "travel-admin";
@@ -139,7 +141,11 @@ export function ProjectApproverBlock({ onChange }) {
     if (approvalRequired) {
       dispatch(fetchEmployees());
     }
-  }, [corporateId, dispatch, approvalRequired]);
+    // Fetch travel admin info for auto-approval details
+    if (!travelAdmin) {
+      dispatch(getMyTravelAdmin());
+    }
+  }, [corporateId, dispatch, approvalRequired, travelAdmin]);
 
   // Notify parent whenever values change
   useEffect(() => {
@@ -150,10 +156,10 @@ export function ProjectApproverBlock({ onChange }) {
 
     const approver = !approvalRequired 
       ? { 
-          id: user?.id || user?._id || user?.userId, 
-          email: user?.email, 
-          name: `${user?.name?.firstName || ''} ${user?.name?.lastName || ''}`.trim(), 
-          role: user?.role 
+          id: isTravelAdmin ? (user?.id || user?._id || user?.userId) : (travelAdmin?.id), 
+          email: isTravelAdmin ? user?.email : travelAdmin?.email, 
+          name: "Auto Approve", 
+          role: isTravelAdmin ? user?.role : "travel-admin" 
         }
       : manualApprover
         ? (approverEmail?.trim() ? { email: approverEmail } : null)
@@ -161,9 +167,9 @@ export function ProjectApproverBlock({ onChange }) {
 
     onChange?.({
       project: isProjectValid ? project : null,
-      approver: approver,
+      approver: approver ? { ...approver, name: approver.name === "Auto Approve" ? "Auto Approve" : getDisplayName(approver) } : null,
     });
-  }, [selectedProject, projectManual, manualProject, selectedApprover, approverEmail, manualApprover, approvalRequired, user]);
+  }, [selectedProject, projectManual, manualProject, selectedApprover, approverEmail, manualApprover, approvalRequired, user, travelAdmin]);
 
   const clearProject = () => { setSelectedProject(null); setProjectManual({ id: "", name: "", client: "" }); };
   const clearApprover = () => { setSelectedApprover(null); setApproverEmail(""); };
@@ -171,7 +177,20 @@ export function ProjectApproverBlock({ onChange }) {
   const matchingApprovers = (query) => {
     if (!query || query.length < 2) return [];
     const q = query.toLowerCase();
-    return employees.filter((e) => {
+    
+    // Include travel-admin in the list of potential approvers
+    const allPotential = [...employees];
+    if (travelAdmin && !allPotential.some(e => (e.userId || e._id) === travelAdmin.id)) {
+      allPotential.push({
+        userId: travelAdmin.id,
+        _id: travelAdmin.id,
+        name: travelAdmin.fullName,
+        email: travelAdmin.email,
+        role: "travel-admin"
+      });
+    }
+
+    return allPotential.filter((e) => {
       const nameStr =
         typeof e.name === "string"
           ? e.name
@@ -351,14 +370,27 @@ export function ProjectApproverBlock({ onChange }) {
               <>
                 <SearchDropdown
                   placeholder="Search manager by name or email…"
-                  items={employees?.map(e => ({
-                    id: e.userId || e._id,
-                    userId: e.userId,
-                    employeeId: e._id,
-                    name: e.name,
-                    email: e.email,
-                    role: e.role,
-                  })) || []}
+                  items={(() => {
+                    const base = employees?.map(e => ({
+                      id: e.userId || e._id,
+                      userId: e.userId,
+                      employeeId: e._id,
+                      name: e.name,
+                      email: e.email,
+                      role: e.role,
+                    })) || [];
+                    
+                    if (travelAdmin && !base.some(b => b.id === travelAdmin.id)) {
+                      base.push({
+                        id: travelAdmin.id,
+                        userId: travelAdmin.id,
+                        name: travelAdmin.fullName,
+                        email: travelAdmin.email,
+                        role: "travel-admin"
+                      });
+                    }
+                    return base;
+                  })()}
                   selectedItem={selectedApprover}
                   onSelect={setSelectedApprover}
                   getLabel={(item) => `${getDisplayName(item)} (${item.email || ""})`}

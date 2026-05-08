@@ -28,10 +28,61 @@ exports.getWalletBalance = asyncHandler(async (req, res) => {
   );
 });
 
+exports.getRechargeHistory = asyncHandler(async (req, res) => {
+  const { dateFrom, dateTo } = req.query;
+
+  const query = { 
+    corporateId: req.user.corporateId,
+    type: "credit" 
+  };
+
+  if (dateFrom || dateTo) {
+    query.createdAt = {};
+    if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+    if (dateTo) query.createdAt.$lte = new Date(dateTo);
+  }
+
+  const transactions = await WalletTransaction.find(query)
+    .sort({ createdAt: -1 });
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      { transactions },
+      "Recharge history fetched successfully",
+    ),
+  );
+});
+
+exports.getBookingTransactions = asyncHandler(async (req, res) => {
+  const { dateFrom, dateTo } = req.query;
+
+  const query = { 
+    corporateId: req.user.corporateId,
+    type: { $in: ["debit", "refund"] }
+  };
+
+  if (dateFrom || dateTo) {
+    query.createdAt = {};
+    if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+    if (dateTo) query.createdAt.$lte = new Date(dateTo);
+  }
+
+  const transactions = await WalletTransaction.find(query)
+    .populate("bookingId", "bookingReference")
+    .sort({ createdAt: -1 });
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      { transactions },
+      "Booking transactions fetched successfully",
+    ),
+  );
+});
+
 exports.getWalletTransactions = asyncHandler(async (req, res) => {
-  const { type, dateFrom, dateTo, page = 1, limit = 10 } = req.query;
-  const parsedPage = Number(page);
-  const parsedLimit = Number(limit);
+  const { type, dateFrom, dateTo } = req.query;
 
   const query = { corporateId: req.user.corporateId };
 
@@ -49,25 +100,14 @@ exports.getWalletTransactions = asyncHandler(async (req, res) => {
     }
   }
 
-  const total = await WalletTransaction.countDocuments(query);
   const transactions = await WalletTransaction.find(query)
     .populate("bookingId", "bookingReference")
-    .sort({ createdAt: -1 })
-    .skip((parsedPage - 1) * parsedLimit)
-    .limit(parsedLimit);
+    .sort({ createdAt: -1 });
 
   res.status(200).json(
     new ApiResponse(
       200,
-      {
-        transactions,
-        pagination: {
-          total,
-          page: parsedPage,
-          limit: parsedLimit,
-          hasMore: parsedPage * parsedLimit < total,
-        },
-      },
+      { transactions },
       "Wallet transactions fetched successfully",
     ),
   );

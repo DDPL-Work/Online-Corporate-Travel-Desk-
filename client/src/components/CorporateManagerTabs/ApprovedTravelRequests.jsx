@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { FaPlane, FaHotel } from "react-icons/fa";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import {
   FiHome,
   FiCheckCircle,
@@ -8,6 +9,7 @@ import {
   FiDollarSign,
   FiX,
   FiRefreshCw,
+  FiList,
 } from "react-icons/fi";
 import {
   getApprovedHotelRequests,
@@ -135,10 +137,11 @@ function FlightApprovalsSection({
   const failed = filtered.filter((a) => a.executionStatus === "failed").length;
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+    <div className="space-y-6">
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
-          label="Total Flights"
+          label="Approved Flights"
           value={filtered.length}
           Icon={FaPlane}
           borderCls="border-[#0A4D68]"
@@ -146,7 +149,7 @@ function FlightApprovalsSection({
           iconColorCls="text-[#0A4D68]"
         />
         <StatCard
-          label="Not Started"
+          label="Execution Pending"
           value={notStarted}
           Icon={FiClock}
           borderCls="border-amber-500"
@@ -154,192 +157,188 @@ function FlightApprovalsSection({
           iconColorCls="text-amber-600"
         />
         <StatCard
-          label="Failed"
+          label="Execution Failed"
           value={failed}
           Icon={FiX}
           borderCls="border-red-500"
           iconBgCls="bg-red-50"
           iconColorCls="text-red-600"
         />
-        {/* <StatCard
-          label="Est. Cost"
-          value={`₹${totalCost.toLocaleString()}`}
-          Icon={FiDollarSign}
-          borderCls="border-violet-500"
-          iconBgCls="bg-violet-50"
-          iconColorCls="text-violet-600"
-        /> */}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-          <LabeledField label="Search">
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Ref, name, route…"
-            />
-          </LabeledField>
-          <LabeledField label="From Date">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStart(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField label="To Date">
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEnd(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField label="Travel Date">
-            <input
-              type="date"
-              value={travelDate}
-              onChange={(e) => setTravelDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField label="Execution Status">
-            <select
-              value={execFilter}
-              onChange={(e) => setExec(e.target.value)}
-              className={selectCls}
-            >
-              {execStatuses.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </LabeledField>
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div className="md:col-span-12 lg:col-span-4">
+            <LabeledField label="Search Requests">
+              <SearchBar
+                value={search}
+                onChange={setSearch}
+                placeholder="Search by Ref, Name, Route..."
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="From Date">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStart(e.target.value)}
+                className={dateCls}
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="To Date">
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEnd(e.target.value)}
+                className={dateCls}
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="Travel Date">
+              <input
+                type="date"
+                value={travelDate}
+                onChange={(e) => setTravelDate(e.target.value)}
+                className={dateCls}
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="Execution">
+              <select
+                value={execFilter}
+                onChange={(e) => setExec(e.target.value)}
+                className={selectCls}
+              >
+                {execStatuses.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </LabeledField>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm">
-        <TableScrollWrapper>
-          <table className="w-full border-collapse min-w-[1000px]">
-            <thead>
-              <tr className="bg-[#0A4D68] text-blue-100">
-                <Th>Order ID</Th>
-                <Th>Employee</Th>
-                <Th>Route</Th>
-                <Th>Airline</Th>
-                <Th>Travel Date</Th>
-                <Th>Amount</Th>
-                <Th>Exec Status</Th>
-                {/* <Th>Fare Timer</Th> */}
-                <Th>Action</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {paginated.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="py-16 text-center text-slate-400">
-                    <div className="flex justify-center mb-3">
-                      <FaPlane size={32} className="opacity-20" />
+      {/* Table */}
+      <ResponsiveDataTable
+        title="Flight Approval Queue"
+        subtitle={`${filtered.length} requests pending execution`}
+        tableMinWidth="1100px"
+        arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+        pagination={
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setCurrentPage}
+          />
+        }
+        footer={
+          <div className="px-6 py-3 flex justify-between items-center bg-slate-50 border-t border-slate-100">
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+              Showing <span className="text-slate-900">{paginated.length}</span> of <span className="text-slate-900">{filtered.length}</span> entries
+            </div>
+          </div>
+        }
+      >
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-[#0A4D68] text-white">
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Order ID</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Employee</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Route</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Airline</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Travel Date</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Amount</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Exec Status</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan="8" className="py-20 text-center">
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                      <FaPlane className="w-8 h-8 text-slate-300" />
                     </div>
-                    <p className="font-semibold text-sm">
-                      No approved flight bookings found
-                    </p>
-                    <p className="text-xs mt-1">
-                      Try adjusting the filters or search query
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                paginated.map((a, i) => {
-                  const segs = a.flightRequest?.segments || [];
-                  const route =
-                    segs.length > 0
-                      ? `${segs[0].origin?.airportCode || "—"} → ${segs[segs.length - 1].destination?.airportCode || "—"}`
-                      : a.bookingSnapshot?.sectors?.join(", ") || "—";
-                  const airline =
-                    a.bookingSnapshot?.airline || segs[0]?.airlineName || "—";
-                  const leadTraveller = a.travellers?.find(
-                    (t) => t.isLeadPassenger,
-                  );
+                    <h3 className="text-lg font-bold text-slate-800">No Approvals Found</h3>
+                    <p className="text-slate-500 text-sm mt-1">No approved flight requests match your search criteria.</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              paginated.map((a, i) => {
+                const segs = a.flightRequest?.segments || [];
+                const route =
+                  segs.length > 0
+                    ? `${segs[0].origin?.airportCode || "—"} → ${segs[segs.length - 1].destination?.airportCode || "—"}`
+                    : a.bookingSnapshot?.sectors?.join(", ") || "—";
+                const airline =
+                  a.bookingSnapshot?.airline || segs[0]?.airlineName || "—";
+                const leadTraveller = a.travellers?.find(
+                  (t) => t.isLeadPassenger,
+                );
+                const emp = leadTraveller
+                  ? `${leadTraveller.firstName} ${leadTraveller.lastName}`
+                  : "—";
 
-                  const emp = leadTraveller
-                    ? `${leadTraveller.firstName} ${leadTraveller.lastName}`
-                    : "—";
-                  return (
-                    <tr
-                      key={a._id}
-                      className={`hover:bg-sky-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}
-                    >
-                      <td className="px-4 py-3">
-                        <IdCell id={a.orderId || "N/A"} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-[13px] text-slate-800">
-                          {emp}
-                        </p>
-                        <p className="text-[11px] text-slate-400 truncate max-w-40">
-                          {a.purposeOfTravel}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 font-bold text-[13px] text-slate-900">
-                        {route}
-                      </td>
-                      <td className="px-4 py-3 text-[13px] text-slate-500">
-                        {airline}
-                      </td>
-                      <td className="px-4 py-3 text-[13px] text-slate-500">
-                        {formatDate(
-                          a.bookingSnapshot?.travelDate ||
-                            segs[0]?.departureDateTime,
-                        )}
-                      </td>
-                      <td className="px-4 py-3 font-bold text-slate-900">
-                        ₹
-                        {(a.pricingSnapshot?.totalAmount || 0).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3">
-                        <ExecStatusBadge status={a.executionStatus} />
-                      </td>
-                      {/* <td className="px-4 py-3">
-                        {a.flightRequest?.traceId ? (
-                          <TraceTimer timer={traceTimers[a._id]} />
-                        ) : (
-                          <span className="text-[11px] text-slate-300">—</span>
-                        )}
-                      </td> */}
-                      <td className="px-4 py-3">
+                return (
+                  <tr
+                    key={a._id}
+                    className="group hover:bg-slate-50 transition-colors"
+                  >
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">
+                        {a.orderId || "N/A"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-black text-slate-800 text-[13px]">{emp}</span>
+                        <span className="text-[11px] text-slate-400 font-bold truncate max-w-[150px]">{a.purposeOfTravel}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-[13px] font-black text-slate-900">
+                      {route}
+                    </td>
+                    <td className="px-6 py-4 text-[13px] font-bold text-slate-500">
+                      {airline}
+                    </td>
+                    <td className="px-6 py-4 text-[13px] font-bold text-slate-500">
+                      {formatDate(
+                        a.bookingSnapshot?.travelDate ||
+                          segs[0]?.departureDateTime,
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-black text-slate-900">₹{(a.pricingSnapshot?.totalAmount || 0).toLocaleString()}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <ExecStatusBadge status={a.executionStatus} />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-center">
                         <button
                           onClick={() => setSelected(a)}
-                          className="text-[12px] px-3 py-1.5 bg-[#0A4D68] text-white rounded-lg hover:bg-[#093f54] transition-colors font-semibold"
+                          className="inline-flex items-center gap-2 px-5 py-2 bg-slate-800 text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-900 transition-all active:scale-95 shadow-md shadow-slate-200"
                         >
                           View
                         </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </TableScrollWrapper>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-          <span>
-            Showing{" "}
-            <strong className="text-slate-600">{paginated.length}</strong> of{" "}
-            <strong className="text-slate-600">{filtered.length}</strong>{" "}
-            flights (filtered)
-          </span>
-          {/* <span className="text-red-400 text-[11px]">
-            ✕ ticketed &amp; cancelled excluded
-          </span> */}
-        </div>
-        <Pagination
-          currentPage={currentPage}
-          totalItems={filtered.length}
-          pageSize={PAGE_SIZE}
-          onPageChange={setCurrentPage}
-        />
-      </div>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
 
       {selected && (
         <FlightBookingModal
@@ -425,10 +424,11 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
   const failed = filtered.filter((a) => a.executionStatus === "failed").length;
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+    <div className="space-y-6">
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
-          label="Total Hotels"
+          label="Approved Hotels"
           value={filtered.length}
           Icon={FiHome}
           borderCls="border-[#088395]"
@@ -436,7 +436,7 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
           iconColorCls="text-[#088395]"
         />
         <StatCard
-          label="Not Started"
+          label="Execution Pending"
           value={notStarted}
           Icon={FiClock}
           borderCls="border-amber-500"
@@ -444,205 +444,184 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
           iconColorCls="text-amber-600"
         />
         <StatCard
-          label="Failed"
+          label="Execution Failed"
           value={failed}
           Icon={FiX}
           borderCls="border-red-500"
           iconBgCls="bg-red-50"
           iconColorCls="text-red-600"
         />
-        {/* <StatCard
-          label="Est. Cost"
-          value={`₹${totalCost.toLocaleString()}`}
-          Icon={FiDollarSign}
-          borderCls="border-violet-500"
-          iconBgCls="bg-violet-50"
-          iconColorCls="text-violet-600"
-        /> */}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-          <LabeledField label="Search">
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Hotel, ref, name…"
-            />
-          </LabeledField>
-          <LabeledField label="From Date">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStart(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField label="To Date">
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEnd(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField label="CheckIn Date">
-            <input
-              type="date"
-              value={checkInDate}
-              onChange={(e) => setCheckInDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField label="CheckOut Date">
-            <input
-              type="date"
-              value={checkOutDate}
-              onChange={(e) => setCheckOutDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField label="Execution Status">
-            <select
-              value={execFilter}
-              onChange={(e) => setExec(e.target.value)}
-              className={selectCls}
-            >
-              {execStatuses.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </LabeledField>
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div className="md:col-span-12 lg:col-span-4">
+            <LabeledField label="Search Requests">
+              <SearchBar
+                value={search}
+                onChange={setSearch}
+                placeholder="Search by Hotel, Ref, Name..."
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="From Date">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStart(e.target.value)}
+                className={dateCls}
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="To Date">
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEnd(e.target.value)}
+                className={dateCls}
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="Check-In">
+              <input
+                type="date"
+                value={checkInDate}
+                onChange={(e) => setCheckInDate(e.target.value)}
+                className={dateCls}
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="Execution">
+              <select
+                value={execFilter}
+                onChange={(e) => setExec(e.target.value)}
+                className={selectCls}
+              >
+                {execStatuses.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </LabeledField>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm">
-        <TableScrollWrapper>
-          <table className="w-full border-collapse min-w-[950px]">
-            <thead>
-              <tr className="bg-[#088395] text-teal-100">
-                <Th>Order ID</Th>
-                <Th>Employee</Th>
-                <Th>Hotel</Th>
-                <Th>Check-In</Th>
-                <Th>Check-Out</Th>
-                {/* <Th>Nights</Th> */}
-                <Th>Amount</Th>
-                <Th>Exec Status</Th>
-                <Th>Action</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {paginated.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="py-16 text-center text-slate-400">
-                    <div className="flex justify-center mb-3">
-                      <FaHotel size={32} className="opacity-20" />
+      {/* Table */}
+      <ResponsiveDataTable
+        title="Hotel Approval Queue"
+        subtitle={`${filtered.length} requests pending execution`}
+        tableMinWidth="1100px"
+        arrowBgClass="bg-teal-50 border-teal-200 text-[#088395] hover:bg-teal-100"
+        pagination={
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setCurrentPage}
+          />
+        }
+        footer={
+          <div className="px-6 py-3 flex justify-between items-center bg-slate-50 border-t border-slate-100">
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+              Showing <span className="text-slate-900">{paginated.length}</span> of <span className="text-slate-900">{filtered.length}</span> entries
+            </div>
+          </div>
+        }
+      >
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-[#088395] text-white">
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Order ID</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Employee</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Hotel</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Check-In</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Check-Out</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Amount</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Exec Status</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan="8" className="py-20 text-center">
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                      <FaHotel className="w-8 h-8 text-slate-300" />
                     </div>
-                    <p className="font-semibold text-sm">
-                      No approved hotel bookings found
-                    </p>
-                    <p className="text-xs mt-1">
-                      Try adjusting the filters or search query
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                paginated.map((a, i) => {
-                 const hotel = a.hotelRequest?.selectedHotel || {};
-const snap = a.bookingSnapshot || {};
+                    <h3 className="text-lg font-bold text-slate-800">No Approvals Found</h3>
+                    <p className="text-slate-500 text-sm mt-1">No approved hotel requests match your search criteria.</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              paginated.map((a, i) => {
+                const hotel = a.hotelRequest?.selectedHotel || {};
+                const leadTraveller = a.travellers?.find((t) => t.isLeadPassenger);
+                const emp = leadTraveller
+                  ? `${leadTraveller.firstName} ${leadTraveller.lastName}`
+                  : "—";
+                const amount =
+                  a.hotelRequest?.selectedRoom?.rawRoomData?.[0]?.Price?.totalFare ||
+                  a.hotelRequest?.selectedRoom?.price?.totalFare ||
+                  0;
 
-// ✅ Lead Traveller (CORRECT)
-const leadTraveller = a.travellers?.find((t) => t.isLeadPassenger);
-
-const emp = leadTraveller
-  ? `${leadTraveller.firstName} ${leadTraveller.lastName}`
-  : "—";
-
-// ✅ Nights (CORRECT CALCULATION)
-const nights =
-  a.hotelRequest?.noOfNights ||
-  calculateNights(
-    a.hotelRequest?.checkInDate,
-    a.hotelRequest?.checkOutDate
-  );
-
-// ✅ Amount (CORRECT SOURCE)
-const amount =
-  a.hotelRequest?.selectedRoom?.rawRoomData?.[0]?.Price?.totalFare ||
-  a.hotelRequest?.selectedRoom?.price?.totalFare ||
-  0;
-                  return (
-                    <tr
-                      key={a._id}
-                      className={`hover:bg-teal-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}
-                    >
-                      <td className="px-4 py-3">
-                        <IdCell id={a.orderId || "N/A"} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-[13px] text-slate-800">
-                          {emp}
-                        </p>
-                        <p className="text-[11px] text-slate-400 truncate max-w-40">
-                          {a.purposeOfTravel}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-[13px] text-slate-800">
-                          {hotel.hotelName || "—"}
-                        </p>
-                        <p className="text-[11px] text-slate-400 truncate max-w-[200px]">
-                          {hotel.address?.split(",")[0]}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-[13px] text-slate-500">
-                        {formatDate(a.hotelRequest?.checkInDate)}
-                      </td>
-                      <td className="px-4 py-3 text-[13px] text-slate-500">
-                        {formatDate(a.hotelRequest?.checkOutDate)}
-                      </td>
-                      {/* <td className="px-4 py-3 font-bold text-center text-slate-700">
-                        {nights}
-                      </td> */}
-                      <td className="px-4 py-3 font-bold text-slate-900">
-                       ₹{amount.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3">
-                        <ExecStatusBadge status={a.executionStatus} />
-                      </td>
-                      <td className="px-4 py-3">
+                return (
+                  <tr
+                    key={a._id}
+                    className="group hover:bg-slate-50 transition-colors"
+                  >
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-sm font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-md border border-teal-100">
+                        {a.orderId || "N/A"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-black text-slate-800 text-[13px]">{emp}</span>
+                        <span className="text-[11px] text-slate-400 font-bold truncate max-w-[150px]">{a.purposeOfTravel}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-black text-slate-800 text-[13px] line-clamp-1">{hotel.hotelName || "—"}</span>
+                        <span className="text-[11px] text-slate-400 font-bold">{hotel.address?.split(",")[0]}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-[13px] font-bold text-slate-500 text-center">
+                      {formatDate(a.hotelRequest?.checkInDate)}
+                    </td>
+                    <td className="px-6 py-4 text-[13px] font-bold text-slate-500 text-center">
+                      {formatDate(a.hotelRequest?.checkOutDate)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-black text-slate-900">₹{amount.toLocaleString()}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <ExecStatusBadge status={a.executionStatus} />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-center">
                         <button
                           onClick={() => setSelected(a)}
-                          className="text-[12px] px-3 py-1.5 bg-[#088395] text-white rounded-lg hover:bg-[#066f7e] transition-colors font-semibold"
+                          className="inline-flex items-center gap-2 px-5 py-2 bg-slate-800 text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-900 transition-all active:scale-95 shadow-md shadow-slate-200"
                         >
                           View
                         </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </TableScrollWrapper>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-          <span>
-            Showing{" "}
-            <strong className="text-slate-600">{paginated.length}</strong> of{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> hotels (filtered)
-          </span>
-          {/* <span className="text-red-400 text-[11px]">
-            ✕ voucher-generated &amp; cancelled excluded
-          </span> */}
-        </div>
-        <Pagination
-          currentPage={currentPage}
-          totalItems={filtered.length}
-          pageSize={PAGE_SIZE}
-          onPageChange={setCurrentPage}
-        />
-      </div>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
 
       {selected && (
         <HotelBookingModal
@@ -756,46 +735,59 @@ export default function ApprovedTravelRequestsForManager() {
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-[#0A4D68] flex items-center justify-center shrink-0">
-            <FiCheckCircle size={18} className="text-white" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        
+        {/* Header Card */}
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white shrink-0">
+              <FiCheckCircle size={24} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase leading-none truncate">
+                Approved Requests
+              </h1>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 font-bold uppercase tracking-widest truncate">
+                Approved bookings pending execution
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">
-              Approved Travel Requests
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Approved bookings pending execution &nbsp;·&nbsp;
-              {/* <span className="text-red-500">
-                Ticketed flights &amp; voucher-generated hotels are excluded
-              </span> */}
-            </p>
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              onClick={handleRefresh}
+              disabled={loadingActive}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold transition-all shadow-sm border bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100 active:scale-95 disabled:opacity-50"
+            >
+              <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
+              Refresh
+            </button>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={loadingActive}
-            className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-slate-800 hover:border-slate-300 disabled:opacity-50"
-          >
-            <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
-            Refresh
-          </button>
         </div>
 
-        <div className="flex items-end gap-0 mb-5 border-b-2 border-slate-200">
+        {/* Tab Navigation */}
+        <div className="flex bg-slate-200/50 p-1.5 rounded-2xl w-fit shadow-inner">
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-5 py-2.5 text-[13px] font-bold transition-all border-b-2 -mb-0.5 rounded-t-lg ${active ? `bg-white ${tab.activeText} ${tab.activeBorder} shadow-sm` : "text-slate-400 border-transparent hover:text-slate-600 hover:bg-white/60"}`}
+                className={`
+                  flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all
+                  ${
+                    active
+                      ? `bg-white ${tab.activeText} shadow-md`
+                      : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
+                  }
+                `}
               >
                 <tab.Icon size={14} />
                 {tab.label}
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${active ? "bg-slate-100 text-slate-600" : "bg-slate-200 text-slate-400"}`}
-                >
+                <span className={`
+                  px-2 py-0.5 rounded-full text-[10px] font-black
+                  ${active ? "bg-slate-100 text-slate-600" : "bg-slate-200 text-slate-400"}
+                `}>
                   {tab.count}
                 </span>
               </button>
@@ -803,21 +795,21 @@ export default function ApprovedTravelRequestsForManager() {
           })}
         </div>
 
-        <div className={activeTab === "flight" ? "block" : "hidden"}>
+        {/* Tab Content */}
+        {activeTab === "flight" ? (
           <FlightApprovalsSection
-            rawApprovals={approvedFlightRequests}
+            rawApprovals={approvedFlightRequests || []}
             traceTimers={traceTimers}
             loading={loadingApprovedFlightRequests}
             onCountChange={setFlightCount}
           />
-        </div>
-        <div className={activeTab === "hotel" ? "block" : "hidden"}>
+        ) : (
           <HotelApprovalsSection
-            rawApprovals={approvedHotelRequests}
+            rawApprovals={approvedHotelRequests || []}
             loading={loadingApprovedRequests}
             onCountChange={setHotelCount}
           />
-        </div>
+        )}
       </div>
     </div>
   );

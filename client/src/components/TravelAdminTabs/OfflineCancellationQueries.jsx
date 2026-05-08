@@ -15,8 +15,10 @@ import {
   FiUser,
   FiTag,
   FiHash,
+  FiX,
 } from "react-icons/fi";
-import { StatCard, IdCell, Th } from "./Shared/CommonComponents";
+import { StatCard, IdCell, Th, LabeledField } from "./Shared/CommonComponents";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import CancellationQueryDetailsPage from "./CancellationQueryDetailsPage";
 
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -240,44 +242,36 @@ const OfflineCancellationQueries = () => {
   }
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto font-sans text-slate-900">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-800 flex items-center gap-3">
-            Offline Cancellation Queries
-            <span className="px-3 py-1 rounded-full bg-[#0A4D68]/5 text-[#0A4D68] text-xs font-black uppercase tracking-tighter">
-              BETA
-            </span>
-          </h1>
-          <p className="text-slate-400 font-medium mt-1">
-            Track and manage offline cancellation requests for your team.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => dispatch(fetchCancellationQueries())}
-            disabled={queriesLoading}
-            className="p-3 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-[#0A4D68] hover:border-[#0A4D68]/30 transition shadow-sm"
-          >
-            <FiRefreshCw size={18} className={queriesLoading ? "animate-spin" : ""} />
-          </button>
-          <div className="relative group">
-            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0A4D68] transition-colors" />
-            <input
-              type="text"
-              placeholder="Search by Ref or Query ID..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-11 pr-4 py-3 rounded-2xl bg-white border border-slate-200 w-full md:w-72 outline-none focus:border-[#0A4D68] focus:ring-4 focus:ring-[#0A4D68]/5 transition shadow-sm font-medium text-sm"
-            />
+    <div className="w-full min-w-0 space-y-6 font-sans">
+      <div className="flex items-center justify-between gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shrink-0 shadow-sm">
+            <FiInbox size={18} className="text-white" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-xl font-black text-slate-900 tracking-tight truncate flex items-center gap-2">
+              Offline Cancellation Queries
+              <span className="px-2 py-0.5 rounded-md bg-[#0A4D68]/5 text-[#0A4D68] text-[10px] font-black uppercase tracking-tighter shrink-0">
+                BETA
+              </span>
+            </h1>
+            <p className="text-xs text-slate-400 mt-0.5 truncate">
+              Track and manage offline cancellation requests for your team.
+            </p>
           </div>
         </div>
+        <button
+          onClick={() => dispatch(fetchCancellationQueries())}
+          disabled={queriesLoading}
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-bold transition-all shadow-sm border bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100 disabled:opacity-60 disabled:cursor-wait"
+        >
+          <FiRefreshCw size={14} className={queriesLoading ? "animate-spin" : ""} />
+          {queriesLoading ? "Refreshing…" : "Refresh"}
+        </button>
       </div>
 
       {/* STATS SECTION */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
         <StatCard
           label="Total Queries"
           value={stats.total}
@@ -312,38 +306,67 @@ const OfflineCancellationQueries = () => {
         />
       </div>
 
-      {/* TABS SECTION */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
-        <div className="flex p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
-          <button
-            onClick={() => setActiveTab("my")}
-            className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${
-              activeTab === "my"
-                ? "bg-white text-[#0A4D68] shadow-sm scale-[1.02]"
-                : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            {userRole === "employee" ? "My Queries" : "Assigned to Me"}
-          </button>
-          {(userRole === "manager" || userRole === "travel-admin") && (
-            <button
-              onClick={() => setActiveTab("company")}
-              className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${
-                activeTab === "company"
-                  ? "bg-white text-[#0A4D68] shadow-sm scale-[1.02]"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+          <div className="md:col-span-5">
+            <div className="flex p-1.5 bg-slate-100 rounded-xl border border-slate-200">
+              <button
+                onClick={() => setActiveTab("my")}
+                className={`flex-1 px-4 py-2 rounded-lg text-[13px] font-bold transition-all ${
+                  activeTab === "my"
+                    ? "bg-white text-[#0A4D68] shadow-sm"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                {userRole === "employee" ? "My Queries" : "Assigned to Me"}
+              </button>
+              {(userRole === "manager" || userRole === "travel-admin") && (
+                <button
+                  onClick={() => setActiveTab("company")}
+                  className={`flex-1 px-4 py-2 rounded-lg text-[13px] font-bold transition-all ${
+                    activeTab === "company"
+                      ? "bg-white text-[#0A4D68] shadow-sm"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {userRole === "manager" ? "Team Queries" : "All Company Queries"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="md:col-span-4">
+            <LabeledField
+              label={
+                <>
+                  <FiSearch size={10} /> Search Reference
+                </>
+              }
             >
-              {userRole === "manager" ? "Team Queries" : "All Company Queries"}
+              <div className="relative group">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0A4D68] transition-colors" />
+                <input
+                  type="text"
+                  placeholder="Ref or Query ID..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-[13px] rounded-lg bg-slate-50 border border-slate-200 outline-none focus:border-[#0A4D68] focus:ring-4 focus:ring-[#0A4D68]/5 transition font-medium"
+                />
+              </div>
+            </LabeledField>
+          </div>
+
+          <div className="md:col-span-3">
+            <button
+              onClick={() => {
+                setSearch("");
+                setActiveTab("my");
+              }}
+              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold text-slate-500 bg-slate-100 rounded-lg hover:bg-slate-200 hover:text-slate-700 transition-colors"
+            >
+              <FiX size={12} /> Reset Filters
             </button>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-2 px-4 py-2 bg-[#dac448]/10 border border-[#dac448]/20 rounded-xl">
-          <FiAlertCircle className="text-[#dac448]" size={14} />
-          <p className="text-[11px] font-bold text-[#b5a23a] uppercase tracking-wider">
-            Standard Processing Time: 2-4 Business Hours
-          </p>
+          </div>
         </div>
       </div>
 
@@ -384,68 +407,69 @@ const OfflineCancellationQueries = () => {
         </div>
       ) : (
         /* TABLE FOR ADMIN/COMPANY VIEW */
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <Th label="Query ID" icon={<FiHash />} />
-                  <Th label="Reference" icon={<FiTag />} />
-                  <Th label="Employee" icon={<FiUser />} />
-                  <Th label="Requested At" icon={<FiCalendar />} />
-                  <Th label="Status" />
-                  <Th label="Action" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filteredQueries.map((query) => (
-                  <tr key={query._id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="px-6 py-4">
-                      <IdCell id={query.queryId} prefix="Q" />
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-bold text-slate-700">{query.bookingReference}</p>
-                      <p className="text-[10px] text-slate-400 uppercase font-black">{query.bookingSnapshot?.airline || "N/A"}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-bold text-slate-700">{query.corporate?.employeeName}</p>
-                      <p className="text-[11px] text-slate-400">{query.corporate?.employeeEmail}</p>
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-slate-600">
-                      {new Date(query.requestedAt).toLocaleString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={query.status} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <button 
-                        onClick={() => handleOpenModal(query._id)}
-                        className="px-4 py-2 rounded-lg bg-[#0A4D68]/5 text-[#0A4D68] text-xs font-bold hover:bg-[#0A4D68] hover:text-white transition-all"
-                      >
-                        View Details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
-              Showing {filteredQueries.length} of {stats.total} total requests
-            </p>
-            <div className="flex gap-2">
-              <button disabled className="px-3 py-1 rounded border border-slate-200 text-[10px] font-bold text-slate-400 bg-white">Prev</button>
-              <button disabled className="px-3 py-1 rounded border border-slate-200 text-[10px] font-bold text-slate-400 bg-white">Next</button>
+        <ResponsiveDataTable
+          title="Company Cancellation Queries"
+          subtitle={`${filteredQueries.length} record${filteredQueries.length !== 1 ? "s" : ""} found`}
+          tableMinWidth="960px"
+          arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+          footer={
+            <div className="px-4 py-2.5 flex justify-between text-xs text-slate-400">
+              <span>
+                Showing <strong className="text-slate-600">{filteredQueries.length}</strong> of <strong className="text-slate-600">{stats.total}</strong> total requests
+              </span>
             </div>
-          </div>
-        </div>
+          }
+        >
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <Th label="Query ID" icon={<FiHash />} />
+                <Th label="Reference" icon={<FiTag />} />
+                <Th label="Employee" icon={<FiUser />} />
+                <Th label="Requested At" icon={<FiCalendar />} />
+                <Th label="Status" />
+                <Th label="Action" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filteredQueries.map((query) => (
+                <tr key={query._id} className="hover:bg-slate-50/80 transition-colors group">
+                  <td className="px-6 py-4">
+                    <IdCell id={query.queryId} prefix="Q" />
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-bold text-slate-700">{query.bookingReference}</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-black">{query.bookingSnapshot?.airline || "N/A"}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-bold text-slate-700">{query.corporate?.employeeName}</p>
+                    <p className="text-[11px] text-slate-400">{query.corporate?.employeeEmail}</p>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-medium text-slate-600">
+                    {new Date(query.requestedAt).toLocaleString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </td>
+                  <td className="px-6 py-4">
+                    <StatusBadge status={query.status} />
+                  </td>
+                  <td className="px-6 py-4">
+                    <button 
+                      onClick={() => handleOpenModal(query._id)}
+                      className="px-4 py-2 rounded-lg bg-[#0A4D68]/5 text-[#0A4D68] text-xs font-bold hover:bg-[#0A4D68] hover:text-white transition-all"
+                    >
+                      View Details
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ResponsiveDataTable>
       )}
     </div>
   );

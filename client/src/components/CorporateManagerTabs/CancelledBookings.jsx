@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { FaPlane, FaHotel } from "react-icons/fa";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import {
   FiSearch,
   FiXCircle,
@@ -10,6 +11,7 @@ import {
   FiFilter,
   FiRefreshCw,
   FiClock,
+  FiEye,
 } from "react-icons/fi";
 import { BsBuilding } from "react-icons/bs";
 import {
@@ -95,7 +97,7 @@ function CancelledFlightSection() {
       ? `${b.travellers[0].title || ""} ${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim()
       : "N/A";
 
-    const employeeId = b.userId?._id;
+    const employeeId = b.userId?.email || "N/A";
     const cancelStatus = b.amendment?.status;
     const cancelledDate = b.amendmentHistory?.[0]?.createdAt || null;
     const refundAmount =
@@ -194,9 +196,9 @@ function CancelledFlightSection() {
   const total = filtered.reduce((s, b) => s + (b.amount || 0), 0);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Stat cards */}
-      {/* <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Total Cancelled"
           value={filtered.length}
@@ -229,199 +231,183 @@ function CancelledFlightSection() {
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
         />
-      </div> */}
+      </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          <LabeledField
-            label={
-              <>
-                <FiSearch size={10} /> Search Traveller / PNR
-              </>
-            }
-          >
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Name, PNR, booking ID…"
-            />
-          </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> From Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> To Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> Travel Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={travelDate}
-              onChange={(e) => setTravelDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiFilter size={10} /> Cancel Status
-              </>
-            }
-          >
-            <select
-              value={cancelStatusFilter}
-              onChange={(e) => setCancelStatus(e.target.value)}
-              className={selectCls}
-            >
-              {["All", "Cancelled", "Refunded", "Refund Pending"].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </LabeledField>
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div className="md:col-span-12 lg:col-span-4">
+            <LabeledField label="Search Traveller / PNR">
+              <SearchBar
+                value={search}
+                onChange={setSearch}
+                placeholder="Search by Name, PNR, ID..."
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="From Date">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className={dateCls}
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="To Date">
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className={dateCls}
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="Travel Date">
+              <input
+                type="date"
+                value={travelDate}
+                onChange={(e) => setTravelDate(e.target.value)}
+                className={dateCls}
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="Cancel Status">
+              <select
+                value={cancelStatusFilter}
+                onChange={(e) => setCancelStatus(e.target.value)}
+                className={selectCls}
+              >
+                {["All", "Cancelled", "Refunded", "Refund Pending"].map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </LabeledField>
+          </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[960px]">
-            <thead>
-              <tr className="bg-red-800 text-red-100">
-                <Th>Order ID</Th>
-                <Th>Traveller Name</Th>
-                <Th>Booked Date</Th>
-                <Th>Cancelled Date</Th>
-                <Th>Refund Amount</Th>
-                <Th>Cancel Status</Th>
-                <Th>PNR / Cancel Request ID</Th>
-                <Th>Action</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {paginated.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="py-16 text-center text-slate-400">
-                    <div className="flex justify-center mb-3">
-                      <FaPlane size={32} className="opacity-20" />
+      <ResponsiveDataTable
+        title="Cancelled Flight Inventory"
+        subtitle={`${filtered.length} total cancellations`}
+        tableMinWidth="1100px"
+        arrowBgClass="bg-red-50 border-red-200 text-red-800 hover:bg-red-100"
+        pagination={
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setCurrentPage}
+          />
+        }
+        footer={
+          <div className="px-6 py-3 flex justify-between items-center bg-slate-50 border-t border-slate-100">
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+              Showing <span className="text-slate-900">{paginated.length}</span> of <span className="text-slate-900">{filtered.length}</span> entries
+            </div>
+            <div className="text-[12px] font-black text-red-600 uppercase tracking-widest">
+              Refund Value: ₹{totalRefund.toLocaleString()}
+            </div>
+          </div>
+        }
+      >
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-red-800 text-white">
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Order ID</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Traveller Name</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Booked Date</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Cancelled Date</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Refund</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Status</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">PNR / Request ID</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan="8" className="py-20 text-center">
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                      <FaPlane className="w-8 h-8 text-slate-300" />
                     </div>
-                    <p className="font-semibold text-sm">
-                      No cancelled flight bookings found
-                    </p>
-                    <p className="text-xs mt-1">
-                      Try adjusting the filters or search query
-                    </p>
+                    <h3 className="text-lg font-bold text-slate-800">No Cancellations Found</h3>
+                    <p className="text-slate-500 text-sm mt-1">No cancelled flight records match your search criteria.</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              paginated.map((b, i) => (
+                <tr
+                  key={b._id}
+                  className="group hover:bg-slate-50 transition-colors"
+                >
+                  <td className="px-6 py-4">
+                    <span className="font-mono text-sm font-bold text-red-600 bg-red-50 px-2 py-1 rounded-md border border-red-100">
+                      {b.orderId || "N/A"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="font-black text-slate-800 text-[13px]">{b.travellerName}</span>
+                      <span className="text-[11px] text-slate-400 font-bold truncate max-w-[150px]">{b.employeeId}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-[13px] font-bold text-slate-500 text-center">
+                    {new Date(b.bookedDate).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </td>
+                  <td className="px-6 py-4 text-[13px] font-bold text-slate-500 text-center">
+                    {b.cancelledDate
+                      ? new Date(b.cancelledDate).toLocaleDateString(
+                          "en-IN",
+                          {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          },
+                        )
+                      : "—"}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm font-black text-slate-900">₹{(b.refundAmount || 0).toLocaleString()}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <CancelStatusBadge
+                      status={mapCancelStatus(b.cancelStatus || b.status)}
+                    />
+                  </td>
+                  <td className="px-6 py-4">
+                    <DualCell
+                      primary={b.pnr}
+                      secondary={b.providerBookingId}
+                    />
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex justify-center">
+                      <button
+                        onClick={() => navigate(`/manager/team-booking/${b._id}`)}
+                        className="inline-flex items-center gap-2 px-5 py-2 bg-slate-800 text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-900 transition-all active:scale-95 shadow-md shadow-slate-200"
+                      >
+                        <FiEye size={12} /> View
+                      </button>
+                    </div>
                   </td>
                 </tr>
-              ) : (
-                paginated.map((b, i) => (
-                  <tr
-                    key={b._id}
-                    className={`transition-colors hover:bg-red-50 ${
-                      i % 2 === 0 ? "bg-white" : "bg-slate-50/50"
-                    }`}
-                  >
-                    <td className="px-4 py-3">
-                      <IdCell id={b.orderId || "N/A"} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-[13px] text-slate-800">
-                          {b.travellerName}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          {b.employeeId}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {new Date(b.bookedDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {b.cancelledDate
-                        ? new Date(b.cancelledDate).toLocaleDateString(
-                            "en-IN",
-                            {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            },
-                          )
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      ₹{(b.refundAmount || 0).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <CancelStatusBadge
-                        status={mapCancelStatus(b.cancelStatus || b.status)}
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-700">
-                      <DualCell
-                        primary={b.pnr}
-                        secondary={b.providerBookingId}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() =>
-                          navigate(`/manager/team-booking/${b._id}`)
-                        }
-                        className="px-3 py-1 text-xs font-semibold bg-red-700 text-white rounded-md hover:bg-red-800"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-          <span>
-            Showing {paginated.length} of {filtered.length} cancelled flights
-          </span>
-        </div>
-        <Pagination
-          currentPage={currentPage}
-          totalItems={filtered.length}
-          pageSize={PAGE_SIZE}
-          onPageChange={setCurrentPage}
-        />
-      </div>
+              ))
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
     </div>
   );
 }
@@ -464,7 +450,7 @@ function CancelledHotelSection() {
       ? `${b.travellers[0].title || ""} ${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim()
       : "N/A";
 
-    const employeeId = b.userId?._id;
+    const employeeId = b.userId?.email || "N/A";
 
     const hotelName =
       b.hotelRequest?.selectedHotel?.hotelName ||
@@ -586,13 +572,9 @@ function CancelledHotelSection() {
   ).length;
 
   return (
-    <div className="space-y-4">
-      {/* {loadingHotels && (
-        <div className="bg-white rounded-xl shadow-sm p-3 text-sm text-slate-500">
-          Loading cancelled hotel bookings…
-        </div>
-      )} */}
-      {/* <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="space-y-6">
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Total Cancelled"
           value={filtered.length}
@@ -625,214 +607,186 @@ function CancelledHotelSection() {
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
         />
-      </div> */}
+      </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <LabeledField
-            label={
-              <>
-                <FiSearch size={10} /> Search Guest
-              </>
-            }
-          >
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Name, booking ID…"
-            />
-          </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> From Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> To Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> CheckIn Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={checkInDate}
-              onChange={(e) => setCheckInDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> CheckOut Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={checkOutDate}
-              onChange={(e) => setCheckOutDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiFilter size={10} /> Cancel Status
-              </>
-            }
-          >
-            <select
-              value={cancelStatusFilter}
-              onChange={(e) => setCancelStatus(e.target.value)}
-              className={selectCls}
-            >
-              {["All", "Cancelled", "Refunded", "Refund Pending"].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </LabeledField>
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div className="md:col-span-12 lg:col-span-4">
+            <LabeledField label="Search Guest">
+              <SearchBar
+                value={search}
+                onChange={setSearch}
+                placeholder="Search by Name, ID, Hotel..."
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="From Date">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className={dateCls}
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="To Date">
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className={dateCls}
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="Check-In">
+              <input
+                type="date"
+                value={checkInDate}
+                onChange={(e) => setCheckInDate(e.target.value)}
+                className={dateCls}
+              />
+            </LabeledField>
+          </div>
+          <div className="md:col-span-4 lg:col-span-2">
+            <LabeledField label="Cancel Status">
+              <select
+                value={cancelStatusFilter}
+                onChange={(e) => setCancelStatus(e.target.value)}
+                className={selectCls}
+              >
+                {["All", "Cancelled", "Refunded", "Refund Pending"].map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </LabeledField>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[960px]">
-            <thead>
-              <tr className="bg-red-800 text-red-100">
-                <Th>Order ID</Th>
-                <Th>Guest Name</Th>
-                <Th>Booked Date</Th>
-                <Th>Cancelled Date</Th>
-                <Th>Refund Amount</Th>
-                <Th>Cancel Status</Th>
-                <Th>Change Request ID</Th>
-                <Th>Reason</Th>
-                <Th>Action</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="py-16 text-center text-slate-400">
-                    <div className="flex justify-center mb-3">
-                      <FaHotel size={32} className="opacity-20" />
+      {/* Table */}
+      <ResponsiveDataTable
+        title="Cancelled Hotel Inventory"
+        subtitle={`${filtered.length} total cancellations`}
+        tableMinWidth="1100px"
+        arrowBgClass="bg-red-50 border-red-200 text-red-800 hover:bg-red-100"
+        pagination={
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setCurrentPage}
+          />
+        }
+        footer={
+          <div className="px-6 py-3 flex justify-between items-center bg-slate-50 border-t border-slate-100">
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+              Showing <span className="text-slate-900">{paginated.length}</span> of <span className="text-slate-900">{filtered.length}</span> entries
+            </div>
+            <div className="text-[12px] font-black text-red-600 uppercase tracking-widest">
+              Refund Value: ₹{totalRefund.toLocaleString()}
+            </div>
+          </div>
+        }
+      >
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-red-800 text-white">
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Order ID</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Guest Name</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Booked Date</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Cancelled Date</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Refund</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Status</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Request ID</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Reason</th>
+              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan="9" className="py-20 text-center">
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                      <FaHotel className="w-8 h-8 text-slate-300" />
                     </div>
-                    <p className="font-semibold text-sm">
-                      No cancelled hotel bookings found
-                    </p>
-                    <p className="text-xs mt-1">
-                      Try adjusting the filters or search query
-                    </p>
+                    <h3 className="text-lg font-bold text-slate-800">No Cancellations Found</h3>
+                    <p className="text-slate-500 text-sm mt-1">No cancelled hotel records match your search criteria.</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              paginated.map((b, i) => (
+                <tr
+                  key={b._id}
+                  className="group hover:bg-slate-50 transition-colors"
+                >
+                  <td className="px-6 py-4">
+                    <span className="font-mono text-sm font-bold text-red-600 bg-red-50 px-2 py-1 rounded-md border border-red-100">
+                      {b.orderId || "N/A"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="font-black text-slate-800 text-[13px]">{b.guestName}</span>
+                      <span className="text-[11px] text-slate-400 font-bold truncate max-w-[150px]">{b.employeeId}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-[13px] font-bold text-slate-500 text-center">
+                    {new Date(b.bookedDate).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </td>
+                  <td className="px-6 py-4 text-[13px] font-bold text-slate-500 text-center">
+                    {b.cancelledDate
+                      ? new Date(b.cancelledDate).toLocaleDateString(
+                          "en-IN",
+                          {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          },
+                        )
+                      : "—"}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="text-sm font-black text-slate-900">₹{(b.refundAmount || 0).toLocaleString()}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <CancelStatusBadge
+                      status={mapCancelStatus(b.cancelStatus || b.executionStatus)}
+                    />
+                  </td>
+                  <td className="px-6 py-4 text-[13px] font-bold text-slate-900">
+                    {b.providerBookingId}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-[11px] text-slate-400 font-bold line-clamp-1 max-w-[150px]" title={b.remarks}>
+                      {b.remarks}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex justify-center">
+                      <button
+                        onClick={() => navigate(`/manager/team-hotel-booking/${b._id}`)}
+                        className="inline-flex items-center gap-2 px-5 py-2 bg-slate-800 text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-900 transition-all active:scale-95 shadow-md shadow-slate-200"
+                      >
+                        <FiEye size={12} /> View
+                      </button>
+                    </div>
                   </td>
                 </tr>
-              ) : (
-                paginated.map((b, i) => (
-                  <tr
-                    key={b._id}
-                    className={`transition-colors hover:bg-red-50 ${
-                      i % 2 === 0 ? "bg-white" : "bg-slate-50/50"
-                    }`}
-                  >
-                    <td className="px-4 py-3">
-                      <IdCell id={b.orderId || "N/A"} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-[13px] text-slate-800">
-                          {b.guestName}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          {b.employeeId}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {new Date(b.bookedDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {b.cancelledDate
-                        ? new Date(b.cancelledDate).toLocaleDateString(
-                            "en-IN",
-                            {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            },
-                          )
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      ₹{(b.refundAmount || 0).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <CancelStatusBadge
-                        status={mapCancelStatus(
-                          b.cancelStatus || b.executionStatus,
-                        )}
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-700">
-                      {b.providerBookingId}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {b.remarks}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() =>
-                          navigate(`/manager/team-hotel-booking/${b._id}`)
-                        }
-                        className="px-3 py-1 text-xs font-semibold bg-red-700 text-white rounded-md hover:bg-red-800"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-          <span>
-            Showing {paginated.length} of {filtered.length} cancelled hotels
-          </span>
-        </div>
-        <Pagination
-          currentPage={currentPage}
-          totalItems={filtered.length}
-          pageSize={PAGE_SIZE}
-          onPageChange={setCurrentPage}
-        />
-      </div>
+              ))
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
     </div>
   );
 }
@@ -875,33 +829,38 @@ export default function CancelledBookingsForManager() {
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-linear-to-br from-red-700 to-red-500 flex items-center justify-center shrink-0">
-            <FiXCircle size={18} className="text-white" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        
+        {/* Header Card */}
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center shadow-lg text-white shrink-0">
+              <FiXCircle size={24} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase leading-none truncate">
+                Cancelled Bookings
+              </h1>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 font-bold uppercase tracking-widest truncate">
+                Track and manage team cancellations
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">
-              Cancelled Bookings
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              View & track cancelled flight and hotel bookings
-            </p>
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              onClick={handleRefresh}
+              disabled={loadingActive}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold transition-all shadow-sm border bg-red-50 border-red-200 text-red-800 hover:bg-red-100 active:scale-95 disabled:opacity-50"
+            >
+              <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
+              Refresh
+            </button>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={loadingActive}
-            className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-slate-800 hover:border-slate-300 disabled:opacity-50"
-          >
-            <FiRefreshCw
-              size={14}
-              className={loadingActive ? "animate-spin" : ""}
-            />
-            Refresh
-          </button>
         </div>
 
-        <div className="flex items-end gap-0 mb-5 border-b-2 border-slate-200">
+        {/* Tab Navigation */}
+        <div className="flex bg-slate-200/50 p-1.5 rounded-2xl w-fit shadow-inner">
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
             return (
@@ -909,11 +868,11 @@ export default function CancelledBookingsForManager() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`
-                  flex items-center gap-2 px-5 py-2.5 text-[13px] font-bold transition-all border-b-2 -mb-0.5 rounded-t-lg
+                  flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all
                   ${
                     active
-                      ? `bg-white ${tab.activeText} ${tab.activeBorder} shadow-sm`
-                      : "text-slate-400 border-transparent hover:text-slate-600 hover:bg-white/60"
+                      ? `bg-white ${tab.activeText} shadow-md`
+                      : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
                   }
                 `}
               >
@@ -924,6 +883,7 @@ export default function CancelledBookingsForManager() {
           })}
         </div>
 
+        {/* Tab Content */}
         {activeTab === "flight" ? (
           <CancelledFlightSection />
         ) : (

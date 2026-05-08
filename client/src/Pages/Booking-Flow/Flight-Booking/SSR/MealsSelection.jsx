@@ -118,7 +118,27 @@ export const MealSelectionCards = ({
         })}
       </div>
 
-
+      {/* Description Meaning Note */}
+      <div className="mt-8 bg-slate-50 border border-slate-200 rounded-xl p-5">
+        <h4 className="text-xs font-black text-[#0A203E] uppercase tracking-widest mb-3 flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#C9A84C]"></div>
+          Meal Inclusion Meanings
+        </h4>
+        <ul className="space-y-2 text-[11px] text-slate-600 italic">
+          <li className="flex items-start gap-2">
+            <span className="font-bold text-[#0A203E] not-italic shrink-0">Included (1):</span> 
+            <span>The fare includes the Meal.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="font-bold text-[#0A203E] not-italic shrink-0">Direct (2):</span> 
+            <span>The Meal charges are added while making the ticket.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="font-bold text-[#0A203E] not-italic shrink-0">Imported (3):</span> 
+            <span>Meal charges are added while importing the ticket.</span>
+          </li>
+        </ul>
+      </div>
     </div>
   );
 };

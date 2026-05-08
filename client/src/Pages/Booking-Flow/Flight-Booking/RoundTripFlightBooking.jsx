@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useFlightSearch } from "../../../context/FlightSearchContext";
 import { MdArrowBack, MdFlightTakeoff, MdFlightLand } from "react-icons/md";
 import { BsCalendar4 } from "react-icons/bs";
 import { AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
@@ -15,6 +16,7 @@ import {
   CTABox,
   parseRoundTripBooking,
   TravelerForm,
+  SelectedSSRSummary,
 } from "./CommonComponents";
 import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import {
@@ -40,6 +42,7 @@ export default function RoundTripFlightBooking() {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { setActiveTab } = useFlightSearch();
 
   const hasState = Boolean(location.state);
   useEffect(() => {
@@ -914,7 +917,9 @@ export default function RoundTripFlightBooking() {
           travelerId: travelers[travelerIndex]?.id,
           code: meal.Code,
           description: String(meal.Description || meal.Code || ""),
+          airlineDescription: meal.AirlineDescription || meal.Description || meal.Code,
           price: meal.Price,
+          type: meal.Type || meal.Way,
         });
       });
     });
@@ -1147,18 +1152,10 @@ export default function RoundTripFlightBooking() {
       projectId: projectApproverData.project?.id,
       projectClient: projectApproverData.project?.client,
       projectCodeId: projectApproverData.project?.id,
-      approverId: !approvalRequired
-        ? user?._id || user?.id || user?.userId
-        : projectApproverData.approver?.id,
-      approverEmail: !approvalRequired
-        ? user?.email
-        : projectApproverData.approver?.email,
-      approverName: !approvalRequired
-        ? `${user?.name?.firstName} ${user?.name?.lastName}`
-        : projectApproverData.approver?.name,
-      approverRole: !approvalRequired
-        ? user?.role
-        : projectApproverData.approver?.role,
+      approverId: projectApproverData.approver?.id,
+      approverEmail: projectApproverData.approver?.email,
+      approverName: projectApproverData.approver?.name,
+      approverRole: projectApproverData.approver?.role,
       flightRequest: {
         // traceId: searchParams.traceId,
         traceId,
@@ -1186,6 +1183,14 @@ export default function RoundTripFlightBooking() {
         },
 
         fareExpiry,
+        fareRules: fareRule, // ✅ save fare rules for audit
+      },
+
+      requesterDetails: {
+        name: `${user?.name?.firstName} ${user?.name?.lastName}`,
+        email: user?.email,
+        role: user?.role,
+        userId: user?._id || user?.id || user?.userId,
       },
 
       travellers: travelersWithInfants.map((t, idx) => ({
@@ -1557,7 +1562,7 @@ export default function RoundTripFlightBooking() {
 
       {/* Top Bar */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-full mx-10 px-4 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#0A203E] transition group"
@@ -1567,11 +1572,17 @@ export default function RoundTripFlightBooking() {
             </span>
             Back to results
           </button>
-          <div className="flex items-center gap-4">
-            <span className="px-4 py-1.5 text-[10px] font-black rounded-full bg-[#0A203E] text-white uppercase tracking-widest shadow-md">
-              ROUND-TRIP
-            </span>
-          </div>
+
+          <button
+            onClick={() => {
+              setActiveTab("hotel");
+              navigate("/travel", { state: { activeTab: "hotel" } });
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className="flex items-center gap-1.5 font-bold cursor-pointer bg-[#C9A84C] hover:bg-[#b5953e] transition-colors px-3 py-1.5 rounded-md text-[#0A203E] shadow-sm"
+          >
+            Search Hotels
+          </button>
         </div>
       </div>
 
@@ -1770,6 +1781,16 @@ export default function RoundTripFlightBooking() {
                 </div>
               )}
             </div>
+
+
+            {/* Selected Add-ons Summary */}
+            <SelectedSSRSummary
+              selectedSeats={selectedSeats}
+              selectedMeals={selectedMeals}
+              selectedBaggage={selectedBaggage}
+              travelers={travelers}
+              segments={buildFullSegments()}
+            />
 
             {/* Traveller Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

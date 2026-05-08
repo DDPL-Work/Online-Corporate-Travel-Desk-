@@ -1235,7 +1235,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                 {bookRes.providerResponse?.BookResult?.BookingRefNo && (
                   <div className="col-span-full">
                     <p className="text-[10px] font-bold text-green-600 uppercase">
-                      Booking Ref Nos
+                      Order ID
                     </p>
                     <p className="text-xs font-mono font-semibold text-green-700">
                       {bookRes.providerResponse.BookResult.BookingRefNo}
@@ -1363,9 +1363,9 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <p className="text-xs text-slate-400">
-              Ref:{" "}
+              Order ID:{" "}
               <span className="font-mono font-bold text-slate-600">
-                {raw.bookingReference}
+                {raw.orderId || raw.bookingReference}
               </span>
             </p>
             {raw.executionStatus === "voucher_generated" && !showAmend && (
@@ -1393,7 +1393,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // FLIGHT BOOKING MODAL — full details
 // ─────────────────────────────────────────────────────────────────────────────
-export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
+export const FlightBookingModal = ({ booking: raw, onClose }) => {
   const [remarks, setRemarks] = useState("");
   const [showAmend, setShowAmend] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1421,7 +1421,6 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
   };
 
   if (!raw) return null;
-  const timer = traceTimers?.[raw._id];
   const segments = raw.flightRequest?.segments || [];
   const onwardSegments = segments.filter((s) => s.journeyType === "onward");
   const returnSegments = segments.filter((s) => s.journeyType === "return");
@@ -1552,7 +1551,6 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {timer && <TraceTimer timer={timer} />}
             <button
               onClick={onClose}
               className="hover:bg-white/10 p-2 rounded-full transition-colors"

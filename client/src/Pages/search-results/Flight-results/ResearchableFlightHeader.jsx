@@ -8,6 +8,8 @@ import { BsChevronDown, BsCalendar4 } from "react-icons/bs";
 import { airportDatabase } from "../../../data/airportDatabase";
 import TravelersClassModal from "../../../components/FlightSearchComponents/TravelersClassModal";
 import CustomCalendar from "../../../components/CustomCalendar";
+import { useNavigate } from "react-router-dom";
+import { useFlightSearch } from "../../../context/FlightSearchContext";
 
 /* ─── cabin ──────────────────────────────────────────────────────────────────── */
 const CABIN_OPTIONS = [
@@ -262,6 +264,8 @@ export default function ResearchableFlightHeader({
   onSearch = () => {},
   onBack = () => {},
 }) {
+  const navigate = useNavigate();
+  const { setActiveTab } = useFlightSearch();
   const [draft, setDraft]       = useState(() => derive(searchPayload, journeyType));
   const [loading, setLoading]   = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null); // 'dep', 'ret', 'pax', 'trip'
@@ -496,10 +500,20 @@ export default function ResearchableFlightHeader({
           <MdArrowBack className="text-[16px]" /> Back to search
         </button>
         <div className="flex items-center gap-3.5 text-[12px] text-white/50">
+          <span className="font-medium">{flightsCount} flights found</span>
           <span className="bg-[#C9A84C]/20 border border-[#C9A84C]/30 rounded-full px-2.5 py-0.5 text-[#C9A84C] font-bold text-[11px] tracking-[0.04em]">
             {journeyLabel}
           </span>
-          <span className="font-medium">{flightsCount} flights found</span>
+          <button 
+            onClick={() => {
+              setActiveTab('hotel');
+              navigate('/travel', { state: { activeTab: 'hotel' } });
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }} 
+            className="flex items-center gap-1.5 font-bold cursor-pointer bg-[#C9A84C] hover:bg-[#b5953e] transition-colors px-3 py-1 rounded-md text-[#0A203E] shadow-sm ml-2"
+          >
+            Search Hotels
+          </button>
         </div>
       </div>
 

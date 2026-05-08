@@ -1,9 +1,10 @@
+import LandingFooter from "../../../layout/LandingFooter";
 import LandingHeader from "../../../layout/LandingHeader";
 
 // ─── Section Divider ─────────────────────────────────────────────────────────
 function GoldDivider() {
   return (
-    <div className="w-[512px] h-[2px] bg-gradient-to-r from-[#C9A240] to-white" />
+    <div className="w-full max-w-[512px] h-[2px] bg-gradient-to-r from-[#C9A240] to-white" />
   );
 }
 
@@ -29,13 +30,13 @@ function ComparisonRow({ others, traveamer, isFirst = false }) {
     <div
       className={`grid grid-cols-2  ${!isFirst ? "border-t border-black/[0.08]" : ""}`}
     >
-      <div className="px-8 py-6">
-        <p className="text-[#666666] text-[16px] font-['Plus_Jakarta_Sans'] leading-[24.8px]">
+      <div className="px-4 py-4 md:px-8 md:py-6">
+        <p className="text-[#666666] text-[14px] md:text-[16px] font-['Plus_Jakarta_Sans'] leading-[22px] md:leading-[24.8px]">
           {others}
         </p>
       </div>
-      <div className="px-8 py-6 border-l-4 border-[#051D8C]">
-        <p className="text-[#0A0A0A] text-[17px] font-medium font-['DM_Sans'] leading-[25.5px]">
+      <div className="px-4 py-4 md:px-8 md:py-6 border-l-4 border-[#051D8C]">
+        <p className="text-[#0A0A0A] text-[15px] md:text-[17px] font-medium font-['DM_Sans'] leading-[23px] md:leading-[25.5px]">
           {traveamer}
         </p>
       </div>
@@ -54,9 +55,9 @@ export default function AboutUs() {
         {/* Glow effects */}
         <div className="absolute bottom-[-80px] left-[-100px] w-[525px] h-[563px] rounded-full bg-[radial-gradient(ellipse_70.71%_70.71%_at_50%_50%,rgba(80,100,220,0.25)_0%,rgba(80,100,220,0)_70%)] blur-[10px] pointer-events-none" />
 
-        <div className="relative w-full max-w-[1200px] mx-35 py-20 flex flex-col items-start gap-8">
+        <div className="relative w-full max-w-[1340px] mx-auto px-6 md:px-10 py-16 md:py-20 flex flex-col items-center gap-6 md:gap-8">
           {/* Label bar */}
-          <div className="w-[820px] px-2.5 py-0.5 bg-[#C9A240] inline-flex flex-col justify-center items-start">
+          {/* <div className="w-full max-w-[820px] px-2.5 py-0.5 bg-[#C9A240] inline-flex flex-col justify-center items-start">
             <div className="inline-flex justify-start items-center gap-3">
               <div className="w-8 h-px bg-black/60" />
               <div className="inline-flex flex-col justify-start items-start">
@@ -65,17 +66,15 @@ export default function AboutUs() {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Headline */}
-          <h1 className="text-white text-[72px] md:text-[88px] font-bold font-['DM_Sans'] leading-[1] max-w-[881px]">
-            The Opening — Who
-            <br />
-            We Are
+          <h1 className="text-[#C9A240] text-[48px] md:text-[72px] lg:text-[88px] font-bold font-['DM_Sans'] leading-[1.1] md:leading-[1] max-w-[881px] text-center">
+            Who We Are
           </h1>
 
           {/* Body text */}
-          <div className="flex flex-col gap-6 max-w-[820px]">
+          <div className="flex flex-col gap-6 max-w-[820px] text-center">
             <p className="text-white/90 text-[19px] font-light font-['Plus_Jakarta_Sans'] leading-[31.35px]">
               Traveamer is India's corporate travel management platform built
               exclusively for MSMEs, growing businesses, and independent
@@ -92,17 +91,17 @@ export default function AboutUs() {
       </section>
 
       {/* ── THE PROBLEM WE SAW ───────────────────────────────────────────── */}
-      <section className="max-w-[1343px] mx-auto px-10 py-20 flex flex-col gap-6">
+      <section className="w-full max-w-[1340px] mx-auto px-6 md:px-10 py-16 md:py-20 flex flex-col items-start gap-6 text-left">
         <GoldDivider />
-        <h2 className="text-[#0A0A0A] text-[52px] font-bold font-['DM_Sans'] leading-[54.6px]">
+        <h2 className="text-[#0A0A0A] text-[36px] md:text-[52px] font-bold font-['DM_Sans'] leading-[1.1] md:leading-[54.6px]">
           The Problem We Saw
         </h2>
-        <h3 className="text-[#0A0A0A] text-[26px] font-bold font-['DM_Sans'] leading-[35.1px]">
+        <h3 className="text-[#0A0A0A] text-[20px] md:text-[26px] font-bold font-['DM_Sans'] leading-[1.3] md:leading-[35.1px]">
           Business travel in India is broken for most
           <br />
           companies.
         </h3>
-        <p className="self-stretch justify-center text-[#4A4A4A] text-[18px] font-['Plus_Jakarta_Sans'] leading-[28.8px]">
+        <p className="w-full max-w-[900px] text-[#4A4A4A] text-[18px] font-['Plus_Jakarta_Sans'] leading-[28.8px]">
           Not because people are careless. But because there was never a proper
           system built for them. Approvals happen on WhatsApp. Bookings happen
           on personal cards. Expenses are tracked on spreadsheets — if at all.
@@ -120,10 +119,10 @@ export default function AboutUs() {
       </section>
 
       {/* ── WHAT WE BELIEVE ─────────────────────────────────────────────── */}
-      <section className="max-w-[1343px] mx-auto px-10 pb-20 flex flex-col gap-6">
+      <section className="w-full max-w-[1340px] mx-auto px-6 md:px-10 pb-16 md:pb-20 flex flex-col items-start gap-6 text-left">
         <div className="max-w-[760px] flex flex-col gap-6">
           <GoldDivider />
-          <h2 className="text-[#0A0A0A] text-[52px] font-bold font-['DM_Sans'] leading-[54.6px]">
+          <h2 className="text-[#0A0A0A] text-[36px] md:text-[52px] font-bold font-['DM_Sans'] leading-[1.1] md:leading-[54.6px]">
             What We Believe
           </h2>
           <p className="text-[#3A3A3A] text-[18px] font-['Plus_Jakarta_Sans'] leading-[28.8px]">
@@ -131,7 +130,7 @@ export default function AboutUs() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 w-full mt-6 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 w-full mt-6 gap-5">
           {/* Row 1: 01 & 02 */}
           <BeliefItem
             number="01"
@@ -157,18 +156,18 @@ export default function AboutUs() {
           />
         </div>
 
-        <p className="text-center text-[#0A0A0A] text-[28px] font-medium font-['DM_Sans'] leading-[39.2px] mt-8 max-w-[1200px] mx-auto">
+        <p className="text-left text-[#0A0A0A] text-[20px] md:text-[28px] font-medium font-['DM_Sans'] leading-[1.4] md:leading-[39.2px] mt-8 w-full max-w-[800px]">
           Structure is not bureaucracy. Structure is what allows a business to
-          <br />
+          <br className="hidden md:block" />
           grow without losing control.
         </p>
       </section>
 
       {/* ── WHAT MAKES US DIFFERENT ─────────────────────────────────────── */}
-      <section className="max-w-[1200px] mx-auto px-10 pb-28 flex flex-col items-center gap-14">
-        <div className="flex flex-col items-center gap-6 max-w-[760px] text-center">
+      <section className="w-full max-w-[1340px] mx-auto px-6 md:px-10 pb-20 md:pb-28 flex flex-col items-start gap-10 md:gap-14 text-left">
+        <div className="flex flex-col items-start gap-6 max-w-[760px]">
           <GoldDivider />
-          <h2 className="text-[#0A0A0A] text-[52px] font-bold font-['DM_Sans'] leading-[54.6px]">
+          <h2 className="text-[#0A0A0A] text-[36px] md:text-[52px] font-bold font-['DM_Sans'] leading-[1.1] md:leading-[54.6px]">
             What Makes Us Different
           </h2>
           <p className="text-[#3A3A3A] text-[18px] font-['Plus_Jakarta_Sans'] leading-[28.8px]">
@@ -181,13 +180,13 @@ export default function AboutUs() {
         <div className="w-full border border-black/[0.08] overflow-hidden">
           {/* Table headers */}
           <div className="grid grid-cols-2">
-            <div className="px-8 py-7 bg-white border-r border-black/[0.08]">
-              <p className="text-[#999999] text-[11px] font-bold font-['Plus_Jakarta_Sans'] uppercase tracking-[2.5px] leading-[16.5px]">
+            <div className="px-4 py-4 md:px-8 md:py-7 bg-white border-r border-black/[0.08]">
+              <p className="text-[#999999] text-[10px] md:text-[11px] font-bold font-['Plus_Jakarta_Sans'] uppercase tracking-[1.5px] md:tracking-[2.5px] leading-[1.5] md:leading-[16.5px]">
                 What others do
               </p>
             </div>
-            <div className="px-8 py-7 bg-gradient-to-br from-[#051D8C] to-[#030E30]">
-              <p className="text-white text-[11px] font-bold font-['Plus_Jakarta_Sans'] uppercase tracking-[2.5px] leading-[16.5px]">
+            <div className="px-4 py-4 md:px-8 md:py-7 bg-gradient-to-br from-[#051D8C] to-[#030E30]">
+              <p className="text-white text-[10px] md:text-[11px] font-bold font-['Plus_Jakarta_Sans'] uppercase tracking-[1.5px] md:tracking-[2.5px] leading-[1.5] md:leading-[16.5px]">
                 What Traveamer does
               </p>
             </div>
@@ -227,15 +226,15 @@ export default function AboutUs() {
       </section>
 
       {/* ── OUR APPROACH ─────────────────────────────────────────────────── */}
-      <section className="w-full bg-[#0A0A0A] py-24 px-6">
-        <div className="max-w-[1121px] mx-auto flex flex-col md:flex-row items-start gap-12">
-          <h2 className="text-white text-[52px] font-bold font-['DM_Sans'] leading-[54.6px] min-w-[280px]">
+      <section className="w-full bg-[#0A0A0A] py-16 md:py-24">
+        <div className="w-full max-w-[1340px] mx-auto px-6 md:px-10 flex flex-col md:flex-row items-start gap-8 md:gap-12">
+          <h2 className="text-white text-[36px] md:text-[52px] font-bold font-['DM_Sans'] leading-[1.1] md:leading-[54.6px] md:min-w-[280px]">
             Our Approach
           </h2>
-          <div className="flex flex-col gap-7 flex-1">
-            <h3 className="text-white text-[34px] font-bold font-['DM_Sans'] leading-[42.5px]">
+          <div className="flex flex-col gap-6 md:gap-7 flex-1">
+            <h3 className="text-white text-[24px] md:text-[34px] font-bold font-['DM_Sans'] leading-[1.3] md:leading-[42.5px]">
               We make your business organised. Not
-              <br />
+              <br className="hidden md:block" />
               just your travel.
             </h3>
             <p className="text-white/75 text-[17px] font-['Plus_Jakarta_Sans'] leading-[29.75px]">
@@ -255,21 +254,21 @@ export default function AboutUs() {
       </section>
 
       {/* ── WHERE WE ARE TODAY ───────────────────────────────────────────── */}
-      <section className="max-w-[1200px] mx-auto px-10 py-24 flex flex-col items-center gap-20">
-        <div className="flex flex-col items-center gap-7 max-w-[860px] text-center">
+      <section className="w-full max-w-[1340px] mx-auto px-6 md:px-10 py-16 md:py-24 flex flex-col items-start gap-14 md:gap-20 text-left">
+        <div className="flex flex-col items-start gap-5 md:gap-7 max-w-[860px]">
           <GoldDivider />
-          <h2 className="text-[#0A0A0A] text-[52px] font-bold font-['DM_Sans'] leading-[54.6px]">
+          <h2 className="text-[#0A0A0A] text-[36px] md:text-[52px] font-bold font-['DM_Sans'] leading-[1.1] md:leading-[54.6px]">
             Where We Are Today
           </h2>
-          <h3 className="text-[#0A0A0A] text-[64px] font-bold font-['DM_Sans'] leading-[67.2px]">
+          <h3 className="text-[#0A0A0A] text-[42px] md:text-[64px] font-bold font-['DM_Sans'] leading-[1.1] md:leading-[67.2px]">
             Traveamer is here.
           </h3>
           <div className="flex flex-col gap-6 max-w-[680px]">
-            <p className="text-[#3A3A3A] text-[17px] font-['Plus_Jakarta_Sans'] leading-[29.75px] text-center">
+            <p className="text-[#3A3A3A] text-[17px] font-['Plus_Jakarta_Sans'] leading-[29.75px]">
               Built, tested, and ready for businesses that are serious about
               bringing structure to their operations.
             </p>
-            <p className="text-[#3A3A3A] text-[17px] font-['Plus_Jakarta_Sans'] leading-[29.75px] text-center">
+            <p className="text-[#3A3A3A] text-[17px] font-['Plus_Jakarta_Sans'] leading-[29.75px]">
               We are not waiting to be discovered. We are here to make a
               difference — to every business that is tired of managing travel
               through WhatsApp messages, scattered receipts, and informal
@@ -279,34 +278,18 @@ export default function AboutUs() {
         </div>
 
         {/* CTA Banner */}
-        <div className="relative w-full bg-gradient-to-br from-[#051D8C] to-[#030E30] overflow-hidden rounded-sm min-h-[211px] flex items-center justify-center">
+        <div className="relative w-full bg-gradient-to-br from-[#051D8C] to-[#030E30] overflow-hidden rounded-sm min-h-[211px] flex flex-col items-start justify-center py-10 md:py-0 px-8 md:px-12">
           <div className="absolute top-[-84px] right-[-60px] w-[535px] h-[331px] rounded-full bg-[radial-gradient(ellipse_70.71%_70.71%_at_50%_50%,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0)_70%)]" />
-          <p className="relative z-10 text-white text-[44px] font-bold font-['DM_Sans'] leading-[52.8px] text-center px-8">
+          <p className="relative z-10 text-white text-[28px] md:text-[44px] font-bold font-['DM_Sans'] leading-[1.2] md:leading-[52.8px] text-left">
             If your business is ready for structure — Traveamer
-            <br />
+            <br className="hidden md:block" />
             is ready for you.
           </p>
         </div>
       </section>
 
-      {/* ── FOOTER ─────────────────────────────────────────────────────── */}
-      <footer className="border-t border-[#000D26] mx-12 py-8 flex flex-col md:flex-row items-center justify-between gap-6">
-        <img src="/logo-traveamer.svg" alt="Traveamer" className="h-6" />
-        <p className="text-[#04112F] text-[12px] font-['Plus_Jakarta_Sans'] leading-[16px]">
-          © 2026 Traveamer. All rights reserved.
-        </p>
-        <div className="flex items-center gap-6">
-          {["Privacy", "Terms", "Contact"].map((link) => (
-            <a
-              key={link}
-              href={`/legal/${link.toLowerCase()}-${link === "Contact" ? "us" : link === "Privacy" ? "policy" : "of-service"}`}
-              className="text-[#04112F] text-[12px] font-['Plus_Jakarta_Sans'] leading-[16px] hover:underline"
-            >
-              {link}
-            </a>
-          ))}
-        </div>
-      </footer>
+      {/* ── FOOTER── */}
+      <LandingFooter />
     </div>
   );
 }

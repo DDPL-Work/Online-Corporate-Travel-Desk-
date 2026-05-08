@@ -468,9 +468,9 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
         <LeftPanel step={step} />
 
         {/* ── Right Panel ── */}
-        <div className="flex-1 bg-white flex flex-col min-w-0 rounded-r-3xl">
+        <div className="flex-1 bg-white flex flex-col min-w-0 rounded-3xl md:rounded-l-none md:rounded-r-3xl">
           {/* Right header */}
-          <div className="shrink-0 flex items-center justify-between px-8 pt-7 pb-5 border-b border-slate-50">
+          <div className="shrink-0 flex items-center justify-between px-5 pt-6 pb-4 md:px-8 md:pt-7 md:pb-5 border-b border-slate-50">
             <div>
               <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
                 {step === 0
@@ -516,14 +516,14 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
           {/* Scrollable content */}
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto scrollbar-hide px-8 py-6"
+            className="flex-1 overflow-y-auto scrollbar-hide px-5 py-5 md:px-8 md:py-6"
           >
             {renderStep()}
           </div>
 
           {/* Footer — hide on step 0 (Step0 has its own CTA) and last step */}
           {step > 0 && !isLast && (
-            <div className="shrink-0 border-t border-slate-50 px-8 py-5 bg-white">
+            <div className="shrink-0 border-t border-slate-50 px-5 py-4 md:px-8 md:py-5 bg-white">
               <div className="flex items-center gap-3">
                 <button
                   onClick={goBack}

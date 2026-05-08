@@ -412,7 +412,7 @@ export const LeftPanel = ({ step }) => {
   const img = PANEL_IMAGES[Math.min(step, PANEL_IMAGES.length - 1)];
 
   return (
-    <div className="relative w-[340px] shrink-0 overflow-hidden rounded-l-3xl">
+    <div className="hidden md:block relative w-[340px] shrink-0 overflow-hidden rounded-l-3xl">
       {/* Bg image */}
       <img
         src={img}
@@ -485,7 +485,7 @@ export const StepTracker = ({ step }) => {
   const progress = ((step - 1) / (onboardSteps.length - 1)) * 100;
 
   return (
-    <div className="px-8 pt-5 pb-4 border-b border-slate-50">
+    <div className="px-5 md:px-8 pt-5 pb-4 border-b border-slate-50">
       {/* Step pills */}
       <div className="flex items-center gap-1 overflow-x-auto pb-2 scrollbar-hide">
         {onboardSteps.map((s, i) => {

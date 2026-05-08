@@ -235,7 +235,7 @@ export default function CancellationQueryDetailsPage({ queryId, onBack }) {
               {currentQuery.status === "RESOLVED" ? "Request Resolved." : "Request in Progress."}
             </h1>
             <p className="text-sm text-gray-500">
-              Booking Ref: <span className="font-mono font-bold">{bd.bookingReference}</span>
+              Order ID: <span className="font-mono font-bold">{bd.orderId || bd.bookingReference}</span>
               {pnr && <> · PNR: <span className="font-mono font-bold">{pnr}</span></>}
             </p>
           </div>
