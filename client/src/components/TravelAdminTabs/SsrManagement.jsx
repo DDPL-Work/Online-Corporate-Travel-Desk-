@@ -3,11 +3,30 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  FiSearch, FiShield, FiUser, FiMail, FiSave, FiTrash2, FiEdit2,
-  FiCheckCircle, FiXCircle, FiAlertCircle, FiRefreshCw,
-  FiList, FiSettings, FiEye, FiDollarSign, FiToggleLeft, FiToggleRight,
+  FiSearch,
+  FiShield,
+  FiUser,
+  FiMail,
+  FiSave,
+  FiTrash2,
+  FiEdit2,
+  FiCheckCircle,
+  FiXCircle,
+  FiAlertCircle,
+  FiRefreshCw,
+  FiList,
+  FiSettings,
+  FiEye,
+  FiDollarSign,
+  FiToggleLeft,
+  FiToggleRight,
+  FiDownload,
 } from "react-icons/fi";
-import { MdAirlineSeatReclineNormal, MdLunchDining, MdLuggage } from "react-icons/md";
+import {
+  MdAirlineSeatReclineNormal,
+  MdLunchDining,
+  MdLuggage,
+} from "react-icons/md";
 import {
   fetchPolicyByEmail,
   fetchAllSSRPolicies,
@@ -17,6 +36,8 @@ import {
 import { fetchEmployees } from "../../Redux/Slice/employeeActionSlice";
 import { clearLookup, clearSaveState } from "../../Redux/Slice/ssrPolicy.slice";
 import Swal from "sweetalert2";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
+import { Th } from "./Shared/CommonComponents";
 
 /* ─── Shared primitives ─────────────────────────────────────────────────────── */
 
@@ -34,7 +55,14 @@ function SectionHeader({ icon: Icon, title, sub }) {
   );
 }
 
-function Toggle({ label, description, icon: Icon, enabled, onChange, color = "#0A4D68" }) {
+function Toggle({
+  label,
+  description,
+  icon: Icon,
+  enabled,
+  onChange,
+  color = "#0A4D68",
+}) {
   return (
     <div
       className={`flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer
@@ -42,32 +70,56 @@ function Toggle({ label, description, icon: Icon, enabled, onChange, color = "#0
       onClick={() => onChange(!enabled)}
     >
       <div className="flex items-center gap-3">
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${enabled ? "bg-[#0A4D68] text-white" : "bg-slate-100 text-slate-400"}`}>
+        <div
+          className={`w-9 h-9 rounded-xl flex items-center justify-center ${enabled ? "bg-[#0A4D68] text-white" : "bg-slate-100 text-slate-400"}`}
+        >
           <Icon size={16} />
         </div>
         <div>
-          <p className={`text-sm font-bold ${enabled ? "text-[#0A4D68]" : "text-slate-500"}`}>{label}</p>
+          <p
+            className={`text-sm font-bold ${enabled ? "text-[#0A4D68]" : "text-slate-500"}`}
+          >
+            {label}
+          </p>
           <p className="text-[11px] text-slate-400">{description}</p>
         </div>
       </div>
-      <div className={`w-12 h-6 rounded-full flex items-center transition-all duration-300 px-1
-        ${enabled ? "bg-[#0A4D68]" : "bg-slate-200"}`}>
-        <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform duration-300 ${enabled ? "translate-x-6" : "translate-x-0"}`} />
+      <div
+        className={`w-12 h-6 rounded-full flex items-center transition-all duration-300 px-1
+        ${enabled ? "bg-[#0A4D68]" : "bg-slate-200"}`}
+      >
+        <div
+          className={`w-4 h-4 rounded-full bg-white shadow transition-transform duration-300 ${enabled ? "translate-x-6" : "translate-x-0"}`}
+        />
       </div>
     </div>
   );
 }
 
-function PriceRangeInput({ label, icon: Icon, minVal, maxVal, onMinChange, onMaxChange, disabled }) {
+function PriceRangeInput({
+  label,
+  icon: Icon,
+  minVal,
+  maxVal,
+  onMinChange,
+  onMaxChange,
+  disabled,
+}) {
   return (
-    <div className={`bg-white border rounded-xl p-4 ${disabled ? "opacity-40 pointer-events-none" : "border-slate-200"}`}>
+    <div
+      className={`bg-white border rounded-xl p-4 ${disabled ? "opacity-40 pointer-events-none" : "border-slate-200"}`}
+    >
       <div className="flex items-center gap-2 mb-3">
         <Icon size={13} className="text-slate-500" />
-        <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">{label} Price Range</p>
+        <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+          {label} Price Range
+        </p>
       </div>
       <div className="flex items-center gap-2">
         <div className="flex-1">
-          <label className="text-[10px] text-slate-400 font-semibold uppercase">Min (₹)</label>
+          <label className="text-[10px] text-slate-400 font-semibold uppercase">
+            Min (₹)
+          </label>
           <input
             type="number"
             min={0}
@@ -78,7 +130,9 @@ function PriceRangeInput({ label, icon: Icon, minVal, maxVal, onMinChange, onMax
         </div>
         <div className="pt-4 text-slate-300 font-black text-lg">–</div>
         <div className="flex-1">
-          <label className="text-[10px] text-slate-400 font-semibold uppercase">Max (₹)</label>
+          <label className="text-[10px] text-slate-400 font-semibold uppercase">
+            Max (₹)
+          </label>
           <input
             type="number"
             min={0}
@@ -95,18 +149,28 @@ function PriceRangeInput({ label, icon: Icon, minVal, maxVal, onMinChange, onMax
 function StatusBadge({ text, color }) {
   const cls = {
     green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    red:   "bg-red-50 text-red-600 border-red-200",
+    red: "bg-red-50 text-red-600 border-red-200",
     amber: "bg-amber-50 text-amber-700 border-amber-200",
-    blue:  "bg-blue-50 text-blue-700 border-blue-200",
+    blue: "bg-blue-50 text-blue-700 border-blue-200",
   };
   return (
-    <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border uppercase tracking-wider ${cls[color] || cls.blue}`}>
+    <span
+      className={`text-[10px] font-black px-2.5 py-1 rounded-full border uppercase tracking-wider ${cls[color] || cls.blue}`}
+    >
       {text}
     </span>
   );
 }
 
-function CustomAutocomplete({ employees, value, onChange, placeholder, disabled, loading, icon: Icon }) {
+function CustomAutocomplete({
+  employees,
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  loading,
+  icon: Icon,
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -125,7 +189,7 @@ function CustomAutocomplete({ employees, value, onChange, placeholder, disabled,
   const filtered = employees?.filter((emp) =>
     `${emp.name?.firstName} ${emp.name?.lastName} ${emp.email}`
       .toLowerCase()
-      .includes((value || "").toLowerCase())
+      .includes((value || "").toLowerCase()),
   );
 
   const handleInputChange = (e) => {
@@ -145,7 +209,10 @@ function CustomAutocomplete({ employees, value, onChange, placeholder, disabled,
   return (
     <div className="relative w-full" ref={dropdownRef}>
       <div className="relative">
-        <Icon size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
+        <Icon
+          size={14}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10"
+        />
         <input
           type="text"
           value={value}
@@ -214,19 +281,23 @@ function PolicyDetailModal({ policy, onClose }) {
         <Icon size={14} className="text-[#0A4D68]" />
       </div>
       <div>
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          {label}
+        </p>
         <div className="mt-0.5">{children}</div>
       </div>
     </div>
   );
 
   const PermBadge = ({ allowed, label }) => (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 rounded-full border ${
-      allowed
-        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-        : "bg-red-50 text-red-600 border-red-200"
-    }`}>
-      {allowed ? <FiCheckCircle size={10}/> : <FiXCircle size={10}/>}
+    <span
+      className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 rounded-full border ${
+        allowed
+          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+          : "bg-red-50 text-red-600 border-red-200"
+      }`}
+    >
+      {allowed ? <FiCheckCircle size={10} /> : <FiXCircle size={10} />}
       {label}
     </span>
   );
@@ -249,15 +320,23 @@ function PolicyDetailModal({ policy, onClose }) {
         {/* Header */}
         <div className="bg-gradient-to-r from-[#0A4D68] to-[#0d6b8e] px-6 py-5 flex items-start justify-between">
           <div>
-            <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1">SSR Policy Details</p>
-            <h2 className="text-white font-black text-lg leading-tight break-all">{policy.employeeEmail}</h2>
+            <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1">
+              SSR Policy Details
+            </p>
+            <h2 className="text-white font-black text-lg leading-tight break-all">
+              {policy.employeeEmail}
+            </h2>
             <div className="mt-2">
-              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                policy.approvalRequired
-                  ? "bg-amber-400/20 text-amber-200 border border-amber-400/40"
-                  : "bg-emerald-400/20 text-emerald-200 border border-emerald-400/40"
-              }`}>
-                {policy.approvalRequired ? "⏳ Approval Required" : "✅ Auto-Approved"}
+              <span
+                className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                  policy.approvalRequired
+                    ? "bg-amber-400/20 text-amber-200 border border-amber-400/40"
+                    : "bg-emerald-400/20 text-emerald-200 border border-emerald-400/40"
+                }`}
+              >
+                {policy.approvalRequired
+                  ? "⏳ Approval Required"
+                  : "✅ Auto-Approved"}
               </span>
             </div>
           </div>
@@ -283,16 +362,35 @@ function PolicyDetailModal({ policy, onClose }) {
           <Detail label="Price Range Controls" icon={FiDollarSign}>
             <div className="space-y-2 mt-1">
               {[
-                { label: "Seat", range: policy.seatPriceRange, allowed: policy.allowSeat },
-                { label: "Meal", range: policy.mealPriceRange, allowed: policy.allowMeal },
-                { label: "Baggage", range: policy.baggagePriceRange, allowed: policy.allowBaggage },
+                {
+                  label: "Seat",
+                  range: policy.seatPriceRange,
+                  allowed: policy.allowSeat,
+                },
+                {
+                  label: "Meal",
+                  range: policy.mealPriceRange,
+                  allowed: policy.allowMeal,
+                },
+                {
+                  label: "Baggage",
+                  range: policy.baggagePriceRange,
+                  allowed: policy.allowBaggage,
+                },
               ].map(({ label, range, allowed }) => (
-                <div key={label} className={`flex items-center justify-between text-sm ${!allowed ? "opacity-40" : ""}`}>
-                  <span className="text-slate-500 font-semibold w-24">{label} Paid Range</span>
+                <div
+                  key={label}
+                  className={`flex items-center justify-between text-sm ${!allowed ? "opacity-40" : ""}`}
+                >
+                  <span className="text-slate-500 font-semibold w-24">
+                    {label} Paid Range
+                  </span>
                   {allowed ? (
                     <RangePill min={range?.min} max={range?.max} />
                   ) : (
-                    <span className="text-[10px] text-slate-400 italic">Not Allowed</span>
+                    <span className="text-[10px] text-slate-400 italic">
+                      Not Allowed
+                    </span>
                   )}
                 </div>
               ))}
@@ -303,12 +401,24 @@ function PolicyDetailModal({ policy, onClose }) {
           <div className="grid grid-cols-2 gap-3">
             <Detail label="Created" icon={FiAlertCircle}>
               <p className="text-sm font-semibold text-slate-700">
-                {policy.createdAt ? new Date(policy.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                {policy.createdAt
+                  ? new Date(policy.createdAt).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : "—"}
               </p>
             </Detail>
             <Detail label="Last Updated" icon={FiRefreshCw}>
               <p className="text-sm font-semibold text-slate-700">
-                {policy.updatedAt ? new Date(policy.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                {policy.updatedAt
+                  ? new Date(policy.updatedAt).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : "—"}
               </p>
             </Detail>
           </div>
@@ -329,11 +439,21 @@ function PolicyDetailModal({ policy, onClose }) {
 }
 
 /* ─── Policy List Table ─────────────────────────────────────────────────────── */
-function PolicyList({ policies, listLoading, onDelete, onView, onEdit }) {
+function PolicyList({
+  policies,
+  listLoading,
+  onDelete,
+  onView,
+  onEdit,
+  title,
+  subtitle,
+  onExport,
+  onRefresh,
+}) {
   if (listLoading) {
     return (
       <div className="grid gap-3">
-        {[1,2,3].map(i => (
+        {[1, 2, 3].map((i) => (
           <div key={i} className="h-14 bg-slate-100 rounded-xl animate-pulse" />
         ))}
       </div>
@@ -345,44 +465,93 @@ function PolicyList({ policies, listLoading, onDelete, onView, onEdit }) {
       <div className="py-16 text-center text-slate-400">
         <FiShield size={32} className="mx-auto mb-3 opacity-30" />
         <p className="text-sm font-semibold">No SSR policies configured yet</p>
-        <p className="text-xs mt-1">Use the form above to create the first policy</p>
+        <p className="text-xs mt-1">
+          Use the form above to create the first policy
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[700px] border-collapse">
+    <ResponsiveDataTable
+      title={title}
+      subtitle={subtitle}
+      onExport={onExport}
+      toolbarRight={
+        onRefresh && (
+          <button
+            onClick={onRefresh}
+            className="flex items-center gap-1.5 text-[11px] font-bold text-[#0A4D68] uppercase tracking-wider hover:bg-[#0A4D68]/5 px-3 py-2 rounded-lg transition"
+          >
+            <FiRefreshCw size={12} />
+            Refresh
+          </button>
+        )
+      }
+    >
+      <table className="w-full border-collapse">
         <thead>
-          <tr className="bg-[#0A4D68] text-white text-xs font-bold uppercase tracking-wider">
-            <th className="px-4 py-3 text-left">Employee Email</th>
-            <th className="px-4 py-3 text-center">Paid Seat</th>
-            <th className="px-4 py-3 text-center">Paid Meal</th>
-            <th className="px-4 py-3 text-center">Paid Baggage</th>
-            <th className="px-4 py-3 text-center">Approval</th>
-            <th className="px-4 py-3 text-center">Actions</th>
+          <tr className="bg-[#0A4D68] text-white">
+            <Th className="text-left">Employee Email</Th>
+            <Th className="text-center">Paid Seat</Th>
+            <Th className="text-center">Paid Meal</Th>
+            <Th className="text-center">Paid Baggage</Th>
+            <Th className="text-center">Approval</Th>
+            <Th className="text-center">Actions</Th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {policies.map((p, i) => (
-            <tr key={p._id} className={`text-[13px] ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"} hover:bg-sky-50 transition-colors`}>
-              <td className="px-4 py-3 font-mono text-slate-700 text-xs">{p.employeeEmail}</td>
-              <td className="px-4 py-3 text-center">
-                <StatusBadge text={p.allowSeat ? "✓ Allowed" : "✗ Blocked"} color={p.allowSeat ? "green" : "red"} />
-                {p.allowSeat && <p className="text-[9px] text-slate-400 mt-0.5">₹{p.seatPriceRange?.min}–₹{p.seatPriceRange?.max}</p>}
+            <tr
+              key={p._id}
+              className={`text-[13px] ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"} hover:bg-sky-50 transition-colors`}
+            >
+              <td
+                className="px-4 py-3 font-mono text-slate-700 text-xs truncate max-w-[200px]"
+                title={p.employeeEmail}
+              >
+                {p.employeeEmail}
               </td>
-              <td className="px-4 py-3 text-center">
-                <StatusBadge text={p.allowMeal ? "✓ Allowed" : "✗ Blocked"} color={p.allowMeal ? "green" : "red"} />
-                {p.allowMeal && <p className="text-[9px] text-slate-400 mt-0.5">₹{p.mealPriceRange?.min}–₹{p.mealPriceRange?.max}</p>}
+              <td className="px-4 py-3 text-center whitespace-nowrap">
+                <StatusBadge
+                  text={p.allowSeat ? "✓ Allowed" : "✗ Blocked"}
+                  color={p.allowSeat ? "green" : "red"}
+                />
+                {p.allowSeat && (
+                  <p className="text-[9px] text-slate-400 mt-0.5">
+                    ₹{p.seatPriceRange?.min}–₹{p.seatPriceRange?.max}
+                  </p>
+                )}
               </td>
-              <td className="px-4 py-3 text-center">
-                <StatusBadge text={p.allowBaggage ? "✓ Allowed" : "✗ Blocked"} color={p.allowBaggage ? "green" : "red"} />
-                {p.allowBaggage && <p className="text-[9px] text-slate-400 mt-0.5">₹{p.baggagePriceRange?.min}–₹{p.baggagePriceRange?.max}</p>}
+              <td className="px-4 py-3 text-center whitespace-nowrap">
+                <StatusBadge
+                  text={p.allowMeal ? "✓ Allowed" : "✗ Blocked"}
+                  color={p.allowMeal ? "green" : "red"}
+                />
+                {p.allowMeal && (
+                  <p className="text-[9px] text-slate-400 mt-0.5">
+                    ₹{p.mealPriceRange?.min}–₹{p.mealPriceRange?.max}
+                  </p>
+                )}
               </td>
-              <td className="px-4 py-3 text-center">
-                <StatusBadge text={p.approvalRequired ? "Required" : "Auto"} color={p.approvalRequired ? "amber" : "green"} />
+              <td className="px-4 py-3 text-center whitespace-nowrap">
+                <StatusBadge
+                  text={p.allowBaggage ? "✓ Allowed" : "✗ Blocked"}
+                  color={p.allowBaggage ? "green" : "red"}
+                />
+                {p.allowBaggage && (
+                  <p className="text-[9px] text-slate-400 mt-0.5">
+                    ₹{p.baggagePriceRange?.min}–₹{p.baggagePriceRange?.max}
+                  </p>
+                )}
               </td>
-              <td className="px-4 py-3 text-center">
+              <td className="px-4 py-3 text-center whitespace-nowrap">
+                <StatusBadge
+                  text={p.approvalRequired ? "Required" : "Auto"}
+                  color={p.approvalRequired ? "amber" : "green"}
+                />
+              </td>
+              <td className="px-4 py-3 text-center whitespace-nowrap">
                 <div className="flex items-center justify-center gap-1">
                   <button
                     onClick={() => onView(p)}
@@ -411,7 +580,7 @@ function PolicyList({ policies, listLoading, onDelete, onView, onEdit }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ResponsiveDataTable>
   );
 }
 
@@ -419,28 +588,35 @@ function PolicyList({ policies, listLoading, onDelete, onView, onEdit }) {
 export default function SsrManagement() {
   const dispatch = useDispatch();
   const {
-    lookedUp, lookupLoading, lookupError,
-    policies, listLoading,
-    saving, saveError, saveSuccess,
+    lookedUp,
+    lookupLoading,
+    lookupError,
+    policies,
+    listLoading,
+    saving,
+    saveError,
+    saveSuccess,
     deleting,
   } = useSelector((s) => s.ssrPolicy);
-  const { employees, loading: employeesLoading } = useSelector((s) => s.employeeAction);
+  const { employees, loading: employeesLoading } = useSelector(
+    (s) => s.employeeAction,
+  );
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [emailInput, setEmailInput] = useState("");
   const [activeTab, setActiveTab] = useState("configure"); // configure | list
   const [viewPolicy, setViewPolicy] = useState(null); // policy to show in detail modal
 
-  const [allowSeat,    setAllowSeat]    = useState(false);
-  const [allowMeal,    setAllowMeal]    = useState(false);
+  const [allowSeat, setAllowSeat] = useState(false);
+  const [allowMeal, setAllowMeal] = useState(false);
   const [allowBaggage, setAllowBaggage] = useState(false);
 
-  const [seatMin,    setSeatMin]    = useState(0);
-  const [seatMax,    setSeatMax]    = useState(99999);
-  const [mealMin,    setMealMin]    = useState(0);
-  const [mealMax,    setMealMax]    = useState(99999);
-  const [bagMin,     setBagMin]     = useState(0);
-  const [bagMax,     setBagMax]     = useState(99999);
+  const [seatMin, setSeatMin] = useState(0);
+  const [seatMax, setSeatMax] = useState(99999);
+  const [mealMin, setMealMin] = useState(0);
+  const [mealMax, setMealMax] = useState(99999);
+  const [bagMin, setBagMin] = useState(0);
+  const [bagMax, setBagMax] = useState(99999);
 
   const [approvalRequired, setApprovalRequired] = useState(true);
   const [isEditing, setIsEditing] = useState(false); // true when editing existing policy
@@ -488,7 +664,7 @@ export default function SsrManagement() {
     dispatch(clearSaveState());
     dispatch(clearLookup());
     setEmailInput("");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveSuccess]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -501,20 +677,26 @@ export default function SsrManagement() {
     if (!lookedUp) return;
 
     if (seatMin > seatMax || mealMin > mealMax || bagMin > bagMax) {
-      Swal.fire("Invalid Range", "Min price cannot exceed max price.", "warning");
+      Swal.fire(
+        "Invalid Range",
+        "Min price cannot exceed max price.",
+        "warning",
+      );
       return;
     }
 
-    dispatch(upsertSSRPolicy({
-      employeeEmail: emailInput.trim().toLowerCase(),
-      allowSeat,
-      allowMeal,
-      allowBaggage,
-      seatPriceRange: { min: seatMin, max: seatMax },
-      mealPriceRange: { min: mealMin, max: mealMax },
-      baggagePriceRange: { min: bagMin, max: bagMax },
-      approvalRequired,
-    }));
+    dispatch(
+      upsertSSRPolicy({
+        employeeEmail: emailInput.trim().toLowerCase(),
+        allowSeat,
+        allowMeal,
+        allowBaggage,
+        seatPriceRange: { min: seatMin, max: seatMax },
+        mealPriceRange: { min: mealMin, max: mealMax },
+        baggagePriceRange: { min: bagMin, max: bagMax },
+        approvalRequired,
+      }),
+    );
   };
 
   const handleDelete = (id, email) => {
@@ -561,6 +743,66 @@ export default function SsrManagement() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleExport = () => {
+    if (!policies.length) return;
+    const headers = [
+      "Employee Email",
+      "Paid Seat",
+      "Seat Range",
+      "Paid Meal",
+      "Meal Range",
+      "Paid Baggage",
+      "Baggage Range",
+      "Approval",
+    ];
+    const rows = policies.map((p) => [
+      p.employeeEmail,
+      p.allowSeat ? "Allowed" : "Blocked",
+      p.allowSeat
+        ? `₹${p.seatPriceRange?.min}-${p.seatPriceRange?.max}`
+        : "N/A",
+      p.allowMeal ? "Allowed" : "Blocked",
+      p.allowMeal
+        ? `₹${p.mealPriceRange?.min}-${p.mealPriceRange?.max}`
+        : "N/A",
+      p.allowBaggage ? "Allowed" : "Blocked",
+      p.allowBaggage
+        ? `₹${p.baggagePriceRange?.min}-${p.baggagePriceRange?.max}`
+        : "N/A",
+      p.approvalRequired ? "Required" : "Auto",
+    ]);
+
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0A4D68;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ssr-policies-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5 min-h-screen bg-[#F8FAFC]">
@@ -568,7 +810,9 @@ export default function SsrManagement() {
       <div className="bg-white border-b border-slate-200 shadow-sm px-6 py-5">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black text-[#0A4D68] tracking-tight">SSR Management</h1>
+            <h1 className="text-2xl font-black text-[#0A4D68] tracking-tight">
+              SSR Management
+            </h1>
             <p className="text-xs text-slate-400 mt-0.5 font-medium">
               Control seat, meal &amp; baggage permissions per employee
             </p>
@@ -582,8 +826,14 @@ export default function SsrManagement() {
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all capitalize
                   ${activeTab === t ? "bg-[#0A4D68] text-white shadow" : "text-slate-500 hover:text-slate-700"}`}
               >
-                {t === "configure" ? <FiSettings size={12} /> : <FiList size={12} />}
-                {t === "configure" ? "Configure Policy" : `All Policies (${policies.length})`}
+                {t === "configure" ? (
+                  <FiSettings size={12} />
+                ) : (
+                  <FiList size={12} />
+                )}
+                {t === "configure"
+                  ? "Configure Policy"
+                  : `All Policies (${policies.length})`}
               </button>
             ))}
           </div>
@@ -622,7 +872,11 @@ export default function SsrManagement() {
                   disabled={lookupLoading || !emailInput.trim()}
                   className="flex items-center justify-center w-full md:w-[130px] h-[46px] gap-2 px-5 bg-gradient-to-r from-[#0A4D68] to-[#083d52] text-white rounded-xl text-sm font-bold shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-md shrink-0"
                 >
-                  {lookupLoading ? <FiRefreshCw size={14} className="animate-spin" /> : <FiSearch size={14} />}
+                  {lookupLoading ? (
+                    <FiRefreshCw size={14} className="animate-spin" />
+                  ) : (
+                    <FiSearch size={14} />
+                  )}
                   {lookupLoading ? "Loading…" : "Look Up"}
                 </button>
               </div>
@@ -649,10 +903,14 @@ export default function SsrManagement() {
                         ? `${lookedUp.employee.name?.firstName ?? ""} ${lookedUp.employee.name?.lastName ?? ""}`.trim()
                         : "Employee not in system yet"}
                     </p>
-                    <p className="text-xs text-slate-400 font-mono">{emailInput}</p>
+                    <p className="text-xs text-slate-400 font-mono">
+                      {emailInput}
+                    </p>
                   </div>
                   <StatusBadge
-                    text={lookedUp.isNewPolicy ? "New Policy" : "Existing Policy"}
+                    text={
+                      lookedUp.isNewPolicy ? "New Policy" : "Existing Policy"
+                    }
                     color={lookedUp.isNewPolicy ? "amber" : "blue"}
                   />
                 </div>
@@ -662,8 +920,6 @@ export default function SsrManagement() {
             {/* ── Steps 2-5 only visible after lookup ─────────────── */}
             {lookedUp && (
               <>
-
-
                 {/* ── Step 2: Paid SSR Permissions ────────────────── */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                   <SectionHeader
@@ -736,7 +992,8 @@ export default function SsrManagement() {
                     )}
                     {!allowSeat && !allowMeal && !allowBaggage && (
                       <div className="col-span-3 py-4 text-center text-slate-400 italic text-sm">
-                        No paid SSR options enabled. Only free items will be available to the employee.
+                        No paid SSR options enabled. Only free items will be
+                        available to the employee.
                       </div>
                     )}
                   </div>
@@ -765,13 +1022,25 @@ export default function SsrManagement() {
                       ))}
                     </div>
 
-                    <div className={`flex items-start gap-3 p-4 rounded-xl border ${approvalRequired ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"}`}>
-                      {approvalRequired
-                        ? <FiAlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-                        : <FiCheckCircle size={16} className="text-emerald-600 shrink-0 mt-0.5" />}
-                      <p className={`text-xs font-medium ${approvalRequired ? "text-amber-700" : "text-emerald-700"}`}>
+                    <div
+                      className={`flex items-start gap-3 p-4 rounded-xl border ${approvalRequired ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"}`}
+                    >
+                      {approvalRequired ? (
+                        <FiAlertCircle
+                          size={16}
+                          className="text-amber-600 shrink-0 mt-0.5"
+                        />
+                      ) : (
+                        <FiCheckCircle
+                          size={16}
+                          className="text-emerald-600 shrink-0 mt-0.5"
+                        />
+                      )}
+                      <p
+                        className={`text-xs font-medium ${approvalRequired ? "text-amber-700" : "text-emerald-700"}`}
+                      >
                         {approvalRequired
-                          ? "When this is ON, all bookings by this employee go into \"Pending Approval\" status. The specific approver is routed automatically based on corporate settings."
+                          ? 'When this is ON, all bookings by this employee go into "Pending Approval" status. The specific approver is routed automatically based on corporate settings.'
                           : "Bookings by this employee are auto-approved immediately — no manual review required."}
                       </p>
                     </div>
@@ -792,12 +1061,17 @@ export default function SsrManagement() {
                     <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl">
                       <FiEdit2 size={13} className="text-amber-600 shrink-0" />
                       <span className="text-xs font-semibold text-amber-700">
-                        Editing policy for <span className="font-black">{emailInput}</span>
+                        Editing policy for{" "}
+                        <span className="font-black">{emailInput}</span>
                       </span>
                     </div>
                   )}
                   <button
-                    onClick={() => { dispatch(clearLookup()); setEmailInput(""); setIsEditing(false); }}
+                    onClick={() => {
+                      dispatch(clearLookup());
+                      setEmailInput("");
+                      setIsEditing(false);
+                    }}
                     className="px-5 py-2.5 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
                   >
                     Cancel
@@ -811,8 +1085,20 @@ export default function SsrManagement() {
                         : "bg-[#0A4D68] hover:bg-[#083d52]"
                     }`}
                   >
-                    {saving ? <FiRefreshCw size={14} className="animate-spin" /> : isEditing ? <FiEdit2 size={14} /> : <FiSave size={14} />}
-                    {saving ? (isEditing ? "Updating…" : "Saving…") : isEditing ? "Update Policy" : "Save Policy"}
+                    {saving ? (
+                      <FiRefreshCw size={14} className="animate-spin" />
+                    ) : isEditing ? (
+                      <FiEdit2 size={14} />
+                    ) : (
+                      <FiSave size={14} />
+                    )}
+                    {saving
+                      ? isEditing
+                        ? "Updating…"
+                        : "Saving…"
+                      : isEditing
+                        ? "Update Policy"
+                        : "Save Policy"}
                   </button>
                 </div>
               </>
@@ -821,25 +1107,16 @@ export default function SsrManagement() {
         ) : (
           /* ── All Policies Tab ───────────────────────────────────── */
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-black text-slate-800">Configured SSR Policies</p>
-                <p className="text-xs text-slate-400 mt-0.5">{policies.length} policies configured</p>
-              </div>
-              <button
-                onClick={() => dispatch(fetchAllSSRPolicies())}
-                className="flex items-center gap-1.5 text-xs font-semibold text-[#0A4D68] hover:bg-[#0A4D68]/5 px-3 py-1.5 rounded-lg transition"
-              >
-                <FiRefreshCw size={12} />
-                Refresh
-              </button>
-            </div>
             <PolicyList
               policies={policies}
               listLoading={listLoading}
               onDelete={handleDelete}
               onView={(p) => setViewPolicy(p)}
               onEdit={handleEdit}
+              title="Configured SSR Policies"
+              subtitle={`${policies.length} policies configured`}
+              onExport={handleExport}
+              onRefresh={() => dispatch(fetchAllSSRPolicies())}
             />
           </div>
         )}

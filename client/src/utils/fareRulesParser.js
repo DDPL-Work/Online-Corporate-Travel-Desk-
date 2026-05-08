@@ -38,129 +38,130 @@ export const parseFareRuleHtml = (html) => {
     notes: [],
   };
 
-  // 1. FARE HEADER
+  // 1. FARE HEADER & CONTEXT
   const fbcMatch = html.match(/FareBasisCode is:\s*<\/?\w*>?\s*([A-Z0-9]+)/i);
   if (fbcMatch) result.fareHeader.fareBasisCode = fbcMatch[1];
 
-  // Try finding Fare Type from any node
   const textContent = doc.body.textContent || "";
-  const fareTypeMatch = textContent.match(/It is\s+([^,.<]+?)\s+Fare/i);
-  if (fareTypeMatch) {
-    result.fareHeader.fareType = fareTypeMatch[1].trim();
-  } else if (textContent.includes("Xpress Value")) {
-    result.fareHeader.fareType = "Xpress Value";
-  }
+  if (textContent.toLowerCase().includes("non refundable")) result.fareHeader.fareType = "Non-Refundable";
+  else if (textContent.includes("Xpress Value")) result.fareHeader.fareType = "Xpress Value";
+  else if (textContent.includes("Corporate Flex")) result.fareHeader.fareType = "Corporate Flex";
 
   // 2. TABLES
-  const rows = doc.querySelectorAll("table tbody tr");
-  let currentCategory = "";
-
-  const expandShorthand = (str, category = "") => {
+  const tables = Array.from(doc.querySelectorAll("table"));
+  
+  const expandShorthand = (str) => {
     if (!str) return str;
     const lower = str.toLowerCase().trim();
-
-    // Explicit exclusions mapping to full sentences
-    if (lower === "not allowed" || lower === "no") {
-      if (category.includes("cancel")) return "You cannot cancel this flight.";
-      if (category.includes("change") || category.includes("reissue"))
-        return "You cannot change the date for this flight.";
-      return "This is not allowed for this ticket.";
-    }
-
-    if (lower === "allowed" || lower === "yes") {
-      if (category.includes("cancel"))
-        return "You can cancel this flight. The airline will charge a fee.";
-      if (category.includes("change") || category.includes("reissue"))
-        return "You can change your flight date. You will have to pay a fee and any price difference.";
-      return "This is allowed for this ticket.";
-    }
-
-    if (lower === "free" || lower === "included") {
-      return "This is free of charge.";
-    }
-
-    // Expand fees that start with INR or amount
-    if (lower.includes("inr") || lower.includes("rs") || lower.includes("₹")) {
-      if (category.includes("cancel"))
-        return `The airline charges ${str} for cancellation.`;
-      if (category.includes("change") || category.includes("reissue"))
-        return `The airline charges ${str} to change the date.`;
-    }
-
-    if (lower.includes("as per airline")) {
-      return "Fees depend on the airline's policy at the time of the change.";
-    }
-
-    // Wrap small note fragments in a professional wrapper
-    if (str.length < 25 && !category) {
-      return `Note: ${str}`;
-    }
-
+    if (lower.includes("not allowed")) return "Not Allowed";
+    if (lower === "allowed" || lower === "yes") return "Allowed";
+    if (lower === "free" || lower === "included" || lower === "nil" || lower === "no charge") return "Nil";
     return str;
   };
 
-  rows.forEach((tr) => {
-    const tds = Array.from(tr.querySelectorAll("td, th")).map((el) =>
-      el.innerText?.trim().replace(/\s+/g, " "),
-    );
-    if (tds.length === 0) return;
+  tables.forEach(table => {
+    const headers = Array.from(table.querySelectorAll("th, td:first-child")).map(el => el.innerText.toLowerCase());
+    const trs = Array.from(table.querySelectorAll("tr"));
 
-    if (tr.querySelector("td[rowspan], th[rowspan]")) {
-      currentCategory = tds[0].toLowerCase();
-      tds.shift();
-    } else if (
-      tds.length === 1 &&
-      !tds[0].includes("INR") &&
-      !tds[0].toLowerCase().includes("not allowed")
-    ) {
-      currentCategory = tds[0].toLowerCase();
-      return;
+    // A. Air India Style 6-column Penalty Table (Sector | Duration | Type | DepartureType | PenaltyDetails)
+    if (headers.includes("sector") && headers.includes("penaltydetails")) {
+      trs.forEach(tr => {
+         const tds = Array.from(tr.querySelectorAll("td, th")).map(c => c.innerText.trim());
+         if (tds.length >= 5) {
+            const type = tds[2]?.toLowerCase() || "";
+            const depType = tds[3] || "";
+            const penalty = normalizeCurrencyText(tds[4] || "");
+            const timeRange = depType ? `${depType}` : "Policy";
+
+            if (type.includes("reissue") || type.includes("change")) {
+              result.reissue.push({ timeRange, fee: expandShorthand(penalty) });
+            } else if (type.includes("refund") || type.includes("cancel")) {
+              result.cancellation.push({ timeRange, fee: expandShorthand(penalty) });
+            }
+         }
+      });
+      return; // Skip generic parsing for this table
     }
 
-    let value = normalizeCurrencyText(tds[tds.length - 1] || "");
-    const label = tds.length > 1 ? tds[tds.length - 2] : "";
+    // B. Complex Fee Table (Currency | Reschedule | Cancellation)
+    if (headers.includes("reschedule") && headers.includes("cancellation")) {
+      const subHeaders = Array.from(table.querySelectorAll("tr:nth-child(2) th")).map(th => th.innerText.trim());
+      const dataRows = Array.from(table.querySelectorAll("tr")).slice(2);
+      const inrRow = dataRows.find(row => row.innerText.includes("INR")) || dataRows[0];
+      if (inrRow) {
+        const cells = Array.from(inrRow.querySelectorAll("td")).map(td => td.innerText.trim());
+        if (cells.length >= 5 && subHeaders.length >= 4) {
+             result.reissue.push({ timeRange: subHeaders[0], fee: `INR ${cells[1]}` });
+             result.reissue.push({ timeRange: subHeaders[1], fee: `INR ${cells[2]}` });
+             result.cancellation.push({ timeRange: subHeaders[2], fee: `INR ${cells[3]}` });
+             result.cancellation.push({ timeRange: subHeaders[3], fee: `INR ${cells[4]}` });
+        }
+      }
+    }
 
-    // Apply expansive logic to make texts full sentences
-    value = expandShorthand(value, currentCategory);
+    // C. Vertical/Nested Category Table
+    rows_loop: for (let i = 0; i < trs.length; i++) {
+      const tr = trs[i];
+      const cells = Array.from(tr.querySelectorAll("td, th"));
+      if (cells.length === 0) continue;
 
-    if (currentCategory.includes("baggage")) {
-      const lowerLab = label.toLowerCase();
-      if (
-        lowerLab.includes("check") ||
-        lowerLab.includes("adult") ||
-        lowerLab.includes("child")
-      )
-        result.baggage.checkIn = value;
-      else if (lowerLab.includes("cabin") || lowerLab.includes("hand"))
-        result.baggage.cabin = value;
-      else if (lowerLab.includes("infant")) result.baggage.infant = value;
-    } else if (
-      currentCategory.includes("meal") ||
-      currentCategory.includes("seat")
-    ) {
-      const lowerLab = label.toLowerCase() || currentCategory;
-      if (lowerLab.includes("meal")) result.mealAndSeat.meal = value;
-      if (lowerLab.includes("seat")) result.mealAndSeat.seat = value;
-    } else if (currentCategory.includes("cancel")) {
-      result.cancellation.push({ timeRange: label, fee: value });
-    } else if (
-      currentCategory.includes("change") ||
-      currentCategory.includes("reissue")
-    ) {
-      result.reissue.push({ timeRange: label, fee: value });
+      let tds = cells.map(c => c.innerText.trim().replace(/\s+/g, " "));
+      let currentCategory = "";
+
+      if (cells[0].hasAttribute("rowspan")) {
+        currentCategory = tds[0].toLowerCase();
+        tds.shift();
+      }
+
+      const label = (tds[0] || "").toLowerCase();
+      const value = expandShorthand(tds[tds.length - 1] || "");
+
+      if (label.includes("cabin") || label.includes("hand")) result.baggage.cabin = value;
+      else if (label.includes("check-in") || label.includes("adult")) result.baggage.checkIn = value;
+      else if (label.includes("infant")) result.baggage.infant = value;
+      else if (label.includes("meal")) result.mealAndSeat.meal = value;
+      else if (label.includes("seat")) result.mealAndSeat.seat = value;
     }
   });
 
-  // 3. Fallback for baggage if empty
+  // 3. FALLBACKS & NOTES
   if (!result.baggage.checkIn) result.baggage.checkIn = "15 kg";
   if (!result.baggage.cabin) result.baggage.cabin = "7 kg";
 
-  // 4. NOTES & SHORTCODES
-  const lis = doc.querySelectorAll("ol li, ul li");
-  lis.forEach((li) => {
-    let noteText = li.innerText?.trim() || "";
-    noteText = normalizeCurrencyText(noteText);
-    result.notes.push(expandShorthand(noteText, ""));
+  const lists = doc.querySelectorAll("ol, ul, fieldset");
+  lists.forEach(list => {
+    // For fieldsets, look for bold labels as separate notes
+    if (list.tagName === "FIELDSET") {
+       const bolds = Array.from(list.querySelectorAll("b"));
+       bolds.forEach(b => {
+          const text = b.innerText.trim();
+          if (text.length > 5 && text.length < 100 && !result.notes.includes(text)) {
+             result.notes.push(text);
+          }
+       });
+    }
+
+    const items = Array.from(list.querySelectorAll("li"));
+    items.forEach(li => {
+      let text = li.innerText?.trim().replace(/\s+/g, " ");
+      // Only keep short, meaningful bullet points. 
+      // Skip long legal walls (> 160 chars) or very short fragments (< 10 chars)
+      if (text && text.length > 10 && text.length < 160) {
+        if (!result.notes.some(n => n.includes(text.substring(0, 20)))) {
+          result.notes.push(normalizeCurrencyText(text));
+        }
+      }
+    });
+  });
+
+  // Specialized Extraction for "Non-Refundable" text blocks
+  if (textContent.toLowerCase().includes("non refundable") && result.cancellation.length === 0) {
+    result.cancellation.push({ timeRange: "Policy", fee: "Not Allowed" });
+  }
+
+  // Cleanup Notes: Remove duplicates and very similar entries
+  result.notes = result.notes.filter((note, index, self) => {
+    return self.findIndex(n => n.toLowerCase() === note.toLowerCase()) === index;
   });
 
   return result;

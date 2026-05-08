@@ -196,9 +196,14 @@ function FlightBookingCard({ b, navigate, userRole }) {
             ? `${formatDateWithYear(snapshot.travelDate)}  ·  ${formatDateWithYear(snapshot.returnDate)}`
             : formatDateWithYear(snapshot.travelDate) || "—"}
         </div>
-        <p className="text-[11px] text-slate-400 mb-4">
-          Booked on {fmtDate(b.createdAt)}
-        </p>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-[11px] text-slate-400">
+            Booked on {fmtDate(b.createdAt)}
+          </p>
+          <p className="text-[11px] text-slate-500 font-mono">
+            <span className="font-bold text-green-600">ID:</span> {b.orderId || b.bookingReference}
+          </p>
+        </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-100">
@@ -385,9 +390,14 @@ function HotelBookingCard({ b, navigate, userRole }) {
           </span>
         </div>
 
-        <p className="text-[11px] text-slate-400 mb-3">
-          Booked on {fmtDate(b.createdAt)}
-        </p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] text-slate-400">
+            Booked on {fmtDate(b.createdAt)}
+          </p>
+          <p className="text-[11px] text-slate-500 font-mono">
+            <span className="font-bold text-green-600">ID:</span> {b.orderId || b.bookingReference}
+          </p>
+        </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-100">

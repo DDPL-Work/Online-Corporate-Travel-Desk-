@@ -31,6 +31,7 @@ import {
   FiSend,
   FiClock,
   FiXCircle,
+  FiTag,
 } from "react-icons/fi";
 import {
   MdHotel,
@@ -763,11 +764,11 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Booking References                                             */
+/*  Order ID                                                       */
 /* ─────────────────────────────────────────────────────────────── */
 function BookingReferencesSection({ booking, bookingDetail, result }) {
   const refs = [
-    { label: "Booking Ref", val: booking.bookingReference || "—", hash: true },
+    { label: "Order ID", val: booking.orderId || "—", hash: true },
     {
       label: "Confirmation No.",
       val: bookingDetail?.ConfirmationNo || result?.hotelBookingId || "—",
@@ -1763,11 +1764,11 @@ export default function HotelBookingDetails() {
               <MdVerifiedUser size={11} /> Voucher Issued
             </span>
           )}
-          {booking.bookingReference && (
+          {(booking.orderId || booking.bookingReference) && (
             <span className="text-[11px] text-[#A89F94]">
-              Ref:{" "}
+              Order ID:{" "}
               <strong className="text-[#1A1714] font-['DM_Mono']">
-                {booking.bookingReference}
+                {booking.orderId || booking.bookingReference}
               </strong>
             </span>
           )}
@@ -1863,7 +1864,7 @@ export default function HotelBookingDetails() {
         <section className="mb-12">
           <SectionHeader
             num={5}
-            title="Booking References"
+            title="Order ID"
           />
           <BookingReferencesSection
             booking={booking}
@@ -1910,6 +1911,9 @@ export default function HotelBookingDetails() {
             totalFare={totalFare}
           />
         </section>
+
+        {/* 09 Booking History */}
+        <BookingHistory booking={booking} />
       </main>
 
       {/* Sticky bottom total price bar */}
@@ -1918,6 +1922,119 @@ export default function HotelBookingDetails() {
         isCancelled={isCancelled}
         onDownload={() => dispatch(generateHotelVoucher(booking.bookingId))}
       /> */}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Booking History / Timeline                                     */
+/* ─────────────────────────────────────────────────────────────── */
+const getVoucherDate = (b) => {
+  if (b.voucheredAt) return b.voucheredAt;
+  const tboVoucherDate = b.bookingResult?.providerResponse?.VoucherDate || b.bookingResult?.providerResponse?.Response?.VoucherDate;
+  if (tboVoucherDate) return tboVoucherDate;
+  if (["voucher_generated", "confirmed", "booked"].includes((b.executionStatus || "").toLowerCase())) return b.updatedAt;
+  return null;
+};
+
+function BookingHistory({ booking }) {
+  const isCancelled = ["cancelled", "cancel_requested"].includes((booking.executionStatus || "").toLowerCase()) || !!booking.cancellation;
+  const isConfirmed = ["voucher_generated", "confirmed", "booked"].includes((booking.executionStatus || "").toLowerCase()) || (isCancelled && !!booking.bookingResult?.hotelBookingId);
+
+  const steps = [
+    {
+      label: "Request Created",
+      date: booking.createdAt,
+      desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
+      icon: <FiClock size={14} />,
+      active: true,
+    },
+    {
+      label: "Approval Status",
+      date: booking.approvedAt || booking.rejectedAt || (["approved", "rejected"].includes(booking.requestStatus) ? booking.updatedAt : null),
+      desc: (() => {
+        const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
+        const isApproved = booking.approvedAt || booking.requestStatus === "approved";
+        
+        if (isRejected) {
+          return `Rejected by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        if (isApproved) {
+          const reqEmail = booking.userId?.email || booking.requesterDetails?.email;
+          const appEmail = booking.approvedBy?.email || booking.approverEmail;
+          const isSameUser = reqEmail && appEmail && reqEmail === appEmail;
+          if (booking.approverName === "Auto Approve" || isSameUser) {
+             return "Auto Approved by System (Travel Policy)";
+          }
+          return `Approved by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        return "Waiting for manager approval";
+      })(),
+      icon: <FiShield size={14} />,
+      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
+    },
+    {
+      label: "Voucher Issued",
+      date: getVoucherDate(booking),
+      desc: isConfirmed ? "Hotel voucher generated and sent" : "Final confirmation pending",
+      icon: <FiTag size={14} />,
+      active: isConfirmed,
+    },
+    {
+      label: "Cancellation",
+      date: booking.cancelledAt || (isCancelled ? booking.updatedAt : null),
+      desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
+      icon: <FiXCircle size={14} />,
+      active: isCancelled,
+      isLast: true,
+    },
+  ];
+
+  const formatDateStr = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const formatTimeStr = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  return (
+    <div className="bg-white border border-[#EAE4D9] p-8 mt-12 mb-8">
+      <div className="flex items-center gap-4 mb-10">
+        <div className="w-10 h-10 rounded-full bg-[#B5862A]/10 flex items-center justify-center">
+          <FiRefreshCw size={18} className="text-[#B5862A]" />
+        </div>
+        <div>
+          <h3 className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">Booking Lifecycle</h3>
+          <p className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-[0.2em] mt-1">Audit Trail & Timeline</p>
+        </div>
+      </div>
+
+      <div className="relative">
+        {/* Vertical line */}
+        <div className="absolute left-[13px] top-2 bottom-2 w-[1px] bg-gradient-to-b from-[#B5862A]/40 via-[#EAE4D9] to-transparent" />
+
+        <div className="space-y-10">
+          {steps.map((step, idx) => (
+            <div key={idx} className="relative flex gap-8">
+              <div className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center border transition-colors duration-500 ${
+                step.active ? "bg-[#B5862A] border-[#B5862A] text-white shadow-lg" : "bg-white border-[#EAE4D9] text-[#EAE4D9]"
+              }`}>
+                {step.icon}
+              </div>
+
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                  <p className={`text-[12px] font-bold uppercase tracking-[0.15em] ${step.active ? "text-[#1A1714]" : "text-[#A89F94]"}`}>
+                    {step.label}
+                  </p>
+                  {step.date && step.active && (
+                    <span className="text-[10px] font-bold text-[#B5862A] px-3 py-1 bg-[#FAF8F4] border border-[#EAE4D9] rounded-sm uppercase tracking-wider">
+                      {formatDateStr(step.date)} · {formatTimeStr(step.date)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[#A89F94] text-[13px] leading-relaxed">{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

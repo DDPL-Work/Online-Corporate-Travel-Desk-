@@ -241,6 +241,20 @@ export default function PrivacyPolicy() {
     return () => observers.forEach((o) => o.disconnect());
   }, []);
 
+  // Guarantee 100% on mobile if scrolled to the absolute bottom
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + Math.ceil(window.scrollY) >=
+        document.documentElement.scrollHeight - 50
+      ) {
+        setReviewedSections(new Set(SECTIONS.map((s) => s.id)));
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   // Sync sidebar scroll with active section
   useEffect(() => {
     if (
@@ -303,7 +317,7 @@ export default function PrivacyPolicy() {
         </div>
       </div>
 
-      <div className="flex-1 max-w-[1340px] mx-auto w-full px-4 lg:px-8 py-8 pb-32">
+      <div className="flex-1 max-w-[1340px] mx-auto w-full px-4 lg:px-8 py-8 pb-48 md:pb-32">
         <div className="flex gap-8 items-start h-full">
           <aside className="hidden lg:flex flex-col w-[280px] flex-shrink-0 sticky top-[72px] max-h-[calc(100vh-120px)] bg-white rounded-2xl border border-[#0A2540]/5 p-5 shadow-[0px_8px_24px_-12px_rgba(10,37,64,0.08)]">
             <div className="flex items-center justify-between mb-4 px-1">

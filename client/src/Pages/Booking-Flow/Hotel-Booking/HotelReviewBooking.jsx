@@ -1514,10 +1514,10 @@ const HotelReviewBooking = () => {
       projectName: projectApproverData.project?.name,
       projectId: projectApproverData.project?.id,
       projectClient: projectApproverData.project?.client,
-      approverId: !approvalRequired ? (user?._id || user?.id || user?.userId) : projectApproverData.approver?.id,
-      approverEmail: !approvalRequired ? user?.email : projectApproverData.approver?.email,
-      approverName: !approvalRequired ? `${user?.name?.firstName} ${user?.name?.lastName}` : projectApproverData.approver?.name,
-      approverRole: !approvalRequired ? user?.role : projectApproverData.approver?.role,
+      approverId: projectApproverData.approver?.id,
+      approverEmail: projectApproverData.approver?.email,
+      approverName: projectApproverData.approver?.name,
+      approverRole: projectApproverData.approver?.role,
       hotelRequest: {
         hotelCode:
           safeHotel?.HotelCode ||
@@ -1609,6 +1609,12 @@ const HotelReviewBooking = () => {
         PassportIssueDate: t.PassportIssueDate || "",
         PassportNo: t.PassportNo || "",
       })),
+      requesterDetails: {
+        name: `${user?.name?.firstName} ${user?.name?.lastName}`,
+        email: user?.email,
+        role: user?.role,
+        userId: user?._id || user?.id || user?.userId,
+      },
       purposeOfTravel,
       gstDetails,
       pricingSnapshot: {

@@ -12,21 +12,17 @@ import {
   FiCheck,
   FiX,
   FiSearch,
-  FiFilter,
   FiRefreshCw,
   FiMail,
-  FiBriefcase,
-  FiClock,
   FiCheckCircle,
   FiXCircle,
-  FiUser,
   FiCalendar,
-  FiChevronDown,
   FiAlertCircle,
   FiInbox,
 } from "react-icons/fi";
 import { MdVerifiedUser, MdOutlinePendingActions } from "react-icons/md";
 import { HiOutlineOfficeBuilding } from "react-icons/hi";
+import { StatCard } from "./Shared/CommonComponents";
 
 /* ──────────────────────────────────────── */
 /*  Status badge                            */
@@ -91,31 +87,28 @@ const Avatar = ({ name = "", size = "md" }) => {
   );
 };
 
-/* ──────────────────────────────────────── */
-/*  Stat card                               */
-/* ──────────────────────────────────────── */
-const StatCard = ({ label, value, icon, accent }) => (
-  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 flex items-center gap-4">
-    <div
-      className={`w-11 h-11 rounded-xl flex items-center justify-center ${accent}`}
-    >
-      {icon}
-    </div>
-    <div>
-      <p className="text-2xl font-black text-slate-800 leading-none">{value}</p>
-      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-        {label}
-      </p>
-    </div>
-  </div>
+// Internal icon helper for StatusBadge
+const FiClock = ({ size }) => (
+  <svg
+    stroke="currentColor"
+    fill="none"
+    strokeWidth="2"
+    viewBox="0 0 24 24"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    height={size}
+    width={size}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <circle cx="12" cy="12" r="10"></circle>
+    <polyline points="12 6 12 12 16 14"></polyline>
+  </svg>
 );
 
 /* ──────────────────────────────────────── */
 /*  Request Card                            */
 /* ──────────────────────────────────────── */
 const RequestCard = ({ req, onApprove, onReject, loading }) => {
-  const [expanded, setExpanded] = useState(false);
-
   const employee = req.employeeId || req.employee || {};
   const manager = req.managerId || req.manager || {};
   const bookingSnap = req.bookingSnapshot || {};
@@ -143,10 +136,10 @@ const RequestCard = ({ req, onApprove, onReject, loading }) => {
 
   const employeeName =
     getNameFromObj(employee) || req.employeeName || "Unknown Employee";
-  const employeeEmail = employee.email || req.employeeEmail || "�";
+  const employeeEmail = employee.email || req.employeeEmail || "—";
   const managerName = getNameFromObj(manager) || req.managerName || "Manager";
-  const managerEmail = manager.email || req.managerEmail || "�";
-  const managerRole = manager.role || req.managerRole || "";
+  const managerEmail = manager.email || req.managerEmail || "—";
+
   return (
     <div
       className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-300 ${
@@ -159,7 +152,7 @@ const RequestCard = ({ req, onApprove, onReject, loading }) => {
     >
       {/* Top accent bar */}
       <div
-        className={`h-1 w-full ${
+        className={`h-1.5 w-full ${
           isPending
             ? "bg-linear-to-r from-amber-400 to-orange-400"
             : status === "approved"
@@ -168,11 +161,11 @@ const RequestCard = ({ req, onApprove, onReject, loading }) => {
         }`}
       />
 
-      <div className="px-5 py-4">
+      <div className="px-5 py-5">
         {/* ── Row 1: employee + status + actions ── */}
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           {/* Employee info */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-4 min-w-0">
             <Avatar name={employeeName} size="lg" />
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -181,7 +174,7 @@ const RequestCard = ({ req, onApprove, onReject, loading }) => {
                 </p>
                 <StatusBadge status={status} />
               </div>
-              <div className="flex items-center gap-1 mt-0.5">
+              <div className="flex items-center gap-1 mt-1">
                 <FiMail size={11} className="text-slate-400 shrink-0" />
                 <p className="text-[12px] text-slate-400 truncate">
                   {employeeEmail}
@@ -201,30 +194,27 @@ const RequestCard = ({ req, onApprove, onReject, loading }) => {
             </div>
           </div>
 
-          {/* Action buttons */}
-          {isPending && (
-            <div className="flex gap-2 shrink-0">
+          {/* Action buttons or Status badge */}
+          {isPending ? (
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => onReject(req._id)}
                 disabled={loading}
-                className="flex items-center gap-1.5 text-[12px] font-bold text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-xl transition disabled:opacity-50"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-[12px] font-bold text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 px-4 py-2.5 rounded-xl transition disabled:opacity-50"
               >
                 <FiX size={13} /> Reject
               </button>
               <button
                 onClick={() => onApprove(req._id)}
                 disabled={loading}
-                className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-linear-to-r from-[#0A4D68] to-[#088395] hover:from-[#093f54] hover:to-[#066876] px-3 py-2 rounded-xl transition shadow-sm disabled:opacity-50"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-[12px] font-bold text-white bg-linear-to-r from-[#0A4D68] to-[#088395] hover:from-[#093f54] hover:to-[#066876] px-4 py-2.5 rounded-xl transition shadow-md disabled:opacity-50"
               >
                 <FiCheck size={13} /> Approve
               </button>
             </div>
-          )}
-
-          {/* Done state badge */}
-          {!isPending && (
+          ) : (
             <div
-              className={`flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full shrink-0 ${
+              className={`flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full self-start sm:self-center ${
                 status === "approved"
                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                   : "bg-red-50 text-red-600 border border-red-200"
@@ -244,137 +234,97 @@ const RequestCard = ({ req, onApprove, onReject, loading }) => {
         </div>
 
         {/* ── Divider ── */}
-        <div className="border-t border-slate-100 my-3" />
+        <div className="border-t border-slate-100 my-4" />
 
         {/* ── Row 2: Requested-as manager + booking + project info ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">
           {/* Approver for */}
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-1.5 min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
               Requested as Approver for
             </p>
-            <div className="flex items-center gap-1.5 mt-1">
+            <div className="flex items-center gap-2.5 mt-0.5">
               <Avatar name={employeeName} size="sm" />
-              <div>
-                <p className="text-[12px] font-bold text-slate-700 leading-tight">
-                  {employeeName || "�"}
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-bold text-slate-700 leading-tight truncate">
+                  {employeeName || "—"}
                 </p>
-                <p className="text-[10px] text-slate-400">{employeeEmail}</p>
+                <p className="text-[11px] text-slate-400 truncate" title={employeeEmail}>
+                  {employeeEmail}
+                </p>
               </div>
             </div>
           </div>
 
           {/* Project details */}
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-1.5 min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
               Project
             </p>
-            <p className="text-[12px] font-semibold text-slate-700 mt-1">
-              {req.projectName || "—"}
-            </p>
-            <p className="text-[11px] text-slate-400 truncate">
-              {req.projectCodeId
-                ? `${req.projectCodeId} · ${req.projectClient || "—"}`
-                : "—"}
-            </p>
+            <div className="mt-0.5">
+              <p className="text-[13px] font-bold text-slate-700 truncate" title={req.projectName}>
+                {req.projectName || "—"}
+              </p>
+              <p className="text-[11px] text-slate-400 truncate" title={req.projectCodeId}>
+                {req.projectCodeId
+                  ? `${req.projectCodeId} · ${req.projectClient || "—"}`
+                  : "—"}
+              </p>
+            </div>
           </div>
 
           {/* Hotel / Booking */}
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-1.5 min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
               Booking
             </p>
-            <p className="text-[12px] font-semibold text-slate-700 mt-1">
-              {bookingSnap.hotelName || req.bookingType || "Hotel Booking"}
-            </p>
-            <p className="text-[11px] text-slate-400">
-              {bookingSnap.city || ""}
-              {bookingSnap.checkInDate
-                ? ` · ${new Date(bookingSnap.checkInDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}`
-                : ""}
-            </p>
+            <div className="mt-0.5">
+              <p className="text-[13px] font-bold text-slate-700 truncate" title={bookingSnap.hotelName}>
+                {bookingSnap.hotelName || req.bookingType || "Hotel Booking"}
+              </p>
+              <p className="text-[11px] text-slate-400 truncate">
+                {bookingSnap.city || ""}
+                {bookingSnap.checkInDate
+                  ? ` · ${new Date(bookingSnap.checkInDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}`
+                  : ""}
+              </p>
+            </div>
           </div>
 
           {/* Date requested */}
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-1.5 min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
               Requested On
             </p>
-            <div className="flex items-center gap-1 mt-1">
-              <FiCalendar size={12} className="text-slate-400" />
-              <p className="text-[12px] font-semibold text-slate-700">
+            <div className="flex items-center gap-2.5 mt-0.5">
+              <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200/50">
+                <FiCalendar size={13} className="text-[#0A4D68]" />
+              </div>
+              <p className="text-[13px] font-bold text-slate-700">
                 {createdAt}
               </p>
             </div>
           </div>
 
           {managerEmail && managerEmail !== "—" && (
-            <div className="bg-slate-50 rounded-xl px-4">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                Manager / Approver
+            <div className="bg-slate-50/80 rounded-2xl p-3.5 border border-slate-100 sm:col-span-2 md:col-span-1 xl:col-span-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 px-0.5">
+                Designated Approver
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <Avatar name={managerName} size="sm" />
-                <div>
-                  <p className="text-[13px] font-semibold text-slate-700">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-bold text-slate-700 truncate">
                     {managerName}
                   </p>
-                  <p className="text-[11px] text-slate-400">{managerEmail}</p>
-                  {/* {managerRole && (
-                          <p className="text-[11px] text-slate-400 mt-1">
-                            Role: {managerRole}
-                          </p>
-                        )} */}
+                  <p className="text-[11px] text-slate-400 truncate" title={managerEmail}>
+                    {managerEmail}
+                  </p>
                 </div>
               </div>
             </div>
           )}
         </div>
-
-        {/* ── Expand for purpose / more details ── */}
-        {/* {(req.purposeOfTravel || (managerEmail && managerEmail !== "—")) && (
-          <>
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-[#0A4D68] hover:text-[#088395] transition"
-            >
-              <FiChevronDown
-                size={13}
-                className={`transition-transform ${expanded ? "rotate-180" : ""}`}
-              />
-              {expanded ? "Hide details" : "Show more details"}
-            </button>
-
-            {expanded && (
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-100">
-                {req.purposeOfTravel && (
-                  <div className="bg-slate-50 rounded-xl px-4 py-3">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Purpose of Travel
-                    </p>
-                    <p className="text-[13px] text-slate-700">
-                      {req.purposeOfTravel}
-                    </p>
-                  </div>
-                )}
-                <div className="bg-slate-50 rounded-xl px-4 py-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                    Project Details
-                  </p>
-                  <p className="text-[13px] font-semibold text-slate-700">
-                    {req.projectName || "—"}
-                  </p>
-                  <p className="text-[11px] text-slate-400 truncate">
-                    {req.projectCodeId
-                      ? `${req.projectCodeId} · ${req.projectClient || "—"}`
-                      : "—"}
-                  </p>
-                </div>
-                
-              </div>
-            )}
-          </>
-        )} */}
       </div>
     </div>
   );
@@ -486,94 +436,102 @@ const ManagerRequestsPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      {/* ── Page header ── */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-8 h-8 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow">
-                  <MdVerifiedUser size={16} className="text-white" />
-                </div>
-                <h1 className="text-xl font-black text-slate-800 tracking-tight">
+      {/* ── Page Header ── */}
+      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg shadow-[#0A4D68]/20 shrink-0">
+                <MdVerifiedUser size={24} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight leading-none">
                   Manager Approval Requests
                 </h1>
+                <p className="text-[11px] sm:text-xs font-semibold text-slate-400 mt-1.5 uppercase tracking-wider">
+                  Employee verification for corporate travel approvals
+                </p>
               </div>
-              <p className="text-sm text-slate-400 ml-10">
-                Employees who selected a manager/approver for their booking
-                requests
-              </p>
             </div>
-            <button
-              onClick={() => dispatch(fetchManagerRequests())}
-              disabled={loadingManagerRequests}
-              className="flex items-center gap-2 text-sm font-semibold text-[#0A4D68] border border-[#0A4D68]/20 bg-[#0A4D68]/5 hover:bg-[#0A4D68]/10 px-4 py-2 rounded-xl transition"
-            >
-              <FiRefreshCw
-                size={14}
-                className={loadingManagerRequests ? "animate-spin" : ""}
-              />
-              Refresh
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => dispatch(fetchManagerRequests())}
+                disabled={loadingManagerRequests}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-[#0A4D68] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#0A4D68]/20 transition-all active:scale-95 hover:bg-[#083d52] disabled:opacity-50"
+              >
+                <FiRefreshCw
+                  size={14}
+                  className={loadingManagerRequests ? "animate-spin" : ""}
+                />
+                Refresh
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-12 space-y-6">
         {/* ── Stat cards ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             label="Total Requests"
             value={stats.total}
-            icon={<FiUsers size={20} className="text-[#0A4D68]" />}
-            accent="bg-[#0A4D68]/10"
+            Icon={FiUsers}
+            iconBgCls="bg-[#0A4D68]/10"
+            iconColorCls="text-[#0A4D68]"
+            borderCls="border-[#0A4D68]"
           />
           <StatCard
             label="Pending"
             value={stats.pending}
-            icon={
-              <MdOutlinePendingActions size={20} className="text-amber-500" />
-            }
-            accent="bg-amber-50"
+            Icon={MdOutlinePendingActions}
+            iconBgCls="bg-amber-50"
+            iconColorCls="text-amber-500"
+            borderCls="border-amber-400"
           />
           <StatCard
             label="Approved"
             value={stats.approved}
-            icon={<FiCheckCircle size={20} className="text-emerald-500" />}
-            accent="bg-emerald-50"
+            Icon={FiCheckCircle}
+            iconBgCls="bg-emerald-50"
+            iconColorCls="text-emerald-500"
+            borderCls="border-emerald-400"
           />
           <StatCard
             label="Rejected"
             value={stats.rejected}
-            icon={<FiXCircle size={20} className="text-red-500" />}
-            accent="bg-red-50"
+            Icon={FiXCircle}
+            iconBgCls="bg-red-50"
+            iconColorCls="text-red-500"
+            borderCls="border-red-400"
           />
         </div>
 
         {/* ── Filters + Search ── */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col lg:flex-row items-stretch lg:items-center gap-4">
           {/* Search */}
           <div className="relative flex-1">
             <FiSearch
               size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
             />
             <input
               type="text"
               placeholder="Search by employee name, email, or hotel…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-10 w-full pl-9 pr-4 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition text-slate-700 placeholder:text-slate-300"
+              className="h-11 w-full pl-10 pr-4 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#0A4D68] focus:ring-2 focus:ring-[#0A4D68]/10 transition text-slate-700 placeholder:text-slate-400"
             />
           </div>
 
           {/* Filter tabs */}
-          <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+          <div className="flex gap-1 bg-slate-100 rounded-xl p-1 overflow-x-auto no-scrollbar">
             {FILTER_TABS.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setFilter(tab.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold transition whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition whitespace-nowrap ${
                   filter === tab.key
                     ? "bg-white text-[#0A4D68] shadow-sm"
                     : "text-slate-500 hover:text-slate-700"
@@ -581,7 +539,7 @@ const ManagerRequestsPage = () => {
               >
                 {tab.label}
                 <span
-                  className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                  className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
                     filter === tab.key
                       ? "bg-[#0A4D68]/10 text-[#0A4D68]"
                       : "bg-slate-200 text-slate-500"

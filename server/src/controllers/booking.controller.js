@@ -11,7 +11,10 @@ const pdfService = require("../services/pdf.service");
 const notificationService = require("../services/notification.service");
 const { notify } = require("../notifications/orchestrator");
 const EVENTS = require("../events/eventConstants");
-const { generateBookingReference, generateOrderId } = require("../utils/helpers");
+const {
+  generateBookingReference,
+  generateOrderId,
+} = require("../utils/helpers");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
@@ -101,6 +104,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     approverEmail,
     approverName,
     approverRole,
+    requesterDetails,
   } = req.body;
 
   const corporate = req.corporate;
@@ -343,21 +347,26 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   // Enrich segments with SupplierFareClass and FareRules from the quote
   if (bookingType === "flight" && flightRequest.segments) {
     const results = freshFareQuote.Results || [];
-    const fareRules = (results[0]?.FareRules || []).concat(results[1]?.FareRules || []);
-    const quoteSegments = (results[0]?.Segments || []).flat().concat((results[1]?.Segments || []).flat());
+    const fareRules = (results[0]?.FareRules || []).concat(
+      results[1]?.FareRules || [],
+    );
+    const quoteSegments = (results[0]?.Segments || [])
+      .flat()
+      .concat((results[1]?.Segments || []).flat());
 
     flightRequest.segments = flightRequest.segments.map((seg) => {
       const match = quoteSegments.find(
         (qs) =>
           qs.Origin?.Airport?.AirportCode === seg.origin.airportCode &&
-          qs.Destination?.Airport?.AirportCode === seg.destination.airportCode &&
-          qs.Airline?.FlightNumber === String(seg.flightNumber)
+          qs.Destination?.Airport?.AirportCode ===
+            seg.destination.airportCode &&
+          qs.Airline?.FlightNumber === String(seg.flightNumber),
       );
 
       const rule = fareRules.find(
         (r) =>
           r.Origin === seg.origin.airportCode &&
-          r.Destination === seg.destination.airportCode
+          r.Destination === seg.destination.airportCode,
       );
 
       return {
@@ -383,6 +392,8 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     // If policy exists and approvalRequired is false → auto-approve
     if (ssrPolicy && ssrPolicy.approvalRequired === false) {
       requestStatus = "approved";
+      finalApproverName = "Auto Approve";
+      finalApprovedAt = new Date();
       logger.info("✅ SSR Policy: Auto-approving booking for employee", {
         email: user.email,
         corporateId: corporate._id,
@@ -395,6 +406,9 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     });
   }
 
+  let finalApproverName = approverName;
+  let finalApprovedAt = null;
+
   const bookingRequest = await BookingRequest.create({
     bookingReference: generateBookingReference(),
     orderId,
@@ -404,6 +418,8 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
     requestStatus,
     executionStatus: "not_started",
+
+    approvedAt: finalApprovedAt,
 
     fareQuote: freshFareQuote,
 
@@ -415,8 +431,9 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     projectClient,
     approverId,
     approverEmail,
-    approverName,
+    approverName: finalApproverName,
     approverRole,
+    requesterDetails,
     travellers,
     flightRequest:
       bookingType === "flight"
@@ -440,37 +457,36 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   /* ================= NOTIFICATION ================= */
   const _flightRequesterEmail = user.email;
   const _flightRequesterName = user.name?.firstName
-    ? `${user.name.firstName} ${user.name.lastName || ''}`.trim()
-    : user.name || 'Employee';
-  const _flightOrderId = bookingRequest.orderId || bookingRequest.bookingReference;
+    ? `${user.name.firstName} ${user.name.lastName || ""}`.trim()
+    : user.name || "Employee";
+  const _flightOrderId =
+    bookingRequest.orderId || bookingRequest.bookingReference;
 
   // Notify Travel Admin + Manager of new request
   notify(EVENTS.BOOKING_REQUEST_CREATED, {
-    corporateId:   corporate._id,
-    employeeId:    user._id,
+    corporateId: corporate._id,
+    employeeId: user._id,
     employeeEmail: _flightRequesterEmail,
-    employeeName:  _flightRequesterName,
-    managerId:     approverId || null,
-    orderId:       _flightOrderId,
-    bookingType:   'flight',
-    amount:        bookingRequest.pricingSnapshot?.totalAmount,
-    relatedId:     bookingRequest._id,
+    employeeName: _flightRequesterName,
+    managerId: approverId || null,
+    orderId: _flightOrderId,
+    bookingType: "flight",
+    amount: bookingRequest.pricingSnapshot?.totalAmount,
+    relatedId: bookingRequest._id,
   });
 
   // If a manager is selected, also send BOOKING_APPROVAL_REQUIRED to them
   if (approverId) {
     notify(EVENTS.BOOKING_APPROVAL_REQUIRED, {
-      corporateId:  corporate._id,
-      managerId:    approverId,
+      corporateId: corporate._id,
+      managerId: approverId,
       employeeName: _flightRequesterName,
-      orderId:      _flightOrderId,
-      bookingType:  'flight',
-      amount:       bookingRequest.pricingSnapshot?.totalAmount,
-      relatedId:    bookingRequest._id,
+      orderId: _flightOrderId,
+      bookingType: "flight",
+      amount: bookingRequest.pricingSnapshot?.totalAmount,
+      relatedId: bookingRequest._id,
     });
   }
-
-
 
   /* ================= AUTO-APPROVAL: CREATE BOOKING INTENT ================= */
   if (requestStatus === "approved" && bookingType === "flight") {
@@ -529,7 +545,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
   /* ================= RESPONSE ================= */
 
-  // const isAutoApproved = requestStatus === "approved";
+  const isAutoApproved = requestStatus === "approved";
 
   res.status(201).json(
     new ApiResponse(
@@ -1046,6 +1062,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       };
 
       booking.executionStatus = "ticketed";
+      booking.ticketedAt = new Date();
       await booking.save();
 
       await paymentService.processBookingPayment({ booking, corporate });
@@ -1159,6 +1176,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     // await booking.save();
 
     booking.executionStatus = "ticketed";
+    booking.ticketedAt = new Date();
     await booking.save();
 
     return {
@@ -1366,7 +1384,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
   await notificationService.sendBookingNotification(
     booking,
     { _id: booking.userId },
-    "confirmation"
+    "confirmation",
   );
 
   /* ✅ RETURN */
@@ -1622,7 +1640,7 @@ exports.manualTicketNonLcc = asyncHandler(async (req, res) => {
     await notificationService.sendBookingNotification(
       booking,
       { _id: booking.userId },
-      "confirmation"
+      "confirmation",
     );
   }
 
@@ -2027,18 +2045,24 @@ exports.getProjectFlightExpenses = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Project ID is required");
   }
 
-  const expenses = await BookingRequest.find({ 
+  const expenses = await BookingRequest.find({
     projectId,
     corporateId: req.user.corporateId,
-    executionStatus: "ticketed"
+    executionStatus: "ticketed",
   })
     .populate("userId", "name email")
     .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 });
 
-  res.status(200).json(
-    new ApiResponse(200, expenses, "Project flight expenses fetched successfully")
-  );
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        expenses,
+        "Project flight expenses fetched successfully",
+      ),
+    );
 });
 
 module.exports = {

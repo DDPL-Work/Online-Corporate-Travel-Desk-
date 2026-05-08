@@ -12,6 +12,8 @@ import {
 } from "../../Redux/Actions/postpaidThunks";
 import { clearCycleTransactions } from "../../Redux/Slice/postpaidSlice";
 import { Pagination } from "./Shared/Pagination";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
+import { FiRefreshCw, FiX } from "react-icons/fi";
 
 /* ─── constants ──────────────────────────────────────────── */
 const C = {
@@ -164,6 +166,85 @@ export default function CreditUtilizationPostpaid() {
     setDrillPage(1);
   };
 
+  const handleExportCycles = () => {
+    if (!cycles.length) return;
+    const headers = ["Statement ID", "Billing Cycle", "Usage", "Status"];
+    const rows = cycles.map((c) => [
+      c.statementId || "—",
+      `${fmt(c.startDate)} - ${fmt(c.endDate)}`,
+      `₹${(c.usage || 0).toLocaleString()}`,
+      c.status || "—",
+    ]);
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `billing-cycles-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportDrill = () => {
+    if (!drillTx.length) return;
+    const headers = ["Date", "Description", "Ref ID", "Type", "Amount"];
+    const rows = drillTx.map((tx) => [
+      fmt(tx.createdAt),
+      tx.description || "—",
+      tx._id || tx.bookingId || "—",
+      tx.type || "—",
+      `₹${(tx.amount || 0).toLocaleString()}`,
+    ]);
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cycle-transactions-${drillCycle?.statementId || "drill"}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   /* All transactions for the open drill-down */
   const drillTx = drillCycle?.isCurrent ? (transactions || []) : (cycleTransactions || []);
   const drillLoading = drillCycle?.isCurrent ? loadingTransactions : loadingCycleTransactions;
@@ -179,67 +260,114 @@ export default function CreditUtilizationPostpaid() {
   return (
     <div className="min-h-screen p-6 font-sans" style={{ backgroundColor: C.light }}>
       <div className="max-w-7xl mx-auto space-y-5">
-
-        {/* ── PAGE HEADER ── */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+        {/* ── HEADER CARD ── */}
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
             <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center shadow text-white"
-              style={{ background: `linear-gradient(135deg,${C.primary},${C.secondary})` }}
+              className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shadow-lg text-white shrink-0"
+              style={{
+                background: `linear-gradient(135deg,${C.primary},${C.secondary})`,
+              }}
             >
-              <FiCreditCard size={22} />
+              <FiCreditCard size={24} />
             </div>
-            <div>
-              <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none">
-                Credit Utilization (Postpaid)
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tight leading-none truncate">
+                Credit Utilization
               </h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1 truncate">
                 Monitor corporate credit usage
               </p>
+
+              {!loadingBalance && balance && (
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mt-4 pt-4 border-t border-slate-100">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">
+                      Current Cycle
+                    </p>
+                    <p className="text-[11px] sm:text-xs font-bold text-slate-700">
+                      {fmt(balance.currentCycleStart)}{" "}
+                      <span className="text-slate-300 mx-1">→</span>{" "}
+                      {fmt(balance.currentCycleEnd)}
+                    </p>
+                  </div>
+                  <div className="sm:pl-6 sm:border-l border-slate-100 min-w-0">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">
+                      Resets In
+                    </p>
+                    <p
+                      className="text-[11px] sm:text-sm font-black flex items-center gap-1.5"
+                      style={{ color: C.primary }}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      {daysRemaining} Days
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {!loadingBalance && balance && (
-            <div className="flex items-center gap-4">
-              <div className="border-r border-slate-200 pr-4 text-right">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Current Cycle</p>
-                <p className="text-xs font-bold text-slate-700">
-                  {fmt(balance.currentCycleStart)} → {fmt(balance.currentCycleEnd)}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Resets In</p>
-                <p className="text-sm font-black flex items-center gap-1" style={{ color: C.primary }}>
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                  {daysRemaining} Days
-                </p>
-              </div>
-            </div>
-          )}
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold transition-all shadow-sm border bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100 active:scale-95"
+            >
+              <FiRefreshCw size={14} className={loadingBalance ? "animate-spin" : ""} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* ── STAT CARDS ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Credit Limit"    value={loadingBalance ? "…" : `₹${fmtAmt(balance?.totalLimit)}`}              Icon={FaRupeeSign}   color={C.primary}   />
-          <StatCard label="Used Credit"     value={loadingBalance ? "…" : `₹${fmtAmt(balance?.usedCredit)}`}              Icon={FiActivity}    color={C.warning}   />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            label="Credit Limit"
+            value={loadingBalance ? "…" : `₹${fmtAmt(balance?.totalLimit)}`}
+            Icon={FaRupeeSign}
+            color={C.primary}
+          />
+          <StatCard
+            label="Used Credit"
+            value={loadingBalance ? "…" : `₹${fmtAmt(balance?.usedCredit)}`}
+            Icon={FiActivity}
+            color={C.warning}
+          />
           <StatCard
             label={balance?.availableCredit < 0 ? "Over Limit" : "Available"}
-            value={loadingBalance ? "…" : `₹${fmtAmt(Math.abs(balance?.availableCredit))}`}
+            value={
+              loadingBalance
+                ? "…"
+                : `₹${fmtAmt(Math.abs(balance?.availableCredit))}`
+            }
             Icon={FiDollarSign}
             color={balance?.availableCredit < 0 ? C.danger : C.success}
           />
-          <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 flex flex-col justify-between" style={{ borderColor: C.secondary }}>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Utilization</p>
+          <div
+            className="bg-white rounded-xl p-4 shadow-sm border-l-4 flex flex-col justify-between"
+            style={{ borderColor: C.secondary }}
+          >
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">
+              Utilization
+            </p>
             <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: pctColor }} />
+              <div
+                className="h-2 rounded-full transition-all duration-500"
+                style={{ width: `${pct}%`, backgroundColor: pctColor }}
+              />
             </div>
-            <p className="text-lg font-black mt-1" style={{ color: pctColor }}>{pct.toFixed(1)}%</p>
+            <p className="text-lg font-black mt-1" style={{ color: pctColor }}>
+              {pct.toFixed(1)}%
+            </p>
           </div>
         </div>
 
         {/* ── TABS ── */}
         <div className="flex gap-1 bg-white border border-slate-100 rounded-xl p-1 shadow-sm w-fit">
-          {[["current", "Current Cycle"], ["previous", "Previous Cycles"]].map(([k, lbl]) => (
+          {[
+            ["current", "Current Cycle"],
+            ["previous", "Previous Cycles"],
+          ].map(([k, lbl]) => (
             <button
               key={k}
               onClick={() => handleTabSwitch(k)}
@@ -259,7 +387,6 @@ export default function CreditUtilizationPostpaid() {
         ══════════════════════════════════════════════════ */}
         {drillCycle && (
           <div className="space-y-4">
-            {/* Back bar */}
             <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={handleBack}
@@ -269,8 +396,12 @@ export default function CreditUtilizationPostpaid() {
                 Back to {activeTab === "current" ? "Current Cycle" : "Statements"}
               </button>
               <div className="bg-white border border-slate-100 rounded-lg px-4 py-2 text-xs flex items-center gap-2 flex-wrap">
-                <span className="text-slate-400 font-bold uppercase tracking-widest">Statement:</span>
-                <span className="font-black" style={{ color: C.primary }}>{drillStmtId}</span>
+                <span className="text-slate-400 font-bold uppercase tracking-widest">
+                  Statement:
+                </span>
+                <span className="font-black" style={{ color: C.primary }}>
+                  {drillStmtId}
+                </span>
                 <span className="text-slate-300">|</span>
                 <span className="text-slate-500">
                   {fmt(drillCycle.periodStart)} – {fmt(drillCycle.periodEnd)}
@@ -278,41 +409,100 @@ export default function CreditUtilizationPostpaid() {
               </div>
             </div>
 
-            {/* Transactions table */}
-            <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
-              <TableHeader title={`Transactions — ${drillStmtId}`} count={drillTx.length} />
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr style={{ backgroundColor: C.primary }} className="text-white">
-                      {TX_COLS.map((h) => (
-                        <th key={h} className="px-3 py-3 font-bold uppercase tracking-widest whitespace-nowrap">{h}</th>
-                      ))}
+            <ResponsiveDataTable
+              title={`Transactions — ${drillStmtId}`}
+              subtitle={`${drillTx.length} record${drillTx.length !== 1 ? "s" : ""} found`}
+              tableMinWidth="1200px"
+              onExport={handleExportDrill}
+              exportLabel="Export"
+              exportBgClass="bg-[#0A4D68] hover:bg-[#083d52]"
+              arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+              pagination={
+                <div className="flex items-center justify-between gap-3 w-full">
+                  <span className="text-xs font-black text-slate-700">
+                    Net: ₹
+                    {fmtAmt(
+                      drillTx
+                        .filter(
+                          (t) =>
+                            t.transactionType === "debit" ||
+                            (!t.transactionType && t.type === "booking"),
+                        )
+                        .reduce((s, t) => s + (t.amount || 0), 0) -
+                        drillTx
+                          .filter(
+                            (t) =>
+                              t.transactionType === "credit" ||
+                              (!t.transactionType &&
+                                ["payment", "topup", "refund"].includes(t.type)),
+                          )
+                          .reduce((s, t) => s + (t.amount || 0), 0),
+                    )}
+                  </span>
+                  <Pagination
+                    currentPage={drillPage}
+                    totalItems={drillTx.length}
+                    pageSize={DRILL_PAGE_SIZE}
+                    onPageChange={setDrillPage}
+                  />
+                </div>
+              }
+            >
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr style={{ backgroundColor: C.primary }} className="text-white">
+                    {TX_COLS.map((h) => (
+                      <th
+                        key={h}
+                        className="px-3 py-3 font-bold uppercase tracking-widest whitespace-nowrap"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {drillLoading ? (
+                    <tr>
+                      <td colSpan={TX_COLS.length} className="py-10 text-center text-slate-400">
+                        Loading…
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {drillLoading ? (
-                      <tr><td colSpan={TX_COLS.length} className="py-10 text-center text-slate-400">Loading…</td></tr>
-                    ) : drillTx.length === 0 ? (
-                      <tr><td colSpan={TX_COLS.length} className="py-10 text-center text-slate-400">No transactions for this cycle.</td></tr>
-                    ) : paginatedDrillTx.map((t, i) => (
+                  ) : drillTx.length === 0 ? (
+                    <tr>
+                      <td colSpan={TX_COLS.length} className="py-10 text-center text-slate-400">
+                        No transactions for this cycle.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedDrillTx.map((t, i) => (
                       <tr
                         key={t._id}
                         className="hover:bg-blue-50/40 transition-colors"
                         style={{ backgroundColor: i % 2 === 0 ? "#fff" : "#f8fafc" }}
                       >
-                        <td className="px-3 py-2.5 font-mono text-[10px] font-bold" style={{ color: C.secondary }}>
+                        <td
+                          className="px-3 py-2.5 font-mono text-[10px] font-bold"
+                          style={{ color: C.secondary }}
+                        >
                           {String(t._id)}
                         </td>
-                        <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">{fmt(t.createdAt)}</td>
-                        <td className="px-3 py-2.5 font-mono text-slate-700">{t.bookingReference || "—"}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">
+                          {fmt(t.createdAt)}
+                        </td>
+                        <td className="px-3 py-2.5 font-mono text-slate-700">
+                          {t.bookingReference || "—"}
+                        </td>
                         <td className="px-3 py-2.5 text-slate-600">
                           {t.type === "booking" ? "Sales Invoice" : t.type || "—"}
                         </td>
-                        <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">{fmt(t.bookingDate || t.createdAt)}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">
+                          {fmt(t.bookingDate || t.createdAt)}
+                        </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">
                           {t.metadata?.bookingType
-                            ? t.metadata.bookingType.charAt(0).toUpperCase() + t.metadata.bookingType.slice(1)
+                            ? t.metadata.bookingType.charAt(0).toUpperCase() +
+                              t.metadata.bookingType.slice(1)
                             : t.metadata?.productType
                             ? t.metadata.productType
                             : t.metadata?.serviceType
@@ -321,45 +511,38 @@ export default function CreditUtilizationPostpaid() {
                             ? "Air - Domestic"
                             : "—"}
                         </td>
-                        <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">{fmt(t.travelDate || t.bookingDate)}</td>
-                        <td className="px-3 py-2.5 font-mono text-slate-700">{t.bookingReference || t.paymentReference || "—"}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">
+                          {fmt(t.travelDate || t.bookingDate)}
+                        </td>
+                        <td className="px-3 py-2.5 font-mono text-slate-700">
+                          {t.bookingReference || t.paymentReference || "—"}
+                        </td>
                         <td className="px-3 py-2.5 capitalize text-slate-600">
                           {t.transactionType || (t.type === "booking" ? "debit" : "credit")}
                         </td>
                         <td
                           className="px-3 py-2.5 font-black"
                           style={{
-                            color: (t.transactionType === "debit" || (!t.transactionType && t.type === "booking")) ? C.danger : C.success
+                            color:
+                              t.transactionType === "debit" || (!t.transactionType && t.type === "booking")
+                                ? C.danger
+                                : C.success,
                           }}
                         >
-                          {(t.transactionType === "debit" || (!t.transactionType && t.type === "booking")) ? "-" : "+"}₹{fmtAmt(t.amount)}
+                          {t.transactionType === "debit" || (!t.transactionType && t.type === "booking")
+                            ? "-"
+                            : "+"}
+                          ₹{fmtAmt(t.amount)}
                         </td>
-                        <td className="px-3 py-2.5"><StatusBadge status={t.status} /></td>
+                        <td className="px-3 py-2.5">
+                          <StatusBadge status={t.status} />
+                        </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Footer: count + net total + frontend pagination */}
-              <div className="bg-slate-50 px-5 py-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  {drillTx.length} transaction(s)
-                </span>
-                <span className="text-xs font-black text-slate-700">
-                  Net: ₹{fmtAmt(
-                    drillTx.filter(t => t.transactionType === "debit" || (!t.transactionType && t.type === "booking")).reduce((s, t) => s + (t.amount || 0), 0) -
-                    drillTx.filter(t => t.transactionType === "credit" || (!t.transactionType && ["payment", "topup", "refund"].includes(t.type))).reduce((s, t) => s + (t.amount || 0), 0)
+                    ))
                   )}
-                </span>
-                <Pagination
-                  currentPage={drillPage}
-                  totalItems={drillTx.length}
-                  pageSize={DRILL_PAGE_SIZE}
-                  onPageChange={setDrillPage}
-                />
-              </div>
-            </div>
+                </tbody>
+              </table>
+            </ResponsiveDataTable>
           </div>
         )}
 
@@ -367,73 +550,121 @@ export default function CreditUtilizationPostpaid() {
             STATEMENT LIST — CURRENT CYCLE  (no drill-down active)
         ══════════════════════════════════════════════════ */}
         {!drillCycle && activeTab === "current" && (
-          <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
-            <TableHeader title="Current Billing Cycle" count={currentCycleRow ? 1 : 0} />
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr style={{ backgroundColor: C.primary }} className="text-white">
-                    {STMT_COLS.map((h) => (
-                      <th key={h} className="px-4 py-3 font-bold uppercase tracking-widest whitespace-nowrap">{h}</th>
-                    ))}
+          <ResponsiveDataTable
+            title="Current Billing Cycle"
+            subtitle={`${currentCycleRow ? 1 : 0} record found`}
+            tableMinWidth="850px"
+            onExport={handleExportCycles}
+            exportLabel="Export"
+            exportBgClass="bg-[#0A4D68] hover:bg-[#083d52]"
+            arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-teal-100"
+          >
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr style={{ backgroundColor: C.primary }} className="text-white">
+                  {STMT_COLS.map((h) => (
+                    <th
+                      key={h}
+                      className="px-4 py-3 font-bold uppercase tracking-widest whitespace-nowrap"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loadingBalance ? (
+                  <tr>
+                    <td colSpan={STMT_COLS.length} className="py-10 text-center text-slate-400">
+                      Loading…
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {loadingBalance ? (
-                    <tr><td colSpan={STMT_COLS.length} className="py-10 text-center text-slate-400">Loading…</td></tr>
-                  ) : !currentCycleRow ? (
-                    <tr><td colSpan={STMT_COLS.length} className="py-10 text-center text-slate-400">No data available.</td></tr>
-                  ) : (
-                    <StatementRow row={currentCycleRow} onClick={() => openDrillDown(currentCycleRow)} />
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                ) : !currentCycleRow ? (
+                  <tr>
+                    <td colSpan={STMT_COLS.length} className="py-10 text-center text-slate-400">
+                      No data available.
+                    </td>
+                  </tr>
+                ) : (
+                  <StatementRow row={currentCycleRow} onClick={() => openDrillDown(currentCycleRow)} />
+                )}
+              </tbody>
+            </table>
+          </ResponsiveDataTable>
         )}
 
         {/* ══════════════════════════════════════════════════
             STATEMENT LIST — PREVIOUS CYCLES  (no drill-down active)
         ══════════════════════════════════════════════════ */}
         {!drillCycle && activeTab === "previous" && (
-          <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
-            <TableHeader title="Previous Billing Cycle Statements" count={previousCycles.length} />
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr style={{ backgroundColor: C.primary }} className="text-white">
-                    {STMT_COLS.map((h) => (
-                      <th key={h} className="px-4 py-3 font-bold uppercase tracking-widest whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {loadingCycles ? (
-                    <tr><td colSpan={STMT_COLS.length} className="py-10 text-center text-slate-400">Loading statements…</td></tr>
-                  ) : previousCycles.length === 0 ? (
-                    <tr><td colSpan={STMT_COLS.length} className="py-10 text-center text-slate-400">No previous cycles found.</td></tr>
-                  ) : previousCycles.map((c) => (
-                    <StatementRow key={c.cycleIndex} row={c} onClick={() => openDrillDown(c)} />
+          <ResponsiveDataTable
+            title="Previous Billing Cycle Statements"
+            subtitle={`${previousCycles.length} record${previousCycles.length !== 1 ? "s" : ""} found`}
+            tableMinWidth="850px"
+            onExport={handleExportCycles}
+            exportLabel="Export"
+            exportBgClass="bg-[#0A4D68] hover:bg-[#083d52]"
+            arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+          >
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr style={{ backgroundColor: C.primary }} className="text-white">
+                  {STMT_COLS.map((h) => (
+                    <th
+                      key={h}
+                      className="px-4 py-3 font-bold uppercase tracking-widest whitespace-nowrap"
+                    >
+                      {h}
+                    </th>
                   ))}
-                </tbody>
-                {/* ── TOTAL ROW ── */}
-                {!loadingCycles && previousCycles.length > 0 && (
-                  <tfoot>
-                    <tr style={{ backgroundColor: "#F1F5F9" }} className="border-t-2 border-slate-200">
-                      <td colSpan={STMT_COLS.length - 1} className="px-4 py-3 font-black text-slate-700 uppercase tracking-widest text-[10px] text-right">
-                        Total ({previousCycles.length} cycle{previousCycles.length > 1 ? "s" : ""})
-                      </td>
-                      <td className="px-4 py-3 font-black text-slate-900 text-sm">
-                        ₹{fmtAmt(previousCycles.reduce((sum, c) => sum + (c.statementAmount || 0), 0))}
-                      </td>
-                    </tr>
-                  </tfoot>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loadingCycles ? (
+                  <tr>
+                    <td colSpan={STMT_COLS.length} className="py-10 text-center text-slate-400">
+                      Loading statements…
+                    </td>
+                  </tr>
+                ) : previousCycles.length === 0 ? (
+                  <tr>
+                    <td colSpan={STMT_COLS.length} className="py-10 text-center text-slate-400">
+                      No previous cycles found.
+                    </td>
+                  </tr>
+                ) : (
+                  previousCycles.map((c) => (
+                    <StatementRow
+                      key={c.cycleIndex}
+                      row={c}
+                      onClick={() => openDrillDown(c)}
+                    />
+                  ))
                 )}
-              </table>
-            </div>
-          </div>
+              </tbody>
+              {/* ── TOTAL ROW ── */}
+              {!loadingCycles && previousCycles.length > 0 && (
+                <tfoot>
+                  <tr style={{ backgroundColor: "#F1F5F9" }} className="border-t-2 border-slate-200">
+                    <td
+                      colSpan={STMT_COLS.length - 1}
+                      className="px-4 py-3 font-black text-slate-700 uppercase tracking-widest text-[10px] text-right"
+                    >
+                      Total ({previousCycles.length} cycle
+                      {previousCycles.length > 1 ? "s" : ""})
+                    </td>
+                    <td className="px-4 py-3 font-black text-slate-900 text-sm">
+                      ₹
+                      {fmtAmt(
+                        previousCycles.reduce((sum, c) => sum + (c.statementAmount || 0), 0),
+                      )}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </ResponsiveDataTable>
         )}
-
       </div>
     </div>
   );

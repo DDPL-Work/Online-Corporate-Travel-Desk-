@@ -357,7 +357,7 @@ function FlightHeroCard({ booking }) {
           {pnr && (
             <div>
               <p className="text-[8px] sm:text-[9px] uppercase tracking-widest text-white/35 font-bold mb-1">
-                PNR / Booking Reference
+                PNR / Order ID
               </p>
               <p className="text-base sm:text-xl font-black tracking-[0.12em] font-mono text-white">
                 {pnr}
@@ -743,9 +743,9 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
               </h2>
               {booking?.bookingReference && (
                 <p className="text-[10px] text-slate-400">
-                  Ref:{" "}
+                  Order ID:{" "}
                   <span className="font-mono font-semibold text-slate-600">
-                    {booking.bookingReference}
+                    {booking.orderId || booking.bookingReference}
                   </span>
                 </p>
               )}
@@ -940,11 +940,11 @@ export default function FlightDetailModal({ isOpen, bookingId, onClose }) {
 
                 {/* ── Booking References ── */}
                 <SectionCard>
-                  <CardLabel icon={MdReceipt} label="Booking References" />
+                  <CardLabel icon={MdReceipt} label="Order IDs" />
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">
-                        Booking Ref
+                        Order ID
                       </p>
                       <p className="text-xs font-black text-slate-800 font-mono break-all">
                         {booking.bookingReference || "—"}

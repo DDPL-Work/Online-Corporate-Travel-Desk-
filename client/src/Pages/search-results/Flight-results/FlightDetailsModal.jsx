@@ -6,6 +6,7 @@ import { AiOutlineInfoCircle } from "react-icons/ai";
 import { BsSuitcase } from "react-icons/bs";
 import { BiSolidOffer } from "react-icons/bi";
 import { FaPlane } from "react-icons/fa";
+import { FiCheckCircle } from "react-icons/fi";
 import { MdReceiptLong, MdLocalGasStation, MdAccessTime, MdRefresh } from "react-icons/md";
 
 
@@ -32,24 +33,35 @@ function getCabinClassLabel(code) {
 /** Converts raw API fee string to a display-friendly label */
 function formatFeeAmount(details = "") {
   const raw = String(details).trim();
-  const inrMatch = raw.match(/INR\s*([\d,.]+)/i);
+  
+  // Handle "Nil", "0", or "Free" (even with currency prefixes like "INR Nil")
+  if (/^(?:INR|₹)?\s*(nil|0|free)$/i.test(raw)) {
+    return { label: "No Charge", type: "free" };
+  }
+
+  // Handle formatted INR with symbol or text
+  const inrMatch = raw.match(/(?:INR|₹)\s*([\d,.]+)/i);
   if (inrMatch) {
     const num = parseFloat(inrMatch[1].replace(/,/g, ""));
     return { label: `₹${num.toLocaleString("en-IN")}`, type: "fee" };
   }
+
+  // Handle Percentages
   const pctMatch = raw.match(/^(\d+(?:\.\d+)?)%$/);
   if (pctMatch) {
     return { label: `${pctMatch[1]}% of Fare`, type: "percent" };
   }
-  if (/^(nil|0)$/i.test(raw)) {
-    return { label: "No Charge", type: "free" };
-  }
+
+  // Handle Non-Refundable
   if (/non.refundable/i.test(raw)) {
     return { label: "Non-Refundable", type: "blocked" };
   }
+
+  // Handle Airline Discretion
   if (/discretion|not permitted|not allowed/i.test(raw)) {
     return { label: "Airline Discretion", type: "discretion" };
   }
+
   return { label: raw, type: "info" };
 }
 
@@ -186,12 +198,11 @@ function FlightSegmentDetail({ segment }) {
         </div>
       </div>
 
-      {/* Bottom Info Bar */}
       <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center gap-4">
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-            {segment.Baggage || "15 Kg"} Check-in
+            {segment.Baggage || "Check Rules"} Check-in
           </span>
         </div>
         <div className="w-px h-3 bg-slate-300" />
@@ -276,11 +287,12 @@ export function FlightDetailsModal({ isOpen, onClose, selectedFlight, selectedFa
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      fetchFullRules(); // Auto-fetch detailed rules on open
     } else {
       document.body.style.overflow = "";
     }
     return () => { document.body.style.overflow = ""; };
-  }, [isOpen]);
+  }, [isOpen, traceId, selectedFlight, selectedFare]);
 
   const fetchFullRules = async () => {
     const resultIndex = selectedFlight?.ResultIndex || selectedFare?.resultIndex;
@@ -474,8 +486,8 @@ export function FlightDetailsModal({ isOpen, onClose, selectedFlight, selectedFa
               {/* Quick Info Grid — all values from real data */}
               {(() => {
                 const seg = segmentsArrays[0]?.[0];
-                const checkInBaggage = seg?.Baggage;
-                const cabinBaggage = seg?.CabinBaggage;
+                const checkInBaggage = seg?.Baggage || selectedFlight?.Fare?.Baggage?.iB;
+                const cabinBaggage = seg?.CabinBaggage || selectedFlight?.Fare?.Baggage?.cB || "7 Kg";
                 const fareClass = seg?.Airline?.FareClass;
 
                 const infoCards = [
@@ -536,186 +548,203 @@ export function FlightDetailsModal({ isOpen, onClose, selectedFlight, selectedFa
                   <div className="w-12 h-12 border-4 border-[#C9A84C]/20 border-t-[#C9A84C] rounded-full animate-spin"></div>
                   <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Syncing with airline database...</p>
                 </div>
-              ) : fullFareRules ? (
-                /* RENDER FULL RULES */
-                <div className="space-y-10">
-                  {fullFareRules.map((rule, idx) => (
-                    <div key={idx} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                      {/* Rule Header */}
-                      <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 bg-[#0A203E]">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-2 px-4 py-2 bg-white/10 text-white rounded-xl border border-white/20">
-                            <span className="text-sm font-black tracking-tight">{rule.origin}</span>
-                            <FaPlane className="text-[10px] text-[#C9A84C]" />
-                            <span className="text-sm font-black tracking-tight">{rule.destination}</span>
-                          </div>
-                          <div className="h-6 w-px bg-white/20" />
-                          <div>
-                            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Fare Class</p>
-                            <p className="text-sm font-black text-white leading-none mt-0.5">{rule.fareType || "Standard"}</p>
-                          </div>
-                        </div>
-                        <div className="px-4 py-2 bg-[#C9A84C]/15 border border-[#C9A84C]/30 rounded-xl">
-                          <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">Fare Basis</p>
-                          <p className="text-sm font-black text-[#C9A84C] tracking-tight mt-0.5">{rule.fareBasisCode || "N/A"}</p>
-                        </div>
-                      </div>
-
-                      <div className="p-6 space-y-6">
-                        {/* Baggage Allowance */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                              <BsSuitcase size={13} />
-                            </div>
-                            <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">Baggage Allowance</h4>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Check-in (Adult/Child)</p>
-                              <p className="text-sm font-black text-emerald-600">{rule.baggage?.checkIn || "15 KG"}</p>
-                            </div>
-                            <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cabin Baggage</p>
-                              <p className="text-sm font-black text-slate-700">{rule.baggage?.cabin || "7 KG"}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Cancellation Policy */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center text-red-500">
-                              <FaPlane size={11} className="rotate-180" />
-                            </div>
-                            <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">Cancellation Policy</h4>
-                          </div>
-                          <div className="rounded-xl border border-slate-100 overflow-hidden">
-                            {rule.cancellation?.map((c, i) => (
-                              <div key={i} className={`flex items-center justify-between gap-6 px-5 py-4 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"} border-b border-slate-100 last:border-0`}>
-                                <p className="text-sm font-semibold text-slate-700 leading-snug flex-1">{c.timeRange}</p>
-                                <span className="shrink-0 text-xs font-black text-red-600 bg-red-50 border border-red-100 px-3 py-1.5 rounded-lg whitespace-nowrap">{c.fee}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Date Change Policy */}
-                        {rule.reissue && rule.reissue.length > 0 && (
-                          <div>
-                            <div className="flex items-center gap-2 mb-3">
-                              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500">
-                                <MdRefresh size={13} className="rotate-90" />
-                              </div>
-                              <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">Date Change Policy</h4>
-                            </div>
-                            <div className="rounded-xl border border-slate-100 overflow-hidden shadow-sm">
-                              {rule.reissue.map((r, i) => (
-                                <div key={i} className={`flex items-center justify-between gap-6 px-5 py-4 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"} border-b border-slate-100 last:border-0`}>
-                                  <p className="text-sm font-semibold text-slate-700 leading-snug flex-1">{r.timeRange}</p>
-                                  <span className="shrink-0 text-xs font-black text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg whitespace-nowrap">{r.fee}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Airline Notes */}
-                        {rule.notes && rule.notes.length > 0 && (
-                          <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-100/50">
-                            <div className="flex items-center gap-2 mb-3">
-                              <AiOutlineInfoCircle className="text-blue-500" size={14} />
-                              <h4 className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Airline Notes</h4>
-                            </div>
-                            <ul className="space-y-1.5">
-                              {rule.notes.slice(0, 8).map((note, nIdx) => (
-                                <li key={nIdx} className="flex items-start gap-2">
-                                  <span className="text-blue-300 text-xs mt-0.5 shrink-0">›</span>
-                                  <span className="text-xs font-medium text-slate-600 leading-relaxed">{note}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : allMiniFareRuleGroups.length > 0 ? (
-                /* RENDER MINI RULES */
-                <div className="space-y-6">
-                  {allMiniFareRuleGroups.map((legRules, legIdx) => (
-                    <div key={legIdx} className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* Cancellation */}
-                        <div>
-                           <div className="flex items-center gap-2 mb-4">
-                              <div className="w-1.5 h-4 bg-red-500 rounded-full" />
-                              <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Cancellation Fee</h4>
-                           </div>
-                           <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                              {legRules.filter(r => r.Type === "Cancellation" || r.Type === 0).length > 0 ? (
-                                legRules.filter(r => r.Type === "Cancellation" || r.Type === 0).map((rule, i) => (
-                                  <RuleRow key={i} rule={rule} index={i} />
-                                ))
-                              ) : (
-                                <div className="p-6 flex flex-col gap-3 text-center bg-white">
-                                  <p className="text-xs text-slate-400 font-bold italic">Detailed rules unavailable.</p>
-                                  {isRefundable && (
-                                    <button onClick={fetchFullRules} className="px-4 py-2 bg-slate-50 rounded-lg text-[10px] font-black text-[#C9A84C] uppercase tracking-widest hover:bg-[#C9A84C] hover:text-white transition-all shadow-xs border border-slate-100">
-                                      Fetch Detailed Policy
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                           </div>
-                        </div>
-                        {/* Reissue */}
-                        <div>
-                           <div className="flex items-center gap-2 mb-4">
-                              <div className="w-1.5 h-4 bg-[#C9A84C] rounded-full" />
-                              <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Date Change Fee</h4>
-                           </div>
-                           <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                              {legRules.filter(r => r.Type === "Reissue" || r.Type === 1).length > 0 ? (
-                                legRules.filter(r => r.Type === "Reissue" || r.Type === 1).map((rule, i) => (
-                                  <RuleRow key={i} rule={rule} index={i} />
-                                ))
-                              ) : (
-                                <div className="p-6 flex flex-col gap-3 text-center bg-white">
-                                   <p className="text-xs text-slate-400 font-bold italic">No date change rules found.</p>
-                                   <button onClick={fetchFullRules} className="px-4 py-2 bg-slate-50 rounded-lg text-[10px] font-black text-[#C9A84C] uppercase tracking-widest hover:bg-[#C9A84C] hover:text-white transition-all shadow-xs border border-slate-100">
-                                      Sync with Airline
-                                   </button>
-                                </div>
-                              )}
-                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               ) : (
-                /* NO MINI RULES - SHOW FETCH BUTTON */
-                <div className="bg-slate-50 rounded-[3rem] p-16 border border-dashed border-slate-200 text-center">
-                  <div className="w-24 h-24 bg-white rounded-full shadow-lg flex items-center justify-center mx-auto mb-8 text-slate-200">
-                    <AiOutlineInfoCircle size={48} />
-                  </div>
-                  <h3 className="text-xl font-black text-[#0A203E] mb-3">Fare Policies Not Available</h3>
-                  <p className="text-sm text-slate-400 font-bold mb-10 max-w-sm mx-auto leading-relaxed">
-                    Detailed cancellation and modification charges are not provided by the airline for this specific fare class in the initial search.
-                  </p>
-                  <button 
-                    onClick={fetchFullRules}
-                    className="px-12 py-4 bg-[#C9A84C] text-[#0A203E] rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-2xl shadow-[#C9A84C]/30 hover:brightness-110 transition-all active:scale-95 flex items-center gap-3 mx-auto"
-                  >
-                    <BiSolidOffer className="text-lg" />
-                    Fetch Full Fare Rules
-                  </button>
+                <div className="space-y-12">
+                  {/* 1. FULL DETAILED RULES (SOURCE OF TRUTH) */}
+                  {fullFareRules && (
+                    <div className="space-y-10">
+                      <div className="bg-emerald-50 border border-emerald-200 p-6 rounded-3xl flex items-center gap-4 shadow-sm">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                          <FiCheckCircle size={24} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-emerald-800 uppercase tracking-widest">Verified Detailed Rules</h4>
+                          <p className="text-[11px] text-emerald-600 font-bold mt-0.5">These rules are fetched directly from the airline database and are final for all charges.</p>
+                        </div>
+                      </div>
+
+                      {fullFareRules.map((rule, idx) => (
+                        <div key={idx} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                          {/* Rule Header */}
+                          <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 bg-[#0A203E]">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2 px-4 py-2 bg-white/10 text-white rounded-xl border border-white/20">
+                                <span className="text-sm font-black tracking-tight">{rule.origin}</span>
+                                <FaPlane className="text-[10px] text-[#C9A84C]" />
+                                <span className="text-sm font-black tracking-tight">{rule.destination}</span>
+                              </div>
+                              <div className="h-6 w-px bg-white/20" />
+                              <div>
+                                <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Fare Class</p>
+                                <p className="text-sm font-black text-white leading-none mt-0.5">{rule.fareType || "Standard"}</p>
+                              </div>
+                            </div>
+                            <div className="px-4 py-2 bg-[#C9A84C]/15 border border-[#C9A84C]/30 rounded-xl">
+                              <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">Fare Basis</p>
+                              <p className="text-sm font-black text-[#C9A84C] tracking-tight mt-0.5">{rule.fareBasisCode || "N/A"}</p>
+                            </div>
+                          </div>
+
+                          <div className="p-6 space-y-6">
+                            {/* Baggage Allowance */}
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                  <BsSuitcase size={13} />
+                                </div>
+                                <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">Baggage Allowance</h4>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
+                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Check-in (Adult/Child)</p>
+                                  <p className="text-sm font-black text-emerald-600">{rule.baggage?.checkIn || "15 KG"}</p>
+                                </div>
+                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
+                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cabin Baggage</p>
+                                  <p className="text-sm font-black text-slate-700">{rule.baggage?.cabin || "7 KG"}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Cancellation Policy */}
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center text-red-500">
+                                  <FaPlane size={11} className="rotate-180" />
+                                </div>
+                                <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">Cancellation Policy</h4>
+                              </div>
+                              <div className="rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+                                {rule.cancellation?.map((c, i) => (
+                                  <div key={i} className={`flex items-center justify-between gap-6 px-5 py-4 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"} border-b border-slate-100 last:border-0`}>
+                                    <p className="text-sm font-semibold text-slate-700 leading-snug flex-1">{c.timeRange}</p>
+                                    <FeeBadge details={c.fee} />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Date Change Policy */}
+                            {rule.reissue && rule.reissue.length > 0 && (
+                              <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                  <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500">
+                                    <MdRefresh size={13} className="rotate-90" />
+                                  </div>
+                                  <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">Date Change Policy</h4>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+                                  {rule.reissue.map((r, i) => (
+                                    <div key={i} className={`flex items-center justify-between gap-6 px-5 py-4 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"} border-b border-slate-100 last:border-0`}>
+                                      <p className="text-sm font-semibold text-slate-700 leading-snug flex-1">{r.timeRange}</p>
+                                      <FeeBadge details={r.fee} />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Airline Notes */}
+                            {rule.notes && rule.notes.length > 0 && (
+                              <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-100/50">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <AiOutlineInfoCircle className="text-blue-500" size={14} />
+                                  <h4 className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Airline Notes</h4>
+                                </div>
+                                <ul className="space-y-1.5">
+                                  {rule.notes.slice(0, 8).map((note, nIdx) => (
+                                    <li key={nIdx} className="flex items-start gap-2">
+                                      <span className="text-blue-300 text-xs mt-0.5 shrink-0">›</span>
+                                      <span className="text-xs font-medium text-slate-600 leading-relaxed">{note}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 2. MINI RULES (INITIAL SEARCH) */}
+                  {allMiniFareRuleGroups.length > 0 && (
+                    <div className="pt-8 border-t border-slate-200 space-y-8">
+                      <div className="flex items-center gap-4">
+                        <div className="h-px flex-1 bg-slate-200" />
+                        <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">Standard Mini Rules</h4>
+                        <div className="h-px flex-1 bg-slate-200" />
+                      </div>
+                      <div className={`space-y-6 ${fullFareRules ? "opacity-60" : ""}`}>
+                        {allMiniFareRuleGroups.map((legRules, legIdx) => (
+                          <div key={legIdx} className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                              {/* Cancellation */}
+                              <div>
+                                 <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-1.5 h-4 bg-red-500 rounded-full" />
+                                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Cancellation Fee</h4>
+                                 </div>
+                                 <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                                    {legRules.filter(r => r.Type === "Cancellation" || r.Type === 0).length > 0 ? (
+                                      legRules.filter(r => r.Type === "Cancellation" || r.Type === 0).map((rule, i) => (
+                                        <RuleRow key={i} rule={rule} index={i} />
+                                      ))
+                                    ) : (
+                                      <div className="p-6 text-center bg-white">
+                                        <p className="text-xs text-slate-400 font-bold italic">Standard rules unavailable.</p>
+                                      </div>
+                                    )}
+                                 </div>
+                              </div>
+                              {/* Reissue */}
+                              <div>
+                                 <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-1.5 h-4 bg-[#C9A84C] rounded-full" />
+                                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Date Change Fee</h4>
+                                 </div>
+                                 <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                                    {legRules.filter(r => r.Type === "Reissue" || r.Type === 1).length > 0 ? (
+                                      legRules.filter(r => r.Type === "Reissue" || r.Type === 1).map((rule, i) => (
+                                        <RuleRow key={i} rule={rule} index={i} />
+                                      ))
+                                    ) : (
+                                      <div className="p-6 text-center bg-white">
+                                         <p className="text-xs text-slate-400 font-bold italic">Standard rules unavailable.</p>
+                                      </div>
+                                    )}
+                                 </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. FALLBACK (IF NOTHING AVAILABLE) */}
+                  {!fullFareRules && allMiniFareRuleGroups.length === 0 && (
+                    <div className="bg-slate-50 rounded-[3rem] p-16 border border-dashed border-slate-200 text-center">
+                      <div className="w-24 h-24 bg-white rounded-full shadow-lg flex items-center justify-center mx-auto mb-8 text-slate-200">
+                        <AiOutlineInfoCircle size={48} />
+                      </div>
+                      <h3 className="text-xl font-black text-[#0A203E] mb-3">Fare Policies Not Available</h3>
+                      <p className="text-sm text-slate-400 font-bold mb-10 max-w-sm mx-auto leading-relaxed">
+                        Detailed cancellation and modification charges are not provided by the airline for this specific fare class in the initial search.
+                      </p>
+                      <button 
+                        onClick={fetchFullRules}
+                        className="px-12 py-4 bg-[#C9A84C] text-[#0A203E] rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-2xl shadow-[#C9A84C]/30 hover:brightness-110 transition-all active:scale-95 flex items-center gap-3 mx-auto"
+                      >
+                        <BiSolidOffer className="text-lg" />
+                        REFER TO DETAILED FARE RULES
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
-              </div>
-            )}
+            </div>
+          )}
           </div>
 
         {/* Modal Footer */}

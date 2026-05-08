@@ -42,6 +42,43 @@ const getPaxCategory = (pax) => {
   return "Adult";
 };
 
+const getMealDesc = (desc) => {
+  const d = String(desc || "");
+  if (d === "1") return "Included (Fare Includes Meal)";
+  if (d === "2") return "Direct (Added while ticketing)";
+  if (d === "3") return "Imported (Added while importing)";
+  return d;
+};
+
+const getBaggageDesc = (desc) => {
+  const d = String(desc || "");
+  if (d === "0") return "NotSet";
+  if (d === "1") return "Included";
+  if (d === "2") return "Direct (Purchase)";
+  if (d === "3") return "Imported";
+  if (d === "4") return "UpGrade";
+  if (d === "5") return "ImportedUpgrade";
+  return d;
+};
+
+const getTicketDate = (b) => {
+  if (b.ticketedAt) return b.ticketedAt;
+  const onwardIssueDate = b.bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
+  if (onwardIssueDate) return onwardIssueDate;
+  const providerIssueDate = b.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
+  if (providerIssueDate) return providerIssueDate;
+  if (b.executionStatus === "ticketed") return b.updatedAt;
+  return null;
+};
+
+const getVoucherDate = (b) => {
+  if (b.voucheredAt) return b.voucheredAt;
+  const tboVoucherDate = b.bookingResult?.providerResponse?.VoucherDate || b.bookingResult?.providerResponse?.Response?.VoucherDate;
+  if (tboVoucherDate) return tboVoucherDate;
+  if (["voucher_generated", "confirmed", "booked"].includes((b.executionStatus || "").toLowerCase())) return b.updatedAt;
+  return null;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // HOTEL BOOKING MODAL — full details (multi-room fixed)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -684,7 +721,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                 {bookRes.providerResponse?.BookResult?.BookingRefNo && (
                   <div className="col-span-full">
                     <p className="text-[10px] font-bold text-green-600 uppercase">
-                      Booking Ref Nos
+                      Order ID
                     </p>
                     <p className="text-xs font-mono font-semibold text-green-700">
                       {bookRes.providerResponse.BookResult.BookingRefNo}
@@ -726,51 +763,48 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
           )}
 
           {/* ── Requester + Meta ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              {/* <SectionLabel icon={<FiUser size={11} />} title="Requested By" /> */}
+              <SectionLabel icon={<FiUser size={11} />} title="Requested By" />
               <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-start justify-between gap-3">
-                <div className="text-left">
-                  <p className="text-[10px] text-slate-400 uppercase font-bold">
-                    Approved By
-                  </p>
-
-                  <div className="flex-1">
+                <div className="flex-1 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-black text-sm shrink-0">
+                    {(raw.requesterDetails?.name || leadTraveller?.firstName || user.name?.firstName || "?")[0]}
+                  </div>
+                  <div>
                     <p className="font-bold text-slate-900">
-                      {leadTraveller?.firstName} {leadTraveller?.lastName}
+                      {raw.requesterDetails?.name || `${leadTraveller?.firstName || user.name?.firstName || ""} ${leadTraveller?.lastName || user.name?.lastName || ""}`.trim()}
                     </p>
-
                     <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                       <FiMail size={10} />
-                      {leadTraveller?.email || "—"}
+                      {raw.requesterDetails?.email || leadTraveller?.email || user.email}
                     </p>
+                    {raw.requesterDetails?.role && (
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                        Role: {raw.requesterDetails.role}
+                      </p>
+                    )}
                   </div>
                 </div>
-                {/* <div className="flex-1">
-                  <p className="font-bold text-slate-900">
-                    {user.name?.firstName} {user.name?.lastName}
+                <div className="text-right border-l border-slate-200 pl-4">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">
+                    Approver
                   </p>
-                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                    <FiMail size={10} />
-                    {user.email}
-                  </p>
-                </div> */}
-                <div className="text-right">
-                  <p className="text-[10px] text-slate-400 uppercase font-bold">
-                    Approved By
-                  </p>
-
                   <p className="text-sm font-semibold text-slate-800">
                     {raw.approverName || "—"}
                   </p>
-
-                  <p className="text-xs text-slate-500">{raw.approverRole}</p>
-
-                  <p className="text-xs text-slate-400">{raw.approverEmail}</p>
-
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    {formatDateTime(raw.approvedAt)}
-                  </p>
+                  <p className="text-[10px] text-slate-500">{raw.approverRole}</p>
+                  {raw.requestStatus === "approved" && (
+                    <p className="text-[10px] text-green-600 font-bold mt-1">
+                      {(() => {
+                        const requesterId = raw.userId?._id || raw.userId;
+                        const approverId = raw.approverId || raw.approvedBy?._id || raw.approvedBy;
+                        if (raw.approverName === "Auto Approve" || (requesterId && approverId && requesterId.toString() === approverId.toString())) {
+                          return "Auto Approved by Policy";
+                        }
+                        return `Approved: ${formatDate(raw.approvedAt)}`;
+                      })()}
+                    </p>
+                  )}
                 </div>
               </div>
               <div>
@@ -818,6 +852,16 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                   value={formatDateTime(raw.updatedAt)}
                   padded
                 />
+                {["voucher_generated", "confirmed", "booked", "ticketed"].includes((raw.executionStatus || "").toLowerCase()) && (
+                  <InfoRow
+                    label={raw.bookingType === "hotel" ? "Vouchered At" : "Ticketed At"}
+                    value={(() => {
+                      const d = raw.bookingType === "hotel" ? getVoucherDate(raw) : getTicketDate(raw);
+                      return d ? formatDateTime(d) : "—";
+                    })()}
+                    padded
+                  />
+                )}
               </div>
 
               <SectionLabel
@@ -838,12 +882,19 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                 <InfoRow label="Approver ID" value={raw.approverId} padded />
                 <InfoRow
                   label="Approver Name"
-                  value={
-                    approverDetails.name ||
-                    `${approver.name?.firstName || ""} ${approver.name?.lastName || ""}`.trim() ||
-                    raw.approverName ||
-                    "—"
-                  }
+                  value={(() => {
+                    const requesterId = raw.userId?._id || raw.userId;
+                    const approverId = raw.approverId || raw.approvedBy?._id || raw.approvedBy;
+                    if (raw.approverName === "Auto Approve" || (requesterId && approverId && requesterId.toString() === approverId.toString())) {
+                      return "Auto Approved (System)";
+                    }
+                    return (
+                      approverDetails.name ||
+                      `${approver.name?.firstName || ""} ${approver.name?.lastName || ""}`.trim() ||
+                      raw.approverName ||
+                      "—"
+                    );
+                  })()}
                   padded
                 />
                 <InfoRow
@@ -879,9 +930,9 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
         {/* ── Footer ── */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
           <p className="text-xs text-slate-400">
-            Ref:{" "}
+            Order ID:{" "}
             <span className="font-mono font-bold text-slate-600">
-              {raw.bookingReference}
+              {raw.orderId || raw.bookingReference}
             </span>
           </p>
           <button
@@ -892,7 +943,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
           </button>
         </div>
       </div>
-    </div>
+    // </div>
   );
 };
 
@@ -1241,79 +1292,85 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
             </div>
           )}
 
-          {/* Pricing */}
-          <div>
-            <SectionLabel
-              icon={<FiDollarSign size={11} />}
-              title="Fare Summary"
-            />
-            <div className="bg-slate-900 text-white p-5 rounded-2xl flex flex-wrap gap-6 justify-between items-center">
-              <div>
-                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                  Total Amount
-                </p>
-                <p className="text-3xl font-black mt-1">
-                  {amountCurrency} {totalAmount.toLocaleString()}
-                </p>
-                <p className="text-slate-500 text-[10px] mt-1">
-                  Captured: {formatDateTime(pricing.capturedAt)}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-4">
-                {[
-                  {
-                    l: "Base Fare",
-                    v: `${fareSnap.currency || "INR"} ${fareSnap.baseFare?.toLocaleString() || "—"}`,
-                  },
-                  {
-                    l: "Tax",
-                    v: `${fareSnap.currency || "INR"} ${fareSnap.tax?.toLocaleString() || "—"}`,
-                  },
-                  {
-                    l: "Published",
-                    v: `${fareSnap.currency || "INR"} ${fareSnap.publishedFare?.toLocaleString() || "—"}`,
-                  },
-                  {
-                    l: "Offered",
-                    v: `${fareSnap.currency || "INR"} ${fareSnap.offeredFare?.toLocaleString() || "—"}`,
-                  },
-                ].map(({ l, v }, i) => (
-                  <div key={i}>
-                    <p className="text-slate-400 text-[10px] uppercase font-bold">
-                      {l}
-                    </p>
-                    <p className="text-white font-bold text-sm">{v}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
-              <MiniStatCard
-                label="Fare Type"
-                value={fareSnap.fareType || snap.cabinClass || "—"}
-              />
-              <MiniStatCard
-                label="Refundable"
-                value={fareSnap.refundable ? "Yes" : "No"}
-              />
-              <MiniStatCard
-                label="Onward Date"
-                value={formatDate(firstOnwardDate || snap.travelDate)}
-              />
-              <MiniStatCard
-                label="Return Date"
-                value={formatDate(firstReturnDate || snap.returnDate)}
-              />
-              <MiniStatCard
-                label="Last Ticket"
-                value={
-                  fareSnap.lastTicketDate
-                    ? formatDate(fareSnap.lastTicketDate)
-                    : "—"
-                }
-              />
-            </div>
-          </div>
+           {/* Fare Breakdown & Payments */}
+           {(() => {
+             const baseFare = fareSnap.baseFare || 0;
+             const ssrTotal = [...(ssrSnap.seats || []), ...(ssrSnap.meals || []), ...(ssrSnap.baggage || [])].reduce((acc, curr) => acc + (curr.price || 0), 0);
+             const totalTax = (pricing?.totalAmount || totalAmount) - baseFare - ssrTotal;
+
+             return (
+               <div className="space-y-4">
+                 <SectionLabel icon={<FiDollarSign />} title="Fare Breakdown & Payments" />
+                 <div className="bg-slate-900 text-white rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+                   {/* Background Decorative Elements */}
+                   <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-32 -mt-32" />
+                   <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl -ml-24 -mb-24" />
+
+                   <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+                     <div>
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">Total Payable Amount</p>
+                       <div className="flex items-baseline gap-2">
+                         <span className="text-2xl font-bold text-slate-500 italic">INR</span>
+                         <h4 className="text-5xl font-black text-[#C9A84C] tracking-tighter italic tabular-nums">
+                           {totalAmount.toLocaleString()}
+                         </h4>
+                       </div>
+                       <div className="flex items-center gap-2 mt-4">
+                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                         <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest italic">
+                           Fare Captured: {formatDateTime(pricing.capturedAt)}
+                         </p>
+                       </div>
+                     </div>
+
+                     <div className="w-full md:w-80 bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 space-y-4">
+                       <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
+                         <span className="text-slate-400 flex items-center gap-2">
+                            <div className="w-1 h-1 rounded-full bg-slate-600" /> Base Fare
+                         </span>
+                         <span className="text-slate-100 font-mono">₹{baseFare.toLocaleString()}</span>
+                       </div>
+                       <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
+                         <span className="text-slate-400 flex items-center gap-2">
+                            <div className="w-1 h-1 rounded-full bg-slate-600" /> Taxes & Fees
+                         </span>
+                         <span className="text-slate-100 font-mono">₹{totalTax.toLocaleString()}</span>
+                       </div>
+                       <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
+                         <span className="text-slate-400 flex items-center gap-2">
+                            <div className="w-1 h-1 rounded-full bg-slate-600" /> SSR Add-ons
+                         </span>
+                         <span className="text-[#C9A84C] font-mono">₹{ssrTotal.toLocaleString()}</span>
+                       </div>
+                       <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+                          <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Net Payable</span>
+                          <span className="text-lg font-black text-white italic tracking-tighter">₹{totalAmount.toLocaleString()}</span>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                   <MiniStatCard
+                     label="Fare Type"
+                     value={fareSnap.fareType || snap.cabinClass || "—"}
+                   />
+                   <MiniStatCard
+                     label="Refundable"
+                     value={fareSnap.refundable ? "Yes" : "No"}
+                   />
+                   <MiniStatCard
+                     label="Onward Date"
+                     value={formatDate(firstOnwardDate || snap.travelDate)}
+                   />
+                   <MiniStatCard
+                     label="Return Date"
+                     value={formatDate(firstReturnDate || snap.returnDate)}
+                   />
+                 </div>
+               </div>
+             );
+           })()}
 
           {/* Fare Rules */}
           {(() => {
@@ -1648,47 +1705,121 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
             );
           })()}
 
-          {/* SSR */}
+          {/* SSR Details (Segment-wise Table) */}
           {(ssrSnap.seats?.length || 0) +
             (ssrSnap.meals?.length || 0) +
             (ssrSnap.baggage?.length || 0) >
             0 && (
-            <div>
+            <div className="space-y-4">
               <SectionLabel
                 icon={<FiTag size={11} />}
                 title="SSR — Seats / Meals / Baggage"
               />
-              <div className="grid md:grid-cols-3 gap-3">
-                {ssrSnap.seats?.length > 0 && (
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">
-                      Seats
-                    </p>
-                    {ssrSnap.seats.map((s, i) => (
-                      <p
-                        key={i}
-                        className="text-xs font-semibold text-slate-700"
-                      >
-                        Seat {s.seatNo} · Seg {s.segmentIndex} · ₹{s.price}
-                      </p>
-                    ))}
-                  </div>
-                )}
-                {ssrSnap.meals?.length > 0 && (
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">
-                      Meals
-                    </p>
-                    {ssrSnap.meals.map((m, i) => (
-                      <p
-                        key={i}
-                        className="text-xs font-semibold text-slate-700"
-                      >
-                        {m.code} · Seg {m.segmentIndex} · ₹{m.price}
-                      </p>
-                    ))}
-                  </div>
-                )}
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
+                        <th className="pb-3 text-left">Segment / Route</th>
+                        <th className="pb-3 text-left">Seat</th>
+                        <th className="pb-3 text-left">Meal</th>
+                        <th className="pb-3 text-left">Baggage</th>
+                        <th className="pb-3 text-right">Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200/60">
+                      {Array.from(new Set([
+                        ...(ssrSnap.seats || []).map(s => s.segmentIndex),
+                        ...(ssrSnap.meals || []).map(m => m.segmentIndex),
+                        ...(ssrSnap.baggage || []).map(b => b.segmentIndex)
+                      ])).sort((a, b) => a - b).map((segIdx) => {
+                        const seg = segments[segIdx] || {};
+                        const segSeats = (ssrSnap.seats || []).filter(s => s.segmentIndex === segIdx);
+                        const segMeals = (ssrSnap.meals || []).filter(m => m.segmentIndex === segIdx);
+                        const segBaggage = (ssrSnap.baggage || []).filter(b => b.segmentIndex === segIdx);
+                        const segTotal = [...segSeats, ...segMeals, ...segBaggage].reduce((acc, curr) => acc + (curr.price || 0), 0);
+
+                        return (
+                          <tr key={segIdx} className="text-xs font-black text-slate-700 hover:bg-white/50 transition-colors">
+                            <td className="py-4 pr-3">
+                              <div className="flex flex-col">
+                                <span className="text-[9px] text-blue-600 font-bold uppercase mb-0.5">Seg {segIdx + 1}</span>
+                                <span className="text-sm font-black text-slate-900 tracking-tighter">
+                                  {seg.origin?.airportCode || "???"} → {seg.destination?.airportCode || "???"}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-4 pr-3">
+                              {segSeats.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {segSeats.map((s, idx) => (
+                                    <span key={idx} className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-black uppercase border border-blue-100">
+                                      {s.seatNo}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : <span className="text-slate-300 italic">—</span>}
+                            </td>
+                            <td className="py-4 pr-3">
+                              {segMeals.length > 0 ? (
+                                <div className="space-y-1">
+                                  {segMeals.map((m, idx) => (
+                                    <div key={idx} className="flex flex-col gap-0.5">
+                                      <span className="text-[10px] font-black text-slate-800 leading-tight uppercase truncate max-w-[120px] inline-block">{m.airlineDescription || m.code}</span>
+                                      <span className="text-[8px] font-black text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-100 inline-block w-fit italic">{getMealDesc(m.description)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : <span className="text-slate-300 italic">—</span>}
+                            </td>
+                            <td className="py-4 pr-3">
+                              {segBaggage.length > 0 ? (
+                                <div className="space-y-1">
+                                  {segBaggage.map((b, idx) => (
+                                    <div key={idx} className="flex flex-col gap-0.5">
+                                      <span className="text-[10px] font-black text-slate-800 uppercase italic">{b.weight} KG Extra</span>
+                                      <span className="text-[8px] font-black text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-full border border-purple-100 inline-block w-fit">{getBaggageDesc(b.description)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : <span className="text-slate-300 italic">—</span>}
+                            </td>
+                            <td className="py-4 text-right font-mono text-sm text-slate-900">
+                              ₹{segTotal.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-slate-200 bg-white/40">
+                        <td colSpan={4} className="py-3 text-right text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Combined SSR Add-on Total</td>
+                        <td className="py-3 text-right text-base font-black text-blue-700 tracking-tighter">
+                          ₹{[...(ssrSnap.seats || []), ...(ssrSnap.meals || []), ...(ssrSnap.baggage || [])].reduce((acc, curr) => acc + (curr.price || 0), 0).toLocaleString()}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* SSR Legend Note */}
+                <div className="mt-6 pt-5 border-t border-slate-200/60">
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">SSR Status Codes Legend</p>
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="text-[10px] text-slate-500 font-bold leading-relaxed bg-white/50 p-2 rounded-lg border border-slate-100">
+                         <span className="text-blue-600 uppercase block mb-0.5">Seats</span>
+                         1: Included (Fare) · 2: Purchase (Extra)
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-bold leading-relaxed bg-white/50 p-2 rounded-lg border border-slate-100">
+                         <span className="text-amber-600 uppercase block mb-0.5">Meals</span>
+                         1: Included · 2: Direct · 3: Imported
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-bold leading-relaxed bg-white/50 p-2 rounded-lg border border-slate-100">
+                         <span className="text-purple-600 uppercase block mb-0.5">Baggage</span>
+                         1: Included · 2: Direct · 5: ImportedUpgrade
+                      </div>
+                   </div>
+                </div>
               </div>
             </div>
           )}
@@ -2097,43 +2228,63 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <SectionLabel icon={<FiUser size={11} />} title="Requested By" />
-              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-black text-sm shrink-0">
-                  {(leadTraveller.firstName || user.name?.firstName || "?")[0]}
-                  {(leadTraveller.lastName || user.name?.lastName || "?")[0]}
-                </div>
-                <div className="flex-1">
-                  <p className="font-bold text-slate-900">
-                    {leadTraveller.firstName || user.name?.firstName}{" "}
-                    {leadTraveller.lastName || user.name?.lastName}
-                  </p>
-                  <p className="text-xs text-slate-500 flex items-center gap-1">
-                    <FiMail size={10} />
-                    {leadTraveller.email || user.email}
-                  </p>
-                </div>
-                {approver._id && (
-                  <div className="text-right">
-                    <p className="text-[10px] text-slate-400 uppercase font-bold">
-                      Approved By
-                    </p>
-                    <p className="text-xs font-semibold text-slate-700">
-                      {approver.name?.firstName} {approver.name?.lastName}
-                    </p>
-                    <p className="text-[10px] text-slate-400">
-                      {formatDateTime(raw.approvedAt)}
-                    </p>
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-start justify-between gap-3">
+                <div className="flex-1 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-black text-sm shrink-0">
+                    {(raw.requesterDetails?.name || leadTraveller?.firstName || user.name?.firstName || "?")[0]}
                   </div>
-                )}
+                  <div>
+                    <p className="font-bold text-slate-900">
+                      {raw.requesterDetails?.name || `${leadTraveller?.firstName || user.name?.firstName || ""} ${leadTraveller?.lastName || user.name?.lastName || ""}`.trim()}
+                    </p>
+                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                      <FiMail size={10} />
+                      {raw.requesterDetails?.email || leadTraveller?.email || user.email}
+                    </p>
+                    {raw.requesterDetails?.role && (
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                        Role: {raw.requesterDetails.role}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right border-l border-slate-200 pl-4">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">
+                    Approver
+                  </p>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {(() => {
+                      const requesterId = raw.userId?._id || raw.userId;
+                      const approverId = raw.approverId || raw.approvedBy?._id || raw.approvedBy;
+                      if (raw.approverName === "Auto Approve" || (requesterId && approverId && requesterId.toString() === approverId.toString())) {
+                        return "Auto Approved (System)";
+                      }
+                      return raw.approverName || "—";
+                    })()}
+                  </p>
+                  <p className="text-[10px] text-slate-500">{raw.approverRole}</p>
+                  {raw.requestStatus === "approved" && (
+                    <p className="text-[10px] text-green-600 font-bold mt-1">
+                      Approved: {formatDate(raw.approvedAt)}
+                    </p>
+                  )}
+                </div>
               </div>
               <InfoRow
                 label="Approver Name"
-                value={
-                  approverDetails.name ||
-                  `${approver.name?.firstName || ""} ${approver.name?.lastName || ""}`.trim() ||
-                  raw.approverName ||
-                  "—"
-                }
+                value={(() => {
+                  const requesterId = raw.userId?._id || raw.userId;
+                  const approverId = raw.approverId || raw.approvedBy?._id || raw.approvedBy;
+                  if (raw.approverName === "Auto Approve" || (requesterId && approverId && requesterId.toString() === approverId.toString())) {
+                    return "Auto Approved (System)";
+                  }
+                  return (
+                    approverDetails.name ||
+                    `${approver.name?.firstName || ""} ${approver.name?.lastName || ""}`.trim() ||
+                    raw.approverName ||
+                    "—"
+                  );
+                })()}
                 padded
               />
               <InfoRow

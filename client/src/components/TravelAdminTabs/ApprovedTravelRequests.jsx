@@ -1,35 +1,38 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { FaPlane, FaHotel } from "react-icons/fa";
-import TableScrollWrapper from "../common/TableScrollWrapper";
 import {
   FiHome,
   FiCheckCircle,
   FiClock,
   FiDollarSign,
   FiX,
+  FiRefreshCw,
+  FiSearch,
+  FiCalendar,
+  FiFilter,
 } from "react-icons/fi";
+import { FaPlane, FaHotel, FaRupeeSign } from "react-icons/fa";
 import {
   fetchApprovals,
   selectApprovals,
   selectApprovalLoading,
 } from "../../Redux/Actions/approval.thunks";
 import {
-  FlightBookingModal,
-  HotelBookingModal,
-} from "./Modal/BookingRequestDetailsModal";
+  PendingFlightDetailsModal,
+  PendingHotelDetailsModal,
+} from "./Modal/PendingHotelDetailsModal";
 import {
   LabeledField,
   StatCard,
   dateCls,
   IdCell,
   SearchBar,
-  selectCls,
   Th,
-  TraceTimer,
   getSegCity,
   ExecStatusBadge,
+  CustomDropdown,
 } from "./Shared/CommonComponents";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { formatDate } from "../../utils/formatter";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,12 +46,13 @@ const HOTEL_EXCLUDE = new Set(["voucher_generated", "cancelled"]);
 // ─────────────────────────────────────────────────────────────────────────────
 // FLIGHT APPROVALS SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
+function FlightApprovalsSection({ rawApprovals }) {
   const [search, setSearch] = useState("");
   const [startDate, setStart] = useState("");
   const [endDate, setEnd] = useState("");
   const [travelDate, setTravelDate] = useState("");
   const [execFilter, setExec] = useState("All");
+  const [empFilter, setEmp] = useState("All");
   const [selected, setSelected] = useState(null);
 
   const flightRaw = useMemo(
@@ -68,6 +72,20 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
     [flightRaw],
   );
 
+  const employees = useMemo(
+    () => [
+      "All",
+      ...new Set(
+        flightRaw.map((a) =>
+          a.userId?.name
+            ? `${a.userId.name.firstName} ${a.userId.name.lastName}${a.userId.email ? ` (${a.userId.email})` : ""}`
+            : a.userId?.email || "—",
+        ),
+      ),
+    ],
+    [flightRaw],
+  );
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return flightRaw.filter((a) => {
@@ -79,30 +97,80 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
       const eOk = execFilter === "All" || a.executionStatus === execFilter;
       const fOk = !startDate || new Date(a.approvedAt) >= new Date(startDate);
       const tOk = !endDate || new Date(a.approvedAt) <= new Date(endDate);
+      const empName = a.userId?.name
+        ? `${a.userId.name.firstName} ${a.userId.name.lastName}${a.userId.email ? ` (${a.userId.email})` : ""}`
+        : a.userId?.email || "—";
+      const empOk = empFilter === "All" || empName === empFilter;
       const qOk =
         !q ||
         a.bookingReference?.toLowerCase().includes(q) ||
         a.purposeOfTravel?.toLowerCase().includes(q) ||
         route.toLowerCase().includes(q) ||
-        `${a.userId?.name?.firstName} ${a.userId?.name?.lastName}`
-          .toLowerCase()
-          .includes(q);
-      return eOk && fOk && tOk && qOk;
+        empName.toLowerCase().includes(q);
+      return eOk && fOk && tOk && empOk && qOk;
     });
-  }, [search, startDate, endDate, execFilter, flightRaw]);
+  }, [search, startDate, endDate, execFilter, empFilter, flightRaw]);
 
   const totalCost = filtered.reduce(
     (s, a) => s + (a.pricingSnapshot?.totalAmount || 0),
     0,
   );
+
+  const handleExportFlights = () => {
+    if (!filtered.length) return;
+    const headers = ["Order ID", "Employee", "Route", "Airline", "Travel Date", "Amount", "Status"];
+    const rows = filtered.map((a) => {
+      const segs = a.flightRequest?.segments || [];
+      const route = segs.length > 0 ? `${getSegCity(segs[0], "origin")} - ${getSegCity(segs[segs.length - 1], "destination")}` : "N/A";
+      return [
+        a.bookingReference || "N/A",
+        a.userId?.name
+          ? `${a.userId.name.firstName} ${a.userId.name.lastName}${a.userId.email ? ` (${a.userId.email})` : ""}`
+          : a.userId?.email || "—",
+        route,
+        a.flightRequest?.airlineName || "N/A",
+        formatDate(a.flightRequest?.travelDate) || "N/A",
+        `₹${(a.pricingSnapshot?.totalAmount || 0).toLocaleString()}`,
+        a.executionStatus || "N/A",
+      ];
+    });
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `approved-flights-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
   const notStarted = filtered.filter(
     (a) => a.executionStatus === "not_started",
   ).length;
   const failed = filtered.filter((a) => a.executionStatus === "failed").length;
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="space-y-4 min-w-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
         <StatCard
           label="Total Flights"
           value={filtered.length}
@@ -129,8 +197,8 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
         />
         <StatCard
           label="Est. Cost"
-          value={`₹${totalCost.toLocaleString()}`}
-          Icon={FiDollarSign}
+          value={`${totalCost.toLocaleString()}`}
+          Icon={FaRupeeSign}
           borderCls="border-violet-500"
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
@@ -138,77 +206,85 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-          <LabeledField label="Search">
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Ref, name, route…"
-            />
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <LabeledField label={<><FiSearch size={10} /> Search</>}>
+            <SearchBar value={search} onChange={setSearch} placeholder="Ref, name, route…" />
           </LabeledField>
-          <LabeledField label="From Date">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStart(e.target.value)}
-              className={dateCls}
-            />
+          <LabeledField label={<><FiCalendar size={10} /> From Date</>}>
+            <input type="date" value={startDate} onChange={(e) => setStart(e.target.value)} className={dateCls} />
           </LabeledField>
-          <LabeledField label="To Date">
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEnd(e.target.value)}
-              className={dateCls}
-            />
+          <LabeledField label={<><FiCalendar size={10} /> To Date</>}>
+            <input type="date" value={endDate} onChange={(e) => setEnd(e.target.value)} className={dateCls} />
           </LabeledField>
-          <LabeledField label="Travel Date">
-            <input
-              type="date"
-              value={travelDate}
-              onChange={(e) => setTravelDate(e.target.value)}
-              className={dateCls}
-            />
+          <LabeledField label={<><FiCalendar size={10} /> Travel Date</>}>
+            <input type="date" value={travelDate} onChange={(e) => setTravelDate(e.target.value)} className={dateCls} />
           </LabeledField>
-          <LabeledField label="Execution Status">
-            <select
-              value={execFilter}
-              onChange={(e) => setExec(e.target.value)}
-              className={selectCls}
+          <LabeledField label={<><FiFilter size={10} /> Exec Status</>}>
+            <CustomDropdown value={execFilter} onChange={setExec} options={execStatuses} />
+          </LabeledField>
+          <LabeledField label={<><FiFilter size={10} /> Employee</>}>
+            <CustomDropdown value={empFilter} onChange={setEmp} options={employees} />
+          </LabeledField>
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setSearch("");
+                setStart("");
+                setEnd("");
+                setTravelDate("");
+                setExec("All");
+                setEmp("All");
+              }}
+              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold text-slate-500 bg-slate-100 rounded-lg hover:bg-slate-200 hover:text-slate-700 transition-colors"
             >
-              {execStatuses.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </LabeledField>
+              <FiX size={12} /> Reset
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm">
-        <TableScrollWrapper>
-          <table className="w-full border-collapse min-w-[1000px]">
-            <thead>
-              <tr className="bg-[#0A4D68] text-blue-100">
-                <Th>Order ID</Th>
-                <Th>Employee</Th>
-                <Th>Route</Th>
-                <Th>Airline</Th>
-                <Th>Travel Date</Th>
-                <Th>Amount</Th>
-                <Th>Exec Status</Th>
-                <Th>Fare Timer</Th>
-                <Th>Action</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
+      <ResponsiveDataTable
+        title="Flight Approval Requests"
+        subtitle={`${filtered.length} record${filtered.length !== 1 ? "s" : ""} found`}
+        tableMinWidth="1050px"
+        onExport={handleExportFlights}
+        exportLabel="Export"
+        exportBgClass="bg-[#0A4D68] hover:bg-[#083d52]"
+        arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+        footer={
+          <div className="px-4 py-2.5 flex justify-between text-xs text-slate-400">
+            <span>
+              Showing <strong className="text-slate-600">{filtered.length}</strong> of{" "}
+              <strong className="text-slate-600">{flightRaw.length}</strong> flights
+            </span>
+            <span className="text-red-400 text-[11px]">
+              ✕ ticketed &amp; cancelled excluded
+            </span>
+          </div>
+        }
+      >
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-[#0f9041] text-[#ffffff]">
+              <Th>Order ID</Th>
+              <Th>Employee</Th>
+              <Th>Route</Th>
+              <Th>Airline</Th>
+              <Th>Travel Date</Th>
+              <Th>Amount</Th>
+              <Th>Exec Status</Th>
+              <Th>Action</Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-16 text-center text-slate-400">
+                  <td colSpan="9" className="py-16 text-center text-slate-400">
                     <div className="flex justify-center mb-3">
                       <FaPlane size={32} className="opacity-20" />
                     </div>
                     <p className="font-semibold text-sm">
-                      No cancelled flight bookings found
+                      No approved flight requests found
                     </p>
                     <p className="text-xs mt-1">
                       Try adjusting the filters or search query
@@ -263,13 +339,6 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
                         <ExecStatusBadge status={a.executionStatus} />
                       </td>
                       <td className="px-4 py-3">
-                        {a.flightRequest?.traceId ? (
-                          <TraceTimer timer={traceTimers[a._id]} />
-                        ) : (
-                          <span className="text-[11px] text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
                         <button
                           onClick={() => setSelected(a)}
                           className="text-[12px] px-3 py-1.5 bg-[#0A4D68] text-white rounded-lg hover:bg-[#093f54] transition-colors font-semibold"
@@ -278,29 +347,16 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
                         </button>
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </TableScrollWrapper>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-          <span>
-            Showing{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> of{" "}
-            <strong className="text-slate-600">{flightRaw.length}</strong>{" "}
-            flights
-          </span>
-          <span className="text-red-400 text-[11px]">
-            ✕ ticketed &amp; cancelled excluded
-          </span>
-        </div>
-      </div>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
 
       {selected && (
-        <FlightBookingModal
+        <PendingFlightDetailsModal
           booking={selected}
-          traceTimers={traceTimers}
           onClose={() => setSelected(null)}
         />
       )}
@@ -311,13 +367,14 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // HOTEL APPROVALS SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-function HotelApprovalsSection({ rawApprovals, loading }) {
+function HotelApprovalsSection({ rawApprovals }) {
   const [search, setSearch] = useState("");
   const [startDate, setStart] = useState("");
   const [endDate, setEnd] = useState("");
   const [checkInDate, setCheckInDate] = useState("");
   const [checkOutDate, setCheckOutDate] = useState("");
   const [execFilter, setExec] = useState("All");
+  const [empFilter, setEmp] = useState("All");
   const [selected, setSelected] = useState(null);
 
   const hotelRaw = useMemo(
@@ -337,11 +394,29 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
     [hotelRaw],
   );
 
+  const employees = useMemo(
+    () => [
+      "All",
+      ...new Set(
+        hotelRaw.map((a) =>
+          a.userId?.name
+            ? `${a.userId.name.firstName} ${a.userId.name.lastName}${a.userId.email ? ` (${a.userId.email})` : ""}`
+            : a.userId?.email || "—",
+        ),
+      ),
+    ],
+    [hotelRaw],
+  );
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return hotelRaw.filter((a) => {
       const hotelName = a.hotelRequest?.selectedHotel?.hotelName || "";
+      const empName = a.userId?.name
+        ? `${a.userId.name.firstName} ${a.userId.name.lastName}${a.userId.email ? ` (${a.userId.email})` : ""}`
+        : a.userId?.email || "—";
       const eOk = execFilter === "All" || a.executionStatus === execFilter;
+      const empOk = empFilter === "All" || empName === empFilter;
       const fOk = !startDate || new Date(a.approvedAt) >= new Date(startDate);
       const tOk = !endDate || new Date(a.approvedAt) <= new Date(endDate);
       const qOk =
@@ -352,22 +427,64 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
         `${a.userId?.name?.firstName} ${a.userId?.name?.lastName}`
           .toLowerCase()
           .includes(q);
-      return eOk && fOk && tOk && qOk;
+      return eOk && fOk && tOk && empOk && qOk;
     });
-  }, [search, startDate, endDate, execFilter, hotelRaw]);
+  }, [search, startDate, endDate, execFilter, empFilter, hotelRaw]);
 
   const totalCost = filtered.reduce(
     (s, a) => s + (a.pricingSnapshot?.totalAmount || 0),
     0,
   );
+
+  const handleExportHotels = () => {
+    if (!filtered.length) return;
+    const headers = ["Order ID", "Employee", "Hotel", "Check-In", "Check-Out", "Amount", "Status"];
+    const rows = filtered.map((a) => [
+      a.bookingReference || "N/A",
+      `${a.userId?.name?.firstName || ""} ${a.userId?.name?.lastName || ""}`,
+      a.hotelRequest?.selectedHotel?.hotelName || "N/A",
+      formatDate(a.hotelRequest?.checkInDate) || "N/A",
+      formatDate(a.hotelRequest?.checkOutDate) || "N/A",
+      `₹${(a.pricingSnapshot?.totalAmount || 0).toLocaleString()}`,
+      a.executionStatus || "N/A",
+    ]);
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `approved-hotels-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
   const notStarted = filtered.filter(
     (a) => a.executionStatus === "not_started",
   ).length;
   const failed = filtered.filter((a) => a.executionStatus === "failed").length;
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="space-y-4 min-w-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
         <StatCard
           label="Total Hotels"
           value={filtered.length}
@@ -394,8 +511,8 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
         />
         <StatCard
           label="Est. Cost"
-          value={`₹${totalCost.toLocaleString()}`}
-          Icon={FiDollarSign}
+          value={`${totalCost.toLocaleString()}`}
+          Icon={FaRupeeSign}
           borderCls="border-violet-500"
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
@@ -403,85 +520,90 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-          <LabeledField label="Search">
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Hotel, ref, name…"
-            />
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-3">
+          <LabeledField label={<><FiSearch size={10} /> Search</>}>
+            <SearchBar value={search} onChange={setSearch} placeholder="Hotel, ref, name…" />
           </LabeledField>
-          <LabeledField label="From Date">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStart(e.target.value)}
-              className={dateCls}
-            />
+          <LabeledField label={<><FiCalendar size={10} /> From Date</>}>
+            <input type="date" value={startDate} onChange={(e) => setStart(e.target.value)} className={dateCls} />
           </LabeledField>
-          <LabeledField label="To Date">
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEnd(e.target.value)}
-              className={dateCls}
-            />
+          <LabeledField label={<><FiCalendar size={10} /> To Date</>}>
+            <input type="date" value={endDate} onChange={(e) => setEnd(e.target.value)} className={dateCls} />
           </LabeledField>
-          <LabeledField label="CheckIn Date">
-            <input
-              type="date"
-              value={checkInDate}
-              onChange={(e) => setCheckInDate(e.target.value)}
-              className={dateCls}
-            />
+          <LabeledField label={<><FiCalendar size={10} /> CheckIn</>}>
+            <input type="date" value={checkInDate} onChange={(e) => setCheckInDate(e.target.value)} className={dateCls} />
           </LabeledField>
-          <LabeledField label="CheckOut Date">
-            <input
-              type="date"
-              value={checkOutDate}
-              onChange={(e) => setCheckOutDate(e.target.value)}
-              className={dateCls}
-            />
+          <LabeledField label={<><FiCalendar size={10} /> CheckOut</>}>
+            <input type="date" value={checkOutDate} onChange={(e) => setCheckOutDate(e.target.value)} className={dateCls} />
           </LabeledField>
-          <LabeledField label="Execution Status">
-            <select
-              value={execFilter}
-              onChange={(e) => setExec(e.target.value)}
-              className={selectCls}
+          <LabeledField label={<><FiFilter size={10} /> Exec Status</>}>
+            <CustomDropdown value={execFilter} onChange={setExec} options={execStatuses} />
+          </LabeledField>
+          <LabeledField label={<><FiFilter size={10} /> Employee</>}>
+            <CustomDropdown value={empFilter} onChange={setEmp} options={employees} />
+          </LabeledField>
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setSearch("");
+                setStart("");
+                setEnd("");
+                setCheckInDate("");
+                setCheckOutDate("");
+                setExec("All");
+                setEmp("All");
+              }}
+              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold text-slate-500 bg-slate-100 rounded-lg hover:bg-slate-200 hover:text-slate-700 transition-colors"
             >
-              {execStatuses.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </LabeledField>
+              <FiX size={12} /> Reset
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm">
-        <TableScrollWrapper>
-          <table className="w-full border-collapse min-w-[950px]">
-            <thead>
-              <tr className="bg-[#088395] text-teal-100">
-                <Th>Order ID</Th>
-                <Th>Employee</Th>
-                <Th>Hotel</Th>
-                <Th>Check-In</Th>
-                <Th>Check-Out</Th>
-                {/* <Th>Nights</Th>
-                <Th>Amount</Th> */}
-                <Th>Exec Status</Th>
-                <Th>Action</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
+      <ResponsiveDataTable
+        title="Hotel Approval Requests"
+        subtitle={`${filtered.length} record${filtered.length !== 1 ? "s" : ""} found`}
+        tableMinWidth="1050px"
+        onExport={handleExportHotels}
+        exportLabel="Export"
+        exportBgClass="bg-[#0A4D68] hover:bg-[#083d52]"
+        arrowBgClass="bg-teal-50 border-teal-200 text-[#088395] hover:bg-teal-100"
+        footer={
+          <div className="px-4 py-2.5 flex justify-between text-xs text-slate-400">
+            <span>
+              Showing <strong className="text-slate-600">{filtered.length}</strong> of{" "}
+              <strong className="text-slate-600">{hotelRaw.length}</strong> hotels
+            </span>
+            <span className="text-red-400 text-[11px]">
+              ✕ voucher-generated &amp; cancelled excluded
+            </span>
+          </div>
+        }
+      >
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-[#0f9041] text-[#ccfbf1]">
+              <Th>Order ID</Th>
+              <Th>Employee</Th>
+              <Th>Hotel</Th>
+              <Th>Check-In</Th>
+              <Th>Check-Out</Th>
+              <Th>Nights</Th>
+              <Th>Amount</Th>
+              <Th>Exec Status</Th>
+              <Th>Action</Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-16 text-center text-slate-400">
+                  <td colSpan="7" className="py-16 text-center text-slate-400">
                     <div className="flex justify-center mb-3">
-                      <FaPlane size={32} className="opacity-20" />
+                      <FaHotel size={32} className="opacity-20" />
                     </div>
                     <p className="font-semibold text-sm">
-                      No cancelled flight bookings found
+                      No approved hotel requests found
                     </p>
                     <p className="text-xs mt-1">
                       Try adjusting the filters or search query
@@ -529,13 +651,23 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
                       <td className="px-4 py-3 text-[13px] text-slate-500">
                         {formatDate(a.hotelRequest?.checkOutDate)}
                       </td>
-                      {/* <td className="px-4 py-3 font-bold text-center text-slate-700">
+                      <td className="px-4 py-3 font-bold text-center text-slate-700">
                         {nights}
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-900">
                         ₹
-                        {(a.pricingSnapshot?.totalAmount || 0).toLocaleString()}
-                      </td> */}
+                        {(
+                          a.pricingSnapshot?.totalAmount ||
+                          a.bookingSnapshot?.amount ||
+                          (Array.isArray(a.hotelRequest?.selectedRoom?.rawRoomData)
+                            ? a.hotelRequest.selectedRoom.rawRoomData.reduce(
+                                (sum, r) => sum + (r.TotalFare || r.Price?.totalFare || 0),
+                                0,
+                              )
+                            : 0) ||
+                          0
+                        ).toLocaleString()}
+                      </td>
                       <td className="px-4 py-3">
                         <ExecStatusBadge status={a.executionStatus} />
                       </td>
@@ -548,26 +680,15 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
                         </button>
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </TableScrollWrapper>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-          <span>
-            Showing{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> of{" "}
-            <strong className="text-slate-600">{hotelRaw.length}</strong> hotels
-          </span>
-          <span className="text-red-400 text-[11px]">
-            ✕ voucher-generated &amp; cancelled excluded
-          </span>
-        </div>
-      </div>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
 
       {selected && (
-        <HotelBookingModal
+        <PendingHotelDetailsModal
           booking={selected}
           onClose={() => setSelected(null)}
         />
@@ -581,7 +702,6 @@ function HotelApprovalsSection({ rawApprovals, loading }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ApprovedTravelRequests() {
   const [activeTab, setActiveTab] = useState("flight");
-  const [traceTimers, setTimers] = useState({});
 
   const dispatch = useDispatch();
   const approvals = useSelector(selectApprovals);
@@ -591,26 +711,6 @@ export default function ApprovedTravelRequests() {
     dispatch(fetchApprovals({ status: "approved" }));
   }, [dispatch]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const updated = {};
-      approvals.forEach((a) => {
-        const exp = a.flightRequest?.fareExpiry;
-        if (!exp) return;
-        const diff = new Date(exp.$date || exp) - new Date();
-        if (diff <= 0) {
-          updated[a._id] = "expired";
-          return;
-        }
-        const h = Math.floor(diff / 3600000),
-          m = Math.floor((diff % 3600000) / 60000),
-          s = Math.floor((diff % 60000) / 1000);
-        updated[a._id] = `${h}h ${m}m ${s}s`;
-      });
-      setTimers(updated);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [approvals]);
 
   const flightCount = useMemo(
     () =>
@@ -649,24 +749,34 @@ export default function ApprovedTravelRequests() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-[#0A4D68] flex items-center justify-center shrink-0">
-            <FiCheckCircle size={18} className="text-white" />
+    <div className="w-full min-w-0 space-y-6 font-sans">
+      <div className="flex items-center justify-between gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white shrink-0">
+            <FiCheckCircle size={24} />
           </div>
-          <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight truncate">
               Approved Travel Requests
             </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Approved bookings pending execution &nbsp;·&nbsp;
-              <span className="text-red-500">
-                Ticketed flights &amp; voucher-generated hotels are excluded
-              </span>
+            <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-widest truncate">
+              Approved bookings pending execution · <span className="text-red-500 font-black">Ticketed & voucher-generated excluded</span>
             </p>
           </div>
         </div>
+        <button
+          onClick={() => dispatch(fetchApprovals({ status: "approved" }))}
+          disabled={loading}
+          className={`shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-bold transition-all shadow-sm border ${
+            activeTab === "hotel"
+              ? "bg-teal-50 border-teal-200 text-[#088395] hover:bg-teal-100"
+              : "bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+          } disabled:opacity-60 disabled:cursor-not-allowed`}
+        >
+          <FiRefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          Refresh
+        </button>
+      </div>
 
         <div className="flex items-end gap-0 mb-5 border-b-2 border-slate-200">
           {tabs.map((tab) => {
@@ -692,13 +802,10 @@ export default function ApprovedTravelRequests() {
         {activeTab === "flight" ? (
           <FlightApprovalsSection
             rawApprovals={approvals}
-            traceTimers={traceTimers}
-            loading={loading}
           />
         ) : (
-          <HotelApprovalsSection rawApprovals={approvals} loading={loading} />
+          <HotelApprovalsSection rawApprovals={approvals} />
         )}
-      </div>
     </div>
   );
 }

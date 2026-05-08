@@ -95,6 +95,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     approverEmail,
     approverName,
     approverRole,
+    requesterDetails,
   } = req.body;
 
   const user = req.user;
@@ -346,10 +347,15 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
     if (ssrPolicy && ssrPolicy.approvalRequired === false) {
       requestStatus = "approved";
+      finalApproverName = "Auto Approve";
+      finalApprovedAt = new Date();
     }
   } catch (policyErr) {
     // Safe fallback — keep pending_approval
   }
+
+  let finalApproverName = approverName;
+  let finalApprovedAt = null;
 
   const orderId = await generateSequentialOrderId("hotel");
 
@@ -370,8 +376,10 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     projectClient,
     approverId,
     approverEmail,
-    approverName,
+    approverName: finalApproverName,
     approverRole,
+    approvedAt: finalApprovedAt,
+    requesterDetails,
 
     gstDetails: {
       gstin: gstDetails?.gstin || "",
@@ -904,6 +912,7 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     });
 
     booking.executionStatus = "voucher_generated";
+    booking.voucheredAt = new Date();
     await booking.save();
 
     // Notify User
