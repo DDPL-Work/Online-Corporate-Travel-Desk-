@@ -12,6 +12,8 @@ const { generateSequentialOrderId } = require("../utils/orderIdGenerator");
 const notificationService = require("../services/notification.service");
 const { notify } = require("../notifications/orchestrator");
 const EVENTS = require("../events/eventConstants");
+const User = require("../models/User");
+const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
 
 
 // @desc    PreBook Hotel (TBO)
@@ -118,16 +120,12 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
   if (!resolvedApproverId && approverEmail) {
     const normalizedEmail = approverEmail.trim().toLowerCase();
-    let approverUser = await (
-      await require("../models/User")
-    ).findOne({ email: normalizedEmail });
+    let approverUser = await User.findOne({ email: normalizedEmail });
 
     if (!approverUser) {
       // bootstrap temp manager user
       const firstName = normalizedEmail.split("@")[0] || "Manager";
-      approverUser = await (
-        await require("../models/User")
-      ).create({
+      approverUser = await User.create({
         corporateId: corporate._id,
         email: normalizedEmail,
         name: { firstName, lastName: "" },
@@ -335,9 +333,9 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
   });
 
   /* ================= SSR POLICY: AUTO-APPROVE CHECK ================= */
-  const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
-
   let requestStatus = "pending_approval"; // default
+  let finalApproverName = approverName;
+  let finalApprovedAt = null;
 
   try {
     const ssrPolicy = await EmployeeSsrPolicy.findOne({
@@ -353,9 +351,6 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
   } catch (policyErr) {
     // Safe fallback — keep pending_approval
   }
-
-  let finalApproverName = approverName;
-  let finalApprovedAt = null;
 
   const orderId = await generateSequentialOrderId("hotel");
 
@@ -965,6 +960,7 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
   bookingType
   requestStatus
   executionStatus
+  orderId
   bookingSnapshot
   pricingSnapshot
   createdAt
@@ -1020,6 +1016,7 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
       // ✅ NEW: hero image (first image)
       heroImage: images?.[0] || null,
 
+      orderId: booking.orderId,
       amendment: booking.amendment || null,
     };
   });
@@ -1072,6 +1069,10 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
     pricingSnapshot = {},
     travellers = [],
     bookingResult = {},
+    approvedAt,
+    voucheredAt,
+    createdAt,
+    updatedAt,
   } = booking;
 
   const amendment = booking.amendment || null;
@@ -1239,6 +1240,7 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
     data: {
       bookingId: booking._id,
       bookingReference,
+      orderId: booking.orderId,
       purposeOfTravel: booking.purposeOfTravel,
 
       // ✅ DB (stable)
@@ -1247,6 +1249,10 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
       bookingSnapshot,
       pricingSnapshot,
       travellers,
+      approvedAt,
+      voucheredAt,
+      createdAt,
+      updatedAt,
 
       // ✅ NEW (CRITICAL FIX)
       rooms,
@@ -1365,6 +1371,7 @@ exports.generateHotelVoucher = asyncHandler(async (req, res) => {
 
   booking.voucher.filePath = filePath;
   booking.executionStatus = "voucher_generated";
+  booking.voucheredAt = new Date();
 
   await booking.save();
 
