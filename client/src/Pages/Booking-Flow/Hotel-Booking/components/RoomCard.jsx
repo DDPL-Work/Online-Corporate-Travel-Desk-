@@ -43,7 +43,7 @@ const RoomCard = ({ room, count, onAdd, onRemove }) => {
   const price = room.Price || {};
   const totalFare = price.totalFare ?? room.TotalFare ?? 0;
   const tax = price.tax ?? room.TotalTax ?? 0;
-  const finalPrice = totalFare + tax;
+  const finalPrice = totalFare;
   const currency = price.currency ?? room.Currency ?? "INR";
   const nights = room?.DayRates?.[0]?.length || 1;
 

@@ -216,6 +216,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       default: "not_started",
       index: true,
     },
+    voucheredAt: Date,
 
     bookingResult: {
       hotelBookingId: String,

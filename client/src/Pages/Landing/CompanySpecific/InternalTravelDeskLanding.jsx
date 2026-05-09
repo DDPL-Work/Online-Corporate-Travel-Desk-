@@ -58,11 +58,9 @@ import {
   getPublicBrandingBySlug,
   getPublicBrandingById,
 } from "../../../Redux/Actions/landingPageThunks";
-import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import {
   fetchCities,
   fetchCountries,
-  searchHotels,
 } from "../../../Redux/Actions/hotelThunks";
 import { setSearchPayload } from "../../../Redux/Slice/hotelSlice";
 import { CountrySelector } from "../../../components/hotel-search/HotelSearchSubComponents";
@@ -196,7 +194,7 @@ const LandingDateField = ({
         </span>
       </div>
       {isOpen && (
-        <div className="absolute top-full right-0 z-[1000] mt-2 shadow-2xl rounded-xl overflow-hidden">
+        <div className="absolute top-full lg:right-0 right-10 z-[1000] mt-2 shadow-2xl rounded-xl overflow-hidden">
           <CustomCalendar
             range={range}
             value={range ? { start: value, end: valueEnd } : value}
@@ -447,7 +445,6 @@ const HeroWithSearch = ({
   const location = useLocation();
   const { publicBranding } = useSelector((s) => s.landingPage);
 
-
   const [errors, setErrors] = useState({});
   const [tripType, setTripType] = useState("one-way");
   const [returnDate, setReturnDate] = useState("");
@@ -569,7 +566,7 @@ const HeroWithSearch = ({
     try {
       // ✅ Step 1: Clear old results and trigger loading state immediately
       dispatch(resetFlights());
-      
+
       // ✅ Step 2: Trigger the search without waiting (async)
       if (journeyType === 3) dispatch(searchFlightsMC(payload));
       else dispatch(searchFlights(payload));
@@ -767,11 +764,11 @@ const HeroWithSearch = ({
     };
 
     dispatch(setSearchPayload(payload));
-    navigate("/search-hotel-results", { 
-      state: { 
+    navigate("/search-hotel-results", {
+      state: {
         searchPayload: payload,
-        companySlug: companySlug || publicBranding?.companySlug 
-      } 
+        companySlug: companySlug || publicBranding?.companySlug,
+      },
     });
   };
 
@@ -1186,7 +1183,9 @@ const HeroWithSearch = ({
                           onChange={setDepartureDate}
                           onChangeEnd={setReturnDate}
                           isOpen={openCalendarId === "departure"}
-                          onToggle={(st) => handleCalendarToggle("departure", st)}
+                          onToggle={(st) =>
+                            handleCalendarToggle("departure", st)
+                          }
                         />
                       </FieldBox>
                       {tripType === "round-trip" && (
@@ -1201,7 +1200,9 @@ const HeroWithSearch = ({
                             placeholder="Select Return"
                             displayValue={returnDate}
                             isOpen={openCalendarId === "return"}
-                            onToggle={(st) => handleCalendarToggle("return", st)}
+                            onToggle={(st) =>
+                              handleCalendarToggle("return", st)
+                            }
                             focus="end"
                           />
                         </FieldBox>
@@ -1250,10 +1251,7 @@ const HeroWithSearch = ({
                       </FieldBox>
                     </div>
                   )}
-                  <SearchBtn
-                    type="submit"
-                    label="Search Flights"
-                  />
+                  <SearchBtn type="submit" label="Search Flights" />
                 </form>
               </>
             )}
@@ -1429,7 +1427,9 @@ const HeroWithSearch = ({
                       onChangeEnd={setCheckOut}
                       placeholder="Check-in"
                       isOpen={openCalendarId === "hotel-checkin"}
-                      onToggle={(st) => handleCalendarToggle("hotel-checkin", st)}
+                      onToggle={(st) =>
+                        handleCalendarToggle("hotel-checkin", st)
+                      }
                     />
                   </div>
 
@@ -1455,7 +1455,9 @@ const HeroWithSearch = ({
                       placeholder="Check-out"
                       displayValue={checkOut}
                       isOpen={openCalendarId === "hotel-checkout"}
-                      onToggle={(st) => handleCalendarToggle("hotel-checkout", st)}
+                      onToggle={(st) =>
+                        handleCalendarToggle("hotel-checkout", st)
+                      }
                       focus="end"
                     />
                     {nightCount && (
@@ -2140,7 +2142,9 @@ export default function InternalTravelDeskLanding() {
     (s) => s.landingPage,
   );
   const [loading, setLoading] = useState(true);
-  const [landingActiveTab, setLandingActiveTab] = useState(location.state?.activeTab || "flight");
+  const [landingActiveTab, setLandingActiveTab] = useState(
+    location.state?.activeTab || "flight",
+  );
 
   // We map publicBranding to branding so the rest of the file continues to work unchanged
   const branding = publicBranding;

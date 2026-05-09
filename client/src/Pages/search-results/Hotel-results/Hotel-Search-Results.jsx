@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Header from "./Hotel-Header";
 import FilterSidebar from "./Filter-Sidebar";
 import HotelCard from "./Hotel-Card";
-import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import { useDispatch, useSelector } from "react-redux";
 import { searchHotels } from "../../../Redux/Actions/hotelThunks";
 import SearchLoadingModal from "../../../components/common/SearchLoadingModal";
 import NoResultsFound from "../../../components/common/NoResultsFound";
 import { useLocation, useNavigate } from "react-router-dom";
+import LandingHeader from "../../../layout/LandingHeader";
 
 const DEFAULT_FILTERS = {
   minPrice: null,
@@ -231,7 +231,7 @@ function HotelSearchResults() {
 
   return (
     <div className="bg-slate-50 min-h-screen flex flex-col">
-      <CorporateNavbar />
+      <LandingHeader />
       <Header />
 
       {isInitialLoading && (

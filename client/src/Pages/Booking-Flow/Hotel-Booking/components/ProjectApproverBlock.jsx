@@ -93,7 +93,7 @@ function SearchDropdown({
 /* ─────────────────────────────────────────────────────────────── */
 /*  Main Block                                                      */
 /* ─────────────────────────────────────────────────────────────── */
-export function ProjectApproverBlock({ onChange }) {
+export function ProjectApproverBlock({ onChange, errors = {} }) {
   const getDisplayName = (item) => {
     if (!item) return "Unnamed";
     if (typeof item.name === "string") return item.name || "Unnamed";
@@ -282,6 +282,9 @@ export function ProjectApproverBlock({ onChange }) {
                   </div>
                 )}
               />
+              {errors.project && (
+                <p className="text-[11px] text-red-500 mt-1 font-medium">{errors.project}</p>
+              )}
               {selectedProject && (
                 <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
                   <div className="flex items-center gap-2 min-w-0">
@@ -340,6 +343,9 @@ export function ProjectApproverBlock({ onChange }) {
                   className="h-10 w-full px-3 text-[13px] bg-white border border-slate-200 rounded-lg outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/10 transition text-slate-700 placeholder:text-slate-300"
                 />
               </div>
+              {errors.project && (
+                <p className="text-[11px] text-red-500 mt-1 font-medium">{errors.project}</p>
+              )}
             </div>
           )}
         </div>
@@ -432,6 +438,9 @@ export function ProjectApproverBlock({ onChange }) {
                     </div>
                   )}
                 />
+                {errors.approver && (
+                  <p className="text-[11px] text-red-500 mt-1 font-medium">{errors.approver}</p>
+                )}
                 {selectedApprover && (
                   <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -506,6 +515,9 @@ export function ProjectApproverBlock({ onChange }) {
                     <FiCheck size={12} className="text-[#C9A84C]" />
                     Approval request will be sent to <strong>{approverEmail}</strong>
                   </div>
+                )}
+                {errors.approver && (
+                  <p className="text-[11px] text-red-500 mt-1 font-medium">{errors.approver}</p>
                 )}
               </div>
             )}

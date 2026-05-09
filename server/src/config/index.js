@@ -17,8 +17,8 @@ module.exports = {
       dbName: process.env.MONGO_DB_NAME,
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000
-    }
+      socketTimeoutMS: 45000,
+    },
   },
 
   jwt: {
@@ -32,13 +32,16 @@ module.exports = {
     url: process.env.FRONTEND_URL,
     superAdminUrl: process.env.SUPER_ADMIN_URL,
     adminUrl: process.env.ADMIN_FRONTEND_URL,
-    prodUrl: process.env.PRODUCTION_FRONTEND_URL
+    prodUrl: process.env.PRODUCTION_FRONTEND_URL,
   },
 
   upload: {
     maxSize: parseInt(process.env.MAX_FILE_SIZE, 10) || 5242880,
     path: process.env.UPLOAD_PATH || "./uploads",
-    allowedTypes: (process.env.ALLOWED_FILE_TYPES || "image/jpeg,image/png,image/webp,image/svg+xml,image/gif,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel").split(",")
+    allowedTypes: (
+      process.env.ALLOWED_FILE_TYPES ||
+      "image/jpeg,image/png,image/webp,image/svg+xml,image/gif,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+    ).split(","),
   },
 
   rateLimit: {
@@ -54,7 +57,6 @@ module.exports = {
     enabled: process.env.ENABLE_CRON_JOBS === "true",
     creditAlertSchedule: process.env.CREDIT_ALERT_CRON || "0 */6 * * *",
     bookingReminderSchedule: process.env.BOOKING_REMINDER_CRON || "0 8 * * *",
-    phonePeRecoverySchedule:
-      process.env.PHONEPE_RECOVERY_CRON || "*/5 * * * *",
-  }
+    phonePeRecoverySchedule: process.env.PHONEPE_RECOVERY_CRON || "*/5 * * * *",
+  },
 };

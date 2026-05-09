@@ -9,7 +9,6 @@ import HotelImageGallery from "./components/HotelImageGallery";
 import HotelInfo from "./components/HotelInfo";
 import Amenities from "./components/Amenities";
 import RoomTypesList from "./components/RoomTypesList";
-import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import Attractions from "./components/Attractions";
 import HotelDetailsSkeleton from "./components/HotelDetailsSkeleton";
 import { FiPhone, FiMail, FiGlobe, FiCalendar } from "react-icons/fi";
@@ -17,6 +16,7 @@ import { MdCheckCircle } from "react-icons/md";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { FaPlane } from "react-icons/fa";
+import LandingHeader from "../../../layout/LandingHeader";
 
 const fmtDate = (d, opts = { day: "2-digit", month: "short", year: "numeric" }) => {
   if (!d) return "";
@@ -274,7 +274,7 @@ const HotelDetailsPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans">
-      <CorporateNavbar />
+      <LandingHeader />
 
       {/* ── Hotel Header ── */}
       <div className="bg-white border-b border-slate-200">
@@ -463,8 +463,7 @@ const HotelDetailsPage = () => {
                 ₹{Object.values(selectedRooms).reduce(
                   (sum, r) =>
                     sum +
-                    ((r.room.TotalFare || r.room.Price?.TotalFare || 0) +
-                      (r.room.TotalTax || r.room.Price?.Tax || 0)),
+                    ((r.room.TotalFare || r.room.Price?.TotalFare || 0)),
                   0
                 ).toLocaleString("en-IN")}
               </span>

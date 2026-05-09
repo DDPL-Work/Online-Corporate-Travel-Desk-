@@ -40,7 +40,7 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 import { FaUserPlus, FaHotel, FaPlane } from "react-icons/fa";
-import { CorporateNavbar } from "../../../layout/CorporateNavbar";
+import LandingHeader from '../../../layout/LandingHeader'
 import {
   createHotelBookingRequest,
   fetchHotelRequestById,
@@ -570,9 +570,9 @@ function SelectedRoomDetailsCard({
     (Array.isArray(room?.name) ? [...new Set(room.name)].join(", ") : room?.name) ||
     "Room";
 
-  const baseFare = room?.TotalFare || room?.NetAmount || 0;
+  const totalFare = room?.TotalFare || room?.NetAmount || 0;
   const totalTax = room?.TotalTax || room?.NetTax || 0;
-  const totalFare = baseFare + totalTax;
+  const baseFare = totalFare - totalTax;
 
   const cancelPolicies =
     room?.CancelPolicies || displayRoom?.CancelPolicies || [];
@@ -1054,7 +1054,7 @@ const HotelReviewBooking = () => {
         for (let c = 0; c < children; c++) {
           generatedTravelers.push({
             id: generatedTravelers.length + 1,
-            title: "Master",
+            title: "Mr", // UI shows Mr. for children too
             firstName: "",
             lastName: "",
             paxType: 2,
@@ -1298,7 +1298,7 @@ const HotelReviewBooking = () => {
     0,
   );
 
-  let baseFare = preBookBaseFare > 0 
+  let totalFare = preBookBaseFare > 0 
     ? preBookBaseFare 
     : selectedRooms.reduce(
         (sum, r) => sum + (r.TotalFare || r.NetAmount || r.Price?.TotalFare || 0),
@@ -1312,7 +1312,7 @@ const HotelReviewBooking = () => {
         0,
       );
 
-  const totalFare = baseFare + tax;
+  const baseFare = totalFare - tax;
   const price = displayRoom?.Price || displayRoom || {};
   const search = searchParams;
 
@@ -1465,11 +1465,12 @@ const HotelReviewBooking = () => {
       hasGlobalErrors = true;
     }
 
+    if (!projectApproverData.project || !projectApproverData.project.id) {
+      newGlobalErrors.project = "Project ID is required";
+      hasGlobalErrors = true;
+    }
+
     if (approvalRequired && !isTravelAdmin) {
-       if (!projectApproverData.project) {
-         newGlobalErrors.project = "Please select a project";
-         hasGlobalErrors = true;
-       }
        if (!projectApproverData.approver) {
          newGlobalErrors.approver = "Please select an approver";
          hasGlobalErrors = true;
@@ -1594,7 +1595,7 @@ const HotelReviewBooking = () => {
         NoOfRooms: searchParams.rooms.length,
       },
       travellers: travelers.map((t) => ({
-        title: t.title,
+        title: t.paxType === 2 ? "Master" : t.title.replace(".", ""), // Strip dot for adults if needed, or send as is
         firstName: t.firstName,
         lastName: t.lastName,
         gender: t.gender || "Male",
@@ -1638,25 +1639,8 @@ const HotelReviewBooking = () => {
     };
 
     try {
-      let hasGlobalErrors = false;
-      const newGlobalErrors = {};
-
-      if (!purposeOfTravel) {
-        newGlobalErrors.purposeOfTravel = "Please enter purpose of travel";
-        hasGlobalErrors = true;
-      }
-
       if (approvalRequired && !isTravelAdmin) {
-        if (!projectApproverData.project) {
-          newGlobalErrors.project = "Please select a project";
-          hasGlobalErrors = true;
-        }
-        if (!projectApproverData.approver) {
-          newGlobalErrors.approver = "Please select an approver";
-          hasGlobalErrors = true;
-        }
-
-        if (!hasGlobalErrors) {
+        if (projectApproverData.approver && projectApproverData.project) {
           await dispatch(
             selectManager({
               approverId: projectApproverData.approver?.id,
@@ -1669,12 +1653,6 @@ const HotelReviewBooking = () => {
         }
       }
 
-      const errors = validateTravellers(travelers);
-      setFormErrors({ ...errors, ...newGlobalErrors });
-
-      if (Object.keys(errors).length > 0 || hasGlobalErrors) {
-        return;
-      }
 
       const result = await dispatch(createHotelBookingRequest(payload)).unwrap();
 
@@ -1767,13 +1745,13 @@ const HotelReviewBooking = () => {
     );
   }
 
-  if (loading) return <div>Loading...</div>;
+  if (loading && !hotel && !isBookNowMode) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
 
   /* ──────────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      <CorporateNavbar />
+      <LandingHeader />
 
       {/* ── Sticky back bar ── */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
@@ -1785,6 +1763,13 @@ const HotelReviewBooking = () => {
             <MdArrowBack size={18} />
             Back to Details
           </button>
+
+          {actionLoading && (
+            <div className="flex items-center gap-2 text-[#C9A84C] font-semibold animate-pulse">
+              <div className="w-4 h-4 border-2 border-[#C9A84C] border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs uppercase tracking-wider">Requesting...</span>
+            </div>
+          )}
           
           <div className="flex items-center gap-3">
             <button 
@@ -2006,11 +1991,9 @@ const HotelReviewBooking = () => {
                                 }
                                 className="field-input"
                               >
-                                <option>Mr</option>
-                                <option>Mrs</option>
-                                <option>Ms</option>
-                                <option>Miss</option>
-                                <option>Master</option>
+                                <option>Mr.</option>
+                                <option>Mrs.</option>
+                                <option>Miss.</option>
                               </select>
                             </div>
                             <div className="flex flex-col gap-1">
@@ -2462,7 +2445,10 @@ const HotelReviewBooking = () => {
           {/* ── RIGHT: Price Summary ── */}
           <div className="lg:col-span-1">
             <div className="sticky top-20 space-y-4">
-                <ProjectApproverBlock onChange={setProjectApproverData} />
+                <ProjectApproverBlock 
+                  onChange={setProjectApproverData} 
+                  errors={formErrors}
+                />
 
               <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">
                 <div className="bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] px-5 py-4">
@@ -2513,17 +2499,13 @@ const HotelReviewBooking = () => {
 
                 <button
                   onClick={handleAction}
-                  disabled={
-                    actionLoading ||
-                    !projectApproverData.project ||
-                    (approvalRequired && !projectApproverData.approver)
-                  }
+                  disabled={actionLoading}
                   className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-[#000D26] uppercase tracking-wider bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] hover:bg-[#B39340] hover:from-[#B39340] hover:to-[#B39340] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[#C9A84C]/20"
                 >
                   {actionLoading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-slate-300 border-t-white rounded-full animate-spin" />
-                      Processing…
+                      Submitting Request...
                     </>
                   ) : isBookNowMode ? (
                     "Confirm & Book Now"

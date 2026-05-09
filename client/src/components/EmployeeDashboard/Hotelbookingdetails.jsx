@@ -1915,13 +1915,6 @@ export default function HotelBookingDetails() {
         {/* 09 Booking History */}
         <BookingHistory booking={booking} />
       </main>
-
-      {/* Sticky bottom total price bar */}
-      {/* <TotalPriceBar
-        totalFare={totalFare}
-        isCancelled={isCancelled}
-        onDownload={() => dispatch(generateHotelVoucher(booking.bookingId))}
-      /> */}
     </div>
   );
 }
@@ -1929,11 +1922,37 @@ export default function HotelBookingDetails() {
 /* ─────────────────────────────────────────────────────────────── */
 /*  Booking History / Timeline                                     */
 /* ─────────────────────────────────────────────────────────────── */
+const ensureUTC = (d) => {
+  if (!d) return null;
+  if (d instanceof Date) return d;
+  if (typeof d !== "string") return d;
+  
+  // 1. Handle TBO specific format: "DD/MM/YYYY HH:MM:SS"
+  if (d.includes("/") && d.includes(":")) {
+    const parts = d.split(" ");
+    if (parts.length >= 2) {
+      const [datePart, timePart] = parts;
+      const [day, month, year] = datePart.split("/");
+      return new Date(`${year}-${month}-${day}T${timePart}Z`);
+    }
+  }
+  
+  // 2. Handle ISO format without timezone: "YYYY-MM-DDTHH:MM:SS"
+  if (d.includes("-") && d.includes(":") && !d.includes("Z") && !d.includes("+")) {
+    return new Date(`${d}Z`);
+  }
+  
+  return new Date(d);
+};
+
 const getVoucherDate = (b) => {
-  if (b.voucheredAt) return b.voucheredAt;
-  const tboVoucherDate = b.bookingResult?.providerResponse?.VoucherDate || b.bookingResult?.providerResponse?.Response?.VoucherDate;
-  if (tboVoucherDate) return tboVoucherDate;
-  if (["voucher_generated", "confirmed", "booked"].includes((b.executionStatus || "").toLowerCase())) return b.updatedAt;
+  if (b.voucheredAt) return ensureUTC(b.voucheredAt);
+  const tboVoucherDate = b.bookingResult?.providerResponse?.VoucherDate || 
+                         b.bookingResult?.providerResponse?.Response?.VoucherDate ||
+                         b.raw?.BookingDate || 
+                         b.raw?.InvoiceCreatedOn;
+  if (tboVoucherDate) return ensureUTC(tboVoucherDate);
+  if (["voucher_generated", "confirmed", "booked"].includes((b.executionStatus || "").toLowerCase())) return ensureUTC(b.updatedAt);
   return null;
 };
 
@@ -1944,14 +1963,14 @@ function BookingHistory({ booking }) {
   const steps = [
     {
       label: "Request Created",
-      date: booking.createdAt,
+      date: ensureUTC(booking.createdAt),
       desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
       icon: <FiClock size={14} />,
       active: true,
     },
     {
       label: "Approval Status",
-      date: booking.approvedAt || booking.rejectedAt || (["approved", "rejected"].includes(booking.requestStatus) ? booking.updatedAt : null),
+      date: ensureUTC(booking.approvedAt || booking.rejectedAt) || (["approved", "rejected"].includes(booking.requestStatus) ? ensureUTC(booking.updatedAt || booking.createdAt) : null),
       desc: (() => {
         const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
         const isApproved = booking.approvedAt || booking.requestStatus === "approved";
@@ -1975,14 +1994,14 @@ function BookingHistory({ booking }) {
     },
     {
       label: "Voucher Issued",
-      date: getVoucherDate(booking),
+      date: getVoucherDate(booking) || (isConfirmed ? (booking.updatedAt || booking.createdAt) : null),
       desc: isConfirmed ? "Hotel voucher generated and sent" : "Final confirmation pending",
       icon: <FiTag size={14} />,
       active: isConfirmed,
     },
     {
       label: "Cancellation",
-      date: booking.cancelledAt || (isCancelled ? booking.updatedAt : null),
+      date: ensureUTC(booking.cancelledAt) || (isCancelled ? ensureUTC(booking.updatedAt) : null),
       desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
       icon: <FiXCircle size={14} />,
       active: isCancelled,
