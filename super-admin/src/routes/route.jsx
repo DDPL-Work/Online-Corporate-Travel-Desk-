@@ -25,6 +25,10 @@ import PendingCorporates from "../components/SuperAdminTabs/PendingCorporates";
 import OpsTeamManagement from "../components/SuperAdminTabs/OpsTeamManagement";
 import ProfileSettings from "../Pages/Auth/ProfileSettings";
 
+import BlogListPage from '../components/Blog/AllBlogs'
+import BlogEditPage from '../components/Blog/BlogEditPage'
+import CreateBlogPage from '../components/Blog/CreateNewBlog'
+
 export const appRouter = createBrowserRouter([
   // -------------------------------
   // PUBLIC ROUTES
@@ -64,6 +68,18 @@ export const appRouter = createBrowserRouter([
           { path: "/system-logs", element: <SystemLogs /> },
           { path: "/ops-management", element: <OpsTeamManagement /> },
           { path: "/profile", element: <ProfileSettings /> },
+          {
+            path: "/blog-and-articles",
+            element: <BlogListPage />,
+          },
+          {
+            path: "/blog-and-articles/add",
+            element: <CreateBlogPage />,
+          },
+          {
+            path: "/blog-and-articles/:id/edit",
+            element: <BlogEditPage />,
+          },
         ],
       },
     ],

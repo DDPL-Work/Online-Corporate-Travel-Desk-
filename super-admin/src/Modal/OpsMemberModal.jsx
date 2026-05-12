@@ -1,17 +1,17 @@
 // super-admin/src/Modal/OpsMemberModal.jsx
 
 import React, { useState, useEffect } from "react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { createOpsMember, updateOpsMember } from "../API/opsAPI";
 
-const ROLES = ["Booking Manager", "Support Agent", "Finance OPS"];
-const DEPARTMENTS = ["Flights", "Hotels", "Both"];
+const ROLES = ["Booking Manager", "Support Agent", "Finance OPS", "SEO Specialist"];
 const PERMISSIONS_LIST = [
   "View Bookings",
   "Manage Cancellations",
   "View Finance",
   "Manage Corporates",
+  "SEO Management",
 ];
 
 export default function OpsMemberModal({ member, onClose, onSuccess }) {
@@ -22,7 +22,6 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
     email: "",
     phone: "",
     role: ROLES[0],
-    department: DEPARTMENTS[0],
     permissions: [],
     password: "",
   });
@@ -37,7 +36,6 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
         email: member.email || "",
         phone: member.phone || "",
         role: member.role || ROLES[0],
-        department: member.department || DEPARTMENTS[0],
         permissions: member.permissions || [],
         password: "", // Don't show password
       });
@@ -48,7 +46,7 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
     e.preventDefault();
     
     // Basic validation
-    if (!form.name || !form.email || !form.phone || !form.role || !form.department) {
+    if (!form.name || !form.email || !form.phone || !form.role) {
       return toast.error("Please fill all required fields");
     }
 
@@ -138,15 +136,6 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
               </select>
             </Field>
 
-            <Field label="Department *">
-              <select
-                className="modal-input"
-                value={form.department}
-                onChange={(e) => setForm({ ...form, department: e.target.value })}
-              >
-                {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </Field>
 
             <Field label={isEdit ? "Reset Password (Leave blank to keep current)" : "Password"}>
               <div className="relative">

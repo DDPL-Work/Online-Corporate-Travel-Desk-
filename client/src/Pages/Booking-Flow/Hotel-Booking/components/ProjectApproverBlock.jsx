@@ -141,6 +141,10 @@ export function ProjectApproverBlock({ onChange, errors = {} }) {
     if (approvalRequired) {
       dispatch(fetchEmployees());
     }
+    // Fetch managers too for employees if needed
+    if (approvalRequired && !isTravelAdmin) {
+      // dispatch(fetchManagers()); // If we want to use managers specifically
+    }
     // Fetch travel admin info for auto-approval details
     if (!travelAdmin) {
       dispatch(getMyTravelAdmin());

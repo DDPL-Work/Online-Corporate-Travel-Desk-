@@ -14,7 +14,7 @@ import {
   FiPlayCircle,
   FiRepeat
 } from "react-icons/fi";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 export default function AllReissueRequests() {
   const dispatch = useDispatch();

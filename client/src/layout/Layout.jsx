@@ -48,11 +48,8 @@ export default function Layout() {
   }
 
   // =============================
-  // REDIRECT IF NOT AUTHENTICATED
+  // AUTH REDIRECTS (HANDLED BY PROTECTEDROUTE)
   // =============================
-  if (!isAuthenticated || !token) {
-    return <Navigate to="/platform/flight-booking-info" replace />;
-  }
 
   // =============================
   // ROLE-BASED ROOT REDIRECTS

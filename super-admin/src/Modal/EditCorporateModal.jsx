@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { updateCorporate } from "../Redux/Slice/corporateListSlice";
 
 export default function EditCorporateModal({ corporate, onClose }) {

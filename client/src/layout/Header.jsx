@@ -62,7 +62,12 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
 
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate("/platform/flight-booking-info", { replace: true });
+    const storedSlug = localStorage.getItem("companySlug");
+    if (storedSlug) {
+      navigate(`/${storedSlug}`, { replace: true });
+    } else {
+      navigate("/platform/flight-booking-info", { replace: true });
+    }
   };
 
   const handleProfileNavigation = () => {

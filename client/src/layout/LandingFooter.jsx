@@ -1,8 +1,20 @@
 import { useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { FaPlane, FaHotel } from "react-icons/fa";
-import { RiPhoneLine, RiArrowRightLine } from "react-icons/ri";
-import { LuPlane } from "react-icons/lu";
+import { 
+  FiSearch, 
+  FiCalendar, 
+  FiCheckSquare, 
+  FiInfo, 
+  FiHelpCircle, 
+  FiBookOpen, 
+  FiAirplay, 
+  FiBriefcase, 
+  FiFileText, 
+  FiShield, 
+  FiUserCheck, 
+  FiPhone 
+} from "react-icons/fi";
 import logo from "../../public/logo-traveamer.svg";
 import { useFlightSearch } from "../context/FlightSearchContext";
 
@@ -39,328 +51,228 @@ export default function LandingFooter({ onTabChange }) {
     muted: "#65758B",
   };
 
-  if (isAuthenticated && user) {
-    return (
-      <footer
-        style={{ background: C.grayLight, borderTop: `1px solid ${C.border}` }}
+  const FOOTER_SECTIONS = [
+    {
+      head: "Quick Links",
+      links: [
+        { label: "Search Flights", icon: <FiSearch size={14} />, onClick: () => handleSearchClick("flight") },
+        { label: "Search Hotels", icon: <FiSearch size={14} />, onClick: () => handleSearchClick("hotel") },
+        { label: "My Bookings", icon: <FiCalendar size={14} />, href: "/my-bookings" },
+        { label: "Pending Approvals", icon: <FiCheckSquare size={14} />, href: "/my-pending-approvals" },
+      ],
+    },
+    {
+      head: "Resources",
+      links: [
+        { label: "About Us", icon: <FiInfo size={14} />, href: "/about-us" },
+        { label: "FAQs", icon: <FiHelpCircle size={14} />, href: "/faq" },
+        { label: "Blog", icon: <FiBookOpen size={14} />, href: "/blog" },
+      ],
+    },
+    {
+      head: "Platform",
+      links: [
+        { label: "Flight Booking", icon: <FaPlane size={14} />, href: "/platform/flight-booking-info" },
+        { label: "Hotel Booking", icon: <FaHotel size={14} />, href: "/platform/hotel-booking-info" },
+        { label: "Approval & Workflow", icon: <FiCheckSquare size={14} />, href: "/platform/approval-and-workflow" },
+      ],
+    },
+    {
+      head: "Who It's For",
+      links: [
+        { label: "Independent Professionals", icon: <FiBriefcase size={14} />, href: "/who-it's-for/independent" },
+        { label: "Small Business", icon: <FiAirplay size={14} />, href: "/who-it's-for/small-business" },
+        { label: "Mid Size Business", icon: <FiBriefcase size={14} />, href: "/who-it's-for/mid-size-business" },
+        { label: "Growing Business", icon: <FiAirplay size={14} />, href: "/who-it's-for/growing-business" },
+      ],
+    },
+    {
+      head: "Company Legal",
+      links: [
+        { label: "Terms of Service", icon: <FiFileText size={14} />, href: "/legal/terms-of-service" },
+        { label: "Privacy Center", icon: <FiShield size={14} />, href: "/legal/privacy-policy" },
+        { label: "User Agreement", icon: <FiUserCheck size={14} />, href: "/legal/user-agreement" },
+        { label: "Contact Us", icon: <FiPhone size={14} />, href: "/legal/contact-us" },
+      ],
+    },
+  ];
+
+  return (
+    <footer
+      style={{ background: C.grayLight, borderTop: `1px solid ${C.border}` }}
+    >
+      {/* ── Top brand bar ── */}
+      <div
+        style={{
+          background: C.navyDark,
+          borderBottom: `1px solid ${C.border}`,
+        }}
       >
-        {/* ── Top brand bar ── */}
-        <div
-          style={{
-            background: C.navyDark,
-            borderBottom: `1px solid ${C.border}`,
-          }}
-        >
-          <div className="max-w-7xl mx-auto px-6 md:px-10 py-10 flex flex-col lg:flex-row items-center justify-between gap-8">
-            {/* Brand */}
-            <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+        <div className="max-w-7xl mx-auto px-6 md:px-10 py-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+          {/* Brand */}
+          <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+            {branding?.branding?.logo?.url ? (
+              <img
+                src={branding.branding.logo.url}
+                alt="Logo"
+                className="h-12 object-contain"
+              />
+            ) : (
+              <img src={logo} alt="Traveamer" className="h-10" />
+            )}
+            <div className="space-y-1">
+              <h4
+                className="font-bold text-lg md:text-xl leading-tight"
+                style={{
+                  color: C.white,
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                }}
+              >
+                {branding?.corporateName || "Company Travel Desk"}
+              </h4>
+              <p
+                className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-80"
+                style={{
+                  color: GOLD,
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                }}
+              >
+                Internal Travel Ecosystem
+              </p>
+            </div>
+          </div>
+
+          {/* Quick action buttons */}
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => handleSearchClick("flight")}
+              className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-xs font-bold transition-all hover:translate-y-[-2px] active:scale-95"
+              style={{
+                background: GOLD_10,
+                color: GOLD,
+                border: `1px solid ${GOLD_20}`,
+                fontFamily: "'Plus Jakarta Sans',sans-serif",
+              }}
+            >
+              <FaPlane size={12} /> Book Flight
+            </button>
+            <button
+              onClick={() => handleSearchClick("hotel")}
+              className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-xs font-bold transition-all hover:translate-y-[-2px] active:scale-95"
+              style={{
+                background: GOLD_10,
+                color: GOLD,
+                border: `1px solid ${GOLD_20}`,
+                fontFamily: "'Plus Jakarta Sans',sans-serif",
+              }}
+            >
+              <FaHotel size={12} /> Book Hotel
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Main link columns ── */}
+      <div className="max-w-7xl mx-auto px-6 md:px-10 py-16">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-y-12 gap-x-8">
+          {/* Brand description column */}
+          <div className="lg:col-span-1">
+            <div className="mb-5">
               {branding?.branding?.logo?.url ? (
                 <img
                   src={branding.branding.logo.url}
                   alt="Logo"
-                  className="h-12 object-contain"
+                  className="h-10 object-contain"
                 />
               ) : (
-                <img src={logo} alt="Traveamer" className="h-7" />
+                <img src={logo} alt="Traveamer" className="h-8" />
               )}
-              <div className="space-y-1">
-                <h4
-                  className="font-bold text-lg md:text-xl leading-tight"
-                  style={{
-                    color: C.white,
-                    fontFamily: "'Plus Jakarta Sans',sans-serif",
-                  }}
-                >
-                  {branding?.branding?.landingPageTitle ||
-                    branding?.corporateName ||
-                    "Travel Portal"}
-                </h4>
-                <p
-                  className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-80"
-                  style={{
-                    color: GOLD,
-                    fontFamily: "'Plus Jakarta Sans',sans-serif",
-                  }}
-                >
-                  Internal Travel Ecosystem
-                </p>
-              </div>
             </div>
 
-            {/* Quick action buttons */}
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <button
-                onClick={() => handleSearchClick("flight")}
-                className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-xs font-bold transition-all hover:translate-y-[-2px] active:scale-95"
-                style={{
-                  background: GOLD_10,
-                  color: GOLD,
-                  border: `1px solid ${GOLD_20}`,
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                }}
-              >
-                <FaPlane size={12} /> Book Flight
-              </button>
-              <button
-                onClick={() => handleSearchClick("hotel")}
-                className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-xs font-bold transition-all hover:translate-y-[-2px] active:scale-95"
-                style={{
-                  background: GOLD_10,
-                  color: GOLD,
-                  border: `1px solid ${GOLD_20}`,
-                  fontFamily: "'Plus Jakarta Sans',sans-serif",
-                }}
-              >
-                <FaHotel size={12} /> Book Hotel
-              </button>
-            </div>
-          </div>
-        </div>
+            <div
+              className="w-10 h-1 mb-6 rounded-full"
+              style={{ background: GOLD }}
+            />
 
-        {/* ── Main link columns ── */}
-        <div className="max-w-7xl mx-auto px-6 md:px-10 py-16">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-y-12 gap-x-8">
-            {/* Brand description column */}
-            <div className="col-span-2 sm:col-span-3 lg:col-span-1">
-              {/* Company logo */}
-              <div className="mb-5">
-                {branding?.branding?.logo?.url ? (
-                  <img
-                    src={branding.branding.logo.url}
-                    alt={branding?.corporateName || "Company Logo"}
-                    className="h-[2rem] object-contain"
-                  />
-                ) : (
-                  <img src={logo} alt="Traveamer" className="h-7" />
-                )}
-                {branding?.corporateName && (
-                  <p
-                    className="text-[11px] font-bold uppercase tracking-[0.15em] mt-2 opacity-70"
-                    style={{
-                      color: C.muted,
-                      fontFamily: "'Plus Jakarta Sans',sans-serif",
-                    }}
-                  >
-                    {branding.corporateName}
-                  </p>
-                )}
-              </div>
-
-              <div
-                className="w-10 h-1 mb-6 rounded-full"
-                style={{ background: GOLD }}
+            <div className="mb-5">
+              <img
+                className="h-14"
+                src="/iata-logo.svg"
+                alt="iata-logo"
               />
-
-              {/* IATA logo */}
-              <div className="mb-5">
-                <img
-                  className="h-[4.5rem]"
-                  src="/iata-logo.svg"
-                  alt="iata-logo"
-                />
-                {/* Fallback IATA badge (hidden by default, shown if img fails) */}
-                <div
-                  style={{ display: "none" }}
-                  className="items-center gap-2 px-3 py-1.5 rounded-lg border w-fit"
-                >
-                  <div
-                    className="flex flex-col items-center leading-none"
-                    style={{
-                      fontFamily: "'Plus Jakarta Sans',sans-serif",
-                    }}
-                  >
-                    <span
-                      className="text-[9px] font-black tracking-[0.3em] uppercase"
-                      style={{ color: C.navy }}
-                    >
-                      IATA
-                    </span>
-                    <span
-                      className="text-[7px] font-semibold tracking-wide uppercase opacity-60"
-                      style={{ color: C.navy }}
-                    >
-                      Accredited Agent
-                    </span>
-                  </div>
-                </div>
-                <p
-                  className="text-[10px] font-semibold mt-1.5 opacity-60"
-                  style={{
-                    color: C.muted,
-                    fontFamily: "'Plus Jakarta Sans',sans-serif",
-                  }}
-                >
-                  IATA Accredited Agent
-                </p>
-              </div>
+              <p
+                className="text-[10px] font-semibold mt-2 opacity-60"
+                style={{
+                  color: C.muted,
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                }}
+              >
+                IATA Accredited Agent
+              </p>
             </div>
-
-            {/* Link columns */}
-            {[
-              {
-                head: "Quick Links",
-                links: [
-                  {
-                    label: "Search Flights",
-                    onClick: () => handleSearchClick("flight"),
-                  },
-                  {
-                    label: "Search Hotels",
-                    onClick: () => handleSearchClick("hotel"),
-                  },
-                  { label: "My Bookings", href: "/my-bookings" },
-                  { label: "Pending Approvals", href: "/my-pending-approvals" },
-                ],
-              },
-              {
-                head: "Platform",
-                links: [
-                  {
-                    label: "Flight Booking",
-                    href: "/platform/flight-booking-info",
-                  },
-                  {
-                    label: "Hotel Booking",
-                    href: "/platform/hotel-booking-info",
-                  },
-                  {
-                    label: "Approval & Workflow",
-                    href: "/platform/approval-and-workflow",
-                  },
-                ],
-              },
-              {
-                head: "Who It's For",
-                links: [
-                  {
-                    label: "Indepedent Profetional",
-                    href: "/who-it's-for/independent",
-                  },
-                  {
-                    label: "Small Business",
-                    href: "/who-it's-for/small-business",
-                  },
-                  {
-                    label: "Mid Size Business",
-                    href: "/who-it's-for/mid-size-business",
-                  },
-                  {
-                    label: "Growing Business",
-                    href: "/who-it's-for/growing-business",
-                  },
-                ],
-              },
-              {
-                head: "Company Legal",
-                links: [
-                  {
-                    label: "Terms of Service",
-                    href: "/legal/terms-of-service",
-                  },
-                  { label: "Privacy Center", href: "/legal/privacy-policy" },
-                  { label: "User Agreement", href: "/legal/user-agreement" },
-                  { label: "Contact Us", href: "/legal/contact-us" },
-                ],
-              },
-            ].map(({ head, links }) => (
-              <div key={head}>
-                <h5
-                  className="text-[11px] font-black uppercase tracking-[0.25em] mb-7"
-                  style={{
-                    color: C.navy,
-                    fontFamily: "'Plus Jakarta Sans',sans-serif",
-                  }}
-                >
-                  {head}
-                </h5>
-                <ul className="space-y-4">
-                  {links.map(({ label, href, onClick }) => (
-                    <li key={label}>
-                      {onClick ? (
-                        <button
-                          onClick={onClick}
-                          className="text-[13px] font-semibold transition-all hover:translate-x-1 inline-flex items-center gap-2 group border-none bg-transparent p-0 cursor-pointer"
-                          style={{
-                            color: C.muted,
-                            fontFamily: "'Plus Jakarta Sans',sans-serif",
-                          }}
-                        >
-                          <span className="w-1 h-1 rounded-full bg-gray-300 transition-all group-hover:bg-[#C9A84C] group-hover:w-2" />
-                          {label}
-                        </button>
-                      ) : (
-                        <a
-                          href={href}
-                          className="text-[13px] font-semibold transition-all hover:translate-x-1 inline-flex items-center gap-2 group no-underline"
-                          style={{
-                            color: C.muted,
-                            fontFamily: "'Plus Jakarta Sans',sans-serif",
-                          }}
-                        >
-                          <span className="w-1 h-1 rounded-full bg-gray-300 transition-all group-hover:bg-[#C9A84C] group-hover:w-2" />
-                          {label}
-                        </a>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
           </div>
-        </div>
-      </footer>
-    );
-  }
 
-  // Guest Footer (Static)
-  return (
-    <footer className="w-full border-t border-[#E1E7EF] bg-white py-12 px-6">
-      <div className="max-w-[1340px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-        {/* Logo */}
-        <div
-          className="cursor-pointer"
-          onClick={() => {
-            if (isAuthenticated) {
-              navigate("/travel");
-            } else {
-              navigate("/platform/flight-booking-info");
-            }
-          }}
-        >
-          <img src={logo} alt="Traveamer" className="h-10" />
+          {/* Link columns */}
+          {FOOTER_SECTIONS.map(({ head, links }) => (
+            <div key={head}>
+              <h5
+                className="text-[11px] font-black uppercase tracking-[0.25em] mb-7"
+                style={{
+                  color: C.navy,
+                  fontFamily: "'Plus Jakarta Sans',sans-serif",
+                }}
+              >
+                {head}
+              </h5>
+              <ul className="space-y-4">
+                {links.map(({ label, href, onClick, icon }) => (
+                  <li key={label}>
+                    {onClick ? (
+                      <button
+                        onClick={onClick}
+                        className="text-[13px] font-semibold transition-all hover:translate-x-1 flex items-center gap-3 group border-none bg-transparent p-0 cursor-pointer text-left"
+                        style={{
+                          color: C.muted,
+                          fontFamily: "'Plus Jakarta Sans',sans-serif",
+                        }}
+                      >
+                        <span className="text-[#C9A84C] opacity-70 group-hover:opacity-100 transition-colors">
+                          {icon}
+                        </span>
+                        {label}
+                      </button>
+                    ) : (
+                      <Link
+                        to={href}
+                        className="text-[13px] font-semibold transition-all hover:translate-x-1 flex items-center gap-3 group no-underline"
+                        style={{
+                          color: C.muted,
+                          fontFamily: "'Plus Jakarta Sans',sans-serif",
+                        }}
+                      >
+                        <span className="text-[#C9A84C] opacity-70 group-hover:opacity-100 transition-colors">
+                          {icon}
+                        </span>
+                        {label}
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
+      </div>
 
-        {/* Copyright */}
-        <p className="text-[#65758B] text-xs font-['Inter']">
-          © {new Date().getFullYear()} Traveamer. All rights reserved.
+      {/* ── Bottom Bar ── */}
+      <div className="px-6 md:px-10 py-8 border-t flex flex-col md:flex-row items-center justify-between gap-6" style={{ borderColor: C.border, background: C.white }}>
+        <p className="text-[12px] font-medium" style={{ color: C.muted }}>
+          © {new Date().getFullYear()} {branding?.corporateName || "Traveamer"}. All rights reserved.
         </p>
-
-        {/* Links */}
-        <div className="flex items-center gap-6">
-          <a
-            href="/legal/user-agreement"
-            className="text-[#04112F] text-xs font-['Inter'] hover:text-[#C9A84C] transition-colors no-underline"
-          >
-            User Agreement
-          </a>
-          <a
-            href="/legal/privacy-policy"
-            className="text-[#04112F] text-xs font-['Inter'] hover:text-[#C9A84C] transition-colors no-underline"
-          >
-            Privacy
-          </a>
-          <a
-            href="/legal/terms-of-service"
-            className="text-[#04112F] text-xs font-['Inter'] hover:text-[#C9A84C] transition-colors no-underline"
-          >
-            Terms
-          </a>
-          <a
-            href="/legal/contact-us"
-            className="text-[#04112F] text-xs font-['Inter'] hover:text-[#C9A84C] transition-colors no-underline"
-          >
-            Contact
-          </a>
+        <div className="flex items-center gap-8">
+          <Link to="/legal/privacy-policy" className="text-[12px] font-semibold no-underline hover:text-[#C9A84C] transition-colors" style={{ color: C.muted }}>Privacy Policy</Link>
+          <Link to="/legal/terms-of-service" className="text-[12px] font-semibold no-underline hover:text-[#C9A84C] transition-colors" style={{ color: C.muted }}>Terms of Service</Link>
+          <Link to="/legal/cookie-policy" className="text-[12px] font-semibold no-underline hover:text-[#C9A84C] transition-colors" style={{ color: C.muted }}>Cookies</Link>
         </div>
       </div>
     </footer>

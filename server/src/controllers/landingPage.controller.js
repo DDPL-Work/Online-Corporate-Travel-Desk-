@@ -160,13 +160,15 @@ exports.getPublicBrandingBySlug = asyncHandler(async (req, res) => {
   // e.g. "iap-india" -> /iap.india/i  (dots match any character including spaces or hyphens)
   const slugRegex = new RegExp(slug.replace(/-/g, "[\\s\\-_]"), "i");
 
+  // Query by corporateSlug directly, with a fallback to regex match on corporateName for backward compatibility
   const corporate = await Corporate.findOne({
-    corporateName: { $regex: slugRegex },
-  }).select("corporateName branding _id");
+    $or: [
+      { corporateSlug: slug },
+      { corporateName: { $regex: slugRegex } }
+    ]
+  }).select("corporateName branding _id corporateSlug");
 
   if (!corporate) throw new ApiError(404, `No company found for slug '${slug}'`);
 
   res.status(200).json(new ApiResponse(200, corporate, "Public branding data"));
 });
-
-
