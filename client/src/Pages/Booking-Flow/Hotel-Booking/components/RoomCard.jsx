@@ -83,8 +83,6 @@ const RoomCard = ({ room, count, onAdd, onRemove }) => {
   return (
     <div className="group w-full bg-white rounded-lg sm:rounded-xl lg:rounded-2xl border border-slate-200 hover:border-blue-400 hover:shadow-md sm:hover:shadow-lg lg:hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 overflow-hidden">
       <div className="flex flex-col lg:flex-row h-full">
-
-
         {/* INFO SECTION - Responsive */}
         <div className="flex-1 p-5 sm:p-6 lg:p-8 flex flex-col justify-between border-b sm:border-b lg:border-b-0 lg:border-r border-slate-100">
           <div className="space-y-2 sm:space-y-3 lg:space-y-4">
@@ -197,9 +195,9 @@ const RoomCard = ({ room, count, onAdd, onRemove }) => {
               </span>
             </div>
 
-            <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-500 font-medium">
+            {/* <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-500 font-medium">
               ≈ {currency} {perNight.toFixed(0).toLocaleString()} / Night
-            </p>
+            </p> */}
           </div>
 
           {/* CTA Button - Responsive */}
