@@ -40,7 +40,7 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 import { FaUserPlus, FaHotel, FaPlane } from "react-icons/fa";
-import LandingHeader from '../../../layout/LandingHeader'
+import LandingHeader from "../../../layout/LandingHeader";
 import {
   createHotelBookingRequest,
   fetchHotelRequestById,
@@ -69,6 +69,27 @@ const calculateNights = (checkIn, checkOut) => {
   const diffTime = outDate - inDate;
   const nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return nights > 0 ? nights : 1;
+};
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Utility: subtractOneSecond                                     */
+/* ─────────────────────────────────────────────────────────────── */
+const subtractOneSecond = (dateStr) => {
+  try {
+    if (!dateStr || typeof dateStr !== "string") return "";
+    // format is DD-MM-YYYY HH:mm:ss
+    const parts = dateStr.split(" ");
+    if (parts.length < 2) return dateStr;
+    const [datePart, timePart] = parts;
+    const [d, m, y] = datePart.split("-").map(Number);
+    const [hh, mm, ss] = timePart.split(":").map(Number);
+    const date = new Date(y, m - 1, d, hh, mm, ss);
+    date.setSeconds(date.getSeconds() - 1);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  } catch (e) {
+    return dateStr;
+  }
 };
 
 /* ─────────────────────────────────────────────────────────────── */
@@ -214,7 +235,7 @@ function CancelPolicyTable({ policies = [] }) {
         <thead>
           <tr className="bg-white border-b border-slate-200">
             <th className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-              From Date
+              Cancellation Period (From - To)
             </th>
             <th className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
               Charge Type
@@ -231,7 +252,24 @@ function CancelPolicyTable({ policies = [] }) {
               className="border-b border-slate-100 last:border-0 hover:bg-white transition"
             >
               <td className="px-3 py-2.5 text-xs text-slate-800 font-medium">
-                {p.FromDate || "—"}
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] text-slate-400 font-bold uppercase w-8">
+                      From:
+                    </span>
+                    <span>{p.FromDate || "—"}</span>
+                  </div>
+                  {policies[i + 1] && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase w-8">
+                        To:
+                      </span>
+                      <span className="text-slate-500">
+                        {subtractOneSecond(policies[i + 1].FromDate)}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </td>
               <td className="px-3 py-2.5">
                 <span
@@ -268,9 +306,7 @@ function RoomPromotions({ promotions = [] }) {
           <div className="w-5 h-5 rounded-full bg-[#C9A84C] flex items-center justify-center shadow-lg shadow-[#C9A84C]/30">
             <FiGift size={10} className="text-white" />
           </div>
-          <span className="text-[12px] font-bold text-[#C9A84C]">
-            {promo}
-          </span>
+          <span className="text-[12px] font-bold text-[#C9A84C]">{promo}</span>
         </div>
       ))}
     </div>
@@ -539,7 +575,8 @@ function HotelHeroBanner({
           <p className="text-sm font-bold text-[#0A203E]">
             {displaySearchParams?.rooms?.length || 1} Room · {totalAdults} Adult
             {totalAdults !== 1 ? "s" : ""}
-            {totalChildren > 0 && ` · ${totalChildren} Child${totalChildren !== 1 ? "ren" : ""}`}
+            {totalChildren > 0 &&
+              ` · ${totalChildren} Child${totalChildren !== 1 ? "ren" : ""}`}
           </p>
           {/* <p className="text-[11px] text-slate-500 truncate">
             {Array.isArray(selectedRoom)
@@ -564,10 +601,14 @@ function SelectedRoomDetailsCard({
   const room = selectedRoom || displayRoom || {};
 
   const images = room?.images || room?.rawRoomData?.images || [];
-  const roomNameDisplay = 
-    room?.RoomTypeName || 
-    (Array.isArray(room?.Name) ? [...new Set(room.Name)].join(", ") : room?.Name) ||
-    (Array.isArray(room?.name) ? [...new Set(room.name)].join(", ") : room?.name) ||
+  const roomNameDisplay =
+    room?.RoomTypeName ||
+    (Array.isArray(room?.Name)
+      ? [...new Set(room.Name)].join(", ")
+      : room?.Name) ||
+    (Array.isArray(room?.name)
+      ? [...new Set(room.name)].join(", ")
+      : room?.name) ||
     "Room";
 
   const totalFare = room?.TotalFare || room?.NetAmount || 0;
@@ -576,12 +617,15 @@ function SelectedRoomDetailsCard({
 
   const cancelPolicies =
     room?.CancelPolicies || displayRoom?.CancelPolicies || [];
-  const freeCancelUntil = cancelPolicies.find(
-    (p) => p.CancellationCharge === 0,
-  )?.FromDate;
-  const paidCancelFrom = cancelPolicies.find(
-    (p) => p.CancellationCharge > 0,
-  )?.FromDate;
+  const freePolicy = cancelPolicies.find((p) => p.CancellationCharge === 0);
+  const paidPolicy = cancelPolicies.find((p) => p.CancellationCharge > 0);
+
+  const freeCancelFrom = freePolicy?.FromDate;
+  const freeCancelTo = paidPolicy
+    ? subtractOneSecond(paidPolicy.FromDate)
+    : room?.LastCancellationDeadline;
+
+  const paidCancelFrom = paidPolicy?.FromDate;
   const lastCancelDeadline = room?.LastCancellationDeadline;
 
   const mealType =
@@ -621,48 +665,48 @@ function SelectedRoomDetailsCard({
         {/* ── Top section: Image, Title, Badges ── */}
         <div>
           {images.length > 0 && <RoomImageGallery images={images} />}
-            <h4 className="text-base font-extrabold text-[#0A203E] leading-snug mb-3">
-              {roomNameDisplay}
-            </h4>
+          <h4 className="text-base font-extrabold text-[#0A203E] leading-snug mb-3">
+            {roomNameDisplay}
+          </h4>
 
-            {/* Badges */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {/* Meal type */}
-              {mealType ? (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-500/10 border border-emerald-100 px-2.5 py-1 rounded-full">
-                  <FiCoffee size={11} />
-                  {mealType.replace(/_/g, " ")}
-                </span>
+          {/* Badges */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {/* Meal type */}
+            {mealType ? (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-500/10 border border-emerald-100 px-2.5 py-1 rounded-full">
+                <FiCoffee size={11} />
+                {mealType.replace(/_/g, " ")}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-full">
+                <FiCoffee size={11} /> Meal info unavailable
+              </span>
+            )}
+
+            {/* Refundable */}
+            <span
+              className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
+                isRefundable
+                  ? "text-teal-700 bg-teal-50 border-teal-100"
+                  : "text-red-600 bg-red-500/10 border-red-100"
+              }`}
+            >
+              {isRefundable ? (
+                <>
+                  <FiCheckCircle size={11} /> Refundable
+                </>
               ) : (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-full">
-                  <FiCoffee size={11} /> Meal info unavailable
-                </span>
+                <>
+                  <FiXCircle size={11} /> Non-Refundable
+                </>
               )}
+            </span>
 
-              {/* Refundable */}
-              <span
-                className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
-                  isRefundable
-                    ? "text-teal-700 bg-teal-50 border-teal-100"
-                    : "text-red-600 bg-red-500/10 border-red-100"
-                }`}
-              >
-                {isRefundable ? (
-                  <>
-                    <FiCheckCircle size={11} /> Refundable
-                  </>
-                ) : (
-                  <>
-                    <FiXCircle size={11} /> Non-Refundable
-                  </>
-                )}
-              </span>
-
-              {/* Nights */}
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded-full">
-                🌙 {nights} Night{nights !== 1 ? "s" : ""}
-              </span>
-            </div>
+            {/* Nights */}
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded-full">
+              🌙 {nights} Night{nights !== 1 ? "s" : ""}
+            </span>
+          </div>
         </div>
 
         {/* ── Two-column Details ── */}
@@ -703,7 +747,10 @@ function SelectedRoomDetailsCard({
               {room?.Supplements?.[0]?.length > 0 ? (
                 <div className="flex flex-col gap-2">
                   {room.Supplements[0].map((sup, idx) => (
-                    <div key={idx} className="rounded-xl border border-slate-200 bg-white p-3 flex justify-between items-center shadow-sm hover:border-[#C9A84C]/50 transition-all">
+                    <div
+                      key={idx}
+                      className="rounded-xl border border-slate-200 bg-white p-3 flex justify-between items-center shadow-sm hover:border-[#C9A84C]/50 transition-all"
+                    >
                       <div className="flex flex-col">
                         <span className="text-xs font-bold text-slate-800 capitalize">
                           {sup.Description?.replace(/_/g, " ")}
@@ -714,7 +761,9 @@ function SelectedRoomDetailsCard({
                       </div>
                       <div className="text-right flex flex-col">
                         <span className="text-sm font-black text-[#C9A84C]">
-                          {sup.Price === 0 ? "Included" : `${sup.Currency} ${sup.Price}`}
+                          {sup.Price === 0
+                            ? "Included"
+                            : `${sup.Currency} ${sup.Price}`}
                         </span>
                       </div>
                     </div>
@@ -794,15 +843,20 @@ function SelectedRoomDetailsCard({
               </p>
               {cancelPolicies.length > 0 ? (
                 <>
-                  {freeCancelUntil && (
+                  {freeCancelFrom && (
                     <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-100 rounded-xl px-3 py-2.5 mb-2">
                       <FiCheckCircle
                         size={14}
                         className="text-emerald-500 shrink-0"
                       />
-                      <p className="text-[12px] text-emerald-700 font-semibold">
-                        Free cancellation until{" "}
-                        <strong>{freeCancelUntil}</strong>
+                      <p className="text-[12px] text-emerald-700 font-semibold leading-relaxed">
+                        Free cancellation from <strong>{freeCancelFrom}</strong>
+                        {freeCancelTo && (
+                          <>
+                            {" "}
+                            to <strong>{freeCancelTo}</strong>
+                          </>
+                        )}
                       </p>
                     </div>
                   )}
@@ -814,7 +868,7 @@ function SelectedRoomDetailsCard({
                       </p>
                     </div>
                   )}
-                  {lastCancelDeadline && (
+                  {/* {lastCancelDeadline && (
                     <div className="flex items-center gap-2 bg-red-500/10 border border-red-100 rounded-xl px-3 py-2.5 mb-2">
                       <FiClock size={14} className="text-red-500 shrink-0" />
                       <p className="text-[12px] text-red-700 font-semibold">
@@ -822,7 +876,7 @@ function SelectedRoomDetailsCard({
                         <strong>{lastCancelDeadline}</strong>
                       </p>
                     </div>
-                  )}
+                  )} */}
                   <CancelPolicyTable policies={cancelPolicies} />
                 </>
               ) : (
@@ -918,7 +972,8 @@ const HotelReviewBooking = () => {
 
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
   const isTravelAdmin = user?.role === "travel-admin";
-  const approvalRequired = !isTravelAdmin && myPolicy?.approvalRequired !== false;
+  const approvalRequired =
+    !isTravelAdmin && myPolicy?.approvalRequired !== false;
 
   const { hotel, rooms, searchParams } = location.state || {};
 
@@ -1014,24 +1069,31 @@ const HotelReviewBooking = () => {
           let lName = "";
           let email = "";
           let phone = "";
-          
+
           if (isLead) {
-             const sourceProfile = myProfile || user;
-             if (sourceProfile) {
-                if (typeof sourceProfile.name === "object") {
-                   fName = sourceProfile.name.firstName || "";
-                   lName = sourceProfile.name.lastName || "";
-                } else {
-                   const rawName = sourceProfile.name || sourceProfile.displayName || "";
-                   const names = (typeof rawName === "string" ? rawName : "").trim().split(/\s+/);
-                   fName = names[0] || "";
-                   lName = names.slice(1).join(" ") || "";
-                }
-                email = sourceProfile.email || "";
-                phone = sourceProfile.phone || sourceProfile.mobile || sourceProfile.phoneWithCode || "";
-             }
+            const sourceProfile = myProfile || user;
+            if (sourceProfile) {
+              if (typeof sourceProfile.name === "object") {
+                fName = sourceProfile.name.firstName || "";
+                lName = sourceProfile.name.lastName || "";
+              } else {
+                const rawName =
+                  sourceProfile.name || sourceProfile.displayName || "";
+                const names = (typeof rawName === "string" ? rawName : "")
+                  .trim()
+                  .split(/\s+/);
+                fName = names[0] || "";
+                lName = names.slice(1).join(" ") || "";
+              }
+              email = sourceProfile.email || "";
+              phone =
+                sourceProfile.phone ||
+                sourceProfile.mobile ||
+                sourceProfile.phoneWithCode ||
+                "";
+            }
           }
-          
+
           generatedTravelers.push({
             id: generatedTravelers.length + 1,
             title: "Mr",
@@ -1073,26 +1135,33 @@ const HotelReviewBooking = () => {
       });
 
       if (generatedTravelers.length === 0) {
-          let fName = "";
-          let lName = "";
-          let email = "";
-          let phone = "";
-          
-          const sourceProfile = myProfile || user;
-          if (sourceProfile) {
-             if (typeof sourceProfile.name === "object") {
-                fName = sourceProfile.name.firstName || "";
-                lName = sourceProfile.name.lastName || "";
-             } else {
-                const rawName = sourceProfile.name || sourceProfile.displayName || "";
-                const names = (typeof rawName === "string" ? rawName : "").trim().split(/\s+/);
-                fName = names[0] || "";
-                lName = names.slice(1).join(" ") || "";
-             }
-             email = sourceProfile.email || "";
-             phone = sourceProfile.phone || sourceProfile.mobile || sourceProfile.phoneWithCode || "";
+        let fName = "";
+        let lName = "";
+        let email = "";
+        let phone = "";
+
+        const sourceProfile = myProfile || user;
+        if (sourceProfile) {
+          if (typeof sourceProfile.name === "object") {
+            fName = sourceProfile.name.firstName || "";
+            lName = sourceProfile.name.lastName || "";
+          } else {
+            const rawName =
+              sourceProfile.name || sourceProfile.displayName || "";
+            const names = (typeof rawName === "string" ? rawName : "")
+              .trim()
+              .split(/\s+/);
+            fName = names[0] || "";
+            lName = names.slice(1).join(" ") || "";
           }
-          
+          email = sourceProfile.email || "";
+          phone =
+            sourceProfile.phone ||
+            sourceProfile.mobile ||
+            sourceProfile.phoneWithCode ||
+            "";
+        }
+
         generatedTravelers.push({
           id: 1,
           title: "Mr",
@@ -1146,8 +1215,8 @@ const HotelReviewBooking = () => {
         leadPassenger: false,
         email: "",
         phoneWithCode: "",
-        countryCode: "",
-        nationality: "",
+        countryCode: "IN",
+        nationality: "IN",
         PassportNo: "",
         PassportIssueDate: "",
         PassportExpDate: "",
@@ -1288,7 +1357,7 @@ const HotelReviewBooking = () => {
   );
   const countries = Country.getAllCountries();
   const selectedRooms = rooms || [];
-  
+
   const preBookBaseFare = preBookRooms.reduce(
     (sum, r) => sum + (r.TotalFare || r.NetAmount || r.Price?.TotalFare || 0),
     0,
@@ -1298,19 +1367,22 @@ const HotelReviewBooking = () => {
     0,
   );
 
-  let totalFare = preBookBaseFare > 0 
-    ? preBookBaseFare 
-    : selectedRooms.reduce(
-        (sum, r) => sum + (r.TotalFare || r.NetAmount || r.Price?.TotalFare || 0),
-        0,
-      );
+  let totalFare =
+    preBookBaseFare > 0
+      ? preBookBaseFare
+      : selectedRooms.reduce(
+          (sum, r) =>
+            sum + (r.TotalFare || r.NetAmount || r.Price?.TotalFare || 0),
+          0,
+        );
 
-  let tax = preBookBaseFare > 0
-    ? preBookTax
-    : selectedRooms.reduce(
-        (sum, r) => sum + (r.TotalTax || r.NetTax || r.Price?.Tax || 0),
-        0,
-      );
+  let tax =
+    preBookBaseFare > 0
+      ? preBookTax
+      : selectedRooms.reduce(
+          (sum, r) => sum + (r.TotalTax || r.NetTax || r.Price?.Tax || 0),
+          0,
+        );
 
   const baseFare = totalFare - tax;
   const price = displayRoom?.Price || displayRoom || {};
@@ -1331,7 +1403,7 @@ const HotelReviewBooking = () => {
     namePattern += `]{${minLen},${maxLen}}$`;
     const nameRegex = new RegExp(namePattern);
 
-    const emailRegex = /^[a-zA-Z0-9.]+@[a-zA-Z0-9.]+\.[a-zA-Z]{2,}$/; 
+    const emailRegex = /^[a-zA-Z0-9.]+@[a-zA-Z0-9.]+\.[a-zA-Z]{2,}$/;
     const allowedTitles = ["Mr", "Ms", "Mrs", "Miss", "Master"];
 
     const fullNameSet = new Set();
@@ -1362,7 +1434,12 @@ const HotelReviewBooking = () => {
       }
 
       // SAME NAME CHECK
-      if (!allowSameName && fName && lName && fName.toLowerCase() === lName.toLowerCase()) {
+      if (
+        !allowSameName &&
+        fName &&
+        lName &&
+        fName.toLowerCase() === lName.toLowerCase()
+      ) {
         tErrors.lastName = "First and Last name cannot be identical";
       }
 
@@ -1402,7 +1479,7 @@ const HotelReviewBooking = () => {
       const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
       const isAdult = t.paxType === 1 && Number(t.age) > 18;
       const panRequiredCount = validation?.PanCountRequired || 0;
-      
+
       let isPanMandatoryForThisTraveller = false;
       if (validation?.PanMandatory) {
         if (panRequiredCount > 0) {
@@ -1425,8 +1502,10 @@ const HotelReviewBooking = () => {
       // PASSPORT
       if (isInternationalBooking && requiredFlags.isPassportRequired) {
         if (!t.PassportNo) tErrors.PassportNo = "Passport number is required";
-        if (!t.PassportIssueDate) tErrors.PassportIssueDate = "Issue date is required";
-        if (!t.PassportExpDate) tErrors.PassportExpDate = "Expiry date is required";
+        if (!t.PassportIssueDate)
+          tErrors.PassportIssueDate = "Issue date is required";
+        if (!t.PassportExpDate)
+          tErrors.PassportExpDate = "Expiry date is required";
       }
 
       // PHONE (Lead only)
@@ -1456,7 +1535,7 @@ const HotelReviewBooking = () => {
       });
       return;
     }
-    
+
     let hasGlobalErrors = false;
     const newGlobalErrors = {};
 
@@ -1471,10 +1550,10 @@ const HotelReviewBooking = () => {
     }
 
     if (approvalRequired && !isTravelAdmin) {
-       if (!projectApproverData.approver) {
-         newGlobalErrors.approver = "Please select an approver";
-         hasGlobalErrors = true;
-       }
+      if (!projectApproverData.approver) {
+        newGlobalErrors.approver = "Please select an approver";
+        hasGlobalErrors = true;
+      }
     }
 
     const errors = validateTravellers(travelers);
@@ -1562,22 +1641,28 @@ const HotelReviewBooking = () => {
             childAge: r.ChildrenAges || r.ChildAge || r.childAges || [],
           })) || roomGuests,
         rooms: (() => {
-          const baseRooms = preBookRooms.length > 0 ? preBookRooms : selectedRoom;
+          const baseRooms =
+            preBookRooms.length > 0 ? preBookRooms : selectedRoom;
           const noOfRoomsReq = searchParams?.rooms?.length || 1;
-          
-          // If we have fewer room detail objects than requested rooms, 
+
+          // If we have fewer room detail objects than requested rooms,
           // expand the list by duplicating and distributing the price.
-          const expandedRooms = baseRooms.length < noOfRoomsReq && baseRooms.length > 0
-            ? Array.from({ length: noOfRoomsReq }, (_, i) => ({
-                ...baseRooms[0],
-                // Distribute total price across rooms
-                TotalFare: (baseRooms[0].TotalFare || baseRooms[0].NetAmount || 0) / noOfRoomsReq,
-                TotalTax: (baseRooms[0].TotalTax || baseRooms[0].NetTax || 0) / noOfRoomsReq,
-                NetAmount: (baseRooms[0].NetAmount || 0) / noOfRoomsReq,
-                NetTax: (baseRooms[0].NetTax || 0) / noOfRoomsReq,
-                RoomIndex: i + 1 
-              }))
-            : baseRooms;
+          const expandedRooms =
+            baseRooms.length < noOfRoomsReq && baseRooms.length > 0
+              ? Array.from({ length: noOfRoomsReq }, (_, i) => ({
+                  ...baseRooms[0],
+                  // Distribute total price across rooms
+                  TotalFare:
+                    (baseRooms[0].TotalFare || baseRooms[0].NetAmount || 0) /
+                    noOfRoomsReq,
+                  TotalTax:
+                    (baseRooms[0].TotalTax || baseRooms[0].NetTax || 0) /
+                    noOfRoomsReq,
+                  NetAmount: (baseRooms[0].NetAmount || 0) / noOfRoomsReq,
+                  NetTax: (baseRooms[0].NetTax || 0) / noOfRoomsReq,
+                  RoomIndex: i + 1,
+                }))
+              : baseRooms;
 
           return expandedRooms.map((room) => ({
             bookingCode:
@@ -1586,7 +1671,9 @@ const HotelReviewBooking = () => {
             totalFare: room.TotalFare || room.NetAmount,
             totalTax: room.TotalTax || room.NetTax,
             roomIndex: room.RoomIndex,
-            name: Array.isArray(room.Name) ? (room.Name[0] || room.Name) : room.Name,
+            name: Array.isArray(room.Name)
+              ? room.Name[0] || room.Name
+              : room.Name,
             mealType: room.MealType,
             isRefundable: room.IsRefundable,
           }));
@@ -1653,8 +1740,9 @@ const HotelReviewBooking = () => {
         }
       }
 
-
-      const result = await dispatch(createHotelBookingRequest(payload)).unwrap();
+      const result = await dispatch(
+        createHotelBookingRequest(payload),
+      ).unwrap();
 
       if (!approvalRequired) {
         const requestId = result.bookingRequestId || result._id;
@@ -1767,13 +1855,17 @@ const HotelReviewBooking = () => {
           {actionLoading && (
             <div className="flex items-center gap-2 text-[#C9A84C] font-semibold animate-pulse">
               <div className="w-4 h-4 border-2 border-[#C9A84C] border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs uppercase tracking-wider">Requesting...</span>
+              <span className="text-xs uppercase tracking-wider">
+                Requesting...
+              </span>
             </div>
           )}
-          
+
           <div className="flex items-center gap-3">
-            <button 
-              onClick={() => navigate('/travel', { state: { activeTab: 'flight' } })}
+            <button
+              onClick={() =>
+                navigate("/travel", { state: { activeTab: "flight" } })
+              }
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A84C] text-[#000D26] hover:bg-[#C9A84C] transition-colors text-xs font-bold shadow-md shadow-black/20"
             >
               <FaPlane className="text-sm" />
@@ -1935,17 +2027,18 @@ const HotelReviewBooking = () => {
                           Search Criteria:
                         </p>
                         <span className="text-[10px] font-bold text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-0.5 rounded-full border border-[#C9A84C]/20">
-                          {totalAdultsFromSearch} Adult{totalAdultsFromSearch !== 1 ? "s" : ""}
+                          {totalAdultsFromSearch} Adult
+                          {totalAdultsFromSearch !== 1 ? "s" : ""}
                         </span>
                         {totalChildrenFromSearch > 0 && (
                           <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-100">
-                            {totalChildrenFromSearch} Child{totalChildrenFromSearch !== 1 ? "ren" : ""}
+                            {totalChildrenFromSearch} Child
+                            {totalChildrenFromSearch !== 1 ? "ren" : ""}
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
-
                 </div>
 
                 <div className="p-6 space-y-5">
@@ -1970,7 +2063,6 @@ const HotelReviewBooking = () => {
                             </span>
                           )}
                         </div>
-
                       </div>
 
                       <div className="p-5 space-y-6 bg-white">
@@ -2006,13 +2098,18 @@ const HotelReviewBooking = () => {
                                 value={t.firstName}
                                 disabled={isBookNowMode}
                                 onChange={(e) => {
-                                  const val = e.target.value.replace(/[^A-Za-z]/g, "");
+                                  const val = e.target.value.replace(
+                                    /[^A-Za-z]/g,
+                                    "",
+                                  );
                                   updateTraveler(t.id, "firstName", val);
                                 }}
                                 className={`field-input ${formErrors[t.id]?.firstName ? "border-red-500 ring-1 ring-red-500" : ""}`}
                               />
                               {formErrors[t.id]?.firstName && (
-                                <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].firstName}</p>
+                                <p className="text-[10px] text-red-500 mt-1">
+                                  {formErrors[t.id].firstName}
+                                </p>
                               )}
                             </div>
                             <div className="flex flex-col gap-1">
@@ -2028,7 +2125,10 @@ const HotelReviewBooking = () => {
                                 value={t.middleName || ""}
                                 disabled={isBookNowMode}
                                 onChange={(e) => {
-                                  const val = e.target.value.replace(/[^A-Za-z]/g, "");
+                                  const val = e.target.value.replace(
+                                    /[^A-Za-z]/g,
+                                    "",
+                                  );
                                   updateTraveler(t.id, "middleName", val);
                                 }}
                                 className="field-input"
@@ -2044,13 +2144,18 @@ const HotelReviewBooking = () => {
                                 value={t.lastName}
                                 disabled={isBookNowMode}
                                 onChange={(e) => {
-                                  const val = e.target.value.replace(/[^A-Za-z]/g, "");
+                                  const val = e.target.value.replace(
+                                    /[^A-Za-z]/g,
+                                    "",
+                                  );
                                   updateTraveler(t.id, "lastName", val);
                                 }}
                                 className={`field-input ${formErrors[t.id]?.lastName ? "border-red-500 ring-1 ring-red-500" : ""}`}
                               />
                               {formErrors[t.id]?.lastName && (
-                                <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].lastName}</p>
+                                <p className="text-[10px] text-red-500 mt-1">
+                                  {formErrors[t.id].lastName}
+                                </p>
                               )}
                             </div>
                           </div>
@@ -2090,7 +2195,9 @@ const HotelReviewBooking = () => {
                                     className={`field-input pl-9 ${formErrors[t.id]?.email ? "border-red-500 ring-1 ring-red-500" : ""}`}
                                   />
                                   {formErrors[t.id]?.email && (
-                                    <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].email}</p>
+                                    <p className="text-[10px] text-red-500 mt-1">
+                                      {formErrors[t.id].email}
+                                    </p>
                                   )}
                                 </div>
                               </div>
@@ -2120,7 +2227,9 @@ const HotelReviewBooking = () => {
                                   enableSearch
                                 />
                                 {formErrors[t.id]?.phoneWithCode && (
-                                  <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].phoneWithCode}</p>
+                                  <p className="text-[10px] text-red-500 mt-1">
+                                    {formErrors[t.id].phoneWithCode}
+                                  </p>
                                 )}
                               </div>
                             </div>
@@ -2141,8 +2250,8 @@ const HotelReviewBooking = () => {
                                 Nationality <Required />
                               </label>
                               <select
-                                value={t.nationality}
-                                disabled={isBookNowMode}
+                                value={t.nationality || "IN"}
+                                disabled
                                 onChange={(e) =>
                                   updateTraveler(
                                     t.id,
@@ -2150,7 +2259,7 @@ const HotelReviewBooking = () => {
                                     e.target.value,
                                   )
                                 }
-                                className="field-input"
+                                className="field-input cursor-not-allowed bg-slate-50"
                               >
                                 <option value="">Select country</option>
                                 {countries.map((c) => (
@@ -2182,8 +2291,6 @@ const HotelReviewBooking = () => {
                                   )
                                     age--;
 
-
-
                                   updateTraveler(t.id, "dob", dob);
                                   updateTraveler(t.id, "age", age);
                                 }}
@@ -2206,13 +2313,18 @@ const HotelReviewBooking = () => {
                                 className={`field-input bg-white text-slate-500 cursor-not-allowed ${formErrors[t.id]?.age ? "border-red-500 ring-1 ring-red-500" : ""}`}
                               />
                               {formErrors[t.id]?.age && (
-                                <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].age}</p>
+                                <p className="text-[10px] text-red-500 mt-1">
+                                  {formErrors[t.id].age}
+                                </p>
                               )}
                             </div>
                             {requiredFlags.isPANRequired && (
                               <div className="flex flex-col gap-1">
                                 <label className="field-label">
-                                  PAN Card {t.paxType === 1 && Number(t.age) > 18 && <Required />}
+                                  PAN Card{" "}
+                                  {t.paxType === 1 && Number(t.age) > 18 && (
+                                    <Required />
+                                  )}
                                   {(t.paxType === 2 ||
                                     (t.age && Number(t.age) <= 18)) && (
                                     <span className="text-slate-500 font-normal normal-case">
@@ -2240,7 +2352,9 @@ const HotelReviewBooking = () => {
                                   className={`field-input font-mono tracking-widest ${formErrors[t.id]?.panCard ? "border-red-500 ring-1 ring-red-500" : ""}`}
                                 />
                                 {formErrors[t.id]?.panCard && (
-                                  <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].panCard}</p>
+                                  <p className="text-[10px] text-red-500 mt-1">
+                                    {formErrors[t.id].panCard}
+                                  </p>
                                 )}
                                 <p className="text-[10px] text-slate-500">
                                   Required only for adults older than 18.
@@ -2280,7 +2394,9 @@ const HotelReviewBooking = () => {
                                       className={`field-input font-mono tracking-widest ${formErrors[t.id]?.PassportNo ? "border-red-500 ring-1 ring-red-500" : ""}`}
                                     />
                                     {formErrors[t.id]?.PassportNo && (
-                                      <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].PassportNo}</p>
+                                      <p className="text-[10px] text-red-500 mt-1">
+                                        {formErrors[t.id].PassportNo}
+                                      </p>
                                     )}
                                   </div>
                                   <div className="flex flex-col gap-1">
@@ -2300,7 +2416,9 @@ const HotelReviewBooking = () => {
                                       className={`field-input ${formErrors[t.id]?.PassportIssueDate ? "border-red-500 ring-1 ring-red-500" : ""}`}
                                     />
                                     {formErrors[t.id]?.PassportIssueDate && (
-                                      <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].PassportIssueDate}</p>
+                                      <p className="text-[10px] text-red-500 mt-1">
+                                        {formErrors[t.id].PassportIssueDate}
+                                      </p>
                                     )}
                                   </div>
                                   <div className="flex flex-col gap-1">
@@ -2320,7 +2438,9 @@ const HotelReviewBooking = () => {
                                       className={`field-input ${formErrors[t.id]?.PassportExpDate ? "border-red-500 ring-1 ring-red-500" : ""}`}
                                     />
                                     {formErrors[t.id]?.PassportExpDate && (
-                                      <p className="text-[10px] text-red-500 mt-1">{formErrors[t.id].PassportExpDate}</p>
+                                      <p className="text-[10px] text-red-500 mt-1">
+                                        {formErrors[t.id].PassportExpDate}
+                                      </p>
                                     )}
                                   </div>
                                 </div>
@@ -2375,7 +2495,9 @@ const HotelReviewBooking = () => {
                 className={`w-full bg-white border ${formErrors.purposeOfTravel ? "border-red-500 ring-1 ring-red-500" : "border-slate-200"} rounded-xl px-4 py-3 text-sm text-slate-800 outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/10 focus:bg-white min-h-[100px] transition resize-none`}
               />
               {formErrors.purposeOfTravel && (
-                <p className="text-[11px] text-red-500 mt-2 font-medium">{formErrors.purposeOfTravel}</p>
+                <p className="text-[11px] text-red-500 mt-2 font-medium">
+                  {formErrors.purposeOfTravel}
+                </p>
               )}
             </div>
 
@@ -2445,10 +2567,10 @@ const HotelReviewBooking = () => {
           {/* ── RIGHT: Price Summary ── */}
           <div className="lg:col-span-1">
             <div className="sticky top-20 space-y-4">
-                <ProjectApproverBlock 
-                  onChange={setProjectApproverData} 
-                  errors={formErrors}
-                />
+              <ProjectApproverBlock
+                onChange={setProjectApproverData}
+                errors={formErrors}
+              />
 
               <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">
                 <div className="bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] px-5 py-4">
@@ -2509,8 +2631,10 @@ const HotelReviewBooking = () => {
                     </>
                   ) : isBookNowMode ? (
                     "Confirm & Book Now"
+                  ) : approvalRequired ? (
+                    "Request for Approval"
                   ) : (
-                    approvalRequired ? "Request for Approval" : "Confirm & Book"
+                    "Confirm & Book"
                   )}
                 </button>
               </div>
