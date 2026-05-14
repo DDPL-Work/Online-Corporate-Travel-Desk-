@@ -18,7 +18,10 @@ import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { FaPlane } from "react-icons/fa";
 import LandingHeader from "../../../layout/LandingHeader";
 
-const fmtDate = (d, opts = { day: "2-digit", month: "short", year: "numeric" }) => {
+const fmtDate = (
+  d,
+  opts = { day: "2-digit", month: "short", year: "numeric" },
+) => {
   if (!d) return "";
   return new Date(d).toLocaleDateString("en-IN", opts);
 };
@@ -263,14 +266,15 @@ const HotelDetailsPage = () => {
     );
   }
 
-  const cheapestRoom = mergedHotel.rooms?.reduce(
-    (prev, curr) => {
-      const currTotal = (curr.Price?.TotalFare || curr.TotalFare || 0) + (curr.Price?.Tax || curr.TotalTax || 0);
-      const prevTotal = (prev.Price?.TotalFare || prev.TotalFare || 0) + (prev.Price?.Tax || prev.TotalTax || 0);
-      return currTotal < prevTotal ? curr : prev;
-    },
-    mergedHotel.rooms[0],
-  );
+  const cheapestRoom = mergedHotel.rooms?.reduce((prev, curr) => {
+    const currTotal =
+      (curr.Price?.TotalFare || curr.TotalFare || 0) +
+      (curr.Price?.Tax || curr.TotalTax || 0);
+    const prevTotal =
+      (prev.Price?.TotalFare || prev.TotalFare || 0) +
+      (prev.Price?.Tax || prev.TotalTax || 0);
+    return currTotal < prevTotal ? curr : prev;
+  }, mergedHotel.rooms[0]);
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans">
@@ -291,7 +295,9 @@ const HotelDetailsPage = () => {
       </div>
 
       {/* ── Main Content ── */}
-      <div className={`max-w-7xl mx-auto px-4 pt-6 ${Object.keys(selectedRooms).length > 0 ? "pb-32" : "pb-6"}`}>
+      <div
+        className={`max-w-7xl mx-auto px-4 pt-6 ${Object.keys(selectedRooms).length > 0 ? "pb-32" : "pb-6"}`}
+      >
         {/* Gallery — full width */}
         <div className="mb-6">
           <HotelImageGallery images={mergedHotel.images} />
@@ -309,7 +315,8 @@ const HotelDetailsPage = () => {
           <div className="mb-4 text-sm font-semibold text-[#000D26]">
             {Object.keys(selectedRooms).length > 0 ? (
               <span className="flex items-center gap-2">
-                <MdCheckCircle className="text-emerald-500" /> All {requiredRooms} rooms selected
+                <MdCheckCircle className="text-emerald-500" /> All{" "}
+                {requiredRooms} rooms selected
               </span>
             ) : (
               <span>Select this room type for all {requiredRooms} rooms</span>
@@ -341,10 +348,10 @@ const HotelDetailsPage = () => {
 
           {/* ── Right: sticky summary sidebar ── */}
           <div className="lg:col-span-1">
-              {/* ── Booking Summary Section Removed ── */}
+            {/* ── Booking Summary Section Removed ── */}
 
-              {/* Map card */}
-              {/* {mergedHotel.map && (
+            {/* Map card */}
+            {/* {mergedHotel.map && (
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                   <iframe
                     title="Hotel Map"
@@ -360,148 +367,154 @@ const HotelDetailsPage = () => {
                 </div>
               )} */}
 
-              {/* Map card */}
-              {mergedHotel?.latitude != null &&
-                mergedHotel?.longitude != null && (
-                  <div
-                    className="z-0 rounded-2xl border border-slate-200 shadow-sm overflow-hidden  cursor-pointer group"
-                    onClick={() => setMapModalOpen(true)}
-                  >
-                    {/* Thumbnail map — non-interactive overlay to capture click */}
-                    <div className="relative z-0 h-48">
-                      <MapContainer
-                        center={[mergedHotel.latitude, mergedHotel.longitude]}
-                        zoom={15}
-                        className="w-full h-full"
-                        scrollWheelZoom={false}
-                        zoomControl={false}
-                        dragging={false}
-                        doubleClickZoom={false}
-                        attributionControl={false}
+            {/* Map card */}
+            {mergedHotel?.latitude != null &&
+              mergedHotel?.longitude != null && (
+                <div
+                  className="z-0 rounded-2xl border border-slate-200 shadow-sm overflow-hidden  cursor-pointer group"
+                  onClick={() => setMapModalOpen(true)}
+                >
+                  {/* Thumbnail map — non-interactive overlay to capture click */}
+                  <div className="relative z-0 h-48">
+                    <MapContainer
+                      center={[mergedHotel.latitude, mergedHotel.longitude]}
+                      zoom={15}
+                      className="w-full h-full"
+                      scrollWheelZoom={false}
+                      zoomControl={false}
+                      dragging={false}
+                      doubleClickZoom={false}
+                      attributionControl={false}
+                    >
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      <Marker
+                        position={[mergedHotel.latitude, mergedHotel.longitude]}
                       >
-                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                        <Marker
-                          position={[
-                            mergedHotel.latitude,
-                            mergedHotel.longitude,
-                          ]}
+                        <Popup>{mergedHotel.name}</Popup>
+                      </Marker>
+                    </MapContainer>
+
+                    {/* Click overlay with expand hint */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 backdrop-blur-sm text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-full shadow flex items-center gap-1.5">
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
                         >
-                          <Popup>{mergedHotel.name}</Popup>
-                        </Marker>
-                      </MapContainer>
-
-                      {/* Click overlay with expand hint */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
-                        <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 backdrop-blur-sm text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-full shadow flex items-center gap-1.5">
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                          >
-                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-                          </svg>
-                          Click to expand
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="px-4 py-2.5 text-xs text-slate-400 flex items-center gap-1.5">
-                      <FiGlobe size={11} />
-                      {mergedHotel.address}
+                          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                        </svg>
+                        Click to expand
+                      </span>
                     </div>
                   </div>
-                )}
 
-                          {/* Flight Search Promo Banner */}
-              <div className="bg-[#C9A84C] rounded-2xl p-6 shadow-xl shadow-[#C9A84C]/20 flex flex-col items-center text-center mt-6">
-                <div className="w-12 h-12 bg-[#04112F] rounded-full flex items-center justify-center mb-4">
-                  <FaPlane className="text-[#C9A84C] text-xl" />
+                  <div className="px-4 py-2.5 text-xs text-slate-400 flex items-center gap-1.5">
+                    <FiGlobe size={11} />
+                    {mergedHotel.address}
+                  </div>
                 </div>
-                <h4 className="text-white font-black text-lg mb-2">Need a flight to this hotel?</h4>
-                <p className="text-white text-xs mb-5 leading-relaxed">
-                  Book your flight easily alongside your hotel stay. Enter your dates and we'll find the best fares for you.
-                </p>
-                <button 
-                  onClick={() => navigate('/travel', { state: { activeTab: 'flight' } })}
-                  className="w-full flex items-center justify-center gap-2 bg-[#04112F] hover:bg-[#04112F] text-[#C9A84C] px-4 py-3.5 rounded-xl font-black text-sm uppercase tracking-widest transition shadow-lg shadow-[#C9A84C]/20 active:scale-[0.98] border-none cursor-pointer"
+              )}
+
+            {/* Flight Search Promo Banner */}
+            <div className="bg-[#C9A84C] rounded-2xl p-6 shadow-xl shadow-[#C9A84C]/20 flex flex-col items-center text-center mt-6">
+              <div className="w-12 h-12 bg-[#04112F] rounded-full flex items-center justify-center mb-4">
+                <FaPlane className="text-[#C9A84C] text-xl" />
+              </div>
+              <h4 className="text-white font-black text-lg mb-2">
+                Need a flight to this hotel?
+              </h4>
+              <p className="text-white text-xs mb-5 leading-relaxed">
+                Book your flight easily alongside your hotel stay. Enter your
+                dates and we'll find the best fares for you.
+              </p>
+              <button
+                onClick={() =>
+                  navigate("/travel", { state: { activeTab: "flight" } })
+                }
+                className="w-full flex items-center justify-center gap-2 bg-[#04112F] hover:bg-[#04112F] text-[#C9A84C] px-4 py-3.5 rounded-xl font-black text-sm uppercase tracking-widest transition shadow-lg shadow-[#C9A84C]/20 active:scale-[0.98] border-none cursor-pointer"
+              >
+                Search Flights Now
+              </button>
+            </div>
+          </div>
+
+          {/* Sticky Bottom Bar for Selected Room */}
+          {Object.keys(selectedRooms).length > 0 && (
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] z-[9000] px-6 py-4 flex items-center justify-between">
+              <div className="flex flex-col max-w-[50%]">
+                <span className="text-sm font-black text-[#0A203E] truncate">
+                  {(() => {
+                    const r = Object.values(selectedRooms)[0]?.room;
+                    if (!r) return "Selected Room";
+                    return typeof r.RoomTypeName === "string" &&
+                      r.RoomTypeName.trim() !== ""
+                      ? r.RoomTypeName
+                      : Array.isArray(r.Name) && r.Name.length > 0
+                        ? r.Name[0]
+                        : typeof r.Name === "string" && r.Name.trim() !== ""
+                          ? r.Name
+                          : "Selected Room";
+                  })()}
+                </span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-0.5">
+                  {requiredRooms} Room{requiredRooms > 1 ? "s" : ""} Selected
+                </span>
+              </div>
+              <div className="flex items-center gap-6">
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
+                    Total Price
+                  </span>
+                  <span className="text-xl font-black text-[#000D26]">
+                    ₹
+                    {Object.values(selectedRooms)
+                      .reduce(
+                        (sum, r) =>
+                          sum +
+                          (r.room.TotalFare || r.room.Price?.TotalFare || 0),
+                        0,
+                      )
+                      .toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <button
+                  onClick={handleContinue}
+                  className="bg-[#C9A84C] hover:brightness-110 text-[#0A203E] px-8 py-3.5 rounded-xl font-black text-[11px] tracking-widest uppercase shadow-xl shadow-[#C9A84C]/30 active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer border-none"
                 >
-                  Search Flights Now
+                  Proceed to Review
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
                 </button>
               </div>
-      </div>
-
-      {/* Sticky Bottom Bar for Selected Room */}
-      {Object.keys(selectedRooms).length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] z-[9000] px-6 py-4 flex items-center justify-between">
-          <div className="flex flex-col max-w-[50%]">
-            <span className="text-sm font-black text-[#0A203E] truncate">
-              {(() => {
-                const r = Object.values(selectedRooms)[0]?.room;
-                if (!r) return "Selected Room";
-                return typeof r.RoomTypeName === "string" && r.RoomTypeName.trim() !== ""
-                  ? r.RoomTypeName
-                  : Array.isArray(r.Name) && r.Name.length > 0
-                    ? r.Name[0]
-                    : typeof r.Name === "string" && r.Name.trim() !== ""
-                      ? r.Name
-                      : "Selected Room";
-              })()}
-            </span>
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-0.5">
-              {requiredRooms} Room{requiredRooms > 1 ? "s" : ""} Selected
-            </span>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
-                Total Price
-              </span>
-              <span className="text-xl font-black text-[#000D26]">
-                ₹{Object.values(selectedRooms).reduce(
-                  (sum, r) =>
-                    sum +
-                    ((r.room.TotalFare || r.room.Price?.TotalFare || 0)),
-                  0
-                ).toLocaleString("en-IN")}
-              </span>
             </div>
-            <button
-              onClick={handleContinue}
-              className="bg-[#C9A84C] hover:brightness-110 text-[#0A203E] px-8 py-3.5 rounded-xl font-black text-[11px] tracking-widest uppercase shadow-xl shadow-[#C9A84C]/30 active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer border-none"
-            >
-              Proceed to Review
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
+          )}
 
-      <MapModal
-          open={mapModalOpen}
-          onClose={() => setMapModalOpen(false)}
-          lat={mergedHotel?.latitude}
-          lng={mergedHotel?.longitude}
-          name={mergedHotel?.name}
-          address={mergedHotel?.address}
-        />
+          <MapModal
+            open={mapModalOpen}
+            onClose={() => setMapModalOpen(false)}
+            lat={mergedHotel?.latitude}
+            lng={mergedHotel?.longitude}
+            name={mergedHotel?.name}
+            address={mergedHotel?.address}
+          />
+        </div>
       </div>
     </div>
-  </div>
   );
 };
 
