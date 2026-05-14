@@ -958,7 +958,7 @@ function FareBreakdownSection({ priceBreakUp, totalFare }) {
           Final Invoice Amount
         </span>
         <span className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">
-          ₹{Number(totalFare).toLocaleString("en-IN")}
+          ₹{(totalFare).toLocaleString("en-IN")}
         </span>
       </div>
     </div>

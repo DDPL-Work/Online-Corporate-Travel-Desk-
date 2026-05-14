@@ -1685,13 +1685,19 @@ exports.downloadTicketPdf = asyncHandler(async (req, res) => {
   const details = await tboService.getBookingDetails(pnr);
 
   // ✅ generate PDF
-  const pdfPath = await pdfService.generateFlightTicketPdf({
+  const pdfBuffer = await pdfService.generateFlightTicketPdf({
     booking,
     journeyType,
     tboDetails: details,
   });
 
-  return res.download(pdfPath);
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=ticket-${booking.bookingReference}.pdf`,
+  );
+
+  return res.send(pdfBuffer);
 });
 
 // @desc    Employee - Get my bookings (all statuses)

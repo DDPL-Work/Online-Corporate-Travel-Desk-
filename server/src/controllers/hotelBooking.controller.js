@@ -15,7 +15,6 @@ const EVENTS = require("../events/eventConstants");
 const User = require("../models/User");
 const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
 
-
 // @desc    PreBook Hotel (TBO)
 // @route   POST /api/v1/hotel-bookings/prebook
 // @access  Private
@@ -396,37 +395,35 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
   // ── Notify Travel Admin + Manager of new hotel booking request ──
   const _hotelRequesterName = user.name?.firstName
-    ? `${user.name.firstName} ${user.name.lastName || ''}`.trim()
-    : user.name || 'Employee';
-  const _hotelOrderId = bookingRequest.orderId || bookingRequest.bookingReference;
+    ? `${user.name.firstName} ${user.name.lastName || ""}`.trim()
+    : user.name || "Employee";
+  const _hotelOrderId =
+    bookingRequest.orderId || bookingRequest.bookingReference;
 
   notify(EVENTS.BOOKING_REQUEST_CREATED, {
-    corporateId:   corporate._id,
-    employeeId:    user._id,
+    corporateId: corporate._id,
+    employeeId: user._id,
     employeeEmail: user.email,
-    employeeName:  _hotelRequesterName,
-    managerId:     approverId || null,
-    orderId:       _hotelOrderId,
-    bookingType:   'hotel',
-    amount:        bookingRequest.pricingSnapshot?.totalAmount,
-    relatedId:     bookingRequest._id,
+    employeeName: _hotelRequesterName,
+    managerId: approverId || null,
+    orderId: _hotelOrderId,
+    bookingType: "hotel",
+    amount: bookingRequest.pricingSnapshot?.totalAmount,
+    relatedId: bookingRequest._id,
   });
 
   // If a manager is selected, send BOOKING_APPROVAL_REQUIRED to them specifically
   if (approverId) {
     notify(EVENTS.BOOKING_APPROVAL_REQUIRED, {
-      corporateId:  corporate._id,
-      managerId:    approverId,
+      corporateId: corporate._id,
+      managerId: approverId,
       employeeName: _hotelRequesterName,
-      orderId:      _hotelOrderId,
-      bookingType:  'hotel',
-      amount:       bookingRequest.pricingSnapshot?.totalAmount,
-      relatedId:    bookingRequest._id,
+      orderId: _hotelOrderId,
+      bookingType: "hotel",
+      amount: bookingRequest.pricingSnapshot?.totalAmount,
+      relatedId: bookingRequest._id,
     });
   }
-
-
-
 
   return res.status(201).json({
     success: true,
@@ -914,11 +911,10 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     await notificationService.sendBookingNotification(
       booking,
       { _id: booking.userId },
-      "confirmation"
+      "confirmation",
     );
 
     /* ================= SUCCESS ================= */
-
 
     return res.status(200).json({
       success: true,
@@ -1152,9 +1148,11 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
 
   // 🔥 Fallback 1: Hit the DB for saved hotel images
   if (images.length === 0) {
-    images = booking.hotelRequest?.selectedHotel?.images || 
-             booking.hotelRequest?.rawHotelData?.Images || 
-             booking.hotelRequest?.rawHotelData?.images || [];
+    images =
+      booking.hotelRequest?.selectedHotel?.images ||
+      booking.hotelRequest?.rawHotelData?.Images ||
+      booking.hotelRequest?.rawHotelData?.images ||
+      [];
   }
 
   // 🔥 Fallback 2: Check the snapshot image
@@ -1179,7 +1177,10 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
           staticDetails?.[0] ||
           staticDetails;
         const foundImages =
-          hotelInfo?.Images || hotelInfo?.HotelImages || hotelInfo?.images || [];
+          hotelInfo?.Images ||
+          hotelInfo?.HotelImages ||
+          hotelInfo?.images ||
+          [];
 
         if (foundImages && foundImages.length > 0) {
           images = foundImages;
@@ -1192,7 +1193,10 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
               },
             });
           } catch (dbErr) {
-            console.error("FAILED TO SAVE RECOVERED IMAGES TO DB:", dbErr.message);
+            console.error(
+              "FAILED TO SAVE RECOVERED IMAGES TO DB:",
+              dbErr.message,
+            );
           }
           break; // Success!
         }
@@ -1382,7 +1386,6 @@ exports.generateHotelVoucher = asyncHandler(async (req, res) => {
   return res.download(filePath);
 });
 
-
 exports.getProjectHotelExpenses = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
 
@@ -1390,16 +1393,22 @@ exports.getProjectHotelExpenses = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Project ID is required");
   }
 
-  const expenses = await HotelBookingRequest.find({ 
+  const expenses = await HotelBookingRequest.find({
     projectId,
     corporateId: req.user.corporateId,
-    executionStatus: "voucher_generated"
+    executionStatus: "voucher_generated",
   })
     .populate("userId", "name email")
     .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 });
 
-  res.status(200).json(
-    new ApiResponse(200, expenses, "Project hotel expenses fetched successfully")
-  );
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        expenses,
+        "Project hotel expenses fetched successfully",
+      ),
+    );
 });

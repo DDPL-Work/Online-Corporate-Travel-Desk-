@@ -874,16 +874,16 @@ export const PriceSummary = ({
 
         <button
           type="button"
-          onClick={!loading && !disabled ? onSendForApproval : undefined}
-          disabled={loading || disabled}
+          onClick={!loading ? onSendForApproval : undefined}
+          disabled={loading}
           className={`w-full text-white font-black px-3 py-4 flex items-center justify-center rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg
             ${
-              loading || disabled
+              loading
                 ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
                 : "bg-[#0A203E] hover:brightness-110 shadow-[#0A203E]/20"
             }`}
         >
-          {loading ? "Submitting..." : disabled ? "Complete details to submit" : (approvalRequired ? "Send For Approval" : "Confirm & Book")}
+          {loading ? "Submitting..." : (approvalRequired ? "Send For Approval" : "Confirm & Book")}
         </button>
         {/* Approver Message */}
         <div className="mt-3 text-sm text-center">
@@ -1256,9 +1256,16 @@ export const TravelerForm = ({
                       e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
                     )
                   }
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  className={`w-full px-4 py-3 border-2 rounded-lg ${
+                    errors?.[index]?.firstName ? "border-red-500" : "border-gray-300"
+                  }`}
                   required
                 />
+                {errors?.[index]?.firstName && (
+                  <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                    {errors[index].firstName}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1293,9 +1300,16 @@ export const TravelerForm = ({
                       e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
                     )
                   }
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  className={`w-full px-4 py-3 border-2 rounded-lg ${
+                    errors?.[index]?.lastName ? "border-red-500" : "border-gray-300"
+                  }`}
                   required
                 />
+                {errors?.[index]?.lastName && (
+                  <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                    {errors[index].lastName}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1312,9 +1326,16 @@ export const TravelerForm = ({
                     onChange={(e) =>
                       updateTraveler(traveler.id, "email", e.target.value)
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    className={`w-full px-4 py-3 border-2 rounded-lg ${
+                      errors?.[index]?.email ? "border-red-500" : "border-gray-300"
+                    }`}
                     required
                   />
+                  {errors?.[index]?.email && (
+                    <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                      {errors[index].email}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -1346,6 +1367,11 @@ export const TravelerForm = ({
                     }}
                     required
                   />
+                  {errors?.[index]?.phoneWithCode && (
+                    <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                      {errors[index].phoneWithCode}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -1373,7 +1399,9 @@ export const TravelerForm = ({
                   onChange={(e) =>
                     updateTraveler(traveler.id, "gender", e.target.value)
                   }
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  className={`w-full px-4 py-3 border-2 rounded-lg ${
+                    errors?.[index]?.gender ? "border-red-500" : "border-gray-300"
+                  }`}
                   required
                 >
                   <option value="">Select Gender</option>
@@ -1381,6 +1409,11 @@ export const TravelerForm = ({
                   <option value="FEMALE">Female</option>
                   <option value="OTHER">Other</option>
                 </select>
+                {errors?.[index]?.gender && (
+                  <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                    {errors[index].gender}
+                  </p>
+                )}
               </div>
 
               {/* DOB */}
@@ -1398,8 +1431,15 @@ export const TravelerForm = ({
                     updateTraveler(traveler.id, "dob", dob);
                     updateTraveler(traveler.id, "age", age); // derived
                   }}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  className={`w-full px-4 py-3 border-2 rounded-lg ${
+                    errors?.[index]?.dob ? "border-red-500" : "border-gray-300"
+                  }`}
                 />
+                {errors?.[index]?.dob && (
+                  <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                    {errors[index].dob}
+                  </p>
+                )}
               </div>
 
               {/* Calculated Age (Read-only) */}
@@ -1437,7 +1477,9 @@ export const TravelerForm = ({
                         Number(e.target.value),
                       )
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    className={`w-full px-4 py-3 border-2 rounded-lg ${
+                      errors?.[index]?.linkedAdultIndex ? "border-red-500" : "border-gray-300"
+                    }`}
                     required
                   >
                     <option value="" disabled>
@@ -1450,7 +1492,7 @@ export const TravelerForm = ({
                     ))}
                   </select>
                   {errors?.[index]?.linkedAdultIndex && (
-                    <p className="text-xs text-red-500 mt-1">
+                    <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
                       {errors[index].linkedAdultIndex}
                     </p>
                   )}
@@ -1474,9 +1516,16 @@ export const TravelerForm = ({
                         e.target.value,
                       )
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    className={`w-full px-4 py-3 border-2 rounded-lg ${
+                      errors?.[index]?.passportNumber ? "border-red-500" : "border-gray-300"
+                    }`}
                     required
                   />
+                  {errors?.[index]?.passportNumber && (
+                    <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                      {errors[index].passportNumber}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <div>
@@ -1493,9 +1542,16 @@ export const TravelerForm = ({
                           e.target.value,
                         )
                       }
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                      className={`w-full px-4 py-3 border-2 rounded-lg ${
+                        errors?.[index]?.PassportIssueDate ? "border-red-500" : "border-gray-300"
+                      }`}
                       required
                     />
+                    {errors?.[index]?.PassportIssueDate && (
+                      <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                        {errors[index].PassportIssueDate}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -1512,9 +1568,16 @@ export const TravelerForm = ({
                           e.target.value,
                         )
                       }
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                      className={`w-full px-4 py-3 border-2 rounded-lg ${
+                        errors?.[index]?.passportExpiry ? "border-red-500" : "border-gray-300"
+                      }`}
                       required
                     />
+                    {errors?.[index]?.passportExpiry && (
+                      <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                        {errors[index].passportExpiry}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

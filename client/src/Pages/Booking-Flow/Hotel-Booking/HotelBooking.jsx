@@ -192,7 +192,7 @@ const HotelBookNow = () => {
   const totalAdults =
     hotelReq.roomGuests?.reduce((sum, r) => sum + (r.noOfAdults || 0), 0) ||
     travelers.length;
-  const baseFare = selectedRooms.reduce(
+  const totalFare = selectedRooms.reduce(
     (sum, r) => sum + (r.totalFare || r.price?.totalFare || 0),
     0,
   );
@@ -201,8 +201,7 @@ const HotelBookNow = () => {
     (sum, r) => sum + (r.totalTax || r.price?.tax || 0),
     0,
   );
-
-  const totalFare = baseFare + tax;
+  const baseFare = totalFare - tax;
 
   const isApproved = bookingRequest?.requestStatus === "approved";
 

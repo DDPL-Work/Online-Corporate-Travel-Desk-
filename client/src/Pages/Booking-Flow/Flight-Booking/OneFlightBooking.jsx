@@ -608,6 +608,7 @@ export default function OneFlightBooking() {
 
       mealList.forEach((meal, travelerIndex) => {
         meals.push({
+          ...meal, // Save full details for future use
           segmentIndex: Number(segmentIndex),
           travelerIndex,
           code: meal.Code,
@@ -631,6 +632,7 @@ export default function OneFlightBooking() {
       const [, segmentIndex] = key.split("|");
 
       baggage.push({
+        ...bag, // Save full details for future use
         segmentIndex: Number(segmentIndex),
         code: bag.Code,
         weight: bag.Weight,
@@ -1260,7 +1262,6 @@ export default function OneFlightBooking() {
                 approverError={approverError}
                 onSendForApproval={handleSendForApproval}
                 loading={actionLoading}
-                disabled={!isFormReady}
                 approvalRequired={approvalRequired}
               />
 

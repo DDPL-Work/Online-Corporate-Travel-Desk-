@@ -547,6 +547,7 @@ export default function MultiCityFlightBooking() {
 
       mealList.forEach((meal, travelerIndex) => {
         meals.push({
+          ...meal, // Save full details for future use
           segmentIndex: Number(segmentIndex),
           travelerIndex,
           code: meal.Code,
@@ -570,6 +571,7 @@ export default function MultiCityFlightBooking() {
       const [, segmentIndex] = key.split("|");
 
       baggage.push({
+        ...bag, // Save full details for future use
         segmentIndex: Number(segmentIndex),
         code: bag.Code,
         weight: bag.Weight,
@@ -790,7 +792,45 @@ export default function MultiCityFlightBooking() {
     return isValid;
   };
 
+  const validateMandatorySSR = () => {
+    const validators = fareQuote?.Response?.Results?.RequiredFieldValidators;
+    if (!validators) return { valid: true };
+
+    const errors = [];
+    const isMealRequired = validators?.IsMealRequired;
+    const isSeatRequired = validators?.IsSeatRequired;
+
+    if (isMealRequired) {
+      const hasMeal = Object.values(selectedMeals).some((v) => v?.length > 0);
+      if (!hasMeal) errors.push("Meal selection is required");
+    }
+
+    if (isSeatRequired) {
+      const hasSeat = Object.values(selectedSeats).some(
+        (v) => v?.list?.length > 0,
+      );
+      if (!hasSeat) errors.push("Seat selection is required");
+    }
+
+    return {
+      valid: errors.length === 0,
+      message: errors.join(" & "),
+    };
+  };
+
   const handleSendForApproval = async () => {
+    // 🚨 SSR VALIDATION
+    const ssrCheck = validateMandatorySSR();
+    if (!ssrCheck.valid) {
+      Swal.fire({
+        icon: "warning",
+        title: "Required Selection Missing",
+        text: ssrCheck.message,
+        confirmButtonColor: "#f97316",
+      });
+      return;
+    }
+
     if (!purposeOfTravel) {
       ToastWithTimer({
         type: "error",
