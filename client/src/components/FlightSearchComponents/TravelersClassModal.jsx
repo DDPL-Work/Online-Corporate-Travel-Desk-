@@ -223,27 +223,6 @@ export default function TravelersClassModal({
               disableInc={total >= MAX_TRAVELERS}
             />
 
-            {/* 🔥 Child Age Selectors */}
-            {counts.children > 0 && (
-              <div className="ml-12 mt-2 mb-4 grid grid-cols-2 gap-2">
-                {childAges.map((age, idx) => (
-                  <div key={idx} className="flex flex-col gap-1">
-                    <label className="text-[8px] font-bold text-slate-400 uppercase">Child {idx + 1} Age</label>
-                    <select
-                      value={age}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onChange={(e) => updateChildAge(idx, e.target.value)}
-                      className="text-[10px] font-bold border border-slate-200 rounded-lg px-2 py-1 bg-white outline-none focus:border-amber-400 transition-all"
-                    >
-                      {Array.from({ length: 11 }, (_, i) => i + 2).map((a) => (
-                        <option key={a} value={a}>{a} years</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div className="h-px bg-slate-100 ml-12" />
             <PassengerRow
               label="Infants"

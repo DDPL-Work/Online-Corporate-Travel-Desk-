@@ -26,7 +26,10 @@ import {
 } from "../../../Redux/Actions/flight.thunks";
 import api from "../../../API/axios";
 import SeatSelectionModal from "./SSR/SeatSelectionModal";
-import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import {
+  createBookingRequest,
+  instantFlightBooking,
+} from "../../../Redux/Actions/booking.thunks";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { approveApproval } from "../../../Redux/Actions/approval.thunks";
 import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
@@ -547,6 +550,7 @@ export default function MultiCityFlightBooking() {
 
       mealList.forEach((meal, travelerIndex) => {
         meals.push({
+          ...meal, // Save full details for future use
           segmentIndex: Number(segmentIndex),
           travelerIndex,
           code: meal.Code,
@@ -570,6 +574,7 @@ export default function MultiCityFlightBooking() {
       const [, segmentIndex] = key.split("|");
 
       baggage.push({
+        ...bag, // Save full details for future use
         segmentIndex: Number(segmentIndex),
         code: bag.Code,
         weight: bag.Weight,
@@ -790,7 +795,45 @@ export default function MultiCityFlightBooking() {
     return isValid;
   };
 
+  const validateMandatorySSR = () => {
+    const validators = fareQuote?.Response?.Results?.RequiredFieldValidators;
+    if (!validators) return { valid: true };
+
+    const errors = [];
+    const isMealRequired = validators?.IsMealRequired;
+    const isSeatRequired = validators?.IsSeatRequired;
+
+    if (isMealRequired) {
+      const hasMeal = Object.values(selectedMeals).some((v) => v?.length > 0);
+      if (!hasMeal) errors.push("Meal selection is required");
+    }
+
+    if (isSeatRequired) {
+      const hasSeat = Object.values(selectedSeats).some(
+        (v) => v?.list?.length > 0,
+      );
+      if (!hasSeat) errors.push("Seat selection is required");
+    }
+
+    return {
+      valid: errors.length === 0,
+      message: errors.join(" & "),
+    };
+  };
+
   const handleSendForApproval = async () => {
+    // 🚨 SSR VALIDATION
+    const ssrCheck = validateMandatorySSR();
+    if (!ssrCheck.valid) {
+      Swal.fire({
+        icon: "warning",
+        title: "Required Selection Missing",
+        text: ssrCheck.message,
+        confirmButtonColor: "#f97316",
+      });
+      return;
+    }
+
     if (!purposeOfTravel) {
       ToastWithTimer({
         type: "error",
@@ -838,39 +881,47 @@ export default function MultiCityFlightBooking() {
 
     try {
       const payload = buildBookingRequestPayload();
-      if (approvalRequired) {
-        await dispatch(
-          selectManager({
-            approverId: projectApproverData.approver?.id,
-            approverEmail: projectApproverData.approver?.email,
-            projectCodeId: projectApproverData.project?.id,
-            projectName: projectApproverData.project?.name,
-            projectClient: projectApproverData.project?.client,
-          }),
-        ).unwrap();
-      }
-      const result = await dispatch(createBookingRequest(payload)).unwrap();
-
+      let result;
       if (!approvalRequired) {
-        const requestId = result.bookingRequestId || result._id;
-        if (requestId && result.requestStatus !== "approved") {
+        // ✅ Use instant booking API for auto-approved policies
+        result = await dispatch(instantFlightBooking(payload)).unwrap();
+        ToastWithTimer({
+          type: "success",
+          message: "Flight booked automatically per policy",
+        });
+      } else {
+        // ✅ Traditional approval workflow
+        if (!isTravelAdmin) {
           await dispatch(
-            approveApproval({
-              id: requestId,
-              comments: "Self Approved by Travel Admin",
-              type: "flight",
+            selectManager({
+              approverId: projectApproverData.approver?.id,
+              approverEmail: projectApproverData.approver?.email,
+              projectCodeId: projectApproverData.project?.id,
+              projectName: projectApproverData.project?.name,
+              projectClient: projectApproverData.project?.client,
             }),
           ).unwrap();
         }
-        ToastWithTimer({
-          type: "success",
-          message: "Booking auto-approved successfully",
-        });
+        result = await dispatch(createBookingRequest(payload)).unwrap();
+
+        // Handle case where it might still be auto-approved at backend but we used createBookingRequest
+        if (result.autoApproved || result.requestStatus === "approved") {
+          ToastWithTimer({
+            type: "success",
+            message: "Booking auto-approved successfully",
+          });
+        }
       }
 
-      navigate("/my-pending-approvals", {
-        state: { success: true },
-      });
+      if (result.autoApproved || result.requestStatus === "approved") {
+        navigate("/my-bookings", {
+          state: { success: true },
+        });
+      } else {
+        navigate("/my-pending-approvals", {
+          state: { success: true },
+        });
+      }
     } catch (err) {
       ToastWithTimer({
         type: "error",

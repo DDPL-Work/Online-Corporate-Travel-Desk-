@@ -29,7 +29,7 @@ import {
   fetchCycleTransactions,
 } from "../../Redux/Actions/postpaidThunks";
 import { clearCycleTransactions } from "../../Redux/Slice/postpaidSlice";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import Pagination from "../Shared/Pagination";
 import TableActionBar from "../Shared/TableActionBar";
 

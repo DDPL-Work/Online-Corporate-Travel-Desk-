@@ -446,8 +446,11 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6"
-      style={{ background: "rgba(0,13,38,0.85)", backdropFilter: "blur(12px)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 cursor-pointer"
+      style={{ background: "rgba(0,13,38,0.6)", backdropFilter: "blur(8px)" }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -457,7 +460,7 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
       `}</style>
 
       <div
-        className="relative w-full flex shadow-2xl shadow-slate-950/60 rounded-3xl overflow-hidden"
+        className="relative w-full flex shadow-2xl shadow-slate-950/60 rounded-3xl overflow-hidden cursor-default"
         style={{
           fontFamily: "'DM Sans',sans-serif",
           maxWidth: "950px",

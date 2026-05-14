@@ -2521,8 +2521,7 @@ export default function BookingDetails() {
     !isCancelled &&
     !isTravelPassed;
 
-  const handleDownloadTicket = async (journeyType) => {
-    if (!pnrsByJourney[journeyType]) return;
+  const handleDownloadTicket = async (journeyType = "full") => {
     setDownloading(journeyType);
     await dispatch(downloadTicketPdf({ bookingId: booking._id, journeyType }));
     setDownloading(null);
@@ -2568,26 +2567,14 @@ export default function BookingDetails() {
 
             {paymentSuccessful && !isCancelled && (
               <div className="flex items-center gap-2 border-l border-gray-200 pl-4 ml-1">
-                {pnrsByJourney.onward && (
-                  <button
-                    onClick={() => handleDownloadTicket("onward")}
-                    disabled={downloading === "onward"}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition disabled:opacity-50 shadow-sm"
-                  >
-                    <FiDownload size={13} className="text-teal-400" />
-                    {downloading === "onward" ? "Downloading" : isRoundTrip ? "Ticket (Onward)" : "Download Ticket"}
-                  </button>
-                )}
-                {isRoundTrip && pnrsByJourney.return && (
-                  <button
-                    onClick={() => handleDownloadTicket("return")}
-                    disabled={downloading === "return"}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition disabled:opacity-50 shadow-sm"
-                  >
-                    <FiDownload size={13} className="text-teal-400" />
-                    {downloading === "return" ? "Downloading" : "Ticket (Return)"}
-                  </button>
-                )}
+                <button
+                  onClick={() => handleDownloadTicket("full")}
+                  disabled={downloading === "full"}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition disabled:opacity-50 shadow-sm"
+                >
+                  <FiDownload size={13} className="text-teal-400" />
+                  {downloading === "full" ? "Downloading" : "Download E-Ticket"}
+                </button>
               </div>
             )}
           </div>

@@ -11,6 +11,12 @@ router.use(verifyToken);
 // create booking request
 router.post("/", corporateContext, bookingsController.createBookingRequest);
 
+router.post(
+  "/instant-flight-book",
+  corporateContext,
+  bookingsController.instantFlightBooking,
+);
+
 // employee routes
 router.get("/my/rejected", bookingsController.getMyRejectedRequests);
 router.get("/my-bookings", bookingsController.getMyBookings);

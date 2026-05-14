@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { approveCorporate } from "../Redux/Slice/corporateListSlice";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { 
   FaWallet, 
   FaCreditCard, 

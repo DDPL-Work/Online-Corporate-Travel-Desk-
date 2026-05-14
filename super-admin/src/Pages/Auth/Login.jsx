@@ -50,14 +50,14 @@ const Login = () => {
             case "ops-member":
               // Dynamic redirect based on permissions
               const perms = data.user?.permissions || [];
-              let target = "/bookings-summary"; // fallback
-              
+              let target = "/unauthorized";
+
               if (perms.includes("Manage Corporates")) target = "/pending-corporates";
               else if (perms.includes("View Bookings")) target = "/bookings-summary";
               else if (perms.includes("Manage Cancellations")) target = "/cancellation-summary";
               else if (perms.includes("View Finance")) target = "/corporate-revenue";
+              else if (perms.includes("SEO Management")) target = "/blog-and-articles";
               
-              if (perms.length === 0) target = "/unauthorized";
               navigate(target);
               break;
 

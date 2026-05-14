@@ -15,10 +15,10 @@ const EVENTS = require("../events/eventConstants");
 // @route   POST /ops/create
 // @access  Super Admin
 exports.createOpsMember = asyncHandler(async (req, res) => {
-  const { name, email, phone, role, department, permissions, password } = req.body;
+  const { name, email, phone, role, permissions, password } = req.body;
 
   // Validation
-  if (!name || !email || !phone || !role || !department) {
+  if (!name || !email || !phone || !role) {
     throw new ApiError(400, "All required fields must be filled");
   }
 
@@ -36,7 +36,6 @@ exports.createOpsMember = asyncHandler(async (req, res) => {
     email: email.toLowerCase(),
     phone,
     role,
-    department,
     permissions: permissions || [],
     password: actualPassword,
   });
@@ -48,7 +47,6 @@ exports.createOpsMember = asyncHandler(async (req, res) => {
       email: newMember.email,
       name: newMember.name,
       role: newMember.role,
-      department: newMember.department,
       permissions: newMember.permissions,
       password: actualPassword,
       dashboardUrl: process.env.SUPER_ADMIN_URL || `${process.env.FRONTEND_URL}/ops-login`,
@@ -75,7 +73,7 @@ exports.createOpsMember = asyncHandler(async (req, res) => {
 // @route   GET /ops/list
 // @access  Super Admin
 exports.listOpsMembers = asyncHandler(async (req, res) => {
-  const { search, role, department, status } = req.query;
+  const { search, role, status } = req.query;
 
   let query = { isDeleted: false };
 
@@ -87,7 +85,6 @@ exports.listOpsMembers = asyncHandler(async (req, res) => {
   }
 
   if (role) query.role = role;
-  if (department) query.department = department;
   if (status) query.status = status;
 
   const members = await OpsMember.find(query)
@@ -102,7 +99,7 @@ exports.listOpsMembers = asyncHandler(async (req, res) => {
 // @access  Super Admin
 exports.updateOpsMember = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, phone, role, department, permissions, email } = req.body;
+  const { name, phone, role, permissions, email } = req.body;
 
   const member = await OpsMember.findOne({ _id: id, isDeleted: false });
   if (!member) {
@@ -121,7 +118,6 @@ exports.updateOpsMember = asyncHandler(async (req, res) => {
   if (name) member.name = name;
   if (phone) member.phone = phone;
   if (role) member.role = role;
-  if (department) member.department = department;
   
   let permissionsChanged = false;
   let oldPermissions = [...member.permissions];
@@ -217,7 +213,6 @@ exports.resetPassword = asyncHandler(async (req, res) => {
       email: member.email,
       name: member.name,
       role: member.role,
-      department: member.department,
       permissions: member.permissions,
       password: actualPassword,
       dashboardUrl: process.env.SUPER_ADMIN_URL || `${process.env.FRONTEND_URL}/ops-login`,

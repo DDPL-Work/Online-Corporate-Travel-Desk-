@@ -912,7 +912,7 @@ function GuestSection({ travellers = [] }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  08 Fare Breakdown (Travel Admin Only)                          */
 /* ─────────────────────────────────────────────────────────────── */
-function FareBreakdownSection({ priceBreakUp, totalFare }) {
+function FareBreakdownSection({ priceBreakUp, totalFare, detailRoom }) {
   if (!priceBreakUp) return null;
 
   return (
@@ -923,9 +923,11 @@ function FareBreakdownSection({ priceBreakUp, totalFare }) {
         </div>
         <div className="flex flex-col gap-3">
           <div className="flex justify-between text-[14px]">
-            <span className="text-[#7A7068]">Room Rate</span>
+            <span className="text-[#7A7068]">Base Price (Per Night/Person)</span>
             <span className="font-semibold">
-              ₹{priceBreakUp.RoomRate?.toLocaleString("en-IN")}
+              ₹{(detailRoom?.DayRates?.[0]?.[0]?.BasePrice || 
+                 detailRoom?.DayRates?.[0]?.[0]?.RoomRate || 
+                 priceBreakUp.RoomRate)?.toLocaleString("en-IN")}
             </span>
           </div>
           {priceBreakUp.RoomExtraGuestCharges > 0 && (
@@ -958,7 +960,7 @@ function FareBreakdownSection({ priceBreakUp, totalFare }) {
           Final Invoice Amount
         </span>
         <span className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">
-          ₹{Number(totalFare).toLocaleString("en-IN")}
+          ₹{(totalFare).toLocaleString("en-IN")}
         </span>
       </div>
     </div>
@@ -1894,6 +1896,7 @@ export default function HotelBookingDetails() {
             <FareBreakdownSection
               priceBreakUp={priceBreakUp}
               totalFare={totalFare}
+              detailRoom={detailRoom}
             />
           </section>
         )}
@@ -1964,7 +1967,7 @@ function BookingHistory({ booking }) {
     {
       label: "Request Created",
       date: ensureUTC(booking.createdAt),
-      desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
+      desc: "Booking request was successfully created.",
       icon: <FiClock size={14} />,
       active: true,
     },
@@ -1976,16 +1979,34 @@ function BookingHistory({ booking }) {
         const isApproved = booking.approvedAt || booking.requestStatus === "approved";
         
         if (isRejected) {
-          return `Rejected by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+          const fullName = `${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""}`.trim();
+          const email = booking.approvedBy?.email || booking.approverEmail;
+          return `Rejected by ${fullName || "Manager"}${email ? ` (${email})` : ""}`;
         }
         if (isApproved) {
-          const reqEmail = booking.userId?.email || booking.requesterDetails?.email;
+          const reqEmail =
+            booking.userId?.email || booking.requesterDetails?.email;
           const appEmail = booking.approvedBy?.email || booking.approverEmail;
           const isSameUser = reqEmail && appEmail && reqEmail === appEmail;
-          if (booking.approverName === "Auto Approve" || isSameUser) {
-             return "Auto Approved by System (Travel Policy)";
+
+          // If explicitly auto-approved, or same user (self-approved), or no approver info exists
+          if (
+            booking.approverName === "Auto Approve" ||
+            isSameUser ||
+            (!booking.approvedBy && !booking.approverName)
+          ) {
+            return "Auto Approved";
           }
-          return `Approved by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+
+          const firstName =
+            booking.approvedBy?.name?.firstName || booking.approverName || "";
+          const lastName = booking.approvedBy?.name?.lastName || "";
+          const fullName = `${firstName} ${lastName}`.trim();
+          const email = booking.approvedBy?.email || booking.approverEmail;
+
+          if (!fullName && !email) return "Auto Approved";
+
+          return `Approved by ${fullName}${email ? ` (${email})` : ""}`;
         }
         return "Waiting for manager approval";
       })(),

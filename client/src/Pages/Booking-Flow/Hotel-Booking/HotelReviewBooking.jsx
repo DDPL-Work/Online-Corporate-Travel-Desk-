@@ -46,6 +46,7 @@ import {
   fetchHotelRequestById,
   executeHotelBooking,
   preBookHotel,
+  instantHotelBooking,
 } from "../../../Redux/Actions/hotelBooking.thunks";
 import { approveApproval } from "../../../Redux/Actions/approval.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
@@ -744,30 +745,44 @@ function SelectedRoomDetailsCard({
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
                 Supplements
               </p>
-              {room?.Supplements?.[0]?.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {room.Supplements[0].map((sup, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-xl border border-slate-200 bg-white p-3 flex justify-between items-center shadow-sm hover:border-[#C9A84C]/50 transition-all"
-                    >
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-slate-800 capitalize">
-                          {sup.Description?.replace(/_/g, " ")}
-                        </span>
-                        <span className="text-[10px] text-slate-500">
-                          {sup.Type?.replace(/([A-Z])/g, " $1").trim()}
-                        </span>
-                      </div>
-                      <div className="text-right flex flex-col">
-                        <span className="text-sm font-black text-[#C9A84C]">
-                          {sup.Price === 0
-                            ? "Included"
-                            : `${sup.Currency} ${sup.Price}`}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+              {room?.Supplements?.some((s) => s?.length > 0) ? (
+                <div className="flex flex-col gap-4">
+                  {room.Supplements.map(
+                    (roomSup, roomIdx) =>
+                      roomSup?.length > 0 && (
+                        <div key={roomIdx} className="space-y-2">
+                          {room.Supplements.length > 1 && (
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                              Room {roomIdx + 1}
+                            </p>
+                          )}
+                          <div className="flex flex-col gap-2">
+                            {roomSup.map((sup, idx) => (
+                              <div
+                                key={idx}
+                                className="rounded-xl border border-slate-200 bg-white p-3 flex justify-between items-center shadow-sm hover:border-[#C9A84C]/50 transition-all"
+                              >
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-bold text-slate-800 capitalize">
+                                    {sup.Description?.replace(/_/g, " ")}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500">
+                                    {sup.Type?.replace(/([A-Z])/g, " $1").trim()}
+                                  </span>
+                                </div>
+                                <div className="text-right flex flex-col">
+                                  <span className="text-sm font-black text-[#C9A84C]">
+                                    {sup.Price === 0
+                                      ? "Included"
+                                      : `${sup.Currency} ${sup.Price}`}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ),
+                  )}
                 </div>
               ) : (
                 <div className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 flex items-center gap-2">
@@ -1630,7 +1645,9 @@ const HotelReviewBooking = () => {
         latitude: safeHotel?.Latitude || safeHotel?.latitude,
         longitude: safeHotel?.Longitude || safeHotel?.longitude,
         rawHotelData: safeHotel,
-        selectedRoom,
+        selectedRoom: (preBookRooms.length > 0 ? preBookRooms : selectedRoom)[0],
+        traceId: preBookData?.TraceId || searchParams?.traceId || searchParams?.TraceId,
+        preBookResponse: preBookData,
         roomIndex: selectedRoom?.RoomIndex,
         checkIn: search?.checkIn,
         checkOut: search?.checkOut,
@@ -1740,28 +1757,26 @@ const HotelReviewBooking = () => {
         }
       }
 
-      const result = await dispatch(
-        createHotelBookingRequest(payload),
-      ).unwrap();
-
       if (!approvalRequired) {
-        const requestId = result.bookingRequestId || result._id;
-        if (requestId && result.requestStatus !== "approved") {
-          await dispatch(
-            approveApproval({
-              id: requestId,
-              comments: "Self Approved by Travel Admin",
-              type: "hotel",
-            }),
-          ).unwrap();
+        const result = await dispatch(instantHotelBooking(payload)).unwrap();
+
+        if (result.status === "booked") {
+          ToastWithTimer({
+            type: "success",
+            message: "Hotel booked instantly successfully!",
+          });
+          navigate("/my-bookings");
+        } else {
+          ToastWithTimer({
+            type: "success",
+            message: "Booking request submitted successfully",
+          });
+          navigate("/my-pending-approvals");
         }
-        ToastWithTimer({
-          type: "success",
-          message: "Booking auto-approved successfully",
-        });
-        navigate("/my-pending-approvals");
         return;
       }
+
+      const result = await dispatch(createHotelBookingRequest(payload)).unwrap();
 
       ToastWithTimer({
         type: "success",

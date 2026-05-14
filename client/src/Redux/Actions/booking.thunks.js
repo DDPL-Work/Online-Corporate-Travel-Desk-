@@ -23,6 +23,21 @@ export const createBookingRequest = createAsyncThunk(
   },
 );
 
+// INSTANT FLIGHT BOOKING (Auto-approval compliant)
+export const instantFlightBooking = createAsyncThunk(
+  "bookings/instantFlightBooking",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post("/bookings/instant-flight-book", payload);
+      return data.data; // { bookingRequestId, orderId, autoApproved, bookingResult }
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Instant flight booking failed",
+      );
+    }
+  },
+);
+
 // GET logged-in user's booking requests (EMPLOYEE)
 export const fetchMyBookingRequests = createAsyncThunk(
   "bookings/fetchMyRequests",

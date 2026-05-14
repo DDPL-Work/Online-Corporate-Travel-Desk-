@@ -5,7 +5,7 @@ import {
   FiSearch, FiPlus, FiFilter, FiEdit2, FiTrash2,
   FiMoreVertical, FiUserPlus, FiShield, FiCheckCircle, FiXCircle, FiLock
 } from "react-icons/fi";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { listOpsMembers, updateOpsStatus, deleteOpsMember } from "../../API/opsAPI";
 import OpsMemberModal from "../../Modal/OpsMemberModal";
 import { ToastConfirm } from "../../utils/ToastConfirm";
@@ -37,7 +37,6 @@ export default function OpsTeamManagement() {
   // Filter states
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
-  const [deptFilter, setDeptFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
   const fetchMembers = async () => {
@@ -46,7 +45,6 @@ export default function OpsTeamManagement() {
       const res = await listOpsMembers({ 
         search, 
         role: roleFilter, 
-        department: deptFilter, 
         status: statusFilter 
       });
       setMembers(res.data || []);
@@ -60,7 +58,7 @@ export default function OpsTeamManagement() {
   useEffect(() => {
     const timer = setTimeout(fetchMembers, 300);
     return () => clearTimeout(timer);
-  }, [search, roleFilter, deptFilter, statusFilter]);
+  }, [search, roleFilter, statusFilter]);
 
   const handleToggleStatus = (member) => {
     const newStatus = member.status === "Active" ? "Inactive" : "Active";
@@ -153,21 +151,10 @@ export default function OpsTeamManagement() {
               <option value="Booking Manager">Booking Manager</option>
               <option value="Support Agent">Support Agent</option>
               <option value="Finance OPS">Finance OPS</option>
+              <option value="SEO Specialist">SEO Specialist</option>
             </select>
           </FilterItem>
 
-          <FilterItem label="Department">
-            <select
-              value={deptFilter}
-              onChange={(e) => setDeptFilter(e.target.value)}
-              className="px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-[#0A4D68]/10 cursor-pointer"
-            >
-              <option value="">All Departments</option>
-              <option value="Flights">Flights</option>
-              <option value="Hotels">Hotels</option>
-              <option value="Both">Both</option>
-            </select>
-          </FilterItem>
 
           <FilterItem label="Status">
             <select
@@ -198,7 +185,6 @@ export default function OpsTeamManagement() {
                 <tr className="bg-[#0A4D68] text-white">
                   <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Name & Role</th>
                   <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Contact</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Department</th>
                   <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Status</th>
                   <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Joined Date</th>
                   <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Actions</th>
@@ -234,11 +220,6 @@ export default function OpsTeamManagement() {
                           <span className="text-xs text-slate-600 font-medium">{member.email}</span>
                           <span className="text-[10px] text-slate-400 font-mono">{member.phone}</span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-2 py-1 rounded-md bg-teal-50 text-teal-700 text-[10px] font-bold uppercase tracking-wide">
-                          {member.department}
-                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <MemberStatusBadge status={member.status} />

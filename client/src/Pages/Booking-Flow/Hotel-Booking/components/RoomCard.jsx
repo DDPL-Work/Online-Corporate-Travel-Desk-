@@ -19,7 +19,7 @@ import {
 } from "react-icons/fa";
 import { RiRestaurant2Line } from "react-icons/ri";
 
-const RoomCard = ({ room, count, onAdd, onRemove }) => {
+const RoomCard = ({ room, count, onAdd, onRemove, onSeeDetails }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [imgIndex, setImgIndex] = useState(0);
 
@@ -150,7 +150,7 @@ const RoomCard = ({ room, count, onAdd, onRemove }) => {
             {inclusions.length > 6 && (
               <button
                 onClick={() => setShowDetails(!showDetails)}
-                className="flex items-center gap-1 text-[10px] lg:text-[11px] font-black text-[#C9A84C] hover:text-[#B89635] uppercase tracking-widest transition-colors mt-3"
+                className="flex items-center gap-1 text-[10px] lg:text-[11px] font-black text-[#C9A84C] hover:text-[#B89635] uppercase tracking-widest transition-colors mt-3 border-none bg-transparent cursor-pointer"
               >
                 {showDetails ? (
                   <>
@@ -165,6 +165,19 @@ const RoomCard = ({ room, count, onAdd, onRemove }) => {
                 )}
               </button>
             )}
+
+            {/* 🔥 NEW SEE DETAILS LINK */}
+            <div className="pt-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSeeDetails(room);
+                }}
+                className="text-[11px] font-black text-[#C9A84C] hover:underline bg-transparent border-none cursor-pointer uppercase tracking-widest"
+              >
+                See Room Details & Rules
+              </button>
+            </div>
           </div>
         </div>
 

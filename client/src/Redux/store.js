@@ -35,6 +35,7 @@ import adminBookingReducer from "./Slice/travelAdmin.slice.js";
 import ssrPolicyReducer from "./Slice/ssrPolicy.slice.js";
 import landingPageReducer from "./Slice/landingPageSlice.js";
 import reissueReducer from "./Slice/reissueSlice.js";
+import blogReducer from "./Slice/blog.slice.js";
 
 export const store = configureStore({
   reducer: {
@@ -82,5 +83,6 @@ export const store = configureStore({
     // Landing Page & Branding
     landingPage: landingPageReducer,
     reissue: reissueReducer,
+    blogs: blogReducer,
   },
 });
