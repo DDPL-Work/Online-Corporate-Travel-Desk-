@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import {
   FiX,
@@ -22,6 +22,8 @@ import {
   FiMoon,
   FiAlertCircle,
   FiMail,
+  FiChevronLeft,
+  FiChevronRight,
 } from "react-icons/fi";
 import {
   formatDate,
@@ -71,6 +73,14 @@ const getBaggageDesc = (desc) => {
 };
 
 const resolveApproverDetails = (booking) => {
+  if (booking?.approverName === "Auto Approve") {
+    return {
+      name: "Auto Approved",
+      email: "",
+      role: "System",
+    };
+  }
+
   const approver =
     booking?.approverId ||
     booking?.approvedBy ||
@@ -90,7 +100,7 @@ const resolveApproverDetails = (booking) => {
 
   return {
     name,
-    email: approver?.email || booking?.approverEmail || "N/A",
+    email: approver?.email || booking?.approverEmail || "",
     role: approver?.role || booking?.approverRole || "manager",
   };
 };
@@ -168,6 +178,17 @@ export const PendingHotelDetailsModal = ({
   isDiscarded = false,
 }) => {
   const [activeTab, setActiveTab] = useState("details");
+  const tabsRef = useRef(null);
+
+  const scrollTabs = (direction) => {
+    if (tabsRef.current) {
+      const scrollAmount = 200;
+      tabsRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
 
   if (!booking) return null;
 
@@ -180,27 +201,54 @@ export const PendingHotelDetailsModal = ({
     : roomData.rawRoomData
       ? [roomData.rawRoomData]
       : [];
+
+  // Group rooms by BookingCode or Name to avoid repetition
+  const groupedRooms = rawRooms.reduce((acc, room) => {
+    const key =
+      room.BookingCode ||
+      room.RoomTypeCode ||
+      (Array.isArray(room.Name) ? room.Name[0] : room.Name) ||
+      "Standard";
+
+    // TBO sometimes returns a single object representing multiple rooms (e.g. Name is an array)
+    const innerCount = Array.isArray(room.Name) ? room.Name.length : 1;
+
+    if (!acc[key]) {
+      acc[key] = { ...room, count: innerCount };
+    } else {
+      acc[key].count += innerCount;
+    }
+    return acc;
+  }, {});
+  const displayRooms = Object.values(groupedRooms);
+
   const approver = resolveApproverDetails(booking);
 
   // 💰 PRICE CALCULATION FALLBACK
   const { totalAmount, baseFare, tax } = (() => {
-    let total = booking.pricingSnapshot?.totalAmount;
+    // 1. Try pricingSnapshot first (most reliable)
+    let total =
+      booking.pricingSnapshot?.totalAmount || booking.bookingSnapshot?.amount;
     let base = roomData.Price?.baseFare;
     let tx = roomData.Price?.tax;
 
-    // If total is missing, sum from rooms
+    // 2. Try from selectedRoom directly if snapshot is missing
+    if (!total && roomData.totalFare) total = roomData.totalFare;
+    if (!tx && roomData.totalTax) tx = roomData.totalTax;
+
+    // 3. Sum from raw rooms if still missing
     if (!total && rawRooms.length > 0) {
-      total = rawRooms.reduce((sum, r) => {
-        return sum + (r.TotalFare || r.Price?.totalFare || 0);
-      }, 0);
+      total = rawRooms.reduce(
+        (sum, r) => sum + (r.TotalFare || r.Price?.totalFare || 0),
+        0,
+      );
     }
 
-    // If base/tax missing, get from first room if available
-    if (!base && rawRooms[0]?.Price?.baseFare) {
-      base = rawRooms[0].Price.baseFare;
-    }
-    if (!tx && rawRooms[0]?.Price?.tax) {
-      tx = rawRooms[0].Price.tax;
+    // 4. Calculate base if only total and tax are known
+    if ((!base || base === 0) && total && tx) {
+      base = total - tx;
+    } else if ((!base || base === 0) && total) {
+      base = total; // No tax breakdown available
     }
 
     return { totalAmount: total || 0, baseFare: base || 0, tax: tx || 0 };
@@ -316,32 +364,61 @@ export const PendingHotelDetailsModal = ({
         </div>
 
         {/* Tabs Navigation */}
-        <div className="bg-white px-6 border-b border-slate-100 flex items-center gap-8 shrink-0 overflow-x-auto no-scrollbar">
-          {[
-            { id: "details", label: "Hotel Details", icon: <FaHotel /> },
-            { id: "project", label: "Project", icon: <FiBriefcase /> },
-            { id: "charges", label: "Charges and rules", icon: <FiDollarSign /> },
-            { id: "passenger", label: "Passenger", icon: <FiUser /> },
-            { id: "history", label: "Booking History", icon: <FiClock /> },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 py-4 text-[11px] font-black uppercase tracking-widest transition-all relative shrink-0 ${
-                activeTab === tab.id
-                  ? "text-indigo-600"
-                  : "text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              <span className={activeTab === tab.id ? "text-indigo-600" : "text-slate-300"}>
-                {tab.icon}
-              </span>
-              {tab.label}
-              {activeTab === tab.id && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
-              )}
-            </button>
-          ))}
+        <div className="relative bg-white border-b border-slate-100 flex items-center shrink-0 group">
+          <button
+            onClick={() => scrollTabs("left")}
+            className="md:hidden flex items-center justify-center w-10 h-14 bg-white border-r border-slate-100 text-slate-400 hover:text-indigo-600 z-10 transition-colors"
+            aria-label="Scroll left"
+          >
+            <FiChevronLeft size={18} />
+          </button>
+
+          <div
+            ref={tabsRef}
+            className="flex-1 px-6 flex items-center gap-8 overflow-x-auto no-scrollbar scroll-smooth"
+          >
+            {[
+              { id: "details", label: "Hotel Details", icon: <FaHotel /> },
+              { id: "project", label: "Project", icon: <FiBriefcase /> },
+              {
+                id: "charges",
+                label: "Charges and rules",
+                icon: <FiDollarSign />,
+              },
+              { id: "passenger", label: "Passenger", icon: <FiUser /> },
+              { id: "history", label: "Booking History", icon: <FiClock /> },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 py-4 text-[11px] font-black uppercase tracking-widest transition-all relative shrink-0 ${
+                  activeTab === tab.id
+                    ? "text-indigo-600"
+                    : "text-slate-400 hover:text-slate-600"
+                }`}
+              >
+                <span
+                  className={
+                    activeTab === tab.id ? "text-indigo-600" : "text-slate-300"
+                  }
+                >
+                  {tab.icon}
+                </span>
+                {tab.label}
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => scrollTabs("right")}
+            className="md:hidden flex items-center justify-center w-10 h-14 bg-white border-l border-slate-100 text-slate-400 hover:text-indigo-600 z-10 transition-colors"
+            aria-label="Scroll right"
+          >
+            <FiChevronRight size={18} />
+          </button>
         </div>
 
         {/* Body */}
@@ -425,17 +502,24 @@ export const PendingHotelDetailsModal = ({
                       icon={<FiKey />}
                       title="Selected Accommodations"
                     />
-                    {rawRooms.map((r, i) => (
+                    {displayRooms.map((r, i) => (
                       <div
                         key={i}
                         className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-5"
                       >
                         <div className="flex justify-between items-start border-b border-slate-50 pb-5">
                           <div>
-                            <h4 className="text-lg font-black text-slate-900 tracking-tight uppercase">
-                              {r.Name?.[0] || "Standard Room"}
-                            </h4>
-                            <div className="flex items-center gap-3 mt-2">
+                            <div className="flex items-center gap-3">
+                              <h4 className="text-lg font-black text-slate-900 tracking-tight uppercase">
+                                {r.Name?.[0] || "Standard Room"}
+                              </h4>
+                              {r.count > 1 && (
+                                <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-3 py-1 rounded-full border border-amber-200">
+                                  {r.count} ROOMS SELECTED
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 mt-2">
                               <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full uppercase border border-indigo-100 flex items-center gap-1.5">
                                 <FiCoffee size={10} /> {r.MealType || "Room Only"}
                               </span>
@@ -452,45 +536,111 @@ export const PendingHotelDetailsModal = ({
                           </div>
                           <div className="text-right">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                              Per Night
+                              Per Room / Night
                             </p>
                             <p className="text-2xl font-black text-indigo-700 tracking-tighter">
-                              ₹{r.Price?.perNight?.toLocaleString() || "—"}
+                              ₹{r.DayRates?.[0]?.[0]?.BasePrice ||
+                                r.DayRates?.[0]?.[0]?.RoomRate ||
+                                (
+                                  (r.TotalFare ||
+                                    r.Price?.totalFare ||
+                                    r.NetAmount ||
+                                    0) /
+                                  ((Array.isArray(r.Name) ? r.Name.length : 1) *
+                                    (bookSnap.nights || 1))
+                                ).toLocaleString()}
                             </p>
+                            {r.count > 1 && (
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                                Total: ₹
+                                {(
+                                  r.TotalFare ||
+                                  r.Price?.totalFare ||
+                                  r.NetAmount ||
+                                  0
+                                ).toLocaleString()}
+                              </p>
+                            )}
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                              Room Inclusions
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {(r.Inclusion || "Taxes Included")
-                                .split(",")
-                                .map((inc, j) => (
-                                  <span
-                                    key={j}
-                                    className="text-[10px] font-bold bg-slate-50 text-slate-600 px-3 py-1 rounded-lg border border-slate-100 shadow-sm"
-                                  >
-                                    {inc.trim()}
-                                  </span>
-                                ))}
-                            </div>
-                          </div>
-                          {r.RoomPromotion && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          {/* Left: Inclusions & Supplements */}
+                          <div className="space-y-6">
                             <div>
                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                                Special Offer
+                                Room Inclusions
                               </p>
-                              <div className="bg-emerald-50 text-emerald-700 p-3 rounded-2xl border border-emerald-100 flex items-center gap-2">
-                                <FiTag className="shrink-0" />
-                                <p className="text-[11px] font-black leading-tight">
-                                  {r.RoomPromotion[0]}
-                                </p>
+                              <div className="flex flex-wrap gap-2">
+                                {(r.Inclusion || "Taxes Included")
+                                  .split(",")
+                                  .map((inc, j) => (
+                                    <span
+                                      key={j}
+                                      className="text-[10px] font-bold bg-slate-50 text-slate-600 px-3 py-1 rounded-lg border border-slate-100 shadow-sm"
+                                    >
+                                      {inc.trim()}
+                                    </span>
+                                  ))}
                               </div>
                             </div>
-                          )}
+
+                            {/* Supplements */}
+                            {r.Supplements && r.Supplements.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                                  Supplements
+                                </p>
+                                <div className="space-y-2">
+                                  {r.Supplements.map((sup, j) => (
+                                    <div
+                                      key={j}
+                                      className="bg-amber-50 text-amber-700 p-3 rounded-2xl border border-amber-100 flex items-center gap-2"
+                                    >
+                                      <FiPackage className="shrink-0" />
+                                      <p className="text-[10px] font-bold leading-tight">
+                                        {sup.Type} - ₹{sup.Price} (
+                                        {sup.ChargeType === "Fixed"
+                                          ? "Fixed"
+                                          : "Per Person"}
+                                        )
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Right: Promotions & Exclusions */}
+                          <div className="space-y-6">
+                            {r.Exclusion && (
+                              <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 text-red-400">
+                                  Exclusions
+                                </p>
+                                <div className="bg-red-50/30 text-red-700 p-4 rounded-2xl border border-red-100/50">
+                                  <p className="text-[11px] font-medium leading-relaxed italic">
+                                    {r.Exclusion}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                            {r.RoomPromotion && r.RoomPromotion.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 text-emerald-500">
+                                  Special Offer
+                                </p>
+                                <div className="bg-emerald-50 text-emerald-700 p-3 rounded-2xl border border-emerald-100 flex items-center gap-2">
+                                  <FiTag className="shrink-0" />
+                                  <p className="text-[11px] font-black leading-tight">
+                                    {r.RoomPromotion[0]}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1713,21 +1863,50 @@ export const PendingFlightDetailsModal = ({
                       title="Request Initiated"
                       time={formatDateTime(booking.createdAt)}
                       status="completed"
-                      description={`Travel request created by ${booking.requesterDetails?.name || booking.userId?.name?.firstName}`}
+                      description={`Travel request created by ${booking.requesterDetails?.name || booking.userId?.name?.firstName || "Traveler"}`}
                     />
                     <TimelineItem
                       title="Approval Workflow Assigned"
                       time={formatDateTime(booking.createdAt)}
                       status="completed"
-                      description={`Route assigned to ${approver.name} (${approver.role})`}
+                      description={
+                        approver.name === "Auto Approved"
+                          ? "System detected auto-approval policy compliance."
+                          : `Route assigned to ${approver.name} (${approver.role})`
+                      }
                     />
-                    <TimelineItem
-                      title="Awaiting Review"
-                      time="Present"
-                      status="pending"
-                      active={true}
-                      description={`Currently pending with ${approver.name}. Awaiting final decision.`}
-                    />
+
+                    {booking.requestStatus === "approved" ? (
+                      <TimelineItem
+                        title={
+                          approver.name === "Auto Approved"
+                            ? "Auto Approved"
+                            : "Request Approved"
+                        }
+                        time={formatDateTime(booking.approvedAt)}
+                        status="completed"
+                        description={
+                          approver.name === "Auto Approved"
+                            ? "Booking was automatically approved based on corporate policy limits."
+                            : `Request approved by ${approver.name}.`
+                        }
+                      />
+                    ) : booking.requestStatus === "rejected" ? (
+                      <TimelineItem
+                        title="Request Rejected"
+                        time={formatDateTime(booking.updatedAt)}
+                        status="rejected"
+                        description={`Request was rejected by ${approver.name}.`}
+                      />
+                    ) : (
+                      <TimelineItem
+                        title="Awaiting Review"
+                        time="Present"
+                        status="pending"
+                        active={true}
+                        description={`Currently pending with ${approver.name}. Awaiting final decision.`}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

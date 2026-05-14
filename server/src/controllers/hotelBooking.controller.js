@@ -43,10 +43,21 @@ exports.preBookHotel = asyncHandler(async (req, res) => {
   console.log("PREBOOK RESPONSE:", JSON.stringify(preBookResp, null, 2));
 
   /* ================= VALIDATION ================= */
+  if (preBookResp?.Status?.Code !== 200 && preBookResp?.Status !== 1) {
+    return res.status(200).json({
+      success: false,
+      message:
+        preBookResp?.Status?.Description ||
+        preBookResp?.Error?.ErrorMessage ||
+        "PreBook failed",
+      data: preBookResp,
+    });
+  }
+
   const result = preBookResp?.HotelResult?.[0];
 
   if (!result) {
-    throw new ApiError(500, "Invalid PreBook response");
+    throw new ApiError(500, "Invalid PreBook response: HotelResult missing");
   }
 
   const isPriceChanged = result?.IsPriceChanged;
@@ -76,6 +87,437 @@ exports.preBookHotel = asyncHandler(async (req, res) => {
     success: true,
     message: "PreBook successful",
     data: preBookResp,
+  });
+});
+
+/* ======================================================
+   DIRECT HOTEL BOOKING (AUTO-APPROVED)
+====================================================== */
+
+
+exports.instantHotelBooking = asyncHandler(async (req, res) => {
+  const {
+    hotelRequest,
+    travellers,
+    purposeOfTravel,
+    pricingSnapshot,
+    gstDetails,
+    projectName,
+    projectId,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
+    requesterDetails,
+  } = req.body;
+
+  const user = req.user;
+  const corporate = req.corporate;
+
+  /* ================= DEFENSIVE CHECKS ================= */
+  if (!user) throw new ApiError(401, "User not authenticated");
+  if (!corporate) throw new ApiError(400, "Corporate context missing");
+  if (!hotelRequest) throw new ApiError(400, "Hotel request data missing");
+  if (!travellers?.length)
+    throw new ApiError(400, "At least one guest required");
+
+  /* ================= APPROVER RESOLUTION ================= */
+  let resolvedApproverId = approverId;
+  let resolvedApproverName = approverName;
+  let resolvedApproverRole = approverRole;
+
+  if (!resolvedApproverId && approverEmail) {
+    const normalizedEmail = approverEmail.trim().toLowerCase();
+    let approverUser = await User.findOne({ email: normalizedEmail });
+
+    if (!approverUser) {
+      const firstName = normalizedEmail.split("@")[0] || "Manager";
+      approverUser = await User.create({
+        corporateId: corporate._id,
+        email: normalizedEmail,
+        name: { firstName, lastName: "" },
+        role: "manager",
+        isTempManager: true,
+        managerRequestStatus: "pending",
+      });
+    }
+
+    resolvedApproverId = approverUser._id;
+    resolvedApproverName =
+      resolvedApproverName ||
+      `${approverUser.name?.firstName || ""} ${approverUser.name?.lastName || ""}`.trim();
+    resolvedApproverRole =
+      resolvedApproverRole || approverUser.role || "manager";
+  }
+
+  /* ================= TRANSFORM DATA ================= */
+  const paxRooms = hotelRequest?.PaxRooms || hotelRequest?.paxRooms || [];
+  if (!paxRooms.length) {
+    throw new ApiError(400, "PaxRooms is required from frontend");
+  }
+
+  const roomsCount = paxRooms.length;
+  const roomGuests = paxRooms.map((r) => ({
+    noOfAdults: Number(r.Adults || 0),
+    noOfChild: Number(r.Children || 0),
+    childAge: r.ChildrenAges || [],
+  }));
+
+  const transformedHotelRequest = {
+    checkInDate: hotelRequest.checkIn,
+    checkOutDate: hotelRequest.checkOut,
+    noOfRooms: roomsCount,
+    noOfNights: hotelRequest?.nights || 1,
+    guestNationality: hotelRequest.guestNationality || "IN",
+    roomGuests,
+    paxRooms,
+    selectedHotel: {
+      hotelCode: hotelRequest.hotelCode,
+      hotelName:
+        hotelRequest.hotelName?.trim() ||
+        hotelRequest.rawHotelData?.HotelName ||
+        "Unknown Hotel",
+      address: hotelRequest.address || hotelRequest.rawHotelData?.Address,
+      city: hotelRequest.city || hotelRequest.rawHotelData?.CityName,
+      country: hotelRequest.country || "",
+      starRating: hotelRequest.starRating || 0,
+      description: hotelRequest.description || "",
+      images: hotelRequest.images?.length
+        ? hotelRequest.images
+        : hotelRequest.rawHotelData?.Images || [],
+      amenities: hotelRequest.amenities || [],
+      latitude: hotelRequest.latitude || "",
+      longitude: hotelRequest.longitude || "",
+      rawHotelData: hotelRequest.rawHotelData || null,
+    },
+    allRooms: hotelRequest.rooms || [],
+    selectedRoom: {
+      roomIndex: hotelRequest.roomIndex,
+      name: hotelRequest.selectedRoom?.Name || [],
+      bookingCode: hotelRequest.selectedRoom?.BookingCode,
+      inclusion: hotelRequest.selectedRoom?.Inclusion,
+      mealType: hotelRequest.selectedRoom?.MealType,
+      isRefundable: hotelRequest.selectedRoom?.IsRefundable,
+      withTransfers: hotelRequest.selectedRoom?.WithTransfers,
+      beddingGroup: hotelRequest.selectedRoom?.BeddingGroup,
+      totalFare:
+        hotelRequest.selectedRoom?.Price?.TotalFare ||
+        hotelRequest.selectedRoom?.TotalFare,
+      totalTax:
+        hotelRequest.selectedRoom?.Price?.Tax ||
+        hotelRequest.selectedRoom?.TotalTax,
+      dayRates: hotelRequest.selectedRoom?.DayRates,
+      cancelPolicies: hotelRequest.selectedRoom?.CancelPolicies,
+      promotions: hotelRequest.selectedRoom?.RoomPromotion || [],
+      currency: hotelRequest.currency || "INR",
+      rawRoomData: hotelRequest.selectedRoom || null,
+    },
+    providerBookingId: hotelRequest.bookingCode || null,
+    preBookResponse: hotelRequest.preBookResponse || null,
+  };
+
+  const bookingSnapshot = {
+    hotelName: transformedHotelRequest.selectedHotel.hotelName,
+    city: transformedHotelRequest.selectedHotel.city,
+    checkInDate: transformedHotelRequest.checkInDate,
+    checkOutDate: transformedHotelRequest.checkOutDate,
+    roomCount: transformedHotelRequest.noOfRooms,
+    nights: transformedHotelRequest.noOfNights,
+    amount: pricingSnapshot?.totalAmount || 0,
+    currency: pricingSnapshot?.currency || "INR",
+    hotelImage:
+      transformedHotelRequest.selectedHotel?.images?.[0] ||
+      hotelRequest.rawHotelData?.Images?.[0] ||
+      "",
+  };
+
+  const transformedTravellers = travellers.map((t, index) => {
+    const incomingPaxType = (t.paxType || t.PaxType || "")
+      .toString()
+      .toLowerCase();
+    const isChild =
+      incomingPaxType === "child" ||
+      incomingPaxType === "2" ||
+      (t.age != null && Number(t.age) < 12);
+    const paxType = isChild ? "child" : index === 0 ? "lead" : "adult";
+
+    return {
+      title: t.title,
+      firstName: t.firstName,
+      lastName: t.lastName,
+      gender: t.gender,
+      dob: t.dob,
+      age: t.age,
+      email: t.email,
+      phoneWithCode: t.phoneWithCode,
+      nationality: t.nationality,
+      countryCode: t.countryCode,
+      panCard: t.panCard || "",
+      PassportNo: t.PassportNo || "",
+      PassportIssueDate: t.PassportIssueDate || "",
+      PassportExpDate: t.PassportExpDate || "",
+      isLeadPassenger: paxType === "lead",
+      paxType,
+      raw: t,
+    };
+  });
+
+  /* ================= SSR POLICY: AUTO-APPROVE CHECK ================= */
+  let requestStatus = "pending_approval";
+  let finalApproverName = approverName;
+  let finalApprovedAt = null;
+
+  try {
+    const ssrPolicy = await EmployeeSsrPolicy.findOne({
+      corporateId: corporate._id,
+      employeeEmail: user.email?.toLowerCase().trim(),
+    }).lean();
+
+    if (ssrPolicy && ssrPolicy.approvalRequired === false) {
+      requestStatus = "approved";
+      finalApproverName = "Auto Approve";
+      finalApprovedAt = new Date();
+    }
+  } catch (policyErr) {
+    // Safe fallback
+  }
+
+  const orderId = await generateSequentialOrderId("hotel");
+
+  const bookingRequest = await HotelBookingRequest.create({
+    bookingReference: generateBookingReference(),
+    orderId,
+    corporateId: corporate._id,
+    userId: user._id,
+    bookingType: "hotel",
+    requestStatus,
+    purposeOfTravel,
+    projectName,
+    projectId,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName: finalApproverName,
+    approverRole,
+    approvedAt: finalApprovedAt,
+    requesterDetails,
+    gstDetails: {
+      gstin: gstDetails?.gstin || "",
+      legalName: gstDetails?.legalName || "",
+      address: gstDetails?.address || "",
+      gstEmail: gstDetails?.gstEmail || "",
+    },
+    travellers: transformedTravellers,
+    hotelRequest: transformedHotelRequest,
+    pricingSnapshot: {
+      ...pricingSnapshot,
+      capturedAt: new Date(),
+    },
+    bookingSnapshot,
+  });
+
+  const isAutoApproved = requestStatus === "approved";
+
+  // ── Notify ──
+  const _hotelRequesterName = user.name?.firstName
+    ? `${user.name.firstName} ${user.name.lastName || ""}`.trim()
+    : user.name || "Employee";
+  const _hotelOrderId =
+    bookingRequest.orderId || bookingRequest.bookingReference;
+
+  notify(EVENTS.BOOKING_REQUEST_CREATED, {
+    corporateId: corporate._id,
+    employeeId: user._id,
+    employeeEmail: user.email,
+    employeeName: _hotelRequesterName,
+    managerId: approverId || null,
+    orderId: _hotelOrderId,
+    bookingType: "hotel",
+    amount: bookingRequest.pricingSnapshot?.totalAmount,
+    relatedId: bookingRequest._id,
+  });
+
+  if (approverId) {
+    notify(EVENTS.BOOKING_APPROVAL_REQUIRED, {
+      corporateId: corporate._id,
+      managerId: approverId,
+      employeeName: _hotelRequesterName,
+      orderId: _hotelOrderId,
+      bookingType: "hotel",
+      amount: bookingRequest.pricingSnapshot?.totalAmount,
+      relatedId: bookingRequest._id,
+    });
+  }
+
+  /* ======================================================
+     🔥🔥 EXECUTION LOGIC (IF AUTO-APPROVED)
+  ====================================================== */
+  if (isAutoApproved) {
+    try {
+      bookingRequest.executionStatus = "booking_initiated";
+      await bookingRequest.save();
+
+      const bookingCodes = [transformedHotelRequest.selectedRoom.bookingCode];
+      const leadTraveller = transformedTravellers.find(
+        (t) => t.isLeadPassenger,
+      );
+      const bookingPAN = leadTraveller.panCard;
+
+      const adultTravellers = transformedTravellers.filter(
+        (t) => t.paxType !== "child",
+      );
+      const childTravellers = transformedTravellers.filter(
+        (t) => t.paxType === "child",
+      );
+
+      let adultIdx = 0;
+      let childIdx = 0;
+
+      const HotelRoomsDetails = roomGuests.map((room, idx) => {
+        const passengers = [];
+        for (let i = 0; i < room.noOfAdults; i++) {
+          const traveller = adultTravellers[adultIdx];
+          const passenger = {
+            Title: traveller.title,
+            FirstName: traveller.firstName,
+            LastName: traveller.lastName,
+            Email: traveller.email || leadTraveller.email,
+            Phoneno: String(traveller.phoneWithCode || "")
+              .replace(/\D/g, "")
+              .slice(-10),
+            PaxType: 1,
+            LeadPassenger: passengers.length === 0,
+            PAN: traveller.panCard || bookingPAN,
+            PassportNo: traveller.PassportNo || null,
+            PassportIssueDate: traveller.PassportIssueDate || null,
+            PassportExpDate: traveller.PassportExpDate || null,
+          };
+          if (traveller.age) passenger.Age = parseInt(traveller.age);
+          passengers.push(passenger);
+          adultIdx++;
+        }
+        for (let i = 0; i < room.noOfChild; i++) {
+          const traveller = childTravellers[childIdx];
+          const passenger = {
+            Title: traveller.title || "Master",
+            FirstName: traveller.firstName,
+            LastName: traveller.lastName,
+            PaxType: 2,
+            LeadPassenger: false,
+            Email: null,
+            Phoneno: String(leadTraveller.phoneWithCode || "")
+              .replace(/\D/g, "")
+              .slice(-10),
+            PAN: bookingPAN,
+            PassportNo: traveller.PassportNo || null,
+            PassportIssueDate: traveller.PassportIssueDate || null,
+            PassportExpDate: traveller.PassportExpDate || null,
+          };
+          const ages = room.childAge || [];
+          passenger.Age = ages[i]
+            ? parseInt(ages[i])
+            : traveller.age
+              ? parseInt(traveller.age)
+              : 10;
+          passengers.push(passenger);
+          childIdx++;
+        }
+        return { RoomIndex: idx + 1, HotelPassenger: passengers };
+      });
+
+      const bookResp = await hotelService.bookHotel({
+        BookingCode: bookingCodes.join(","),
+        IsVoucherBooking: true,
+        GuestNationality: transformedHotelRequest.guestNationality,
+        EndUserIp: process.env.TBO_END_USER_IP,
+        NetAmount: transformedHotelRequest.selectedRoom.totalFare, // Skip PreBook, use original fare
+        ClientReferenceId: bookingRequest.bookingReference,
+        TraceId: hotelRequest.traceId || hotelRequest.TraceId,
+        HotelRoomsDetails,
+        ...(gstDetails?.gstin && {
+          GSTCompanyInformation: {
+            GSTNumber: gstDetails.gstin,
+            GSTCompanyName: gstDetails.legalName || "NA",
+            GSTCompanyAddress: gstDetails.address || "NA",
+            GSTCompanyEmail: gstDetails.gstEmail || leadTraveller?.email,
+          },
+        }),
+      });
+
+      const bookResult = bookResp?.BookResult || bookResp;
+      if (bookResult?.Status === 1) {
+        const confirmationNumber =
+          bookResult?.ConfirmationNo ||
+          bookResult?.BookingRefNo ||
+          bookResult?.BookingId;
+        bookingRequest.bookingResult = {
+          hotelBookingId: confirmationNumber,
+          providerResponse: bookResp,
+        };
+        bookingRequest.executionStatus = "booked";
+        await bookingRequest.save();
+
+        await paymentService.processBookingPayment({
+          booking: bookingRequest,
+          corporate,
+        });
+        bookingRequest.executionStatus = "voucher_generated";
+        bookingRequest.voucheredAt = new Date();
+        await bookingRequest.save();
+
+        await notificationService.sendBookingNotification(
+          bookingRequest,
+          { _id: user._id },
+          "confirmation",
+        );
+
+        return res.status(201).json({
+          success: true,
+          message: "Hotel booked instantly successfully",
+          data: {
+            bookingRequestId: bookingRequest._id,
+            bookingReference: bookingRequest.bookingReference,
+            confirmationNumber,
+            status: "booked",
+          },
+        });
+      } else {
+        throw new Error(
+          bookResult?.Error?.ErrorMessage ||
+            "Instant booking failed at provider",
+        );
+      }
+    } catch (execErr) {
+      bookingRequest.executionStatus = "failed";
+      await bookingRequest.save();
+      return res.status(200).json({
+        success: true,
+        message:
+          "Request created but instant booking failed: " + execErr.message,
+        data: {
+          bookingRequestId: bookingRequest._id,
+          bookingReference: bookingRequest.bookingReference,
+          requestStatus: "approved",
+          executionStatus: "failed",
+          error: execErr.message,
+        },
+      });
+    }
+  }
+
+  return res.status(201).json({
+    success: true,
+    data: {
+      bookingRequestId: bookingRequest._id,
+      bookingReference: bookingRequest.bookingReference,
+      orderId: bookingRequest.orderId,
+      requestStatus: bookingRequest.requestStatus,
+      autoApproved: isAutoApproved,
+    },
+    message: isAutoApproved
+      ? "Hotel booking request auto-approved but requires manual execution"
+      : "Hotel booking request submitted for approval",
   });
 });
 
@@ -271,8 +713,8 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
       // 🔥 FULL RAW ROOM OBJECT
       rawRoomData: hotelRequest.selectedRoom || null,
     },
-
     providerBookingId: hotelRequest.bookingCode || null,
+    preBookResponse: hotelRequest.preBookResponse || null,
   };
 
   /* ================= SNAPSHOT ================= */
@@ -439,6 +881,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
       : "Hotel booking request submitted for approval",
   });
 });
+
 
 // @desc    Get my hotel booking requests (pending + approved)
 // @route   GET /api/v1/hotel-bookings/my

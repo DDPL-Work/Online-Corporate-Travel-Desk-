@@ -18,7 +18,6 @@ import {
   fetchMyBookingRequestById,
   executeApprovedFlightBooking,
 } from "../../../Redux/Actions/booking.thunks";
-import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import {
   formatDateWithYear,
   formatDateTime,
@@ -282,24 +281,34 @@ export default function BookApprovedFlight() {
 
   const fareResults = flight?.fareQuote?.Results || [];
 
-  const isRoundTrip = fareResults.length === 2;
+  const isRoundTrip = journeyType === "round-trip";
+  const total = booking?.pricingSnapshot?.totalAmount || 0;
+  const fareSnapshot = flight?.fareSnapshot;
 
   let baseFare = 0;
   let tax = 0;
-  let total = 0;
-  let refundable = false;
+  const refundable = fareResults.some((r) => r.IsRefundable);
 
-  fareResults.forEach((result) => {
-    const fare = result?.Fare;
-
-    if (!fare) return;
-
-    baseFare += fare.BaseFare || 0;
-    tax += fare.Tax || 0;
-    total += fare.PublishedFare || 0;
-
-    if (result?.IsRefundable) refundable = true;
-  });
+  if (fareSnapshot?.onwardFare || fareSnapshot?.returnFare) {
+    // Domestic Split Pricing
+    baseFare = (fareSnapshot.onwardFare?.BaseFare || 0) + (fareSnapshot.returnFare?.BaseFare || 0);
+    tax = (fareSnapshot.onwardFare?.Tax || 0) + (fareSnapshot.returnFare?.Tax || 0);
+  } else if (fareSnapshot?.baseFare) {
+    // One-Way or Consolidated International Pricing
+    baseFare = fareSnapshot.baseFare;
+    tax = fareSnapshot.tax;
+  } else if (fareResults.length > 0) {
+    // Fallback: Use first result if snapshot breakdown is missing
+    // For international (consolidated), Result[0] is the combined fare.
+    // For domestic round-trip (split), we sum the two results if it matches total.
+    if (fareResults.length === 2 && (fareResults[0]?.Fare?.PublishedFare + fareResults[1]?.Fare?.PublishedFare) === total) {
+      baseFare = (fareResults[0]?.Fare?.BaseFare || 0) + (fareResults[1]?.Fare?.BaseFare || 0);
+      tax = (fareResults[0]?.Fare?.Tax || 0) + (fareResults[1]?.Fare?.Tax || 0);
+    } else {
+      baseFare = fareResults[0]?.Fare?.BaseFare || 0;
+      tax = fareResults[0]?.Fare?.Tax || 0;
+    }
+  }
 
   if (loading)
     return (
@@ -557,18 +566,18 @@ export default function BookApprovedFlight() {
                       <span className="font-bold text-[#0A203E]">₹{Math.ceil(tax)}</span>
                     </div>
 
-                    {isRoundTrip && (
+                    {isRoundTrip && fareSnapshot?.onwardFare && fareSnapshot?.returnFare && (
                       <div className="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500 space-y-1">
                         <p className="font-black text-slate-400 uppercase tracking-widest text-[9px] mb-2">
                           Route Breakdown
                         </p>
                         <div className="flex justify-between">
                           <span>Onward:</span>
-                          <span>₹{flight?.fareQuote?.Results?.[0]?.Fare?.PublishedFare || 0}</span>
+                          <span>₹{fareSnapshot.onwardFare?.PublishedFare || 0}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Return:</span>
-                          <span>₹{flight?.fareQuote?.Results?.[1]?.Fare?.PublishedFare || 0}</span>
+                          <span>₹{fareSnapshot.returnFare?.PublishedFare || 0}</span>
                         </div>
                       </div>
                     )}

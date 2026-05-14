@@ -26,7 +26,10 @@ import {
 } from "../../../Redux/Actions/flight.thunks";
 import api from "../../../API/axios";
 import SeatSelectionModal from "./SSR/SeatSelectionModal";
-import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import {
+  createBookingRequest,
+  instantFlightBooking,
+} from "../../../Redux/Actions/booking.thunks";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { approveApproval } from "../../../Redux/Actions/approval.thunks";
 import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
@@ -878,39 +881,47 @@ export default function MultiCityFlightBooking() {
 
     try {
       const payload = buildBookingRequestPayload();
-      if (approvalRequired) {
-        await dispatch(
-          selectManager({
-            approverId: projectApproverData.approver?.id,
-            approverEmail: projectApproverData.approver?.email,
-            projectCodeId: projectApproverData.project?.id,
-            projectName: projectApproverData.project?.name,
-            projectClient: projectApproverData.project?.client,
-          }),
-        ).unwrap();
-      }
-      const result = await dispatch(createBookingRequest(payload)).unwrap();
-
+      let result;
       if (!approvalRequired) {
-        const requestId = result.bookingRequestId || result._id;
-        if (requestId && result.requestStatus !== "approved") {
+        // ✅ Use instant booking API for auto-approved policies
+        result = await dispatch(instantFlightBooking(payload)).unwrap();
+        ToastWithTimer({
+          type: "success",
+          message: "Flight booked automatically per policy",
+        });
+      } else {
+        // ✅ Traditional approval workflow
+        if (!isTravelAdmin) {
           await dispatch(
-            approveApproval({
-              id: requestId,
-              comments: "Self Approved by Travel Admin",
-              type: "flight",
+            selectManager({
+              approverId: projectApproverData.approver?.id,
+              approverEmail: projectApproverData.approver?.email,
+              projectCodeId: projectApproverData.project?.id,
+              projectName: projectApproverData.project?.name,
+              projectClient: projectApproverData.project?.client,
             }),
           ).unwrap();
         }
-        ToastWithTimer({
-          type: "success",
-          message: "Booking auto-approved successfully",
-        });
+        result = await dispatch(createBookingRequest(payload)).unwrap();
+
+        // Handle case where it might still be auto-approved at backend but we used createBookingRequest
+        if (result.autoApproved || result.requestStatus === "approved") {
+          ToastWithTimer({
+            type: "success",
+            message: "Booking auto-approved successfully",
+          });
+        }
       }
 
-      navigate("/my-pending-approvals", {
-        state: { success: true },
-      });
+      if (result.autoApproved || result.requestStatus === "approved") {
+        navigate("/my-bookings", {
+          state: { success: true },
+        });
+      } else {
+        navigate("/my-pending-approvals", {
+          state: { success: true },
+        });
+      }
     } catch (err) {
       ToastWithTimer({
         type: "error",

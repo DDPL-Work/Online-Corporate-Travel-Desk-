@@ -133,7 +133,6 @@ class PDFService {
       let allSegments = [];
       let onwardPNR = br?.onwardPNR || br?.pnr || "—";
       let returnPNR = br?.returnPNR || null;
-      const isRoundTrip = !!returnPNR && !!br?.returnResponse;
 
       // Helper to extract segments and response from a response object
       const getJourneyData = (res) => {
@@ -146,9 +145,20 @@ class PDFService {
       const onwardData = getJourneyData(br?.onwardResponse || br?.providerResponse);
       const returnData = getJourneyData(br?.returnResponse);
 
+      // Improved Round-Trip detection for international bookings
+      // In international round-trips, both legs usually come under a single PNR/response
+      const hasReturnSegments = onwardData.segments.some(s => s.TripIndicator === 2);
+      const isInternationalRoundTrip = !br?.returnResponse && hasReturnSegments;
+      const isRoundTrip = !!br?.returnResponse || isInternationalRoundTrip;
+
       if (isRoundTrip) {
         journeyResponse = onwardData.response; // Use onward for global fare/airline info
-        allSegments = [...onwardData.segments, ...returnData.segments];
+        if (isInternationalRoundTrip) {
+          allSegments = onwardData.segments;
+          if (!returnPNR) returnPNR = onwardPNR; // Mirror PNR for international single-PNR trips
+        } else {
+          allSegments = [...onwardData.segments, ...returnData.segments];
+        }
       } else {
         journeyResponse = onwardData.response || returnData.response;
         allSegments = journeyResponse?.FlightItinerary?.Segments || [];
@@ -157,7 +167,9 @@ class PDFService {
       if (!journeyResponse) throw new Error("Invalid booking structure");
 
       const journeySegments = allSegments;
-      const pnr = isRoundTrip ? `${onwardPNR} / ${returnPNR}` : (onwardPNR || returnPNR || "—");
+      const pnr = (isRoundTrip && returnPNR && returnPNR !== onwardPNR) 
+        ? `${onwardPNR} / ${returnPNR}` 
+        : (onwardPNR || returnPNR || "—");
 
       const firstLeg = journeySegments[0];
       const airlineCode = firstLeg?.Airline?.AirlineCode;
@@ -202,7 +214,8 @@ class PDFService {
       }));
 
       // ── Prepare Segment-wise Data (Flight Cards Only) ──
-      const onwardSegmentsCount = onwardData.segments.length;
+      // Calculate onward segments count properly to distinguish between onward and return legs
+      const onwardSegmentsCount = onwardData.segments.filter(s => s.TripIndicator === 1).length;
       const segmentsData = await Promise.all(
         journeySegments.map(async (seg, segIdx) => {
           const depTime = new Date(
@@ -285,7 +298,7 @@ class PDFService {
             aircraft: seg.Craft || "Airbus/Boeing",
             flightNumber: `${seg.Airline?.AirlineCode}-${seg.Airline?.FlightNumber}`,
             airlineLogo: airlineLogo,
-            segmentPNR: seg.AirlinePNR || (isRoundTrip ? (segIdx < onwardSegmentsCount ? onwardPNR : returnPNR) : onwardPNR),
+            segmentPNR: seg.AirlinePNR || (isRoundTrip ? (segIdx < onwardSegmentsCount ? onwardPNR : (returnPNR || onwardPNR)) : onwardPNR),
             journeyType: isRoundTrip ? (segIdx < onwardSegmentsCount ? "ONWARD" : "RETURN") : null,
             isLastOfJourneyType: isRoundTrip 
               ? (segIdx === onwardSegmentsCount - 1 || segIdx === journeySegments.length - 1)
@@ -352,11 +365,19 @@ class PDFService {
           const tboPaxOnward = onwardData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
           const tboPaxReturn = returnData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
           
-          const ticketNumbers = [tboPaxOnward?.Ticket?.TicketNumber, tboPaxReturn?.Ticket?.TicketNumber]
-            .filter(Boolean);
-          const ticketNumber = ticketNumbers.join(" / ") || 
-                             onwardData.response?.FlightItinerary?.TBOConfNo || 
-                             "E-TICKET";
+          const onwardTicket = tboPaxOnward?.Ticket ? {
+            id: tboPaxOnward.Ticket.TicketId || "—",
+            no: tboPaxOnward.Ticket.TicketNumber || "—"
+          } : null;
+
+          const returnTicket = tboPaxReturn?.Ticket ? {
+            id: tboPaxReturn.Ticket.TicketId || "—",
+            no: tboPaxReturn.Ticket.TicketNumber || "—"
+          } : (isInternationalRoundTrip ? onwardTicket : null);
+
+          const ticketNumber = (onwardTicket && returnTicket && onwardTicket.no !== returnTicket.no)
+            ? `${onwardTicket.no} / ${returnTicket.no}`
+            : (onwardTicket?.no || returnTicket?.no || onwardData.response?.FlightItinerary?.TBOConfNo || "E-TICKET");
 
           // Merge SegmentAdditionalInfo for round trips
           const onwardAddInfo = tboPaxOnward?.SegmentAdditionalInfo || [];
@@ -367,8 +388,16 @@ class PDFService {
           let onwardBarcodeBase64 = null;
           let returnBarcodeBase64 = null;
           
-          const onwardContent = tboPaxOnward?.BarcodeDetails?.Barcode?.[0]?.Content;
-          const returnContent = tboPaxReturn?.BarcodeDetails?.Barcode?.[0]?.Content;
+          const onwardBarcodes = tboPaxOnward?.BarcodeDetails?.Barcode || [];
+          const returnBarcodes = tboPaxReturn?.BarcodeDetails?.Barcode || [];
+
+          let onwardContent = onwardBarcodes[0]?.Content;
+          let returnContent = returnBarcodes[0]?.Content;
+
+          // Handle International Round-Trip where both barcodes are in the onward/provider response
+          if (isInternationalRoundTrip && onwardBarcodes.length >= 2 && !returnContent) {
+            returnContent = onwardBarcodes[1]?.Content;
+          }
 
           if (onwardContent) {
             onwardBarcodeBase64 = await this._generateBarcode(onwardContent);
@@ -382,14 +411,8 @@ class PDFService {
             title: traveller.title.toUpperCase(),
             ticketNumber: ticketNumber,
             ticketId: tboPaxOnward?.Ticket?.TicketId || tboPaxReturn?.Ticket?.TicketId || "",
-            onwardTicket: tboPaxOnward?.Ticket ? {
-              id: tboPaxOnward.Ticket.TicketId || "—",
-              no: tboPaxOnward.Ticket.TicketNumber || "—"
-            } : null,
-            returnTicket: tboPaxReturn?.Ticket ? {
-              id: tboPaxReturn.Ticket.TicketId || "—",
-              no: tboPaxReturn.Ticket.TicketNumber || "—"
-            } : null,
+            onwardTicket,
+            returnTicket,
             email: traveller.isLeadPassenger ? traveller.email || "" : "",
             phone: traveller.isLeadPassenger ? traveller.phoneWithCode || "" : "",
             onwardBarcodeBase64,

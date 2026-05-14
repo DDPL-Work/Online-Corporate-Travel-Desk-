@@ -6,6 +6,7 @@ const RoomTypesList = ({
   onSelectRoom,
   selectedRooms,
   requiredRooms,
+  onSeeDetails,
 }) => {
   const [searchText, setSearchText] = useState("");
   const [selectedMeal, setSelectedMeal] = useState("all");
@@ -157,6 +158,7 @@ const RoomTypesList = ({
               count={count}
               onAdd={() => onSelectRoom(room, "add")}
               onRemove={() => onSelectRoom(room, "remove")}
+              onSeeDetails={onSeeDetails}
             />
           );
         })}
