@@ -150,6 +150,13 @@ exports.login = asyncHandler(async (req, res) => {
     userResponse.department = foundUser.user.department;
   }
 
+  if (foundUser.role === "ops-member") {
+    foundUser.user.lastLoginAt = new Date();
+    foundUser.user.lastSeenAt = new Date();
+    foundUser.user.isOnline = true;
+    await foundUser.user.save();
+  }
+
   // Fire-and-forget login success email (never blocks the login response)
   const loginName =
     foundUser.user.name?.firstName

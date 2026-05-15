@@ -3,6 +3,18 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../API/axios"; // axios instance with auth token
 
+const buildThunkError = (err, fallbackMessage) => ({
+  message:
+    err.response?.data?.message ||
+    err.response?.data?.error ||
+    err.message ||
+    fallbackMessage,
+  statusCode: err.response?.status || err.statusCode || 500,
+  code: err.response?.data?.code || null,
+  providerMessage: err.response?.data?.providerMessage || null,
+  data: err.response?.data?.data || null,
+});
+
 // CREATE booking request (approval-first)
 export const createBookingRequest = createAsyncThunk(
   "bookings/createBookingRequest",
@@ -74,9 +86,7 @@ export const executeApprovedFlightBooking = createAsyncThunk(
       const { data } = await api.post(`/bookings/${bookingId}/execute-flight`);
       return data.data;
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data?.message || "Flight booking failed",
-      );
+      return rejectWithValue(buildThunkError(err, "Flight booking failed"));
     }
   },
 );

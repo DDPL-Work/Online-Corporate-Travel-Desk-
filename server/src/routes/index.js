@@ -33,6 +33,10 @@ const landingPageRoutes = require("./landingPage.routes");
 const tboSyncRoutes = require("./tboSync.routes");
 const flightReissueRoutes = require("./flightReissue.routes");
 const notificationRoutes = require("./notificationRoutes");
+const reissueEmployeeRoutes = require("../modules/servicing/reissue/routes/reissue.employee.routes");
+const reissueOpsRoutes = require("../modules/servicing/reissue/routes/reissue.ops.routes");
+const reissueAdminRoutes = require("../modules/servicing/reissue/routes/reissue.admin.routes");
+const reissueOfflineRoutes = require("../modules/servicing/reissue/routes/reissue.offline.routes");
 
 // ------------------ ✅ IMPORTANT FIX ------------------
 // ✅ SSO MUST BE MOUNTED BEFORE /auth (to avoid JWT blocking)
@@ -61,7 +65,7 @@ router.use("/wallet-logs", walletLogsRoutes);
 router.use("/validate-price", validatePrice);
 router.use("/postpaid", postPaidCorporate);
 router.use("/flights/amendments", flightAmendment);
-router.use("/flights/reissue", flightReissueRoutes);
+// Legacy flight reissue routes are intentionally retired in favor of /api/v1/reissue.
 router.use("/tbo", tboSyncRoutes);
 router.use("/hotels/amendments", hotelAmendment);
 router.use("/onboarding/gst", gestRoutes);
@@ -71,6 +75,10 @@ router.use("/ssr-policies", ssrPolicyRoutes);
 
 router.use("/landing-page", landingPageRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/reissue", reissueEmployeeRoutes);
+router.use("/ops/reissues", reissueOpsRoutes);
+router.use("/admin/reissue", reissueAdminRoutes);
+router.use("/reissue/offline", reissueOfflineRoutes);
 
 // ------------------ API Info ------------------
 router.get("/", (req, res) => {

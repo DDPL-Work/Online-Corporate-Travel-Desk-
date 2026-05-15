@@ -10,6 +10,7 @@ const DEPARTMENTS = ["Flights", "Hotels", "Both"];
 const PERMISSIONS_LIST = [
   "View Bookings",
   "Manage Cancellations",
+  "Manage Reissues",
   "View Finance",
   "Manage Corporates",
 ];

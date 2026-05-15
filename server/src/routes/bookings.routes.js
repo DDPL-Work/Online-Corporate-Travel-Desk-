@@ -24,6 +24,11 @@ router.post(
   bookingsController.executeApprovedFlightBooking
 );
 
+router.get(
+  "/:bookingId/execute-flight-status",
+  bookingsController.getApprovedFlightBookingStatus
+);
+
 router.post(
   "/:bookingId/manual-ticket",
   bookingsController.manualTicketNonLcc

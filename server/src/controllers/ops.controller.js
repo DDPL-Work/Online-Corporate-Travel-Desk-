@@ -234,3 +234,24 @@ exports.resetPassword = asyncHandler(async (req, res) => {
     )
   );
 });
+
+exports.opsHeartbeat = asyncHandler(async (req, res) => {
+  if (req.user.role !== "ops-member") {
+    throw new ApiError(403, "Only OPS members can update heartbeat");
+  }
+
+  const member = await OpsMember.findByIdAndUpdate(
+    req.user.id,
+    {
+      lastSeenAt: new Date(),
+      isOnline: true,
+    },
+    { new: true },
+  );
+
+  if (!member) {
+    throw new ApiError(404, "OPS member not found");
+  }
+
+  res.status(200).json(new ApiResponse(200, member, "OPS heartbeat refreshed"));
+});

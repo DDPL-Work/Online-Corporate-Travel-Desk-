@@ -316,7 +316,131 @@ const templates = {
     `),
   }),
 
+  [EVENTS.REISSUE_CREATED]: (d) => ({
+    subject: `Reissue Request Created — ${d.reissueId}`,
+    html: base(`
+      <h2 style="color:#0A4D68;">Reissue Request Created</h2>
+      <p>Your flight reissue request <strong>${d.reissueId}</strong> has been created.</p>
+      ${btn(`${process.env.FRONTEND_URL}/my-reissued`, 'Track Reissue')}
+    `),
+  }),
+
+  [EVENTS.REISSUE_ELIGIBILITY_CHECKED]: (d) => ({
+    subject: `Reissue Eligibility Updated — ${d.reissueId}`,
+    html: base(`
+      <h2 style="color:#0A4D68;">Reissue Eligibility Checked</h2>
+      <p>Reissue <strong>${d.reissueId}</strong> is now marked as <strong>${d.requestedMode || 'UNDER REVIEW'}</strong>.</p>
+      ${btn(`${process.env.FRONTEND_URL}/my-reissued`, 'View Request')}
+    `),
+  }),
+
+  [EVENTS.REISSUE_QUOTE_RECEIVED]: (d) => ({
+    subject: `Reissue Quote Ready â€” ${d.reissueId}`,
+    html: base(`
+      <h2 style="color:#0A4D68;">Reissue Quote Ready</h2>
+      <p>Your final fare quote for reissue <strong>${d.reissueId}</strong> is ready for confirmation.</p>
+      ${btn(`${process.env.FRONTEND_URL}/my-reissued`, 'Review Quote')}
+    `),
+  }),
+
+  [EVENTS.REISSUE_COMPLETED]: (d) => ({
+    subject: `Reissue Completed — ${d.reissueId}`,
+    html: base(`
+      <h2 style="color:#16a34a;">Reissue Completed</h2>
+      <p>Your reissue request <strong>${d.reissueId}</strong> has completed successfully.</p>
+      ${card([
+        ['Reissue ID', d.reissueId],
+        ...(d.newPnr ? [['New PNR', d.newPnr]] : []),
+      ])}
+      ${btn(`${process.env.FRONTEND_URL}/my-reissued`, 'Open Reissue Tracker')}
+    `),
+  }),
+
+  [EVENTS.REISSUE_FAILED]: (d) => ({
+    subject: `Reissue Failed — ${d.reissueId}`,
+    html: base(`
+      <h2 style="color:#dc2626;">Reissue Failed</h2>
+      <p>We could not complete reissue <strong>${d.reissueId}</strong>.</p>
+      ${btn(`${process.env.FRONTEND_URL}/my-reissued`, 'Review Reissue')}
+    `),
+  }),
+
+  [EVENTS.REISSUE_OPS_ASSIGNED]: (d) => ({
+    subject: `Ops Assigned — ${d.reissueId}`,
+    html: base(`
+      <h2 style="color:#0A4D68;">Operations Assigned</h2>
+      <p>An operations specialist has been assigned to reissue <strong>${d.reissueId}</strong>.</p>
+      ${btn(`${process.env.FRONTEND_URL}/my-reissued`, 'Track Request')}
+    `),
+  }),
+
+  [EVENTS.REISSUE_TICKET_UPLOADED]: (d) => ({
+    subject: `Updated Ticket Uploaded — ${d.reissueId}`,
+    html: base(`
+      <h2 style="color:#0A4D68;">Updated Ticket Available</h2>
+      <p>The revised ticket for reissue <strong>${d.reissueId}</strong> has been uploaded.</p>
+      ${btn(`${process.env.FRONTEND_URL}/my-reissued`, 'Download Files')}
+    `),
+  }),
+
   // ── MANAGER_PROMOTION ───────────────────────────────────
+  [EVENTS.OFFLINE_REISSUE_CREATED]: (d) => ({
+    subject: `Offline Reissue Requested — ${d.reissueId}`,
+    html: base(`
+      <h2 style="color:#0A4D68;">Offline Reissue Requested</h2>
+      <p>Your offline reissue request <strong>${d.reissueId}</strong> has been submitted successfully.</p>
+      ${card([
+        ['Status', d.status || 'RAISED'],
+        ['Expected Timeline', 'Operations typically responds within 24 hours'],
+      ])}
+      ${btn(`${process.env.FRONTEND_URL}/my-reissued`, 'Track Request')}
+    `),
+  }),
+
+  [EVENTS.OFFLINE_REISSUE_UPDATED]: (d) => {
+    const status = String(d.status || 'PROCESSING');
+    const subjectMap = {
+      ASSIGNED: `Ops Assigned — ${d.reissueId}`,
+      REJECTED: `Offline Reissue Rejected — ${d.reissueId}`,
+      TICKET_GENERATED: `Reissued Ticket Ready — ${d.reissueId}`,
+      COMPLETED: `Offline Reissue Completed — ${d.reissueId}`,
+    };
+    const titleMap = {
+      ASSIGNED: 'Operations Assigned',
+      REJECTED: 'Offline Reissue Rejected',
+      TICKET_GENERATED: 'Reissued Ticket Ready',
+      COMPLETED: 'Offline Reissue Completed',
+    };
+    const messageMap = {
+      ASSIGNED: `An operations specialist is now handling offline reissue <strong>${d.reissueId}</strong>.`,
+      REJECTED: `Offline reissue <strong>${d.reissueId}</strong> has been rejected by operations.`,
+      TICKET_GENERATED: `Your reissued ticket for offline reissue <strong>${d.reissueId}</strong> is now ready to download.`,
+      COMPLETED: `Offline reissue <strong>${d.reissueId}</strong> has been completed successfully.`,
+    };
+
+    return {
+      subject: subjectMap[status] || `Offline Reissue Updated — ${d.reissueId}`,
+      html: base(`
+        <h2 style="color:#0A4D68;">${titleMap[status] || 'Offline Reissue Updated'}</h2>
+        <p>${messageMap[status] || `Offline reissue <strong>${d.reissueId}</strong> moved to <strong>${status}</strong>.`}</p>
+        ${card([
+          ['Request ID', d.reissueId],
+          ['Status', status],
+        ])}
+        ${btn(`${process.env.FRONTEND_URL}/my-reissued`, 'Open Reissue Tracker')}
+      `),
+    };
+  },
+
+  [EVENTS.OFFLINE_TICKET_GENERATED]: (d) => ({
+    subject: `Reissued Ticket Ready — ${d.reissueId}`,
+    html: base(`
+      <h2 style="color:#0A4D68;">Reissued Ticket Available</h2>
+      <p>Your reissued ticket for offline reissue <strong>${d.reissueId}</strong> is now available to download.</p>
+      ${btn(`${process.env.FRONTEND_URL}/my-reissued`, 'Download Ticket')}
+    `),
+  }),
+
   [EVENTS.MANAGER_PROMOTION]: (d) => ({
     subject: `🏆 You've Been Promoted to Manager — Traveamer`,
     html: base(`

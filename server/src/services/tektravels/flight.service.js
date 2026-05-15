@@ -119,8 +119,10 @@ const toTboFare = (fare = {}, currency = "INR") => ({
 });
 
 const getFareForPassenger = (result, passenger) => {
-  const fareBreakdown = Array.isArray(result?.FareBreakdown)
-    ? result.FareBreakdown
+  const normalizedResult = Array.isArray(result) ? result[0] : result;
+
+  const fareBreakdown = Array.isArray(normalizedResult?.FareBreakdown)
+    ? normalizedResult.FareBreakdown
     : [];
 
   const paxType = getPassengerTypeCode(
@@ -131,19 +133,20 @@ const getFareForPassenger = (result, passenger) => {
   );
 
   return toTboFare(
-    matchedFare || fareBreakdown[0] || result?.Fare,
-    result?.Fare?.Currency,
+    matchedFare || fareBreakdown[0] || normalizedResult?.Fare,
+    normalizedResult?.Fare?.Currency,
   );
 };
 
 const getLccFareForPassenger = (result, passenger) => {
+  const normalizedResult = Array.isArray(result) ? result[0] : result;
   const inlineFare = passenger?.Fare || passenger?.fare;
 
   if (inlineFare) {
-    return toTboFare(inlineFare, inlineFare.Currency || result?.Fare?.Currency);
+    return toTboFare(inlineFare, inlineFare.Currency || normalizedResult?.Fare?.Currency);
   }
 
-  return getFareForPassenger(result, passenger);
+  return getFareForPassenger(normalizedResult, passenger);
 };
 
 function buildLccTicketSsrPayload({ ssr, liveSsrResponse, passengers }) {

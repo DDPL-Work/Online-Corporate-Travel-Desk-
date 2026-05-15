@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import { RiPhoneLine, RiArrowRightLine } from "react-icons/ri";
 import { LuPlane } from "react-icons/lu";
-import logo from "../../public/logo-traveamer.svg";
 import { useFlightSearch } from "../context/FlightSearchContext";
 
 export default function LandingFooter({ onTabChange }) {
@@ -61,7 +60,7 @@ export default function LandingFooter({ onTabChange }) {
                   className="h-12 object-contain"
                 />
               ) : (
-                <img src={logo} alt="Traveamer" className="h-7" />
+                <img src="/logo-traveamer.svg" alt="Traveamer" className="h-7" />
               )}
               <div className="space-y-1">
                 <h4
@@ -131,7 +130,7 @@ export default function LandingFooter({ onTabChange }) {
                     className="h-[2rem] object-contain"
                   />
                 ) : (
-                  <img src={logo} alt="Traveamer" className="h-7" />
+                  <img src="/logo-traveamer.svg" alt="Traveamer" className="h-7" />
                 )}
                 {branding?.corporateName && (
                   <p
@@ -327,7 +326,7 @@ export default function LandingFooter({ onTabChange }) {
             }
           }}
         >
-          <img src={logo} alt="Traveamer" className="h-10" />
+          <img src="/logo-traveamer.svg" alt="Traveamer" className="h-10" />
         </div>
 
         {/* Copyright */}

@@ -16,7 +16,7 @@ const getRecipientModel = (role) => {
 exports.getMyNotifications = async (req, res) => {
   try {
     const query = {
-      recipient: req.user.id
+      recipient: req.user.id,
     };
 
     const notifications = await Notification.find(query)
@@ -50,12 +50,9 @@ exports.getMyNotifications = async (req, res) => {
 exports.markAsRead = async (req, res) => {
   try {
     const notification = await Notification.findOneAndUpdate(
-      { 
-        _id: req.params.id, 
-        $or: [
-          { recipient: req.user.id },
-          { recipientRole: req.user.role }
-        ]
+      {
+        _id: req.params.id,
+        recipient: req.user.id,
       },
       { isRead: true },
       { new: true }
@@ -89,10 +86,7 @@ exports.markAllAsRead = async (req, res) => {
   try {
     const query = {
       isRead: false,
-      $or: [
-        { recipient: req.user.id },
-        { recipientRole: req.user.role }
-      ]
+      recipient: req.user.id,
     };
 
     await Notification.updateMany(query, { isRead: true });
@@ -154,10 +148,7 @@ exports.deleteNotification = async (req, res) => {
   try {
     const notification = await Notification.findOneAndDelete({
       _id: req.params.id,
-      $or: [
-        { recipient: req.user.id },
-        { recipientRole: req.user.role }
-      ]
+      recipient: req.user.id,
     });
 
     if (!notification) {

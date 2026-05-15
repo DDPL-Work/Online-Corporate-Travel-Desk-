@@ -3,6 +3,18 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../API/axios"; // axios instance with auth token
 
+const buildThunkError = (err, fallbackMessage) => ({
+  message:
+    err.response?.data?.message ||
+    err.response?.data?.error ||
+    err.message ||
+    fallbackMessage,
+  statusCode: err.response?.status || err.statusCode || 500,
+  code: err.response?.data?.code || null,
+  providerMessage: err.response?.data?.providerMessage || null,
+  data: err.response?.data?.data || null,
+});
+
 // CREATE booking request (approval-first)
 export const createBookingRequest = createAsyncThunk(
   "bookings/createBookingRequest",
@@ -69,13 +81,32 @@ export const fetchMyRejectedRequests = createAsyncThunk(
 // CONFIRM booking after approval
 export const executeApprovedFlightBooking = createAsyncThunk(
   "bookings/executeFlight",
+  async (input, { rejectWithValue }) => {
+    try {
+      const bookingId = typeof input === "string" ? input : input?.bookingId;
+      const confirmPendingRevalidation =
+        typeof input === "object" && input?.confirmPendingRevalidation === true;
+
+      const { data } = await api.post(`/bookings/${bookingId}/execute-flight`, {
+        confirmPendingRevalidation,
+      });
+
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(buildThunkError(err, "Flight booking failed"));
+    }
+  },
+);
+
+export const fetchApprovedFlightBookingStatus = createAsyncThunk(
+  "bookings/fetchApprovedFlightBookingStatus",
   async (bookingId, { rejectWithValue }) => {
     try {
-      const { data } = await api.post(`/bookings/${bookingId}/execute-flight`);
+      const { data } = await api.get(`/bookings/${bookingId}/execute-flight-status`);
       return data.data;
     } catch (err) {
       return rejectWithValue(
-        err.response?.data?.message || "Flight booking failed",
+        buildThunkError(err, "Failed to fetch approved booking status"),
       );
     }
   },

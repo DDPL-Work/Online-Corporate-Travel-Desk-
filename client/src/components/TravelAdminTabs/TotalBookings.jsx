@@ -58,7 +58,7 @@ function FlightSection() {
     (state) => state.adminBooking.flightBookings,
   );
 
-  console.log(flightBookings);
+  // console.log(flightBookings);
 
   useEffect(() => {
     dispatch(getAllFlightBookingsAdmin());
@@ -468,7 +468,7 @@ function HotelSection() {
     (state) => state.adminBooking.hotelBookings,
   );
 
-  console.log(hotelBookings);
+  // console.log(hotelBookings);
 
   useEffect(() => {
     dispatch(getAllHotelBookingsAdmin());

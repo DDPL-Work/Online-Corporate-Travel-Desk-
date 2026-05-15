@@ -3,7 +3,6 @@ import { MdOutlineFlight, MdOutlineHotel } from "react-icons/md";
 import { FcApproval } from "react-icons/fc";
 import { RiBriefcaseLine, RiUserLine } from "react-icons/ri";
 import { BsBell } from "react-icons/bs";
-import logo from '../../public/logo-traveamer.svg';
 import AuthModal from "../Pages/Auth/AuthModal";
 import { LuWorkflow, LuPlane } from "react-icons/lu";
 import NotificationBell from "../components/common/NotificationBell";
@@ -225,7 +224,7 @@ export default function LandingHeader() {
             className="h-8 object-contain"
           />
         ) : (
-          <img src={logo} alt="Traveamer" className="h-7" />
+          <img src="/logo-traveamer.svg" alt="Traveamer" className="h-7" />
         )}
       </div>
 

@@ -74,11 +74,13 @@ exports.verifyToken = async (req, res, next) => {
           permissions: account.permissions,
           email: account.email,
           name: account.name,
+          status: account.status,
         };
         await cache.set(cacheKey, userData, USER_CACHE_TTL);
       }
 
       req.user = userData;
+      req.opsMember = { _id: userData._id, permissions: userData.permissions, status: userData.status };
       return next();
     }
 

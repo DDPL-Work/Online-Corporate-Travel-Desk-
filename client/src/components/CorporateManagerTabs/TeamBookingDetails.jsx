@@ -37,10 +37,10 @@ import {
   fetchCancellationCharges,
   fullCancellation,
   partialCancellation,
-  amendBooking,
   fetchChangeStatus,
   createCancellationQuery,
 } from "../../Redux/Actions/amendmentThunks";
+import { createReissueRequest } from "../../Redux/Actions/reissueThunks";
 import { resetAmendmentState } from "../../Redux/Slice/amendmentSlice";
 import {
   formatDate,
@@ -2436,6 +2436,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
 
   const [selectedJourney, setSelectedJourney] = useState(null);
   const [reissueDate, setReissueDate] = useState("");
+  const [returnReissueDate, setReturnReissueDate] = useState("");
   const [remarksText, setRemarksText] = useState("");
   const [successData, setSuccessData] = useState(null);
   const [processingLabel, setProcessingLabel] = useState("Processing…");
@@ -2594,18 +2595,27 @@ function CancellationModal({ booking, onClose, onSuccess }) {
 
   const handleReissue = async () => {
     if (!reissueDate) return;
+    if (hasReturn && !returnReissueDate) {
+      setChargesError("Please select the updated return travel date.");
+      setStep("error");
+      return;
+    }
     setStep("processing");
     setProcessingLabel("Submitting reissue request…");
     try {
-      const res = await dispatch(
-        amendBooking({
+      const request = await dispatch(
+        createReissueRequest({
           bookingId: booking._id,
-          segments: [{ newDate: reissueDate }],
+          newJourney: {
+            departureDate: reissueDate,
+            ...(hasReturn ? { returnDate: returnReissueDate } : {}),
+          },
           remarks: remarksText || "User requested reissue",
         }),
+      ).unwrap();
+      toast.success(
+        `${request.reissueId} created in ${request.mode?.toLowerCase?.() || "servicing"} mode`,
       );
-      if (res.error) throw new Error(res.payload || "Reissue failed");
-      toast.success("Reissue request submitted successfully");
       onClose();
       await dispatch(getTeamExecutedFlightRequestById(booking._id));
     } catch (err) {
@@ -2920,6 +2930,18 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                   onChange={(e) => setReissueDate(e.target.value)}
                 />
               </div>
+              {hasReturn && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">New Return Date</p>
+                  <input
+                    type="date"
+                    className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500"
+                    value={returnReissueDate}
+                    min={reissueDate || new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setReturnReissueDate(e.target.value)}
+                  />
+                </div>
+              )}
               <textarea
                 placeholder="Reason for reissue..."
                 className="w-full p-3 border border-slate-200 rounded-xl text-sm"
@@ -2930,7 +2952,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
               <div className="flex gap-3">
                 <button onClick={() => setStep("charges")} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold text-sm rounded-xl">Back</button>
                 <button
-                  disabled={!reissueDate}
+                  disabled={!reissueDate || (hasReturn && !returnReissueDate)}
                   onClick={handleReissue}
                   className="flex-1 py-3 bg-indigo-500 text-white font-bold text-sm rounded-xl disabled:opacity-50"
                 >

@@ -86,7 +86,7 @@ export default function Sidebar({ isOpen, onClose }) {
       to: "/all-reissue-requests",
       label: "All Reissue Requests",
       icon: <FaExchangeAlt />,
-      permission: "Manage Cancellations",
+      permission: "Manage Reissues",
     },
     {
       to: "/corporate-revenue",
