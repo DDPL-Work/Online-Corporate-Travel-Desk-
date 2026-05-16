@@ -1926,7 +1926,7 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
 exports.getMyBookingById = asyncHandler(async (req, res) => {
   const context = await resolveBookingContext(req.params.id, { lean: true });
 
-  if (!booking) {
+  if (!context?.requestedBooking || !context?.activeBooking) {
     throw new ApiError(404, "Booking not found");
   }
 
