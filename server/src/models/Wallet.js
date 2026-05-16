@@ -40,7 +40,13 @@ const walletTransactionSchema = new mongoose.Schema(
     },
     bookingId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Booking",
+      refPath: "bookingModel",
+    },
+    bookingModel: {
+      type: String,
+      required: function() { return !!this.bookingId; },
+      enum: ["BookingRequest", "HotelBookingRequest"],
+      default: "BookingRequest",
     },
     transactionId: {
       type: String,

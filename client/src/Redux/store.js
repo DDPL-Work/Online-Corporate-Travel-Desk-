@@ -36,6 +36,7 @@ import ssrPolicyReducer from "./Slice/ssrPolicy.slice.js";
 import landingPageReducer from "./Slice/landingPageSlice.js";
 import reissueReducer from "./Slice/reissueSlice.js";
 import blogReducer from "./Slice/blog.slice.js";
+import layoutReducer from "./Slice/layoutSlice.js";
 
 export const store = configureStore({
   reducer: {
@@ -84,5 +85,6 @@ export const store = configureStore({
     landingPage: landingPageReducer,
     reissue: reissueReducer,
     blogs: blogReducer,
+    layout: layoutReducer,
   },
 });

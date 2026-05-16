@@ -17,6 +17,7 @@ const ManagerRequestSchema = new mongoose.Schema({
   projectCodeId: String,
   projectName: String,
   projectClient: String,
+  orderId: String,
   corporateId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Corporate',

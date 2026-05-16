@@ -45,6 +45,8 @@ class PDFService {
      PUPPETEER HELPERS
   ====================================================== */
 
+  // for localhost
+
   async _launchBrowser() {
     try {
       if (isProduction) {
@@ -72,6 +74,39 @@ class PDFService {
       throw error;
     }
   }
+
+  // for production
+
+  //   async _launchBrowser() {
+  //   try {
+  //     if (isProduction) {
+  //       logger.info("Launching Puppeteer-core in production mode");
+
+  //       return await puppeteerCore.launch({
+  //         executablePath: "/snap/bin/chromium",
+  //         headless: true,
+  //         args: [
+  //           "--no-sandbox",
+  //           "--disable-setuid-sandbox",
+  //           "--disable-dev-shm-usage",
+  //           "--disable-gpu",
+  //           "--no-zygote",
+  //           "--single-process",
+  //         ],
+  //       });
+  //     } else {
+  //       logger.info("Launching Puppeteer in development mode");
+
+  //       return await puppeteer.launch({
+  //         headless: true,
+  //         args: ["--no-sandbox"],
+  //       });
+  //     }
+  //   } catch (error) {
+  //     logger.error("Failed to launch browser", error);
+  //     throw error;
+  //   }
+  // }
 
   async _generateBarcode(text) {
     try {
@@ -137,17 +172,26 @@ class PDFService {
       // Helper to extract segments and response from a response object
       const getJourneyData = (res) => {
         if (!res) return { response: null, segments: [] };
-        const response = res?.raw?.Response?.Response || res?.Response?.Response || res?.Response || res?.raw?.Response || res;
+        const response =
+          res?.raw?.Response?.Response ||
+          res?.Response?.Response ||
+          res?.Response ||
+          res?.raw?.Response ||
+          res;
         const segments = response?.FlightItinerary?.Segments || [];
         return { response, segments };
       };
 
-      const onwardData = getJourneyData(br?.onwardResponse || br?.providerResponse);
+      const onwardData = getJourneyData(
+        br?.onwardResponse || br?.providerResponse,
+      );
       const returnData = getJourneyData(br?.returnResponse);
 
       // Improved Round-Trip detection for international bookings
       // In international round-trips, both legs usually come under a single PNR/response
-      const hasReturnSegments = onwardData.segments.some(s => s.TripIndicator === 2);
+      const hasReturnSegments = onwardData.segments.some(
+        (s) => s.TripIndicator === 2,
+      );
       const isInternationalRoundTrip = !br?.returnResponse && hasReturnSegments;
       const isRoundTrip = !!br?.returnResponse || isInternationalRoundTrip;
 
@@ -167,20 +211,28 @@ class PDFService {
       if (!journeyResponse) throw new Error("Invalid booking structure");
 
       const journeySegments = allSegments;
-      const pnr = (isRoundTrip && returnPNR && returnPNR !== onwardPNR) 
-        ? `${onwardPNR} / ${returnPNR}` 
-        : (onwardPNR || returnPNR || "—");
+      const pnr =
+        isRoundTrip && returnPNR && returnPNR !== onwardPNR
+          ? `${onwardPNR} / ${returnPNR}`
+          : onwardPNR || returnPNR || "—";
 
       const firstLeg = journeySegments[0];
       const airlineCode = firstLeg?.Airline?.AirlineCode;
       const airlineName = firstLeg?.Airline?.AirlineName || "Airline";
       const airlineLogo = await this._fetchAirlineLogo(airlineCode);
-      
+
       // Determine global cabin class from the first leg
-      const firstSegCabin = firstLeg?.CabinClass || journeyResponse?.FlightItinerary?.Segments?.[0]?.CabinClass;
-      const globalCabinClass = firstSegCabin === 2 ? "Economy" : 
-                               firstSegCabin === 3 ? "Premium Economy" : 
-                               firstSegCabin === 4 ? "Business" : "Standard";
+      const firstSegCabin =
+        firstLeg?.CabinClass ||
+        journeyResponse?.FlightItinerary?.Segments?.[0]?.CabinClass;
+      const globalCabinClass =
+        firstSegCabin === 2
+          ? "Economy"
+          : firstSegCabin === 3
+            ? "Premium Economy"
+            : firstSegCabin === 4
+              ? "Business"
+              : "Standard";
 
       // ── Load static assets as base64 (ensures they render inside Puppeteer) ──
       const publicDir = path.join(__dirname, "../../public");
@@ -190,8 +242,12 @@ class PDFService {
       const iataLogo = `data:image/svg+xml;base64,${fs.readFileSync(path.join(publicDir, "iata-logo.svg")).toString("base64")}`;
 
       // ── Get Ticketed Date ──
-      const ticketInfo = journeyResponse?.FlightItinerary?.Passenger?.[0]?.Ticket;
-      const issueDateRaw = ticketInfo?.IssueDate || journeyResponse?.FlightItinerary?.InvoiceCreatedOn || booking.createdAt;
+      const ticketInfo =
+        journeyResponse?.FlightItinerary?.Passenger?.[0]?.Ticket;
+      const issueDateRaw =
+        ticketInfo?.IssueDate ||
+        journeyResponse?.FlightItinerary?.InvoiceCreatedOn ||
+        booking.createdAt;
       const ticketedDate = new Date(issueDateRaw).toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
@@ -215,7 +271,9 @@ class PDFService {
 
       // ── Prepare Segment-wise Data (Flight Cards Only) ──
       // Calculate onward segments count properly to distinguish between onward and return legs
-      const onwardSegmentsCount = onwardData.segments.filter(s => s.TripIndicator === 1).length;
+      const onwardSegmentsCount = onwardData.segments.filter(
+        (s) => s.TripIndicator === 1,
+      ).length;
       const segmentsData = await Promise.all(
         journeySegments.map(async (seg, segIdx) => {
           const depTime = new Date(
@@ -226,7 +284,8 @@ class PDFService {
           );
 
           let layover = null;
-          const isLegTransition = isRoundTrip && segIdx === onwardSegmentsCount - 1;
+          const isLegTransition =
+            isRoundTrip && segIdx === onwardSegmentsCount - 1;
 
           if (segIdx < journeySegments.length - 1 && !isLegTransition) {
             const nextSeg = journeySegments[segIdx + 1];
@@ -267,7 +326,8 @@ class PDFService {
 
             destinationCity:
               seg.Destination?.Airport?.CityName ||
-              seg.destination?.city || "City",
+              seg.destination?.city ||
+              "City",
             destinationCode:
               seg.Destination?.Airport?.AirportCode ||
               seg.destination?.airportCode ||
@@ -298,10 +358,21 @@ class PDFService {
             aircraft: seg.Craft || "Airbus/Boeing",
             flightNumber: `${seg.Airline?.AirlineCode}-${seg.Airline?.FlightNumber}`,
             airlineLogo: airlineLogo,
-            segmentPNR: seg.AirlinePNR || (isRoundTrip ? (segIdx < onwardSegmentsCount ? onwardPNR : (returnPNR || onwardPNR)) : onwardPNR),
-            journeyType: isRoundTrip ? (segIdx < onwardSegmentsCount ? "ONWARD" : "RETURN") : null,
-            isLastOfJourneyType: isRoundTrip 
-              ? (segIdx === onwardSegmentsCount - 1 || segIdx === journeySegments.length - 1)
+            segmentPNR:
+              seg.AirlinePNR ||
+              (isRoundTrip
+                ? segIdx < onwardSegmentsCount
+                  ? onwardPNR
+                  : returnPNR || onwardPNR
+                : onwardPNR),
+            journeyType: isRoundTrip
+              ? segIdx < onwardSegmentsCount
+                ? "ONWARD"
+                : "RETURN"
+              : null,
+            isLastOfJourneyType: isRoundTrip
+              ? segIdx === onwardSegmentsCount - 1 ||
+                segIdx === journeySegments.length - 1
               : segIdx === journeySegments.length - 1,
             cabinClass:
               (seg.CabinClass === 2
@@ -325,8 +396,16 @@ class PDFService {
               seg.FareClassification?.Type ||
               seg.Remark ||
               "Regular",
-            checkInBaggage: (seg.Baggage || "15 KG").toUpperCase().includes("INCLUDED") ? "15 KG" : (seg.Baggage || "15 KG"),
-            cabinBaggage: (seg.CabinBaggage || "7 KG").toUpperCase().includes("INCLUDED") ? "7 KG" : (seg.CabinBaggage || "7 KG"),
+            checkInBaggage: (seg.Baggage || "15 KG")
+              .toUpperCase()
+              .includes("INCLUDED")
+              ? "15 KG"
+              : seg.Baggage || "15 KG",
+            cabinBaggage: (seg.CabinBaggage || "7 KG")
+              .toUpperCase()
+              .includes("INCLUDED")
+              ? "7 KG"
+              : seg.CabinBaggage || "7 KG",
             layover: layover,
           };
         }),
@@ -362,22 +441,34 @@ class PDFService {
       // ── Prepare Consolidated Passenger Data (Global for the journey) ──
       const consolidatedTravellers = await Promise.all(
         booking.travellers.map(async (traveller, tIdx) => {
-          const tboPaxOnward = onwardData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
-          const tboPaxReturn = returnData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
-          
-          const onwardTicket = tboPaxOnward?.Ticket ? {
-            id: tboPaxOnward.Ticket.TicketId || "—",
-            no: tboPaxOnward.Ticket.TicketNumber || "—"
-          } : null;
+          const tboPaxOnward =
+            onwardData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
+          const tboPaxReturn =
+            returnData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
 
-          const returnTicket = tboPaxReturn?.Ticket ? {
-            id: tboPaxReturn.Ticket.TicketId || "—",
-            no: tboPaxReturn.Ticket.TicketNumber || "—"
-          } : (isInternationalRoundTrip ? onwardTicket : null);
+          const onwardTicket = tboPaxOnward?.Ticket
+            ? {
+                id: tboPaxOnward.Ticket.TicketId || "—",
+                no: tboPaxOnward.Ticket.TicketNumber || "—",
+              }
+            : null;
 
-          const ticketNumber = (onwardTicket && returnTicket && onwardTicket.no !== returnTicket.no)
-            ? `${onwardTicket.no} / ${returnTicket.no}`
-            : (onwardTicket?.no || returnTicket?.no || onwardData.response?.FlightItinerary?.TBOConfNo || "E-TICKET");
+          const returnTicket = tboPaxReturn?.Ticket
+            ? {
+                id: tboPaxReturn.Ticket.TicketId || "—",
+                no: tboPaxReturn.Ticket.TicketNumber || "—",
+              }
+            : isInternationalRoundTrip
+              ? onwardTicket
+              : null;
+
+          const ticketNumber =
+            onwardTicket && returnTicket && onwardTicket.no !== returnTicket.no
+              ? `${onwardTicket.no} / ${returnTicket.no}`
+              : onwardTicket?.no ||
+                returnTicket?.no ||
+                onwardData.response?.FlightItinerary?.TBOConfNo ||
+                "E-TICKET";
 
           // Merge SegmentAdditionalInfo for round trips
           const onwardAddInfo = tboPaxOnward?.SegmentAdditionalInfo || [];
@@ -387,7 +478,7 @@ class PDFService {
           // ── BARCODE GENERATION (Dual for Round-Trip) ──
           let onwardBarcodeBase64 = null;
           let returnBarcodeBase64 = null;
-          
+
           const onwardBarcodes = tboPaxOnward?.BarcodeDetails?.Barcode || [];
           const returnBarcodes = tboPaxReturn?.BarcodeDetails?.Barcode || [];
 
@@ -395,7 +486,11 @@ class PDFService {
           let returnContent = returnBarcodes[0]?.Content;
 
           // Handle International Round-Trip where both barcodes are in the onward/provider response
-          if (isInternationalRoundTrip && onwardBarcodes.length >= 2 && !returnContent) {
+          if (
+            isInternationalRoundTrip &&
+            onwardBarcodes.length >= 2 &&
+            !returnContent
+          ) {
             returnContent = onwardBarcodes[1]?.Content;
           }
 
@@ -410,23 +505,35 @@ class PDFService {
             name: `${traveller.firstName} ${traveller.lastName}`.toUpperCase(),
             title: traveller.title.toUpperCase(),
             ticketNumber: ticketNumber,
-            ticketId: tboPaxOnward?.Ticket?.TicketId || tboPaxReturn?.Ticket?.TicketId || "",
+            ticketId:
+              tboPaxOnward?.Ticket?.TicketId ||
+              tboPaxReturn?.Ticket?.TicketId ||
+              "",
             onwardTicket,
             returnTicket,
             email: traveller.isLeadPassenger ? traveller.email || "" : "",
-            phone: traveller.isLeadPassenger ? traveller.phoneWithCode || "" : "",
+            phone: traveller.isLeadPassenger
+              ? traveller.phoneWithCode || ""
+              : "",
             onwardBarcodeBase64,
             returnBarcodeBase64,
             // Fallback for one-way or if one is missing
             barcodeBase64: onwardBarcodeBase64 || returnBarcodeBase64,
             segmentServices: journeySegments.map((seg, segIdx) => {
               const addInfo = mergedAddInfo[segIdx] || {};
-              const checkIn = (seg.Baggage || "15 KG").toUpperCase().includes("INCLUDED") ? "15 KG" : (seg.Baggage || "15 KG");
-              
+              const checkIn = (seg.Baggage || "15 KG")
+                .toUpperCase()
+                .includes("INCLUDED")
+                ? "15 KG"
+                : seg.Baggage || "15 KG";
+
               return {
                 route: `${seg.Origin?.Airport?.AirportCode || seg.Origin?.airportCode || "ORG"}-${seg.Destination?.Airport?.AirportCode || seg.Destination?.airportCode || "DEST"}`,
                 seat: addInfo.Seat || "Auto",
-                meal: addInfo.Meal && addInfo.Meal !== "0 Platter" ? addInfo.Meal : "N/A",
+                meal:
+                  addInfo.Meal && addInfo.Meal !== "0 Platter"
+                    ? addInfo.Meal
+                    : "N/A",
                 baggage: checkIn,
                 addOnBaggage: "N/A",
               };

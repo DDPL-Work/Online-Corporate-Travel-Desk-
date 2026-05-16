@@ -17,31 +17,39 @@ const fs = require("fs");
 // ===============================
 exports.getProfile = async (req, res, next) => {
   try {
-    let employee = await Employee.findOne({ userId: req.user.id })
+    const user = await User.findById(req.user.id).populate("corporateId").lean();
+    if (!user) return next(new ApiError(404, "User not found"));
+
+    let employeeDoc = await Employee.findOne({ userId: req.user.id })
       .populate("managerId", "name email designation phone")
       .populate(
         "corporateId",
         "corporateName primaryContact secondaryContact defaultApprover",
       )
-      .select("-__v");
+      .select("-__v")
+      .lean();
 
-    const user = await User.findById(req.user.id).populate("corporateId");
+    // Unified Profile Object (Employee + User merge)
+    const employee = {
+      // Identity from User
+      _id: user._id,
+      name: employeeDoc?.name || `${user.name?.firstName || ""} ${user.name?.lastName || ""}`.trim() || user.username,
+      email: user.email,
+      phone: employeeDoc?.mobile || user.phone || "",
+      profilePicture: user.profilePicture,
+      role: user.role,
+      corporateId: user.corporateId?._id || user.corporateId,
+      corporate: user.corporateId,
 
-    // FALLBACK: If travel-admin or manager doesn't have an Employee doc, synthesize one from User doc
-    if (!employee && ["travel-admin", "manager"].includes(user?.role)) {
-      employee = {
-        userId: user._id,
-        name: `${user.name?.firstName || ""} ${user.name?.lastName || ""}`.trim() || user.username,
-        email: user.email,
-        corporateId: user.corporateId,
-        designation: user.role,
-        department: "Administration",
-        mobile: user.phone || "",
-        employeeCode: "ADMIN",
-      };
-    }
-
-    if (!employee) return next(new ApiError(404, "Employee profile not found"));
+      // Professional from Employee
+      employeeCode: employeeDoc?.employeeCode || (["travel-admin", "corporate-admin"].includes(user.role) ? "ADMIN" : "PENDING"),
+      department: employeeDoc?.department || (["travel-admin", "corporate-admin"].includes(user.role) ? "Administration" : "Not Assigned"),
+      designation: employeeDoc?.designation || user.role,
+      
+      // Relations
+      managerId: employeeDoc?.managerId,
+      status: employeeDoc?.status || (user.isActive ? "active" : "inactive"),
+    };
 
     // Check for all "Manager Selection" requests for this employee (including project-specific)
     const ManagerRequest = require("../models/ManagerRequest");
@@ -104,13 +112,8 @@ exports.getProfile = async (req, res, next) => {
     res.json({
       success: true,
       employee: {
-        name: employee.name,
-        email: user?.email,
-        phone: employee.mobile,
-        employeeCode: employee.employeeCode,
-        department: employee.department,
-        designation: employee.designation,
-        projectApprovers, // <--- New field for list
+        ...employee,
+        projectApprovers,
         travelAdmin: travelAdmin
           ? {
               name: travelAdmin.name,
@@ -150,47 +153,27 @@ exports.updateProfile = async (req, res, next) => {
       });
     }
 
+    // Fetch user to get corporateId, name, email for potential upsert
+    const user = await User.findById(req.user.id);
+    if (!user) return next(new ApiError(404, "User not found"));
+
+    // Prepare default fields for upsert if document doesn't exist
+    const upsertDoc = {
+      ...updates,
+      userId: user._id,
+      corporateId: user.corporateId,
+      email: user.email,
+      name: updates.name || `${user.name?.firstName || ""} ${user.name?.lastName || ""}`.trim() || user.username || user.email,
+    };
+
     const emp = await Employee.findOneAndUpdate(
       { userId: req.user.id },
-      { $set: updates },
-      { new: true, runValidators: true },
+      { $set: upsertDoc },
+      { new: true, upsert: true, runValidators: true },
     )
       .populate("managerId", "name email designation phone")
       .select("-__v");
 
-    // If no Employee doc but user is admin/manager, we can allow basic User updates
-    if (!emp) {
-        const user = await User.findById(req.user.id);
-        if (["travel-admin", "manager"].includes(user?.role)) {
-            const userUpdates = {};
-            if (updates.name) {
-                const parts = updates.name.split(" ");
-                userUpdates["name.firstName"] = parts[0];
-                userUpdates["name.lastName"] = parts.slice(1).join(" ");
-            }
-            if (updates.mobile !== undefined) {
-                userUpdates.phone = updates.mobile;
-            }
-            
-            await User.findByIdAndUpdate(req.user.id, userUpdates);
-            
-            // Re-fetch to return the synthesized employee object
-            const updatedUser = await User.findById(req.user.id).populate("corporateId");
-            const synthesizedEmployee = {
-                userId: updatedUser._id,
-                name: `${updatedUser.name?.firstName || ""} ${updatedUser.name?.lastName || ""}`.trim() || updatedUser.username,
-                email: updatedUser.email,
-                corporateId: updatedUser.corporateId,
-                designation: updatedUser.role,
-                department: "Administration",
-                phone: updatedUser.phone || "",
-                employeeCode: "ADMIN",
-            };
-            
-            return res.json({ success: true, message: "Profile updated", employee: synthesizedEmployee });
-        }
-        return next(new ApiError(404, "Employee profile not found"));
-    }
 
     // Handle Manager Selection via ManagerRequest
     if (req.body.managerId) {
@@ -224,14 +207,13 @@ exports.updateProfile = async (req, res, next) => {
             projectName,
             projectCodeId,
             projectClient,
+            orderId: req.body.orderId,
             status: "pending",
           },
           { upsert: true, new: true },
         );
       }
     }
-
-    const user = await User.findById(req.user.id);
 
     // Determine the Travel Admin by searching users with the role 'travel-admin' for this corporate
     const travelAdminUser = await User.findOne({

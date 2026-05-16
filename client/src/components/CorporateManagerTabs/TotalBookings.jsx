@@ -1,29 +1,25 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
-import { FaPlane, FaHotel } from "react-icons/fa";
-import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
+import { FaPlane, FaHotel, FaRupeeSign } from "react-icons/fa";
 import {
   FiSearch,
   FiCheckCircle,
   FiClock,
   FiXCircle,
-  FiDollarSign,
   FiCalendar,
   FiFilter,
   FiList,
   FiRefreshCw,
-  FiEye,
+  FiX,
+  FiUser,
+  FiArrowRight,
 } from "react-icons/fi";
 import {
   getTeamExecutedHotelRequests,
   getTeamExecutedFlightRequests,
 } from "../../Redux/Actions/manager.thunk";
-// import {
-//   FlightBookingModal,
-//   HotelBookingModal,
-// } from "./Modal/BookingRequestDetailsModal";
-import { Pagination } from "./Shared/Pagination";
+import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import {
   LabeledField,
   StatCard,
@@ -31,347 +27,252 @@ import {
   dateCls,
   IdCell,
   SearchBar,
-  selectCls,
   Th,
-} from "./Shared/CommonComponents";
+  CustomDropdown,
+} from "../TravelAdminTabs/Shared/CommonComponents";
+import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
+import { C } from "../Shared/color";
+import { airlineLogo } from "../../utils/formatter";
 
-const mapStatus = (status) => {
-  if (status === "confirmed") return "Confirmed";
-  if (status === "cancel_requested") return "Cancelled";
-  return "Pending";
+const RouteCell = ({ routes, airline }) => {
+  if (!routes || routes.length === 0) return <span className="text-slate-400">No Route</span>;
+  
+  const airlineCode = (airline?.airlineCode || "AI").toUpperCase();
+  const airlineName = airline?.airlineName || "Airline";
+  const logoUrl = airlineLogo(airlineCode);
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
+        <img 
+          src={logoUrl} 
+          alt={airlineName} 
+          className="w-full h-full object-contain"
+          onError={(e) => { 
+            e.target.onerror = null;
+            e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
+          }} 
+        />
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-tight">
+            {routes[0].fromCode}
+          </span>
+          <FiArrowRight size={12} className="text-slate-400" />
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-tight">
+            {routes.length > 1 ? routes[0].toCode : routes[routes.length - 1].toCode}
+          </span>
+          {routes.length > 1 && (
+            <span className="bg-amber-50 text-amber-600 text-[8px] font-black px-1.5 py-0.5 rounded border border-amber-100 ml-1">RT</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-500">
+          <span className="capitalize">{routes[0].fromCity || "Origin"}</span>
+          <span>→</span>
+          <span className="capitalize">{routes.length > 1 ? (routes[0].toCity || "Turnaround") : (routes[routes.length - 1].toCity || "Dest")}</span>
+        </div>
+      </div>
+    </div>
+  );
 };
 
-// ── FLIGHT SECTION ────────────────────────────────────────────────────────────
 function FlightSection() {
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatus] = useState("All");
-  const [corpFilter, setCorp] = useState("All");
-  const [travelDate, setTravelDate] = useState("");
+  const [empFilter, setEmp] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
-  const dispatch = useDispatch();
-
-  const { teamExecutedFlightRequests: flightBookings } = useSelector(
-    (state) => state.manager,
-  );
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { teamExecutedFlightRequests: flightBookings } = useSelector((state) => state.manager);
 
-  useEffect(() => {
-    dispatch(getTeamExecutedFlightRequests());
-  }, [dispatch]);
+  useEffect(() => { dispatch(getTeamExecutedFlightRequests()); }, [dispatch]);
 
-  // Reset to page 1 whenever filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, startDate, endDate, statusFilter, travelDate]);
-
-  const corps = ["All"];
-
-  const formatFlight = (b) => {
+  const formattedBookings = useMemo(() => (flightBookings || []).map(b => {
     const traveller = b.travellers?.length
       ? `${b.travellers[0].title || ""} ${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim()
-      : "N/A";
-
-    const employeeId = b.userId?.email || "N/A";
-
+      : "Staff Member";
+    
     const executionStatus = (b.executionStatus || "").toLowerCase();
-    const status =
-      executionStatus === "ticketed" || executionStatus === "confirmed"
-        ? "Confirmed"
-        : ["cancelled", "cancel_requested"].includes(executionStatus)
-          ? "Cancelled"
-          : executionStatus === "failed"
-            ? "Failed"
-            : "Pending";
+    const status = (executionStatus === "ticketed" || executionStatus === "confirmed") ? "Confirmed" : executionStatus === "cancel_requested" ? "Cancelled" : "Pending";
+    
+    const pnr = b.bookingResult?.pnr || "-";
+    const amount = b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
 
-    const pnr =
-      b.bookingResult?.pnr ||
-      b.bookingResult?.providerResponse?.raw?.Response?.Response?.PNR ||
-      "-";
-
-    const providerBookingId =
-      b.bookingResult?.providerResponse?.raw?.Response?.Response?.BookingId ||
-      "-";
-
-    const amount =
-      b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
-
-    return {
-      ...b,
-      travellerName: traveller,
-      employeeId,
-      status,
-      pnr,
-      providerBookingId,
-      amount,
-      bookedDate: b.createdAt,
+    // Route logic
+    const segments = b.flightRequest?.segments || [];
+    const onwardSegments = segments.filter(s => s.journeyType === "onward");
+    const returnSegments = segments.filter(s => s.journeyType === "return");
+    
+    const buildLeg = (segs) => {
+      if (!segs.length) return null;
+      const first = segs[0]; 
+      const last = segs[segs.length - 1];
+      return {
+        fromCode: first?.origin?.airportCode || "N/A",
+        toCode: last?.destination?.airportCode || "N/A",
+        fromCity: first?.origin?.city || "Unknown",
+        toCity: last?.destination?.city || "Unknown"
+      };
     };
-  };
+
+    const routes = [];
+    if (onwardSegments.length > 0 || returnSegments.length > 0) {
+      const onwardLeg = buildLeg(onwardSegments);
+      const returnLeg = buildLeg(returnSegments);
+      if (onwardLeg) routes.push(onwardLeg);
+      if (returnLeg) routes.push(returnLeg);
+    } else if (segments.length > 0) {
+      const leg = buildLeg(segments);
+      if (leg) routes.push(leg);
+    }
+    
+    const airline = segments[0] ? { 
+      airlineCode: segments[0].airlineCode || segments[0].airline?.airlineCode, 
+      airlineName: segments[0].airlineName || segments[0].airline?.airlineName 
+    } : null;
+
+    return { 
+      ...b, 
+      travellerName: traveller, 
+      employeeId: b.requesterDetails?.email || b.userId?.email || "—", 
+      status, 
+      pnr, 
+      amount, 
+      bookedDate: b.createdAt,
+      routes,
+      airline
+    };
+  }), [flightBookings]);
+
+  const employees = ["All", ...new Set(formattedBookings.map(b => b.travellerName))];
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-
-    return flightBookings
-      .filter((b) => {
-        const exec = (b.executionStatus || "").toLowerCase();
-        return (
-          exec !== "not_started" &&
-          exec !== "failed" &&
-          b.requestStatus !== "discarded"
-        );
-      })
-      .map(formatFlight)
-      .filter((b) => {
-        const searchOk =
-          !q ||
-          b.travellerName?.toLowerCase().includes(q) ||
-          (b.orderId || "").toLowerCase().includes(q) ||
-          b.pnr?.toLowerCase().includes(q) ||
-          (b.providerBookingId || "").toString().toLowerCase().includes(q);
-
-      const booked = b.bookedDate
-        ? new Date(b.bookedDate).toISOString().slice(0, 10)
-        : "";
-
-      const bookedDateOk =
-        (!startDate || booked >= startDate) && (!endDate || booked <= endDate);
-
-      const statusOk = statusFilter === "All" || b.status === statusFilter;
-
-      const travelDateOk =
-        !travelDate ||
-        (() => {
-          const snapshotDate = b.bookingSnapshot?.travelDate;
-          if (snapshotDate) {
-            if (
-              new Date(snapshotDate).toISOString().slice(0, 10) === travelDate
-            ) {
-              return true;
-            }
-          }
-
-          return (b.flightRequest?.segments ?? []).some((seg) => {
-            const raw = seg.departureDateTime;
-            if (!raw) return false;
-
-            return new Date(raw).toISOString().slice(0, 10) === travelDate;
-          });
-        })();
-
-      if (b.status === "Failed") return false;
-
-      return searchOk && bookedDateOk && statusOk && travelDateOk;
+    return formattedBookings.filter(b => {
+      const exec = (b.executionStatus || "").toLowerCase();
+      if (exec !== "ticketed" && exec !== "confirmed") return false;
+      if (b.amendment?.status === "requested") return false;
+      
+      const booked = b.bookedDate ? new Date(b.bookedDate).toISOString().slice(0, 10) : "";
+      return (!q || b.travellerName?.toLowerCase().includes(q) || b.employeeId?.toLowerCase().includes(q) || b.pnr?.toLowerCase().includes(q) || (b.orderId || "").toLowerCase().includes(q)) &&
+             (!startDate || booked >= startDate) && (!endDate || booked <= endDate) &&
+             (statusFilter === "All" || b.status === statusFilter) &&
+             (empFilter === "All" || b.travellerName === empFilter);
     });
-  }, [search, startDate, endDate, statusFilter, travelDate, flightBookings]);
+  }, [search, startDate, endDate, statusFilter, empFilter, formattedBookings]);
 
-  const paginated = useMemo(
-    () =>
-      filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [filtered, currentPage],
-  );
+  const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
+  const totalSpend = filtered.reduce((s, b) => s + (b.amount || 0), 0);
 
-  // const filtered = useMemo(() => {
-  //   const q = search.toLowerCase();
-
-  //   return flightBookings
-  //     .map(formatFlight) // 🔥 IMPORTANT
-  //     .filter((b) => {
-  //       const searchOk =
-  //         !q ||
-  //         b.travellerName?.toLowerCase().includes(q) ||
-  //         b.pnr?.toLowerCase().includes(q) ||
-  //         (b.providerBookingId || "").toString().toLowerCase().includes(q);
-
-  //       return searchOk;
-  //     });
-  // }, [search, flightBookings]);
-
-  const total = filtered.reduce((s, b) => s + (b.amount || 0), 0);
-  const confirmed = filtered.filter((b) => b.status === "Confirmed").length;
-  const pending = filtered.filter((b) => b.status === "Pending").length;
+  const handleExport = () => {
+    if (!filtered.length) return;
+    const headers = ["Order ID", "Personnel", "Route", "Booked Date", "Status", "PNR", "Amount"];
+    const rows = filtered.map(b => [
+      b.orderId, 
+      b.travellerName, 
+      b.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—",
+      new Date(b.bookedDate).toLocaleDateString(), 
+      b.status, 
+      b.pnr, 
+      `₹${b.amount.toLocaleString()}`
+    ]);
+    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `flight-manifest.xls`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard
-          label="Total Flight Bookings"
-          value={filtered.length}
-          Icon={FaPlane}
-          borderCls="border-[#0A4D68]"
-          iconBgCls="bg-[#0A4D68]/10"
-          iconColorCls="text-[#0A4D68]"
-        />
-        <StatCard
-          label="Confirmed Tickets"
-          value={confirmed}
-          Icon={FiCheckCircle}
-          borderCls="border-emerald-500"
-          iconBgCls="bg-emerald-50"
-          iconColorCls="text-emerald-600"
-        />
-        <StatCard
-          label="Processing / Pending"
-          value={pending}
-          Icon={FiClock}
-          borderCls="border-amber-500"
-          iconBgCls="bg-amber-50"
-          iconColorCls="text-amber-600"
-        />
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard label="Flight Manifest" value={filtered.length} Icon={FaPlane} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+        <StatCard label="Ticketed Assets" value={filtered.filter(b => b.status === "Confirmed").length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Pending Sync" value={filtered.filter(b => b.status === "Pending").length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Capital Outlay" value={`₹${totalSpend.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          <div className="md:col-span-12 lg:col-span-4">
-            <LabeledField label="Search Bookings">
-              <SearchBar
-                value={search}
-                onChange={setSearch}
-                placeholder="Search by Traveller, PNR, ID..."
-              />
-            </LabeledField>
-          </div>
-          <div className="md:col-span-4 lg:col-span-2">
-            <LabeledField label="Booked From">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className={dateCls}
-              />
-            </LabeledField>
-          </div>
-          <div className="md:col-span-4 lg:col-span-2">
-            <LabeledField label="Booked To">
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className={dateCls}
-              />
-            </LabeledField>
-          </div>
-          <div className="md:col-span-4 lg:col-span-2">
-            <LabeledField label="Travel Date">
-              <input
-                type="date"
-                value={travelDate}
-                onChange={(e) => setTravelDate(e.target.value)}
-                className={dateCls}
-              />
-            </LabeledField>
-          </div>
-          <div className="md:col-span-4 lg:col-span-2">
-            <LabeledField label="Booking Status">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatus(e.target.value)}
-                className={selectCls}
-              >
-                {["All", "Confirmed", "Pending", "Cancelled"].map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </LabeledField>
+      <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+          <LabeledField label={<><FiSearch size={10} /> Manifest Search</>} className="lg:col-span-3">
+            <SearchBar value={search} onChange={setSearch} placeholder="PNR, Name or ID..." />
+          </LabeledField>
+          <LabeledField label="Personnel" className="lg:col-span-2">
+            <CustomDropdown value={empFilter} onChange={setEmp} options={employees} />
+          </LabeledField>
+          <LabeledField label="Status" className="lg:col-span-2">
+            <CustomDropdown value={statusFilter} onChange={setStatus} options={["All", "Confirmed", "Pending"]} />
+          </LabeledField>
+          <LabeledField label="Booking Window" className="lg:col-span-3">
+             <div className="flex items-center gap-2">
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+                <span className="text-slate-300">to</span>
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+             </div>
+          </LabeledField>
+          <div className="flex items-end lg:col-span-2">
+             <button onClick={() => { setSearch(""); setStartDate(""); setEndDate(""); setStatus("All"); setEmp("All"); }} className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest" style={{ background: C.white, borderColor: C.border, color: C.muted }}><FiX /> Reset Filters</button>
           </div>
         </div>
       </div>
 
-      {/* Table */}
-      <ResponsiveDataTable
-        title="Complete Flight Inventory"
-        subtitle={`${filtered.length} total flight records`}
-        tableMinWidth="1100px"
-        arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
-        pagination={
-          <Pagination
-            currentPage={currentPage}
-            totalItems={filtered.length}
-            pageSize={PAGE_SIZE}
-            onPageChange={setCurrentPage}
-          />
-        }
-        footer={
-          <div className="px-6 py-3 flex justify-between items-center bg-slate-50 border-t border-slate-100">
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-              Showing <span className="text-slate-900">{paginated.length}</span> of <span className="text-slate-900">{filtered.length}</span> entries
-            </div>
-            <div className="text-[12px] font-black text-indigo-600 uppercase tracking-widest">
-              Total Volume: ₹{total.toLocaleString()}
-            </div>
-          </div>
-        }
-      >
+      <ResponsiveDataTable title="Flight Ledger" subtitle={`${filtered.length} active deployments`} onExport={handleExport} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-[#0A4D68] text-white">
-              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Order ID</th>
-              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Traveller Name</th>
-              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Booked Date</th>
-              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Amount</th>
-              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Status</th>
-              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Action</th>
+            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="!px-6 !py-5">Order ID</Th>
+              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Route</Th>
+              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Status</Th>
+              <Th className="!px-6 !py-5">PNR Ref</Th>
+              <Th className="!px-6 !py-5">Amount</Th>
+              <Th className="!px-6 !py-5 !text-left">Action</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filtered.length === 0 ? (
+          <tbody>
+            {paginated.length > 0 ? paginated.map((b, i) => (
+              <tr key={b._id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.gold + "08" }}>
+                <td className="!px-6 !py-5"><IdCell id={b.orderId} /></td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.travellerName}</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{b.flightRequest?.purposeOfTravel}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <RouteCell routes={b.routes} airline={b.airline} />
+                </td>
+                <td className="!px-6 !py-5">
+                   <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{b.employeeId}</span>
+                </td>
+                <td className="!px-6 !py-5"><StatusBadge status={b.status} /></td>
+                <td className="!px-6 !py-5 font-black text-blue-500 text-xs">{b.pnr}</td>
+                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
+                <td className="!px-6 !py-5 !text-left">
+                    <button 
+                      onClick={() => navigate(`/manager/team-booking/${b._id}`)} 
+                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group"
+                    >
+                      <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
+                    </button>
+                </td>
+              </tr>
+            )) : (
               <tr>
-                <td colSpan="6" className="py-20 text-center">
-                  <div className="flex flex-col items-center justify-center">
-                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                      <FaPlane className="w-8 h-8 text-slate-300" />
+                <td colSpan={8} className="!px-6 !py-20 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                      <FiSearch size={32} />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-800">No Bookings Found</h3>
-                    <p className="text-slate-500 text-sm mt-1">No flight records match your search criteria.</p>
+                    <p className="text-sm font-bold text-slate-400">No active deployments found for the selected criteria.</p>
                   </div>
                 </td>
               </tr>
-            ) : (
-              paginated.map((b, i) => (
-                <tr
-                  key={b._id}
-                  className="group hover:bg-slate-50 transition-colors"
-                >
-                  <td className="px-6 py-4">
-                    <span className="font-mono text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">
-                      {b.orderId || "N/A"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="font-black text-slate-800 text-[13px]">{b.travellerName}</span>
-                      <span className="text-[11px] text-slate-400 font-bold truncate max-w-[150px]">{b.employeeId}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-[13px] font-bold text-slate-500">
-                    {new Date(b.bookedDate).toLocaleDateString("en-IN", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-black text-slate-900">₹{b.amount.toLocaleString()}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <StatusBadge status={b.status} />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center">
-                      <button
-                        onClick={() => navigate(`/manager/team-booking/${b._id}`)}
-                        className="inline-flex items-center gap-2 px-5 py-2 bg-slate-800 text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-900 transition-all active:scale-95 shadow-md shadow-slate-200"
-                      >
-                        <FiEye size={12} /> View
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
             )}
           </tbody>
         </table>
@@ -380,361 +281,149 @@ function FlightSection() {
   );
 }
 
-// ── HOTEL SECTION ─────────────────────────────────────────────────────────────
 function HotelSection() {
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [statusFilter, setStatus] = useState("All");
-  const [corpFilter, setCorp] = useState("All");
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
-  const dispatch = useDispatch();
-
-  const hotelBookings = useSelector(
-    (state) => state.manager.teamExecutedHotelRequests,
-  );
-
-  const loading = useSelector(
-    (state) => state.manager.loadingTeamExecutedRequests,
-  );
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { teamExecutedHotelRequests: hotelBookings } = useSelector((state) => state.manager);
 
-  console.log(hotelBookings);
+  useEffect(() => { dispatch(getTeamExecutedHotelRequests()); }, [dispatch]);
 
-  useEffect(() => {
-    dispatch(getTeamExecutedHotelRequests());
-  }, [dispatch]);
-
-  // Reset to page 1 whenever filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, startDate, endDate, statusFilter, checkIn, checkOut]);
-
-  const corps = ["All"];
-
-  const formatHotel = (b) => {
+  const formattedBookings = useMemo(() => (hotelBookings || []).map(b => {
     const guest = b.travellers?.length
       ? `${b.travellers[0].title || ""} ${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim()
-      : "N/A";
-
-    const employeeId = b.userId?.email || "N/A";
-
+      : "Staff Member";
+    
     const executionStatus = (b.executionStatus || "").toLowerCase();
-    const amendmentStatus = (b.amendment?.status || "").toLowerCase();
+    const status = executionStatus === "voucher_generated" ? "Confirmed" : "Pending";
+    
+    const amount = b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
+    const hotelName = b.bookingSnapshot?.hotelName || b.hotelRequest?.selectedHotel?.hotelName || "Unknown Hotel";
+    const city = b.hotelRequest?.selectedHotel?.city || b.hotelRequest?.city || b.hotelRequest?.cityName || b.hotelRequest?.selectedHotel?.cityName || b.bookingSnapshot?.city || "—";
 
-    let status = "Pending";
-    if (["requested", "in_progress"].includes(amendmentStatus)) {
-      status = "Cancelled";
-    } else if (
-      executionStatus === "voucher_generated" ||
-      executionStatus === "confirmed"
-    ) {
-      status = "Confirmed";
-    } else if (["cancelled", "cancel_requested"].includes(executionStatus)) {
-      status = "Cancelled";
-    } else if (executionStatus === "failed") {
-      status = "Failed";
-    }
-
-    const bookResult = b.bookingResult?.providerResponse?.BookResult || {};
-
-    const invoiceNo = bookResult.InvoiceNumber || "-";
-    const providerBookingId = bookResult.BookingId || "-";
-
-    const amount =
-      b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
-
-    return {
-      ...b,
-      guestName: guest,
-      employeeId,
-      status,
-      invoiceNo,
-      providerBookingId,
-      amount,
+    return { 
+      ...b, 
+      guestName: guest, 
+      employeeId: b.requesterDetails?.email || b.userId?.email || "—", 
+      status, 
+      amount, 
       bookedDate: b.createdAt,
+      hotelName,
+      city
     };
-  };
+  }), [hotelBookings]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
+    return formattedBookings.filter(b => {
+      const exec = (b.executionStatus || "").toLowerCase();
+      if (exec !== "voucher_generated") return false;
 
-    return hotelBookings.map(formatHotel).filter((b) => {
-      // Base visibility rules - Allow showing cancelled/failed if requested or All
-      const isConfirmed = b.status === "Confirmed";
-      const isCancelled = b.status === "Cancelled";
-      const isFailed = b.status === "Failed";
-      const isPending = b.status === "Pending";
-      const amendmentRequested = b.amendment?.status === "requested";
-
-      // If status filter is "All", we might want to show everything. 
-      // But looking at the existing logic, it seems it was trying to only show "Confirmed" by default?
-      // Given the user's request, we should probably allow showing what the statusFilter says.
-      
-      if (statusFilter !== "All" && b.status !== statusFilter) {
-        return false;
-      }
-      
-      // If it's "All", maybe we should still hide some things? 
-      // Actually, the user said "total bookings", so it should probably show everything that is NOT discarded.
-      const rawExecutionStatus = (b.executionStatus || "").toLowerCase();
-      if (
-        b.requestStatus === "discarded" ||
-        rawExecutionStatus === "failed" ||
-        rawExecutionStatus === "not_started"
-      )
-        return false;
-
-      // Search
-      const searchOk =
-        !q ||
-        b.guestName?.toLowerCase().includes(q) ||
-        (b.orderId || "").toLowerCase().includes(q) ||
-        b.invoiceNo?.toLowerCase().includes(q) ||
-        (b.providerBookingId || "").toString().toLowerCase().includes(q);
-
-      // Booked date range
-      const booked = b.bookedDate
-        ? new Date(b.bookedDate).toISOString().slice(0, 10)
-        : "";
-      const bookedDateOk =
-        (!startDate || booked >= startDate) && (!endDate || booked <= endDate);
-
-      // Status
-      const statusOk = statusFilter === "All" || b.status === statusFilter;
-
-      // Check-in / Check-out
-      // Adjust field paths below to match your actual booking object shape
-      const rawCheckIn =
-        b.hotelDetails?.checkInDate ?? b.checkIn ?? b.checkInDate;
-      const rawCheckOut =
-        b.hotelDetails?.checkOutDate ?? b.checkOut ?? b.checkOutDate;
-
-      const ciStr = rawCheckIn
-        ? new Date(rawCheckIn).toISOString().slice(0, 10)
-        : "";
-      const coStr = rawCheckOut
-        ? new Date(rawCheckOut).toISOString().slice(0, 10)
-        : "";
-
-      const checkInOk = !checkIn || !ciStr || ciStr >= checkIn;
-      const checkOutOk = !checkOut || !coStr || coStr <= checkOut;
-
-      return searchOk && bookedDateOk && statusOk && checkInOk && checkOutOk;
+      const bDate = b.bookedDate ? new Date(b.bookedDate).toISOString().slice(0, 10) : "";
+      return (!q || b.guestName?.toLowerCase().includes(q) || b.employeeId?.toLowerCase().includes(q) || (b.orderId || "").toLowerCase().includes(q)) &&
+             (!startDate || bDate >= startDate) && (!endDate || bDate <= endDate);
     });
-  }, [
-    search,
-    startDate,
-    endDate,
-    statusFilter,
-    checkIn,
-    checkOut,
-    hotelBookings,
-  ]);
+  }, [search, startDate, endDate, formattedBookings]);
 
-  const paginated = useMemo(
-    () =>
-      filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [filtered, currentPage],
-  );
+  const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
+  const totalSpend = filtered.reduce((s, b) => s + (b.amount || 0), 0);
 
-  const total = filtered.reduce((s, b) => s + (b.amount || 0), 0);
-  const confirmed = filtered.filter((b) => b.status === "Confirmed").length;
-  const pending = filtered.filter((b) => b.status === "Pending").length;
+  const handleExport = () => {
+    if (!filtered.length) return;
+    const headers = ["Order ID", "Personnel", "Hotel", "City", "Status", "Amount"];
+    const rows = filtered.map(b => [b.orderId, b.guestName, b.hotelName, b.city, b.status, `₹${b.amount.toLocaleString()}`]);
+    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `hotel-manifest.xls`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard
-          label="Total Hotel Bookings"
-          value={filtered.length}
-          Icon={FaHotel}
-          borderCls="border-[#088395]"
-          iconBgCls="bg-[#088395]/10"
-          iconColorCls="text-[#088395]"
-        />
-        <StatCard
-          label="Confirmed Stays"
-          value={confirmed}
-          Icon={FiCheckCircle}
-          borderCls="border-emerald-500"
-          iconBgCls="bg-emerald-50"
-          iconColorCls="text-emerald-600"
-        />
-        <StatCard
-          label="Processing / Pending"
-          value={pending}
-          Icon={FiClock}
-          borderCls="border-amber-500"
-          iconBgCls="bg-amber-50"
-          iconColorCls="text-amber-600"
-        />
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard label="Hotel Manifest" value={filtered.length} Icon={FaHotel} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+        <StatCard label="Vouchered Assets" value={filtered.length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Capital Outlay" value={`₹${totalSpend.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Unique Properties" value={new Set(filtered.map(b => b.hotelName)).size} Icon={FiList} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          <div className="md:col-span-12 lg:col-span-4">
-            <LabeledField label="Search Bookings">
-              <SearchBar
-                value={search}
-                onChange={setSearch}
-                placeholder="Search by Guest, Invoice, ID..."
-              />
-            </LabeledField>
-          </div>
-          <div className="md:col-span-4 lg:col-span-2">
-            <LabeledField label="Booked From">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className={dateCls}
-              />
-            </LabeledField>
-          </div>
-          <div className="md:col-span-4 lg:col-span-2">
-            <LabeledField label="Booked To">
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className={dateCls}
-              />
-            </LabeledField>
-          </div>
-          <div className="md:col-span-4 lg:col-span-2">
-            <LabeledField label="Check-In">
-              <input
-                type="date"
-                value={checkIn}
-                onChange={(e) => setCheckIn(e.target.value)}
-                className={dateCls}
-              />
-            </LabeledField>
-          </div>
-          <div className="md:col-span-4 lg:col-span-2">
-            <LabeledField label="Check-Out">
-              <input
-                type="date"
-                value={checkOut}
-                onChange={(e) => setCheckOut(e.target.value)}
-                className={dateCls}
-              />
-            </LabeledField>
-          </div>
-          <div className="md:col-span-4 lg:col-span-2">
-            <LabeledField label="Booking Status">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatus(e.target.value)}
-                className={selectCls}
-              >
-                {["All", "Confirmed", "Pending", "Cancelled"].map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </LabeledField>
+      <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+          <LabeledField label={<><FiSearch size={10} /> Manifest Search</>} className="lg:col-span-4">
+            <SearchBar value={search} onChange={setSearch} placeholder="Guest Name or Order ID..." />
+          </LabeledField>
+          <LabeledField label="Booking Window" className="lg:col-span-4">
+             <div className="flex items-center gap-2">
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+                <span className="text-slate-300">to</span>
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+             </div>
+          </LabeledField>
+          <div className="flex items-end lg:col-span-4">
+             <button onClick={() => { setSearch(""); setStartDate(""); setEndDate(""); }} className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest" style={{ background: C.white, borderColor: C.border, color: C.muted }}><FiX /> Reset Filters</button>
           </div>
         </div>
       </div>
 
-      {/* Table */}
-      <ResponsiveDataTable
-        title="Complete Hotel Inventory"
-        subtitle={`${filtered.length} total hotel records`}
-        tableMinWidth="1100px"
-        arrowBgClass="bg-teal-50 border-teal-200 text-[#088395] hover:bg-teal-100"
-        pagination={
-          <Pagination
-            currentPage={currentPage}
-            totalItems={filtered.length}
-            pageSize={PAGE_SIZE}
-            onPageChange={setCurrentPage}
-          />
-        }
-        footer={
-          <div className="px-6 py-3 flex justify-between items-center bg-slate-50 border-t border-slate-100">
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-              Showing <span className="text-slate-900">{paginated.length}</span> of <span className="text-slate-900">{filtered.length}</span> entries
-            </div>
-            <div className="text-[12px] font-black text-teal-600 uppercase tracking-widest">
-              Total Volume: ₹{total.toLocaleString()}
-            </div>
-          </div>
-        }
-      >
+      <ResponsiveDataTable title="Hotel Ledger" subtitle={`${filtered.length} active stays`} onExport={handleExport} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-[#088395] text-white">
-              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Order ID</th>
-              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Guest Name</th>
-              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Booked Date</th>
-              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Amount</th>
-              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">Status</th>
-              <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">Action</th>
+            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="!px-6 !py-5">Order Reference</Th>
+              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Asset Detail</Th>
+              <Th className="!px-6 !py-5">Booked Date</Th>
+              <Th className="!px-6 !py-5">Status</Th>
+              <Th className="!px-6 !py-5">Amount</Th>
+              <Th className="!px-6 !py-5 !text-left">Action</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filtered.length === 0 ? (
+          <tbody>
+            {paginated.length > 0 ? paginated.map((b, i) => (
+              <tr key={b._id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.gold + "08" }}>
+                <td className="!px-6 !py-5"><IdCell id={b.orderId} /></td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.guestName}</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{b.hotelRequest?.purposeOfTravel}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{b.employeeId}</span>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.hotelName}</p>
+                   <p className="text-[10px] font-bold text-gold uppercase">{b.city}</p>
+                </td>
+                <td className="!px-6 !py-5 text-[11px] font-bold text-slate-500 uppercase">{new Date(b.bookedDate).toLocaleDateString()}</td>
+                <td className="!px-6 !py-5"><StatusBadge status={b.status} /></td>
+                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
+                <td className="!px-6 !py-5 !text-left">
+                    <button 
+                      onClick={() => navigate(`/manager/team-hotel-booking/${b._id}`)} 
+                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group"
+                    >
+                      <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
+                    </button>
+                </td>
+              </tr>
+            )) : (
               <tr>
-                <td colSpan="6" className="py-20 text-center">
-                  <div className="flex flex-col items-center justify-center">
-                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                      <FaHotel className="w-8 h-8 text-slate-300" />
+                <td colSpan={8} className="!px-6 !py-20 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                      <FiSearch size={32} />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-800">No Bookings Found</h3>
-                    <p className="text-slate-500 text-sm mt-1">No hotel records match your search criteria.</p>
+                    <p className="text-sm font-bold text-slate-400">No active stays found for the selected criteria.</p>
                   </div>
                 </td>
               </tr>
-            ) : (
-              paginated.map((b, i) => (
-                <tr
-                  key={b._id}
-                  className="group hover:bg-slate-50 transition-colors"
-                >
-                  <td className="px-6 py-4">
-                    <span className="font-mono text-sm font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-md border border-teal-100">
-                      {b.orderId || "N/A"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="font-black text-slate-800 text-[13px]">{b.guestName}</span>
-                      <span className="text-[11px] text-slate-400 font-bold truncate max-w-[150px]">{b.employeeId}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-[13px] font-bold text-slate-500">
-                    {new Date(b.bookedDate).toLocaleDateString("en-IN", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-black text-slate-900">₹{b.amount.toLocaleString()}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <StatusBadge status={b.status} />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center">
-                      <button
-                        onClick={() => navigate(`/manager/team-hotel-booking/${b._id}`)}
-                        className="inline-flex items-center gap-2 px-5 py-2 bg-slate-800 text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-900 transition-all active:scale-95 shadow-md shadow-slate-200"
-                      >
-                        <FiEye size={12} /> View
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
             )}
           </tbody>
         </table>
@@ -743,100 +432,78 @@ function HotelSection() {
   );
 }
 
-// ── ROOT ──────────────────────────────────────────────────────────────────────
-export default function BookingsDashboardForManager() {
+export default function TotalBookings() {
   const [activeTab, setActiveTab] = useState("flight");
   const dispatch = useDispatch();
-  const loadingFlights = useSelector(
-    (state) => state.manager.loadingTeamExecutedFlightRequests,
-  );
-  const loadingHotels = useSelector(
-    (state) => state.manager.loadingTeamExecutedRequests,
-  );
-  const loadingActive = activeTab === "flight" ? loadingFlights : loadingHotels;
+  const navigate = useNavigate();
+  const { loadingFlights, loadingTeamExecutedRequests: loadingHotels } = useSelector((state) => state.manager);
+  const reduxLoading = activeTab === "flight" ? loadingFlights : loadingHotels;
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const handleRefresh = () => {
-    if (activeTab === "flight") {
-      dispatch(getTeamExecutedFlightRequests());
-      return;
+  const handleRefresh = async () => {
+    setIsSyncing(true);
+    try {
+      await dispatch(activeTab === "flight" ? getTeamExecutedFlightRequests() : getTeamExecutedHotelRequests());
+    } finally {
+      setIsSyncing(false);
     }
-    dispatch(getTeamExecutedHotelRequests());
   };
 
-  const tabs = [
-    {
-      id: "flight",
-      label: "Flight Bookings",
-      Icon: FaPlane,
-      activeText: "text-[#0A4D68]",
-      activeBorder: "border-b-[#0A4D68]",
-    },
-    {
-      id: "hotel",
-      label: "Hotel Bookings",
-      Icon: FaHotel,
-      activeText: "text-[#088395]",
-      activeBorder: "border-b-[#088395]",
-    },
-  ];
-
   return (
-    <div className="min-h-screen bg-slate-100 font-sans">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        
-        {/* Header Card */}
-        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4 sm:gap-6">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white shrink-0">
-              <FiList size={24} />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase leading-none truncate">
-                Booking Inventory
-              </h1>
-              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 font-bold uppercase tracking-widest truncate">
-                Comprehensive overview of your team's travel history
-              </p>
-            </div>
-          </div>
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
+      {/* Navy Header Section - Aligned with CancelledBookings */}
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-10 pb-24 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+             <div className="flex items-center gap-3">
+               <button 
+                  onClick={() => navigate(-1)} 
+                  className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 backdrop-blur-md shadow-xl"
+               >
+                 <FiArrowRight className="rotate-180" size={22} />
+               </button>
+               <button 
+                  onClick={handleRefresh} 
+                  className={`p-3.5 rounded-2xl bg-white/10 transition-all border border-white/10 backdrop-blur-md shadow-xl ${(isSyncing || reduxLoading) ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                  disabled={isSyncing || reduxLoading}
+               >
+                 <div className={(isSyncing || reduxLoading) ? "animate-spin" : ""}>
+                   <FiRefreshCw size={22} />
+                 </div>
+               </button>
+             </div>
+             
+             <div className="h-16 w-[1px] bg-white/10 mx-2 hidden md:block" />
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <button
-              onClick={handleRefresh}
-              disabled={loadingActive}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold transition-all shadow-sm border bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100 active:scale-95 disabled:opacity-50"
-            >
-              <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
-              Refresh
-            </button>
+             <div className="flex items-center gap-5">
+               <div className="w-16 h-16 rounded-[2rem] flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
+                 <FiList size={32} />
+               </div>
+               <div>
+                 <h1 className="text-4xl font-black tracking-tight leading-none">Booking Registry</h1>
+                 <p className="text-[11px] mt-3 font-bold uppercase tracking-[3px] opacity-60">
+                   Enterprise Oversight & Team Deployment Analytics
+                 </p>
+               </div>
+             </div>
           </div>
         </div>
+      </div>
 
-        {/* Tab Navigation */}
-        <div className="flex bg-slate-200/50 p-1.5 rounded-2xl w-fit shadow-inner">
-          {tabs.map((tab) => {
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all
-                  ${
-                    active
-                      ? `bg-white ${tab.activeText} shadow-md`
-                      : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
-                  }
-                `}
-              >
-                <tab.Icon size={14} />
-                {tab.label}
-              </button>
-            );
-          })}
+      <div className="w-full px-4 md:px-10 -mt-12 space-y-10">
+        {/* Tab Switcher - Premium Glassmorphism */}
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+           {[["flight", "Flight Manifest", FaPlane], ["hotel", "Hotel Manifest", FaHotel]].map(([k, lbl, Icon]) => (
+             <button 
+                key={k} 
+                onClick={() => setActiveTab(k)} 
+                className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+             >
+                <Icon size={14} /> {lbl}
+             </button>
+           ))}
         </div>
 
-        {/* Tab Content */}
         {activeTab === "flight" ? <FlightSection /> : <HotelSection />}
       </div>
     </div>

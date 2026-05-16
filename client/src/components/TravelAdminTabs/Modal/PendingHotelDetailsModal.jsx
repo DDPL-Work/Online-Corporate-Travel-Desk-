@@ -31,6 +31,7 @@ import {
   formatDateWithYear,
 } from "../../../utils/formatter";
 import { InfoBadge, SectionLabel } from "../Shared/CommonComponents";
+import { C } from "../../Shared/color";
 
 // ─────────────────────────────────────────────
 // SHARED HELPERS
@@ -134,30 +135,34 @@ const TravellerField = ({ icon, label, value }) => (
   </div>
 );
 
-const TimelineItem = ({ title, time, status, description, active }) => (
-  <div className="flex gap-4 relative">
-    <div className="flex flex-col items-center">
+const TimelineItem = ({ title, time, status, description, active, horizontal }) => (
+  <div className={`flex ${horizontal ? "flex-col items-center text-center flex-1" : "gap-6"} relative group`}>
+    <div className={`flex ${horizontal ? "w-full items-center mb-4" : "flex-col items-center"}`}>
+      {horizontal && <div className="flex-1 h-[2px] bg-slate-100 group-first:bg-transparent" />}
       <div
-        className={`w-3.5 h-3.5 rounded-full border-2 z-10 ${
+        className={`w-4 h-4 rounded-full border-2 z-10 transition-all duration-300 shadow-sm shrink-0 ${
           status === "completed"
-            ? "bg-emerald-500 border-emerald-100"
-            : active
-              ? "bg-amber-400 border-amber-100 animate-pulse"
-              : "bg-slate-200 border-slate-100"
+            ? "bg-emerald-500 border-emerald-100 ring-4 ring-emerald-50"
+            : status === "rejected"
+              ? "bg-rose-500 border-rose-100 ring-4 ring-rose-50"
+              : active
+                ? "bg-amber-400 border-amber-100 ring-4 ring-amber-50 animate-pulse"
+                : "bg-slate-200 border-[#EAE4D9]"
         }`}
       />
+      {horizontal && <div className="flex-1 h-[2px] bg-slate-100 group-last:bg-transparent" />}
     </div>
-    <div className="-mt-1 pb-6">
+    <div className={`${horizontal ? "px-4" : "-mt-1 pb-10"}`}>
       <p
-        className={`text-xs font-black ${active ? "text-slate-900" : "text-slate-500"}`}
+        className={`text-[11px] font-black uppercase tracking-tight ${active ? "text-[#1A1714]" : "text-slate-600"}`}
       >
         {title}
       </p>
-      <p className="text-[10px] text-indigo-600 font-mono font-bold mt-0.5">
+      <p className="text-[9px] text-[#B5862A] font-mono font-black mt-1 uppercase tracking-widest bg-[#FAF8F4] px-2 py-0.5 rounded border border-[#EAE4D9] inline-block">
         {time}
       </p>
       {description && (
-        <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+        <p className="text-[10px] text-slate-500 mt-2 leading-relaxed font-medium mx-auto max-w-[180px]">
           {description}
         </p>
       )}
@@ -255,10 +260,10 @@ export const PendingHotelDetailsModal = ({
   })();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl my-4 overflow-hidden flex flex-col h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1A1C20]/60 backdrop-blur-md overflow-y-auto">
+      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-[1440px] w-[96%] my-2 overflow-hidden flex flex-col h-[96vh]">
         {/* Header */}
-        <div className="bg-slate-900 px-6 py-4 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
+        <div className="bg-gradient-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center shrink-0 shadow-lg relative z-10">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-[#C9A84C]/20 rounded-lg text-[#C9A84C]">
               <FaHotel size={20} />
@@ -281,7 +286,7 @@ export const PendingHotelDetailsModal = ({
         </div>
 
         {/* Sticky Action Bar */}
-        <div className="sticky top-0 z-20 bg-white border-b border-slate-100 px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+        <div className="sticky top-0 z-20 bg-white border-b border-[#EAE4D9] px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
           <div className="flex flex-wrap items-center gap-4 text-xs font-bold">
             {booking.requestStatus === "approved" ? (
               <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100 uppercase tracking-tighter">
@@ -294,7 +299,7 @@ export const PendingHotelDetailsModal = ({
                 Rejected
               </div>
             ) : isDiscarded ? (
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-full border border-slate-200 uppercase tracking-tighter font-black">
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-full border border-[#EAE4D9] uppercase tracking-tighter font-black">
                 Expired
               </div>
             ) : (
@@ -304,11 +309,11 @@ export const PendingHotelDetailsModal = ({
               </div>
             )}
 
-            <div className="flex items-center gap-1.5 text-slate-500 border-l border-slate-200 pl-4">
+            <div className="flex items-center gap-1.5 text-slate-500 border-l border-[#EAE4D9] pl-4">
               <FiClock className="text-slate-400" />
               <span>{formatDateTime(booking.createdAt)}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-slate-500 border-l border-slate-200 pl-4">
+            <div className="flex items-center gap-1.5 text-slate-500 border-l border-[#EAE4D9] pl-4">
               <FiBriefcase className="text-slate-400" />
               <span>{booking.projectName || "Internal"}</span>
             </div>
@@ -326,14 +331,14 @@ export const PendingHotelDetailsModal = ({
               )}
 
             {booking.requestStatus !== "pending_approval" ? (
-              <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 text-slate-500 rounded-xl border border-slate-200 italic">
+              <div className="flex items-center gap-2 px-4 py-2 bg-[#FAF8F4] text-slate-500 rounded-xl border border-[#EAE4D9] italic">
                 <FiInfo size={14} className="text-slate-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight">
                   Request already {booking.requestStatus}
                 </span>
               </div>
             ) : isDiscarded ? (
-              <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-xl border border-slate-200">
+              <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-xl border border-[#EAE4D9]">
                 <FiAlertCircle size={14} className="text-slate-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight">
                   Travel Date Passed · No Action Possible
@@ -344,7 +349,7 @@ export const PendingHotelDetailsModal = ({
                 <button
                   onClick={() => onReject(booking._id, "hotel", "reject")}
                   disabled={!isVerified}
-                  className={`px-5 py-2 border border-red-100 text-red-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-slate-200" : "hover:bg-red-50"}`}
+                  className={`px-5 py-2 border border-red-100 text-red-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-[#EAE4D9]" : "hover:bg-red-50"}`}
                   title={!isVerified ? "Account pending verification" : ""}
                 >
                   Reject Request
@@ -364,10 +369,10 @@ export const PendingHotelDetailsModal = ({
         </div>
 
         {/* Tabs Navigation */}
-        <div className="relative bg-white border-b border-slate-100 flex items-center shrink-0 group">
+        <div className="relative bg-white border-b border-[#EAE4D9] flex items-center shrink-0 group">
           <button
             onClick={() => scrollTabs("left")}
-            className="md:hidden flex items-center justify-center w-10 h-14 bg-white border-r border-slate-100 text-slate-400 hover:text-indigo-600 z-10 transition-colors"
+            className="md:hidden flex items-center justify-center w-10 h-14 bg-white border-r border-[#EAE4D9] text-slate-400 hover:text-[#B5862A] z-10 transition-colors"
             aria-label="Scroll left"
           >
             <FiChevronLeft size={18} />
@@ -393,20 +398,20 @@ export const PendingHotelDetailsModal = ({
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 py-4 text-[11px] font-black uppercase tracking-widest transition-all relative shrink-0 ${
                   activeTab === tab.id
-                    ? "text-indigo-600"
+                    ? "text-[#B5862A]"
                     : "text-slate-400 hover:text-slate-600"
                 }`}
               >
                 <span
                   className={
-                    activeTab === tab.id ? "text-indigo-600" : "text-slate-300"
+                    activeTab === tab.id ? "text-[#B5862A]" : "text-slate-300"
                   }
                 >
                   {tab.icon}
                 </span>
                 {tab.label}
                 {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#B5862A] rounded-full" />
                 )}
               </button>
             ))}
@@ -414,7 +419,7 @@ export const PendingHotelDetailsModal = ({
 
           <button
             onClick={() => scrollTabs("right")}
-            className="md:hidden flex items-center justify-center w-10 h-14 bg-white border-l border-slate-100 text-slate-400 hover:text-indigo-600 z-10 transition-colors"
+            className="md:hidden flex items-center justify-center w-10 h-14 bg-white border-l border-[#EAE4D9] text-slate-400 hover:text-[#B5862A] z-10 transition-colors"
             aria-label="Scroll right"
           >
             <FiChevronRight size={18} />
@@ -422,25 +427,25 @@ export const PendingHotelDetailsModal = ({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 scroll-smooth bg-slate-50/30">
-          <div className="max-w-7xl mx-auto">
+        <div className="flex-1 overflow-y-auto p-6 scroll-smooth bg-[#FAF8F4]/30">
+          <div className="w-full mx-auto">
             {activeTab === "details" && (
               <div className="flex flex-col lg:flex-row gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {/* Left Column */}
                 <div className="flex-1 space-y-6">
                   {/* Hotel Snapshot */}
-                  <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm flex flex-col md:flex-row">
-                    <div className="w-full md:w-64 h-48 md:h-auto relative shrink-0">
+                  <div className="bg-white border border-[#EAE4D9] rounded-3xl overflow-hidden shadow-sm flex flex-col md:flex-row">
+                    <div className="w-full md:w-72 h-64 md:h-auto relative shrink-0 overflow-hidden">
                       <img
                         src={
                           bookSnap.hotelImage ||
                           "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500"
                         }
                         alt={bookSnap.hotelName}
-                        className="w-full h-full object-cover"
+                        className="md:absolute md:inset-0 w-full h-full object-cover"
                       />
                       <div className="absolute top-4 left-4">
-                        <span className="bg-slate-900/80 backdrop-blur-sm text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-white/20 shadow-xl">
+                        <span className="bg-[#1A1C20]/80 backdrop-blur-sm text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-white/20 shadow-xl">
                           Confirmed Rate
                         </span>
                       </div>
@@ -448,11 +453,11 @@ export const PendingHotelDetailsModal = ({
                     <div className="p-6 flex-1 space-y-5">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="text-2xl font-black text-slate-900 leading-tight tracking-tighter uppercase italic">
+                          <h3 className="text-2xl font-black text-[#1A1714] leading-tight tracking-tighter uppercase italic">
                             {bookSnap.hotelName}
                           </h3>
                           <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-2 font-medium">
-                            <FiMapPin className="text-indigo-500" />{" "}
+                            <FiMapPin className="text-[#B5862A]" />{" "}
                             {hotelRequest?.selectedHotel?.address || "N/A"}
                           </p>
                         </div>
@@ -462,7 +467,8 @@ export const PendingHotelDetailsModal = ({
                               key={i}
                               size={12}
                               fill={
-                                i < (hotelRequest?.selectedHotel?.starRating || 4)
+                                i <
+                                (hotelRequest?.selectedHotel?.starRating || 4)
                                   ? "currentColor"
                                   : "none"
                               }
@@ -505,12 +511,20 @@ export const PendingHotelDetailsModal = ({
                     {displayRooms.map((r, i) => (
                       <div
                         key={i}
-                        className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-5"
+                        className="bg-white border border-[#EAE4D9] rounded-3xl p-6 shadow-sm space-y-5"
                       >
                         <div className="flex justify-between items-start border-b border-slate-50 pb-5">
                           <div>
                             <div className="flex items-center gap-3">
-                              <h4 className="text-lg font-black text-slate-900 tracking-tight uppercase">
+                              <h4 className="text-lg font-black text-[#1A1714] tracking-tight uppercase">
+                                {r.count > 1 ? (
+                                  <span className="mr-2 inline-flex items-center">
+                                    <span className="text-[#1A1714]">{r.count}</span>
+                                    <span className="text-[#C9A84C] ml-1">x</span>
+                                  </span>
+                                ) : (
+                                  ""
+                                )}
                                 {r.Name?.[0] || "Standard Room"}
                               </h4>
                               {r.count > 1 && (
@@ -520,8 +534,9 @@ export const PendingHotelDetailsModal = ({
                               )}
                             </div>
                             <div className="flex flex-wrap items-center gap-3 mt-2">
-                              <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full uppercase border border-indigo-100 flex items-center gap-1.5">
-                                <FiCoffee size={10} /> {r.MealType || "Room Only"}
+                              <span className="text-[10px] font-black bg-[#FAF8F4] text-[#B5862A] px-3 py-1 rounded-full uppercase border border-indigo-100 flex items-center gap-1.5">
+                                <FiCoffee size={10} />{" "}
+                                {r.MealType || "Room Only"}
                               </span>
                               {r.IsRefundable ? (
                                 <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full uppercase border border-emerald-100 flex items-center gap-1.5">
@@ -538,8 +553,9 @@ export const PendingHotelDetailsModal = ({
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
                               Per Room / Night
                             </p>
-                            <p className="text-2xl font-black text-indigo-700 tracking-tighter">
-                              ₹{r.DayRates?.[0]?.[0]?.BasePrice ||
+                            <p className="text-2xl font-black text-[#B5862A] tracking-tighter">
+                              ₹
+                              {r.DayRates?.[0]?.[0]?.BasePrice ||
                                 r.DayRates?.[0]?.[0]?.RoomRate ||
                                 (
                                   (r.TotalFare ||
@@ -577,7 +593,7 @@ export const PendingHotelDetailsModal = ({
                                   .map((inc, j) => (
                                     <span
                                       key={j}
-                                      className="text-[10px] font-bold bg-slate-50 text-slate-600 px-3 py-1 rounded-lg border border-slate-100 shadow-sm"
+                                      className="text-[10px] font-bold bg-[#FAF8F4] text-slate-600 px-3 py-1 rounded-lg border border-[#EAE4D9] shadow-sm"
                                     >
                                       {inc.trim()}
                                     </span>
@@ -585,28 +601,45 @@ export const PendingHotelDetailsModal = ({
                               </div>
                             </div>
 
-                            {/* Supplements */}
+                            {/* Supplements & Add-ons */}
                             {r.Supplements && r.Supplements.length > 0 && (
-                              <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                                  Supplements
+                              <div className="space-y-3">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                  Mandatory Supplements & Taxes
                                 </p>
-                                <div className="space-y-2">
-                                  {r.Supplements.map((sup, j) => (
-                                    <div
-                                      key={j}
-                                      className="bg-amber-50 text-amber-700 p-3 rounded-2xl border border-amber-100 flex items-center gap-2"
-                                    >
-                                      <FiPackage className="shrink-0" />
-                                      <p className="text-[10px] font-bold leading-tight">
-                                        {sup.Type} - ₹{sup.Price} (
-                                        {sup.ChargeType === "Fixed"
-                                          ? "Fixed"
-                                          : "Per Person"}
-                                        )
-                                      </p>
-                                    </div>
-                                  ))}
+                                <div className="grid grid-cols-1 gap-2">
+                                  {r.Supplements.map((supItem, j) => {
+                                    // Handle both flat and nested structures
+                                    const sups = Array.isArray(supItem) ? supItem : [supItem];
+                                    return sups.map((sup, k) => (
+                                      <div
+                                        key={`${j}-${k}`}
+                                        className="bg-blue-50 text-blue-700 p-3 rounded-2xl border border-blue-100 flex items-center justify-between gap-3 group hover:bg-blue-100/50 transition-colors"
+                                      >
+                                        <div className="flex items-center gap-2.5">
+                                          <div className="w-8 h-8 rounded-xl bg-white/80 flex items-center justify-center shadow-sm text-blue-600">
+                                            <FiPackage size={14} />
+                                          </div>
+                                          <div>
+                                            <p className="text-[11px] font-black leading-tight uppercase tracking-tight">
+                                              {sup.Type?.replace(/([A-Z])/g, " $1").trim() || "Supplement"}
+                                            </p>
+                                            <p className="text-[9px] font-bold text-blue-500/80 uppercase mt-0.5">
+                                              {sup.Description?.replace(/_/g, " ") || "Service Charge"} · {sup.ChargeType === "Fixed" ? "Fixed Fee" : "Per Person"}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="text-xs font-black text-blue-800">
+                                            ₹{sup.Price?.toLocaleString() || "0"}
+                                          </p>
+                                          {sup.Currency && sup.Currency !== "INR" && (
+                                            <p className="text-[8px] font-bold opacity-60 uppercase">{sup.Currency}</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ));
+                                  })}
                                 </div>
                               </div>
                             )}
@@ -650,8 +683,11 @@ export const PendingHotelDetailsModal = ({
                 {/* Right Column */}
                 <div className="w-full lg:w-96 space-y-6">
                   {/* Pricing Snapshot */}
-                  <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-                    <SectionLabel icon={<FiDollarSign />} title="Fare Summary" />
+                  <div className="bg-gradient-to-br from-[#003399] to-[#000d26] text-white rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+                    <SectionLabel
+                      icon={<FiDollarSign />}
+                      title="Fare Summary"
+                    />
                     <div className="mt-6">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
                         Total Amount (Inc. Tax)
@@ -680,15 +716,6 @@ export const PendingHotelDetailsModal = ({
                     </div>
                     <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full blur-3xl pointer-events-none" />
                   </div>
-
-                  <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-50 pb-3">
-                      Quick Notes
-                    </p>
-                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed italic">
-                      "Selected room is {rawRooms?.[0]?.IsRefundable ? 'refundable' : 'non-refundable'}. Please review the cancellation policy in the 'Charges' tab before approval."
-                    </p>
-                  </div>
                 </div>
               </div>
             )}
@@ -696,14 +723,17 @@ export const PendingHotelDetailsModal = ({
             {activeTab === "project" && (
               <div className="flex flex-col lg:flex-row gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex-1 space-y-6">
-                  <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
-                    <SectionLabel icon={<FiBriefcase />} title="Project Context" />
+                  <div className="bg-white border border-[#EAE4D9] rounded-3xl p-8 shadow-sm">
+                    <SectionLabel
+                      icon={<FiBriefcase />}
+                      title="Project Context"
+                    />
                     <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                           Project Name
                         </p>
-                        <p className="text-base font-black text-slate-900 uppercase tracking-tighter">
+                        <p className="text-base font-black text-[#1A1714] uppercase tracking-tighter">
                           {booking.projectName || "Internal Business"}
                         </p>
                       </div>
@@ -719,7 +749,7 @@ export const PendingHotelDetailsModal = ({
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                           Project ID / Code
                         </p>
-                        <p className="text-sm font-mono font-black text-slate-700 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100 inline-block">
+                        <p className="text-sm font-mono font-black text-slate-700 bg-[#FAF8F4] px-3 py-1 rounded-lg border border-[#EAE4D9] inline-block">
                           {booking.projectId || "N/A"}
                         </p>
                       </div>
@@ -727,7 +757,7 @@ export const PendingHotelDetailsModal = ({
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                           Assigned Approver
                         </p>
-                        <p className="text-sm font-black text-slate-900 uppercase tracking-tighter">
+                        <p className="text-sm font-black text-[#1A1714] uppercase tracking-tighter">
                           {approver.name}
                         </p>
                         <p className="text-[10px] font-bold text-slate-400 mt-1">
@@ -737,10 +767,10 @@ export const PendingHotelDetailsModal = ({
                     </div>
                   </div>
 
-                  <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+                  <div className="bg-white border border-[#EAE4D9] rounded-3xl p-8 shadow-sm">
                     <SectionLabel icon={<FiUser />} title="Requested By" />
                     <div className="mt-8 flex items-center gap-6">
-                      <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl italic shadow-inner">
+                      <div className="w-20 h-20 rounded-full bg-[#FAF8F4] border border-[#EAE4D9] flex items-center justify-center text-slate-400 font-black text-2xl italic shadow-inner">
                         {
                           (booking.requesterDetails?.name ||
                             booking.userId?.name?.firstName ||
@@ -748,16 +778,18 @@ export const PendingHotelDetailsModal = ({
                         }
                       </div>
                       <div>
-                        <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
+                        <p className="text-xl font-black text-[#1A1714] uppercase tracking-tighter italic">
                           {booking.requesterDetails?.name ||
                             `${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""}`.trim()}
                         </p>
                         <p className="text-xs font-bold text-slate-400 mt-1">
-                          {booking.requesterDetails?.email || booking.userId?.email}
+                          {booking.requesterDetails?.email ||
+                            booking.userId?.email}
                         </p>
                         <div className="mt-2 flex gap-2">
-                          <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-indigo-100">
-                            Role: {booking.requesterDetails?.role || "Team Member"}
+                          <span className="text-[10px] font-black text-[#B5862A] bg-[#FAF8F4] px-3 py-1 rounded-full uppercase tracking-widest italic border border-indigo-100">
+                            Role:{" "}
+                            {booking.requesterDetails?.role || "Team Member"}
                           </span>
                         </div>
                       </div>
@@ -766,9 +798,10 @@ export const PendingHotelDetailsModal = ({
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
                         Reason for Travel
                       </p>
-                      <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 italic text-sm font-black text-slate-700 leading-relaxed shadow-inner">
+                      <div className="bg-[#FAF8F4] p-6 rounded-[2rem] border border-[#EAE4D9] italic text-sm font-black text-slate-700 leading-relaxed shadow-inner">
                         "
-                        {booking.purposeOfTravel || "Internal business requirement"}
+                        {booking.purposeOfTravel ||
+                          "Internal business requirement"}
                         "
                       </div>
                     </div>
@@ -779,27 +812,32 @@ export const PendingHotelDetailsModal = ({
 
             {activeTab === "charges" && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
-                  <SectionLabel icon={<FiShield />} title="Cancellation Policies" />
+                <div className="bg-white border border-[#EAE4D9] rounded-3xl p-8 shadow-sm">
+                  <SectionLabel
+                    icon={<FiShield />}
+                    title="Cancellation Policies"
+                  />
                   <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
                     {rawRooms?.[0]?.CancelPolicies?.map((policy, idx) => (
                       <div
                         key={idx}
-                        className="flex flex-col p-5 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group"
+                        className="flex flex-col p-5 bg-[#FAF8F4] rounded-2xl border border-[#EAE4D9] hover:bg-white hover:shadow-md transition-all group"
                       >
                         <div className="flex justify-between items-center mb-3">
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                             Effective Date
                           </span>
-                          <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded uppercase">
+                          <span className="text-[10px] font-black text-[#B5862A] bg-[#FAF8F4] px-2 py-0.5 rounded uppercase">
                             Window {idx + 1}
                           </span>
                         </div>
                         <p className="text-sm font-black text-slate-700 uppercase mb-4">
                           From {policy.FromDate.split(" ")[0]}
                         </p>
-                        <div className="mt-auto pt-4 border-t border-slate-100 flex justify-between items-center">
-                          <span className="text-[11px] font-bold text-slate-500 uppercase">Charge</span>
+                        <div className="mt-auto pt-4 border-t border-[#EAE4D9] flex justify-between items-center">
+                          <span className="text-[11px] font-bold text-slate-500 uppercase">
+                            Charge
+                          </span>
                           <span
                             className={`text-base font-black ${policy.CancellationCharge === 0 ? "text-emerald-600" : "text-red-600"}`}
                           >
@@ -811,16 +849,23 @@ export const PendingHotelDetailsModal = ({
                       </div>
                     ))}
                     {!rawRooms?.[0]?.CancelPolicies?.length && (
-                      <div className="md:col-span-2 py-12 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                        <FiAlertCircle className="mx-auto text-slate-300 mb-3" size={32} />
-                        <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No cancellation policy details available</p>
+                      <div className="md:col-span-2 py-12 text-center bg-[#FAF8F4] rounded-3xl border border-dashed border-[#EAE4D9]">
+                        <FiAlertCircle
+                          className="mx-auto text-slate-300 mb-3"
+                          size={32}
+                        />
+                        <p className="text-sm font-black text-slate-400 uppercase tracking-widest">
+                          No cancellation policy details available
+                        </p>
                       </div>
                     )}
                   </div>
                   <div className="mt-8 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3">
                     <FiInfo className="text-amber-500 shrink-0 mt-0.5" />
                     <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                      Cancellation charges are subject to change based on the hotel's terms. The amounts shown are based on the latest data captured from the supplier.
+                      Cancellation charges are subject to change based on the
+                      hotel's terms. The amounts shown are based on the latest
+                      data captured from the supplier.
                     </p>
                   </div>
                 </div>
@@ -838,23 +883,23 @@ export const PendingHotelDetailsModal = ({
                     {travelers.map((pax, idx) => (
                       <div
                         key={idx}
-                        className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm"
+                        className="bg-white border border-[#EAE4D9] rounded-3xl p-8 shadow-sm"
                       >
                         <div className="flex items-center gap-6">
-                          <div className="w-16 h-16 rounded-2xl bg-slate-900 text-[#C9A84C] flex items-center justify-center font-black text-2xl shadow-lg uppercase italic">
+                          <div className="w-16 h-16 rounded-2xl bg-[#1A1C20] text-[#C9A84C] flex items-center justify-center font-black text-2xl shadow-lg uppercase italic">
                             {pax.firstName?.[0]}
                             {pax.lastName?.[0]}
                           </div>
                           <div>
-                            <p className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">
+                            <p className="text-2xl font-black text-[#1A1714] uppercase tracking-tighter italic">
                               {pax.title} {pax.firstName} {pax.lastName}
                             </p>
                             <div className="flex gap-2 mt-2">
-                              <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-widest">
+                              <span className="text-[10px] font-black bg-[#1A1C20] text-white px-3 py-1 rounded-full uppercase tracking-widest">
                                 {pax.paxType || "Adult"}
                               </span>
                               {pax.isLeadPassenger && (
-                                <span className="text-[10px] font-black bg-[#C9A84C] text-slate-900 px-3 py-1 rounded-full uppercase tracking-widest">
+                                <span className="text-[10px] font-black bg-[#C9A84C] text-[#1A1714] px-3 py-1 rounded-full uppercase tracking-widest">
                                   Lead Passenger
                                 </span>
                               )}
@@ -891,24 +936,29 @@ export const PendingHotelDetailsModal = ({
             )}
 
             {activeTab === "history" && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="bg-white border border-slate-100 rounded-[2.5rem] p-10 shadow-sm max-w-2xl mx-auto">
-                  <SectionLabel icon={<FiClock />} title="Approval Request Timeline" />
-                  <div className="mt-12 relative">
-                    <div className="absolute left-[6.5px] top-2 bottom-2 w-[1px] bg-slate-100" />
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 flex justify-center py-10">
+                <div className="bg-white border border-[#EAE4D9] rounded-[3rem] p-12 shadow-xl shadow-slate-100/50 w-full max-w-6xl">
+                  <SectionLabel
+                    icon={<FiClock className="text-[#B5862A]" />}
+                    title="Approval Request Timeline"
+                  />
+                  <div className="mt-16 flex items-start">
                     <TimelineItem
+                      horizontal
                       title="Request Initiated"
                       time={formatDateTime(booking.createdAt)}
                       status="completed"
                       description={`Travel request created by ${booking.requesterDetails?.name || booking.userId?.name?.firstName}`}
                     />
                     <TimelineItem
+                      horizontal
                       title="Approval Workflow Assigned"
                       time={formatDateTime(booking.createdAt)}
                       status="completed"
                       description={`Route assigned to ${approver.name} (${approver.role})`}
                     />
                     <TimelineItem
+                      horizontal
                       title="Awaiting Review"
                       time="Present"
                       status="pending"
@@ -977,11 +1027,12 @@ export const PendingFlightDetailsModal = ({
   const paxTypeLabel = { 1: "Adult", 2: "Child", 3: "Infant" };
   const cabinDisplay =
     bookSnap.cabinClass || cabinLabel[segments[0]?.cabinClass] || "Economy";
-  
+
   // 💰 PRICE FALLBACKS
   const baseFare = fareSnapshot.baseFare ?? fareQuoteResult.Fare?.BaseFare ?? 0;
   const totalTax = fareSnapshot.tax ?? fareQuoteResult.Fare?.Tax ?? 0;
-  const publishFare = fareQuoteResult.Fare?.PublishedFare ?? fareSnapshot.publishedFare ?? 0;
+  const publishFare =
+    fareQuoteResult.Fare?.PublishedFare ?? fareSnapshot.publishedFare ?? 0;
   const displayTotal = pricingSnapshot.totalAmount || publishFare || 0;
 
   const onwardSegments = segments.filter(
@@ -993,10 +1044,10 @@ export const PendingFlightDetailsModal = ({
   const allDetailedSegments = (fareQuoteResult.Segments || []).flat();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl my-4 overflow-hidden flex flex-col h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1A1C20]/60 backdrop-blur-md overflow-y-auto">
+      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-[1440px] w-[96%] my-2 overflow-hidden flex flex-col h-[96vh]">
         {/* Header */}
-        <div className="bg-slate-900 px-6 py-4 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
+        <div className="bg-gradient-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center shrink-0 shadow-lg relative z-10">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-[#C9A84C]/20 rounded-lg text-[#C9A84C]">
               <FaPlane size={20} />
@@ -1019,7 +1070,7 @@ export const PendingFlightDetailsModal = ({
         </div>
 
         {/* Sticky Action Bar */}
-        <div className="sticky top-0 z-20 bg-white border-b border-slate-100 px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+        <div className="sticky top-0 z-20 bg-white border-b border-[#EAE4D9] px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
           <div className="flex flex-wrap items-center gap-4 text-[11px] font-black uppercase tracking-tighter">
             {booking.requestStatus === "approved" ? (
               <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100 uppercase tracking-tighter">
@@ -1032,7 +1083,7 @@ export const PendingFlightDetailsModal = ({
                 Rejected
               </div>
             ) : isDiscarded ? (
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-full border border-slate-200 uppercase tracking-tighter font-black">
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-full border border-[#EAE4D9] uppercase tracking-tighter font-black">
                 Expired
               </div>
             ) : (
@@ -1042,11 +1093,11 @@ export const PendingFlightDetailsModal = ({
               </div>
             )}
 
-            <div className="flex items-center gap-1.5 text-slate-500 border-l border-slate-200 pl-4">
+            <div className="flex items-center gap-1.5 text-slate-500 border-l border-[#EAE4D9] pl-4">
               <FiClock className="text-slate-400" />
               <span>Submitted: {formatDateTime(booking.createdAt)}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-slate-500 border-l border-slate-200 pl-4">
+            <div className="flex items-center gap-1.5 text-slate-500 border-l border-[#EAE4D9] pl-4">
               <FiBriefcase className="text-slate-400" />
               <span>{booking.projectName || "Internal"}</span>
             </div>
@@ -1064,14 +1115,14 @@ export const PendingFlightDetailsModal = ({
               )}
 
             {booking.requestStatus !== "pending_approval" ? (
-              <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 text-slate-500 rounded-xl border border-slate-200 italic">
+              <div className="flex items-center gap-2 px-4 py-2 bg-[#FAF8F4] text-slate-500 rounded-xl border border-[#EAE4D9] italic">
                 <FiInfo size={14} className="text-slate-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight">
                   Request already {booking.requestStatus}
                 </span>
               </div>
             ) : isDiscarded ? (
-              <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-xl border border-slate-200">
+              <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-xl border border-[#EAE4D9]">
                 <FiAlertCircle size={14} className="text-slate-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight">
                   Travel Date Passed · No Action Possible
@@ -1082,7 +1133,7 @@ export const PendingFlightDetailsModal = ({
                 <button
                   onClick={() => onReject(booking._id, "flight", "reject")}
                   disabled={!isVerified}
-                  className={`px-5 py-2 border border-red-100 text-red-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-slate-200" : "hover:bg-red-50"}`}
+                  className={`px-5 py-2 border border-red-100 text-red-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-[#EAE4D9]" : "hover:bg-red-50"}`}
                   title={!isVerified ? "Account pending verification" : ""}
                 >
                   Reject Request
@@ -1102,11 +1153,15 @@ export const PendingFlightDetailsModal = ({
         </div>
 
         {/* Tabs Navigation */}
-        <div className="bg-white px-6 border-b border-slate-100 flex items-center gap-8 shrink-0 overflow-x-auto no-scrollbar">
+        <div className="bg-white px-6 border-b border-[#EAE4D9] flex items-center gap-8 shrink-0 overflow-x-auto no-scrollbar">
           {[
             { id: "details", label: "Flight Details", icon: <FaPlane /> },
             { id: "project", label: "Project", icon: <FiBriefcase /> },
-            { id: "charges", label: "Charges and rules", icon: <FiDollarSign /> },
+            {
+              id: "charges",
+              label: "Charges and rules",
+              icon: <FiDollarSign />,
+            },
             { id: "passenger", label: "Passenger", icon: <FiUser /> },
             { id: "history", label: "Booking History", icon: <FiClock /> },
           ].map((tab) => (
@@ -1115,23 +1170,27 @@ export const PendingFlightDetailsModal = ({
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 py-4 text-[11px] font-black uppercase tracking-widest transition-all relative shrink-0 ${
                 activeTab === tab.id
-                  ? "text-indigo-600"
+                  ? "text-[#B5862A]"
                   : "text-slate-400 hover:text-slate-600"
               }`}
             >
-              <span className={activeTab === tab.id ? "text-indigo-600" : "text-slate-300"}>
+              <span
+                className={
+                  activeTab === tab.id ? "text-[#B5862A]" : "text-slate-300"
+                }
+              >
                 {tab.icon}
               </span>
               {tab.label}
               {activeTab === tab.id && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#B5862A] rounded-full" />
               )}
             </button>
           ))}
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 scroll-smooth bg-slate-50/30">
+        <div className="flex-1 overflow-y-auto p-6 scroll-smooth bg-[#FAF8F4]/30">
           <div className="max-w-7xl mx-auto">
             {activeTab === "details" && (
               <div className="flex flex-col lg:flex-row gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -1177,19 +1236,19 @@ export const PendingFlightDetailsModal = ({
 
                       return (
                         <React.Fragment key={idx}>
-                          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-6">
+                          <div className="bg-white border border-[#EAE4D9] rounded-3xl p-6 shadow-sm space-y-6">
                             <div className="flex items-center justify-between border-b border-slate-50 pb-5">
                               <div className="flex items-center gap-3">
-                                <span className="text-[10px] font-black bg-indigo-600 text-white px-3 py-1 rounded-full uppercase shadow-sm tracking-widest">
+                                <span className="text-[10px] font-black bg-[#B5862A] text-white px-3 py-1 rounded-full uppercase shadow-sm tracking-widest">
                                   {legLabel}
                                 </span>
-                                <span className="text-sm font-black text-slate-800 tracking-tight uppercase italic">
+                                <span className="text-sm font-black text-[#1A1714] tracking-tight uppercase italic">
                                   {seg.airlineName} · {seg.airlineCode}
                                   {seg.flightNumber} · {supplierFareClass}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-black bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 uppercase tracking-widest">
+                                <span className="text-[10px] font-black bg-[#FAF8F4] text-[#B5862A] px-3 py-1 rounded-full border border-blue-100 uppercase tracking-widest">
                                   {cabinDisplay}
                                 </span>
                                 {isRefundable ? (
@@ -1206,21 +1265,23 @@ export const PendingFlightDetailsModal = ({
 
                             <div className="flex items-center justify-between gap-12 py-4">
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-4xl font-black text-slate-900 tracking-tighter italic leading-none">
+                                <h4 className="text-4xl font-black text-[#1A1714] tracking-tighter italic leading-none">
                                   {origin.airportCode}
                                 </h4>
-                                <p className="text-[11px] font-black text-slate-800 mt-2 truncate uppercase tracking-tighter">
+                                <p className="text-[11px] font-black text-[#1A1714] mt-2 truncate uppercase tracking-tighter">
                                   {originName}
                                 </p>
                                 <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate uppercase">
                                   {origin.city}{" "}
-                                  {origin.terminal ? `· T${origin.terminal}` : ""}
+                                  {origin.terminal
+                                    ? `· T${origin.terminal}`
+                                    : ""}
                                 </p>
                                 <div className="mt-4">
-                                  <p className="text-xl font-black text-indigo-700 leading-none">
+                                  <p className="text-xl font-black text-[#B5862A] leading-none">
                                     {formatTime(seg.departureDateTime)}
                                   </p>
-                                  <p className="text-[11px] font-black text-slate-900 uppercase mt-1.5 italic">
+                                  <p className="text-[11px] font-black text-[#1A1714] uppercase mt-1.5 italic">
                                     {formatDate(seg.departureDateTime)}
                                   </p>
                                 </div>
@@ -1233,27 +1294,29 @@ export const PendingFlightDetailsModal = ({
                                     : "—"}
                                 </p>
                                 <div className="w-full flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full bg-indigo-600 shadow-lg shadow-indigo-100 shrink-0" />
-                                  <div className="flex-1 border-t-2 border-dashed border-slate-200 relative">
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-3 py-1 rounded-full border border-slate-100 shadow-sm">
+                                  <div className="w-2 h-2 rounded-full bg-[#B5862A] shadow-lg shadow-indigo-100 shrink-0" />
+                                  <div className="flex-1 border-t-2 border-dashed border-[#EAE4D9] relative">
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-3 py-1 rounded-full border border-[#EAE4D9] shadow-sm">
                                       <FaPlane
-                                        className="text-indigo-600 rotate-90"
+                                        className="text-[#B5862A] rotate-90"
                                         size={12}
                                       />
                                     </div>
                                   </div>
-                                  <div className="w-2 h-2 rounded-full bg-indigo-600 shadow-lg shadow-indigo-100 shrink-0" />
+                                  <div className="w-2 h-2 rounded-full bg-[#B5862A] shadow-lg shadow-indigo-100 shrink-0" />
                                 </div>
                                 <div className="mt-3">
                                   <span
                                     className="text-[8px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full border"
                                     style={{
                                       color:
-                                        seg.fareClassification?.color || "#94a3b8",
+                                        seg.fareClassification?.color ||
+                                        "#94a3b8",
                                       borderColor: seg.fareClassification?.color
                                         ? `${seg.fareClassification.color}60`
                                         : "#e2e8f0",
-                                      backgroundColor: seg.fareClassification?.color
+                                      backgroundColor: seg.fareClassification
+                                        ?.color
                                         ? `${seg.fareClassification.color}10`
                                         : "#f8fafc",
                                     }}
@@ -1266,10 +1329,10 @@ export const PendingFlightDetailsModal = ({
                               </div>
 
                               <div className="flex-1 min-w-0 text-right">
-                                <h4 className="text-4xl font-black text-slate-900 tracking-tighter italic leading-none">
+                                <h4 className="text-4xl font-black text-[#1A1714] tracking-tighter italic leading-none">
                                   {destination.airportCode}
                                 </h4>
-                                <p className="text-[11px] font-black text-slate-800 mt-2 truncate uppercase tracking-tighter">
+                                <p className="text-[11px] font-black text-[#1A1714] mt-2 truncate uppercase tracking-tighter">
                                   {destName}
                                 </p>
                                 <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate uppercase">
@@ -1279,10 +1342,10 @@ export const PendingFlightDetailsModal = ({
                                     : ""}
                                 </p>
                                 <div className="mt-4">
-                                  <p className="text-xl font-black text-indigo-700 leading-none">
+                                  <p className="text-xl font-black text-[#B5862A] leading-none">
                                     {formatTime(seg.arrivalDateTime)}
                                   </p>
-                                  <p className="text-[11px] font-black text-slate-900 uppercase mt-1.5 italic">
+                                  <p className="text-[11px] font-black text-[#1A1714] uppercase mt-1.5 italic">
                                     {formatDate(seg.arrivalDateTime)}
                                   </p>
                                 </div>
@@ -1313,21 +1376,22 @@ export const PendingFlightDetailsModal = ({
                             (seg.journeyType || "onward") ===
                               (segments[idx + 1].journeyType || "onward") && (
                               <div className="flex items-center gap-4 py-2 px-6">
-                                <div className="flex-1 border-t border-dashed border-slate-200" />
+                                <div className="flex-1 border-t border-dashed border-[#EAE4D9]" />
                                 <div className="flex items-center gap-2 bg-amber-50 text-amber-700 px-4 py-1.5 rounded-full border border-amber-100 shadow-sm">
                                   <FiClock
                                     size={12}
                                     className="animate-pulse text-amber-600"
                                   />
                                   <span className="text-[10px] font-black uppercase tracking-widest">
-                                    Layover in {destination.city || "Connection"}:{" "}
+                                    Layover in{" "}
+                                    {destination.city || "Connection"}:{" "}
                                     {calculateLayover(
                                       seg.arrivalDateTime,
                                       segments[idx + 1].departureDateTime,
                                     )}
                                   </span>
                                 </div>
-                                <div className="flex-1 border-t border-dashed border-slate-200" />
+                                <div className="flex-1 border-t border-dashed border-[#EAE4D9]" />
                               </div>
                             )}
                         </React.Fragment>
@@ -1345,15 +1409,21 @@ export const PendingFlightDetailsModal = ({
                         icon={<FiTag />}
                         title="Extra Add-ons (SSR Details)"
                       />
-                      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm overflow-hidden">
+                      <div className="bg-white border border-[#EAE4D9] rounded-3xl p-6 shadow-sm overflow-hidden">
                         <div className="overflow-x-auto">
                           <table className="w-full">
                             <thead>
                               <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">
                                 <th className="pb-4 text-left">Route</th>
-                                <th className="pb-4 text-left">Seat Selection</th>
-                                <th className="pb-4 text-left">Meal Selection</th>
-                                <th className="pb-4 text-left">Extra Baggage</th>
+                                <th className="pb-4 text-left">
+                                  Seat Selection
+                                </th>
+                                <th className="pb-4 text-left">
+                                  Meal Selection
+                                </th>
+                                <th className="pb-4 text-left">
+                                  Extra Baggage
+                                </th>
                                 <th className="pb-4 text-right">
                                   Total Add-on Cost
                                 </th>
@@ -1382,9 +1452,9 @@ export const PendingFlightDetailsModal = ({
                                   const segMeals = (ssrSnap.meals || []).filter(
                                     (m) => m.segmentIndex === segIdx,
                                   );
-                                  const segBaggage = (ssrSnap.baggage || []).filter(
-                                    (b) => b.segmentIndex === segIdx,
-                                  );
+                                  const segBaggage = (
+                                    ssrSnap.baggage || []
+                                  ).filter((b) => b.segmentIndex === segIdx);
 
                                   const segTotal = [
                                     ...segSeats,
@@ -1398,13 +1468,14 @@ export const PendingFlightDetailsModal = ({
                                   return (
                                     <tr
                                       key={segIdx}
-                                      className="text-xs font-black text-slate-700 hover:bg-slate-50/50 transition-colors"
+                                      className="text-xs font-black text-slate-700 hover:bg-[#FAF8F4]/50 transition-colors"
                                     >
                                       <td className="py-5 pr-4">
                                         <div className="flex flex-col">
-                                          <span className="text-sm font-black text-slate-900 tracking-tighter italic">
+                                          <span className="text-sm font-black text-[#1A1714] tracking-tighter italic">
                                             {seg.origin?.airportCode || "???"} →{" "}
-                                            {seg.destination?.airportCode || "???"}
+                                            {seg.destination?.airportCode ||
+                                              "???"}
                                           </span>
                                         </div>
                                       </td>
@@ -1416,7 +1487,7 @@ export const PendingFlightDetailsModal = ({
                                                 key={idx}
                                                 className="flex items-center gap-2"
                                               >
-                                                <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-black uppercase">
+                                                <span className="bg-[#FAF8F4] text-[#B5862A] px-2 py-0.5 rounded text-[10px] font-black uppercase">
                                                   SEAT {s.seatNo}
                                                 </span>
                                                 <span className="text-[9px] text-slate-400">
@@ -1439,8 +1510,9 @@ export const PendingFlightDetailsModal = ({
                                                 key={idx}
                                                 className="flex flex-col gap-0.5"
                                               >
-                                                <span className="text-[10px] font-black text-slate-800 leading-tight uppercase">
-                                                  {m.airlineDescription || m.code}
+                                                <span className="text-[10px] font-black text-[#1A1714] leading-tight uppercase">
+                                                  {m.airlineDescription ||
+                                                    m.code}
                                                 </span>
                                                 <div className="flex items-center gap-1.5">
                                                   <span className="text-[8px] font-black text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase">
@@ -1467,12 +1539,14 @@ export const PendingFlightDetailsModal = ({
                                                 key={idx}
                                                 className="flex flex-col gap-0.5"
                                               >
-                                                <span className="text-[10px] font-black text-slate-800 uppercase italic leading-tight">
+                                                <span className="text-[10px] font-black text-[#1A1714] uppercase italic leading-tight">
                                                   {b.weight} KG Extra
                                                 </span>
                                                 <div className="flex items-center gap-1.5">
                                                   <span className="text-[8px] font-black text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded uppercase">
-                                                    {getBaggageDesc(b.description)}
+                                                    {getBaggageDesc(
+                                                      b.description,
+                                                    )}
                                                   </span>
                                                   <span className="text-[9px] text-slate-400">
                                                     ₹{b.price || 0}
@@ -1487,7 +1561,7 @@ export const PendingFlightDetailsModal = ({
                                           </span>
                                         )}
                                       </td>
-                                      <td className="py-5 text-right font-mono text-sm text-slate-900">
+                                      <td className="py-5 text-right font-mono text-sm text-[#1A1714]">
                                         ₹{segTotal.toLocaleString()}
                                       </td>
                                     </tr>
@@ -1495,14 +1569,14 @@ export const PendingFlightDetailsModal = ({
                                 })}
                             </tbody>
                             <tfoot>
-                              <tr className="border-t border-slate-100 bg-slate-50/30">
+                              <tr className="border-t border-[#EAE4D9] bg-[#FAF8F4]/30">
                                 <td
                                   colSpan={4}
                                   className="py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest italic"
                                 >
                                   Combined SSR Total
                                 </td>
-                                <td className="py-4 text-right text-base font-black text-indigo-700 tracking-tighter">
+                                <td className="py-4 text-right text-base font-black text-[#B5862A] tracking-tighter">
                                   ₹
                                   {[
                                     ...(ssrSnap.seats || []),
@@ -1520,41 +1594,7 @@ export const PendingFlightDetailsModal = ({
                           </table>
                         </div>
 
-                        {/* SSR Legend Note */}
-                        <div className="mt-8 pt-6 border-t border-slate-50">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                            SSR Status Legend
-                          </p>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
-                              <p className="text-[9px] font-black text-indigo-600 uppercase mb-1">
-                                Seats
-                              </p>
-                              <p className="text-[10px] text-slate-500 leading-relaxed font-bold">
-                                1: Included (Fare) <br />
-                                2: Purchase (Extra)
-                              </p>
-                            </div>
-                            <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
-                              <p className="text-[9px] font-black text-amber-600 uppercase mb-1">
-                                Meals
-                              </p>
-                              <p className="text-[10px] text-slate-500 leading-relaxed font-bold">
-                                1: Included · 2: Direct <br />
-                                3: Imported
-                              </p>
-                            </div>
-                            <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
-                              <p className="text-[9px] font-black text-purple-600 uppercase mb-1">
-                                Baggage
-                              </p>
-                              <p className="text-[10px] text-slate-500 leading-relaxed font-bold">
-                                1: Included · 2: Direct <br />
-                                5: ImportedUpgrade
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                        
                       </div>
                     </div>
                   )}
@@ -1563,7 +1603,7 @@ export const PendingFlightDetailsModal = ({
                 {/* Right Column */}
                 <div className="w-full lg:w-96 space-y-6">
                   {/* Fare Breakdown */}
-                  <div className="bg-slate-900 text-white rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
+                  <div className="bg-gradient-to-br from-[#003399] to-[#000d26] text-white rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
                     <SectionLabel
                       icon={<FiDollarSign />}
                       title="Fare Snapshot"
@@ -1583,11 +1623,15 @@ export const PendingFlightDetailsModal = ({
                       <div className="mt-8 space-y-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6">
                         <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
                           <span className="text-slate-400">Base Fare</span>
-                          <span className="text-slate-100">₹{Math.ceil(baseFare).toLocaleString()}</span>
+                          <span className="text-slate-100">
+                            ₹{Math.ceil(baseFare).toLocaleString()}
+                          </span>
                         </div>
                         <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
                           <span className="text-slate-400">Taxes & Fees</span>
-                          <span className="text-slate-100">₹{Math.ceil(totalTax).toLocaleString()}</span>
+                          <span className="text-slate-100">
+                            ₹{Math.ceil(totalTax).toLocaleString()}
+                          </span>
                         </div>
                         <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
                           <span className="text-slate-400">SSR Add-ons</span>
@@ -1603,32 +1647,16 @@ export const PendingFlightDetailsModal = ({
                           </span>
                         </div>
                         <div className="pt-4 border-t border-white/10 flex justify-between items-center">
-                          <span className="text-[10px] font-black text-slate-500 uppercase">Net Payable</span>
+                          <span className="text-[10px] font-black text-slate-500 uppercase">
+                            Net Payable
+                          </span>
                           <span className="text-xl font-black text-white italic tracking-tighter">
                             ₹ {Math.ceil(displayTotal)?.toLocaleString()}
                           </span>
                         </div>
                       </div>
                     </div>
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
-                  </div>
-
-                  <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-50 pb-3 font-mono">
-                      Flight Reference
-                    </p>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">PNR / Booking Ref</p>
-                        <p className="text-xs font-black text-slate-900">{booking.bookingReference || "Pending"}</p>
-                      </div>
-                      <div className="pt-3 border-t border-slate-50">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Cabin Class</p>
-                        <span className="text-[10px] font-black bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full border border-blue-100 uppercase tracking-widest">
-                          {cabinDisplay}
-                        </span>
-                      </div>
-                    </div>
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-[#FAF8F4]0/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
                   </div>
                 </div>
               </div>
@@ -1637,14 +1665,17 @@ export const PendingFlightDetailsModal = ({
             {activeTab === "project" && (
               <div className="flex flex-col lg:flex-row gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex-1 space-y-6">
-                  <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
-                    <SectionLabel icon={<FiBriefcase />} title="Project Context" />
+                  <div className="bg-white border border-[#EAE4D9] rounded-3xl p-8 shadow-sm">
+                    <SectionLabel
+                      icon={<FiBriefcase />}
+                      title="Project Context"
+                    />
                     <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                           Project Name
                         </p>
-                        <p className="text-base font-black text-slate-900 uppercase tracking-tighter">
+                        <p className="text-base font-black text-[#1A1714] uppercase tracking-tighter">
                           {booking.projectName || "Internal Business"}
                         </p>
                       </div>
@@ -1660,7 +1691,7 @@ export const PendingFlightDetailsModal = ({
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                           Project ID / Code
                         </p>
-                        <p className="text-sm font-mono font-black text-slate-700 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100 inline-block">
+                        <p className="text-sm font-mono font-black text-slate-700 bg-[#FAF8F4] px-3 py-1 rounded-lg border border-[#EAE4D9] inline-block">
                           {booking.projectId || "N/A"}
                         </p>
                       </div>
@@ -1668,7 +1699,7 @@ export const PendingFlightDetailsModal = ({
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                           Assigned Approver
                         </p>
-                        <p className="text-sm font-black text-slate-900 uppercase tracking-tighter">
+                        <p className="text-sm font-black text-[#1A1714] uppercase tracking-tighter">
                           {approver.name}
                         </p>
                         <p className="text-[10px] font-bold text-slate-400 mt-1">
@@ -1678,10 +1709,10 @@ export const PendingFlightDetailsModal = ({
                     </div>
                   </div>
 
-                  <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+                  <div className="bg-white border border-[#EAE4D9] rounded-3xl p-8 shadow-sm">
                     <SectionLabel icon={<FiUser />} title="Requested By" />
                     <div className="mt-8 flex items-center gap-6">
-                      <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl italic shadow-inner">
+                      <div className="w-20 h-20 rounded-full bg-[#FAF8F4] border border-[#EAE4D9] flex items-center justify-center text-slate-400 font-black text-2xl italic shadow-inner">
                         {
                           (booking.requesterDetails?.name ||
                             booking.userId?.name?.firstName ||
@@ -1689,16 +1720,18 @@ export const PendingFlightDetailsModal = ({
                         }
                       </div>
                       <div>
-                        <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
+                        <p className="text-xl font-black text-[#1A1714] uppercase tracking-tighter italic">
                           {booking.requesterDetails?.name ||
                             `${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""}`.trim()}
                         </p>
                         <p className="text-xs font-bold text-slate-400 mt-1">
-                          {booking.requesterDetails?.email || booking.userId?.email}
+                          {booking.requesterDetails?.email ||
+                            booking.userId?.email}
                         </p>
                         <div className="mt-2 flex gap-2">
-                          <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-indigo-100">
-                            Role: {booking.requesterDetails?.role || "Team Member"}
+                          <span className="text-[10px] font-black text-[#B5862A] bg-[#FAF8F4] px-3 py-1 rounded-full uppercase tracking-widest italic border border-indigo-100">
+                            Role:{" "}
+                            {booking.requesterDetails?.role || "Team Member"}
                           </span>
                         </div>
                       </div>
@@ -1707,9 +1740,10 @@ export const PendingFlightDetailsModal = ({
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
                         Reason for Travel
                       </p>
-                      <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 italic text-sm font-black text-slate-700 leading-relaxed shadow-inner">
+                      <div className="bg-[#FAF8F4] p-6 rounded-[2rem] border border-[#EAE4D9] italic text-sm font-black text-slate-700 leading-relaxed shadow-inner">
                         "
-                        {booking.purposeOfTravel || "Internal business requirement"}
+                        {booking.purposeOfTravel ||
+                          "Internal business requirement"}
                         "
                       </div>
                     </div>
@@ -1723,7 +1757,7 @@ export const PendingFlightDetailsModal = ({
                 <div className="space-y-6">
                   {/* Cancellation & Fare Rules */}
                   {(miniFareRules.length > 0 || fareRules.length > 0) && (
-                    <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+                    <div className="bg-white border border-[#EAE4D9] rounded-3xl p-8 shadow-sm">
                       <SectionLabel
                         icon={<FiAlertCircle />}
                         title="Cancellation & Date Change Rules"
@@ -1732,34 +1766,45 @@ export const PendingFlightDetailsModal = ({
                         {miniFareRules.map((group, gIdx) => (
                           <div
                             key={gIdx}
-                            className="bg-slate-50/50 border border-slate-100 rounded-3xl p-6 space-y-6"
+                            className="bg-[#FAF8F4]/50 border border-[#EAE4D9] rounded-3xl p-6 space-y-6"
                           >
-                            <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-                              <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100">
+                            <div className="flex items-center gap-3 pb-4 border-b border-[#EAE4D9]">
+                              <div className="p-2 bg-[#B5862A] text-white rounded-xl shadow-lg shadow-indigo-100">
                                 <FiMapPin size={14} />
                               </div>
                               <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sector Route</p>
-                                <p className="text-sm font-black text-slate-900 uppercase italic">{group[0]?.JourneyPoints || "All Sectors"}</p>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                  Sector Route
+                                </p>
+                                <p className="text-sm font-black text-[#1A1714] uppercase italic">
+                                  {group[0]?.JourneyPoints || "All Sectors"}
+                                </p>
                               </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {group.map((rule, rIdx) => (
                                 <div
                                   key={rIdx}
-                                  className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between hover:border-indigo-200 transition-all"
+                                  className="p-5 bg-white rounded-2xl border border-[#EAE4D9] shadow-sm flex flex-col justify-between hover:border-indigo-200 transition-all"
                                 >
                                   <div className="flex justify-between items-start mb-4">
-                                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${rule.Type === "Cancellation" ? "bg-red-50 text-red-600 border border-red-100" : "bg-blue-50 text-blue-600 border border-blue-100"}`}>
+                                    <span
+                                      className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${rule.Type === "Cancellation" ? "bg-red-50 text-red-600 border border-red-100" : "bg-[#FAF8F4] text-blue-600 border border-blue-100"}`}
+                                    >
                                       {rule.Type}
                                     </span>
-                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{rule.Unit}</span>
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                      {rule.Unit}
+                                    </span>
                                   </div>
                                   <div className="space-y-1">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase">
-                                      {rule.From ? `From ${rule.From} ` : ""} {rule.To ? `to ${rule.To} ` : "onwards "}
+                                      {rule.From ? `From ${rule.From} ` : ""}{" "}
+                                      {rule.To ? `to ${rule.To} ` : "onwards "}
                                     </p>
-                                    <p className={`text-xl font-black tracking-tighter ${rule.Details === "100%" || rule.Details?.toLowerCase().includes("non") ? "text-red-600" : rule.Details?.toLowerCase() === "nil" ? "text-emerald-600" : "text-indigo-700"}`}>
+                                    <p
+                                      className={`text-xl font-black tracking-tighter ${rule.Details === "100%" || rule.Details?.toLowerCase().includes("non") ? "text-red-600" : rule.Details?.toLowerCase() === "nil" ? "text-emerald-600" : "text-[#B5862A]"}`}
+                                    >
                                       {rule.Details}
                                     </p>
                                   </div>
@@ -1769,23 +1814,42 @@ export const PendingFlightDetailsModal = ({
                           </div>
                         ))}
 
-                        {fareRules.map((rule, idx) => rule.FareRuleDetail && (
-                          <div key={idx} className="bg-slate-50 border border-slate-100 rounded-2xl p-6">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 italic">Detailed Rule: {rule.Origin} to {rule.Destination}</p>
-                            <div className="text-[11px] text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">{rule.FareRuleDetail}</div>
-                          </div>
-                        ))}
+                        {fareRules.map(
+                          (rule, idx) =>
+                            rule.FareRuleDetail && (
+                              <div
+                                key={idx}
+                                className="bg-[#FAF8F4] border border-[#EAE4D9] rounded-2xl p-6"
+                              >
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 italic">
+                                  Detailed Rule: {rule.Origin} to{" "}
+                                  {rule.Destination}
+                                </p>
+                                <div className="text-[11px] text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">
+                                  {rule.FareRuleDetail}
+                                </div>
+                              </div>
+                            ),
+                        )}
                       </div>
                     </div>
                   )}
 
-                  {!miniFareRules.length && !fareRules.some(r => r.FareRuleDetail) && (
-                    <div className="py-20 text-center bg-white rounded-[2.5rem] border border-dashed border-slate-200 shadow-sm">
-                      <FiAlertCircle className="mx-auto text-amber-400 mb-4 animate-bounce" size={48} />
-                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Policy Data Not Available</h3>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Fare rules were not captured for this request</p>
-                    </div>
-                  )}
+                  {!miniFareRules.length &&
+                    !fareRules.some((r) => r.FareRuleDetail) && (
+                      <div className="py-20 text-center bg-white rounded-[2.5rem] border border-dashed border-[#EAE4D9] shadow-sm">
+                        <FiAlertCircle
+                          className="mx-auto text-amber-400 mb-4 animate-bounce"
+                          size={48}
+                        />
+                        <h3 className="text-xl font-black text-[#1A1714] uppercase tracking-tight italic">
+                          Policy Data Not Available
+                        </h3>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">
+                          Fare rules were not captured for this request
+                        </p>
+                      </div>
+                    )}
                 </div>
               </div>
             )}
@@ -1801,23 +1865,23 @@ export const PendingFlightDetailsModal = ({
                     {travelers.map((pax, idx) => (
                       <div
                         key={idx}
-                        className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm"
+                        className="bg-white border border-[#EAE4D9] rounded-3xl p-8 shadow-sm"
                       >
                         <div className="flex items-center gap-6">
-                          <div className="w-16 h-16 rounded-2xl bg-slate-900 text-[#C9A84C] flex items-center justify-center font-black text-2xl shadow-lg uppercase italic">
+                          <div className="w-16 h-16 rounded-2xl bg-[#1A1C20] text-[#C9A84C] flex items-center justify-center font-black text-2xl shadow-lg uppercase italic">
                             {pax.firstName?.[0]}
                             {pax.lastName?.[0]}
                           </div>
                           <div>
-                            <p className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">
+                            <p className="text-2xl font-black text-[#1A1714] uppercase tracking-tighter italic">
                               {pax.title} {pax.firstName} {pax.lastName}
                             </p>
                             <div className="flex gap-2 mt-2">
-                              <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-widest">
+                              <span className="text-[10px] font-black bg-[#1A1C20] text-white px-3 py-1 rounded-full uppercase tracking-widest">
                                 {pax.paxType || "Adult"}
                               </span>
                               {pax.isLeadPassenger && (
-                                <span className="text-[10px] font-black bg-[#C9A84C] text-slate-900 px-3 py-1 rounded-full uppercase tracking-widest">
+                                <span className="text-[10px] font-black bg-[#C9A84C] text-[#1A1714] px-3 py-1 rounded-full uppercase tracking-widest">
                                   Lead Passenger
                                 </span>
                               )}
@@ -1854,18 +1918,22 @@ export const PendingFlightDetailsModal = ({
             )}
 
             {activeTab === "history" && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="bg-white border border-slate-100 rounded-[2.5rem] p-10 shadow-sm max-w-2xl mx-auto">
-                  <SectionLabel icon={<FiClock />} title="Approval Request Timeline" />
-                  <div className="mt-12 relative">
-                    <div className="absolute left-[6.5px] top-2 bottom-2 w-[1px] bg-slate-100" />
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 flex justify-center py-10">
+                <div className="bg-white border border-[#EAE4D9] rounded-[3rem] p-12 shadow-xl shadow-slate-100/50 w-full max-w-6xl">
+                  <SectionLabel
+                    icon={<FiClock className="text-[#B5862A]" />}
+                    title="Approval Request Timeline"
+                  />
+                  <div className="mt-16 flex items-start">
                     <TimelineItem
+                      horizontal
                       title="Request Initiated"
                       time={formatDateTime(booking.createdAt)}
                       status="completed"
                       description={`Travel request created by ${booking.requesterDetails?.name || booking.userId?.name?.firstName || "Traveler"}`}
                     />
                     <TimelineItem
+                      horizontal
                       title="Approval Workflow Assigned"
                       time={formatDateTime(booking.createdAt)}
                       status="completed"
@@ -1878,7 +1946,8 @@ export const PendingFlightDetailsModal = ({
 
                     {booking.requestStatus === "approved" ? (
                       <TimelineItem
-                        title={
+                        horizontal
+                      title={
                           approver.name === "Auto Approved"
                             ? "Auto Approved"
                             : "Request Approved"
@@ -1893,14 +1962,16 @@ export const PendingFlightDetailsModal = ({
                       />
                     ) : booking.requestStatus === "rejected" ? (
                       <TimelineItem
-                        title="Request Rejected"
+                        horizontal
+                      title="Request Rejected"
                         time={formatDateTime(booking.updatedAt)}
                         status="rejected"
                         description={`Request was rejected by ${approver.name}.`}
                       />
                     ) : (
                       <TimelineItem
-                        title="Awaiting Review"
+                        horizontal
+                      title="Awaiting Review"
                         time="Present"
                         status="pending"
                         active={true}

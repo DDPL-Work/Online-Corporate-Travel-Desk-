@@ -20,8 +20,14 @@ const ledgerSchema = new mongoose.Schema({
 
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking',
+    refPath: 'bookingModel',
     index: true
+  },
+
+  bookingModel: {
+    type: String,
+    enum: ['Booking', 'BookingRequest', 'HotelBookingRequest'],
+    default: 'Booking'
   },
 
   bookingReference: String, // 👈 VERY IMPORTANT (PNR / Ref ID)

@@ -19,6 +19,7 @@ exports.handleManagerSelection = async (req, res) => {
       projectCodeId,
       projectName,
       projectClient,
+      orderId,
     } = req.body;
 
     const normalizedEmail = (approverEmail || "").trim().toLowerCase();
@@ -180,6 +181,7 @@ exports.handleManagerSelection = async (req, res) => {
       projectCodeId,
       projectName,
       projectClient,
+      orderId,
 
       corporateId: req.user.corporateId,
     });
