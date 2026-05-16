@@ -20,6 +20,7 @@ import {
   FiXCircle,
   FiBriefcase,
   FiKey,
+  FiRefreshCw,
 } from "react-icons/fi";
 import { FaHotel } from "react-icons/fa";
 import {
@@ -34,6 +35,7 @@ import {
 } from "../../../Redux/Actions/approval.thunks";
 import Swal from "sweetalert2";
 import { SectionLabel, InfoRow, InfoBadge } from "./Shared/CommonComponents";
+import { C } from "../../Shared/color";
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Utility helpers                                               */
@@ -100,7 +102,7 @@ export default function PendingHotelApprovalPage() {
         })
         .catch(() => {
           setLoading(false);
-          toast.error("Failed to load request details");
+          Swal.fire("Error", "Failed to load request details", "error");
         });
     }
   }, [id, dispatch]);
@@ -109,8 +111,8 @@ export default function PendingHotelApprovalPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FAF8F4]">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-[#088395] border-t-transparent rounded-full animate-spin" />
-          <p className="text-[#088395] font-bold animate-pulse">Loading hotel details...</p>
+          <div className="w-12 h-12 border-4 rounded-full animate-spin" style={{ borderColor: C.gold, borderTopColor: "transparent" }} />
+          <p className="font-bold animate-pulse" style={{ color: C.navy }}>Loading hotel details...</p>
         </div>
       </div>
     );
@@ -140,7 +142,7 @@ export default function PendingHotelApprovalPage() {
       input: isApprove ? null : "textarea",
       icon: isApprove ? "question" : "warning",
       showCancelButton: true,
-      confirmButtonColor: isApprove ? "#16a34a" : "#dc2626",
+      confirmButtonColor: isApprove ? "#10B981" : "#EF4444",
       confirmButtonText: isApprove ? "Yes, Approve" : "Reject Request",
       cancelButtonText: "Cancel",
     });
@@ -158,13 +160,14 @@ export default function PendingHotelApprovalPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F4] font-sans pb-20">
+    <div className="min-h-screen font-sans pb-20" style={{ background: C.offWhite }}>
       {/* ── Header ── */}
-      <div className="bg-[#000D26] text-white">
+      <div className="text-white" style={{ background: C.navy }}>
         <div className="max-w-7xl mx-auto px-6 py-8">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-[#088395] hover:text-[#0AA3B8] transition-colors mb-6 group"
+            className="flex items-center gap-2 transition-colors mb-6 group"
+            style={{ color: C.gold }}
           >
             <FiArrowLeft className="group-hover:-translate-x-1 transition-transform" />
             <span className="text-xs font-bold uppercase tracking-widest">Back to Requests</span>
@@ -173,7 +176,7 @@ export default function PendingHotelApprovalPage() {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#088395]/20 flex items-center justify-center text-[#088395]">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg" style={{ background: `${C.gold}20`, color: C.gold }}>
                   <FaHotel size={20} />
                 </div>
                 <h1 className="text-3xl font-black tracking-tight">Pending Hotel Approval</h1>
@@ -186,13 +189,15 @@ export default function PendingHotelApprovalPage() {
             <div className="flex gap-4">
               <button
                 onClick={() => handleAction("reject")}
-                className="px-6 py-3 bg-red-500/10 border border-red-500/50 text-red-400 hover:bg-red-500 hover:text-white font-bold text-xs rounded-xl transition-all uppercase tracking-widest"
+                className="px-6 py-3 border font-bold text-xs rounded-xl transition-all uppercase tracking-widest"
+                style={{ background: "#EF444410", borderColor: "#EF444450", color: "#EF4444" }}
               >
                 Reject Request
               </button>
               <button
                 onClick={() => handleAction("approve")}
-                className="px-8 py-3 bg-[#088395] text-white hover:bg-[#0AA3B8] font-bold text-xs rounded-xl shadow-lg shadow-[#088395]/20 transition-all uppercase tracking-widest"
+                className="px-8 py-3 text-white font-bold text-xs rounded-xl shadow-lg transition-all uppercase tracking-widest"
+                style={{ background: C.gold, boxShadow: `0 4px 14px ${C.gold}40` }}
               >
                 Approve & Book
               </button>
@@ -208,33 +213,33 @@ export default function PendingHotelApprovalPage() {
           <div className="lg:col-span-2 space-y-8">
             
             {/* Status Bar */}
-            <div className="bg-white rounded-2xl border border-[#E8E0D0] p-6 flex flex-wrap items-center justify-between gap-6 shadow-sm">
+            <div className="bg-white rounded-2xl border p-6 flex flex-wrap items-center justify-between gap-6 shadow-sm" style={{ borderColor: C.border }}>
               <div className="flex items-center gap-4">
-                <div className="px-4 py-1 bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <div className="px-4 py-1 border text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-2" style={{ background: "#FEF3C7", borderColor: "#FBBF24", color: "#92400E" }}>
+                  <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#F59E0B" }} />
                   Awaiting Approval
                 </div>
-                <div className="h-6 w-[1px] bg-[#E8E0D0]" />
-                <div className="flex items-center gap-2 text-slate-500">
-                  <FiClock size={14} className="text-[#088395]" />
+                <div className="h-6 w-[1px]" style={{ background: C.border }} />
+                <div className="flex items-center gap-2" style={{ color: C.muted }}>
+                  <FiClock size={14} style={{ color: C.gold }} />
                   <span className="text-xs font-bold uppercase tracking-wide">Submitted: {formatDateTime(booking.createdAt)}</span>
                 </div>
               </div>
               <div className="flex items-center gap-6 text-right">
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Check-In</p>
-                  <p className="text-sm font-black text-slate-900">{formatDate(booking.hotelRequest?.checkInDate)}</p>
+                  <p className="text-sm font-black" style={{ color: C.navy }}>{formatDate(booking.hotelRequest?.checkInDate)}</p>
                 </div>
                 <div className="w-[1px] h-8 bg-slate-100" />
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Check-Out</p>
-                  <p className="text-sm font-black text-slate-900">{formatDate(booking.hotelRequest?.checkOutDate)}</p>
+                  <p className="text-sm font-black" style={{ color: C.navy }}>{formatDate(booking.hotelRequest?.checkOutDate)}</p>
                 </div>
               </div>
             </div>
 
             {/* Hotel Details Card */}
-            <div className="bg-white rounded-2xl border border-[#E8E0D0] overflow-hidden shadow-sm">
+            <div className="bg-white rounded-2xl border overflow-hidden shadow-sm" style={{ borderColor: C.border }}>
               <div className="flex flex-col md:flex-row">
                 <div className="md:w-1/3 relative h-64 md:h-auto overflow-hidden bg-slate-100">
                   <img
@@ -251,9 +256,9 @@ export default function PendingHotelApprovalPage() {
                 <div className="p-8 flex-1">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 mb-1">{hotel.hotelName}</h2>
-                      <p className="text-xs text-slate-500 flex items-center gap-1.5 font-medium">
-                        <FiMapPin className="text-[#088395]" /> {hotel.city}, {hotel.address}
+                      <h2 className="text-2xl font-black mb-1" style={{ color: C.navy }}>{hotel.hotelName}</h2>
+                      <p className="text-xs flex items-center gap-1.5 font-medium" style={{ color: C.muted }}>
+                        <FiMapPin style={{ color: C.gold }} /> {hotel.city}, {hotel.address}
                       </p>
                     </div>
                   </div>
@@ -280,8 +285,8 @@ export default function PendingHotelApprovalPage() {
             </div>
 
             {/* Room Selections */}
-            <div className="bg-white rounded-2xl border border-[#E8E0D0] overflow-hidden shadow-sm">
-              <div className="bg-slate-50 px-6 py-4 border-b border-[#E8E0D0]">
+            <div className="bg-white rounded-2xl border overflow-hidden shadow-sm" style={{ borderColor: C.border }}>
+              <div className="bg-slate-50 px-6 py-4 border-b" style={{ borderColor: C.border }}>
                 <SectionLabel icon={<FiHome />} title="Selected Room Details" />
               </div>
               <div className="divide-y divide-slate-100">
@@ -289,8 +294,8 @@ export default function PendingHotelApprovalPage() {
                   <div key={idx} className="p-8">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
                       <div>
-                        <h3 className="text-xl font-black text-slate-900 mb-1">{r.Name?.[0] || "Standard Room"}</h3>
-                        <p className="text-xs text-[#088395] font-bold uppercase tracking-widest">Included Meals: {r.MealType || "Room Only"}</p>
+                        <h3 className="text-xl font-black mb-1" style={{ color: C.navy }}>{r.Name?.[0] || "Standard Room"}</h3>
+                        <p className="text-xs font-bold uppercase tracking-widest" style={{ color: C.gold }}>Included Meals: {r.MealType || "Room Only"}</p>
                       </div>
                       <div className="flex items-center gap-3">
                          <InfoBadge color={r.IsRefundable ? "green" : "red"}>
@@ -299,8 +304,8 @@ export default function PendingHotelApprovalPage() {
                       </div>
                     </div>
                     
-                    <div className="p-6 bg-[#000D26]/5 rounded-2xl border border-[#000D26]/10 mb-6">
-                       <p className="text-[10px] font-black text-[#000D26]/40 uppercase tracking-[0.15em] mb-3">Room Description</p>
+                    <div className="p-6 rounded-2xl border mb-6" style={{ background: `${C.navy}08`, borderColor: `${C.navy}15` }}>
+                       <p className="text-[10px] font-black uppercase tracking-[0.15em] mb-3" style={{ color: `${C.navy}40` }}>Room Description</p>
                        <div 
                          className="text-sm text-slate-600 leading-relaxed italic"
                          dangerouslySetInnerHTML={{ __html: r.RoomDescription }}
@@ -314,7 +319,7 @@ export default function PendingHotelApprovalPage() {
                            <div className="space-y-2">
                              {r.Inclusions.map((inc, i) => (
                                <div key={i} className="flex items-center gap-2 text-xs text-slate-600">
-                                 <FiCheckCircle className="text-[#088395] shrink-0" />
+                                 <FiCheckCircle style={{ color: C.gold }} className="shrink-0" />
                                  <span>{inc}</span>
                                </div>
                              ))}
@@ -341,13 +346,13 @@ export default function PendingHotelApprovalPage() {
             </div>
 
             {/* Travellers Section */}
-            <div className="bg-white rounded-2xl border border-[#E8E0D0] overflow-hidden shadow-sm">
-              <div className="bg-slate-50 px-6 py-4 border-b border-[#E8E0D0]">
+            <div className="bg-white rounded-2xl border overflow-hidden shadow-sm" style={{ borderColor: C.border }}>
+              <div className="bg-slate-50 px-6 py-4 border-b" style={{ borderColor: C.border }}>
                 <SectionLabel icon={<FiUser />} title={`Guests (${travelers.length})`} />
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-50/50 border-b border-[#E8E0D0]">
+                  <thead className="bg-slate-50/50 border-b" style={{ borderColor: C.border }}>
                     <tr className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
                       <th className="px-6 py-4">Guest Name</th>
                       <th className="px-6 py-4">Contact</th>
@@ -360,12 +365,12 @@ export default function PendingHotelApprovalPage() {
                       <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-[#000D26]/5 text-[#000D26] flex items-center justify-center font-black text-xs shrink-0 border border-[#000D26]/10">
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center font-black text-xs shrink-0 border" style={{ background: `${C.navy}08`, color: C.navy, borderColor: `${C.navy}15` }}>
                               {pax.firstName?.[0]}{pax.lastName?.[0]}
                             </div>
                             <div>
-                              <p className="font-bold text-slate-900 text-sm">{pax.title} {pax.firstName} {pax.lastName}</p>
-                              <p className="text-[10px] font-bold text-[#088395] uppercase tracking-wider">{pax.paxType || "Adult"}</p>
+                              <p className="font-bold text-sm" style={{ color: C.navy }}>{pax.title} {pax.firstName} {pax.lastName}</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: C.gold }}>{pax.paxType || "Adult"}</p>
                             </div>
                           </div>
                         </td>
@@ -398,13 +403,13 @@ export default function PendingHotelApprovalPage() {
           <div className="space-y-8">
             
             {/* Pricing Summary */}
-            <div className="bg-[#000D26] text-white rounded-2xl p-8 shadow-xl shadow-[#000D26]/20 relative overflow-hidden">
+            <div className="text-white rounded-2xl p-8 shadow-xl relative overflow-hidden" style={{ background: C.navy, boxShadow: `0 10px 30px ${C.navy}30` }}>
               <div className="absolute top-0 right-0 p-8 opacity-10">
                  <FiDollarSign size={120} className="rotate-12" />
               </div>
               <div className="relative z-10 space-y-6">
                 <div>
-                  <p className="text-[#088395] text-[10px] font-black uppercase tracking-[0.2em] mb-2">Total Amount</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-2" style={{ color: C.gold }}>Total Amount</p>
                   <p className="text-5xl font-black tracking-tight flex items-baseline gap-1">
                     <span className="text-xl opacity-40 font-normal">₹</span>
                     {bookingSnapshot.totalAmount?.toLocaleString() || bookingSnapshot.amount?.toLocaleString() || "0"}
@@ -424,9 +429,9 @@ export default function PendingHotelApprovalPage() {
                 </div>
 
                 <div className="pt-6 border-t border-white/10">
-                   <p className="text-[10px] text-[#088395] font-black uppercase tracking-[0.2em] mb-3">Booking Status</p>
+                   <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-3" style={{ color: C.gold }}>Booking Status</p>
                    <div className="flex items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/10">
-                      <FiShield className="text-[#088395]" />
+                      <FiShield style={{ color: C.gold }} />
                       <p className="text-xs font-bold uppercase tracking-widest text-slate-300">Pending Approval</p>
                    </div>
                 </div>
@@ -434,8 +439,8 @@ export default function PendingHotelApprovalPage() {
             </div>
 
             {/* Request Context */}
-            <div className="bg-white rounded-2xl border border-[#E8E0D0] overflow-hidden shadow-sm">
-               <div className="bg-slate-50 px-6 py-4 border-b border-[#E8E0D0]">
+            <div className="bg-white rounded-2xl border overflow-hidden shadow-sm" style={{ borderColor: C.border }}>
+               <div className="bg-slate-50 px-6 py-4 border-b" style={{ borderColor: C.border }}>
                  <SectionLabel icon={<FiInfo />} title="Request Context" />
                </div>
                <div className="p-6 space-y-6">
@@ -443,12 +448,12 @@ export default function PendingHotelApprovalPage() {
                  <div>
                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Requested By</p>
                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                     <div className="w-10 h-10 rounded-full bg-[#000D26] text-[#088395] flex items-center justify-center font-black text-xs shrink-0">
+                     <div className="w-10 h-10 rounded-full flex items-center justify-center font-black text-xs shrink-0" style={{ background: C.navy, color: C.gold }}>
                        {booking.userId?.name?.firstName?.[0]}{booking.userId?.name?.lastName?.[0]}
                      </div>
                      <div>
-                       <p className="font-black text-slate-900 text-sm">{booking.userId?.name?.firstName} {booking.userId?.name?.lastName}</p>
-                       <p className="text-[11px] text-slate-400 font-medium">{booking.userId?.email}</p>
+                       <p className="font-black text-sm" style={{ color: C.navy }}>{booking.userId?.name?.firstName} {booking.userId?.name?.lastName}</p>
+                       <p className="text-[11px] font-medium" style={{ color: C.muted }}>{booking.userId?.email}</p>
                      </div>
                    </div>
                  </div>
@@ -482,7 +487,7 @@ export default function PendingHotelApprovalPage() {
                    <div className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden divide-y divide-slate-100">
                      <div className="px-4 py-3 flex justify-between items-center text-xs">
                         <span className="text-slate-500 font-medium">Name</span>
-                        <span className="font-bold text-[#088395]">{approver.name}</span>
+                        <span className="font-bold" style={{ color: C.gold }}>{approver.name}</span>
                      </div>
                      <div className="px-4 py-3 flex justify-between items-center text-xs text-slate-400">
                         <span className="font-medium">Role</span>
@@ -518,7 +523,7 @@ export default function PendingHotelApprovalPage() {
 
 const TravellerField = ({ icon, label, value }) => (
   <div className="flex items-start gap-2.5">
-    <div className="mt-1 text-[#088395] opacity-60">{icon}</div>
+    <div className="mt-1 opacity-60" style={{ color: C.gold }}>{icon}</div>
     <div>
       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{label}</p>
       <p className="text-[11px] font-bold text-slate-700 leading-tight">{value || "—"}</p>

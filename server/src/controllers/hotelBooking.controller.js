@@ -169,6 +169,8 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
     checkOutDate: hotelRequest.checkOut,
     noOfRooms: roomsCount,
     noOfNights: hotelRequest?.nights || 1,
+    cityName: hotelRequest.city || hotelRequest.rawHotelData?.CityName,
+    countryName: hotelRequest.country || hotelRequest.rawHotelData?.CountryName,
     guestNationality: hotelRequest.guestNationality || "IN",
     roomGuests,
     paxRooms,
@@ -220,6 +222,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
   const bookingSnapshot = {
     hotelName: transformedHotelRequest.selectedHotel.hotelName,
     city: transformedHotelRequest.selectedHotel.city,
+    country: transformedHotelRequest.selectedHotel.country,
     checkInDate: transformedHotelRequest.checkInDate,
     checkOutDate: transformedHotelRequest.checkOutDate,
     roomCount: transformedHotelRequest.noOfRooms,
@@ -649,6 +652,8 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     noOfRooms: roomsCount,
     noOfNights: hotelRequest?.nights || 1,
 
+    cityName: hotelRequest.city || hotelRequest.rawHotelData?.CityName,
+    countryName: hotelRequest.country || hotelRequest.rawHotelData?.CountryName,
     guestNationality: hotelRequest.guestNationality || "IN",
 
     roomGuests,
@@ -722,6 +727,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
   const bookingSnapshot = {
     hotelName: transformedHotelRequest.selectedHotel.hotelName,
     city: transformedHotelRequest.selectedHotel.city,
+    country: transformedHotelRequest.selectedHotel.country,
     checkInDate: transformedHotelRequest.checkInDate,
     checkOutDate: transformedHotelRequest.checkOutDate,
     roomCount: transformedHotelRequest.noOfRooms,
@@ -1406,7 +1412,13 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
   bookingResult
   hotelRequest.selectedRoom
   hotelRequest.selectedHotel
+  hotelRequest.checkInDate
+  hotelRequest.checkOutDate
+  hotelRequest.noOfNights
+  hotelRequest.noOfRooms
   amendment
+  travellers
+  requesterDetails
   `,
       )
       .sort({ createdAt: -1 })
@@ -1441,22 +1453,20 @@ exports.getMyHotelBookings = asyncHandler(async (req, res) => {
 
       // ✅ ROOM DETAILS (IMPORTANT)
       roomType: rawRoom?.Name?.[0] || selectedRoom?.roomTypeName || null,
-
       mealType: selectedRoom?.mealType || rawRoom?.MealType || null,
-
       isRefundable: selectedRoom?.isRefundable ?? rawRoom?.IsRefundable ?? null,
+      cancelPolicies: rawRoom?.CancelPolicies || selectedRoom?.cancelPolicies || [],
 
-      cancelPolicies:
-        rawRoom?.CancelPolicies || selectedRoom?.cancelPolicies || [],
-
-      // ✅ NEW: images
+      // ✅ images
       images,
-
-      // ✅ NEW: hero image (first image)
       heroImage: images?.[0] || null,
 
       orderId: booking.orderId,
       amendment: booking.amendment || null,
+
+      // ✅ Guest / requester info (used by frontend table for Guest column)
+      travellers: booking.travellers || [],
+      requesterDetails: booking.requesterDetails || null,
     };
   });
 

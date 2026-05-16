@@ -1,16 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   FiClock,
-  FiDollarSign,
   FiCheck,
   FiX,
   FiList,
   FiRefreshCw,
   FiAlertCircle,
   FiXCircle,
+  FiSearch,
+  FiArrowRight,
 } from "react-icons/fi";
-import { FaHotel, FaPlane } from "react-icons/fa";
+import { FaHotel, FaPlane, FaRupeeSign } from "react-icons/fa";
 import {
   approveApproval,
   rejectApproval,
@@ -21,10 +23,8 @@ import {
   getMyEmployees,
 } from "../../Redux/Actions/manager.thunk";
 import { fetchCorporateAdmin } from "../../Redux/Slice/corporateAdminSlice";
-import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
-import { Pagination } from "./Shared/Pagination";
-import { FiSearch } from "react-icons/fi";
-
+import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
+import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import Swal from "sweetalert2";
 import PendingHotelDetailsModal, {
   PendingFlightDetailsModal,
@@ -36,359 +36,443 @@ import {
   dateCls,
   IdCell,
   SearchBar,
-  selectCls,
   Th,
-} from "./Shared/CommonComponents";
+  CustomDropdown,
+} from "../TravelAdminTabs/Shared/CommonComponents";
+import { C } from "../Shared/color";
+import { airlineLogo } from "../../utils/formatter";
 
-// ── FilterChip ───────────────────────────────────────────────────────────────
-function FilterChip({ label, onRemove }) {
+const RouteCell = ({ routes, airline }) => {
+  if (!routes || routes.length === 0) return <span className="text-slate-400">No Route</span>;
+  
+  const airlineCode = (airline?.airlineCode || "AI").toUpperCase();
+  const airlineName = airline?.airlineName || "Airline";
+  const logoUrl = airlineLogo(airlineCode);
+
   return (
-    <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 bg-[#0A4D68]/8 border border-[#0A4D68]/20 text-[#0A4D68] rounded-lg text-[10px] font-black uppercase tracking-wider">
-      {label}
-      <button
-        onClick={onRemove}
-        className="w-4 h-4 rounded-md flex items-center justify-center hover:bg-[#0A4D68]/20 transition-colors"
-      >
-        <FiX size={9} />
-      </button>
-    </span>
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
+        <img 
+          src={logoUrl} 
+          alt={airlineName} 
+          className="w-full h-full object-contain"
+          onError={(e) => { 
+            e.target.onerror = null;
+            e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
+          }} 
+        />
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-tight">
+            {routes[0].fromCode}
+          </span>
+          <FiArrowRight size={12} className="text-slate-400" />
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-tight">
+            {routes.length > 1 ? routes[0].toCode : routes[routes.length - 1].toCode}
+          </span>
+          {routes.length > 1 && (
+            <span className="bg-amber-50 text-amber-600 text-[8px] font-black px-1.5 py-0.5 rounded border border-amber-100 ml-1">RT</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-500">
+          <span className="capitalize">{routes[0].fromCity || "Origin"}</span>
+          <span>→</span>
+          <span className="capitalize">{routes.length > 1 ? (routes[0].toCity || "Turnaround") : (routes[routes.length - 1].toCity || "Dest")}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+function FlightSection({ data, loading, onRefresh, handleAction, isVerified, onSelect }) {
+  const [search, setSearch] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+  const navigate = useNavigate();
+
+  const formatted = useMemo(() => (data || []).map(b => {
+    const traveller = b.travellers?.length
+      ? `${b.travellers[0].title || ""} ${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim()
+      : "Staff Member";
+    
+    const amount = b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? b.flightRequest?.fareSnapshot?.publishedFare ?? 0;
+
+    const segments = b.flightRequest?.segments || [];
+    const onwardSegments = segments.filter(s => s.journeyType === "onward");
+    const returnSegments = segments.filter(s => s.journeyType === "return");
+    
+    const buildLeg = (segs) => {
+      if (!segs.length) return null;
+      const first = segs[0]; 
+      const last = segs[segs.length - 1];
+      return {
+        fromCode: first?.origin?.airportCode || "N/A",
+        toCode: last?.destination?.airportCode || "N/A",
+        fromCity: first?.origin?.city || "Unknown",
+        toCity: last?.destination?.city || "Unknown"
+      };
+    };
+
+    const routes = [];
+    if (onwardSegments.length > 0 || returnSegments.length > 0) {
+      const onwardLeg = buildLeg(onwardSegments);
+      const returnLeg = buildLeg(returnSegments);
+      if (onwardLeg) routes.push(onwardLeg);
+      if (returnLeg) routes.push(returnLeg);
+    } else if (segments.length > 0) {
+      const leg = buildLeg(segments);
+      if (leg) routes.push(leg);
+    }
+    
+    const airline = segments[0] ? { 
+      airlineCode: segments[0].airlineCode || segments[0].airline?.airlineCode, 
+      airlineName: segments[0].airlineName || segments[0].airline?.airlineName 
+    } : null;
+
+    const isTravelPassed = Boolean(segments[0]?.departureDateTime && new Date() > new Date(segments[0].departureDateTime));
+
+    return { 
+      ...b, 
+      travellerName: traveller, 
+      employeeId: b.requesterDetails?.email || b.userId?.email || "—", 
+      status: b.requestStatus || "pending_approval", 
+      amount, 
+      bookedDate: b.createdAt,
+      routes,
+      airline,
+      isTravelPassed,
+      travelDate: segments[0]?.departureDateTime || b.bookingSnapshot?.travelDate
+    };
+  }), [data]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return formatted.filter(b => {
+      const bDate = b.bookedDate ? new Date(b.bookedDate).toISOString().slice(0, 10) : "";
+      return (!q || b.travellerName.toLowerCase().includes(q) || (b.orderId || "").toLowerCase().includes(q) || b.employeeId.toLowerCase().includes(q)) &&
+             (!startDate || bDate >= startDate) && (!endDate || bDate <= endDate);
+    });
+  }, [search, startDate, endDate, formatted]);
+
+  const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard label="Pending Flights" value={filtered.length} Icon={FaPlane} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+        <StatCard label="Urgent Review" value={filtered.filter(r => !r.isTravelPassed).length} Icon={FiClock} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Expired/Discarded" value={filtered.filter(r => r.isTravelPassed).length} Icon={FiXCircle} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
+        <StatCard label="Potential Outlay" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+          <LabeledField label={<><FiSearch size={10} /> Manifest Search</>} className="lg:col-span-4">
+            <SearchBar value={search} onChange={setSearch} placeholder="Name or Order ID..." />
+          </LabeledField>
+          <LabeledField label="Booking Window" className="lg:col-span-4">
+             <div className="flex items-center gap-2">
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+                <span className="text-slate-300">to</span>
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+             </div>
+          </LabeledField>
+          <div className="flex items-end lg:col-span-4">
+             <button onClick={() => { setSearch(""); setStartDate(""); setEndDate(""); }} className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest" style={{ background: C.white, borderColor: C.border, color: C.muted }}><FiX /> Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <ResponsiveDataTable title="Flight Approval Queue" subtitle={`${filtered.length} pending decisions`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="!px-6 !py-5">Order ID</Th>
+              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Requested On</Th>
+              <Th className="!px-6 !py-5">Travel Date</Th>
+              <Th className="!px-6 !py-5">Route</Th>
+              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Status</Th>
+              <Th className="!px-6 !py-5">Amount</Th>
+              <Th className="!px-6 !py-5 !text-center">Action</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginated.length > 0 ? paginated.map((b, i) => (
+              <tr key={b._id} className={`hover:bg-slate-100 transition-colors ${b.isTravelPassed ? "opacity-60" : ""}`} style={{ background: i % 2 === 0 ? C.white : C.gold + "08" }}>
+                <td className="!px-6 !py-5"><IdCell id={b.orderId} /></td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.travellerName}</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{b.flightRequest?.purposeOfTravel}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{new Date(b.bookedDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(b.bookedDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.travelDate ? new Date(b.travelDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
+                   <p className="text-[9px] font-bold text-gold uppercase">{b.travelDate ? new Date(b.travelDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : ""}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <RouteCell routes={b.routes} airline={b.airline} />
+                </td>
+                <td className="!px-6 !py-5">
+                   <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{b.employeeId}</span>
+                </td>
+                <td className="!px-6 !py-5">
+                   {b.isTravelPassed && b.status === "pending_approval" ? <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded border border-slate-200">EXPIRED</span> : <StatusBadge status={b.status} />}
+                </td>
+                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
+                <td className="!px-6 !py-5 !text-center">
+                    <button onClick={() => onSelect(b)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
+                      <FiList size={16} className="text-[#E7C695] group-hover:scale-110 transition-transform" />
+                    </button>
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={9} className="!px-6 !py-20 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                      <FiSearch size={32} />
+                    </div>
+                    <p className="text-sm font-bold text-slate-400">No pending flight requests found.</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
+    </div>
   );
 }
 
-// ── Main Component ──────────────────────────────────────────────────────────
+function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSelect }) {
+  const [search, setSearch] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+  const navigate = useNavigate();
+
+  const formatted = useMemo(() => (data || []).map(b => {
+    const guest = b.travellers?.length
+      ? `${b.travellers[0].title || ""} ${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim()
+      : "Staff Member";
+    
+    const amount = (() => {
+      const rooms = b.hotelRequest?.selectedRoom?.rawRoomData || [];
+      if (!Array.isArray(rooms)) return 0;
+      return rooms.reduce((total, room) => {
+        if (room.TotalFare) return total + room.TotalFare;
+        if (room.Price?.totalFare) return total + room.Price.totalFare;
+        if (Array.isArray(room.DayRates)) {
+          return total + room.DayRates.flat().reduce((sum, day) => sum + (day.BasePrice || 0), 0);
+        }
+        return total;
+      }, 0);
+    })();
+
+    const isTravelPassed = Boolean(b.hotelRequest?.checkInDate && new Date() > new Date(b.hotelRequest.checkInDate));
+
+    return { 
+      ...b, 
+      guestName: guest, 
+      employeeId: b.requesterDetails?.email || b.userId?.email || "—", 
+      status: b.requestStatus || "pending_approval", 
+      amount, 
+      bookedDate: b.createdAt,
+      hotelName: b.hotelRequest?.selectedHotel?.hotelName || "N/A",
+      city: b.hotelRequest?.selectedHotel?.city || "N/A",
+      isTravelPassed,
+      checkIn: b.hotelRequest?.checkInDate
+    };
+  }), [data]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return formatted.filter(b => {
+      const bDate = b.bookedDate ? new Date(b.bookedDate).toISOString().slice(0, 10) : "";
+      return (!q || b.guestName.toLowerCase().includes(q) || b.hotelName.toLowerCase().includes(q) || (b.orderId || "").toLowerCase().includes(q) || b.employeeId.toLowerCase().includes(q)) &&
+             (!startDate || bDate >= startDate) && (!endDate || bDate <= endDate);
+    });
+  }, [search, startDate, endDate, formatted]);
+
+  const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard label="Pending Hotels" value={filtered.length} Icon={FaHotel} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+        <StatCard label="Urgent Review" value={filtered.filter(r => !r.isTravelPassed).length} Icon={FiClock} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Expired/Discarded" value={filtered.filter(r => r.isTravelPassed).length} Icon={FiXCircle} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
+        <StatCard label="Potential Outlay" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+          <LabeledField label={<><FiSearch size={10} /> Manifest Search</>} className="lg:col-span-4">
+            <SearchBar value={search} onChange={setSearch} placeholder="Guest Name or Order ID..." />
+          </LabeledField>
+          <LabeledField label="Booking Window" className="lg:col-span-4">
+             <div className="flex items-center gap-2">
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+                <span className="text-slate-300">to</span>
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+             </div>
+          </LabeledField>
+          <div className="flex items-end lg:col-span-4">
+             <button onClick={() => { setSearch(""); setStartDate(""); setEndDate(""); }} className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest" style={{ background: C.white, borderColor: C.border, color: C.muted }}><FiX /> Reset Filters</button>
+          </div>
+        </div>
+      </div>
+
+      <ResponsiveDataTable title="Hotel Approval Queue" subtitle={`${filtered.length} pending decisions`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="!px-6 !py-5">Order Reference</Th>
+              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Requested On</Th>
+              <Th className="!px-6 !py-5">Check-in</Th>
+              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Asset Detail</Th>
+              <Th className="!px-6 !py-5">Status</Th>
+              <Th className="!px-6 !py-5">Estimate</Th>
+              <Th className="!px-6 !py-5 !text-center">Action</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginated.length > 0 ? paginated.map((b, i) => (
+              <tr key={b._id} className={`hover:bg-slate-100 transition-colors ${b.isTravelPassed ? "opacity-60" : ""}`} style={{ background: i % 2 === 0 ? C.white : C.gold + "08" }}>
+                <td className="!px-6 !py-5"><IdCell id={b.orderId} /></td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.guestName}</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{b.hotelRequest?.purposeOfTravel}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{new Date(b.bookedDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(b.bookedDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.checkIn ? new Date(b.checkIn).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
+                   <p className="text-[9px] font-bold text-gold uppercase">{b.checkIn ? "Check-in" : ""}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{b.employeeId}</span>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.hotelName}</p>
+                   <p className="text-[10px] font-bold text-gold uppercase">{b.city}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   {b.isTravelPassed && b.status === "pending_approval" ? <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded border border-slate-200">EXPIRED</span> : <StatusBadge status={b.status} />}
+                </td>
+                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
+                <td className="!px-6 !py-5 !text-center">
+                    <button onClick={() => onSelect(b)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
+                      <FiList size={16} className="text-[#E7C695] group-hover:scale-110 transition-transform" />
+                    </button>
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={9} className="!px-6 !py-20 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                      <FiSearch size={32} />
+                    </div>
+                    <p className="text-sm font-bold text-slate-400">No pending hotel requests found.</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
+    </div>
+  );
+}
 
 export default function PendingTravelRequestsForManager() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const {
     pendingHotelRequests,
     loadingPendingRequests,
     pendingFlightRequests,
     loadingPendingFlightRequests,
-    myEmployees,
   } = useSelector((state) => state.manager);
 
   const [activeTab, setActiveTab] = useState("flight");
-  const [searchTerm, setSearchTerm] = useState("");
-  // ── Date / range filters ───────────────────────────────────────────────────
-  const [bookingFrom, setBookingFrom] = useState("");   // booking created date range
-  const [bookingTo, setBookingTo]     = useState("");
-  const [travelFrom, setTravelFrom]   = useState("");   // travel/check-in date (single filter)
-  // ── Dropdown filters ───────────────────────────────────────────────────────
-  const [selectedEmployee, setSelectedEmployee] = useState("");
-  const [selectedStatus,   setSelectedStatus]   = useState("");
-  // ── Modal ─────────────────────────────────────────────────────────────────
+  const [isSyncing, setIsSyncing] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   useEffect(() => {
-    if (activeTab === "flight") {
-      dispatch(getPendingFlightRequests());
-    } else {
-      dispatch(getPendingHotelRequests());
-    }
+    if (activeTab === "flight") dispatch(getPendingFlightRequests());
+    else dispatch(getPendingHotelRequests());
     dispatch(fetchCorporateAdmin());
     dispatch(getMyEmployees());
   }, [activeTab, dispatch]);
 
-  const loadingActive =
-    activeTab === "flight"
-      ? loadingPendingFlightRequests
-      : loadingPendingRequests;
+  const loadingActive = activeTab === "flight" ? loadingPendingFlightRequests : loadingPendingRequests;
 
-  const handleRefresh = () => {
-    if (activeTab === "flight") {
-      dispatch(getPendingFlightRequests());
-      return;
+  const handleRefresh = async () => {
+    setIsSyncing(true);
+    try {
+      await dispatch(activeTab === "flight" ? getPendingFlightRequests() : getPendingHotelRequests());
+    } finally {
+      setIsSyncing(false);
     }
-    dispatch(getPendingHotelRequests());
   };
 
-  const requests = useMemo(() => {
-    const source =
-      activeTab === "flight" ? pendingFlightRequests : pendingHotelRequests;
-
-    return source.map((b) => {
-      const bookingType = b.bookingType || activeTab;
-      const isHotel = bookingType === "hotel";
-      const isFlight = bookingType === "flight";
-
-      const estimatedCost = (() => {
-        if (isHotel) {
-          const rooms = b.hotelRequest?.selectedRoom?.rawRoomData || [];
-          if (!Array.isArray(rooms)) return 0;
-
-          return rooms.reduce((total, room) => {
-            if (room.TotalFare) return total + room.TotalFare;
-            if (room.Price?.totalFare) return total + room.Price.totalFare;
-            if (Array.isArray(room.DayRates)) {
-              const roomTotal = room.DayRates.flat().reduce(
-                (sum, day) => sum + (day.BasePrice || 0),
-                0,
-              );
-              return total + roomTotal;
-            }
-            return total;
-          }, 0);
-        }
-
-        if (isFlight) {
-          return (
-            b.pricingSnapshot?.totalAmount ||
-            b.bookingSnapshot?.amount ||
-            b.flightRequest?.fareSnapshot?.publishedFare ||
-            0
-          );
-        }
-
-        return 0;
-      })();
-
-      const leadTraveller = b.travellers?.find((t) => t.isLeadPassenger);
-
-      const common = {
-        id: b._id,
-        orderId: b.orderId,
-        bookingRef: b.bookingReference,
-        type: bookingType,
-        status: b.requestStatus || "pending_approval",
-        employee: leadTraveller
-          ? `${leadTraveller.firstName} ${leadTraveller.lastName}`
-          : "N/A",
-
-        employeeId:
-          leadTraveller?.email || leadTraveller?.phoneWithCode || "N/A",
-        bookedDate: b.createdAt ? new Date(b.createdAt) : new Date(),
-        estimatedCost,
-        originalData: b, // Important for the detailed modal
-        isTravelPassed: isHotel
-          ? Boolean(
-              b.hotelRequest?.checkInDate &&
-              new Date() > new Date(b.hotelRequest.checkInDate),
-            )
-          : Boolean(
-              b.flightRequest?.segments?.[0]?.departureDateTime &&
-              new Date() >
-                new Date(b.flightRequest.segments[0].departureDateTime),
-            ),
-      };
-
-      if (isHotel) {
-        const hotelReq = b.hotelRequest || {};
-        return {
-          ...common,
-          hotelName: hotelReq.selectedHotel?.hotelName || "N/A",
-          city: hotelReq.selectedHotel?.city || "N/A",
-          checkIn: hotelReq.checkInDate,
-          checkOut: hotelReq.checkOutDate,
-          roomName:
-            hotelReq.selectedRoom?.rawRoomData?.Name?.[0] || "Standard Room",
-        };
-      }
-
-      const segments = b.flightRequest?.segments || [];
-      const onwardSegments = segments.filter((s) => s.journeyType === "onward");
-      const returnSegments = segments.filter((s) => s.journeyType === "return");
-
-      const buildLeg = (segs, label) => {
-        if (!segs.length) return null;
-        const first = segs[0];
-        const last = segs[segs.length - 1];
-
-        return {
-          label,
-          fromCity: first?.origin?.city || first?.origin?.airportCode || "N/A",
-          toCity:
-            last?.destination?.city || last?.destination?.airportCode || "N/A",
-          fromCode: first?.origin?.airportCode || "",
-          toCode: last?.destination?.airportCode || "",
-        };
-      };
-
-      const routes = [];
-      const onwardLeg = buildLeg(onwardSegments, "Onward");
-      const returnLeg = buildLeg(returnSegments, "Return");
-
-      if (onwardLeg) routes.push(onwardLeg);
-      if (returnLeg) routes.push(returnLeg);
-      if (!routes.length) {
-        const fallbackLeg = buildLeg(segments, "Route");
-        if (fallbackLeg) routes.push(fallbackLeg);
-      }
-      return {
-        ...common,
-        cityFrom:
-          onwardSegments[0]?.origin?.city || segments[0]?.origin?.city || "N/A",
-        cityTo:
-          (returnLeg ? returnLeg.toCity : onwardLeg?.toCity) ||
-          segments[segments.length - 1]?.destination?.city ||
-          "N/A",
-        pnr: b.bookingReference?.substring(0, 6).toUpperCase() || "N/A",
-        providerId: "P-882910",
-        routes,
-      };
-    });
-  }, [activeTab, pendingFlightRequests, pendingHotelRequests]);
-
-  // ── Unique employee names for dropdown (from team list) ────────────────────
-  const employeeOptions = useMemo(() => {
-    // Show all employees in the team dropdown
-    const names = myEmployees.map(emp => emp.name).filter(Boolean);
-    return [...new Set(names)].sort();
-  }, [myEmployees]);
-
-  // ── Filtered data (all filters applied) ──────────────────────────────────
-  const filteredData = useMemo(() => {
-    const bFromTs = bookingFrom ? new Date(bookingFrom).setHours(0,0,0,0) : null;
-    const bToTs   = bookingTo   ? new Date(bookingTo).setHours(23,59,59,999) : null;
-    const tFromTs = travelFrom  ? new Date(travelFrom).setHours(0,0,0,0) : null;
-
-    return requests.filter(r => {
-      if (r.type !== activeTab) return false;
-
-      // ── Search bar ─────────────────────────────────────────────────────
-      if (searchTerm) {
-        const q = searchTerm.toLowerCase();
-        const matched =
-          r.employee.toLowerCase().includes(q) ||
-          (r.orderId || "").toLowerCase().includes(q) ||
-          r.bookingRef.toLowerCase().includes(q) ||
-          (r.hotelName || "").toLowerCase().includes(q) ||
-          (r.city || "").toLowerCase().includes(q);
-        if (!matched) return false;
-      }
-
-      // ── Employee dropdown ───────────────────────────────────────────────
-      if (selectedEmployee && r.employee !== selectedEmployee) return false;
-
-      // ── Status dropdown ─────────────────────────────────────────────────
-      if (selectedStatus) {
-        const effectiveStatus = (r.isTravelPassed && r.status === "pending_approval") ? "discarded" : r.status;
-        if (effectiveStatus !== selectedStatus) return false;
-      }
-
-      // ── Booking date range ──────────────────────────────────────────────
-      const bookedTs = r.bookedDate.getTime();
-      if (bFromTs && bookedTs < bFromTs) return false;
-      if (bToTs   && bookedTs > bToTs)   return false;
-
-      // ── Travel / check-in date range ───────────────────────────────────
-      if (tFromTs) {
-        const travelDateRaw = activeTab === "flight"
-          ? r.originalData?.flightRequest?.segments?.[0]?.departureDateTime
-          : r.originalData?.hotelRequest?.checkInDate;
-        const travelDateEnd = activeTab === "hotel"
-          ? r.originalData?.hotelRequest?.checkOutDate
-          : null;
-
-        if (travelDateRaw) {
-          const travelTs = new Date(travelDateRaw).getTime();
-          if (tFromTs && travelTs < tFromTs) return false;
-        } else {
-          return false; // no travel date — exclude when date filter active
-        }
-      }
-
-      return true;
-    });
-  }, [requests, activeTab, searchTerm, selectedEmployee, selectedStatus, bookingFrom, bookingTo, travelFrom]);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
-
-  const paginatedData = useMemo(() => {
-    return filteredData.slice(
-      (currentPage - 1) * PAGE_SIZE,
-      currentPage * PAGE_SIZE,
-    );
-  }, [filteredData, currentPage]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, activeTab, selectedEmployee, selectedStatus, bookingFrom, bookingTo, travelFrom]);
-
-  // Reset all filters when tab switches
-  useEffect(() => {
-    setSearchTerm("");
-    setBookingFrom("");
-    setBookingTo("");
-    setTravelFrom("");
-    setSelectedEmployee("");
-    setSelectedStatus("");
-  }, [activeTab]);
-
   const { corporate } = useSelector((state) => state.corporateAdmin);
-  // ... rest of handleAction ...
+  const { user } = useSelector((state) => state.auth);
+  const isVerified = user?.managerRequestStatus === "approved";
 
-  const handleAction = async (id, type, action) => {
+  const handleAction = async (id, type, action, request) => {
     const isApprove = action === "approve";
-
-    // 💰 CREDIT CHECK LOGIC
     if (isApprove) {
-      const request = requests.find((r) => r.id === id);
-      const estimatedCost = request?.estimatedCost || 0;
+      const estimatedCost = (() => {
+        if (type === "hotel") {
+          const rooms = request?.hotelRequest?.selectedRoom?.rawRoomData || [];
+          if (!Array.isArray(rooms)) return 0;
+          return rooms.reduce((total, room) => total + (room.TotalFare || room.Price?.totalFare || 0), 0);
+        }
+        return request?.pricingSnapshot?.totalAmount || request?.bookingSnapshot?.amount || request?.flightRequest?.fareSnapshot?.publishedFare || 0;
+      })();
 
       let currentCorp = corporate;
       if (!currentCorp) {
         try {
-          const res = await dispatch(fetchCorporateAdmin()).unwrap();
-          currentCorp = res;
+          currentCorp = await dispatch(fetchCorporateAdmin()).unwrap();
         } catch (err) {
-          Swal.fire(
-            "Error",
-            "Could not verify corporate balance. Please try again.",
-            "error",
-          );
+          Swal.fire("Error", "Could not verify corporate balance.", "error");
           return;
         }
       }
-
       if (currentCorp) {
-        const {
-          classification,
-          walletBalance,
-          creditLimit,
-          creditUtilization,
-        } = currentCorp;
-
-        if (classification === "prepaid") {
-          const balance = walletBalance || 0;
-          if (balance < estimatedCost) {
-            await Swal.fire({
-              title: "Insufficient Wallet Balance",
-              text: `Wallet balance (₹${balance.toLocaleString()}) is less than the booking amount (₹${estimatedCost.toLocaleString()}). Please recharge your wallet to proceed.`,
-              icon: "error",
-              confirmButtonColor: "#0A4D68",
-            });
-            return;
-          }
+        const { classification, walletBalance, creditLimit, creditUtilization } = currentCorp;
+        if (classification === "prepaid" && (walletBalance || 0) < estimatedCost) {
+          Swal.fire({ title: "Insufficient Balance", text: `Wallet balance (₹${walletBalance.toLocaleString()}) is low.`, icon: "error" });
+          return;
         } else if (classification === "postpaid") {
-          const limit = creditLimit || 0;
-          const utilization = creditUtilization || 0;
-          const usedCredit = (limit * utilization) / 100;
-          const availableCredit = limit - usedCredit;
-
-          if (availableCredit < estimatedCost) {
-            await Swal.fire({
-              title: "Insufficient Credit Limit",
-              text: `Available credit limit (₹${availableCredit.toLocaleString()}) is less than the booking amount (₹${estimatedCost.toLocaleString()}). Approval blocked.`,
-              icon: "error",
-              confirmButtonColor: "#0A4D68",
-            });
+          const available = (creditLimit || 0) - ((creditLimit * (creditUtilization || 0)) / 100);
+          if (available < estimatedCost) {
+            Swal.fire({ title: "Insufficient Credit", text: `Available credit (₹${available.toLocaleString()}) is low.`, icon: "error" });
             return;
           }
         }
-      } else {
-        Swal.fire(
-          "Error",
-          "Corporate financial data not found. Approval blocked.",
-          "error",
-        );
-        return;
       }
     }
 
     const result = await Swal.fire({
       title: `${isApprove ? "Approve" : "Reject"} Request`,
-      text: isApprove ? "Confirm approval?" : "Provide a reason for rejection",
       input: isApprove ? null : "textarea",
       icon: isApprove ? "question" : "warning",
       showCancelButton: true,
@@ -396,477 +480,92 @@ export default function PendingTravelRequestsForManager() {
     });
 
     if (result.isConfirmed) {
-      const actionThunk = isApprove ? approveApproval : rejectApproval;
-      dispatch(actionThunk({ id, comments: result.value || "", type }))
+      dispatch(isApprove ? approveApproval({ id, comments: "", type }) : rejectApproval({ id, comments: result.value || "", type }))
         .unwrap()
         .then(() => {
           Swal.fire("Success", `Request ${action}d successfully`, "success");
-          setSelectedRequest(null);
         })
         .catch((err) => Swal.fire("Error", err || "Update failed", "error"));
     }
   };
 
-  const { user } = useSelector((state) => state.auth);
-  const isVerified = user?.managerRequestStatus === "approved";
-
   return (
-    <div className="min-h-screen bg-slate-100 font-sans">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        {/* Verification Alert */}
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-10 pb-24 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+             <div className="flex items-center gap-3">
+               <button onClick={() => navigate(-1)} className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 backdrop-blur-md shadow-xl">
+                 <FiArrowRight className="rotate-180" size={22} />
+               </button>
+               <button onClick={handleRefresh} className={`p-3.5 rounded-2xl bg-white/10 transition-all border border-white/10 backdrop-blur-md shadow-xl ${(isSyncing || loadingActive) ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`} disabled={isSyncing || loadingActive}>
+                 <div className={(isSyncing || loadingActive) ? "animate-spin" : ""}>
+                   <FiRefreshCw size={22} />
+                 </div>
+               </button>
+             </div>
+             <div className="h-16 w-[1px] bg-white/10 mx-2 hidden md:block" />
+             <div className="flex items-center gap-5">
+               <div className="w-16 h-16 rounded-[2rem] flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
+                 <FiClock size={32} />
+               </div>
+               <div>
+                 <h1 className="text-4xl font-black tracking-tight leading-none">Approval Queue</h1>
+                 <p className="text-[11px] mt-3 font-bold uppercase tracking-[3px] opacity-60">Team Travel Requirement Oversight</p>
+               </div>
+             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="w-full px-4 md:px-10 -mt-12 space-y-10">
         {!isVerified && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-center gap-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-500">
-            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-              <FiAlertCircle className="text-amber-600" size={20} />
+          <div className="bg-amber-50 border-2 border-amber-200 rounded-[1.5rem] px-6 py-5 flex items-center gap-5 shadow-xl animate-bounce-subtle">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center shrink-0 border border-amber-200">
+              <FiAlertCircle className="text-amber-600" size={24} />
             </div>
             <div>
-              <h3 className="text-sm font-black text-amber-900 tracking-tight">
-                Account Verification Pending
-              </h3>
-              <p className="text-[12px] text-amber-700 mt-0.5 leading-relaxed">
-                Your manager account is awaiting verification. You'll be able to
-                approve requests once verified by your Travel Admin.
-              </p>
+              <h3 className="text-sm font-black text-amber-900 tracking-tight uppercase">Verification Pending</h3>
+              <p className="text-[12px] text-amber-700 mt-1 font-bold">Your account is awaiting Travel Admin verification. Approvals are temporarily locked.</p>
             </div>
           </div>
         )}
 
-        {/* Header Card */}
-        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4 sm:gap-6">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white shrink-0">
-              <FiList size={24} />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase leading-none truncate">
-                Approval Queue
-              </h1>
-              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 font-bold uppercase tracking-widest truncate">
-                Review and manage employee travel requirements
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <button
-              onClick={handleRefresh}
-              disabled={loadingActive}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold transition-all shadow-sm border bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100 active:scale-95 disabled:opacity-50"
-            >
-              <FiRefreshCw
-                size={14}
-                className={loadingActive ? "animate-spin" : ""}
-              />
-              Refresh
-            </button>
-          </div>
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+           {[["flight", "Flight Requests", FaPlane], ["hotel", "Hotel Requests", FaHotel]].map(([k, lbl, Icon]) => (
+             <button key={k} onClick={() => setActiveTab(k)} className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
+                <Icon size={14} /> {lbl}
+             </button>
+           ))}
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex bg-slate-200/50 p-1.5 rounded-2xl w-fit shadow-inner">
-          <button
-            onClick={() => setActiveTab("flight")}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${
-              activeTab === "flight"
-                ? "bg-white text-[#0A4D68] shadow-md"
-                : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
-            }`}
-          >
-            <FaPlane size={14} />
-            Flight Requests
-          </button>
-          <button
-            onClick={() => setActiveTab("hotel")}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${
-              activeTab === "hotel"
-                ? "bg-white text-[#088395] shadow-md"
-                : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
-            }`}
-          >
-            <FaHotel size={14} />
-            Hotel Requests
-          </button>
-        </div>
-
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard
-            label={`Total ${activeTab}s`}
-            value={filteredData.length}
-            Icon={activeTab === "flight" ? FaPlane : FaHotel}
-            borderCls={
-              activeTab === "flight" ? "border-[#0A4D68]" : "border-[#088395]"
-            }
-            iconBgCls={
-              activeTab === "flight" ? "bg-[#0A4D68]/10" : "bg-[#088395]/10"
-            }
-            iconColorCls={
-              activeTab === "flight" ? "text-[#0A4D68]" : "text-[#088395]"
-            }
-          />
-          <StatCard
-            label="Awaiting Urgent Review"
-            value={filteredData.filter((r) => !r.isTravelPassed).length}
-            Icon={FiClock}
-            borderCls="border-emerald-500"
-            iconBgCls="bg-emerald-50"
-            iconColorCls="text-emerald-600"
-          />
-          <StatCard
-            label="Expired / Discarded"
-            value={filteredData.filter((r) => r.isTravelPassed).length}
-            Icon={FiXCircle}
-            borderCls="border-red-500"
-            iconBgCls="bg-red-50"
-            iconColorCls="text-red-600"
-          />
-        </div>
-
-        {/* ── Filter Panel ────────────────────────────────────────────────────── */}
-        {(() => {
-          const isFlight = activeTab === "flight";
-          const activeFiltersCount = [
-            searchTerm, selectedEmployee, selectedStatus,
-            bookingFrom, bookingTo, travelFrom,
-          ].filter(Boolean).length;
-
-          const inputCls = "w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[13px] font-medium outline-none focus:ring-2 focus:ring-[#0A4D68]/15 focus:border-[#0A4D68] transition-all placeholder:text-slate-400";
-          const labelCls = "block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5";
-
-          const handleClearAll = () => {
-            setSearchTerm("");
-            setBookingFrom("");
-            setBookingTo("");
-            setTravelFrom("");
-            setSelectedEmployee("");
-            setSelectedStatus("");
-          };
-
-          return (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              {/* Filter header */}
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
-                <div className="flex items-center gap-2.5">
-                  <svg className="w-4 h-4 text-[#0A4D68]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M7 9h10M10 14h4" />
-                  </svg>
-                  <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest">
-                    Filters
-                  </span>
-                  {activeFiltersCount > 0 && (
-                    <span className="inline-flex items-center justify-center w-5 h-5 bg-[#0A4D68] text-white text-[10px] font-black rounded-full">
-                      {activeFiltersCount}
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={handleClearAll}
-                  disabled={activeFiltersCount === 0}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all ${
-                    activeFiltersCount > 0
-                      ? "bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 active:scale-95"
-                      : "bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed opacity-60"
-                  }`}
-                >
-                  <FiX size={11} />
-                  Reset Filters
-                </button>
-              </div>
-
-              <div className="p-5 space-y-4">
-                {/* Row 1: Search + Employee + Status */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  {/* Search */}
-                  <div className="md:col-span-5">
-                    <label className={labelCls}>Search</label>
-                    <div className="relative group">
-                      <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0A4D68] transition-colors" size={14} />
-                      <input
-                        type="text"
-                        placeholder={isFlight ? "Order ID, traveller, route..." : "Order ID, hotel name, city..."}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className={inputCls + " pl-9"}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Employee */}
-                  <div className="md:col-span-4">
-                    <label className={labelCls}>Employee</label>
-                    <select
-                      value={selectedEmployee}
-                      onChange={(e) => setSelectedEmployee(e.target.value)}
-                      className={inputCls}
-                    >
-                      <option value="">All Employees</option>
-                      {employeeOptions.map((name) => (
-                        <option key={name} value={name}>{name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Status */}
-                  <div className="md:col-span-3">
-                    <label className={labelCls}>Status</label>
-                    <select
-                      value={selectedStatus}
-                      onChange={(e) => setSelectedStatus(e.target.value)}
-                      className={inputCls}
-                    >
-                      <option value="">All Statuses</option>
-                      <option value="pending_approval">Pending Approval</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                      <option value="discarded">Discarded (Expired)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Row 2: Booking Date range + Travel / Check-in+Check-out */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-1">
-                  {/* Booking From */}
-                  <div className="md:col-span-3">
-                    <label className={labelCls}>Booking From</label>
-                    <input
-                      type="date"
-                      value={bookingFrom}
-                      onChange={(e) => setBookingFrom(e.target.value)}
-                      max={bookingTo || undefined}
-                      className={inputCls}
-                    />
-                  </div>
-
-                  {/* Booking To */}
-                  <div className="md:col-span-3">
-                    <label className={labelCls}>Booking To</label>
-                    <input
-                      type="date"
-                      value={bookingTo}
-                      onChange={(e) => setBookingTo(e.target.value)}
-                      min={bookingFrom || undefined}
-                      className={inputCls}
-                    />
-                  </div>
-
-                  {/* Travel / Check-in — single date */}
-                  <div className="md:col-span-4">
-                    <label className={labelCls}>{isFlight ? "Travel Date" : "Check-in Date"}</label>
-                    <input
-                      type="date"
-                      value={travelFrom}
-                      onChange={(e) => setTravelFrom(e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-                </div>
-
-                {/* Active filter chips */}
-                {activeFiltersCount > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
-                    {searchTerm && (
-                      <FilterChip label={`"${searchTerm}"`} onRemove={() => setSearchTerm("")} />
-                    )}
-                    {selectedEmployee && (
-                      <FilterChip label={selectedEmployee} onRemove={() => setSelectedEmployee("")} />
-                    )}
-                    {selectedStatus && (
-                      <FilterChip label={selectedStatus.replace("_", " ")} onRemove={() => setSelectedStatus("")} />
-                    )}
-                    {bookingFrom && (
-                      <FilterChip label={`Booking ≥ ${bookingFrom}`} onRemove={() => setBookingFrom("")} />
-                    )}
-                    {bookingTo && (
-                      <FilterChip label={`Booking ≤ ${bookingTo}`} onRemove={() => setBookingTo("")} />
-                    )}
-                    {travelFrom && (
-                      <FilterChip label={`${isFlight ? "Travel" : "Check-in"}: ${travelFrom}`} onRemove={() => setTravelFrom("")} />
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Data Table */}
-        <ResponsiveDataTable
-          title={`${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Approval Queue`}
-          subtitle={`${filteredData.length} request${filteredData.length !== 1 ? "s" : ""} pending`}
-          tableMinWidth="1000px"
-          arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
-          pagination={
-            <Pagination
-              currentPage={currentPage}
-              totalItems={filteredData.length}
-              pageSize={PAGE_SIZE}
-              onPageChange={setCurrentPage}
-            />
-          }
-          footer={
-            <div className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-              Showing{" "}
-              <span className="text-slate-900">{paginatedData.length}</span> of{" "}
-              <span className="text-slate-900">{filteredData.length}</span>{" "}
-              entries
-            </div>
-          }
-        >
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-[#0A4D68] text-white">
-                <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">
-                  Order ID
-                </th>
-                <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">
-                  Traveller
-                </th>
-                <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">
-                  Requested On
-                </th>
-                <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">
-                  Amount
-                </th>
-                <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">
-                  {activeTab === "flight" ? "Route" : "Hotel"}
-                </th>
-                <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest">
-                  Status
-                </th>
-                <th className="px-6 py-4 text-[11px] font-black uppercase tracking-widest text-center">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredData.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                        <FiList className="w-8 h-8 text-slate-300" />
-                      </div>
-                      <h3 className="text-lg font-bold text-slate-800">
-                        No Requests Found
-                      </h3>
-                      <p className="text-slate-500 text-sm mt-1">
-                        There are no pending {activeTab} approvals matching your
-                        current view.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                paginatedData.map((r, i) => {
-                  const isDiscarded =
-                    r.isTravelPassed && r.status === "pending_approval";
-                  return (
-                    <tr
-                      key={r.id}
-                      className={`group hover:bg-slate-50 transition-colors ${isDiscarded ? "opacity-60 grayscale-[40%]" : ""}`}
-                    >
-                      <td className="px-6 py-4">
-                        <span className="font-mono text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">
-                          {r.orderId || "N/A"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-black text-slate-800 text-[13px]">
-                            {r.employee}
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-bold truncate max-w-[150px]">
-                            {r.employeeId}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-[13px] font-bold text-slate-600">
-                        {r.bookedDate.toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm font-black text-slate-900">
-                          ₹{Math.ceil(r.estimatedCost).toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {activeTab === "flight" ? (
-                          <div className="flex flex-col gap-1">
-                            {r.routes?.map((leg, idx) => (
-                              <div
-                                key={idx}
-                                className="flex items-center gap-2"
-                              >
-                                <span className="font-bold text-slate-700 text-[12px]">
-                                  {leg.fromCode} → {leg.toCode}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-800 text-[13px] line-clamp-1">
-                              {r.hotelName}
-                            </span>
-                            <span className="text-[11px] text-slate-400 font-bold">
-                              {r.city}
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {isDiscarded ? (
-                          <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200">
-                            Discarded
-                          </span>
-                        ) : (
-                          <StatusBadge status={r.status} />
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex justify-center">
-                          <button
-                            onClick={() => setSelectedRequest(r)}
-                            className="inline-flex items-center gap-2 px-5 py-2 bg-slate-800 text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-900 transition-all active:scale-95 shadow-md shadow-slate-200"
-                          >
-                            <FiList size={12} /> View
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </ResponsiveDataTable>
+        {activeTab === "flight" ? (
+          <FlightSection data={pendingFlightRequests} loading={loadingPendingFlightRequests} onRefresh={handleRefresh} handleAction={handleAction} isVerified={isVerified} onSelect={setSelectedRequest} />
+        ) : (
+          <HotelSection data={pendingHotelRequests} loading={loadingPendingRequests} onRefresh={handleRefresh} handleAction={handleAction} isVerified={isVerified} onSelect={setSelectedRequest} />
+        )}
       </div>
 
-      {/* RENDER THE CORRECT MODAL */}
-      {selectedRequest && selectedRequest.type === "hotel" && (
-        <PendingHotelDetailsModal
-          booking={selectedRequest.originalData}
-          onClose={() => setSelectedRequest(null)}
-          onApprove={handleAction}
-          onReject={handleAction}
-          isVerified={isVerified}
-          isDiscarded={selectedRequest.isTravelPassed}
-        />
-      )}
-
-      {/* Flight Modal placeholder (if needed) */}
-      {selectedRequest && selectedRequest.type === "flight" && (
-        <PendingFlightDetailsModal
-          booking={selectedRequest.originalData}
-          onClose={() => setSelectedRequest(null)}
-          onApprove={handleAction}
-          onReject={handleAction}
-          isVerified={isVerified}
-          isDiscarded={selectedRequest.isTravelPassed}
-        />
+      {selectedRequest && (
+        selectedRequest.bookingType === "flight" ? (
+          <PendingFlightDetailsModal 
+            booking={selectedRequest} 
+            onClose={() => setSelectedRequest(null)} 
+            onApprove={(id, type, action) => handleAction(id, type, action, selectedRequest)} 
+            onReject={(id, type, action) => handleAction(id, type, action, selectedRequest)} 
+            isVerified={isVerified} 
+            isDiscarded={selectedRequest.isTravelPassed} 
+          />
+        ) : (
+          <PendingHotelDetailsModal 
+            booking={selectedRequest} 
+            onClose={() => setSelectedRequest(null)} 
+            onApprove={(id, type, action) => handleAction(id, type, action, selectedRequest)} 
+            onReject={(id, type, action) => handleAction(id, type, action, selectedRequest)} 
+            isVerified={isVerified} 
+            isDiscarded={selectedRequest.isTravelPassed} 
+          />
+        )
       )}
     </div>
   );

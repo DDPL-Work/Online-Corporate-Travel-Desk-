@@ -1274,11 +1274,13 @@ const HotelReviewBooking = () => {
 
   const displayHotel = isBookNowMode
     ? {
-        name: bookingRequest?.bookingSnapshot?.hotelName,
+        name: bookingRequest?.bookingSnapshot?.hotelName || bookingRequest?.hotelRequest?.selectedHotel?.hotelName,
         rating: 4,
         address:
           bookingRequest?.hotelRequest?.selectedHotel?.address ||
           bookingRequest?.bookingSnapshot?.city,
+        city: bookingRequest?.bookingSnapshot?.city || bookingRequest?.hotelRequest?.selectedHotel?.city,
+        country: bookingRequest?.bookingSnapshot?.country || bookingRequest?.hotelRequest?.selectedHotel?.country,
         images: [
           bookingRequest?.bookingSnapshot?.hotelImage ||
             "/placeholder-hotel.jpg",
@@ -1290,6 +1292,8 @@ const HotelReviewBooking = () => {
     : {
         ...hotel,
         resultIndex: hotel?.resultIndex || hotelFromSearch?.ResultIndex,
+        city: hotel?.city || hotel?.cityName || hotel?.CityName,
+        country: hotel?.country || hotel?.countryName || hotel?.CountryName,
       };
 
   const selectedRoom = rooms || [];
@@ -1629,12 +1633,16 @@ const HotelReviewBooking = () => {
           bookingRequest?.hotelRequest?.selectedHotel?.address,
         city:
           safeHotel?.CityName ||
+          safeHotel?.cityName ||
           safeHotel?.city ||
-          bookingRequest?.hotelRequest?.selectedHotel?.city,
+          bookingRequest?.hotelRequest?.selectedHotel?.city ||
+          bookingRequest?.hotelRequest?.city,
         country:
           safeHotel?.CountryName ||
+          safeHotel?.countryName ||
           safeHotel?.country ||
-          bookingRequest?.hotelRequest?.selectedHotel?.country,
+          bookingRequest?.hotelRequest?.selectedHotel?.country ||
+          bookingRequest?.hotelRequest?.country,
         starRating: safeHotel?.StarRating || safeHotel?.starRating || 0,
         images:
           safeHotel?.Images ||
@@ -1726,20 +1734,21 @@ const HotelReviewBooking = () => {
         totalAmount: totalFare,
         currency: displayRoom?.Currency || "INR",
       },
-      bookingSnapshot: {
-        hotelName: displayHotel?.name,
-        hotelImage: displayHotel?.images?.[0] || "/placeholder-hotel.jpg",
-        city: displayHotel?.city || displaySearchParams?.city,
-        checkInDate: displaySearchParams?.checkIn,
-        checkOutDate: displaySearchParams?.checkOut,
-        roomCount: displaySearchParams?.rooms?.length || 1,
-        nights: calculateNights(
-          displaySearchParams?.checkIn,
-          displaySearchParams?.checkOut,
-        ),
-        amount: totalFare,
-        currency: displayRoom?.Currency || "INR",
-      },
+        bookingSnapshot: {
+          hotelName: displayHotel?.name || displayHotel?.HotelName,
+          hotelImage: displayHotel?.images?.[0] || "/placeholder-hotel.jpg",
+          city: displayHotel?.city || displayHotel?.cityName || displaySearchParams?.city,
+          country: displayHotel?.country || displayHotel?.countryName || hotelCountry,
+          checkInDate: displaySearchParams?.checkIn,
+          checkOutDate: displaySearchParams?.checkOut,
+          roomCount: displaySearchParams?.rooms?.length || 1,
+          nights: calculateNights(
+            displaySearchParams?.checkIn,
+            displaySearchParams?.checkOut,
+          ),
+          amount: totalFare,
+          currency: displayRoom?.Currency || "INR",
+        },
     };
 
     try {
