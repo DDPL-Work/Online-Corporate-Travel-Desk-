@@ -51,41 +51,90 @@ const buildRule = (rule = {}) => {
  *
  * The parser handles both nested array formats and flat array formats.
  */
+/**
+ * Resolves whether online reissue is allowed from raw TBO MiniFareRules.
+ *
+ * CORRECT BUSINESS LOGIC (per TBO documentation):
+ *   - For REISSUE eligibility → ONLY evaluate Type=="Reissue" + OnlineReissueAllowed
+ *   - For CANCELLATION/REFUND → ONLY evaluate Type=="Cancellation" + OnlineRefundAllowed
+ *
+ * NEVER cross-check OnlineRefundAllowed to determine reissue eligibility.
+ * That was a merge-corruption bug that caused valid online reissues to fall
+ * back to offline when OnlineRefundAllowed=false.
+ */
 function resolveOnlineReissueAllowed(rawMiniFareRules) {
-  // Direct boolean flags on the parent object (legacy formats)
+  // ── Direct boolean flag on parent object (legacy/flat format from some TBO responses) ──
   if (rawMiniFareRules?.OnlineReissueAllowed === true) return true;
   if (rawMiniFareRules?.OnlineReissueAllowed === false) return false;
 
-  // Check OnlineRefundAllowed as fallback for backward compatibility
-  if (rawMiniFareRules?.OnlineRefundAllowed === true) return true;
-  if (rawMiniFareRules?.OnlineRefundAllowed === false) return false;
+  // ── NOTE: Do NOT fall back to OnlineRefundAllowed here. ──
+  // OnlineRefundAllowed belongs to Type=Cancellation rules only.
+  // Using it as a reissue fallback was a bug that blocked valid online reissues.
 
-  // Check individual rules in the array for Type=Reissue + OnlineReissueAllowed
+  // ── Check individual rules: ONLY Type="Reissue" rules matter here ──
   const rules = toArray(rawMiniFareRules);
   if (rules.length > 0) {
-    const hasReissueRule = rules.some(
+    // Check if any Reissue-type rule explicitly permits online reissue
+    const hasExplicitAllow = rules.some(
       (r) =>
         (r.Type === "Reissue" || r.Type === 1 || r.Type === "1") &&
         r.OnlineReissueAllowed === true,
     );
-    if (hasReissueRule) return true;
+    if (hasExplicitAllow) return true;
 
-    // If any reissue rule explicitly sets OnlineReissueAllowed = false
+    // Check if any Reissue-type rule explicitly denies online reissue
     const hasExplicitDenial = rules.some(
       (r) =>
         (r.Type === "Reissue" || r.Type === 1 || r.Type === "1") &&
         r.OnlineReissueAllowed === false,
     );
     if (hasExplicitDenial) return false;
+
+    // Rules exist but none are Type=Reissue — no restriction, allow by default
   }
 
-  // Default: true only when no rules exist (no restrictions means allowed)
+  // Default: true when no rules exist (no restriction = allowed)
+  return rules.length === 0;
+}
+
+/**
+ * Resolves whether online refund is allowed from raw TBO MiniFareRules.
+ *
+ * CORRECT BUSINESS LOGIC:
+ *   - ONLY evaluate Type=="Cancellation" + OnlineRefundAllowed
+ *   - Never uses OnlineReissueAllowed
+ */
+function resolveOnlineRefundAllowed(rawMiniFareRules) {
+  // Direct boolean flag on parent object
+  if (rawMiniFareRules?.OnlineRefundAllowed === true) return true;
+  if (rawMiniFareRules?.OnlineRefundAllowed === false) return false;
+
+  const rules = toArray(rawMiniFareRules);
+  if (rules.length > 0) {
+    const hasExplicitAllow = rules.some(
+      (r) =>
+        (r.Type === "Cancellation" || r.Type === 0 || r.Type === "0") &&
+        r.OnlineRefundAllowed === true,
+    );
+    if (hasExplicitAllow) return true;
+
+    const hasExplicitDenial = rules.some(
+      (r) =>
+        (r.Type === "Cancellation" || r.Type === 0 || r.Type === "0") &&
+        r.OnlineRefundAllowed === false,
+    );
+    if (hasExplicitDenial) return false;
+  }
+
   return rules.length === 0;
 }
 
 function parseMiniFareRules(rawMiniFareRules) {
   const rules = toArray(rawMiniFareRules).map(buildRule);
+
+  // Correctly separated: reissue uses OnlineReissueAllowed, refund uses OnlineRefundAllowed
   const onlineReissueAllowed = resolveOnlineReissueAllowed(rawMiniFareRules);
+  const onlineRefundAllowed = resolveOnlineRefundAllowed(rawMiniFareRules);
 
   const refundableType =
     rawMiniFareRules?.RefundableType ||
@@ -99,6 +148,7 @@ function parseMiniFareRules(rawMiniFareRules) {
     reissueRules: rules.filter((rule) => rule.type === "Reissue"),
     refundableType,
     onlineReissueAllowed: Boolean(onlineReissueAllowed),
+    onlineRefundAllowed: Boolean(onlineRefundAllowed),
     raw: rawMiniFareRules || null,
   };
 }
@@ -106,4 +156,5 @@ function parseMiniFareRules(rawMiniFareRules) {
 module.exports = {
   parseMiniFareRules,
   resolveOnlineReissueAllowed,
+  resolveOnlineRefundAllowed,
 };

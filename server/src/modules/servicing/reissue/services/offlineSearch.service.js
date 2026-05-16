@@ -114,9 +114,33 @@ const extractResultSegments = (result) => {
     .map((segment) => {
       const origin = extractAirportCode(segment?.Origin || segment?.origin || segment?.OriginAirport);
       const destination = extractAirportCode(segment?.Destination || segment?.destination || segment?.DestinationAirport);
-      const departureTime = segment?.DepTime || segment?.DepartureTime || segment?.DepartureDateTime || segment?.departureDateTime || null;
-      const arrivalTime = segment?.ArrTime || segment?.ArrivalTime || segment?.ArrivalDateTime || segment?.arrivalDateTime || null;
-      const flightNumber = segment?.FlightNo || segment?.FlightNumber || segment?.flightNumber || null;
+      // TBO FlightSearch response stores timings inside the nested Origin/Destination objects:
+      //   segment.Origin.DepTime    (e.g. "2026-05-20T08:45:00")
+      //   segment.Destination.ArrTime (e.g. "2026-05-20T10:35:00")
+      // Flat fields (DepTime, ArrTime at top-level) exist only in some legacy/LCC responses.
+      const departureTime =
+        segment?.Origin?.DepTime ||
+        segment?.Origin?.DepDateTime ||
+        segment?.DepTime ||
+        segment?.DepartureTime ||
+        segment?.DepartureDateTime ||
+        segment?.departureDateTime ||
+        null;
+      const arrivalTime =
+        segment?.Destination?.ArrTime ||
+        segment?.Destination?.ArrDateTime ||
+        segment?.ArrTime ||
+        segment?.ArrivalTime ||
+        segment?.ArrivalDateTime ||
+        segment?.arrivalDateTime ||
+        null;
+      // TBO puts flight number inside the Airline sub-object
+      const flightNumber =
+        segment?.Airline?.FlightNumber ||
+        segment?.FlightNo ||
+        segment?.FlightNumber ||
+        segment?.flightNumber ||
+        null;
       const stops = Number(segment?.Stops || segment?.StopCount || 0);
       const airlineCode =
         segment?.Airline?.AirlineCode ||
@@ -298,9 +322,24 @@ const normalizeSearchResults = async (searchResponse, booking) => {
     const segments = extractResultSegments(result);
     const origin = segments[0]?.origin || null;
     const destination = segments[segments.length - 1]?.destination || null;
-    const departureTime = segments[0]?.departureTime || result?.DepartureTime || result?.DepartureDateTime || null;
-    const arrivalTime = segments[segments.length - 1]?.arrivalTime || result?.ArrivalTime || result?.ArrivalDateTime || null;
-    const flightNumber = segments.length === 1 ? segments[0]?.flightNumber : segments.map((seg) => seg.flightNumber).filter(Boolean).join(", ");
+    // Primary: pull from normalised segment data (already fixed to read TBO nested fields)
+    // Fallback: try top-level result fields and TBO nested Origin/Destination
+    const departureTime =
+      segments[0]?.departureTime ||
+      result?.Origin?.DepTime ||
+      result?.DepartureTime ||
+      result?.DepartureDateTime ||
+      null;
+    const arrivalTime =
+      segments[segments.length - 1]?.arrivalTime ||
+      result?.Destination?.ArrTime ||
+      result?.ArrivalTime ||
+      result?.ArrivalDateTime ||
+      null;
+    const flightNumber =
+      segments.length === 1
+        ? segments[0]?.flightNumber
+        : segments.map((seg) => seg.flightNumber).filter(Boolean).join(", ");
     const airlineCode =
       result?.Airline?.AirlineCode || result?.AirlineCode || result?.FlightAirlineCode || segments[0]?.airlineCode || null;
     const airlineName =

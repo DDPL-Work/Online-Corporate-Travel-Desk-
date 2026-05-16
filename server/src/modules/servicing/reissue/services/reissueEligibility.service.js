@@ -1,6 +1,9 @@
 const { REISSUE_MODES, REISSUE_TYPES } = require("../constants/reissue.constants");
 const { validateNdcReissue } = require("../validators/ndcReissue.validator");
-const { resolveOnlineReissueAllowed } = require("../utils/miniFareRuleParser");
+const {
+  resolveOnlineReissueAllowed,
+  resolveOnlineRefundAllowed,
+} = require("../utils/miniFareRuleParser");
 
 // ── Sandbox override for QA: bypasses MiniFareRules gate on supported airlines ──
 // Set ALLOW_SANDBOX_REISSUE_OVERRIDE=true in .env for dev/QA only. NEVER in production.
@@ -116,15 +119,15 @@ class ReissueEligibilityService {
     }
 
     // ── Post-search MiniFareRules check (when available) ──
+    // CORRECT: ONLY evaluate OnlineReissueAllowed for reissue eligibility.
+    // OnlineRefundAllowed belongs exclusively to cancellation/refund rules.
     if (miniFareRules) {
-      const postSearchAllowed =
+      const postSearchReissueAllowed =
         miniFareRules?.onlineReissueAllowed ??
         miniFareRules?.OnlineReissueAllowed ??
-        miniFareRules?.OnlineRefundAllowed ??
-        miniFareRules?.onlineRefundAllowed ??
-        true;
+        true; // default allow when flag is absent
 
-      if (!postSearchAllowed) {
+      if (!postSearchReissueAllowed) {
         if (!reasons.some((r) => r.includes("Fare rules do not permit"))) {
           reasons.push("Fare rules do not permit online reissue for this booking");
         }
@@ -163,15 +166,25 @@ class ReissueEligibilityService {
     // ── QA sandbox flag: completely isolated from real eligibility ──
     const sandboxTestingAllowed = isSandboxTestingAllowed(booking, airlineCode);
 
+    // ── Compute onlineRefundAllowed using the CORRECT cancellation-only parser ──
+    // This MUST use resolveOnlineRefundAllowed (checks Type=Cancellation rules),
+    // NOT the reissue parser. Mixing them was the root cause of the offline fallback bug.
+    const rawMiniFareRules =
+      miniFareRules?.raw ??
+      booking?.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.MiniFareRules ??
+      booking?.fareSnapshot?.miniFareRules ??
+      booking?.bookingResult?.miniFareRules ??
+      null;
+
+    const realOnlineRefundAllowed = rawMiniFareRules
+      ? resolveOnlineRefundAllowed(rawMiniFareRules)
+      : Boolean(miniFareRules?.onlineRefundAllowed ?? miniFareRules?.OnlineRefundAllowed ?? true);
+
     const support = {
       // ── Production fields (real airline truth) ──
-      onlineReissue: reallyEligible,              // used by workflow gate
-      onlineReissueAllowed: realOnlineReissueAllowed, // used by frontend primary badge
-      onlineRefundAllowed: Boolean(
-        miniFareRules?.onlineReissueAllowed ??
-          miniFareRules?.onlineRefundAllowed ??
-          realOnlineReissueAllowed,
-      ),
+      onlineReissue: reallyEligible,                  // used by workflow gate
+      onlineReissueAllowed: realOnlineReissueAllowed,  // used by frontend primary badge
+      onlineRefundAllowed: realOnlineRefundAllowed,    // used by cancellation flow ONLY
       ndc: supplier === "NDC",
       manualRestriction: false,
       supplierRestriction: reasons.some((reason) => reason.includes("not enabled")),
@@ -180,7 +193,7 @@ class ReissueEligibilityService {
       supportedAirline: SUPPORTED_AIRLINE_CODES.has(airlineCode),
       airlineCode,
       // ── QA-only flags (NEVER affect production eligibility) ──
-      sandboxTestingAllowed,          // QA can attempt provider test even when ineligible
+      sandboxTestingAllowed,           // QA can attempt provider test even when ineligible
       sandboxOverrideApplied: sandboxTestingAllowed, // legacy alias kept for compatibility
     };
 

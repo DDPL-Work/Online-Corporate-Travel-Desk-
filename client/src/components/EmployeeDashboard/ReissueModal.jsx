@@ -102,12 +102,22 @@ const formatStops = (stops) => {
   return `${stops} stops`;
 };
 
-const formatDuration = (minutes) => {
-  const totalMinutes = Number(minutes);
-  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return "Duration unavailable";
+const formatDuration = (value) => {
+  // Offline API returns a pre-formatted string e.g. "1h 50m" — pass through directly
+  if (typeof value === "string" && value && !/^\d+$/.test(value.trim())) return value;
+  const totalMinutes = Number(value);
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return null;
   const hours = Math.floor(totalMinutes / 60);
   const mins = totalMinutes % 60;
   return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+};
+
+// Calculate layover minutes between two ISO datetime strings
+const calcLayoverMinutes = (prevArrival, nextDeparture) => {
+  if (!prevArrival || !nextDeparture) return null;
+  const diff = new Date(nextDeparture).getTime() - new Date(prevArrival).getTime();
+  if (!Number.isFinite(diff) || diff <= 0) return null;
+  return Math.round(diff / 60000);
 };
 
 const getCabinLabel = (value) => {
@@ -140,7 +150,12 @@ const getDurationFromSegments = (segments) =>
 
 const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
   return toArray(rawResults).map((result, index) => {
-    const segments = toArray(result?.Segments?.[0] || result?.Segments || []);
+    // TBO Results structure: Results = [[seg1, seg2, ...]] (one-way) or [[onward...], [return...]]
+    // Segments field: Segments = [[seg1, seg2]] — first element is the segments array for the journey
+    const rawSegs = result?.Segments;
+    const segments = toArray(
+      Array.isArray(rawSegs?.[0]) ? rawSegs[0] : (rawSegs || [])
+    );
     const first = segments[0] || {};
     const last = segments[segments.length - 1] || first;
     const newFare = Number(
@@ -156,6 +171,7 @@ const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
     );
     const fareDifference = Math.max(newFare - Number(oldFare || 0), 0);
     const totalCollection = fareDifference + supplierCharge;
+    const noOfSeats = result?.NoOfSeatAvailable ?? null;
 
     return {
       id: `${result?.ResultIndex ?? index}`,
@@ -163,8 +179,7 @@ const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
       raw: result,
       airlineCode: first?.Airline?.AirlineCode || first?.AirlineCode || "",
       airlineName: first?.Airline?.AirlineName || first?.AirlineName || "Airline",
-      flightNumber:
-        first?.Airline?.FlightNumber || first?.FlightNumber || "",
+      flightNumber: first?.Airline?.FlightNumber || first?.FlightNumber || "",
       origin: getSegmentAirport(first, "Origin") || PLACEHOLDER,
       destination: getSegmentAirport(last, "Destination") || PLACEHOLDER,
       departureDate: getSegmentTime(first, "Origin"),
@@ -173,6 +188,8 @@ const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
       durationMinutes: getDurationFromSegments(segments),
       duration: formatDuration(getDurationFromSegments(segments)),
       stops: Math.max(segments.length - 1, 0),
+      noOfSeatAvailable: noOfSeats,
+      lowSeatWarning: noOfSeats !== null && Number(noOfSeats) <= 3,
       cabin: getCabinLabel(
         result?.Fare?.CabinClass ||
           first?.CabinClass ||
@@ -189,6 +206,8 @@ const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
       reissueCharge: supplierCharge,
       totalCollection,
       currency: result?.Fare?.Currency || "INR",
+      isNdc: !!(result?.SupplierFareClass || result?.FareClassification?.Type),
+      fareBadge: result?.SupplierFareClass || result?.ResultFareType || null,
       segments: segments.map((segment) => ({
         origin: getSegmentAirport(segment, "Origin"),
         destination: getSegmentAirport(segment, "Destination"),
@@ -197,6 +216,7 @@ const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
         airlineCode: segment?.Airline?.AirlineCode || "",
         airlineName: segment?.Airline?.AirlineName || "Airline",
         flightNumber: segment?.Airline?.FlightNumber || segment?.FlightNumber || "",
+        duration: segment?.Duration ? formatDuration(segment.Duration) : null,
         baggage: segment?.Baggage || segment?.CabinBaggage || null,
       })),
     };
@@ -263,74 +283,105 @@ function FlightOptionCard({
   onSelect,
   mode,
 }) {
+  const hasTimings = option.departureTime && option.arrivalTime;
+  const depTime = hasTimings ? formatFlightTime(option.departureTime) : PLACEHOLDER;
+  const arrTime = hasTimings ? formatFlightTime(option.arrivalTime) : PLACEHOLDER;
+  const travelDate = hasTimings ? formatDate(option.departureTime) : formatDate(option.departureDate);
+
   return (
     <div
       className={`rounded-3xl border p-5 shadow-sm transition ${
         selected
           ? "border-[#0A4D68] bg-[#f4fbff] shadow-[0_18px_50px_rgba(10,77,104,0.12)]"
-          : "border-slate-200 bg-white"
+          : "border-slate-200 bg-white hover:border-slate-300"
       }`}
     >
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        {/* LEFT — Flight identity + schedule */}
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-4">
             <img
               src={airlineLogo(option.airlineCode)}
               alt={option.airlineCode || "Airline"}
-              className="h-12 w-12 rounded-2xl border border-slate-200 bg-white object-contain p-2"
+              className="h-12 w-12 shrink-0 rounded-2xl border border-slate-200 bg-white object-contain p-2"
             />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-black text-slate-900">
-                {option.airlineName || option.airlineCode || "Airline"}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                {option.airlineCode || PLACEHOLDER} {option.flightNumber || ""}
+              {/* Airline + badges row */}
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-base font-black text-slate-900">
+                  {option.airlineName || option.airlineCode || "Airline"}
+                </p>
+                {option.isNdc && (
+                  <span className="rounded-full bg-gradient-to-r from-violet-600 to-purple-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white">
+                    NDC
+                  </span>
+                )}
+                {option.lowSeatWarning && (
+                  <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-rose-700">
+                    Only {option.noOfSeatAvailable} left
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-sm font-semibold text-slate-500">
+                {option.airlineCode || PLACEHOLDER}{option.flightNumber ? ` · ${option.flightNumber}` : ""}
               </p>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
-                    Route
-                  </p>
-                  <p className="mt-1 text-lg font-bold text-slate-900">
-                    {option.origin || PLACEHOLDER} {"->"} {option.destination || PLACEHOLDER}
-                  </p>
-                  <p className="mt-2 text-sm font-medium text-slate-500">
-                    {formatDate(option.departureDate)}
-                  </p>
+              {/* Main schedule block */}
+              <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <div className="flex items-center gap-3">
+                  {/* Origin */}
+                  <div className="text-center">
+                    <p className="text-2xl font-black text-slate-900">{depTime}</p>
+                    <p className="mt-0.5 text-sm font-bold text-slate-600">{option.origin || PLACEHOLDER}</p>
+                  </div>
+                  {/* Arrow + duration */}
+                  <div className="flex flex-1 flex-col items-center gap-1">
+                    <p className="text-[11px] font-semibold text-slate-400">
+                      {option.duration || ""}
+                    </p>
+                    <div className="flex w-full items-center gap-1">
+                      <div className="h-px flex-1 bg-slate-300" />
+                      <span className="text-slate-400">✈</span>
+                      <div className="h-px flex-1 bg-slate-300" />
+                    </div>
+                    <p className="text-[11px] font-semibold text-slate-400">
+                      {formatStops(option.stops)}
+                    </p>
+                  </div>
+                  {/* Destination */}
+                  <div className="text-center">
+                    <p className="text-2xl font-black text-slate-900">{arrTime}</p>
+                    <p className="mt-0.5 text-sm font-bold text-slate-600">{option.destination || PLACEHOLDER}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
-                    Schedule
-                  </p>
-                  <p className="mt-1 text-lg font-bold text-slate-900">
-                    {formatFlightTime(option.departureTime)} {"->"} {formatFlightTime(option.arrivalTime)}
-                  </p>
-                  <p className="mt-2 text-sm font-medium text-slate-500">
-                    {option.duration} {"|"} {formatStops(option.stops)}
-                  </p>
-                </div>
+                {travelDate && travelDate !== PLACEHOLDER && (
+                  <p className="mt-2 text-center text-xs font-medium text-slate-400">{travelDate}</p>
+                )}
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                  Cabin: {option.cabin || "Economy"}
+              {/* Cabin / baggage tags */}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                  {option.cabin || "Economy"}
                 </span>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                  Baggage: {option.baggage || PLACEHOLDER}
-                </span>
+                {option.baggage && option.baggage !== PLACEHOLDER && (
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                    Bag: {option.baggage}
+                  </span>
+                )}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="w-full rounded-3xl border border-slate-100 bg-slate-50 p-4 xl:max-w-[340px]">
+        {/* RIGHT — Pricing panel */}
+        <div className="w-full rounded-3xl border border-slate-100 bg-slate-50 p-4 xl:max-w-[320px]">
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">
             {mode === "ONLINE" ? "Online Reissue Estimate" : "Offline Reissue Estimate"}
           </p>
           <div className="mt-4 space-y-2">
             <PricingRow label="Current Ticket" value={formatMoney(option.oldFare, option.currency)} />
-            <PricingRow label="New Flight" value={formatMoney(option.newFare, option.currency)} />
+            <PricingRow label="New Flight" value={formatMoney(option.newFare ?? option.fare, option.currency)} />
             <PricingRow label="Fare Difference" value={formatMoney(option.fareDifference, option.currency)} />
             <PricingRow label="Date Change Fee" value={formatMoney(option.reissueCharge, option.currency)} />
           </div>
@@ -339,7 +390,7 @@ function FlightOptionCard({
               Total Additional Collection
             </p>
             <p className="mt-2 text-2xl font-black text-slate-900">
-              {formatMoney(option.totalCollection, option.currency)}
+              {formatMoney(option.totalCollection ?? option.totalEstimate, option.currency)}
             </p>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -349,7 +400,7 @@ function FlightOptionCard({
               className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               {expanded ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
-              View Details
+              {expanded ? "Hide Details" : "View Details"}
             </button>
             <button
               type="button"
@@ -360,33 +411,54 @@ function FlightOptionCard({
                   : "border border-[#0A4D68] text-[#0A4D68] hover:bg-[#eef8fc]"
               }`}
             >
-              {selected ? "Selected Flight" : "Select Flight"}
+              {selected ? "✓ Selected" : "Select Flight"}
             </button>
           </div>
         </div>
       </div>
 
+      {/* Expanded segment details with layovers */}
       {expanded && (
         <div className="mt-5 border-t border-slate-100 pt-5">
           {option.segments?.length ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              {option.segments.map((segment, index) => (
-                <div
-                  key={`${segment.origin}-${segment.destination}-${index}`}
-                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
-                >
-                  <p className="text-sm font-bold text-slate-900">
-                    {segment.origin || PLACEHOLDER} {"->"} {segment.destination || PLACEHOLDER}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {formatFlightTime(segment.departureTime)} {"->"} {formatFlightTime(segment.arrivalTime)}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {segment.airlineName || segment.airlineCode || "Airline"}
-                    {segment.flightNumber ? ` | ${segment.flightNumber}` : ""}
-                  </p>
-                </div>
-              ))}
+            <div className="space-y-2">
+              {option.segments.map((segment, index) => {
+                const prevSeg = index > 0 ? option.segments[index - 1] : null;
+                const layoverMins = prevSeg
+                  ? calcLayoverMinutes(prevSeg.arrivalTime, segment.departureTime)
+                  : null;
+                return (
+                  <div key={`${segment.origin}-${segment.destination}-${index}`}>
+                    {layoverMins !== null && (
+                      <div className="flex items-center gap-2 py-2 pl-4 text-xs font-semibold text-amber-700">
+                        <span className="h-4 w-0.5 rounded bg-amber-300" />
+                        Layover at {prevSeg?.destination || ""}: {formatDuration(layoverMins)}
+                      </div>
+                    )}
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">
+                            {segment.origin || PLACEHOLDER} → {segment.destination || PLACEHOLDER}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {segment.airlineName || segment.airlineCode || "Airline"}
+                            {segment.flightNumber ? ` · ${segment.flightNumber}` : ""}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-slate-900">
+                            {formatFlightTime(segment.departureTime)} → {formatFlightTime(segment.arrivalTime)}
+                          </p>
+                          {segment.duration && (
+                            <p className="mt-0.5 text-xs text-slate-400">{segment.duration}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-500">
@@ -455,7 +527,12 @@ export default function ReissueModal({ booking, onClose }) {
   );
   const oldFare = Number(booking?.pricingSnapshot?.totalAmount || 0);
   const isOnlineEligible = eligibility?.support?.onlineReissueAllowed === true;
-  const showOfflineFlow = !isOnlineEligible || Boolean(offlineFallback);
+  // CORRECT FLOW:
+  // showOfflineFlow is driven EXCLUSIVELY by offlineFallback (set after the actual
+  // API search attempt confirms online is unavailable). The eligibility badge informs
+  // the user but does NOT prematurely switch the UI to offline mode.
+  // This ensures: user clicks Search → API called → THEN mode is determined.
+  const showOfflineFlow = Boolean(offlineFallback);
 
   useEffect(() => {
     if (booking?._id) {
@@ -471,6 +548,10 @@ export default function ReissueModal({ booking, onClose }) {
   }, [booking?._id, dispatch]);
 
   useEffect(() => {
+    // Do NOT reset when in SUCCESS or PROCESSING — those are terminal/in-flight states
+    // that must not be wiped by date or mode changes.
+    if (currentStep === STEP.SUCCESS || currentStep === STEP.PROCESSING) return;
+
     setSelectedOption(null);
     setExpandedOptionId(null);
     setOnlineOptions([]);
@@ -909,10 +990,16 @@ export default function ReissueModal({ booking, onClose }) {
   );
 
   const modalTitle = showOfflineFlow ? "Offline Reissue Request" : "Reissue Flight";
+  // Header message logic:
+  // - If offline fallback is active: show the reason from the API
+  // - If online eligible: show online confirmation
+  // - If not online eligible but no fallback yet: inform user that online check will run on Search
   const headerMessage = showOfflineFlow
     ? offlineFallback?.message ||
-      "Choose a preferred date, review replacement flights, and submit the request for operations processing."
-    : "This booking supports online reissue. Search, select, quote, and confirm in one flow.";
+      "Online reissue is unavailable for this booking. Choose a preferred date, review replacement flights, and submit the request for operations processing."
+    : isOnlineEligible
+      ? "This booking supports online reissue. Search, select, quote, and confirm in one flow."
+      : "We will attempt an online reissue search. If unavailable, you will be guided through offline servicing.";
 
   const showBackButton =
     !showOfflineFlow &&
@@ -980,18 +1067,26 @@ export default function ReissueModal({ booking, onClose }) {
                     className={`rounded-3xl border p-4 ${
                       showOfflineFlow
                         ? "border-amber-100 bg-amber-50"
-                        : "border-emerald-100 bg-emerald-50"
+                        : isOnlineEligible
+                          ? "border-emerald-100 bg-emerald-50"
+                          : "border-blue-100 bg-blue-50"
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       {showOfflineFlow ? (
                         <FiAlertCircle className="mt-0.5 shrink-0 text-amber-600" />
-                      ) : (
+                      ) : isOnlineEligible ? (
                         <FiCheckCircle className="mt-0.5 shrink-0 text-emerald-600" />
+                      ) : (
+                        <FiRefreshCw className="mt-0.5 shrink-0 text-blue-600" />
                       )}
                       <div>
                         <p className="text-sm font-bold text-slate-900">
-                          {showOfflineFlow ? "Offline servicing required" : "Online reissue available"}
+                          {showOfflineFlow
+                            ? "Offline servicing required"
+                            : isOnlineEligible
+                              ? "Online reissue available"
+                              : "Online reissue will be attempted"}
                         </p>
                         <p className="mt-1 text-sm text-slate-600">{headerMessage}</p>
                       </div>

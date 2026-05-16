@@ -562,7 +562,7 @@ const airlineNames = {
 // ─── Single Rule Card ────────────────────────────────────────────────────────
 const RuleCard = ({ fareRule, theme }) => {
   const [open, setOpen] = useState(true);
-  const { origin, destination, fareBasisCode, baggage, mealAndSeat, cancellation, reissue, notes } = fareRule;
+  const { origin, destination, fareBasisCode, baggage, mealAndSeat, cancellation, reissue, notes, fareInclusions } = fareRule;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-xs hover:shadow-md transition-shadow duration-300 overflow-hidden mb-5">
@@ -595,6 +595,28 @@ const RuleCard = ({ fareRule, theme }) => {
       {open && (
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50">
           
+          {/* ── Fare Inclusions chips ──────────────────────────────────── */}
+          {fareInclusions?.items?.length > 0 && (
+            <div className="md:col-span-2 mb-1">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Included in This Fare</p>
+              <div className="flex flex-wrap gap-2">
+                {fareInclusions.items.map((item) => (
+                  <span
+                    key={item.key}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all ${
+                      item.positive
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                        : "bg-red-50 border-red-200 text-red-700"
+                    }`}
+                  >
+                    <span>{item.positive ? "✅" : "❌"}</span>
+                    {item.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Baggage */}
           <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden transition-all hover:border-[#C9A84C]/50 hover:shadow-sm">
             <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 bg-slate-50/50">

@@ -210,6 +210,7 @@ const initialState = {
   loading: false,
   actionLoading: false,
   error: null,
+  errorCode: null,       // HTTP status code for UI differentiation (409, 500, etc.)
   revalidatedBookingContext: null,
   revalidatedBookingStatus: null,
   revalidationMeta: initialRevalidationMeta,
@@ -231,6 +232,10 @@ const bookingSlice = createSlice({
     resetBookingLifecycle(state) {
       state.bookingLifecycle = initialBookingLifecycle;
     },
+    clearBookingError(state) {
+      state.error = null;
+      state.errorCode = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -244,7 +249,8 @@ const bookingSlice = createSlice({
       })
       .addCase(createBookingRequest.rejected, (state, action) => {
         state.actionLoading = false;
-        state.error = action.payload;
+        state.error = action.payload?.message || action.payload;
+        state.errorCode = action.payload?.statusCode || null;
       })
 
       /* ================= INSTANT FLIGHT BOOKING ================= */
@@ -258,7 +264,8 @@ const bookingSlice = createSlice({
       })
       .addCase(instantFlightBooking.rejected, (state, action) => {
         state.actionLoading = false;
-        state.error = action.payload;
+        state.error = action.payload?.message || action.payload;
+        state.errorCode = action.payload?.statusCode || null;
       })
 
       /* ================= FETCH MY REQUESTS (EMPLOYEE) ================= */
@@ -322,6 +329,7 @@ const bookingSlice = createSlice({
       .addCase(executeApprovedFlightBooking.rejected, (state, action) => {
         state.actionLoading = false;
         state.error = action.payload?.message || action.payload;
+        state.errorCode = action.payload?.statusCode || null;
       })
 
       .addCase(fetchApprovedFlightBookingStatus.pending, (state) => {
@@ -363,7 +371,8 @@ const bookingSlice = createSlice({
       .addCase(manualTicketNonLcc.rejected, (state, action) => {
         state.manualTicketLoading = false;
         state.manualTicketStatus = "failed";
-        state.error = action.payload;
+        state.error = action.payload?.message || action.payload;
+        state.errorCode = action.payload?.statusCode || null;
       })
 
       .addCase(fetchMyBookings.pending, (state) => {
@@ -414,6 +423,7 @@ export const {
   clearSelectedBookingRequest,
   clearRevalidatedBookingContext,
   resetBookingLifecycle,
+  clearBookingError,
 } = bookingSlice.actions;
 export const selectMyRejectedRequests = (state) => state.bookings.myRejected;
 

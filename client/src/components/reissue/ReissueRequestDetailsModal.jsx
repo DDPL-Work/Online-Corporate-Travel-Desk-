@@ -105,9 +105,10 @@ export default function ReissueRequestDetailsModal({ requestId, onClose }) {
           remarks: remarks.trim() || undefined,
         }),
       ).unwrap();
-      toast.success("Reissue confirmation submitted");
+      toast.success("✅ Reissue confirmation submitted successfully");
     } catch (err) {
-      toast.error(err || "Failed to confirm reissue");
+      const message = typeof err === "string" ? err : err?.message || "Failed to confirm reissue";
+      toast.error(`⚠️ ${message}`);
     }
   };
 
@@ -270,15 +271,21 @@ export default function ReissueRequestDetailsModal({ requestId, onClose }) {
                 </div>
               )}
 
-              {false && request.mode === "OFFLINE" && (
-                <div className="rounded-2xl border border-violet-200 bg-violet-50 p-5">
-                  <p className="text-sm font-bold text-violet-800">
-                    This request is in offline servicing mode.
-                  </p>
-                  <p className="mt-1 text-sm text-violet-700">
-                    Operations will handle supplier execution and upload the
-                    revised ticket and invoice once available.
-                  </p>
+              {request.mode === "OFFLINE" && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 text-amber-600">ℹ️</span>
+                    <div>
+                      <p className="text-sm font-bold text-amber-900">
+                        This request is in offline servicing mode.
+                      </p>
+                      <p className="mt-1 text-sm text-amber-800">
+                        Operations will handle supplier execution and upload the
+                        revised ticket and invoice once available. You will receive
+                        a notification when your reissued ticket is ready.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 

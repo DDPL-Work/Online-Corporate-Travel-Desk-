@@ -21,16 +21,12 @@ export const createBookingRequest = createAsyncThunk(
   async (payload, { rejectWithValue }) => {
     try {
       console.log("🔥 API PAYLOAD:", payload);
-
       const { data } = await api.post("/bookings", payload);
       console.log("✅ API RESPONSE:", data);
-      return data.data; // { bookingRequestId, approvalId, bookingReference }
+      return data.data;
     } catch (err) {
       console.error("❌ API ERROR:", err);
-      return rejectWithValue(
-        err.response?.data?.message ||
-          "Failed to submit booking request for approval",
-      );
+      return rejectWithValue(buildThunkError(err, "Failed to submit booking request for approval"));
     }
   },
 );
@@ -41,11 +37,9 @@ export const instantFlightBooking = createAsyncThunk(
   async (payload, { rejectWithValue }) => {
     try {
       const { data } = await api.post("/bookings/instant-flight-book", payload);
-      return data.data; // { bookingRequestId, orderId, autoApproved, bookingResult }
+      return data.data;
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data?.message || "Instant flight booking failed",
-      );
+      return rejectWithValue(buildThunkError(err, "Instant flight booking failed"));
     }
   },
 );
@@ -189,10 +183,10 @@ export const manualTicketNonLcc = createAsyncThunk(
   async (bookingId, { rejectWithValue }) => {
     try {
       const res = await api.post(`/bookings/${bookingId}/manual-ticket`);
-
       return res.data.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
+      // Structured error so booking.slice can surface statusCode and code
+      return rejectWithValue(buildThunkError(err, "Manual ticket generation failed"));
     }
   },
 );
@@ -221,7 +215,10 @@ export const downloadTicketPdf = createAsyncThunk(
 
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      return rejectWithValue("Failed to download ticket");
+      // Surface real server error message (e.g. 409 "Ticket generation is not allowed from status COMPLETED")
+      return rejectWithValue(
+        buildThunkError(err, "Failed to download ticket PDF"),
+      );
     }
   },
 );

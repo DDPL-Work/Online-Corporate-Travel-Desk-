@@ -2688,8 +2688,15 @@ export default function BookingDetails() {
 
   const handleDownloadTicket = async (journeyType = "full") => {
     setDownloading(journeyType);
-    await dispatch(downloadTicketPdf({ bookingId: booking._id, journeyType }));
-    setDownloading(null);
+    try {
+      await dispatch(downloadTicketPdf({ bookingId: booking._id, journeyType })).unwrap();
+    } catch (err) {
+      // Surface real server message (e.g. 409 "Ticket generation is not allowed from status COMPLETED")
+      const message = err?.message || "Failed to download ticket. Please try again.";
+      toast.error(`⚠️ ${message}`);
+    } finally {
+      setDownloading(null);
+    }
   };
 
   // Fare summary calculations (simplified)
@@ -3161,15 +3168,12 @@ export default function BookingDetails() {
               <button
                 onClick={async () => {
                   try {
-                    await dispatch(manualTicketNonLcc(booking._id));
-                    Swal.fire({
-                      icon: "info",
-                      title: "Retrying Ticket",
-                      timer: 2000,
-                      showConfirmButton: false,
-                    });
-                  } catch {
-                    Swal.fire({ icon: "error", title: "Retry Failed" });
+                    await dispatch(manualTicketNonLcc(booking._id)).unwrap();
+                    toast.success("✅ Ticket generation initiated successfully.");
+                  } catch (err) {
+                    // Surface real API error (e.g. 409 status conflicts)
+                    const message = err?.message || "Ticket retry failed. Please contact support.";
+                    toast.error(`⚠️ ${message}`);
                   }
                 }}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-900 text-white rounded-full text-[11px] font-bold hover:bg-gray-800 transition-all"
