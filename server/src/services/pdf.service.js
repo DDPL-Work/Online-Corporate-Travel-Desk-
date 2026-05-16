@@ -47,44 +47,12 @@ class PDFService {
 
   // for localhost
 
-  async _launchBrowser() {
-    try {
-      if (isProduction) {
-        logger.info("Launching Puppeteer-core in production mode");
-        return await puppeteerCore.launch({
-          executablePath: "/usr/bin/chromium-browser",
-          args: [
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-gpu",
-            "--no-zygote",
-            "--single-process",
-          ],
-        });
-      } else {
-        logger.info("Launching Puppeteer in development mode");
-        return await puppeteer.launch({
-          headless: true,
-          args: ["--no-sandbox"],
-        });
-      }
-    } catch (error) {
-      logger.error("Failed to launch browser", error);
-      throw error;
-    }
-  }
-
-  // for production
-
-  //   async _launchBrowser() {
+  // async _launchBrowser() {
   //   try {
   //     if (isProduction) {
   //       logger.info("Launching Puppeteer-core in production mode");
-
   //       return await puppeteerCore.launch({
-  //         executablePath: "/snap/bin/chromium",
-  //         headless: true,
+  //         executablePath: "/usr/bin/chromium-browser",
   //         args: [
   //           "--no-sandbox",
   //           "--disable-setuid-sandbox",
@@ -96,7 +64,6 @@ class PDFService {
   //       });
   //     } else {
   //       logger.info("Launching Puppeteer in development mode");
-
   //       return await puppeteer.launch({
   //         headless: true,
   //         args: ["--no-sandbox"],
@@ -107,6 +74,39 @@ class PDFService {
   //     throw error;
   //   }
   // }
+
+  // for production
+
+    async _launchBrowser() {
+    try {
+      if (isProduction) {
+        logger.info("Launching Puppeteer-core in production mode");
+
+        return await puppeteerCore.launch({
+          executablePath: "/snap/bin/chromium",
+          headless: true,
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--no-zygote",
+            "--single-process",
+          ],
+        });
+      } else {
+        logger.info("Launching Puppeteer in development mode");
+
+        return await puppeteer.launch({
+          headless: true,
+          args: ["--no-sandbox"],
+        });
+      }
+    } catch (error) {
+      logger.error("Failed to launch browser", error);
+      throw error;
+    }
+  }
 
   async _generateBarcode(text) {
     try {
