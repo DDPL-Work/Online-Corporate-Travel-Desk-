@@ -6,6 +6,7 @@ export default function ReturnFlightList({
   enabled,
   selectedFlight,
   onSelect,
+  traceId,
 }) {
   return (
     <div className={`space-y-3 ${!enabled ? "opacity-50 pointer-events-none" : ""}`}>
@@ -36,6 +37,7 @@ export default function ReturnFlightList({
               selected={isSelected}
               selectedFlight={selectedFlight}
               onSelect={onSelect}
+              traceId={traceId}
             />
           );
         })}

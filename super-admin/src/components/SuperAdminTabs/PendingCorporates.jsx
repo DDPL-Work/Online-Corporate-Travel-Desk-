@@ -9,7 +9,7 @@ import {
   FiClock,
 } from "react-icons/fi";
 import { useDispatch, useSelector } from "react-redux";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 import EditCorporateModal from "../../Modal/EditCorporateModal";
 import {

@@ -1,7 +1,7 @@
 // OnwardFlightList.jsx
 import SelectableFlightCard from "./SelectableFlightCard";
 
-export default function OnwardFlightList({ flights, selectedFlight, onSelect }) {
+export default function OnwardFlightList({ flights, selectedFlight, onSelect, traceId }) {
   return (
     <div className="space-y-3">
 
@@ -16,6 +16,7 @@ export default function OnwardFlightList({ flights, selectedFlight, onSelect }) 
               selected={isSelected}
               selectedFlight={selectedFlight}
               onSelect={onSelect}
+              traceId={traceId}
             />
           );
         })}

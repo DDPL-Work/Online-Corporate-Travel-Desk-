@@ -1,4 +1,5 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 import Layout from "../layout/Layout";
 import RootLayout from "../layout/RootLayout";
@@ -71,6 +72,8 @@ import MidSizeBusiness from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 import InternalTravelDeskLanding from "../Pages/Landing/CompanySpecific/InternalTravelDeskLanding";
 import SsrManagement from "../components/TravelAdminTabs/SsrManagement";
 import ApprovalWorkflow from "../Pages/Landing/Platform/ApprovalWorkflow";
+import AboutUs from "../Pages/Landing/About-Us/AboutUs";
+import FAQs from "../Pages/Landing/FAQ/FAQs";
 import UserAgreement from "../Pages/Legal/UserAgreement";
 import TermsOfService from "../Pages/Legal/TermsOfService";
 import PrivacyPolicy from "../Pages/Legal/PrivacyPolicy";
@@ -80,22 +83,46 @@ import TeamBookingDetails from "../components/CorporateManagerTabs/TeamBookingDe
 import TeamHotelBookingDetails from "../components/CorporateManagerTabs/TeamHotelBookingDetails";
 import FlightBookingDetails from "../components/TravelAdminTabs/Shared/FlightBookingDetails";
 import HotelBookingDetails1 from "../components/TravelAdminTabs/Shared/HotelBookingDetails";
+import WalletPhonePeStatusPage from "../Pages/Payments/WalletPhonePeStatusPage";
+import CompanyLandingPage from "../Pages/Landing/CompanySpecific/CompanyLandingPage";
+import BlogList from "../Pages/Landing/Blog/BlogList";
+import BlogDetails from "../Pages/Landing/Blog/BlogDetails";
+import Traveamer from "../Pages/Landing/Traveamer/Traveamer";
 // import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
+
+const HomeRedirect = () => {
+  const { isAuthenticated, role } = useSelector((s) => s.auth);
+
+  if (!isAuthenticated) {
+    return <FlightBookingInfo />;
+  }
+
+  if (role === "travel-admin") {
+    return <Navigate to="/total-bookings" replace />;
+  }
+  if (role === "manager") {
+    return <Navigate to="/manager/total-bookings" replace />;
+  }
+  return <Navigate to="/my-bookings" replace />;
+};
 
 export const appRouter = createBrowserRouter([
   {
     element: <RootLayout />, // ✅ Root layout with PageTitleHandler
     children: [
       // PUBLIC ROUTES
-      { path: "/:slug", element: <FlightBookingInfo /> },
+      {
+        path: "/",
+        element: <HomeRedirect />,
+      },
       {
         path: "/sso/callback",
         element: <SSOCallback />,
       },
-      {
-        path: "/unauthorized",
-        element: <Unauthorized />,
-      },
+      // {
+      //   path: "/unauthorized",
+      //   element: <Unauthorized />,
+      // },
 
       // TRAVEL-ADMIN PROTECTED ROUTES
       {
@@ -108,11 +135,11 @@ export const appRouter = createBrowserRouter([
               { path: "/update-profile", element: <ProfileSettings /> },
               { path: "total-bookings", element: <BookingsDashboard /> },
 
-                {
+              {
                 path: "/employee-flight-booking/:id",
                 element: <FlightBookingDetails />,
               },
-               {
+              {
                 path: "/employee-hotel-booking/:id",
                 element: <HotelBookingDetails1 />,
               },
@@ -140,11 +167,17 @@ export const appRouter = createBrowserRouter([
                 element: <TravelAdminProfile />,
               },
               { path: "/corporate-wallet", element: <CorporateWallet /> },
-              { path: "/credit-utilization", element: <CreditUtilizationPostpaid /> },
+              {
+                path: "/credit-utilization",
+                element: <CreditUtilizationPostpaid />,
+              },
               { path: "/ssr-management", element: <SsrManagement /> },
               { path: "/branding-settings", element: <BrandingSettings /> },
               { path: "/reissue-requests", element: <ReissueRequests /> },
-              { path: "/offline-cancellations", element: <OfflineCancellationQueries /> },
+              {
+                path: "/offline-cancellations",
+                element: <OfflineCancellationQueries />,
+              },
             ],
           },
         ],
@@ -186,11 +219,20 @@ export const appRouter = createBrowserRouter([
                 path: "/manager/rejected-requests",
                 element: <RejectedTravelRequestsForManager />,
               },
-              { path: "/manager/upcoming-trips", element: <UpcomingTripsForManager /> },
+              {
+                path: "/manager/upcoming-trips",
+                element: <UpcomingTripsForManager />,
+              },
               { path: "/manager/past-trips", element: <PastTripsForManager /> },
               { path: "/manager/team-management", element: <MyTeam /> },
-              { path: "/manager/reissue-requests", element: <ReissueRequests /> },
-              { path: "/manager/offline-cancellations", element: <OfflineCancellationQueries /> },
+              {
+                path: "/manager/reissue-requests",
+                element: <ReissueRequests />,
+              },
+              {
+                path: "/manager/offline-cancellations",
+                element: <OfflineCancellationQueries />,
+              },
             ],
           },
         ],
@@ -222,9 +264,15 @@ export const appRouter = createBrowserRouter([
                 path: "/my-cancelled-bookings",
                 element: <CancelledFlightsPage />,
               },
-              { path: "/my-cancelled-booking/:id", element: <BookingDetails /> },
+              {
+                path: "/my-cancelled-booking/:id",
+                element: <BookingDetails />,
+              },
               { path: "/my-reissued", element: <MyReissueRequests /> },
-              { path: "/my-offline-cancellations", element: <OfflineCancellationQueries /> },
+              {
+                path: "/my-offline-cancellations",
+                element: <OfflineCancellationQueries />,
+              },
               { path: "/my-upcoming-trips", element: <MyUpcomingTrips /> },
               { path: "/my-past-trips", element: <MyPastTrips /> },
               {
@@ -243,26 +291,26 @@ export const appRouter = createBrowserRouter([
               { path: "/search-hotel", element: <HotelSearchPage /> },
             ],
           },
+          // SHARED SEARCH & BOOKING RESULTS (PROTECTED)
+          { path: "/travel", element: <InternalTravelDeskLanding /> },
+          { path: "/search-flight-results", element: <FlightSearchResults /> },
+          { path: "/one-way-flight/booking", element: <OneFlightBooking /> },
+          {
+            path: "/round-trip-flight/booking",
+            element: <RoundTripFlightBooking />,
+          },
+          {
+            path: "/multi-city-flight/booking",
+            element: <MultiCityFlightBooking />,
+          },
+          { path: "/fare-upsell", element: <FareUpsellPage /> },
+          { path: "/search-hotel-results", element: <HotelSearchResults /> },
+          { path: "/one-hotel-details", element: <HotelDetailsPage /> },
+          { path: "/hotel-review-booking", element: <HotelReviewBooking /> },
+          { path: "/hotel-review-booking/:id", element: <HotelReviewBooking /> },
+          { path: "/hotel-booking/:id", element: <HotelBookNow /> },
         ],
       },
-
-      // SHARED SEARCH & BOOKING RESULTS
-      { path: "/search-flight-results", element: <FlightSearchResults /> },
-      { path: "/one-way-flight/booking", element: <OneFlightBooking /> },
-      {
-        path: "/round-trip-flight/booking",
-        element: <RoundTripFlightBooking />,
-      },
-      {
-        path: "/multi-city-flight/booking",
-        element: <MultiCityFlightBooking />,
-      },
-      { path: "/fare-upsell", element: <FareUpsellPage /> },
-      { path: "/search-hotel-results", element: <HotelSearchResults /> },
-      { path: "/one-hotel-details", element: <HotelDetailsPage /> },
-      { path: "/hotel-review-booking", element: <HotelReviewBooking /> },
-      { path: "/hotel-review-booking/:id", element: <HotelReviewBooking /> },
-      { path: "/hotel-booking/:id", element: <HotelBookNow /> },
 
       // DEFAULT ROUTES
       { path: "/who-it's-for/independent", element: <Independent /> },
@@ -271,15 +319,24 @@ export const appRouter = createBrowserRouter([
       { path: "/who-it's-for/mid-size-business", element: <MidSizeBusiness /> },
       { path: "/platform/flight-booking-info", element: <FlightBookingInfo /> },
       { path: "/platform/hotel-booking-info", element: <HotelBookingInfo /> },
-      { path: "/platform/approval-and-workflow", element: <ApprovalWorkflow /> },
+      {
+        path: "/platform/approval-and-workflow",
+        element: <ApprovalWorkflow />,
+      },
+
       { path: "/legal/user-agreement", element: <UserAgreement /> },
       { path: "/legal/terms-of-service", element: <TermsOfService /> },
       { path: "/legal/privacy-policy", element: <PrivacyPolicy /> },
       { path: "/legal/contact-us", element: <ContactUs /> },
 
+      { path: "/blog", element: <BlogList /> },
+      { path: "/blog/:slug", element: <BlogDetails /> },
+      { path: "/about-us", element: <AboutUs /> },
+      { path: "/faq", element: <FAQs /> },
+      { path: "/:slug", element: <CompanyLandingPage /> },
+      { path: "/company-specific", element: <CompanyLandingPage /> },
+      { path: "/traveamer", element: <Traveamer /> },
 
-
-      { path: "/travel", element: <InternalTravelDeskLanding /> },
       {
         path: "*",
         element: <FlightBookingInfo />,

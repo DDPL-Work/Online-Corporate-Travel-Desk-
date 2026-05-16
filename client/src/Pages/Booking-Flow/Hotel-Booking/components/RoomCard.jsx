@@ -19,7 +19,7 @@ import {
 } from "react-icons/fa";
 import { RiRestaurant2Line } from "react-icons/ri";
 
-const RoomCard = ({ room, count, onAdd, onRemove }) => {
+const RoomCard = ({ room, count, onAdd, onRemove, onSeeDetails }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [imgIndex, setImgIndex] = useState(0);
 
@@ -43,7 +43,7 @@ const RoomCard = ({ room, count, onAdd, onRemove }) => {
   const price = room.Price || {};
   const totalFare = price.totalFare ?? room.TotalFare ?? 0;
   const tax = price.tax ?? room.TotalTax ?? 0;
-  const finalPrice = totalFare + tax;
+  const finalPrice = totalFare;
   const currency = price.currency ?? room.Currency ?? "INR";
   const nights = room?.DayRates?.[0]?.length || 1;
 
@@ -83,8 +83,6 @@ const RoomCard = ({ room, count, onAdd, onRemove }) => {
   return (
     <div className="group w-full bg-white rounded-lg sm:rounded-xl lg:rounded-2xl border border-slate-200 hover:border-blue-400 hover:shadow-md sm:hover:shadow-lg lg:hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 overflow-hidden">
       <div className="flex flex-col lg:flex-row h-full">
-
-
         {/* INFO SECTION - Responsive */}
         <div className="flex-1 p-5 sm:p-6 lg:p-8 flex flex-col justify-between border-b sm:border-b lg:border-b-0 lg:border-r border-slate-100">
           <div className="space-y-2 sm:space-y-3 lg:space-y-4">
@@ -152,7 +150,7 @@ const RoomCard = ({ room, count, onAdd, onRemove }) => {
             {inclusions.length > 6 && (
               <button
                 onClick={() => setShowDetails(!showDetails)}
-                className="flex items-center gap-1 text-[10px] lg:text-[11px] font-black text-[#C9A84C] hover:text-[#B89635] uppercase tracking-widest transition-colors mt-3"
+                className="flex items-center gap-1 text-[10px] lg:text-[11px] font-black text-[#C9A84C] hover:text-[#B89635] uppercase tracking-widest transition-colors mt-3 border-none bg-transparent cursor-pointer"
               >
                 {showDetails ? (
                   <>
@@ -167,6 +165,19 @@ const RoomCard = ({ room, count, onAdd, onRemove }) => {
                 )}
               </button>
             )}
+
+            {/* 🔥 NEW SEE DETAILS LINK */}
+            <div className="pt-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSeeDetails(room);
+                }}
+                className="text-[11px] font-black text-[#C9A84C] hover:underline bg-transparent border-none cursor-pointer uppercase tracking-widest"
+              >
+                See Room Details & Rules
+              </button>
+            </div>
           </div>
         </div>
 
@@ -197,9 +208,9 @@ const RoomCard = ({ room, count, onAdd, onRemove }) => {
               </span>
             </div>
 
-            <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-500 font-medium">
+            {/* <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-500 font-medium">
               ≈ {currency} {perNight.toFixed(0).toLocaleString()} / Night
-            </p>
+            </p> */}
           </div>
 
           {/* CTA Button - Responsive */}

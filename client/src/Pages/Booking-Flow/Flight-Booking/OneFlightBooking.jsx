@@ -14,6 +14,7 @@ import {
   HotelHomeButton,
   CTABox,
   TravelerForm,
+  SelectedSSRSummary,
 } from "./CommonComponents";
 import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import { useDispatch, useSelector } from "react-redux";
@@ -22,8 +23,12 @@ import {
   getFareRule,
   getSSR,
 } from "../../../Redux/Actions/flight.thunks";
+import { useFlightSearch } from "../../../context/FlightSearchContext";
 import SeatSelectionModal from "./SSR/SeatSelectionModal";
-import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import {
+  createBookingRequest,
+  instantFlightBooking,
+} from "../../../Redux/Actions/booking.thunks";
 import { approveApproval } from "../../../Redux/Actions/approval.thunks";
 import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
 import { fetchMyProfile } from "../../../Redux/Slice/employeeActionSlice";
@@ -40,6 +45,7 @@ export default function OneFlightBooking() {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { setActiveTab } = useFlightSearch();
 
   useEffect(() => {
     console.log("Navigation State:", location.state);
@@ -605,11 +611,14 @@ export default function OneFlightBooking() {
 
       mealList.forEach((meal, travelerIndex) => {
         meals.push({
+          ...meal, // Save full details for future use
           segmentIndex: Number(segmentIndex),
           travelerIndex,
           code: meal.Code,
           description: String(meal.Description || meal.Code || ""),
+          airlineDescription: meal.AirlineDescription || meal.Description || meal.Code,
           price: meal.Price,
+          type: meal.Type || meal.Way,
         });
       });
     });
@@ -626,6 +635,7 @@ export default function OneFlightBooking() {
       const [, segmentIndex] = key.split("|");
 
       baggage.push({
+        ...bag, // Save full details for future use
         segmentIndex: Number(segmentIndex),
         code: bag.Code,
         weight: bag.Weight,
@@ -693,18 +703,10 @@ export default function OneFlightBooking() {
       projectId: projectApproverData.project?.id,
       projectClient: projectApproverData.project?.client,
       projectCodeId: projectApproverData.project?.id,
-      approverId: !approvalRequired
-        ? user?._id || user?.id || user?.userId
-        : projectApproverData.approver?.id,
-      approverEmail: !approvalRequired
-        ? user?.email
-        : projectApproverData.approver?.email,
-      approverName: !approvalRequired
-        ? `${user?.name?.firstName} ${user?.name?.lastName}`
-        : projectApproverData.approver?.name,
-      approverRole: !approvalRequired
-        ? user?.role
-        : projectApproverData.approver?.role,
+      approverId: projectApproverData.approver?.id,
+      approverEmail: projectApproverData.approver?.email,
+      approverName: projectApproverData.approver?.name,
+      approverRole: projectApproverData.approver?.role,
       flightRequest: {
         traceId: searchParams.traceId,
         resultIndex: selectedFlight.ResultIndex,
@@ -725,6 +727,14 @@ export default function OneFlightBooking() {
         },
 
         fareExpiry,
+        fareRules: fareRule, // ✅ save fare rules for audit
+      },
+
+      requesterDetails: {
+        name: `${user?.name?.firstName} ${user?.name?.lastName}`,
+        email: user?.email,
+        role: user?.role, 
+        userId: user?._id || user?.id || user?.userId,
       },
 
       travellers: travelers.map((t, idx) => ({
@@ -898,40 +908,47 @@ export default function OneFlightBooking() {
 
     try {
       const payload = buildBookingRequestPayload();
-      if (approvalRequired && !isTravelAdmin) {
-        await dispatch(
-          selectManager({
-            approverId: projectApproverData.approver?.id,
-            approverEmail: projectApproverData.approver?.email,
-            projectCodeId: projectApproverData.project?.id,
-            projectName: projectApproverData.project?.name,
-            projectClient: projectApproverData.project?.client,
-          }),
-        ).unwrap();
-      }
-
-      const result = await dispatch(createBookingRequest(payload)).unwrap();
-
+      let result;
       if (!approvalRequired) {
-        const requestId = result.bookingRequestId || result._id;
-        if (requestId && result.requestStatus !== "approved") {
+        // ✅ Use instant booking API for auto-approved policies
+        result = await dispatch(instantFlightBooking(payload)).unwrap();
+        ToastWithTimer({
+          type: "success",
+          message: "Flight booked automatically per policy",
+        });
+      } else {
+        // ✅ Traditional approval workflow
+        if (!isTravelAdmin) {
           await dispatch(
-            approveApproval({
-              id: requestId,
-              comments: "Self Approved by Travel Admin",
-              type: "flight",
+            selectManager({
+              approverId: projectApproverData.approver?.id,
+              approverEmail: projectApproverData.approver?.email,
+              projectCodeId: projectApproverData.project?.id,
+              projectName: projectApproverData.project?.name,
+              projectClient: projectApproverData.project?.client,
             }),
           ).unwrap();
         }
-        ToastWithTimer({
-          type: "success",
-          message: "Booking auto-approved successfully",
-        });
+        result = await dispatch(createBookingRequest(payload)).unwrap();
+
+        // Handle case where it might still be auto-approved at backend but we used createBookingRequest
+        if (result.autoApproved || result.requestStatus === "approved") {
+          ToastWithTimer({
+            type: "success",
+            message: "Booking auto-approved successfully",
+          });
+        }
       }
 
-      navigate("/my-pending-approvals", {
-        state: { success: true },
-      });
+      if (result.autoApproved || result.requestStatus === "approved") {
+        navigate("/my-bookings", {
+          state: { success: true },
+        });
+      } else {
+        navigate("/my-pending-approvals", {
+          state: { success: true },
+        });
+      }
     } catch (err) {
       ToastWithTimer({
         type: "error",
@@ -1046,7 +1063,7 @@ export default function OneFlightBooking() {
 
       {/* Top Bar */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#0A203E] transition group"
@@ -1055,6 +1072,17 @@ export default function OneFlightBooking() {
               <MdArrowBack size={18} />
             </span>
             Back to results
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("hotel");
+              navigate("/travel", { state: { activeTab: "hotel" } });
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className="flex items-center gap-1.5 font-bold cursor-pointer bg-[#C9A84C] hover:bg-[#b5953e] transition-colors px-3 py-1.5 rounded-md text-[#0A203E] shadow-sm"
+          >
+            Search Hotels
           </button>
         </div>
       </div>
@@ -1168,6 +1196,16 @@ export default function OneFlightBooking() {
               )}
             </div>
 
+
+            {/* Selected Add-ons Summary */}
+            <SelectedSSRSummary
+              selectedSeats={selectedSeats}
+              selectedMeals={selectedMeals}
+              selectedBaggage={selectedBaggage}
+              travelers={travelers}
+              segments={fullSegments}
+            />
+
             {/* Traveller Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <TravelerForm
@@ -1234,7 +1272,6 @@ export default function OneFlightBooking() {
                 approverError={approverError}
                 onSendForApproval={handleSendForApproval}
                 loading={actionLoading}
-                disabled={!isFormReady}
                 approvalRequired={approvalRequired}
               />
 

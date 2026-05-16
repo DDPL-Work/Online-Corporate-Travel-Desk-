@@ -65,7 +65,6 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                   alt={onwardData.airline}
                   className="w-9 h-9 object-contain"
                 />
-
                 <div>
                   <div className="flex items-center gap-2 text-sm font-bold text-slate-800 uppercase tracking-wider">
                     <span>{onwardData.fromCode}</span>
@@ -73,39 +72,13 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                     <span>{onwardData.toCode}</span>
                   </div>
 
-                  <div className="text-xs text-gray-500 mt-0.5">
+                  <div className="text-[10px] text-slate-500 font-medium uppercase tracking-widest mt-0.5">
                     {onwardData.airline} · {onwardData.flightNo}
                   </div>
-                  <div className="text-xs text-slate-600 mt-0.5 font-medium">
-                    {formatDate(onwardData.depTime)} ·{" "}
-                    <span className="text-[#0A203E] font-bold">{formatTime(onwardData.depTime)}</span> –{" "}
-                    <span className="text-[#0A203E] font-bold">{formatTime(onwardData.arrTime)}</span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 mt-1.5">
-                    {onwardData.fromTerminal && (
-                      <span className="px-1.5 py-0.5 bg-slate-50 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
-                        T-{onwardData.fromTerminal} (Dep)
-                      </span>
-                    )}
-                    {onwardData.toTerminal && (
-                      <span className="px-1.5 py-0.5 bg-slate-50 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
-                        T-{onwardData.toTerminal} (Arr)
-                      </span>
-                    )}
-                    {onwardData.stops > 0 && (
-                      <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 text-[9px] font-bold uppercase rounded border border-amber-100">
-                        {onwardData.stops} Stop{onwardData.stops > 1 ? "s" : ""}{" "}
-                        {onwardData.stopCities?.length > 0
-                          ? `via ${onwardData.stopCities.join(", ")}`
-                          : ""}
-                      </span>
-                    )}
-                    <span className="px-1.5 py-0.5 bg-slate-50 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
-                      CLASS: {onwardData.cabinClass}
-                    </span>
-                    <span className="px-1.5 py-0.5 bg-slate-100 text-[#C9A84C] text-[9px] font-black uppercase rounded border border-slate-200">
-                      FARE: {onwardData.supplierFareClass}
+                  <div className="text-[11px] text-[#0A203E] font-bold mt-1">
+                    {formatTime(onwardData.depTime)} – {formatTime(onwardData.arrTime)}
+                    <span className="text-slate-400 font-medium ml-2 border-l border-slate-200 pl-2">
+                      {formatDate(onwardData.depTime)}
                     </span>
                   </div>
                 </div>
@@ -114,7 +87,7 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
 
             {/* DIVIDER */}
             {onwardData && returnData && (
-              <div className="h-12 w-px bg-slate-200"></div>
+              <div className="h-10 w-px bg-slate-200"></div>
             )}
 
             {/* RETURN */}
@@ -133,40 +106,14 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                     <span>{returnData.toCode}</span>
                   </div>
 
-                  <div className="text-xs text-gray-500 mt-0.5">
+                  <div className="text-[10px] text-slate-500 font-medium uppercase tracking-widest mt-0.5">
                     {returnData.airline} · {returnData.flightNo}
                   </div>
 
-                  <div className="text-xs text-slate-600 mt-0.5 font-medium">
-                    {formatDate(returnData.depTime)} ·{" "}
-                    <span className="text-[#0A203E] font-bold">{formatTime(returnData.depTime)}</span> –{" "}
-                    <span className="text-[#0A203E] font-bold">{formatTime(returnData.arrTime)}</span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 mt-1.5">
-                    {returnData.fromTerminal && (
-                      <span className="px-1.5 py-0.5 bg-slate-50 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
-                        T-{returnData.fromTerminal} (Dep)
-                      </span>
-                    )}
-                    {returnData.toTerminal && (
-                      <span className="px-1.5 py-0.5 bg-slate-50 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
-                        T-{returnData.toTerminal} (Arr)
-                      </span>
-                    )}
-                    {returnData.stops > 0 && (
-                      <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 text-[9px] font-bold uppercase rounded border border-amber-100">
-                        {returnData.stops} Stop{returnData.stops > 1 ? "s" : ""}{" "}
-                        {returnData.stopCities?.length > 0
-                          ? `via ${returnData.stopCities.join(", ")}`
-                          : ""}
-                      </span>
-                    )}
-                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold uppercase rounded border border-slate-200">
-                      CLASS: {returnData.cabinClass}
-                    </span>
-                    <span className="px-1.5 py-0.5 bg-slate-100 text-[#C9A84C] text-[9px] font-black uppercase rounded border border-slate-200">
-                      FARE: {returnData.supplierFareClass}
+                  <div className="text-[11px] text-[#0A203E] font-bold mt-1">
+                    {formatTime(returnData.depTime)} – {formatTime(returnData.arrTime)}
+                    <span className="text-slate-400 font-medium ml-2 border-l border-slate-200 pl-2">
+                      {formatDate(returnData.depTime)}
                     </span>
                   </div>
                 </div>

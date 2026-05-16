@@ -71,6 +71,14 @@ const hotelBookingRequestSchema = new mongoose.Schema(
     approverName: String,
     approverRole: String,
 
+    /* ================= REQUESTER DETAILS ================= */
+    requesterDetails: {
+      name: String,
+      email: String,
+      role: String,
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    },
+
     /* ================= GST DETAILS ================= */
 
     gstDetails: {
@@ -114,6 +122,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
     hotelRequest: {
       cityId: String,
       cityName: String,
+      countryName: String,
       countryCode: String,
 
       checkInDate: Date,
@@ -208,6 +217,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       default: "not_started",
       index: true,
     },
+    voucheredAt: Date,
 
     bookingResult: {
       hotelBookingId: String,
@@ -237,6 +247,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       hotelName: String,
       hotelImage: String,
       city: String,
+      country: String,
       checkInDate: Date,
       checkOutDate: Date,
       roomCount: Number,

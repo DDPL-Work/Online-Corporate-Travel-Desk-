@@ -11,6 +11,7 @@ import {
   fetchBookedHotelDetails,
   generateHotelVoucher,
   preBookHotel,
+  instantHotelBooking,
 } from "../Actions/hotelBooking.thunks";
 
 const initialState = {
@@ -98,6 +99,23 @@ const hotelBookingSlice = createSlice({
         });
       })
       .addCase(createHotelBookingRequest.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        state.success = false;
+      })
+ 
+      /* ================= INSTANT BOOK ================= */
+      .addCase(instantHotelBooking.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.success = false;
+      })
+      .addCase(instantHotelBooking.fulfilled, (state, action) => {
+        state.loading = false;
+        state.success = true;
+        // Optionally update requests/completed list if needed
+      })
+      .addCase(instantHotelBooking.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
         state.success = false;

@@ -8,15 +8,13 @@ import {
 } from "react-router-dom";
 
 import Sidebar from "./Sidebar";
-import Header from "./Header";
-import { loginUser } from "../Redux/Slice/authSlice";
+import LandingHeader from "./LandingHeader";
+import { C } from "../components/Shared/color";
 
 export default function Layout() {
   const dispatch = useDispatch();
   const location = useLocation();
-  const { token, role, isAuthenticated } = useSelector((state) => state.auth);
-
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { role } = useSelector((state) => state.auth);
 
   // 🚪 Pages that do NOT need sidebar/header
   const authPages = ["/login", "/register", "/forgot-password"];
@@ -24,34 +22,18 @@ export default function Layout() {
 
   // ✅ Logout handler
   const handleLogout = () => {
-    dispatch(loginUser());
+    dispatch(logoutUser());
   };
-
-  // 📱 Responsive Sidebar Reset on Resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) setIsSidebarOpen(false);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   // =============================
   // AUTH PAGES — Minimal Layout
   // =============================
   if (isAuthPage) {
     return (
-      <div className="min-h-screen w-full bg-[#F8FAFC] flex items-center justify-center">
+      <div className="min-h-screen w-full bg-[#F8FAFC] flex items-center justify-center" style={{ background: C.offWhite }}>
         <Outlet />
       </div>
     );
-  }
-
-  // =============================
-  // REDIRECT IF NOT AUTHENTICATED
-  // =============================
-  if (!isAuthenticated || !token) {
-    return <Navigate to="/platform/flight-booking-info" replace />;
   }
 
   // =============================
@@ -72,42 +54,23 @@ export default function Layout() {
     <>
       <ScrollRestoration />
 
-      <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
-        {/* ===== FIXED SIDEBAR ===== */}
-        <div className="fixed top-0 left-0 h-full z-50">
-          <Sidebar
-            role={role}
-            isOpen={isSidebarOpen}
-            onClose={() => setIsSidebarOpen(false)}
-          />
-        </div>
+      <div className="flex h-screen w-full overflow-hidden" style={{ background: C.offWhite }}>
+        {/* SIDEBAR IS NOW GLOBAL IN ROOTLAYOUT */}
 
         {/* ===== MAIN AREA ===== */}
-        <div className="flex-1 flex flex-col lg:ml-64">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* ===== STICKY HEADER ===== */}
           <header className="sticky top-0 z-40 bg-white shadow-sm">
-            <Header
-              toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-              sidebarOpen={isSidebarOpen}
-              handleLogout={handleLogout}
-            />
+            <LandingHeader handleLogout={handleLogout} />
           </header>
 
           {/* ===== SCROLLABLE CONTENT ===== */}
-          <main className="flex-1 overflow-y-auto px-4 md:px-6 py-6">
-            <div className="max-w-7xl mx-auto">
+          <main className="flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden px-4 md:px-6 py-6">
+            <div className="w-full min-w-0 mx-auto">
               <Outlet />
             </div>
           </main>
         </div>
-
-        {/* ===== MOBILE BACKDROP ===== */}
-        {isSidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        )}
       </div>
     </>
   );

@@ -160,6 +160,7 @@ const FlightFilterSidebar = ({
     popularFilters: false,
     stops: true,
     departureTime: true,
+    arrivalTime: false,
     airlines: true,
     fareType: false,
     terminal: false,
@@ -472,6 +473,7 @@ const FlightFilterSidebar = ({
     setSelectedMaxDuration(durationRange.max);
     setSelectedStops([]);
     setSelectedTime("");
+    setSelectedArrivalTime("");
     setSelectedAirlines([]);
     setSelectedFareTypes([]);
     setSelectedTerminals([]);
@@ -702,7 +704,34 @@ const FlightFilterSidebar = ({
               }`}
             >
               <div className="mb-1">{t.icon}</div>
-              <div className="font-medium">{t.label}</div>
+              <div className="font-medium hidden sm:block">{t.label}</div>
+              <div className="text-[10px] mt-0.5">{t.range}</div>
+            </div>
+          ))}
+        </div>
+      </FilterSection>
+
+      {/* Arrival Time */}
+      <FilterSection
+        title="Arrival Time"
+        isExpanded={expandedSections.arrivalTime}
+        onToggle={() => toggleSection("arrivalTime")}
+      >
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {times.map((t) => (
+            <div
+              key={t.label}
+              onClick={() =>
+                setSelectedArrivalTime(selectedArrivalTime === t.label ? "" : t.label)
+              }
+              className={`flex flex-col items-center justify-center border rounded-md px-2 py-2 text-xs cursor-pointer transition ${
+                selectedArrivalTime === t.label
+                  ? "bg-[#C9A84C] text-[#0A203E] border-[#C9A84C]"
+                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              <div className="mb-1">{t.icon}</div>
+              <div className="font-medium hidden sm:block">{t.label}</div>
               <div className="text-[10px] mt-0.5">{t.range}</div>
             </div>
           ))}

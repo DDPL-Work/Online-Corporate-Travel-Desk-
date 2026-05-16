@@ -279,8 +279,8 @@ export default function Independent() {
       <LandingHeader />
       <main className="flex-1">
         {/* ── HERO ── */}
-        <section className="w-full bg-linear-to-bl from-[#003399] to-[#000D26] overflow-hidden">
-          <div className="max-w-[1200px] mx-auto px-6 pt-16 pb-20 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-12 text-center lg:text-left">
+        <section className="w-full bg-gradient-to-bl from-[#003399] to-[#000D26] overflow-hidden">
+          <div className="max-w-[1200px] mx-auto px-6 md:px-10 pt-16 pb-20 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-12 text-center lg:text-left">
             {/* Left Content */}
             <div className="flex-1 max-w-[540px] flex flex-col items-center lg:items-start">
               <p className="text-[#C9A84C] text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-widest mb-6">
@@ -342,48 +342,68 @@ export default function Independent() {
         </section>
 
         {/* ── FEATURE BANNER ── */}
-        <div className="w-full bg-slate-950 py-10 px-6 overflow-hidden">
-          <div className="max-w-7xl mx-auto relative">
-            {/* Carousel Container */}
-            <div className="flex w-max md:w-full md:grid md:grid-cols-2 lg:grid-cols-4 md:justify-items-center items-center gap-x-12 md:gap-x-12 lg:gap-16 animate-infinite-scroll md:animate-none">
-              {/* Original Items */}
+        <div className="w-full bg-slate-950 py-10 overflow-hidden">
+          <div className="max-w-[1200px] mx-auto px-6 md:px-10 relative">
+            
+            {/* Desktop Layout: Evenly spaced without awkward end gaps */}
+            <div className="hidden md:flex w-full justify-between items-center">
               {featuresHero.map(({ title, sub }, idx) => (
                 <div
-                  key={`orig-${idx}`}
-                  className="flex flex-col items-center text-center gap-2 whitespace-nowrap md:whitespace-normal"
+                  key={`desktop-${idx}`}
+                  className="flex flex-col items-center text-center gap-2"
                 >
-                  <span className="text-white text-lg font-normal font-['DM_Serif_Display'] leading-tight">
+                  <span className="text-white text-lg lg:text-xl font-normal font-['DM_Serif_Display'] leading-tight">
                     {title}
                   </span>
-                  <span className="text-white/70 text-sm sm:text-base font-light font-['Plus_Jakarta_Sans'] leading-snug">
+                  <span className="text-white/70 text-sm lg:text-base font-light font-['Plus_Jakarta_Sans'] leading-snug">
                     {sub}
                   </span>
                 </div>
               ))}
+            </div>
 
-              {/* Duplicated Items (Hidden on MD screens and above) */}
-              <div className="flex md:hidden gap-x-12">
+            {/* Mobile Layout: Seamless Infinite Scroll */}
+            <div className="flex md:hidden w-max animate-infinite-scroll items-center">
+              {/* Group 1 */}
+              <div className="flex gap-x-12 pr-12">
                 {featuresHero.map(({ title, sub }, idx) => (
                   <div
-                    key={`dup-${idx}`}
+                    key={`mob1-${idx}`}
                     className="flex flex-col items-center text-center gap-2 whitespace-nowrap"
                   >
                     <span className="text-white text-lg font-normal font-['DM_Serif_Display'] leading-tight">
                       {title}
                     </span>
-                    <span className="text-white/70 text-sm sm:text-base font-light font-['Plus_Jakarta_Sans'] leading-snug">
+                    <span className="text-white/70 text-sm font-light font-['Plus_Jakarta_Sans'] leading-snug">
+                      {sub}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {/* Group 2 */}
+              <div className="flex gap-x-12 pr-12">
+                {featuresHero.map(({ title, sub }, idx) => (
+                  <div
+                    key={`mob2-${idx}`}
+                    className="flex flex-col items-center text-center gap-2 whitespace-nowrap"
+                  >
+                    <span className="text-white text-lg font-normal font-['DM_Serif_Display'] leading-tight">
+                      {title}
+                    </span>
+                    <span className="text-white/70 text-sm font-light font-['Plus_Jakarta_Sans'] leading-snug">
                       {sub}
                     </span>
                   </div>
                 ))}
               </div>
             </div>
+
           </div>
         </div>
 
         {/* ── WHO THIS IS FOR ── */}
-        <section className="w-full bg-slate-50 py-20 overflow-hidden">
-          <div className="max-w-[1340px] mx-auto px-8 flex flex-col items-start text-left">
+        <section className="w-full bg-slate-50 py-16 md:py-20 overflow-hidden">
+          <div className="max-w-[1200px] mx-auto px-6 md:px-10 flex flex-col items-start text-left">
             <div className="mb-12 flex flex-col items-start">
               <div
                 style={{ background: ORANGE, color: "#000" }}
@@ -429,10 +449,10 @@ export default function Independent() {
         </section>
 
         {/* ── WHAT TRAVEAMER DOES ── */}
-        <section className="w-full bg-slate-50 -py-5 md:py-20">
-          <div className="max-w-[1340px] mx-auto px-8 flex flex-col items-start text-left">
-            <div className="flex flex-col xl:flex-row gap-10 xl:gap-16 items-start justify-between">
-              <div className="w-full xl:flex-1 xl:max-w-[600px] flex flex-col items-start">
+        <section className="w-full bg-slate-50 py-16 md:py-20">
+          <div className="max-w-[1200px] mx-auto px-6 md:px-10 flex flex-col items-start text-left">
+            <div className="flex flex-col lg:flex-row gap-10 lg:gap-12 items-start justify-between w-full">
+              <div className="w-full lg:flex-1 lg:max-w-[540px] flex flex-col items-start">
                 <div
                   className="w-full lg:w-[519px] px-2.5 py-1 mb-5 text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase"
                   style={{ background: ORANGE, color: "#000" }}
@@ -473,7 +493,7 @@ export default function Independent() {
                 </div>
               </div>
 
-              <div className="w-full xl:w-[580px] bg-white rounded-2xl shadow-[0px_5px_12px_rgba(4,13,22,0.20)] border border-stone-300/10 p-6 flex flex-col gap-5">
+              <div className="w-full lg:flex-1 lg:max-w-[580px] bg-white rounded-2xl shadow-[0px_5px_12px_rgba(4,13,22,0.20)] border border-stone-300/10 p-6 flex flex-col gap-5">
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="text-slate-950 text-sm font-bold font-['Plus_Jakarta_Sans'] leading-5">
@@ -533,8 +553,8 @@ export default function Independent() {
         </section>
 
         {/* ── HOW IT WORKS ── */}
-        <section className="w-full bg-slate-50 py-20">
-          <div className="max-w-[1340px] mx-auto px-8 flex flex-col items-center lg:items-start text-left">
+        <section className="w-full bg-slate-50 py-16 md:py-20">
+          <div className="max-w-[1200px] mx-auto px-6 md:px-10 flex flex-col items-start text-left">
             <div className="mb-14 flex flex-col items-start">
               <div
                 className="w-full md:w-[519px] px-2.5 py-1 mb-5 text-[10px] lg:text-xs font-semibold tracking-[0.2em] uppercase"
@@ -555,14 +575,14 @@ export default function Independent() {
               </p>
             </div>
 
-            <div className="relative">
-              <div className="hidden lg:block absolute top-10 left-[10%] right-[10%] h-0.5 bg-linear-to-r from-blue-500 via-blue-500 to-blue-500/60 z-0 item-center lg:item-start" />
+            <div className="relative w-full">
+              <div className="hidden lg:block absolute top-10 left-[10%] right-[10%] h-0.5 bg-gradient-to-r from-blue-500 via-blue-500 to-blue-500/60 z-0 items-center lg:items-start" />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 relative z-10">
                 {steps.map(({ num, icon, title, desc }) => (
                   <div
                     key={num}
-                    className="flex flex-col items-center text-center"
+                    className="flex flex-col items-start text-left"
                   >
                     <div className="relative mb-6">
                       <div className="w-20 h-20 bg-white rounded-full shadow-[0px_0px_40px_rgba(60,131,246,0.15)] border-2 border-blue-900 flex justify-center items-center">
@@ -577,7 +597,7 @@ export default function Independent() {
                     <h3 className="text-slate-950 text-xl font-normal font-['DM_Serif_Display'] leading-7 mb-2">
                       {title}
                     </h3>
-                    <p className="text-stone-500 text-sm font-normal font-['Plus_Jakarta_Sans'] leading-6 max-w-[200px]">
+                    <p className="text-stone-500 text-sm font-normal font-['Plus_Jakarta_Sans'] leading-6 max-w-[240px]">
                       {desc}
                     </p>
                   </div>
@@ -588,8 +608,8 @@ export default function Independent() {
         </section>
 
         {/* ── CTA ── */}
-        <section className="w-full bg-slate-950 py-20 overflow-hidden">
-          <div className="max-w-[1400px] mx-auto px-8 flex flex-col items-center text-center gap-6">
+        <section className="w-full bg-slate-950 py-16 md:py-20 overflow-hidden">
+          <div className="max-w-[1200px] mx-auto px-6 md:px-10 flex flex-col items-center text-center gap-6">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-normal font-['DM_Serif_Display'] leading-tight max-w-2xl px-4">
               <span className="text-white">Your next client visit</span>
               <br />

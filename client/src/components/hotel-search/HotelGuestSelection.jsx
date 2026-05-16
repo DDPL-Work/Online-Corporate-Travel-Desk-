@@ -237,20 +237,27 @@ export default function HotelGuestSelection({
       <div className="flex flex-col sm:flex-row overflow-y-auto custom-scrollbar max-h-[50vh] sm:max-h-[380px]">
         {/* Left Side: Management */}
         <div className="flex-1 p-4 bg-slate-50/40 border-b sm:border-b-0 sm:border-r border-slate-100 space-y-5">
-           {/* <div>
-              <div className="flex items-center gap-1.5 mb-2.5">
-                <div className="w-1 h-1 rounded-full bg-amber-500" />
-                <h4 className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Nationality</h4>
+           <div className="relative">
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center gap-1.5">
+                   <div className="w-1 h-1 rounded-full bg-amber-500" />
+                   <h4 className="text-[9px] font-black text-slate-700 uppercase tracking-widest">Nationality</h4>
+                </div>
+                <span className="text-[7px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full uppercase">Fixed</span>
               </div>
-              <div className="bg-white p-0.5 rounded-lg border border-slate-100 shadow-sm">
-                 <CountrySelector value={guestNationality} onChange={setGuestNationality} countries={normalizedCountries} />
+              <div className="bg-white p-0.5 rounded-lg border border-slate-200 pointer-events-none shadow-sm">
+                 <CountrySelector 
+                    value={guestNationality || 'IN'} 
+                    onChange={() => {}} 
+                    countries={normalizedCountries} 
+                 />
               </div>
-           </div> */}
+           </div>
 
            <div className="pt-4 border-t border-slate-100">
               <div className="p-3 rounded-xl bg-white border border-slate-100 shadow-sm space-y-2">
                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-black text-slate-400 uppercase">Rooms</span>
+                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight">Rooms</span>
                     <Counter val={rooms} setVal={(v) => {
                        if (v > rooms) setRoomConfigs([...roomConfigs, { adults: 1, children: 0, childrenAges: [] }]);
                        else if (v < rooms && rooms > 1) setRoomConfigs(roomConfigs.slice(0, v));

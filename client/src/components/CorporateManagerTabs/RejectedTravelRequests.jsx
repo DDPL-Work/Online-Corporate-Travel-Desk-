@@ -1,682 +1,431 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   FiXCircle,
-  FiHome,
-  FiUser,
-  FiCalendar,
-  FiDollarSign,
-  FiFilter,
   FiEye,
   FiMessageCircle,
   FiX,
   FiSearch,
-  FiAlertTriangle,
-  FiList,
   FiRefreshCw,
   FiClock,
-  FiAlertCircle,
+  FiArrowRight,
+  FiList,
 } from "react-icons/fi";
-import { FaPlane, FaHotel } from "react-icons/fa";
-import TableScrollWrapper from "../common/TableScrollWrapper";
-import { useDispatch, useSelector } from "react-redux";
+import { FaPlane, FaHotel, FaRupeeSign } from "react-icons/fa";
+import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
 import {
   getRejectedHotelRequests,
   getRejectedFlightRequests,
 } from "../../Redux/Actions/manager.thunk";
 import {
-  formatDate,
-  formatDuration,
-  formatTime,
-  getCabinClassLabel,
-  getDateInIST,
-} from "../../utils/formatter";
-import {
   FlightBookingModal,
   HotelBookingModal,
 } from "./Modal/BookingRequestDetailsModal";
-import { dateCls, IdCell, LabeledField, SearchBar, selectCls, StatCard, Th } from "./Shared/CommonComponents";
+import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
+import {
+  dateCls,
+  IdCell,
+  LabeledField,
+  SearchBar,
+  StatCard,
+  StatusBadge,
+  Th,
+  CustomDropdown,
+} from "../TravelAdminTabs/Shared/CommonComponents";
+import { C } from "../Shared/color";
+import { airlineLogo } from "../../utils/formatter";
 
-function normalize(rejectedRequests) {
-  return rejectedRequests.map((r) => {
-    const lead = r.travellers?.find(t => t.isLeadPassenger);
-
-    const employeeName = lead
-      ? `${lead.firstName} ${lead.lastName}`
-      : "—";
-    const employeeEmail = lead
-      ? `${lead.email}`
-      : "—";
-
-    const amount =
-      r.hotelRequest?.selectedRoom?.Price?.totalFare ||
-      r.hotelRequest?.allRooms?.[0]?.totalFare ||
-      r.bookingSnapshot?.amount ||
-      0;
-
-    return {
-      id: r._id,
-      orderId: r.orderId,
-      raw: r,
-
-      // ✅ FIXED
-      employee: employeeName,
-      employeeMail: employeeEmail,
-
-      type:
-        r.bookingType === "flight" || r.flightRequest ? "Flight" : "Hotel",
-
-      destination: r.hotelRequest?.selectedHotel?.hotelName || "N/A",
-
-      rejectedDate: r.rejectedAt,
-
-      rejectedBy:
-        r.rejectedByDetails?.name ||
-        (r.rejectedBy?.name?.firstName
-          ? `${r.rejectedBy.name.firstName} ${r.rejectedBy.name.lastName}`
-          : "Admin"),
-
-      reason: r.approverComments || "No reason provided",
-
-      // ✅ FIXED
-      estimatedCost: amount,
-
-      status: "Rejected",
-    };
-  });
-}
-// ── FLIGHT SECTION ────────────────────────────────────────────────────────────
-function FlightSection({ allRequests, loading }) {
-  const today = new Date();
-  const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState(
-    new Date(today.getFullYear(), 0, 1).toISOString().split("T")[0],
-  );
-  const [endDate, setEndDate] = useState(
-    new Date(today.getFullYear(), 11, 31).toISOString().split("T")[0],
-  );
-  const [deptFilter, setDept] = useState("All");
-  const [selectedRequest, setSelectedRequest] = useState(null);
-
-  const flightRequests = allRequests.filter((r) => r.type === "Flight");
+const RouteCell = ({ routes, airline }) => {
+  if (!routes || routes.length === 0) return <span className="text-slate-400">No Route</span>;
   
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return flightRequests.filter((r) => {
-      const rejDate = new Date(r.rejectedDate);
-      const dateOk =
-        rejDate >= new Date(startDate) && rejDate <= new Date(endDate);
-      const searchOk =
-        !q ||
-        r.employee.toLowerCase().includes(q) ||
-        (r.orderId || "").toLowerCase().includes(q) ||
-        r.destination.toLowerCase().includes(q) ||
-        r.rejectedBy.toLowerCase().includes(q) ||
-        r.id.toString().includes(q);
-      return dateOk && searchOk;
-    });
-  }, [search, startDate, endDate, deptFilter, flightRequests]);
-
-  const totalCost = filtered.reduce((s, r) => s + r.estimatedCost, 0);
+  const airlineCode = (airline?.airlineCode || "AI").toUpperCase();
+  const airlineName = airline?.airlineName || "Airline";
+  const logoUrl = airlineLogo(airlineCode);
 
   return (
-    <div className="space-y-4">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-2 gap-3">
-        <StatCard
-          label="Total Rejected"
-          value={filtered.length}
-          Icon={FiXCircle}
-          borderCls="border-red-500"
-          iconBgCls="bg-red-50"
-          iconColorCls="text-red-500"
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
+        <img 
+          src={logoUrl} 
+          alt={airlineName} 
+          className="w-full h-full object-contain"
+          onError={(e) => { 
+            e.target.onerror = null;
+            e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
+          }} 
         />
-        <StatCard
-          label="Flight Requests"
-          value={filtered.length}
-          Icon={FaPlane}
-          borderCls="border-[#0A4D68]"
-          iconBgCls="bg-[#0A4D68]/10"
-          iconColorCls="text-[#0A4D68]"
-        />
-        {/* <StatCard
-          label="Est. Cost Lost"
-          value={`₹${totalCost.toLocaleString()}`}
-          Icon={FiDollarSign}
-          borderCls="border-violet-500"
-          iconBgCls="bg-violet-50"
-          iconColorCls="text-violet-600"
-        /> */}
-      
       </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <LabeledField
-            label={
-              <>
-                <FiSearch size={10} /> Search Employee / Destination
-              </>
-            }
-          >
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Name, destination, ID…"
-            />
-          </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> From Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> To Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-         
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[960px]">
-            <thead>
-              <tr className="bg-red-700 text-red-100">
-                <Th>Order ID</Th>
-                <Th>Employee</Th>
-                <Th>Destination</Th>
-                <Th>Rejected Date</Th>
-                <Th>Rejected By</Th>
-                <Th>Reason</Th>
-                <Th>Est. Cost</Th>
-                <Th>Action</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan="9" className="py-16 text-center text-slate-400">
-                    <p className="text-sm font-semibold">Loading...</p>
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="py-16 text-center text-slate-400">
-                    <div className="flex justify-center mb-3">
-                      <FaPlane size={32} className="opacity-20" />
-                    </div>
-                    <p className="font-semibold text-sm">
-                      No rejected flight requests found
-                    </p>
-                    <p className="text-xs mt-1">
-                      Try adjusting the filters or search query
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((r, i) => (
-                  <tr
-                    key={r.id}
-                    className={`transition-colors hover:bg-red-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
-                  >
-                    <td className="px-4 py-3">
-                      <IdCell id={r.orderId || "N/A"} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-red-100 flex items-center justify-center text-[11px] font-black text-red-600 shrink-0">
-                          {r.employee[0]}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-[13px] text-slate-800">
-                            {r.employee}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    
-                    <td className="px-4 py-3 text-[13px] text-slate-700 font-medium">
-                      {r.destination}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {r.rejectedDate
-                        ? new Date(r.rejectedDate).toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "N/A"}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-600">
-                      {r.rejectedBy}
-                    </td>
-                    <td className="px-4 py-3 max-w-[180px]">
-                      <p
-                        className="text-[12px] text-red-600 truncate"
-                        title={r.reason}
-                      >
-                        {r.reason}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 font-bold text-slate-900">
-                      ₹{r.estimatedCost.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => setSelectedRequest(r)}
-                        className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] flex items-center gap-1"
-                      >
-                        <FiEye size={12} /> View
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-          <span>
-            Showing{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> of{" "}
-            <strong className="text-slate-600">{flightRequests.length}</strong>{" "}
-            rejected flight requests
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-tight">
+            {routes[0].fromCode}
           </span>
-          <span>
-            Est. Cost:{" "}
-            <strong className="text-red-600">
-              ₹{totalCost.toLocaleString()}
-            </strong>
+          <FiArrowRight size={12} className="text-slate-400" />
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-tight">
+            {routes.length > 1 ? routes[0].toCode : routes[routes.length - 1].toCode}
           </span>
+          {routes.length > 1 && (
+            <span className="bg-amber-50 text-amber-600 text-[8px] font-black px-1.5 py-0.5 rounded border border-amber-100 ml-1">RT</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-500">
+          <span className="capitalize">{routes[0].fromCity || "Origin"}</span>
+          <span>→</span>
+          <span className="capitalize">{routes.length > 1 ? (routes[0].toCity || "Turnaround") : (routes[routes.length - 1].toCity || "Dest")}</span>
         </div>
       </div>
-
-      {selectedRequest?.raw?.bookingType === "flight" && (
-        <FlightBookingModal
-          booking={selectedRequest.raw}
-          onClose={() => setSelectedRequest(null)}
-        />
-      )}
     </div>
   );
-}
+};
 
-// ── HOTEL SECTION ─────────────────────────────────────────────────────────────
-function HotelSection({ allRequests, loading }) {
-  const today = new Date();
+function FlightSection({ data, loading }) {
   const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState(
-    new Date(today.getFullYear(), 0, 1).toISOString().split("T")[0],
-  );
-  const [endDate, setEndDate] = useState(
-    new Date(today.getFullYear(), 11, 31).toISOString().split("T")[0],
-  );
-  const [deptFilter, setDept] = useState("All");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const PAGE_SIZE = 10;
+  const navigate = useNavigate();
 
-  const hotelRequests = allRequests.filter((r) => r.type === "Hotel");
- 
+  const formatted = useMemo(() => (data || []).map(b => {
+    const traveller = b.travellers?.length
+      ? `${b.travellers[0].title || ""} ${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim()
+      : "Staff Member";
+    
+    const amount = b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? b.flightRequest?.fareSnapshot?.publishedFare ?? 0;
+
+    const segments = b.flightRequest?.segments || [];
+    const onwardSegments = segments.filter(s => s.journeyType === "onward");
+    const returnSegments = segments.filter(s => s.journeyType === "return");
+    
+    const buildLeg = (segs) => {
+      if (!segs.length) return null;
+      const first = segs[0]; 
+      const last = segs[segs.length - 1];
+      return {
+        fromCode: first?.origin?.airportCode || "N/A",
+        toCode: last?.destination?.airportCode || "N/A",
+        fromCity: first?.origin?.city || "Unknown",
+        toCity: last?.destination?.city || "Unknown"
+      };
+    };
+
+    const routes = [];
+    if (onwardSegments.length > 0 || returnSegments.length > 0) {
+      const onwardLeg = buildLeg(onwardSegments);
+      const returnLeg = buildLeg(returnSegments);
+      if (onwardLeg) routes.push(onwardLeg);
+      if (returnLeg) routes.push(returnLeg);
+    } else if (segments.length > 0) {
+      const leg = buildLeg(segments);
+      if (leg) routes.push(leg);
+    }
+    
+    const airline = segments[0] ? { 
+      airlineCode: segments[0].airlineCode || segments[0].airline?.airlineCode, 
+      airlineName: segments[0].airlineName || segments[0].airline?.airlineName 
+    } : null;
+
+    return { 
+      ...b, 
+      travellerName: traveller, 
+      employeeId: b.requesterDetails?.email || b.userId?.email || "—", 
+      status: "Rejected", 
+      amount, 
+      bookedDate: b.createdAt,
+      routes,
+      airline,
+      rejectedDate: b.rejectedAt
+    };
+  }), [data]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return hotelRequests.filter((r) => {
-      const rejDate = new Date(r.rejectedDate);
-      const dateOk =
-        rejDate >= new Date(startDate) && rejDate <= new Date(endDate);
-      const searchOk =
-        !q ||
-        r.employee.toLowerCase().includes(q) ||
-        (r.orderId || "").toLowerCase().includes(q) ||
-        r.destination.toLowerCase().includes(q) ||
-        r.rejectedBy.toLowerCase().includes(q) ||
-        r.id.toString().includes(q);
-      return dateOk && searchOk;
+    return formatted.filter(b => {
+      const rejDate = b.rejectedDate ? new Date(b.rejectedDate).toISOString().slice(0, 10) : "";
+      return (!q || b.travellerName.toLowerCase().includes(q) || (b.orderId || "").toLowerCase().includes(q) || b.employeeId.toLowerCase().includes(q)) &&
+             (!startDate || rejDate >= startDate) && (!endDate || rejDate <= endDate);
     });
-  }, [search, startDate, endDate, deptFilter, hotelRequests]);
+  }, [search, startDate, endDate, formatted]);
 
-  const totalCost = filtered.reduce((s, r) => s + r.estimatedCost, 0);
+  const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
 
   return (
-    <div className="space-y-4">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-2 gap-3">
-        <StatCard
-          label="Total Rejected"
-          value={filtered.length}
-          Icon={FiXCircle}
-          borderCls="border-red-500"
-          iconBgCls="bg-red-50"
-          iconColorCls="text-red-500"
-        />
-        <StatCard
-          label="Hotel Requests"
-          value={filtered.length}
-          Icon={FaHotel}
-          borderCls="border-[#088395]"
-          iconBgCls="bg-[#088395]/10"
-          iconColorCls="text-[#088395]"
-        />
-        {/* <StatCard
-          label="Est. Cost Lost"
-          value={`₹${totalCost.toLocaleString()}`}
-          Icon={FiDollarSign}
-          borderCls="border-violet-500"
-          iconBgCls="bg-violet-50"
-          iconColorCls="text-violet-600"
-        /> */}
-        
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard label="Rejected Flights" value={filtered.length} Icon={FaPlane} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+        <StatCard label="Value Impact" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
+        <StatCard label="Avg. Response" value="2.4h" Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Critical Rejections" value={filtered.length} Icon={FiXCircle} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <LabeledField
-            label={
-              <>
-                <FiSearch size={10} /> Search Employee / Destination
-              </>
-            }
-          >
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Name, destination, ID…"
-            />
+      <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+          <LabeledField label={<><FiSearch size={10} /> Manifest Search</>} className="lg:col-span-4">
+            <SearchBar value={search} onChange={setSearch} placeholder="PNR, Name or ID..." />
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> From Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={dateCls}
-            />
+          <LabeledField label="Rejection Window" className="lg:col-span-4">
+             <div className="flex items-center gap-2">
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+                <span className="text-slate-300">to</span>
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+             </div>
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> To Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={dateCls}
-            />
-          </LabeledField>
-          
+          <div className="flex items-end lg:col-span-4">
+             <button onClick={() => { setSearch(""); setStartDate(""); setEndDate(""); }} className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest" style={{ background: C.white, borderColor: C.border, color: C.muted }}><FiX /> Reset</button>
+          </div>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[960px]">
-            <thead>
-              <tr className="bg-red-700 text-red-100">
-                <Th>Order ID</Th>
-                <Th>Employee</Th>
-                <Th>Rejected Date</Th>
-                <Th>Rejected By</Th>
-                <Th>Reason</Th>
-                <Th>Est. Cost</Th>
-                <Th>Action</Th>
+      <ResponsiveDataTable title="Flight Rejection Ledger" subtitle={`${filtered.length} requests rejected`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="!px-6 !py-5">Order ID</Th>
+              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Route</Th>
+              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Rejected On</Th>
+              <Th className="!px-6 !py-5">Amount</Th>
+              <Th className="!px-6 !py-5 !text-center">Action</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginated.length > 0 ? paginated.map((b, i) => (
+              <tr key={b._id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.gold + "08" }}>
+                <td className="!px-6 !py-5"><IdCell id={b.orderId} /></td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.travellerName}</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{b.flightRequest?.purposeOfTravel}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <RouteCell routes={b.routes} airline={b.airline} />
+                </td>
+                <td className="!px-6 !py-5">
+                   <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{b.employeeId}</span>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.rejectedDate ? new Date(b.rejectedDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase">{b.rejectedDate ? new Date(b.rejectedDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : ""}</p>
+                </td>
+                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
+                <td className="!px-6 !py-5 !text-center">
+                    <button onClick={() => setSelectedRequest(b)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
+                      <FiEye size={16} className="text-[#E7C695] group-hover:scale-110 transition-transform" />
+                    </button>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan="9" className="py-16 text-center text-slate-400">
-                    <p className="text-sm font-semibold">Loading...</p>
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="py-16 text-center text-slate-400">
-                    <div className="flex justify-center mb-3">
-                      <FaHotel size={32} className="opacity-20" />
+            )) : (
+              <tr>
+                <td colSpan={8} className="!px-6 !py-20 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                      <FiSearch size={32} />
                     </div>
-                    <p className="font-semibold text-sm">
-                      No rejected hotel requests found
-                    </p>
-                    <p className="text-xs mt-1">
-                      Try adjusting the filters or search query
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((r, i) => (
-                  <tr
-                    key={r.id}
-                    className={`transition-colors hover:bg-red-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
-                  >
-                    <td className="px-4 py-3">
-                      <IdCell id={r.orderId || "N/A"} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-[13px] text-slate-800">
-                            {r.employee}
-                          </span>
-                          <span className="font-mono text-[11px] text-slate-400">
-                            {r.employeeMail || "N/A"}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {r.rejectedDate
-                        ? new Date(r.rejectedDate).toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "N/A"}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-600">
-                      {r.rejectedBy}
-                    </td>
-                    <td className="px-4 py-3 max-w-[180px]">
-                      <p
-                        className="text-[12px] text-red-600 truncate"
-                        title={r.reason}
-                      >
-                        {r.reason}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 font-bold text-slate-900">
-                      ₹{r.estimatedCost.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => setSelectedRequest(r)}
-                        className="px-3 py-1 text-xs font-semibold bg-[#088395] text-white rounded-md hover:bg-[#066b78] flex items-center gap-1"
-                      >
-                        <FiEye size={12} /> View
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-          <span>
-            Showing{" "}
-            <strong className="text-slate-600">{filtered.length}</strong> of{" "}
-            <strong className="text-slate-600">{hotelRequests.length}</strong>{" "}
-            rejected hotel requests
-          </span>
-          <span>
-            Est. Cost:{" "}
-            <strong className="text-red-600">
-              ₹{totalCost.toLocaleString()}
-            </strong>
-          </span>
-        </div>
-      </div>
-
-      {selectedRequest?.raw?.bookingType === "hotel" && (
-        <HotelBookingModal
-          booking={selectedRequest.raw}
-          onClose={() => setSelectedRequest(null)}
-        />
-      )}
+                    <p className="text-sm font-bold text-slate-400">No rejected flight requests found.</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
+      {selectedRequest && <FlightBookingModal booking={selectedRequest} onClose={() => setSelectedRequest(null)} />}
     </div>
   );
 }
 
-// ── ROOT ──────────────────────────────────────────────────────────────────────
+function HotelSection({ data, loading }) {
+  const [search, setSearch] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const PAGE_SIZE = 10;
+  const navigate = useNavigate();
+
+  const formatted = useMemo(() => (data || []).map(b => {
+    const guest = b.travellers?.length
+      ? `${b.travellers[0].title || ""} ${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim()
+      : "Staff Member";
+    
+    const amount = b.hotelRequest?.selectedRoom?.Price?.totalFare || b.hotelRequest?.allRooms?.[0]?.totalFare || b.bookingSnapshot?.amount || 0;
+
+    return { 
+      ...b, 
+      guestName: guest, 
+      employeeId: b.requesterDetails?.email || b.userId?.email || "—", 
+      status: "Rejected", 
+      amount, 
+      bookedDate: b.createdAt,
+      hotelName: b.hotelRequest?.selectedHotel?.hotelName || "N/A",
+      city: b.hotelRequest?.selectedHotel?.city || "N/A",
+      rejectedDate: b.rejectedAt
+    };
+  }), [data]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return formatted.filter(b => {
+      const rejDate = b.rejectedDate ? new Date(b.rejectedDate).toISOString().slice(0, 10) : "";
+      return (!q || b.guestName.toLowerCase().includes(q) || b.hotelName.toLowerCase().includes(q) || (b.orderId || "").toLowerCase().includes(q) || b.employeeId.toLowerCase().includes(q)) &&
+             (!startDate || rejDate >= startDate) && (!endDate || rejDate <= endDate);
+    });
+  }, [search, startDate, endDate, formatted]);
+
+  const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard label="Rejected Hotels" value={filtered.length} Icon={FaHotel} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+        <StatCard label="Value Impact" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
+        <StatCard label="Critical Rejections" value={filtered.length} Icon={FiXCircle} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Total Loss" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FiMessageCircle} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+          <LabeledField label={<><FiSearch size={10} /> Manifest Search</>} className="lg:col-span-4">
+            <SearchBar value={search} onChange={setSearch} placeholder="Guest Name or Order ID..." />
+          </LabeledField>
+          <LabeledField label="Rejection Window" className="lg:col-span-4">
+             <div className="flex items-center gap-2">
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+                <span className="text-slate-300">to</span>
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+             </div>
+          </LabeledField>
+          <div className="flex items-end lg:col-span-4">
+             <button onClick={() => { setSearch(""); setStartDate(""); setEndDate(""); }} className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest" style={{ background: C.white, borderColor: C.border, color: C.muted }}><FiX /> Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <ResponsiveDataTable title="Hotel Rejection Ledger" subtitle={`${filtered.length} requests rejected`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="!px-6 !py-5">Order Reference</Th>
+              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Asset Detail</Th>
+              <Th className="!px-6 !py-5">Rejected On</Th>
+              <Th className="!px-6 !py-5">Amount</Th>
+              <Th className="!px-6 !py-5 !text-center">Action</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginated.length > 0 ? paginated.map((b, i) => (
+              <tr key={b._id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.gold + "08" }}>
+                <td className="!px-6 !py-5"><IdCell id={b.orderId} /></td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.guestName}</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{b.hotelRequest?.purposeOfTravel}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{b.employeeId}</span>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.hotelName}</p>
+                   <p className="text-[10px] font-bold text-gold uppercase">{b.city}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{b.rejectedDate ? new Date(b.rejectedDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase">{b.rejectedDate ? new Date(b.rejectedDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : ""}</p>
+                </td>
+                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
+                <td className="!px-6 !py-5 !text-center">
+                    <button onClick={() => setSelectedRequest(b)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
+                      <FiEye size={16} className="text-[#E7C695] group-hover:scale-110 transition-transform" />
+                    </button>
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={8} className="!px-6 !py-20 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                      <FiSearch size={32} />
+                    </div>
+                    <p className="text-sm font-bold text-slate-400">No rejected hotel requests found.</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
+      {selectedRequest && <HotelBookingModal booking={selectedRequest} onClose={() => setSelectedRequest(null)} />}
+    </div>
+  );
+}
+
 export default function RejectedTravelRequestsForManager() {
   const [activeTab, setActiveTab] = useState("flight");
-
+  const navigate = useNavigate();
   const dispatch = useDispatch();
-  const {
-    rejectedHotelRequests,
-    rejectedFlightRequests,
-    loadingRejectedRequests,
-    loadingRejectedFlightRequests,
-  } = useSelector((state) => state.manager);
+  const { rejectedHotelRequests, rejectedFlightRequests, loadingRejectedRequests, loadingRejectedFlightRequests } = useSelector((state) => state.manager);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    if (activeTab === "flight") {
-      dispatch(getRejectedFlightRequests());
-    } else {
-      dispatch(getRejectedHotelRequests());
-    }
+    if (activeTab === "flight") dispatch(getRejectedFlightRequests());
+    else dispatch(getRejectedHotelRequests());
   }, [activeTab, dispatch]);
 
-  const allRequests = useMemo(
-    () => normalize([
-      ...(rejectedFlightRequests || []),
-      ...(rejectedHotelRequests || []),
-    ]),
-    [rejectedFlightRequests, rejectedHotelRequests],
-  );
+  const loadingActive = activeTab === "flight" ? loadingRejectedFlightRequests : loadingRejectedRequests;
 
-  const loadingActive =
-    activeTab === "flight"
-      ? loadingRejectedFlightRequests
-      : loadingRejectedRequests;
-
-  const handleRefresh = () => {
-    if (activeTab === "flight") {
-      dispatch(getRejectedFlightRequests());
-      return;
+  const handleRefresh = async () => {
+    setIsSyncing(true);
+    try {
+      await dispatch(activeTab === "flight" ? getRejectedFlightRequests() : getRejectedHotelRequests());
+    } finally {
+      setIsSyncing(false);
     }
-    dispatch(getRejectedHotelRequests());
   };
 
-  const tabs = [
-    {
-      id: "flight",
-      label: "Flight Requests",
-      Icon: FaPlane,
-      activeText: "text-red-700",
-      activeBorder: "border-b-red-700",
-    },
-    {
-      id: "hotel",
-      label: "Hotel Requests",
-      Icon: FaHotel,
-      activeText: "text-red-600",
-      activeBorder: "border-b-red-600",
-    },
-  ];
-
   return (
-    <div className="min-h-screen bg-slate-100 font-sans">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Page Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-linear-to-br from-red-600 to-red-400 flex items-center justify-center shrink-0">
-            <FiXCircle size={18} className="text-white" />
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-10 pb-24 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+             <div className="flex items-center gap-3">
+               <button onClick={() => navigate(-1)} className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 backdrop-blur-md shadow-xl">
+                 <FiArrowRight className="rotate-180" size={22} />
+               </button>
+               <button onClick={handleRefresh} className={`p-3.5 rounded-2xl bg-white/10 transition-all border border-white/10 backdrop-blur-md shadow-xl ${(isSyncing || loadingActive) ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`} disabled={isSyncing || loadingActive}>
+                 <div className={(isSyncing || loadingActive) ? "animate-spin" : ""}>
+                   <FiRefreshCw size={22} />
+                 </div>
+               </button>
+             </div>
+             <div className="h-16 w-[1px] bg-white/10 mx-2 hidden md:block" />
+             <div className="flex items-center gap-5">
+               <div className="w-16 h-16 rounded-[2rem] flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
+                 <FiXCircle size={32} />
+               </div>
+               <div>
+                 <h1 className="text-4xl font-black tracking-tight leading-none">Rejection Registry</h1>
+                 <p className="text-[11px] mt-3 font-bold uppercase tracking-[3px] opacity-60">Analysis of Declined Travel Requirements</p>
+               </div>
+             </div>
           </div>
-          <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">
-              Rejected Travel Requests
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Review and analyze all rejected or cancelled travel requests
-            </p>
-          </div>
-          <button
-            onClick={handleRefresh}
-            disabled={loadingActive}
-            className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:text-slate-800 hover:border-slate-300 disabled:opacity-50"
-          >
-            <FiRefreshCw size={14} className={loadingActive ? "animate-spin" : ""} />
-            Refresh
-          </button>
         </div>
+      </div>
 
-        {/* Tab Bar */}
-        <div className="flex items-end gap-0 mb-5 border-b-2 border-slate-200">
-          {tabs.map((tab) => {
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 px-5 py-2.5 text-[13px] font-bold transition-all border-b-2 -mb-0.5 rounded-t-lg
-                  ${
-                    active
-                      ? `bg-white ${tab.activeText} ${tab.activeBorder} shadow-sm`
-                      : "text-slate-400 border-transparent hover:text-slate-600 hover:bg-white/60"
-                  }
-                `}
-              >
-                <tab.Icon size={14} />
-                {tab.label}
-              </button>
-            );
-          })}
+      <div className="w-full px-4 md:px-10 -mt-12 space-y-10">
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+           {[["flight", "Flight Requests", FaPlane], ["hotel", "Hotel Requests", FaHotel]].map(([k, lbl, Icon]) => (
+             <button key={k} onClick={() => setActiveTab(k)} className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
+                <Icon size={14} /> {lbl}
+             </button>
+           ))}
         </div>
-
-        {/* Tab Content */}
         {activeTab === "flight" ? (
-          <FlightSection
-            allRequests={allRequests}
-            loading={loadingRejectedFlightRequests}
-          />
+          <FlightSection data={rejectedFlightRequests} loading={loadingRejectedFlightRequests} />
         ) : (
-          <HotelSection
-            allRequests={allRequests}
-            loading={loadingRejectedRequests}
-          />
+          <HotelSection data={rejectedHotelRequests} loading={loadingRejectedRequests} />
         )}
       </div>
     </div>

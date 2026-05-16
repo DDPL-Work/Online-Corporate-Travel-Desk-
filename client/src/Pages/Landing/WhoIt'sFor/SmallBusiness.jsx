@@ -220,12 +220,22 @@ function InfoBar() {
 
   return (
     <div className="bg-slate-950 border-t border-white/10 py-8 overflow-hidden">
-      <div className="max-w-7xl mx-auto">
-        {/* The wrapper that handles the animation on mobile and static grid on desktop */}
-        <div className="flex w-max md:w-full md:justify-center items-center gap-x-12 animate-infinite-scroll md:animate-none">
-          
-          {/* First Set of Items */}
-          <div className="flex items-center gap-x-12">
+      <div className="max-w-[1200px] mx-auto px-6 md:px-10 relative">
+        
+        {/* Desktop Layout: Evenly spread across the full width */}
+        <div className="hidden md:flex w-full justify-between items-center">
+          {items.map((it, idx) => (
+            <p key={`desktop-${idx}`} className="text-white/80 text-sm flex items-center gap-1 whitespace-nowrap">
+              <span className="font-bold">{it.bold}</span>
+              <span className="font-normal opacity-60">{it.rest}</span>
+            </p>
+          ))}
+        </div>
+
+        {/* Mobile / Tablet Layout: Seamless Infinite Scroll */}
+        <div className="flex md:hidden w-max animate-infinite-scroll items-center">
+          {/* Group 1 */}
+          <div className="flex items-center gap-x-12 pr-12">
             {items.map((it, idx) => (
               <p key={`set1-${idx}`} className="text-white/80 text-sm flex items-center gap-1 whitespace-nowrap">
                 <span className="font-bold">{it.bold}</span>
@@ -234,8 +244,8 @@ function InfoBar() {
             ))}
           </div>
 
-          {/* Second Identical Set (Visible only on mobile for the loop) */}
-          <div className="flex md:hidden items-center gap-x-12">
+          {/* Group 2 */}
+          <div className="flex items-center gap-x-12 pr-12">
             {items.map((it, idx) => (
               <p key={`set2-${idx}`} className="text-white/80 text-sm flex items-center gap-1 whitespace-nowrap">
                 <span className="font-bold">{it.bold}</span>
@@ -243,8 +253,8 @@ function InfoBar() {
               </p>
             ))}
           </div>
-
         </div>
+
       </div>
     </div>
   );

@@ -2,7 +2,9 @@ const Corporate = require("../models/Corporate");
 const CreditTransaction = require("../models/CreditTransaction");
 const Ledger = require("../models/Ledger");
 const User = require("../models/User");
-const { ApiError } = require("../utils/ApiError");
+const BookingRequest = require("../models/BookingRequest");
+const HotelBookingRequest = require("../models/hotelBookingRequest.model");
+const ApiError = require("../utils/ApiError");
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 function computeCycles(onboardedAt, cycleDays) {
@@ -36,7 +38,8 @@ function trackId(corporateId, cycleIndex) {
 // =======================================
 exports.getPostpaidBalance = async (req, res, next) => {
   try {
-    const corporateId = (req.user.role === "super-admin" && req.query.corporateId) 
+    const isAdmin = ["super-admin", "ops-member"].includes(req.user.role);
+    const corporateId = (isAdmin && req.query.corporateId) 
       ? req.query.corporateId 
       : req.user.corporateId;
 
@@ -118,7 +121,8 @@ exports.getPostpaidTransactions = async (req, res, next) => {
   try {
     const { startDate, endDate, department, page = 1, limit = 10 } = req.query;
 
-    const corporateId = (req.user.role === "super-admin" && req.query.corporateId)
+    const isAdmin = ["super-admin", "ops-member"].includes(req.user.role);
+    const corporateId = (isAdmin && req.query.corporateId)
       ? req.query.corporateId
       : req.user.corporateId;
 
@@ -140,7 +144,7 @@ exports.getPostpaidTransactions = async (req, res, next) => {
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    const [transactions, total] = await Promise.all([
+    const [rawTransactions, total] = await Promise.all([
       Ledger.find(filter)
         .populate("userId", "name email")
         .sort({ createdAt: -1 })
@@ -148,6 +152,53 @@ exports.getPostpaidTransactions = async (req, res, next) => {
         .limit(Number(limit)),
       Ledger.countDocuments(filter),
     ]);
+
+    // 🔹 SMART RESOLUTION: Search in BookingRequest / HotelBookingRequest manually
+    const transactions = await Promise.all(
+      rawTransactions.map(async (tx) => {
+        const t = tx.toObject();
+        let bId = tx.bookingId || t.metadata?.bookingId;
+
+        if (bId) {
+          // 1. Check if it's a Hotel based on metadata or description
+          const isHotel = 
+            t.metadata?.bookingType === "hotel" || 
+            t.description?.toLowerCase().includes("hotel");
+          
+          // 2. Try primary model based on hint
+          let Model = isHotel ? HotelBookingRequest : BookingRequest;
+          let details = await Model.findById(bId).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+
+          // 3. If not found, try the other model (robust fallback)
+          if (!details) {
+            Model = isHotel ? BookingRequest : HotelBookingRequest;
+            details = await Model.findById(bId).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+          }
+
+          if (details) {
+            t.bookingId = details;
+          } else {
+            // 4. Try searching by bookingReference as a final safety net
+            if (tx.bookingReference) {
+              details = await Model.findOne({ bookingReference: tx.bookingReference }).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+              if (!details) {
+                Model = isHotel ? BookingRequest : HotelBookingRequest;
+                details = await Model.findOne({ bookingReference: tx.bookingReference }).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+              }
+            }
+            
+            if (details) {
+              t.bookingId = details;
+            } else {
+              // Last resort: try generic Booking model
+              const Booking = require("../models/Booking");
+              t.bookingId = await Booking.findById(bId).select("flightDetails hotelDetails tboBookingId bookingReference bookingType");
+            }
+          }
+        }
+        return t;
+      })
+    );
 
     res.json({
       success: true,
@@ -169,7 +220,8 @@ exports.getPostpaidTransactions = async (req, res, next) => {
 // =======================================
 exports.getPreviousCycles = async (req, res, next) => {
   try {
-    const corporateId = (req.user.role === "super-admin" && req.query.corporateId)
+    const isAdmin = ["super-admin", "ops-member"].includes(req.user.role);
+    const corporateId = (isAdmin && req.query.corporateId)
       ? req.query.corporateId
       : req.user.corporateId;
 
@@ -257,7 +309,8 @@ exports.getPreviousCycles = async (req, res, next) => {
 // =======================================
 exports.getCycleTransactions = async (req, res, next) => {
   try {
-    const corporateId = (req.user.role === "super-admin" && req.query.corporateId)
+    const isAdmin = ["super-admin", "ops-member"].includes(req.user.role);
+    const corporateId = (isAdmin && req.query.corporateId)
       ? req.query.corporateId
       : req.user.corporateId;
 
@@ -285,15 +338,57 @@ exports.getCycleTransactions = async (req, res, next) => {
       createdAt: { $gte: cycle.start, $lte: cycle.end },
     };
 
-    const [transactions, total] = await Promise.all([
+    const [rawTransactions, total] = await Promise.all([
       Ledger.find(filter)
         .populate("userId", "name email")
-        .populate("bookingId", "bookingReference pnr ticketNumber")
         .sort({ createdAt: 1 })
         .skip(skip)
         .limit(Number(limit)),
       Ledger.countDocuments(filter),
     ]);
+
+    // 🔹 SMART RESOLUTION: Search in BookingRequest / HotelBookingRequest manually
+    const transactions = await Promise.all(
+      rawTransactions.map(async (tx) => {
+        const t = tx.toObject();
+        let bId = tx.bookingId || t.metadata?.bookingId;
+
+        if (bId) {
+          const isHotel = 
+            t.metadata?.bookingType === "hotel" || 
+            t.description?.toLowerCase().includes("hotel");
+          
+          let Model = isHotel ? HotelBookingRequest : BookingRequest;
+          let details = await Model.findById(bId).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+
+          if (!details) {
+            Model = isHotel ? BookingRequest : HotelBookingRequest;
+            details = await Model.findById(bId).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+          }
+
+          if (details) {
+            t.bookingId = details;
+          } else {
+            // 4. Try searching by bookingReference as a final safety net
+            if (tx.bookingReference) {
+              details = await Model.findOne({ bookingReference: tx.bookingReference }).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+              if (!details) {
+                Model = isHotel ? BookingRequest : HotelBookingRequest;
+                details = await Model.findOne({ bookingReference: tx.bookingReference }).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+              }
+            }
+            
+            if (details) {
+              t.bookingId = details;
+            } else {
+              const Booking = require("../models/Booking");
+              t.bookingId = await Booking.findById(bId).select("flightDetails hotelDetails tboBookingId bookingReference bookingType");
+            }
+          }
+        }
+        return t;
+      })
+    );
 
     const stmtId = statementId(corporateId, cycle.index);
 

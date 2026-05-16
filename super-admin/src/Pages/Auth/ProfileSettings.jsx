@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUserProfile, updateUserProfile } from "../../Redux/Slice/profileSlice";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
   FaUser,
   FaEnvelope,

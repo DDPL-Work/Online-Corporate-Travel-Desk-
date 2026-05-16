@@ -20,6 +20,13 @@ const walletRechargeLogSchema = new mongoose.Schema(
       required: true,
     },
 
+    gateway: {
+      type: String,
+      enum: ["razorpay", "phonepe"],
+      default: "razorpay",
+      index: true,
+    },
+
     status: {
       type: String,
       enum: ["PENDING", "SUCCESS", "FAILED"],
@@ -37,12 +44,25 @@ const walletRechargeLogSchema = new mongoose.Schema(
       index: true,
     },
 
+    providerOrderId: {
+      type: String,
+      index: true,
+    },
+
+    lastKnownState: {
+      type: String,
+      trim: true,
+    },
+
     failureReason: {
       type: String,
     },
 
     balanceBefore: Number,
     balanceAfter: Number,
+    processedAt: Date,
+    webhookReceivedAt: Date,
+    lastStatusCheckAt: Date,
 
     metadata: mongoose.Schema.Types.Mixed,
   },
@@ -51,6 +71,8 @@ const walletRechargeLogSchema = new mongoose.Schema(
 
 walletRechargeLogSchema.index({ createdAt: -1 });
 walletRechargeLogSchema.index({ corporateId: 1, createdAt: -1 });
+walletRechargeLogSchema.index({ gateway: 1, orderId: 1 });
+walletRechargeLogSchema.index({ gateway: 1, paymentId: 1 });
 
 module.exports = mongoose.model(
   "WalletRechargeLog",

@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Header from "./Hotel-Header";
 import FilterSidebar from "./Filter-Sidebar";
 import HotelCard from "./Hotel-Card";
-import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import { useDispatch, useSelector } from "react-redux";
 import { searchHotels } from "../../../Redux/Actions/hotelThunks";
 import SearchLoadingModal from "../../../components/common/SearchLoadingModal";
 import NoResultsFound from "../../../components/common/NoResultsFound";
 import { useLocation, useNavigate } from "react-router-dom";
+import LandingHeader from "../../../layout/LandingHeader";
 
 const DEFAULT_FILTERS = {
   minPrice: null,
@@ -42,6 +42,7 @@ function HotelSearchResults() {
   const [filters, setFilters] = useState(() => ({ ...DEFAULT_FILTERS }));
   const [searchText, setSearchText] = useState("");
   const [sortOrder, setSortOrder] = useState("low");
+  const [selectedLocation, setSelectedLocation] = useState(null); // { lat, lng, name }
 
   const availablePriceRange = filterMeta?.priceRange || { min: 0, max: 0 };
 
@@ -93,9 +94,8 @@ function HotelSearchResults() {
 
       const nights = cheapestRoom?.DayRates?.[0]?.length || 1;
       const noOfRooms = searchPayload?.NoOfRooms || 1;
-      const finalPrice = (cheapestRoom?.TotalFare || 0) + (cheapestRoom?.TotalTax || 0);
-      const perNight =
-        nights > 0 ? (finalPrice / noOfRooms) / nights : (finalPrice / noOfRooms);
+      const finalPrice = (cheapestRoom?.TotalFare || 0);
+      const perNight = cheapestRoom?.DayRates?.[0]?.[0]?.BasePrice || 0;
       const inclusions =
         cheapestRoom?.Inclusion?.split(",")?.map((item) =>
           item.replaceAll("_", " ").trim(),
@@ -138,12 +138,57 @@ function HotelSearchResults() {
     // ─── Local Filtering ───
     if (searchText.trim()) {
       const q = searchText.toLowerCase().trim();
-      result = result.filter((h) => h.name.toLowerCase().includes(q));
+      result = result.filter((h) => 
+        h.name.toLowerCase().includes(q) || 
+        h.address.toLowerCase().includes(q)
+      );
     }
 
-    if (filters.location.trim()) {
+    if (filters.location.trim() && !selectedLocation) {
       const loc = filters.location.toLowerCase().trim();
-      result = result.filter((h) => h.address.toLowerCase().includes(loc));
+      result = result.filter((h) => 
+        h.address.toLowerCase().includes(loc) ||
+        h.name.toLowerCase().includes(loc)
+      );
+    }
+
+    // ─── Distance Calculation & Sorting ───
+    if (selectedLocation) {
+      const calculateDistance = (lat1, lon1, lat2, lon2) => {
+        const R = 6371; // Radius of the earth in km
+        const dLat = (lat2 - lat1) * (Math.PI / 180);
+        const dLon = (lon2 - lon1) * (Math.PI / 180);
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(lat1 * (Math.PI / 180)) *
+            Math.cos(lat2 * (Math.PI / 180)) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      };
+
+      result = result.map((h) => {
+        if (h.latitude && h.longitude) {
+          return {
+            ...h,
+            distance: calculateDistance(
+              selectedLocation.lat,
+              selectedLocation.lng,
+              h.latitude,
+              h.longitude,
+            ),
+          };
+        }
+        return { ...h, distance: Infinity };
+      });
+
+      // ─── Radius Filtering (e.g., show only within 20km) ───
+      // If a specific landmark is selected, we only show hotels in that proximity
+      result = result.filter((h) => h.distance <= 25); // 25km limit
+      
+      // Sort by distance
+      result.sort((a, b) => a.distance - b.distance);
     }
 
     if (filters.starRating.length > 0) {
@@ -168,21 +213,24 @@ function HotelSearchResults() {
     }
 
     // ─── Local Sorting ───
-    if (sortOrder === "low") {
-      result.sort((a, b) => a.price - b.price);
-    } else {
-      result.sort((a, b) => b.price - a.price);
+    // ─── Local Sorting (only if no distance sorting) ───
+    if (!selectedLocation) {
+      if (sortOrder === "low") {
+        result.sort((a, b) => a.price - b.price);
+      } else {
+        result.sort((a, b) => b.price - a.price);
+      }
     }
 
     return result;
-  }, [hotels, traceId, searchText, filters, sortOrder]);
+  }, [hotels, traceId, searchText, filters, sortOrder, selectedLocation]);
 
   const isInitialLoading = loading?.search && (hotels?.length || 0) === 0;
   const isLoadingMore = loading?.loadMore;
 
   return (
     <div className="bg-slate-50 min-h-screen flex flex-col">
-      <CorporateNavbar />
+      <LandingHeader />
       <Header />
 
       {isInitialLoading && (
@@ -212,9 +260,11 @@ function HotelSearchResults() {
                 setFilters={setFilters}
                 searchText={searchText}
                 setSearchText={setSearchText}
-                mapSearchPayload={baseSearchPayload}
+                mapSearchPayload={searchPayload}
                 loading={loading}
                 pagination={pagination}
+                selectedLocation={selectedLocation}
+                setSelectedLocation={setSelectedLocation}
               />
             </div>
           </div>

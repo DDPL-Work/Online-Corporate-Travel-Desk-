@@ -848,6 +848,24 @@ export default function SeatSelectionModal({
                       </div>
                     ))}
                   </div>
+
+                  {/* Seat Description Note */}
+                  <div className="mt-4 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                    <h4 className="text-[10px] font-black text-[#0A203E] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                      <div className="w-1 h-1 rounded-full bg-[#C9A84C]"></div>
+                      Seat Selection Rules
+                    </h4>
+                    <ul className="space-y-1.5 text-[9px] text-slate-500 italic">
+                      <li className="flex items-start gap-1.5">
+                        <span className="font-bold text-[#0A203E] not-italic shrink-0">Included (1):</span>
+                        <span>The fare includes the Seat.</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="font-bold text-[#0A203E] not-italic shrink-0">Purchase (2):</span>
+                        <span>Seat charges are added during ticketing.</span>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>

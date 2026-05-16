@@ -51,7 +51,7 @@ import {
   fetchCorporateDetailedBookings,
 } from "../../Redux/Actions/corporate.related.thunks";
 import api from "../../API/axios";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import Pagination from "../Shared/Pagination";
 import TableActionBar from "../Shared/TableActionBar";
 

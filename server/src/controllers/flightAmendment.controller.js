@@ -284,6 +284,7 @@ exports.fullCancellation = async (req, res) => {
 /* If ALL are completed → cancelled */
 if (statuses.length && statuses.every((s) => s === 4 || s === 6)) {
   finalExecutionStatus = "cancelled";
+  var finalCancelledAt = new Date();
 }
 
 /* If ANY rejected → failed */
@@ -298,6 +299,7 @@ else {
 
     await updateBooking(bookingId, {
       executionStatus: finalExecutionStatus,
+      ...(finalExecutionStatus === "cancelled" && { cancelledAt: finalCancelledAt }),
 
       amendment: {
         type: "FULL_CANCEL",
@@ -633,6 +635,7 @@ exports.getChangeStatus = async (req, res) => {
           "amendment.status": status,
           ...(status === "completed" && {
             executionStatus: "cancelled",
+            cancelledAt: new Date(),
             cancellation: {
               cancelledAt: new Date(),
               reason: "User cancellation",
@@ -678,6 +681,7 @@ exports.releasePNR = async (req, res) => {
 
     await updateBooking(bookingId, {
       executionStatus: "cancelled",
+      cancelledAt: new Date(),
       amendment: {
         type: "RELEASE_PNR",
         status: "completed",

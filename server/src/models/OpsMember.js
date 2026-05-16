@@ -25,12 +25,7 @@ const OpsMemberSchema = new mongoose.Schema(
     role: {
       type: String,
       required: [true, "Role is required"],
-      enum: ["Booking Manager", "Support Agent", "Finance OPS"],
-    },
-    department: {
-      type: String,
-      required: [true, "Department is required"],
-      enum: ["Flights", "Hotels", "Both"],
+      enum: ["Booking Manager", "Support Agent", "Finance OPS", "SEO Specialist"],
     },
     permissions: {
       type: [String],
@@ -45,6 +40,10 @@ const OpsMemberSchema = new mongoose.Schema(
       type: String,
       required: [true, "Password is required"],
       select: false,
+    },
+    fcmTokens: {
+      type: [String],
+      default: [],
     },
     isDeleted: {
       type: Boolean,

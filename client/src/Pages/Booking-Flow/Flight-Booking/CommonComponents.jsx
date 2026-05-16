@@ -874,16 +874,16 @@ export const PriceSummary = ({
 
         <button
           type="button"
-          onClick={!loading && !disabled ? onSendForApproval : undefined}
-          disabled={loading || disabled}
+          onClick={!loading ? onSendForApproval : undefined}
+          disabled={loading}
           className={`w-full text-white font-black px-3 py-4 flex items-center justify-center rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg
             ${
-              loading || disabled
+              loading
                 ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
                 : "bg-[#0A203E] hover:brightness-110 shadow-[#0A203E]/20"
             }`}
         >
-          {loading ? "Submitting..." : disabled ? "Complete details to submit" : (approvalRequired ? "Send For Approval" : "Confirm & Book")}
+          {loading ? "Submitting..." : (approvalRequired ? "Send For Approval" : "Confirm & Book")}
         </button>
         {/* Approver Message */}
         <div className="mt-3 text-sm text-center">
@@ -1256,9 +1256,16 @@ export const TravelerForm = ({
                       e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
                     )
                   }
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  className={`w-full px-4 py-3 border-2 rounded-lg ${
+                    errors?.[index]?.firstName ? "border-red-500" : "border-gray-300"
+                  }`}
                   required
                 />
+                {errors?.[index]?.firstName && (
+                  <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                    {errors[index].firstName}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1293,9 +1300,16 @@ export const TravelerForm = ({
                       e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
                     )
                   }
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  className={`w-full px-4 py-3 border-2 rounded-lg ${
+                    errors?.[index]?.lastName ? "border-red-500" : "border-gray-300"
+                  }`}
                   required
                 />
+                {errors?.[index]?.lastName && (
+                  <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                    {errors[index].lastName}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1312,9 +1326,16 @@ export const TravelerForm = ({
                     onChange={(e) =>
                       updateTraveler(traveler.id, "email", e.target.value)
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    className={`w-full px-4 py-3 border-2 rounded-lg ${
+                      errors?.[index]?.email ? "border-red-500" : "border-gray-300"
+                    }`}
                     required
                   />
+                  {errors?.[index]?.email && (
+                    <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                      {errors[index].email}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -1346,6 +1367,11 @@ export const TravelerForm = ({
                     }}
                     required
                   />
+                  {errors?.[index]?.phoneWithCode && (
+                    <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                      {errors[index].phoneWithCode}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -1373,7 +1399,9 @@ export const TravelerForm = ({
                   onChange={(e) =>
                     updateTraveler(traveler.id, "gender", e.target.value)
                   }
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  className={`w-full px-4 py-3 border-2 rounded-lg ${
+                    errors?.[index]?.gender ? "border-red-500" : "border-gray-300"
+                  }`}
                   required
                 >
                   <option value="">Select Gender</option>
@@ -1381,6 +1409,11 @@ export const TravelerForm = ({
                   <option value="FEMALE">Female</option>
                   <option value="OTHER">Other</option>
                 </select>
+                {errors?.[index]?.gender && (
+                  <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                    {errors[index].gender}
+                  </p>
+                )}
               </div>
 
               {/* DOB */}
@@ -1398,8 +1431,15 @@ export const TravelerForm = ({
                     updateTraveler(traveler.id, "dob", dob);
                     updateTraveler(traveler.id, "age", age); // derived
                   }}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                  className={`w-full px-4 py-3 border-2 rounded-lg ${
+                    errors?.[index]?.dob ? "border-red-500" : "border-gray-300"
+                  }`}
                 />
+                {errors?.[index]?.dob && (
+                  <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                    {errors[index].dob}
+                  </p>
+                )}
               </div>
 
               {/* Calculated Age (Read-only) */}
@@ -1437,7 +1477,9 @@ export const TravelerForm = ({
                         Number(e.target.value),
                       )
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    className={`w-full px-4 py-3 border-2 rounded-lg ${
+                      errors?.[index]?.linkedAdultIndex ? "border-red-500" : "border-gray-300"
+                    }`}
                     required
                   >
                     <option value="" disabled>
@@ -1450,7 +1492,7 @@ export const TravelerForm = ({
                     ))}
                   </select>
                   {errors?.[index]?.linkedAdultIndex && (
-                    <p className="text-xs text-red-500 mt-1">
+                    <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
                       {errors[index].linkedAdultIndex}
                     </p>
                   )}
@@ -1474,9 +1516,16 @@ export const TravelerForm = ({
                         e.target.value,
                       )
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                    className={`w-full px-4 py-3 border-2 rounded-lg ${
+                      errors?.[index]?.passportNumber ? "border-red-500" : "border-gray-300"
+                    }`}
                     required
                   />
+                  {errors?.[index]?.passportNumber && (
+                    <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                      {errors[index].passportNumber}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <div>
@@ -1493,9 +1542,16 @@ export const TravelerForm = ({
                           e.target.value,
                         )
                       }
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                      className={`w-full px-4 py-3 border-2 rounded-lg ${
+                        errors?.[index]?.PassportIssueDate ? "border-red-500" : "border-gray-300"
+                      }`}
                       required
                     />
+                    {errors?.[index]?.PassportIssueDate && (
+                      <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                        {errors[index].PassportIssueDate}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -1512,9 +1568,16 @@ export const TravelerForm = ({
                           e.target.value,
                         )
                       }
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                      className={`w-full px-4 py-3 border-2 rounded-lg ${
+                        errors?.[index]?.passportExpiry ? "border-red-500" : "border-gray-300"
+                      }`}
                       required
                     />
+                    {errors?.[index]?.passportExpiry && (
+                      <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                        {errors[index].passportExpiry}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1822,4 +1885,174 @@ export default {
   CTABox,
   HotelHomeButton,
   Amenities,
+};
+
+// ─── Selected SSR Summary Component ──────────────────────────────────────────
+export const SelectedSSRSummary = ({
+  selectedSeats = {},
+  selectedMeals = {},
+  selectedBaggage = {},
+  segments = [],
+}) => {
+  const hasSeats = Object.values(selectedSeats).some((v) => v?.list?.length > 0);
+  const hasMeals = Object.values(selectedMeals).some((v) => v?.length > 0);
+  const hasBaggage = Object.values(selectedBaggage).some((v) => v !== null);
+
+  if (!hasSeats && !hasMeals && !hasBaggage) return null;
+
+  const renderPriceTag = (price) => {
+    const p = Number(price || 0);
+    if (p === 0)
+      return (
+        <span className="text-[10px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded border border-emerald-100 uppercase tracking-widest">
+          Free
+        </span>
+      );
+    return (
+      <span className="text-[10px] font-black bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-100 uppercase tracking-widest">
+        ₹{p.toLocaleString()}
+      </span>
+    );
+  };
+
+  return (
+    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-100">
+            <FaConciergeBell className="text-white text-xs" />
+          </div>
+          Selected Add-ons (SSR)
+        </h3>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-50/30 border-b border-slate-100">
+              <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Route</th>
+              <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Seats</th>
+              <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Meals</th>
+              <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Extra Baggage</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {segments.map((segment, sIdx) => {
+              // Calculate the local index within this journey type (onward vs return)
+              // This ensures that for Round-Trip flights, "onward|0" and "return|0" are mapped to their respective segments.
+              const journeyType = segment.journeyType || "onward";
+              const localIdx = segments
+                .slice(0, sIdx)
+                .filter((prev) => (prev.journeyType || "onward") === journeyType).length;
+              
+              const matchKey = `${journeyType}|${localIdx}`;
+
+              const seatEntries = Object.entries(selectedSeats).filter(([k]) => k === matchKey);
+              const mealEntries = Object.entries(selectedMeals).filter(([k]) => k === matchKey);
+              const baggageEntries = Object.entries(selectedBaggage).filter(([k]) => k === matchKey);
+
+              const hasAnySSR = seatEntries.some(([, v]) => v?.list?.length > 0) ||
+                                mealEntries.some(([, v]) => v?.length > 0) ||
+                                baggageEntries.some(([, v]) => v !== null);
+
+              if (!hasAnySSR) return null;
+
+              return (
+                <tr key={sIdx} className="hover:bg-slate-50/30 transition-colors">
+                  {/* Route */}
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black text-slate-800 uppercase italic">
+                        {segment?.origin?.airportCode || segment?.from} →{" "}
+                        {segment?.destination?.airportCode || segment?.to}
+                      </span>
+                    </div>
+                  </td>
+
+                  {/* Seats */}
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-2">
+                      {seatEntries.map(([k, value]) => value?.list?.map((seat, tIdx) => (
+                        <div key={`${k}-seat-${tIdx}`} className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-xs">
+                          <MdEventSeat size={12} className="text-indigo-500" />
+                          <span className="text-xs font-black text-slate-900">{seat}</span>
+                          {renderPriceTag(value.priceMap?.[seat])}
+                        </div>
+                      )))}
+                      {seatEntries.every(([, v]) => !v?.list?.length) && <span className="text-[10px] font-bold text-slate-300 italic uppercase">None Selected</span>}
+                    </div>
+                  </td>
+
+                  {/* Meals */}
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col gap-1.5">
+                      {mealEntries.map(([k, meals]) => meals.map((meal, mIdx) => {
+                        // TBO uses Description field for Inclusion Type codes (1=Included, 2=Direct, 3=Imported)
+                        // But sometimes it might be in Type or Way.
+                        const inclusionCode = meal.Description || meal.Type || meal.Way;
+                        const mealTypeLabel = 
+                          inclusionCode === 1 || inclusionCode === "1" ? "Included" :
+                          inclusionCode === 2 || inclusionCode === "2" ? "Direct" :
+                          inclusionCode === 3 || inclusionCode === "3" ? "Imported" : null;
+                        
+                        // Use AirlineDescription for the actual name. 
+                        // If Description is a number (code), don't use it as a fallback name.
+                        const mealName = meal.AirlineDescription || meal.airlineDescription || 
+                                        (typeof meal.Description === 'string' ? meal.Description : null) || 
+                                        meal.Code;
+                        
+                        return (
+                          <div key={`${k}-meal-${mIdx}`} className="flex items-center justify-between gap-3 bg-white px-2 py-1.5 rounded-lg border border-slate-200 shadow-xs">
+                            <div className="flex items-center gap-2">
+                              <PiForkKnifeBold size={12} className="text-orange-500" />
+                              <div className="flex flex-col">
+                                <span className="text-[11px] font-bold text-slate-700 leading-tight">
+                                  {mealName}
+                                </span>
+                                {mealTypeLabel && (
+                                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter italic">
+                                     {mealTypeLabel}
+                                   </span>
+                                )}
+                              </div>
+                            </div>
+                            {renderPriceTag(meal.Price)}
+                          </div>
+                        );
+                      }))}
+                      {mealEntries.every(([, v]) => !v?.length) && <span className="text-[10px] font-bold text-slate-300 italic uppercase">None Selected</span>}
+                    </div>
+                  </td>
+
+                  {/* Baggage */}
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex flex-col items-end gap-1.5">
+                      {baggageEntries.map(([k, bag]) => bag && (
+                        <div key={`${k}-bag`} className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-lg border border-slate-200 shadow-xs">
+                          <MdLuggage size={12} className="text-blue-500" />
+                          <div className="flex flex-col items-end">
+                            <span className="text-xs font-bold text-slate-700">
+                              {bag.Text || `${bag.Weight} KG Extra`}
+                            </span>
+                            {/* Show inclusion label for baggage too if available */}
+                            {(bag.Description === 1 || bag.Description === 2 || bag.Description === 3) && (
+                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter italic">
+                                 {bag.Description === 1 ? "Included" : bag.Description === 2 ? "Direct" : "Imported"}
+                               </span>
+                            )}
+                          </div>
+                          {renderPriceTag(bag.Price)}
+                        </div>
+                      ))}
+                      {baggageEntries.every(([, v]) => !v) && <span className="text-[10px] font-bold text-slate-300 italic uppercase">None Selected</span>}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 };

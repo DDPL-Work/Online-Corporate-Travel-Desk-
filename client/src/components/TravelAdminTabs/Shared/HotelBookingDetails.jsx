@@ -50,20 +50,116 @@ import {
   getHotelAmendmentStatus,
 } from "../../../Redux/Actions/hotelAmendment.thunks";
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Design tokens Mapping (for reference during conversion)        */
-/* ─────────────────────────────────────────────────────────────── */
-// bg: "#FAF8F4"         -> bg-[#FAF8F4]
-// surface: "#FFFFFF"    -> bg-white
-// border: "#EAE4D9"     -> border-[#EAE4D9]
-// gold: "#B5862A"       -> text-[#B5862A] / bg-[#B5862A]
-// text: "#1A1714"       -> text-[#1A1714]
-// textMuted: "#7A7068"  -> text-[#7A7068]
-// textLight: "#A89F94"  -> text-[#A89F94]
-// green: "#2C7A4B"      -> text-[#2C7A4B] / bg-[#2C7A4B]
-// red: "#B5341A"        -> text-[#B5341A] / bg-[#B5341A]
-// amber: "#8A6200"      -> text-[#8A6200] / bg-[#8A6200]
-// blue: "#1A4A7A"       -> text-[#1A4A7A] / bg-[#1A4A7A]
+
+const getVoucherDate = (b) => {
+  if (b.voucheredAt) return b.voucheredAt;
+  const tboVoucherDate = b.bookingResult?.providerResponse?.VoucherDate || b.bookingResult?.providerResponse?.Response?.VoucherDate;
+  if (tboVoucherDate) return tboVoucherDate;
+  if (["voucher_generated", "confirmed", "booked"].includes((b.executionStatus || "").toLowerCase())) return b.updatedAt;
+  return null;
+};
+
+function BookingHistory({ booking }) {
+  const isCancelled = ["cancelled", "cancel_requested"].includes((booking.executionStatus || "").toLowerCase()) || !!booking.cancellation;
+  const isConfirmed = ["voucher_generated", "confirmed", "booked"].includes((booking.executionStatus || "").toLowerCase()) || (isCancelled && !!booking.bookingResult?.hotelBookingId);
+
+  const steps = [
+    {
+      label: "Request Created",
+      date: booking.createdAt,
+      desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
+      icon: <FiClock size={14} />,
+      active: true,
+    },
+    {
+      label: "Approval Status",
+      date: booking.approvedAt || booking.rejectedAt || (["approved", "rejected"].includes(booking.requestStatus) ? booking.updatedAt : null),
+      desc: (() => {
+        const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
+        const isApproved = booking.approvedAt || booking.requestStatus === "approved";
+        
+        if (isRejected) {
+          return `Rejected by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        if (isApproved) {
+          const reqEmail = booking.userId?.email || booking.requesterDetails?.email;
+          const appEmail = booking.approvedBy?.email || booking.approverEmail;
+          const isSameUser = reqEmail && appEmail && reqEmail === appEmail;
+          if (booking.approverName === "Auto Approve" || isSameUser) {
+             return "Auto Approved by System (Travel Policy)";
+          }
+          return `Approved by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        return "Waiting for manager approval";
+      })(),
+      icon: <FiShield size={14} />,
+      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
+    },
+    {
+      label: "Voucher Issued",
+      date: getVoucherDate(booking),
+      desc: isConfirmed ? "Hotel voucher generated and sent" : "Final confirmation pending",
+      icon: <FiTag size={14} />,
+      active: isConfirmed,
+    },
+    {
+      label: "Cancellation",
+      date: booking.cancelledAt || (isCancelled ? booking.updatedAt : null),
+      desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
+      icon: <FiXCircle size={14} />,
+      active: isCancelled,
+      isLast: true,
+    },
+  ];
+
+  const formatDate = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const formatTime = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  return (
+    <div className="bg-white border border-[#EAE4D9] p-8 mb-8">
+      <div className="flex items-center gap-4 mb-10">
+        <div className="w-10 h-10 rounded-full bg-[#B5862A]/10 flex items-center justify-center">
+          <FiRefreshCw size={18} className="text-[#B5862A]" />
+        </div>
+        <div>
+          <h3 className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">Booking Lifecycle</h3>
+          <p className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-[0.2em] mt-1">Audit Trail & Timeline</p>
+        </div>
+      </div>
+
+      <div className="relative">
+        {/* Vertical line */}
+        <div className="absolute left-[13px] top-2 bottom-2 w-[1px] bg-gradient-to-b from-[#B5862A]/40 via-[#EAE4D9] to-transparent" />
+
+        <div className="space-y-10">
+          {steps.map((step, idx) => (
+            <div key={idx} className="relative flex gap-8">
+              <div className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center border transition-colors duration-500 ${
+                step.active ? "bg-[#B5862A] border-[#B5862A] text-white shadow-lg" : "bg-white border-[#EAE4D9] text-[#EAE4D9]"
+              }`}>
+                {step.icon}
+              </div>
+
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                  <p className={`text-[12px] font-bold uppercase tracking-[0.15em] ${step.active ? "text-[#1A1714]" : "text-[#A89F94]"}`}>
+                    {step.label}
+                  </p>
+                  {step.date && (
+                    <span className="text-[10px] font-bold text-[#B5862A] px-3 py-1 bg-[#FAF8F4] border border-[#EAE4D9] rounded-sm uppercase tracking-wider">
+                      {formatDate(step.date)} · {formatTime(step.date)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[13px] text-[#7A7068] leading-relaxed font-medium">{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Helpers                                                        */
@@ -320,8 +416,8 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
                 <div className="flex-1 border-t border-dashed border-[#EAE4D9] w-10" />
                 <span className="w-[6px] h-[6px] rounded-full bg-[#B5862A] inline-block" />
               </div>
-              <div className="text-[10px] text-[#A89F94] mt-2 max-w-[80px] text-center mx-auto">
-                {roomType}
+              <div className="text-[10px] text-[#A89F94] mt-2 max-w-[120px] text-center mx-auto font-bold uppercase tracking-wide">
+                {hotelReq?.noOfRooms || 1} x {roomType}
               </div>
             </div>
 
@@ -393,11 +489,13 @@ function PaymentStatusCard({
     },
     {
       label: "Guests",
-      value: `${hotelReq.roomGuests?.[0]?.noOfAdults || 0} Adults${
-        hotelReq.roomGuests?.[0]?.noOfChild > 0
-          ? `, ${hotelReq.roomGuests[0].noOfChild} Child`
-          : ""
-      }`,
+      value: (() => {
+        const adults = hotelReq.roomGuests?.reduce((acc, r) => acc + (r.noOfAdults || 0), 0) || 0;
+        const children = hotelReq.roomGuests?.reduce((acc, r) => acc + (r.noOfChild || 0), 0) || 0;
+        let str = `${adults} ${adults === 1 ? "Adult" : "Adults"}`;
+        if (children > 0) str += `, ${children} ${children === 1 ? "Child" : "Children"}`;
+        return str;
+      })(),
       ok: null,
       icon: <FiUsers size={13} />,
     },
@@ -410,7 +508,7 @@ function PaymentStatusCard({
   ].filter((item) => !item.hidden);
 
   return (
-    <div className="grid grid-cols-4 gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9]">
+    <div className="grid grid-cols-5 gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9]">
       {items.map((item, i) => (
         <div key={i} className="bg-white p-5">
           <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
@@ -447,7 +545,7 @@ function PaymentStatusCard({
 /* ─────────────────────────────────────────────────────────────── */
 /*  Room Section                                                   */
 /* ─────────────────────────────────────────────────────────────── */
-function RoomSection({ rooms, selectedRoom }) {
+function RoomSection({ rooms = [], selectedRoom = {}, noOfRooms }) {
   if (!rooms?.length) return null;
 
   return (
@@ -461,6 +559,7 @@ function RoomSection({ rooms, selectedRoom }) {
             {/* Room header */}
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-['Cormorant_Garamond'] text-[26px] font-semibold text-[#1A1714]">
+                {noOfRooms > 1 && <span className="text-[#B5862A]">{noOfRooms} x </span>}
                 {room.RoomTypeName ||
                   (Array.isArray(room.Name) ? room.Name[0] : room.Name) ||
                   `Room ${index + 1}`}
@@ -510,7 +609,56 @@ function RoomSection({ rooms, selectedRoom }) {
                 </div>
               )}
 
-              {/* Inclusions + cancellation */}
+              {/* Inclusions & Promotions */}
+              {(() => {
+                const inclusion = room.Inclusion || room.inclusion || "";
+                const promotions = room.RoomPromotion || room.roomPromotion || [];
+                const supplements = room.Supplements || room.supplements || [];
+                
+                if (!inclusion && promotions.length === 0 && supplements.length === 0) return null;
+
+                return (
+                  <div className="bg-white p-6 border-t border-[#EAE4D9]">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                      {inclusion && (
+                        <div>
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">Inclusion</div>
+                          <div className="text-[13px] text-[#7A7068] leading-relaxed">{inclusion}</div>
+                        </div>
+                      )}
+                      {promotions.length > 0 && (
+                        <div>
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">Promotions</div>
+                          <ul className="list-none p-0 m-0 space-y-2">
+                            {promotions.map((p, pi) => (
+                              <li key={pi} className="text-[12px] text-[#2C7A4B] font-semibold flex items-start gap-2 bg-[#EDF7F2] p-2 border border-[#C3E4D2]">
+                                <FiCheckCircle size={14} className="mt-0.5 shrink-0" /> {p}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {supplements.length > 0 && (
+                        <div>
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">Supplements</div>
+                           <ul className="list-none p-0 m-0 space-y-2">
+                            {supplements.map((s, si) => (
+                              <li key={si} className="text-[12px] text-[#7A7068] bg-[#FAF8F4] p-2 border border-[#EAE4D9]">
+                                <div className="font-bold text-[#1A1714] mb-1">{s.Type || s.type || "Extra"}</div>
+                                {(s.SuppAmount || s.Price) > 0 && (
+                                  <div className="text-[#B5862A] font-bold">
+                                    ₹{(s.SuppAmount || s.Price).toLocaleString()}
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         );
@@ -751,7 +899,6 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
 function BookingReferencesSection({ booking, bookingDetail, result }) {
   const refs = [
     { label: "Order ID", val: booking.orderId || "—", hash: true },
-    { label: "Booking Ref", val: booking.bookingReference || "—", hash: true },
     {
       label: "Confirmation No.",
       val: bookingDetail?.ConfirmationNo || result?.hotelBookingId || "—",
@@ -777,7 +924,7 @@ function BookingReferencesSection({ booking, bookingDetail, result }) {
 
   return (
     <div>
-      <div className="grid grid-cols-5 gap-[1px] bg-[#EAE4D9] mb-[1px]">
+      <div className="grid grid-cols-4 gap-[1px] bg-[#EAE4D9] mb-[1px]">
         {refs.map((r, i) => (
           <div key={i} className="bg-white p-5">
             <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-[6px]">
@@ -1774,12 +1921,32 @@ export default function HotelBookingDetails() {
   // Detect source: cancelled table or total bookings table
   const searchParams = new URLSearchParams(location.search);
   const source = searchParams.get("source");
-  const backPath = source === "cancelled" ? "/total-cancelled-bookings" : source === "past" ? "/past-trips" : source === "upcoming" ? "/upcoming-trips" : "/total-bookings";
-  const backLabel = source === "cancelled" ? "Cancelled Bookings" : source === "past" ? "Past Trips" : source === "upcoming" ? "Upcoming Trips" : "Total Bookings";
+  const backPath =
+    source === "cancelled"
+      ? "/total-cancelled-bookings"
+      : source === "past"
+        ? "/past-trips"
+        : source === "upcoming"
+          ? "/upcoming-trips"
+          : source === "wallet"
+            ? "/corporate-wallet"
+            : source === "postpaid"
+              ? "/credit-utilization"
+              : "/total-bookings";
 
-  const rooms = (Array.isArray(booking?.rooms) && booking.rooms.length > 0)
-    ? booking.rooms
-    : (booking?.hotelRequest?.selectedRoom?.rawRoomData || []);
+  const backLabel =
+    source === "cancelled"
+      ? "Cancelled Bookings"
+      : source === "past"
+        ? "Past Trips"
+        : source === "upcoming"
+          ? "Upcoming Trips"
+          : source === "wallet"
+            ? "Corporate Wallet"
+            : source === "postpaid"
+              ? "Postpaid Credit Ledger"
+              : "Total Bookings";
+
   const {
     sendLoading,
     sendError,
@@ -1835,7 +2002,12 @@ export default function HotelBookingDetails() {
 
   // Room data from the actual API response structure
   const allRooms = hotelReq.allRooms || [];
-  const selectedRoomRaw = hotelReq.selectedRoom?.rawRoomData?.[0] || allRooms[0] || {};
+  const rawData = hotelReq.selectedRoom?.rawRoomData;
+  const selectedRoomRaw = Array.isArray(rawData) ? (rawData[0] || {}) : (rawData || allRooms[0] || {});
+
+  const rooms = (Array.isArray(booking?.rooms) && booking.rooms.length > 0)
+    ? booking.rooms
+    : (Array.isArray(rawData) ? rawData : (rawData ? [rawData] : allRooms));
 
   const cancelPolicies = selectedRoomRaw?.CancelPolicies || [];
   const amenities = selectedRoomRaw?.Amenities || [];
@@ -1877,7 +2049,7 @@ export default function HotelBookingDetails() {
       `}</style>
 
       {/* ── Sticky nav ── */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[#EAE4D9] h-14 px-8 flex items-center gap-4">
+      <header className="sticky top-0 z-10 bg-white border-b border-[#EAE4D9] h-14 px-8 flex items-center gap-4">
         <button
           onClick={() => navigate(backPath)}
           className="flex items-center gap-[6px] bg-none border-none cursor-pointer text-[12px] font-semibold text-[#B5862A] font-['DM_Sans'] tracking-[0.05em] uppercase hover:opacity-80 transition-opacity"
@@ -1898,7 +2070,7 @@ export default function HotelBookingDetails() {
           )}
           { (booking.orderId || booking.bookingReference) && (
             <span className="text-[11px] text-[#A89F94]">
-              Ref:{" "}
+              Order ID:{" "}
               <strong className="text-[#1A1714] font-['DM_Mono']">
                 {booking.orderId || booking.bookingReference}
               </strong>
@@ -1908,7 +2080,7 @@ export default function HotelBookingDetails() {
       </header>
 
       {/* ── Main ── */}
-      <main className="max-w-[1200px] mx-auto p-[32px_24px_120px]">
+      <main className="max-w-[1440px] mx-auto p-[32px_24px_120px]">
         {/* Hero */}
         <div className="mb-10">
           <HotelHeroCard
@@ -1941,6 +2113,7 @@ export default function HotelBookingDetails() {
             <RoomSection
               rooms={rooms}
               selectedRoom={selectedRoom}
+              noOfRooms={hotelReq?.noOfRooms}
             />
           </section>
         )}
@@ -1966,7 +2139,7 @@ export default function HotelBookingDetails() {
         <section className="mb-12">
           <SectionHeader
             num={3}
-            title="Booking References"
+            title="Order ID"
           />
           <BookingReferencesSection
             booking={booking}
@@ -2013,6 +2186,7 @@ export default function HotelBookingDetails() {
             totalFare={totalFare}
           />
         </section>
+        <BookingHistory booking={booking} />
       </main>
     </div>
   );

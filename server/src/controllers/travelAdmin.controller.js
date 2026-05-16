@@ -9,6 +9,8 @@ const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
+const { notify } = require("../notifications/orchestrator");
+const EVENTS = require("../events/eventConstants");
 
 /**
  * ============================================================
@@ -48,9 +50,9 @@ exports.getAllFlightBookingsAdmin = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    const formattedBookings = bookings.map(b => ({
+    const formattedBookings = bookings.map((b) => ({
       ...b,
-      orderId: b.orderId || "N/A"
+      orderId: b.orderId || "N/A",
     }));
 
     return res.status(200).json({
@@ -128,9 +130,9 @@ exports.getAllHotelBookingsAdmin = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    const formattedBookings = bookings.map(b => ({
+    const formattedBookings = bookings.map((b) => ({
       ...b,
-      orderId: b.orderId || "N/A"
+      orderId: b.orderId || "N/A",
     }));
 
     return res.status(200).json({
@@ -219,9 +221,9 @@ exports.getCancelledHotelBookingsAdmin = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    const formattedBookings = bookings.map(b => ({
+    const formattedBookings = bookings.map((b) => ({
       ...b,
-      orderId: b.orderId || "N/A"
+      orderId: b.orderId || "N/A",
     }));
 
     return res.status(200).json({
@@ -321,6 +323,22 @@ exports.promoteToManager = async (req, res) => {
     await user.save();
 
     console.log("UPDATED USER:", user);
+
+    // ── Notify promoted employee ─────────────────────────────────
+    const _corp = user.corporateId
+      ? await Corporate.findById(user.corporateId)
+          .select("corporateName")
+          .lean()
+      : null;
+    notify(EVENTS.MANAGER_PROMOTION, {
+      userId: user._id,
+      email: user.email,
+      name: user.name?.firstName
+        ? `${user.name.firstName} ${user.name.lastName || ""}`.trim()
+        : user.email,
+      corporateId: user.corporateId || admin.corporateId,
+      corporateName: _corp?.corporateName || "Your Company",
+    });
 
     return res.status(200).json({
       success: true,
@@ -457,33 +475,61 @@ exports.getAllEmployees = async (req, res, next) => {
 
     // ❗ Must belong to something
     if (!corporateId && !domain) {
-      return next(
-        new ApiError(400, "CorporateId or domain is required")
-      );
+      return next(new ApiError(400, "CorporateId or domain is required"));
     }
 
     // ✅ Base query (role filter)
     let query = {
-      role: { $in: ["manager", "employee"] },
+      role: { $in: ["manager", "employee", "travel-admin", "corporate-admin"] },
     };
 
     // ✅ Scope filter (corporate OR domain)
-    if (corporateId && domain) {
-      query.$or = [
-        { corporateId },
-        { domain },
-      ];
-    } else if (corporateId) {
-      query.corporateId = corporateId;
+    // 💡 Aggregation doesn't auto-cast strings to ObjectIds, so we must do it manually
+    const _cId = corporateId ? new mongoose.Types.ObjectId(corporateId) : null;
+
+    if (_cId && domain) {
+      query.$or = [{ corporateId: _cId }, { domain }];
+    } else if (_cId) {
+      query.corporateId = _cId;
     } else if (domain) {
       query.domain = domain;
     }
 
-    // ✅ Fetch users
-    const employees = await User.find(query)
-      .select("-password -__v") // 🔒 remove sensitive fields
-      .sort({ createdAt: -1 }) // optional
-      .lean();
+    // ✅ Fetch users with Employee details (department, designation, etc.) via aggregation
+    const employees = await User.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: "employees", 
+          localField: "_id",
+          foreignField: "userId",
+          as: "empProfile",
+        },
+      },
+      {
+        $addFields: {
+          profile: { $arrayElemAt: ["$empProfile", 0] },
+        },
+      },
+      {
+        $project: {
+          password: 0,
+          __v: 0,
+          empProfile: 0,
+        },
+      },
+      {
+        $addFields: {
+          // Merge Employee fields into the top level if they exist
+          department: { $ifNull: ["$profile.department", "Administration"] },
+          designation: { $ifNull: ["$profile.designation", "$role"] },
+          employeeCode: { $ifNull: ["$profile.employeeCode", "ADMIN"] },
+          mobile: { $ifNull: ["$profile.mobile", "$phone"] },
+        },
+      },
+      { $unset: "profile" },
+      { $sort: { createdAt: -1 } },
+    ]);
 
     res.status(200).json({
       success: true,
@@ -536,7 +582,6 @@ exports.updateEmployee = async (req, res, next) => {
     next(err);
   }
 };
-
 
 // ===============================
 // ADMIN: TOGGLE USER + EMPLOYEE STATUS
@@ -594,7 +639,7 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
     const employee = await Employee.findOneAndUpdate(
       { userId: user._id },
       { status: newStatus },
-      { new: true, session }
+      { new: true, session },
     );
 
     // ⚠️ Optional strict check
@@ -608,9 +653,7 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: `User ${
-        newIsActive ? "activated" : "deactivated"
-      } successfully`,
+      message: `User ${newIsActive ? "activated" : "deactivated"} successfully`,
       data: {
         userId: user._id,
         isActive: newIsActive,
@@ -645,8 +688,6 @@ exports.removeEmployee = async (req, res, next) => {
   }
 };
 
-
-
 //manager related routes
 
 exports.getManagerRequests = async (req, res) => {
@@ -678,7 +719,6 @@ exports.getManagerRequests = async (req, res) => {
       count: requests.length,
       data: requests,
     });
-
   } catch (err) {
     console.error("Fetch Manager Requests Error:", err);
 
@@ -688,7 +728,6 @@ exports.getManagerRequests = async (req, res) => {
     });
   }
 };
-
 
 exports.reviewManagerRequest = async (req, res) => {
   try {
@@ -759,6 +798,14 @@ exports.reviewManagerRequest = async (req, res) => {
       }
 
       request.status = "approved";
+
+      // ── Notify the Manager: A new employee is assigned to you ──
+      notify(EVENTS.MANAGER_ASSIGNED_TO_EMPLOYEE, {
+        managerId: user._id, // recipient
+        managerName: request.managerName,
+        employeeName: request.employeeEmail || "An Employee",
+        employeeEmail: request.employeeEmail,
+      });
     }
 
     // ❌ REJECT
@@ -771,11 +818,32 @@ exports.reviewManagerRequest = async (req, res) => {
     await user.save();
     await request.save();
 
+    // ── Notify the manager/employee whose request was reviewed ───
+    const _reviewedUserName = user.name?.firstName
+      ? `${user.name.firstName} ${user.name.lastName || ""}`.trim()
+      : user.email;
+    notify(EVENTS.MANAGER_REQUEST_REVIEWED, {
+      recipientId: user._id,
+      employeeId: user._id,
+      employeeEmail: user.email,
+      corporateId: request.corporateId,
+      name: _reviewedUserName,
+      action,
+      relatedId: request._id,
+    });
+
+    // ── Notify Travel Admin of the completed review ──────────
+    notify(EVENTS.EMPLOYEE_MANAGER_FIRST_APPROVAL, {
+      corporateId: request.corporateId,
+      employeeName: request.employeeId?.name || _reviewedUserName,
+      managerName: request.managerName,
+      managerEmail: request.managerEmail,
+    });
+
     return res.json({
       success: true,
       message: `Request ${action}ed successfully`,
     });
-
   } catch (err) {
     console.error("Review Manager Error:", err);
     res.status(500).json({
@@ -784,6 +852,3 @@ exports.reviewManagerRequest = async (req, res) => {
     });
   }
 };
-
-
-

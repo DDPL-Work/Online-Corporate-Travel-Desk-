@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   FiFilter,
   FiDownload,
@@ -9,101 +9,77 @@ import {
   FiCalendar,
   FiActivity,
   FiCreditCard,
+  FiRefreshCw,
+  FiX,
+  FiArrowRight,
+  FiEye,
+  FiHash,
+  FiClock,
+  FiChevronLeft,
+  FiChevronRight,
 } from "react-icons/fi";
 import { FaRupeeSign } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  fetchWalletBalance,
-  fetchWalletTransactions,
-  initiateWalletRecharge,
-  verifyWalletPayment,
-} from "../../Redux/Slice/walletSlice";
+  LabeledField,
+  CustomDropdown,
+  SearchBar,
+  Th,
+  StatCard,
+} from "./Shared/CommonComponents";
 import { Pagination } from "./Shared/Pagination";
-
-// Extended color palette matching CreditUtilizationPostpaid
-const colors = {
-  primary: "#0A4D68",
-  secondary: "#088395",
-  accent: "#05BFDB",
-  light: "#F8FAFC",
-  dark: "#1E293B",
-  success: "#10B981",
-  warning: "#F59E0B",
-  danger: "#EF4444",
-};
-
-// Helper Components (reused from postpaid page)
-const StatCard = ({
-  label,
-  value,
-  borderCls,
-  iconBgCls,
-  iconColorCls,
-  Icon,
-}) => (
-  <div
-    className={`bg-white rounded-xl p-4 flex items-center gap-3 shadow-sm border-l-4 ${borderCls}`}
-  >
-    <div
-      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBgCls}`}
-    >
-      <Icon size={18} className={iconColorCls} />
-    </div>
-    <div className="text-left">
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
-        {label}
-      </p>
-      <p className="text-xl font-black text-slate-900 leading-none">{value}</p>
-    </div>
-  </div>
-);
-
-const LabeledInput = ({ label, children }) => (
-  <div className="flex flex-col gap-1 text-left">
-    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-      {label}
-    </label>
-    {children}
-  </div>
-);
+import {
+  fetchWalletBalance,
+  fetchRechargeHistory,
+  fetchBookingTransactions,
+  fetchWalletPaymentStatus,
+  initiateWalletRecharge,
+} from "../../Redux/Slice/walletSlice";
+import { C } from "../Shared/color";
+import { useNavigate } from "react-router-dom";
 
 const StatusBadge = ({ status }) => {
   const config = {
     success: {
-      bg: "bg-emerald-50",
-      text: "text-emerald-700",
-      border: "border-emerald-100",
+      bg: "#ECFDF5",
+      text: "#065F46",
+      border: "#A7F3D0",
       label: "Success",
     },
     credit: {
-      bg: "bg-emerald-50",
-      text: "text-emerald-700",
-      border: "border-emerald-100",
+      bg: "#ECFDF5",
+      text: "#065F46",
+      border: "#A7F3D0",
       label: "Credit",
     },
     debit: {
-      bg: "bg-rose-50",
-      text: "text-rose-700",
-      border: "border-rose-100",
+      bg: "#FEF2F2",
+      text: "#991B1B",
+      border: "#FECACA",
       label: "Debit",
     },
     pending: {
-      bg: "bg-amber-50",
-      text: "text-amber-700",
-      border: "border-amber-100",
+      bg: "#FFFBEB",
+      text: "#92400E",
+      border: "#FDE68A",
       label: "Pending",
     },
     failed: {
-      bg: "bg-rose-50",
-      text: "text-rose-700",
-      border: "border-rose-100",
+      bg: "#FEF2F2",
+      text: "#991B1B",
+      border: "#FECACA",
       label: "Failed",
     },
   };
   const style = config[status] || config.success;
   return (
     <span
-      className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border ${style.bg} ${style.text} ${style.border}`}
+      className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-sm"
+      style={{
+        backgroundColor: style.bg,
+        color: style.text,
+        borderColor: style.border,
+      }}
     >
       {style.label}
     </span>
@@ -112,68 +88,130 @@ const StatusBadge = ({ status }) => {
 
 export default function CorporateWallet() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { balance, currency, transactions, loading, rechargeOrder } =
+    useSelector((state) => state.wallet);
 
-  const {
-    balance,
-    currency,
-    transactions,
-    loading,
-    rechargeOrder,
-    pagination,
-  } = useSelector((state) => state.wallet);
-
-  // Original filter states
-  const [filterType, setFilterType] = useState("All");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [activeTab, setActiveTab] = useState("all"); // all | recharge
-
-  // New UI filters (client-side)
+  const [activeTab, setActiveTab] = useState("booking"); // booking | recharge
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // all, success, pending, failed
-
-  // Modal state
+  const [statusFilter, setStatusFilter] = useState("All");
   const [showRecharge, setShowRecharge] = useState(false);
   const [rechargeAmount, setRechargeAmount] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showDetails, setShowDetails] = useState(false);
+  const [selectedTx, setSelectedTx] = useState(null);
 
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const itemsPerPage = 10;
+  const pendingStatusSyncRef = useRef(new Map());
+  const ledgerScrollRef = useRef(null);
 
-  // INITIAL LOAD (preserved)
+  const handleScroll = (direction) => {
+    if (ledgerScrollRef.current) {
+      const scrollAmount = direction === "left" ? -300 : 300;
+      ledgerScrollRef.current.scrollBy({
+        left: scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  const handleOpenDetails = (tx) => {
+    // If it's a booking transaction (debit) and we have a valid booking ID, navigate to details page
+    if (tx.type === "debit" && tx.bookingId?._id) {
+      const route =
+        tx.bookingModel === "HotelBookingRequest"
+          ? `/employee-hotel-booking/${tx.bookingId._id}?source=wallet`
+          : `/employee-flight-booking/${tx.bookingId._id}?source=wallet`;
+      navigate(route);
+      return;
+    }
+
+    // Fallback for recharges/adjustments or if booking data is missing
+    setSelectedTx(tx);
+    setShowDetails(true);
+  };
+
+  const handleCloseDetails = () => {
+    setShowDetails(false);
+    setSelectedTx(null);
+  };
+
   useEffect(() => {
     dispatch(fetchWalletBalance());
-    dispatch(fetchWalletTransactions({ page: 1, limit: 10 }));
   }, [dispatch]);
 
-  // APPLY FILTERS (original server-side logic)
-  const applyFilters = () => {
-    dispatch(
-      fetchWalletTransactions({
-        page: 1,
-        limit: 10,
-        type: filterType !== "All" ? filterType.toLowerCase() : undefined,
+  useEffect(() => {
+    const params = {
+      dateFrom: startDate || undefined,
+      dateTo: endDate || undefined,
+    };
+    if (activeTab === "recharge") dispatch(fetchRechargeHistory(params));
+    else dispatch(fetchBookingTransactions(params));
+    setSearchTerm("");
+    setStatusFilter("All");
+    setCurrentPage(1);
+  }, [dispatch, activeTab, startDate, endDate]);
+
+  const getTransactionStatus = (tx) =>
+    tx.status ? tx.status.toLowerCase() : "success";
+
+  useEffect(() => {
+    const pendingPhonePeOrderIds = [
+      ...new Set(
+        (transactions || [])
+          .filter(
+            (tx) =>
+              getTransactionStatus(tx) === "pending" &&
+              tx.type === "credit" &&
+              tx.paymentGateway?.name === "phonepe" &&
+              tx.paymentGateway?.orderId,
+          )
+          .map((tx) => tx.paymentGateway.orderId),
+      ),
+    ];
+    if (!pendingPhonePeOrderIds.length) return;
+    const now = Date.now();
+    const orderIdsToSync = pendingPhonePeOrderIds.filter(
+      (orderId) =>
+        now - (pendingStatusSyncRef.current.get(orderId) || 0) >= 15000,
+    );
+    if (!orderIdsToSync.length) return;
+    orderIdsToSync.forEach((orderId) =>
+      pendingStatusSyncRef.current.set(orderId, now),
+    );
+    let cancelled = false;
+    const syncPendingStatuses = async () => {
+      let shouldRefreshWallet = false;
+      for (const orderId of orderIdsToSync) {
+        try {
+          const statusResult = await dispatch(
+            fetchWalletPaymentStatus({ orderId, gateway: "phonepe" }),
+          ).unwrap();
+          if (["SUCCESS", "FAILED"].includes(statusResult?.status))
+            shouldRefreshWallet = true;
+        } catch (error) {
+          pendingStatusSyncRef.current.delete(orderId);
+        }
+      }
+      if (cancelled || !shouldRefreshWallet) return;
+      dispatch(fetchWalletBalance());
+      const params = {
         dateFrom: startDate || undefined,
         dateTo: endDate || undefined,
-      }),
-    );
-    // Reset pagination and client-side filters when server filters change
-    setSearchTerm("");
-    setStatusFilter("all");
-  };
+      };
+      if (activeTab === "recharge") dispatch(fetchRechargeHistory(params));
+      else dispatch(fetchBookingTransactions(params));
+    };
+    syncPendingStatuses();
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, transactions, activeTab, startDate, endDate]);
 
-
-  // Helper: determine transaction status (fallback to 'success')
-  const getTransactionStatus = (tx) => {
-    if (tx.status) return tx.status.toLowerCase();
-    // If no status field, assume success
-    return "success";
-  };
-
-  // Combine filters: server-side filtered data from Redux + client-side search + status + tab
   const filteredTransactions = useMemo(() => {
     let filtered = transactions || [];
-
-    // Client-side search (description or transaction ID)
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -183,27 +221,20 @@ export default function CorporateWallet() {
           tx.bookingId?.toLowerCase().includes(term),
       );
     }
-
-    // Status filter (client-side)
-    if (statusFilter !== "all") {
+    if (statusFilter !== "All")
       filtered = filtered.filter(
-        (tx) => getTransactionStatus(tx) === statusFilter,
+        (tx) => getTransactionStatus(tx) === statusFilter.toLowerCase(),
       );
-    }
-
-    // Tab filter (original logic)
-    if (activeTab === "recharge") {
-      filtered = filtered.filter((t) => t.type === "credit");
-    }
-
-    // Sort by newest first (clone to avoid mutating Redux arrays)
     return [...filtered].sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
     );
-  }, [transactions, searchTerm, statusFilter, activeTab]);
+  }, [transactions, searchTerm, statusFilter]);
 
-  // Summary stats (based on filtered transactions)
-  const totalTransactions = filteredTransactions.length;
+  const paginatedTransactions = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredTransactions.slice(start, start + itemsPerPage);
+  }, [filteredTransactions, currentPage]);
+
   const totalCredit = filteredTransactions
     .filter((tx) => tx.type === "credit")
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
@@ -211,535 +242,820 @@ export default function CorporateWallet() {
     .filter((tx) => tx.type === "debit")
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
-  // Pagination
-  // const totalPages = Math.ceil(totalTransactions / itemsPerPage);
-  // const paginatedTransactions = useMemo(() => {
-  //   const start = (currentPage - 1) * itemsPerPage;
-  //   return filteredTransactions.slice(start, start + itemsPerPage);
-  // }, [filteredTransactions, currentPage, itemsPerPage]);
-
-  // Export to CSV (based on filtered transactions)
   const handleExport = () => {
+    if (!filteredTransactions.length) return;
     const headers = [
       "Date",
       "Description",
-      "Transaction ID",
+      "Order ID",
       "Type",
       "Amount",
       "Status",
     ];
     const rows = filteredTransactions.map((tx) => [
-      new Date(tx.createdAt).toLocaleDateString(),
-      tx.description || "-",
-      tx._id || tx.bookingId || "-",
-      tx.type,
+      new Date(tx.createdAt).toLocaleDateString("en-IN"),
+      tx.description || "—",
+      tx.orderId || tx._id || tx.bookingId || "—",
+      tx.type || "—",
       `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}`,
       getTransactionStatus(tx),
     ]);
-    const csvContent = [headers, ...rows]
-      .map((row) => row.join(","))
-      .join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
+    const tableHtml = rows
+      .map(
+        (r) =>
+          `<tr>${r.map((c) => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;font-weight:700;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "wallet_transactions.csv";
+    a.download = `wallet-ledger.xls`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  // Razorpay logic (preserved exactly as original)
-  const loadRazorpayScript = () => {
-    return new Promise((resolve) => {
-      if (window.Razorpay) return resolve(true);
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
+    document.body.removeChild(a);
   };
 
   useEffect(() => {
-    if (!rechargeOrder) return;
-
-    const openRazorpay = async () => {
-      const loaded = await loadRazorpayScript();
-      if (!loaded) {
-        alert("Razorpay SDK failed to load");
-        return;
-      }
-
-      const options = {
-        key: rechargeOrder.keyId,
-        amount: rechargeOrder.amount,
-        currency: rechargeOrder.currency,
-        name: "Corporate Wallet Recharge",
-        description: "Wallet Top-up",
-        order_id: rechargeOrder.orderId,
-        handler: function (response) {
-          dispatch(
-            verifyWalletPayment({
-              orderId: rechargeOrder.orderId,
-              paymentId: response.razorpay_payment_id,
-              signature: response.razorpay_signature,
-              amount: rechargeOrder.amount,
-            }),
-          ).then(() => {
-            dispatch(fetchWalletBalance());
-            dispatch(fetchWalletTransactions());
-          });
-        },
-        theme: { color: colors.primary },
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.open();
-    };
-
-    openRazorpay();
-  }, [rechargeOrder, dispatch]);
+    if (rechargeOrder?.gateway === "phonepe" && rechargeOrder.redirectUrl)
+      window.location.assign(rechargeOrder.redirectUrl);
+  }, [rechargeOrder]);
 
   const handleRecharge = async () => {
-    if (!rechargeAmount || rechargeAmount <= 0) {
-      alert("Enter a valid amount");
-      return;
-    }
-    const result = await dispatch(
-      initiateWalletRecharge({ amount: Number(rechargeAmount) }),
-    );
-    if (result.error) return;
+    if (!rechargeAmount || rechargeAmount <= 0) return;
+    await dispatch(initiateWalletRecharge({ amount: Number(rechargeAmount) }));
     setShowRecharge(false);
     setRechargeAmount("");
   };
 
   return (
     <div
-      className="min-h-screen p-6 font-sans"
-      style={{ backgroundColor: colors.light }}
+      className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6"
+      style={{ background: C.offWhite }}
     >
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* HEADER with Icon Block (matching postpaid) */}
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-12 h-12 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white">
-            <FiCreditCard size={24} />
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"
+              >
+                <FiArrowRight className="rotate-180" size={20} />
+              </button>
+              <button
+                onClick={() => dispatch(fetchWalletBalance())}
+                className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                disabled={loading}
+              >
+                <div className={loading ? "animate-spin" : ""}>
+                  <FiRefreshCw size={20} />
+                </div>
+              </button>
+            </div>
+
+            <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
+                <FiCreditCard size={28} />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black tracking-tight leading-none">
+                  Corporate Wallet
+                </h1>
+                <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                  Comprehensive Oversight of all Corporate Fund Deployments and
+                  Capital Management
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="text-left">
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase leading-none">
-              Corporate Wallet
-            </h1>
-            <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-widest">
-              Manage balance & transactions
-            </p>
-          </div>
-          <div className="ml-auto">
+
+          <div className="flex items-center gap-4">
             <button
               onClick={() => setShowRecharge(true)}
-              className="flex items-center gap-2 px-5 py-3 rounded-lg text-white font-semibold shadow hover:opacity-90"
-              style={{ backgroundColor: colors.primary }}
+              className="px-8 py-3.5 rounded-xl font-black text-[11px] bg-gold text-navy hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2.5 uppercase tracking-widest"
             >
-              <FiPlusCircle size={18} />
-              Recharge Wallet
+              <FiPlusCircle size={16} /> Initiate Recharge
             </button>
           </div>
         </div>
+      </div>
 
-        {/* STATS CARDS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+          {[
+            ["booking", "Consumption Ledger", FiArrowUpRight],
+            ["recharge", "Infusion Ledger", FiArrowDownLeft],
+          ].map(([k, lbl, Icon]) => (
+            <button
+              key={k}
+              onClick={() => setActiveTab(k)}
+              className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+            >
+              <Icon size={14} /> {lbl}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
-            label="Available Balance"
+            label="Available Asset"
             value={
               loading
                 ? "..."
                 : `${currency || "₹"} ${(balance || 0).toLocaleString()}`
             }
             Icon={FaRupeeSign}
-            borderCls="border-[#0A4D68]"
-            iconBgCls="bg-[#0A4D68]/10"
-            iconColorCls="text-[#0A4D68]"
+            borderCls="border-[#000D26]"
+            iconBgCls="bg-slate-100"
+            iconColorCls="text-[#000D26]"
           />
           <StatCard
-            label="Total Recharge (Filtered)"
+            label="Total Capital In"
             value={`₹${totalCredit.toLocaleString()}`}
             Icon={FiArrowDownLeft}
-            borderCls="border-[#10B981]"
+            borderCls="border-emerald-500"
             iconBgCls="bg-emerald-50"
             iconColorCls="text-emerald-600"
           />
           <StatCard
-            label="Total Spend (Filtered)"
+            label="Total Capital Out"
             value={`₹${totalDebit.toLocaleString()}`}
             Icon={FiArrowUpRight}
-            borderCls="border-[#F59E0B]"
+            borderCls="border-amber-500"
             iconBgCls="bg-amber-50"
             iconColorCls="text-amber-600"
           />
           <StatCard
-            label="Transactions Count"
-            value={totalTransactions}
+            label="Ledger Entries"
+            value={filteredTransactions.length}
             Icon={FiActivity}
-            borderCls="border-[#088395]"
-            iconBgCls="bg-[#088395]/10"
-            iconColorCls="text-[#088395]"
+            borderCls="border-gold"
+            iconBgCls="bg-gold/10"
+            iconColorCls="text-gold"
           />
         </div>
 
-        {/* FILTERS SECTION (enhanced, but preserves original server filters) */}
-        <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-            <LabeledInput label="Search">
-              <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Description / ID..."
+        <div
+          className="bg-white rounded-3xl p-8 border shadow-sm"
+          style={{ borderColor: C.border }}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
+            <div className="lg:col-span-4">
+              <LabeledField label="Universal Search">
+                <SearchBar
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+                  onChange={setSearchTerm}
+                  placeholder="Ref ID, booking or description..."
                 />
-              </div>
-            </LabeledInput>
-
-            <LabeledInput label="From Date">
-              <div className="relative">
-                <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+              </LabeledField>
+            </div>
+            <div className="lg:col-span-4">
+              <LabeledField label="Ledger Period">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-4 py-2.5 border rounded-xl text-xs outline-none bg-slate-50 focus:bg-white transition-all"
+                    style={{ borderColor: C.border }}
+                  />
+                  <span className="text-[10px] font-black uppercase text-slate-300">
+                    to
+                  </span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-4 py-2.5 border rounded-xl text-xs outline-none bg-slate-50 focus:bg-white transition-all"
+                    style={{ borderColor: C.border }}
+                  />
+                </div>
+              </LabeledField>
+            </div>
+            <div className="lg:col-span-2">
+              <LabeledField label="Execution Status">
+                <CustomDropdown
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  options={["All", "Success", "Pending", "Failed"]}
                 />
-              </div>
-            </LabeledInput>
-
-            <LabeledInput label="To Date">
-              <div className="relative">
-                <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
-                />
-              </div>
-            </LabeledInput>
-
-            <LabeledInput label="Transaction Type">
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
-              >
-                <option>All</option>
-                <option>Credit</option>
-                <option>Debit</option>
-              </select>
-            </LabeledInput>
-
-            <LabeledInput label="Status">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
-              >
-                <option value="all">All Statuses</option>
-                <option value="success">Success</option>
-                <option value="pending">Pending</option>
-                <option value="failed">Failed</option>
-              </select>
-            </LabeledInput>
-
-            <div className="flex items-end gap-2">
+              </LabeledField>
+            </div>
+            <div className="lg:col-span-2">
               <button
-                onClick={applyFilters}
-                className="flex-1 text-white rounded-lg px-4 py-2 text-sm font-medium"
-                style={{ backgroundColor: colors.primary }}
+                onClick={() => {
+                  setSearchTerm("");
+                  setStatusFilter("All");
+                  setStartDate("");
+                  setEndDate("");
+                }}
+                className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest"
+                style={{
+                  background: C.white,
+                  borderColor: C.border,
+                  color: C.muted,
+                }}
               >
-                Apply
-              </button>
-              <button
-                onClick={handleExport}
-                className="flex items-center justify-center gap-2 border rounded-lg px-4 py-2 text-sm font-medium bg-white hover:bg-slate-50 transition"
-              >
-                <FiDownload /> Export
+                <FiX /> Reset Ledger
               </button>
             </div>
           </div>
         </div>
 
-        {/* TRANSACTIONS TABLE with Tabs */}
-        <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex flex-wrap justify-between items-center gap-4 bg-slate-50/50">
-            <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
-              Transaction History
-            </h2>
-            <div className="flex gap-2">
+        <div className="bg-white rounded-3xl overflow-hidden">
+          <div className="p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-black" style={{ color: C.navy }}>
+                {activeTab === "booking"
+                  ? "Asset Consumption Ledger"
+                  : "Capital Infusion Ledger"}
+              </h2>
+              <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
+                {filteredTransactions.length} records processed
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 mr-2">
+                <button
+                  onClick={() => handleScroll("left")}
+                  className="p-2.5 rounded-xl border bg-white hover:bg-slate-50 text-slate-400 hover:text-navy transition-all active:scale-90"
+                  style={{ borderColor: C.border }}
+                  title="Scroll Left"
+                >
+                  <FiChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={() => handleScroll("right")}
+                  className="p-2.5 rounded-xl border bg-white hover:bg-slate-50 text-slate-400 hover:text-navy transition-all active:scale-90"
+                  style={{ borderColor: C.border }}
+                  title="Scroll Right"
+                >
+                  <FiChevronRight size={16} />
+                </button>
+              </div>
               <button
-                onClick={() => setActiveTab("all")}
-                className={`px-5 py-2 rounded-lg text-sm font-medium transition ${
-                  activeTab === "all"
-                    ? "bg-[#0A4D68] text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                onClick={handleExport}
+                className="px-4 py-2.5 rounded-xl font-black text-[10px] flex items-center gap-2 border shadow-sm hover:bg-slate-50 transition-all uppercase tracking-widest"
+                style={{ borderColor: C.border, color: C.muted }}
               >
-                All Transactions
-              </button>
-              <button
-                onClick={() => setActiveTab("recharge")}
-                className={`px-5 py-2 rounded-lg text-sm font-medium transition ${
-                  activeTab === "recharge"
-                    ? "bg-[#0A4D68] text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                Recharge History
+                <FiDownload size={14} /> Export XLS
               </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" ref={ledgerScrollRef}>
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr
-                  style={{ backgroundColor: colors.primary }}
-                  className="text-white"
-                >
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Date
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Description
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Transaction ID
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Type
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Amount
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Status
-                  </th>
+                <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+                  <Th className="!px-6 !py-5">Deployment Date</Th>
+                  <Th className="!px-6 !py-5">Mission Protocol</Th>
+                  <Th className="!px-6 !py-5">Asset Reference</Th>
+                  <Th className="!px-6 !py-5">Category</Th>
+                  <Th className="!px-6 !py-5">Matrix Type</Th>
+                  <Th className="!px-6 !py-5">Capital Flow</Th>
+                  <Th className="!px-6 !py-5">Status</Th>
+                  <Th className="!px-6 !py-5 text-right">Actions</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {loading ? (
-                  <tr>
-                    <td colSpan="6" className="py-8 text-center text-slate-500">
-                      Loading transactions...
-                    </td>
-                  </tr>
-                ) : transactions.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="py-8 text-center text-slate-500">
-                      No transactions found for the selected filters.
-                    </td>
-                  </tr>
-                ) : (
-                  transactions.map((tx) => (
+              <tbody>
+                {paginatedTransactions.map((tx, idx) => {
+                  const processorName = tx.processedBy?.name
+                    ? `${tx.processedBy.name.firstName || ""} ${tx.processedBy.name.lastName || ""}`.trim()
+                    : "System Protocol";
+                  const gatewayInfo =
+                    tx.paymentGateway?.name || tx.type === "debit"
+                      ? "Corporate Asset"
+                      : "Direct Infusion";
+
+                  return (
                     <tr
                       key={tx._id}
-                      className="hover:bg-slate-50 transition-all"
+                      className="hover:bg-slate-50 transition-colors"
+                      style={{
+                        background: idx % 2 === 0 ? C.white : "#FAF6EB",
+                      }}
                     >
-                      <td className="px-6 py-4 text-slate-600 font-medium">
-                        {new Date(tx.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 text-slate-800 max-w-xs truncate">
-                        {tx.description || "—"}
-                      </td>
-                      <td className="px-6 py-4 font-mono text-slate-600 text-xs">
-                        {tx._id || tx.bookingId || "—"}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                            tx.type === "credit"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
+                      <td className="px-6 py-5">
+                        <p
+                          className="text-xs font-black"
+                          style={{ color: C.navy }}
                         >
-                          {tx.type === "credit" ? (
-                            <FiArrowDownLeft size={12} />
+                          {new Date(tx.createdAt).toLocaleDateString("en-IN")}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">
+                          {new Date(tx.createdAt).toLocaleTimeString("en-IN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </td>
+                      <td className="px-6 py-5">
+                        <p
+                          className="text-xs font-black"
+                          style={{ color: C.navy }}
+                        >
+                          {tx.description || "Travel Asset Procurement"}
+                        </p>
+                      </td>
+                      <td className="px-6 py-5">
+                        <code
+                          className="text-[10px] font-black px-2 py-1 rounded border uppercase block w-fit mb-1"
+                          style={{
+                            background: C.white,
+                            borderColor: C.border,
+                            color: C.muted,
+                          }}
+                        >
+                          {tx.orderId || tx.reference || tx._id}
+                        </code>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                          <FiCreditCard size={10} className="text-gold" />{" "}
+                          {gatewayInfo}
+                        </p>
+                      </td>
+                      <td className="px-6 py-5">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-[10px] font-black uppercase text-navy border border-slate-200/60 shadow-sm block w-fit mb-1">
+                          {tx.bookingModel === "HotelBookingRequest"
+                            ? "Hotel"
+                            : "Flight"}
+                        </span>
+                        {tx.bookingId?.orderId && (
+                          <p className="text-[9px] font-bold text-gold uppercase tracking-tight">
+                            {tx.bookingId.orderId}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-6 py-5">
+                        <span
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm"
+                          style={{
+                            backgroundColor:
+                              tx.type === "credit" || tx.type === "refund"
+                                ? "#ECFDF5"
+                                : "#FEF2F2",
+                            color:
+                              tx.type === "credit" || tx.type === "refund"
+                                ? "#065F46"
+                                : "#991B1B",
+                            borderColor:
+                              tx.type === "credit" || tx.type === "refund"
+                                ? "#A7F3D0"
+                                : "#FECACA",
+                          }}
+                        >
+                          {tx.type === "credit" || tx.type === "refund" ? (
+                            <FiArrowDownLeft />
                           ) : (
-                            <FiArrowUpRight size={12} />
-                          )}
+                            <FiArrowUpRight />
+                          )}{" "}
                           {tx.type}
                         </span>
                       </td>
-                      <td
-                        className={`px-6 py-4 font-semibold ${
-                          tx.type === "credit"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {tx.type === "credit" ? "+" : "-"} ₹
-                        {(tx.amount || 0).toLocaleString()}
+                      <td className="px-6 py-5 font-black text-xs text-left">
+                        <span
+                          style={{
+                            color:
+                              tx.type === "credit" || tx.type === "refund"
+                                ? "#10B981"
+                                : "#EF4444",
+                          }}
+                        >
+                          {tx.type === "credit" || tx.type === "refund"
+                            ? "+"
+                            : "-"}{" "}
+                          ₹{(tx.amount || 0).toLocaleString()}
+                        </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-5">
                         <StatusBadge status={getTransactionStatus(tx)} />
                       </td>
+                      <td className="px-6 py-5 text-right">
+                        <button
+                          onClick={() => handleOpenDetails(tx)}
+                          className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-[#003399] transition-all border border-slate-100 hover:border-[#003399]/20"
+                          title="View Protocol Details"
+                        >
+                          <FiEye size={16} />
+                        </button>
+                      </td>
                     </tr>
-                  ))
-                )}
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination Footer */}
-          <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            <span>
-              Showing {transactions.length} of {pagination?.total || 0}{" "}
-              transaction(s)
-            </span>
+          <div className="p-6 border-t" style={{ borderColor: C.border }}>
             <Pagination
-              currentPage={pagination?.page || 1}
-              totalItems={pagination?.total || 0}
-              pageSize={pagination?.limit || 10}
-              onPageChange={(page) => {
-                dispatch(
-                  fetchWalletTransactions({
-                    page,
-                    limit: pagination?.limit || 10,
-                    type:
-                      filterType !== "All"
-                        ? filterType.toLowerCase()
-                        : undefined,
-                    dateFrom: startDate || undefined,
-                    dateTo: endDate || undefined,
-                  }),
-                );
-              }}
+              currentPage={currentPage}
+              totalItems={filteredTransactions.length}
+              pageSize={itemsPerPage}
+              onPageChange={setCurrentPage}
             />
           </div>
         </div>
       </div>
 
-      {/* RECHARGE MODAL - Enhanced Real-World Design */}
       {showRecharge && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowRecharge(false);
-          }}
-        >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100 opacity-100 animate-in fade-in zoom-in">
-            {/* Header with gradient bar */}
-            <div className="relative">
-              <div
-                className="absolute top-0 left-0 w-full h-1 rounded-t-2xl"
-                style={{ backgroundColor: colors.primary }}
-              />
-              <div className="flex justify-between items-center p-5 pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-full bg-[#0A4D68]/10">
-                    <FiPlusCircle className="text-[#0A4D68]" size={20} />
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-800">
-                    Recharge Wallet
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setShowRecharge(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
-                  aria-label="Close"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div
+            className="absolute inset-0 backdrop-blur-sm animate-in fade-in duration-300"
+            style={{ background: `${C.navy}CC` }}
+            onClick={() => setShowRecharge(false)}
+          />
+          <div className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300 border border-white/20">
+            <div
+              className="p-10 text-center relative overflow-hidden"
+              style={{
+                background: `linear-gradient(135deg, ${C.navyMid}, ${C.navy})`,
+              }}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gold/10 rounded-full -mr-16 -mt-16 blur-3xl" />
+              <div className="w-20 h-20 rounded-[24px] bg-white/10 flex items-center justify-center mx-auto mb-6 text-white shadow-xl border border-white/10 relative z-10">
+                <FiPlusCircle size={40} />
               </div>
-              <p className="text-sm text-gray-500 px-5 pb-3">
-                Add funds to your corporate wallet securely
+              <h3 className="text-3xl font-black text-white tracking-tight leading-none mb-2">
+                Capital Infusion
+              </h3>
+              <p className="text-[10px] text-white/50 font-black uppercase tracking-[0.3em]">
+                Authorized Recharge Protocol
               </p>
             </div>
 
-            {/* Amount Input Section */}
-            <div className="p-5 pt-2">
-              <label className="text-sm font-semibold text-gray-700 block mb-1">
-                Enter Amount <span className="text-red-500">*</span>
-              </label>
-              <div className="relative mt-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium text-lg">
-                  ₹
-                </span>
-                <input
-                  type="number"
-                  value={rechargeAmount}
-                  onChange={(e) => setRechargeAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full pl-8 pr-3 py-3 text-lg border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A4D68]/30 focus:border-[#0A4D68] transition-all"
-                  autoFocus
-                />
-              </div>
-
-              {/* Quick Amount Buttons */}
-              <div className="mt-4">
-                <p className="text-xs text-gray-500 mb-2 font-medium">
-                  Quick select
+            <div className="p-10 space-y-8">
+              <div className="space-y-2">
+                <p
+                  className="text-[10px] font-black uppercase tracking-[0.1em]"
+                  style={{ color: C.muted }}
+                >
+                  Transaction Amount (INR)
                 </p>
-                <div className="grid grid-cols-3 gap-3">
-                  {[1000, 5000, 10000].map((amt) => (
-                    <button
-                      key={amt}
-                      onClick={() => setRechargeAmount(amt)}
-                      className={`py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                        Number(rechargeAmount) === amt
-                          ? "bg-[#0A4D68] text-white border-[#0A4D68] shadow-md"
-                          : "bg-white text-gray-700 border-gray-200 hover:border-[#0A4D68] hover:bg-[#0A4D68]/5"
-                      }`}
-                    >
-                      ₹ {amt.toLocaleString()}
-                    </button>
-                  ))}
+                <div className="relative group">
+                  <span
+                    className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-2xl transition-colors group-focus-within:text-gold"
+                    style={{ color: C.muted }}
+                  >
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    value={rechargeAmount}
+                    onChange={(e) => setRechargeAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-12 pr-6 py-5 text-3xl font-black rounded-2xl outline-none border-2 transition-all focus:ring-4 focus:ring-gold/5"
+                    style={{
+                      borderColor: C.border,
+                      color: C.navy,
+                      background: C.offWhite,
+                    }}
+                    autoFocus
+                  />
                 </div>
               </div>
 
-              {/* Optional: Info note */}
-              <div className="mt-5 p-3 bg-blue-50 rounded-lg flex items-start gap-2">
-                <FiCreditCard
-                  className="text-blue-600 mt-0.5 shrink-0"
-                  size={14}
-                />
-                <p className="text-xs text-blue-800">
-                  Minimum recharge amount is ₹100. Funds will be credited
-                  instantly.
-                </p>
+              <div className="grid grid-cols-3 gap-3">
+                {[1000, 5000, 10000].map((amt) => (
+                  <button
+                    key={amt}
+                    onClick={() => setRechargeAmount(amt)}
+                    className="py-4 rounded-xl text-[11px] font-black border-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    style={{
+                      borderColor:
+                        Number(rechargeAmount) === amt ? C.gold : C.border,
+                      background:
+                        Number(rechargeAmount) === amt
+                          ? `${C.gold}15`
+                          : C.white,
+                      color: Number(rechargeAmount) === amt ? C.gold : C.muted,
+                    }}
+                  >
+                    ₹{amt.toLocaleString()}
+                  </button>
+                ))}
               </div>
-            </div>
 
-            {/* Actions Buttons */}
-            <div className="flex gap-3 p-5 pt-2 border-t border-gray-100">
-              <button
-                onClick={() => setShowRecharge(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRecharge}
-                className="flex-1 px-4 py-2.5 rounded-xl text-white font-medium shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
-                style={{ backgroundColor: colors.primary }}
-              >
-                <FiPlusCircle size={16} />
-                Proceed to Pay
-              </button>
+              <div className="flex gap-4 pt-4">
+                <button
+                  onClick={() => setShowRecharge(false)}
+                  className="flex-1 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border transition-all hover:bg-slate-50"
+                  style={{ borderColor: C.border, color: C.muted }}
+                >
+                  Abstain
+                </button>
+                <button
+                  onClick={handleRecharge}
+                  className="flex-[2.5] py-4 rounded-2xl font-black text-[10px] text-white uppercase tracking-widest shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-navy/20"
+                  style={{
+                    background: `linear-gradient(to right, ${C.navy}, ${C.navyMid})`,
+                  }}
+                >
+                  Initialize Protocol
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+      {/* Recharge Details Modal */}
+      {showDetails && selectedTx && (
+        <RechargeDetailsModal tx={selectedTx} onClose={handleCloseDetails} />
+      )}
     </div>
   );
 }
+
+const RechargeDetailsModal = ({ tx, onClose }) => {
+  const processorName = tx.processedBy?.name
+    ? `${tx.processedBy.name.firstName || ""} ${tx.processedBy.name.lastName || ""}`.trim()
+    : "System Protocol";
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 backdrop-blur-sm animate-in fade-in duration-300"
+        style={{ background: `${C.navy}99` }}
+        onClick={onClose}
+      />
+
+      <div
+        className="relative w-full max-w-4xl rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border"
+        style={{ background: C.white, borderColor: `${C.white}33` }}
+      >
+        {/* Header */}
+        <div
+          className="p-8 text-white relative"
+          style={{
+            background: `linear-gradient(135deg, ${C.navyMid}, ${C.navy})`,
+          }}
+        >
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div
+                  className="px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest"
+                  style={{
+                    background: `${C.gold}33`,
+                    borderColor: `${C.gold}4D`,
+                    color: C.gold,
+                  }}
+                >
+                  Financial Protocol
+                </div>
+                <div
+                  className="px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest"
+                  style={{
+                    background:
+                      tx.status === "completed"
+                        ? `${C.emerald}33`
+                        : `${C.amber}33`,
+                    borderColor:
+                      tx.status === "completed"
+                        ? `${C.emerald}4D`
+                        : `${C.amber}4D`,
+                    color: tx.status === "completed" ? C.emerald : C.amber,
+                  }}
+                >
+                  {tx.status}
+                </div>
+              </div>
+              <h2 className="text-2xl font-black tracking-tight leading-none">
+                Recharge Registry Details
+              </h2>
+              <p className="text-white/60 text-[10px] font-bold mt-2 uppercase tracking-[2px]">
+                Internal Audit Log Reference: {tx._id}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all border border-white/10"
+            >
+              <FiX size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-8 space-y-8 overflow-y-auto max-h-[60vh]">
+          {/* Main Info Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <DetailItem
+              label="Transaction ID"
+              value={tx.transactionId || tx._id}
+              icon={<FiHash style={{ color: C.gold }} />}
+              isCode
+            />
+            <DetailItem
+              label="Amount Processed"
+              value={`₹${(tx.amount || 0).toLocaleString()}`}
+              icon={<FiActivity style={{ color: C.emerald }} />}
+              isBold
+            />
+            <DetailItem
+              label="Execution Date"
+              value={new Date(tx.createdAt).toLocaleString("en-IN", {
+                day: "2-digit",
+                month: "long",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+              icon={<FiClock className="text-blue-500" />}
+            />
+            <DetailItem
+              label="Payment Gateway"
+              value={tx.paymentGateway?.name?.toUpperCase() || "N/A"}
+              icon={<FiCreditCard className="text-violet-500" />}
+            />
+          </div>
+
+          {/* User Info & Balance Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div
+              className="rounded-2xl p-6 border"
+              style={{ background: C.offWhite, borderColor: C.border }}
+            >
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-xs shadow-lg"
+                  style={{
+                    background: `linear-gradient(135deg, ${C.navyMid}, ${C.navy})`,
+                  }}
+                >
+                  {tx.processedBy?.name?.firstName?.[0] || "S"}
+                  {tx.processedBy?.name?.lastName?.[0] || "P"}
+                </div>
+                <div>
+                  <p
+                    className="text-[10px] font-black uppercase tracking-widest mb-1"
+                    style={{ color: C.muted }}
+                  >
+                    Authorizing Administrator
+                  </p>
+                  <p className="text-sm font-black" style={{ color: C.navy }}>
+                    {processorName}
+                  </p>
+                  <p
+                    className="text-[11px] font-bold"
+                    style={{ color: C.muted }}
+                  >
+                    {tx.processedBy?.email ||
+                      "system.protocol@corporate.travel"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div
+                className="p-4 rounded-2xl border shadow-sm"
+                style={{ background: C.white, borderColor: C.border }}
+              >
+                <p
+                  className="text-[9px] font-black uppercase tracking-widest mb-2"
+                  style={{ color: C.muted }}
+                >
+                  Balance Before
+                </p>
+                <p className="text-lg font-black" style={{ color: C.muted }}>
+                  ₹
+                  {parseFloat(tx.balanceBefore || 0).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+              <div
+                className="p-4 rounded-2xl border shadow-sm"
+                style={{
+                  background: `${C.gold}0D`,
+                  borderColor: `${C.gold}33`,
+                }}
+              >
+                <p
+                  className="text-[9px] font-black uppercase tracking-widest mb-2"
+                  style={{ color: C.gold }}
+                >
+                  Balance After
+                </p>
+                <p className="text-lg font-black" style={{ color: C.navy }}>
+                  ₹
+                  {parseFloat(tx.balanceAfter || 0).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Technical Metadata */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-1.5 h-4 rounded-full"
+                style={{ background: C.gold }}
+              />
+              <h3
+                className="text-xs font-black uppercase tracking-wider"
+                style={{ color: C.navy }}
+              >
+                Protocol Metadata
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+              <DetailRow
+                label="Gateway Order Ref"
+                value={tx.paymentGateway?.orderId}
+              />
+              <DetailRow
+                label="Gateway Payment Ref"
+                value={tx.paymentGateway?.paymentId}
+              />
+              <DetailRow
+                label="Provider Identifier"
+                value={tx.paymentGateway?.providerOrderId}
+              />
+              <DetailRow label="Description" value={tx.description} />
+              {tx.metadata?.source && (
+                <DetailRow label="Sync Source" value={tx.metadata.source} />
+              )}
+              {tx.metadata?.creditedAt && (
+                <DetailRow
+                  label="Credit Time"
+                  value={new Date(tx.metadata.creditedAt).toLocaleString()}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          className="p-6 border-t flex justify-end"
+          style={{ background: C.offWhite, borderColor: C.border }}
+        >
+          <button
+            onClick={onClose}
+            className="px-8 py-3 rounded-xl text-white font-black text-xs uppercase tracking-[2px] shadow-xl hover:scale-105 transition-all active:scale-95"
+            style={{ background: C.navy }}
+          >
+            Acknowledge Protocol
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DetailItem = ({ label, value, icon, isCode, isBold }) => (
+  <div className="flex gap-3">
+    <div
+      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-sm"
+      style={{ background: C.offWhite, borderColor: C.border }}
+    >
+      {icon}
+    </div>
+    <div className="min-w-0">
+      <p
+        className="text-[9px] font-black uppercase tracking-widest mb-1"
+        style={{ color: C.muted }}
+      >
+        {label}
+      </p>
+      <p
+        className={`text-[12px] truncate ${isCode ? "font-mono px-1.5 py-0.5 rounded border" : "font-black"} ${isBold ? "" : ""}`}
+        style={{
+          background: isCode ? C.offWhite : "transparent",
+          borderColor: isCode ? C.border : "transparent",
+          color: isBold ? C.navy : C.muted,
+        }}
+      >
+        {value || "—"}
+      </p>
+    </div>
+  </div>
+);
+
+const DetailRow = ({ label, value }) => (
+  <div
+    className="flex justify-between items-center py-2 border-b last:border-0"
+    style={{ borderColor: C.border }}
+  >
+    <p
+      className="text-[10px] font-bold uppercase tracking-tight"
+      style={{ color: C.muted }}
+    >
+      {label}
+    </p>
+    <p
+      className="text-[10px] font-black font-mono select-all px-2 py-0.5 rounded border"
+      style={{ background: C.offWhite, borderColor: C.border, color: C.navy }}
+    >
+      {value || "—"}
+    </p>
+  </div>
+);

@@ -12,6 +12,7 @@ import tboBalanceReducer from "./Slice/tboBalanceSlice";
 import corporateRelatedReducer from "./Slice/corporate.related.slice.js"
 import postpaidReducer from "./Slice/postpaidSlice";
 import reissueReducer from "./Slice/reissueSlice";
+import blogReducer from "./Slice/blog.slice.js";
 
 export const store = configureStore({
   reducer: {
@@ -28,5 +29,7 @@ export const store = configureStore({
     walletRechargeLogs: walletRechargeLogsReducer,
     tboBalance: tboBalanceReducer,
     reissue: reissueReducer,
+
+    blogs: blogReducer,
   },
 });

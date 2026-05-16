@@ -6,10 +6,15 @@ import { BsBell } from "react-icons/bs";
 import logo from '../../public/logo-traveamer.svg';
 import AuthModal from "../Pages/Auth/AuthModal";
 import { LuWorkflow, LuPlane } from "react-icons/lu";
-import { useNavigate } from "react-router-dom";
+import NotificationBell from "../components/common/NotificationBell";
+
+import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { logoutUser } from "../Redux/Slice/authSlice";
 import { useEffect, useRef, useState } from "react";
+import { FaBars } from "react-icons/fa";
+import { C } from "../components/Shared/color";
+import { toggleSidebar } from "../Redux/Slice/layoutSlice";
 
 /* ── Dropdown Data ── */
 const platformLinks = [
@@ -111,8 +116,12 @@ function NavDropdown({ label, items, isOpen, onToggle, dropdownRef }) {
 
 /* ── Main Header ── */
 export default function LandingHeader() {
+  const { isSidebarOpen } = useSelector((state) => state.layout);
   const navigate = useNavigate();
+  const { slug } = useParams();
   const dispatch = useDispatch();
+  const storedSlug = localStorage.getItem("companySlug");
+  const activeSlug = slug || storedSlug;
   const { user, isAuthenticated } = useSelector((s) => s.auth);
   const { publicBranding } = useSelector((s) => s.landingPage);
   const branding = publicBranding;
@@ -121,6 +130,7 @@ export default function LandingHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobilePlatformOpen, setMobilePlatformOpen] = useState(false);
   const [mobileWhoOpen, setMobileWhoOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [authStep, setAuthStep] = useState(0); // initial step for AuthModal
   const [showInactiveModal, setShowInactiveModal] = useState(false);
@@ -131,6 +141,7 @@ export default function LandingHeader() {
 
   const platformRef = useRef(null);
   const whoForRef = useRef(null);
+  const profileRef = useRef(null);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 8);
@@ -140,7 +151,12 @@ export default function LandingHeader() {
 
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate("/login");
+    const storedSlug = localStorage.getItem("companySlug");
+    if (storedSlug) {
+      navigate(`/${storedSlug}`);
+    } else {
+      navigate("/platform/flight-booking-info");
+    }
   };
 
   let dashboardRoute = "/my-bookings";
@@ -159,10 +175,12 @@ export default function LandingHeader() {
   useEffect(() => {
     function handleClick(e) {
       if (
-        platformRef.current && !platformRef.current.contains(e.target) &&
-        whoForRef.current && !whoForRef.current.contains(e.target)
+        (platformRef.current && !platformRef.current.contains(e.target)) &&
+        (whoForRef.current && !whoForRef.current.contains(e.target)) &&
+        (profileRef.current && !profileRef.current.contains(e.target))
       ) {
         setOpenMenu(null);
+        setProfileDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -199,33 +217,49 @@ export default function LandingHeader() {
   const toggle = (menu) => setOpenMenu((prev) => (prev === menu ? null : menu));
 
   return (
-    <header className="w-full px-6 py-4 bg-[#F5F5F5] flex justify-between items-center z-50 sticky top-0 shadow-sm">
-
-      {/* Logo */}
-      <div
-        className="flex items-center cursor-pointer"
-        onClick={() => {
-          if (isAuthenticated) {
-            navigate("/travel");
-          } else {
-            navigate("/platform/flight-booking-info");
-          }
-        }}
-      >
-        {isAuthenticated && branding?.branding?.logo?.url ? (
-          <img
-            src={branding.branding.logo.url}
-            alt={branding.corporateName || "Logo"}
-            className="h-8 object-contain"
-          />
-        ) : (
-          <img src={logo} alt="Traveamer" className="h-7" />
-        )}
+    <header className="w-full px-6 py-4 flex justify-between items-center z-50 sticky top-0 shadow-sm transition-all" style={{ background: "#FFFFFF" }}>
+      
+      <div className="flex items-center gap-4">
+        {/* Logo */}
+        <div
+          className="flex items-center cursor-pointer"
+          onClick={() => {
+            if (isAuthenticated) {
+              navigate("/travel");
+            } else {
+              navigate("/platform/flight-booking-info");
+            }
+          }}
+        >
+          {branding?.branding?.logo?.url ? (
+            <img
+              src={branding.branding.logo.url}
+              alt={branding.corporateName || "Logo"}
+              className="h-8 object-contain"
+            />
+          ) : (
+            <img src={logo} alt="Traveamer" className="h-7" />
+          )}
+        </div>
       </div>
 
       {/* Desktop Nav */}
       {!isAuthenticated && (
         <nav className="hidden md:flex items-center gap-8">
+           <a
+            href="/traveamer"
+            className="text-sm font-semibold font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors px-3 py-1.5 rounded-full border border-[#C9A84C]/40 hover:border-[#C9A84C] hover:bg-[#C9A84C]/8"
+          >
+            Traveamer
+          </a>
+          {activeSlug && (
+            <a
+              href={`/${activeSlug}`}
+              className="text-sm font-bold font-['Plus_Jakarta_Sans'] text-[#C9A84C] hover:text-[#C9A84C] transition-colors"
+            >
+              Home
+            </a>
+          )}
           <NavDropdown
             label="Platform"
             items={platformLinks}
@@ -241,23 +275,38 @@ export default function LandingHeader() {
             dropdownRef={whoForRef}
           />
          
+          <a
+            href="/about-us"
+            className="text-sm font-medium font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors"
+          >
+            About Us
+          </a>
+          <a
+            href="/faq"
+            className="text-sm font-medium font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors"
+          >
+            FAQs
+          </a>
+          <a
+            href="/blog"
+            className="text-sm font-medium font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors"
+          >
+            Blog
+          </a>
         </nav>
       )}
 
       {/* CTA Buttons / Auth State */}
-      <div className="hidden md:flex items-center gap-4">
+      {/* CTA Buttons / Auth State */}
+      <div className={`${isAuthenticated ? "flex" : "hidden md:flex"} items-center gap-4`}>
         {isAuthenticated && user ? (
           <div className="flex items-center gap-3">
-            <button
-              className="w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-black/5"
-              style={{ color: C.navy }}
-            >
-              <BsBell size={18} />
-            </button>
+            <NotificationBell />
 
-            <div className="relative group">
+            <div className="relative" ref={profileRef}>
               <div
                 className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer font-bold text-sm transition-all"
+                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                 style={{
                   background: GOLD,
                   color: C.navy,
@@ -266,9 +315,9 @@ export default function LandingHeader() {
               >
                 {user?.name?.firstName?.charAt(0)?.toUpperCase() || "E"}
               </div>
-              {/* Hover Dropdown */}
+              {/* Click Dropdown */}
               <div
-                className="absolute right-0 top-full mt-2 w-48 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all overflow-hidden z-50"
+                className={`absolute right-0 top-full mt-2 w-48 rounded-xl shadow-xl transition-all overflow-hidden z-50 ${profileDropdownOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"}`}
                 style={{
                   background: C.white,
                   border: `1px solid ${C.border}`,
@@ -282,12 +331,6 @@ export default function LandingHeader() {
                     {user?.role?.replace("-", " ")}
                   </p>
                 </div>
-                <button
-                  onClick={() => navigate(dashboardRoute)}
-                  className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 border-none cursor-pointer"
-                >
-                  <RiBriefcaseLine size={15} /> Dashboard
-                </button>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 border-none cursor-pointer"
@@ -304,43 +347,75 @@ export default function LandingHeader() {
                 setAuthStep(0); // login flow start
                 setShowAuth(true);
               }}
-              className="text-black text-sm font-medium font-['Plus_Jakarta_Sans'] hover:text-[#C9A84C] transition-colors"
+              className={
+                activeSlug
+                  ? "h-10 px-6 bg-[#C9A84C] text-black text-sm font-bold font-['Plus_Jakarta_Sans'] rounded-full shadow-lg shadow-[#C9A84C]/20 hover:bg-[#b8963d] transition-all hover:scale-105 active:scale-95"
+                  : "text-black text-sm font-medium font-['Plus_Jakarta_Sans'] hover:text-[#C9A84C] transition-colors"
+              }
             >
               Login
             </button>
-            <button
-              onClick={() => {
-                setAuthStep(1); // start at step 1 for sign up
-                setShowAuth(true);
-              }}
-              className="h-10 px-5 bg-[#C9A84C] text-black text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-full shadow-[0px_0px_40px_0px_rgba(60,131,246,0.15)] hover:bg-[#b8963d] transition-colors"
-            >
-              Sign Up
-            </button>
+            {!localStorage.getItem("companySlug") && (
+              <button
+                onClick={() => {
+                  setAuthStep(1); // start at step 1 for sign up
+                  setShowAuth(true);
+                }}
+                className="h-10 px-5 bg-[#C9A84C] text-black text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-full shadow-[0px_0px_40px_0px_rgba(60,131,246,0.15)] hover:bg-[#b8963d] transition-colors"
+              >
+                Sign Up
+              </button>
+            )}
           </>
+        )}
+        {/* Sidebar Toggle (Always Visible if Logged In) */}
+        {isAuthenticated && (
+          <button
+            onClick={() => dispatch(toggleSidebar())}
+            className="p-2 rounded-lg hover:bg-slate-200 transition-colors text-slate-700 flex items-center justify-center ml-2"
+            title={isSidebarOpen ? "Close Menu" : "Open Menu"}
+          >
+            <FaBars size={20} />
+          </button>
         )}
       </div>
 
-      {/* Mobile toggle */}
-      <button
-        className="md:hidden text-[#000D26]"
-        onClick={() => setMobileOpen(!mobileOpen)}
-      >
-        <div className="w-5 flex flex-col gap-1">
-          <span className="block h-0.5 bg-current" />
-          <span className="block h-0.5 bg-current" />
-          <span className="block h-0.5 bg-current" />
-        </div>
-      </button>
+      {/* Mobile toggle (Only show if guest) */}
+      {!isAuthenticated && (
+        <button
+          className="md:hidden text-[#000D26]"
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
+          <div className="w-5 flex flex-col gap-1">
+            <span className="block h-0.5 bg-current" />
+            <span className="block h-0.5 bg-current" />
+            <span className="block h-0.5 bg-current" />
+          </div>
+        </button>
+      )}
 
       {/* Mobile Menu */}
       {mobileOpen && (
         <div className="absolute top-full left-0 w-full bg-[#F5F5F5] shadow-lg md:hidden flex flex-col gap-1 p-4 z-50">
+           <a
+            href="/traveamer"
+            className="text-sm font-semibold font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors px-3 py-1.5 rounded-full border border-[#C9A84C]/40 hover:border-[#C9A84C] hover:bg-[#C9A84C]/8"
+          >
+            Traveamer
+          </a>
 
           {/* Nav Links - Only show if guest */}
           {!isAuthenticated && (
             <>
-              {/* Platform accordion */}
+              {activeSlug && (
+            <a
+              href={`/${activeSlug}`}
+              className="flex items-center w-full px-3 py-2.5 text-[#C9A84C] text-sm font-bold font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
+            >
+              Home
+            </a>
+          )}
+          {/* Platform accordion */}
               <button
                 onClick={() => setMobilePlatformOpen(!mobilePlatformOpen)}
                 className="flex items-center justify-between w-full px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
@@ -389,6 +464,26 @@ export default function LandingHeader() {
                   ))}
                 </div>
               )}
+
+             
+              <a
+                href="/about-us"
+                className="px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
+              >
+                About Us
+              </a>
+              <a
+                href="/faq"
+                className="px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
+              >
+                FAQ
+              </a>
+              <a
+                href="/blog"
+                className="px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
+              >
+                Blog
+              </a>
             </>
           )}
 
@@ -396,13 +491,16 @@ export default function LandingHeader() {
 
           {isAuthenticated && user ? (
             <div className="flex flex-col gap-1">
-              <div className="px-3 py-3 bg-white/40 rounded-xl mb-1">
-                <p className="text-sm font-bold text-gray-800 leading-tight">
-                  {user?.name?.firstName} {user?.name?.lastName}
-                </p>
-                <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider mt-0.5">
-                  {user?.role?.replace("-", " ")}
-                </p>
+              <div className="px-3 py-3 bg-white/40 rounded-xl mb-1 flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-bold text-gray-800 leading-tight">
+                    {user?.name?.firstName} {user?.name?.lastName}
+                  </p>
+                  <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider mt-0.5">
+                    {user?.role?.replace("-", " ")}
+                  </p>
+                </div>
+                <NotificationBell />
               </div>
               <button
                 onClick={() => {

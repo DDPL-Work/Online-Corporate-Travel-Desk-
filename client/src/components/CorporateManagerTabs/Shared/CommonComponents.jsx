@@ -37,7 +37,7 @@ export const selectCls =
 export const dateCls =
   "w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white outline-none focus:border-slate-400 transition-colors";
 
-  // ── shared small components ───────────────────────────────────────────────────
+// ── shared small components ───────────────────────────────────────────────────
 
 export const statusStyles = {
   Confirmed: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
@@ -63,38 +63,69 @@ export const StatCard = ({
   Icon,
 }) => (
   <div
-    className={`bg-white rounded-xl p-4 flex items-center gap-3 shadow-sm border-l-4 ${borderCls}`}
+    className={`bg-white rounded-2xl p-4 sm:p-5 flex items-center gap-4 shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all duration-300`}
   >
     <div
-      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBgCls}`}
+      className={`absolute top-0 left-0 w-1 h-full ${borderCls.replace("border-", "bg-")}`}
+    />
+    <div
+      className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-300 ${iconBgCls}`}
     >
-      <Icon size={18} className={iconColorCls} />
+      <Icon size={22} className={iconColorCls} />
     </div>
-    <div>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
+    <div className="min-w-0">
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">
         {label}
       </p>
-      <p className="text-xl font-black text-slate-900 leading-none">{value}</p>
+      <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none truncate">
+        {typeof value === "number" ? value.toLocaleString() : value}
+      </p>
     </div>
   </div>
 );
 
 export const Th = ({ children }) => (
-  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-widest whitespace-nowrap select-none">
+  <th className="px-6 py-4 text-left text-[11px] font-black uppercase tracking-widest whitespace-nowrap select-none">
     {children}
   </th>
 );
 
-export const StatusBadge = ({ status }) => (
-  <span
-    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-600 ${statusStyles[status] || statusStyles.Pending}`}
-  >
+export const StatusBadge = ({ status }) => {
+  const s = status?.toLowerCase() || "";
+  const styles = {
+    completed: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+    success: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+    confirmed: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+    pending: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+    pending_approval: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+    cancelled: "bg-red-50 text-red-700 ring-1 ring-red-200",
+    rejected: "bg-red-50 text-red-700 ring-1 ring-red-200",
+    failed: "bg-red-50 text-red-700 ring-1 ring-red-200",
+  };
+  const dots = {
+    completed: "bg-emerald-500",
+    success: "bg-emerald-500",
+    confirmed: "bg-emerald-500",
+    pending: "bg-amber-500",
+    pending_approval: "bg-amber-500",
+    cancelled: "bg-red-500",
+    rejected: "bg-red-500",
+    failed: "bg-red-500",
+  };
+
+  const label = status?.replace(/_/g, " ") || "Pending";
+
+  return (
     <span
-      className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotStyles[status] || dotStyles.Pending}`}
-    />
-    {status}
-  </span>
-);
+      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${styles[s] || styles.pending}`}
+    >
+      <span
+        className={`w-1.5 h-1.5 rounded-full shrink-0 animate-pulse ${dots[s] || dots.pending}`}
+      />
+      {label}
+    </span>
+  );
+};
 
 export const DualCell = ({ primary, secondary }) => (
   <div className="flex flex-col gap-0.5">
@@ -111,19 +142,36 @@ export const Avatar = ({ name, bgClass, textClass }) => (
   </div>
 );
 
-
 export const SectionLabel = ({ icon, title }) => (
-  <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">{icon} {title}</h3>
+  <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+    {icon} {title}
+  </h3>
 );
 
 export const InfoBadge = ({ color, children }) => {
-  const c = { teal:"bg-teal-100 text-teal-700", blue:"bg-blue-100 text-blue-700", green:"bg-green-100 text-green-700", red:"bg-red-100 text-red-700", amber:"bg-amber-100 text-amber-700", gray:"bg-slate-100 text-slate-600", sky:"bg-sky-100 text-sky-700" };
-  return <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase flex items-center ${c[color]||c.gray}`}>{children}</span>;
+  const c = {
+    teal: "bg-teal-100 text-teal-700",
+    blue: "bg-blue-100 text-blue-700",
+    green: "bg-green-100 text-green-700",
+    red: "bg-red-100 text-red-700",
+    amber: "bg-amber-100 text-amber-700",
+    gray: "bg-slate-100 text-slate-600",
+    sky: "bg-sky-100 text-sky-700",
+  };
+  return (
+    <span
+      className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase flex items-center ${c[color] || c.gray}`}
+    >
+      {children}
+    </span>
+  );
 };
 
 export const MiniStatCard = ({ label, value, sub }) => (
   <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{label}</p>
+    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+      {label}
+    </p>
     <p className="text-sm font-bold text-slate-900 mt-0.5">{value}</p>
     {sub && <p className="text-[10px] text-slate-400 mt-0.5">{sub}</p>}
   </div>
@@ -179,7 +227,6 @@ export const InfoRow = ({ label, value, mono, padded, capitalize }) => (
     </span>
   </div>
 );
-
 
 export const RatingStars = ({ rating }) => (
   <div className="flex items-center gap-1">

@@ -4,6 +4,8 @@ import { useDispatch, useSelector } from "react-redux";
 import { logoutUser } from "../Redux/Slice/authSlice";
 import { useNavigate } from "react-router-dom";
 import { FiSettings } from "react-icons/fi";
+import NotificationBell from "../components/common/NotificationBell";
+
 
 export default function Header({ toggleSidebar, sidebarOpen }) {
   const dispatch = useDispatch();
@@ -90,14 +92,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
       {/* RIGHT */}
       <div className="flex items-center gap-3">
         {/* Notifications */}
-        <div ref={notificationsRef} className="relative">
-          <button
-            className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded"
-            onClick={() => setNotificationsOpen(!notificationsOpen)}
-          >
-            <FaBell size={20} />
-          </button>
-        </div>
+        <NotificationBell />
 
         {/* User Dropdown */}
         <div ref={dropdownRef} className="relative">

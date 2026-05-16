@@ -1,179 +1,126 @@
 import React, { useEffect, useState } from "react";
-import { FiSearch, FiEdit2, FiTrash2 } from "react-icons/fi";
+import { FiSearch, FiEdit2, FiTrash2, FiUser, FiMail, FiBriefcase, FiUsers, FiRefreshCw, FiPlus, FiArrowRight } from "react-icons/fi";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchEmployees,
   deleteEmployee,
 } from "../../Redux/Slice/employeeActionSlice";
 import EditUserModal from "../../Modal/EditUserModal";
-
-const colors = {
-  primary: "#0A4D68",
-  secondary: "#088395",
-  accent: "#05BFDB",
-  light: "#F8FAFC",
-  dark: "#1E293B",
-};
+import { C } from "../Shared/color";
+import { LabeledField, CustomDropdown, SearchBar } from "./Shared/CommonComponents";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
+import Swal from "sweetalert2";
 
 export default function UserManagement() {
   const dispatch = useDispatch();
   const [openEdit, setOpenEdit] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-
-  // ✅ CORRECT SELECTOR
-  const { employees, loading, error } = useSelector(
-    (state) => state.employeeAction,
-  );
-
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("All");
 
-  // -------------------------
-  // FETCH EMPLOYEES
-  // -------------------------
-  useEffect(() => {
-    dispatch(fetchEmployees());
-  }, [dispatch]);
+  const { employees, loading } = useSelector((state) => state.employeeAction);
 
-  // -------------------------
-  // DELETE EMPLOYEE
-  // -------------------------
+  useEffect(() => { dispatch(fetchEmployees()); }, [dispatch]);
+
   const handleDelete = (id) => {
-    if (!window.confirm("Are you sure you want to delete this employee?"))
-      return;
-
-    dispatch(deleteEmployee(id));
+    Swal.fire({
+      title: "Terminate Personnel?",
+      text: "This protocol will permanently remove the record.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: C.navy,
+      cancelButtonColor: "#64748B",
+      confirmButtonText: "Terminate",
+      background: C.white,
+      color: C.navy,
+    }).then((result) => {
+      if (result.isConfirmed) dispatch(deleteEmployee(id));
+    });
   };
 
-  // -------------------------
-  // FILTER LOGIC
-  // -------------------------
-  const departments = [
-    "All",
-    ...new Set(employees.map((e) => e.department).filter(Boolean)),
-  ];
+  const departments = ["All", ...new Set(employees.map(e => e.department).filter(Boolean))];
 
-  const filteredEmployees = employees.filter((e) => {
-    const name =
-      typeof e.name === "string"
-        ? e.name
-        : `${e.name?.firstName || ""} ${e.name?.lastName || ""}`;
-
-    const matchSearch =
-      name.toLowerCase().includes(search.toLowerCase()) ||
-      e.email?.toLowerCase().includes(search.toLowerCase());
-
-    const matchDept =
-      departmentFilter === "All" || e.department === departmentFilter;
-
-    return matchSearch && matchDept;
+  const filtered = employees.filter(e => {
+    const name = typeof e.name === "string" ? e.name : `${e.name?.firstName || ""} ${e.name?.lastName || ""}`;
+    return (name.toLowerCase().includes(search.toLowerCase()) || e.email?.toLowerCase().includes(search.toLowerCase())) &&
+           (departmentFilter === "All" || e.department === departmentFilter);
   });
 
-  // -------------------------
-  // UI STATES
-  // -------------------------
-  if (loading) {
-    return (
-      <div className="p-6 text-center text-gray-500">Loading employees…</div>
-    );
-  }
-
-  if (error) {
-    return <div className="p-6 text-center text-red-600">{error}</div>;
-  }
-
   return (
-    <div className="p-6" style={{ backgroundColor: colors.light }}>
-      <div className="max-w-6xl mx-auto">
-        {/* HEADER */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold" style={{ color: colors.dark }}>
-            User Management
-          </h2>
-          <p className="text-gray-500">Manage employees in your organization</p>
-        </div>
-
-        {/* SEARCH + FILTER */}
-        <div className="bg-white shadow p-4 rounded-lg mb-6 flex flex-col md:flex-row gap-4">
-          <div className="flex items-center gap-2 border p-2 rounded-lg w-full md:w-1/2">
-            <FiSearch className="text-gray-500" />
-            <input
-              placeholder="Search by name or email"
-              className="w-full outline-none"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+    <div className="min-h-screen font-sans pb-20 px-6 pt-8" style={{ background: C.offWhite }}>
+      <div className="max-w-7xl mx-auto space-y-8">
+        
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-2xl border shadow-sm" style={{ borderColor: C.border }}>
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg text-white" style={{ background: `linear-gradient(135deg, ${C.navy}, ${C.gold})` }}>
+              <FiUsers size={32} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-black tracking-tight" style={{ color: C.navy }}>Access Control</h1>
+              <p className="text-xs mt-1 font-bold uppercase tracking-widest" style={{ color: C.muted }}>Strategic Management of Corporate Personnel Permissions</p>
+            </div>
           </div>
-
-          <select
-            className="border p-2 rounded-lg w-full md:w-1/4"
-            value={departmentFilter}
-            onChange={(e) => setDepartmentFilter(e.target.value)}
-          >
-            {departments.map((d) => (
-              <option key={d}>{d}</option>
-            ))}
-          </select>
+          <button onClick={() => dispatch(fetchEmployees())} className="px-6 py-3 rounded-xl font-bold text-xs flex items-center gap-2 border transition-all shadow-sm" style={{ background: C.white, borderColor: C.border, color: C.navy }}>
+            <FiRefreshCw className={loading ? "animate-spin" : ""} /> Sync Records
+          </button>
         </div>
 
-        {/* EMPLOYEE LIST */}
-        <div className="bg-white rounded-lg shadow p-4">
-          {filteredEmployees.length === 0 ? (
-            <p className="text-center text-gray-500 py-6">No employees found</p>
+        {/* Filters Area */}
+        <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+              <LabeledField label={<><FiSearch size={10} /> Personnel Search</>}>
+                <SearchBar value={search} onChange={setSearch} placeholder="Search by name, email or department..." />
+              </LabeledField>
+            </div>
+            <LabeledField label="Personnel Unit">
+              <CustomDropdown value={departmentFilter} onChange={setDepartmentFilter} options={departments} />
+            </LabeledField>
+          </div>
+        </div>
+
+        {/* Card Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered.length === 0 ? (
+             <div className="col-span-full py-24 text-center bg-white rounded-3xl border border-dashed" style={{ borderColor: C.border }}>
+                <FiUsers size={48} className="mx-auto mb-4 opacity-10" style={{ color: C.navy }} />
+                <p className="font-black uppercase tracking-[0.2em] text-slate-300">No Personnel Found</p>
+             </div>
           ) : (
-            <ul className="space-y-4">
-              {filteredEmployees.map((e) => {
-                const fullName =
-                  typeof e.name === "string"
-                    ? e.name
-                    : `${e.name?.firstName || ""} ${e.name?.lastName || ""}`;
-
-                return (
-                  <li
-                    key={e._id}
-                    className="flex justify-between items-center p-4 rounded-lg border hover:shadow"
-                  >
-                    <div>
-                      <div
-                        className="font-semibold text-lg"
-                        style={{ color: colors.primary }}
-                      >
-                        {fullName}
+            filtered.map((e) => {
+              const fullName = typeof e.name === "string" ? e.name : `${e.name?.firstName || ""} ${e.name?.lastName || ""}`;
+              const initials = typeof e.name === "string" ? e.name.charAt(0) : `${e.name?.firstName?.charAt(0) || ""}${e.name?.lastName?.charAt(0) || ""}`;
+              return (
+                <div key={e._id} className="bg-white rounded-3xl border shadow-sm hover:shadow-md transition-all p-8 group relative overflow-hidden" style={{ borderColor: C.border }}>
+                   <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-bl-full -mr-8 -mt-8 transition-all group-hover:bg-gold/5" />
+                   <div className="flex items-start justify-between mb-8 relative z-10">
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center font-black text-xl shadow-inner transition-transform group-hover:scale-110" style={{ background: `${C.navy}08`, color: C.navy, border: `1px solid ${C.navy}10` }}>{initials || "P"}</div>
+                      <div className="flex gap-1">
+                        <button onClick={() => { setSelectedUser(e); setOpenEdit(true); }} className="p-3 rounded-xl transition-all hover:bg-slate-50 text-slate-400 hover:text-navy"><FiEdit2 size={18} /></button>
+                        <button onClick={() => handleDelete(e._id)} className="p-3 rounded-xl transition-all hover:bg-rose-50 text-slate-400 hover:text-rose-500"><FiTrash2 size={18} /></button>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        {e.email} • {e.department}
+                   </div>
+                   <div className="space-y-6 relative z-10">
+                      <div>
+                        <h3 className="text-xl font-black truncate tracking-tight" style={{ color: C.navy }}>{fullName}</h3>
+                        <div className="flex items-center gap-2 mt-1.5 font-bold text-[11px] text-slate-400 uppercase tracking-tighter"><FiMail size={12} className="text-gold" /> {e.email}</div>
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => {
-                          setSelectedUser(e);
-                          setOpenEdit(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <FiEdit2 size={20} />
-                      </button>
-
-                      <button
-                        onClick={() => handleDelete(e._id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <FiTrash2 size={20} />
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+                      <div className="pt-6 border-t flex items-center justify-between" style={{ borderColor: C.offWhite }}>
+                         <div className="flex items-center gap-2">
+                            <FiBriefcase size={12} className="text-gold" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">{e.department || "Corporate"}</span>
+                         </div>
+                         <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest" style={{ background: `${C.navy}08`, color: C.navy }}>{e.role || "PERSONNEL"}</span>
+                      </div>
+                   </div>
+                </div>
+              );
+            })
           )}
         </div>
       </div>
-
-      {openEdit && selectedUser && (
-        <EditUserModal user={selectedUser} onClose={() => setOpenEdit(false)} />
-      )}
+      {openEdit && selectedUser && <EditUserModal user={selectedUser} onClose={() => setOpenEdit(false)} />}
     </div>
   );
 }

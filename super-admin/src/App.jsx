@@ -15,6 +15,10 @@ function App() {
           unstyled: true, // 🚀 this disables Sonner’s default styles completely
           classNames: {
             toast: "sonner-toast",
+            success: "success",
+            error: "error",
+            warning: "warning",
+            info: "info",
           },
         }}
       />

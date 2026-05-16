@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useFlightSearch } from "../../../context/FlightSearchContext";
 import { MdArrowBack, MdFlightTakeoff, MdFlightLand } from "react-icons/md";
 import { BsCalendar4 } from "react-icons/bs";
 import { AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
@@ -15,6 +16,7 @@ import {
   CTABox,
   parseRoundTripBooking,
   TravelerForm,
+  SelectedSSRSummary,
 } from "./CommonComponents";
 import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import {
@@ -23,7 +25,10 @@ import {
   getRTSSR,
 } from "../../../Redux/Actions/flight.thunks.RT";
 import RTSeatSelectionModal from "./SSR/RTSeatSelectionModal";
-import { createBookingRequest } from "../../../Redux/Actions/booking.thunks";
+import {
+  createBookingRequest,
+  instantFlightBooking,
+} from "../../../Redux/Actions/booking.thunks";
 import { approveApproval } from "../../../Redux/Actions/approval.thunks";
 import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
 import { fetchMyProfile } from "../../../Redux/Slice/employeeActionSlice";
@@ -40,6 +45,7 @@ export default function RoundTripFlightBooking() {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { setActiveTab } = useFlightSearch();
 
   const hasState = Boolean(location.state);
   useEffect(() => {
@@ -908,13 +914,16 @@ export default function RoundTripFlightBooking() {
 
       listToIterate.forEach((meal, travelerIndex) => {
         meals.push({
+          ...meal, // Save full details for future use
           journeyType,
           segmentIndex: Number(segmentIndex),
           travelerIndex,
           travelerId: travelers[travelerIndex]?.id,
           code: meal.Code,
           description: String(meal.Description || meal.Code || ""),
+          airlineDescription: meal.AirlineDescription || meal.Description || meal.Code,
           price: meal.Price,
+          type: meal.Type || meal.Way,
         });
       });
     });
@@ -997,6 +1006,7 @@ export default function RoundTripFlightBooking() {
       const [journeyType, segmentIndex] = key.split("|");
 
       baggage.push({
+        ...bag, // Save full details for future use
         journeyType,
         segmentIndex: Number(segmentIndex),
         code: bag.Code,
@@ -1147,18 +1157,10 @@ export default function RoundTripFlightBooking() {
       projectId: projectApproverData.project?.id,
       projectClient: projectApproverData.project?.client,
       projectCodeId: projectApproverData.project?.id,
-      approverId: !approvalRequired
-        ? user?._id || user?.id || user?.userId
-        : projectApproverData.approver?.id,
-      approverEmail: !approvalRequired
-        ? user?.email
-        : projectApproverData.approver?.email,
-      approverName: !approvalRequired
-        ? `${user?.name?.firstName} ${user?.name?.lastName}`
-        : projectApproverData.approver?.name,
-      approverRole: !approvalRequired
-        ? user?.role
-        : projectApproverData.approver?.role,
+      approverId: projectApproverData.approver?.id,
+      approverEmail: projectApproverData.approver?.email,
+      approverName: projectApproverData.approver?.name,
+      approverRole: projectApproverData.approver?.role,
       flightRequest: {
         // traceId: searchParams.traceId,
         traceId,
@@ -1186,6 +1188,14 @@ export default function RoundTripFlightBooking() {
         },
 
         fareExpiry,
+        fareRules: fareRule, // ✅ save fare rules for audit
+      },
+
+      requesterDetails: {
+        name: `${user?.name?.firstName} ${user?.name?.lastName}`,
+        email: user?.email,
+        role: user?.role,
+        userId: user?._id || user?.id || user?.userId,
       },
 
       travellers: travelersWithInfants.map((t, idx) => ({
@@ -1342,7 +1352,45 @@ export default function RoundTripFlightBooking() {
     return isValid;
   };
 
+  const validateMandatorySSR = () => {
+    const validators = fareQuote?.Response?.Results?.RequiredFieldValidators;
+    if (!validators) return { valid: true };
+
+    const errors = [];
+    const isMealRequired = validators?.IsMealRequired;
+    const isSeatRequired = validators?.IsSeatRequired;
+
+    if (isMealRequired) {
+      const hasMeal = Object.values(selectedMeals).some((v) => v?.length > 0);
+      if (!hasMeal) errors.push("Meal selection is required");
+    }
+
+    if (isSeatRequired) {
+      const hasSeat = Object.values(selectedSeats).some(
+        (v) => v?.list?.length > 0,
+      );
+      if (!hasSeat) errors.push("Seat selection is required");
+    }
+
+    return {
+      valid: errors.length === 0,
+      message: errors.join(" & "),
+    };
+  };
+
   const handleSendForApproval = async () => {
+    // 🚨 SSR VALIDATION
+    const ssrCheck = validateMandatorySSR();
+    if (!ssrCheck.valid) {
+      Swal.fire({
+        icon: "warning",
+        title: "Required Selection Missing",
+        text: ssrCheck.message,
+        confirmButtonColor: "#f97316",
+      });
+      return;
+    }
+
     if (!purposeOfTravel) {
       ToastWithTimer({
         type: "error",
@@ -1386,40 +1434,47 @@ export default function RoundTripFlightBooking() {
 
     try {
       const payload = buildBookingRequestPayload();
-      if (approvalRequired && !isTravelAdmin) {
-        await dispatch(
-          selectManager({
-            approverId: projectApproverData.approver?.id,
-            approverEmail: projectApproverData.approver?.email,
-            projectCodeId: projectApproverData.project?.id,
-            projectName: projectApproverData.project?.name,
-            projectClient: projectApproverData.project?.client,
-          }),
-        ).unwrap();
-      }
-
-      const result = await dispatch(createBookingRequest(payload)).unwrap();
-
+      let result;
       if (!approvalRequired) {
-        const requestId = result.bookingRequestId || result._id;
-        if (requestId && result.requestStatus !== "approved") {
+        // ✅ Use instant booking API for auto-approved policies
+        result = await dispatch(instantFlightBooking(payload)).unwrap();
+        ToastWithTimer({
+          type: "success",
+          message: "Flight booked automatically per policy",
+        });
+      } else {
+        // ✅ Traditional approval workflow
+        if (!isTravelAdmin) {
           await dispatch(
-            approveApproval({
-              id: requestId,
-              comments: "Self Approved by Travel Admin",
-              type: "flight",
+            selectManager({
+              approverId: projectApproverData.approver?.id,
+              approverEmail: projectApproverData.approver?.email,
+              projectCodeId: projectApproverData.project?.id,
+              projectName: projectApproverData.project?.name,
+              projectClient: projectApproverData.project?.client,
             }),
           ).unwrap();
         }
-        ToastWithTimer({
-          type: "success",
-          message: "Booking auto-approved successfully",
-        });
+        result = await dispatch(createBookingRequest(payload)).unwrap();
+
+        // Handle case where it might still be auto-approved at backend but we used createBookingRequest
+        if (result.autoApproved || result.requestStatus === "approved") {
+          ToastWithTimer({
+            type: "success",
+            message: "Booking auto-approved successfully",
+          });
+        }
       }
 
-      navigate("/my-pending-approvals", {
-        state: { success: true },
-      });
+      if (result.autoApproved || result.requestStatus === "approved") {
+        navigate("/my-bookings", {
+          state: { success: true },
+        });
+      } else {
+        navigate("/my-pending-approvals", {
+          state: { success: true },
+        });
+      }
     } catch (err) {
       ToastWithTimer({
         type: "error",
@@ -1557,7 +1612,7 @@ export default function RoundTripFlightBooking() {
 
       {/* Top Bar */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-full mx-10 px-4 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#0A203E] transition group"
@@ -1567,11 +1622,17 @@ export default function RoundTripFlightBooking() {
             </span>
             Back to results
           </button>
-          <div className="flex items-center gap-4">
-            <span className="px-4 py-1.5 text-[10px] font-black rounded-full bg-[#0A203E] text-white uppercase tracking-widest shadow-md">
-              ROUND-TRIP
-            </span>
-          </div>
+
+          <button
+            onClick={() => {
+              setActiveTab("hotel");
+              navigate("/travel", { state: { activeTab: "hotel" } });
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className="flex items-center gap-1.5 font-bold cursor-pointer bg-[#C9A84C] hover:bg-[#b5953e] transition-colors px-3 py-1.5 rounded-md text-[#0A203E] shadow-sm"
+          >
+            Search Hotels
+          </button>
         </div>
       </div>
 
@@ -1771,6 +1832,16 @@ export default function RoundTripFlightBooking() {
               )}
             </div>
 
+
+            {/* Selected Add-ons Summary */}
+            <SelectedSSRSummary
+              selectedSeats={selectedSeats}
+              selectedMeals={selectedMeals}
+              selectedBaggage={selectedBaggage}
+              travelers={travelers}
+              segments={buildFullSegments()}
+            />
+
             {/* Traveller Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <TravelerForm
@@ -1851,7 +1922,6 @@ export default function RoundTripFlightBooking() {
                 approverError={approverError}
                 onSendForApproval={handleSendForApproval}
                 loading={actionLoading}
-                disabled={!isFormReady}
                 approvalRequired={approvalRequired}
               />
 
