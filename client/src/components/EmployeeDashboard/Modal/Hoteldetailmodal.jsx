@@ -288,7 +288,7 @@ function HotelDetailModal({ isOpen, hotelId, onClose }) {
                   )}
 
                 {/* Booking Info */}
-                <SectionCard title="Booking Reference" icon={MdInfo}>
+                <SectionCard title="Order ID" icon={MdInfo}>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
                       <span className="text-sm text-slate-600">
@@ -300,7 +300,7 @@ function HotelDetailModal({ isOpen, hotelId, onClose }) {
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-slate-100">
                       <span className="text-sm text-slate-600">
-                        Booking Reference
+                        Order ID
                       </span>
                       <code className="text-xs font-mono text-teal-600 font-semibold">
                         {hotelDetails?.bookingReference || "—"}

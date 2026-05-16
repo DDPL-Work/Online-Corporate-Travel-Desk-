@@ -71,6 +71,14 @@ const bookingRequestSchema = new mongoose.Schema(
     approverName: String,
     approverRole: String,
 
+    /* ================= REQUESTER DETAILS ================= */
+    requesterDetails: {
+      name: String,
+      email: String,
+      role: String,
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    },
+
     /* ================= REQUEST INFO ================= */
 
     purposeOfTravel: {
@@ -163,6 +171,8 @@ const bookingRequestSchema = new mongoose.Schema(
       default: "not_started",
       index: true,
     },
+    ticketedAt: Date,
+    cancelledAt: Date,
 
     // bookingResult: {
     //   pnr: String,

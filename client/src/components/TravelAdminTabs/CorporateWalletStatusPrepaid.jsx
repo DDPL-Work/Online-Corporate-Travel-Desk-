@@ -9,16 +9,15 @@ import {
   FiCalendar,
   FiActivity,
   FiCreditCard,
+  FiRefreshCw,
+  FiX,
 } from "react-icons/fi";
 import { FaRupeeSign } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  fetchWalletBalance,
-  fetchWalletPaymentStatus,
-  fetchWalletTransactions,
-  initiateWalletRecharge,
-} from "../../Redux/Slice/walletSlice";
+import { LabeledField, CustomDropdown } from "./Shared/CommonComponents";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { Pagination } from "./Shared/Pagination";
+import { fetchWalletBalance, fetchWalletTransactions, initiateWalletRecharge, fetchRechargeHistory, fetchBookingTransactions } from "../../Redux/Slice/walletSlice";
 
 // Extended color palette matching CreditUtilizationPostpaid
 const colors = {
@@ -50,7 +49,7 @@ const StatCard = ({
       <Icon size={18} className={iconColorCls} />
     </div>
     <div className="text-left">
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 italic">
         {label}
       </p>
       <p className="text-xl font-black text-slate-900 leading-none">{value}</p>
@@ -60,7 +59,7 @@ const StatCard = ({
 
 const LabeledInput = ({ label, children }) => (
   <div className="flex flex-col gap-1 text-left">
-    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+    <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 italic mb-1">
       {label}
     </label>
     {children}
@@ -103,7 +102,7 @@ const StatusBadge = ({ status }) => {
   const style = config[status] || config.success;
   return (
     <span
-      className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border ${style.bg} ${style.text} ${style.border}`}
+      className={`px-3 py-1 rounded-xl text-xs font-black uppercase tracking-tighter border shadow-sm ${style.bg} ${style.text} ${style.border}`}
     >
       {style.label}
     </span>
@@ -127,7 +126,7 @@ export default function CorporateWallet() {
   const [filterType, setFilterType] = useState("All");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [activeTab, setActiveTab] = useState("all"); // all | recharge
+  const [activeTab, setActiveTab] = useState("booking"); // booking | recharge
 
   // New UI filters (client-side)
   const [searchTerm, setSearchTerm] = useState("");
@@ -137,32 +136,35 @@ export default function CorporateWallet() {
   const [showRecharge, setShowRecharge] = useState(false);
   const [rechargeAmount, setRechargeAmount] = useState("");
 
-  const [page, setPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [selectedTx, setSelectedTx] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const pendingStatusSyncRef = useRef(new Map());
 
-  // INITIAL LOAD (preserved)
+  // INITIAL LOAD
   useEffect(() => {
     dispatch(fetchWalletBalance());
-    dispatch(fetchWalletTransactions({ page: 1, limit: 10 }));
   }, [dispatch]);
 
   // APPLY FILTERS (original server-side logic)
-  const applyFilters = () => {
-    dispatch(
-      fetchWalletTransactions({
-        page: 1,
-        limit: 10,
-        type: filterType !== "All" ? filterType.toLowerCase() : undefined,
-        dateFrom: startDate || undefined,
-        dateTo: endDate || undefined,
-      }),
-    );
-    // Reset pagination and client-side filters when server filters change
+  // AUTO APPLY FILTERS (trigger when filter states change)
+  useEffect(() => {
+    const params = {
+      dateFrom: startDate || undefined,
+      dateTo: endDate || undefined,
+    };
+
+    if (activeTab === "recharge") {
+      dispatch(fetchRechargeHistory(params));
+    } else {
+      dispatch(fetchBookingTransactions(params));
+    }
+
     setSearchTerm("");
     setStatusFilter("all");
-  };
-
+    setCurrentPage(1); // Reset to first page on filter change
+  }, [dispatch, activeTab, startDate, endDate]);
 
   // Helper: determine transaction status (fallback to 'success')
   const getTransactionStatus = (tx) => {
@@ -231,15 +233,11 @@ export default function CorporateWallet() {
       }
 
       dispatch(fetchWalletBalance());
-      dispatch(
-        fetchWalletTransactions({
-          page: pagination?.page || 1,
-          limit: pagination?.limit || 10,
-          type: filterType !== "All" ? filterType.toLowerCase() : undefined,
-          dateFrom: startDate || undefined,
-          dateTo: endDate || undefined,
-        }),
-      );
+      if (activeTab === "recharge") {
+        dispatch(fetchRechargeHistory({ dateFrom: startDate || undefined, dateTo: endDate || undefined }));
+      } else {
+        dispatch(fetchBookingTransactions({ dateFrom: startDate || undefined, dateTo: endDate || undefined }));
+      }
     };
 
     syncPendingStatuses();
@@ -279,16 +277,17 @@ export default function CorporateWallet() {
       );
     }
 
-    // Tab filter (original logic)
-    if (activeTab === "recharge") {
-      filtered = filtered.filter((t) => t.type === "credit");
-    }
-
-    // Sort by newest first (clone to avoid mutating Redux arrays)
+    // Note: Server-side separation is now handled by different API calls
     return [...filtered].sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
     );
   }, [transactions, searchTerm, statusFilter, activeTab]);
+
+  // Frontend Pagination Logic
+  const paginatedTransactions = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredTransactions.slice(start, start + itemsPerPage);
+  }, [filteredTransactions, currentPage, itemsPerPage]);
 
   // Summary stats (based on filtered transactions)
   const totalTransactions = filteredTransactions.length;
@@ -308,31 +307,50 @@ export default function CorporateWallet() {
 
   // Export to CSV (based on filtered transactions)
   const handleExport = () => {
+    if (!filteredTransactions.length) return;
     const headers = [
       "Date",
       "Description",
-      "Transaction ID",
+      "Order ID",
       "Type",
       "Amount",
       "Status",
     ];
     const rows = filteredTransactions.map((tx) => [
-      new Date(tx.createdAt).toLocaleDateString(),
-      tx.description || "-",
-      tx._id || tx.bookingId || "-",
-      tx.type,
+      new Date(tx.createdAt).toLocaleDateString("en-IN"),
+      tx.description || "—",
+      tx.orderId || tx._id || tx.bookingId || "—",
+      tx.type || "—",
       `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}`,
       getTransactionStatus(tx),
     ]);
-    const csvContent = [headers, ...rows]
-      .map((row) => row.join(","))
-      .join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "wallet_transactions.csv";
+    a.download = `wallet-transactions-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
@@ -371,27 +389,48 @@ export default function CorporateWallet() {
       style={{ backgroundColor: colors.light }}
     >
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* HEADER with Icon Block (matching postpaid) */}
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-12 h-12 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white">
-            <FiCreditCard size={24} />
+        {/* HEADER CARD */}
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white shrink-0">
+              <FiCreditCard size={24} />
+            </div>
+            <div className="text-left min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase leading-none truncate">
+                Corporate Wallet
+              </h1>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 font-bold uppercase tracking-widest truncate">
+                Manage balance & transactions
+              </p>
+            </div>
           </div>
-          <div className="text-left">
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase leading-none">
-              Corporate Wallet
-            </h1>
-            <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-widest">
-              Manage balance & transactions
-            </p>
-          </div>
-          <div className="ml-auto">
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              onClick={() => {
+                dispatch(fetchWalletBalance());
+                const params = {
+                  dateFrom: startDate || undefined,
+                  dateTo: endDate || undefined,
+                };
+                if (activeTab === "recharge") {
+                  dispatch(fetchRechargeHistory(params));
+                } else {
+                  dispatch(fetchBookingTransactions(params));
+                }
+              }}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-bold transition-all shadow-sm border bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100 active:scale-95"
+            >
+              <FiRefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              Refresh
+            </button>
             <button
               onClick={() => setShowRecharge(true)}
-              className="flex items-center gap-2 px-5 py-3 rounded-lg text-white font-semibold shadow hover:opacity-90"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-[13px] shadow-lg transition-all active:scale-95 hover:opacity-90"
               style={{ backgroundColor: colors.primary }}
             >
               <FiPlusCircle size={18} />
-              Recharge Wallet
+              Recharge
             </button>
           </div>
         </div>
@@ -411,7 +450,7 @@ export default function CorporateWallet() {
             iconColorCls="text-[#0A4D68]"
           />
           <StatCard
-            label="Total Recharge (Filtered)"
+            label="Total Recharge"
             value={`₹${totalCredit.toLocaleString()}`}
             Icon={FiArrowDownLeft}
             borderCls="border-[#10B981]"
@@ -419,7 +458,7 @@ export default function CorporateWallet() {
             iconColorCls="text-emerald-600"
           />
           <StatCard
-            label="Total Spend (Filtered)"
+            label="Total Spend"
             value={`₹${totalDebit.toLocaleString()}`}
             Icon={FiArrowUpRight}
             borderCls="border-[#F59E0B]"
@@ -427,7 +466,7 @@ export default function CorporateWallet() {
             iconColorCls="text-amber-600"
           />
           <StatCard
-            label="Transactions Count"
+            label="Transactions"
             value={totalTransactions}
             Icon={FiActivity}
             borderCls="border-[#088395]"
@@ -436,237 +475,241 @@ export default function CorporateWallet() {
           />
         </div>
 
-        {/* FILTERS SECTION (enhanced, but preserves original server filters) */}
-        <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-            <LabeledInput label="Search">
-              <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Description / ID..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
-                />
-              </div>
-            </LabeledInput>
-
-            <LabeledInput label="From Date">
-              <div className="relative">
-                <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
-                />
-              </div>
-            </LabeledInput>
-
-            <LabeledInput label="To Date">
-              <div className="relative">
-                <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
-                />
-              </div>
-            </LabeledInput>
-
-            <LabeledInput label="Transaction Type">
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-end">
+            <div className="sm:col-span-2 lg:col-span-4">
+              <LabeledField
+                label={
+                  <>
+                    <FiSearch size={10} /> Search
+                  </>
+                }
               >
-                <option>All</option>
-                <option>Credit</option>
-                <option>Debit</option>
-              </select>
-            </LabeledInput>
+                <div className="relative group">
+                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0A4D68] transition-colors" />
+                  <input
+                    type="text"
+                    placeholder="Description / Order ID..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 border rounded-xl text-sm outline-none bg-slate-50 focus:ring-2 focus:ring-[#0A4D68]/10 focus:border-[#0A4D68] transition-all"
+                  />
+                </div>
+              </LabeledField>
+            </div>
 
-            <LabeledInput label="Status">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68]"
+            <div className="sm:col-span-2 lg:col-span-4">
+              <LabeledField
+                label={
+                  <>
+                    <FiCalendar size={10} /> Transaction Dates
+                  </>
+                }
               >
-                <option value="all">All Statuses</option>
-                <option value="success">Success</option>
-                <option value="pending">Pending</option>
-                <option value="failed">Failed</option>
-              </select>
-            </LabeledInput>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-2 py-2 border rounded-lg text-[11px] outline-none bg-slate-50 focus:border-[#0A4D68] focus:ring-1 focus:ring-[#0A4D68]/10 transition-all"
+                  />
+                  <span className="text-slate-400 text-[10px] font-bold uppercase">to</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-2 py-2 border rounded-lg text-[11px] outline-none bg-slate-50 focus:border-[#0A4D68] focus:ring-1 focus:ring-[#0A4D68]/10 transition-all"
+                  />
+                </div>
+              </LabeledField>
+            </div>
 
-            <div className="flex items-end gap-2">
+            <div className="sm:col-span-1 lg:col-span-2">
+              <LabeledField
+                label={
+                  <>
+                    <FiFilter size={10} /> Status
+                  </>
+                }
+              >
+                <CustomDropdown
+                  value={statusFilter === "all" ? "All Statuses" : statusFilter}
+                  onChange={(val) =>
+                    setStatusFilter(val === "All Statuses" ? "all" : val)
+                  }
+                  options={["All Statuses", "success", "pending", "failed"]}
+                />
+              </LabeledField>
+            </div>
+
+            <div className="sm:col-span-1 lg:col-span-2">
               <button
-                onClick={applyFilters}
-                className="flex-1 text-white rounded-lg px-4 py-2 text-sm font-medium"
-                style={{ backgroundColor: colors.primary }}
+                onClick={() => {
+                  setSearchTerm("");
+                  setStatusFilter("all");
+                  setStartDate("");
+                  setEndDate("");
+                }}
+                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors active:scale-95 border border-slate-200 shadow-sm"
               >
-                Apply
-              </button>
-              <button
-                onClick={handleExport}
-                className="flex items-center justify-center gap-2 border rounded-lg px-4 py-2 text-sm font-medium bg-white hover:bg-slate-50 transition"
-              >
-                <FiDownload /> Export
+                <FiRefreshCw size={12} /> Reset
               </button>
             </div>
           </div>
         </div>
 
-        {/* TRANSACTIONS TABLE with Tabs */}
-        <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex flex-wrap justify-between items-center gap-4 bg-slate-50/50">
-            <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
-              Transaction History
-            </h2>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setActiveTab("all")}
-                className={`px-5 py-2 rounded-lg text-sm font-medium transition ${
-                  activeTab === "all"
-                    ? "bg-[#0A4D68] text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                All Transactions
-              </button>
-              <button
-                onClick={() => setActiveTab("recharge")}
-                className={`px-5 py-2 rounded-lg text-sm font-medium transition ${
-                  activeTab === "recharge"
-                    ? "bg-[#0A4D68] text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                Recharge History
-              </button>
-            </div>
+        <ResponsiveDataTable
+          title="Transaction History"
+          subtitle={`${filteredTransactions.length} record${filteredTransactions.length !== 1 ? "s" : ""} found`}
+          tableMinWidth="1050px"
+          onExport={handleExport}
+          exportLabel="Export"
+          exportBgClass="bg-[#0A4D68] hover:bg-[#083d52]"
+          arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+          pagination={
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredTransactions.length}
+              pageSize={itemsPerPage}
+              onPageChange={setCurrentPage}
+            />
+          }
+        >
+          <div className="p-4 border-b border-slate-100 flex gap-2 bg-slate-50/30">
+            <button
+              onClick={() => setActiveTab("booking")}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === "booking"
+                  ? "bg-[#0A4D68] text-white shadow-sm"
+                  : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              Bookings & Refunds
+            </button>
+            <button
+              onClick={() => setActiveTab("recharge")}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === "recharge"
+                  ? "bg-[#0A4D68] text-white shadow-sm"
+                  : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              Recharge History
+            </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr
-                  style={{ backgroundColor: colors.primary }}
-                  className="text-white"
-                >
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Date
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Description
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Transaction ID
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Type
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Amount
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Status
-                  </th>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr
+                style={{ backgroundColor: colors.primary }}
+                className="text-white"
+              >
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                  Date
+                </th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                  Description
+                </th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                  Order ID
+                </th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                  Type
+                </th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                  Amount
+                </th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="py-12 text-center text-slate-500">
+                    <div className="flex flex-col items-center gap-2">
+                      <FiRefreshCw
+                        className="animate-spin text-slate-300"
+                        size={24}
+                      />
+                      <span className="font-medium text-xs">
+                        Loading transactions...
+                      </span>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {loading ? (
-                  <tr>
-                    <td colSpan="6" className="py-8 text-center text-slate-500">
-                      Loading transactions...
+              ) : paginatedTransactions.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-16 text-center text-slate-400">
+                    <div className="flex flex-col items-center gap-2">
+                      <FiActivity className="opacity-20" size={32} />
+                      <p className="font-semibold text-sm">
+                        No transactions found
+                      </p>
+                      <p className="text-xs">
+                        Try adjusting the filters or search query
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedTransactions.map((tx) => (
+                  <tr
+                    key={tx._id}
+                    onClick={() => setSelectedTx(tx)}
+                    className="hover:bg-slate-900 transition-all border-b border-slate-50 cursor-pointer group"
+                  >
+                    <td className="px-6 py-4 text-slate-600 font-medium group-hover:text-slate-300">
+                      {new Date(tx.createdAt).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </td>
-                  </tr>
-                ) : transactions.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="py-8 text-center text-slate-500">
-                      No transactions found for the selected filters.
+                    <td className="px-6 py-4 text-slate-800 font-semibold max-w-xs truncate group-hover:text-white transition-colors">
+                      {tx.description || "—"}
                     </td>
-                  </tr>
-                ) : (
-                  transactions.map((tx) => (
-                    <tr
-                      key={tx._id}
-                      className="hover:bg-slate-50 transition-all"
-                    >
-                      <td className="px-6 py-4 text-slate-600 font-medium">
-                        {new Date(tx.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 text-slate-800 max-w-xs truncate">
-                        {tx.description || "—"}
-                      </td>
-                      <td className="px-6 py-4 font-mono text-slate-600 text-xs">
-                        {tx._id || tx.bookingId || "—"}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                            tx.type === "credit"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {tx.type === "credit" ? (
-                            <FiArrowDownLeft size={12} />
-                          ) : (
-                            <FiArrowUpRight size={12} />
-                          )}
-                          {tx.type}
-                        </span>
-                      </td>
-                      <td
-                        className={`px-6 py-4 font-semibold ${
-                          tx.type === "credit"
-                            ? "text-green-600"
-                            : "text-red-600"
+                    <td className="px-6 py-4 font-mono text-slate-500 text-[11px]">
+                      <span className="bg-slate-50/50 px-2 py-0.5 rounded border border-slate-100 group-hover:bg-slate-800 group-hover:border-slate-700 group-hover:text-indigo-400 transition-all">
+                        {tx.orderId || tx.reference || tx.bookingId || tx._id}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter transition-all ${
+                          tx.type === "credit" || tx.type === "refund"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-100 group-hover:bg-emerald-500 group-hover:text-white group-hover:border-emerald-400"
+                            : "bg-rose-50 text-rose-700 border border-rose-100 group-hover:bg-rose-500 group-hover:text-white group-hover:border-rose-400"
                         }`}
                       >
-                        {tx.type === "credit" ? "+" : "-"} ₹
-                        {(tx.amount || 0).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={getTransactionStatus(tx)} />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Footer */}
-          <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            <span>
-              Showing {transactions.length} of {pagination?.total || 0}{" "}
-              transaction(s)
-            </span>
-            <Pagination
-              currentPage={pagination?.page || 1}
-              totalItems={pagination?.total || 0}
-              pageSize={pagination?.limit || 10}
-              onPageChange={(page) => {
-                dispatch(
-                  fetchWalletTransactions({
-                    page,
-                    limit: pagination?.limit || 10,
-                    type:
-                      filterType !== "All"
-                        ? filterType.toLowerCase()
-                        : undefined,
-                    dateFrom: startDate || undefined,
-                    dateTo: endDate || undefined,
-                  }),
-                );
-              }}
-            />
-          </div>
-        </div>
+                        {tx.type === "credit" || tx.type === "refund" ? (
+                          <FiArrowDownLeft size={12} />
+                        ) : (
+                          <FiArrowUpRight size={12} />
+                        )}
+                        {tx.type}
+                      </span>
+                    </td>
+                    <td
+                      className={`px-6 py-4 font-black text-sm transition-colors ${
+                        tx.type === "credit" || tx.type === "refund"
+                          ? "text-emerald-600 group-hover:text-emerald-400"
+                          : "text-rose-600 group-hover:text-rose-400"
+                      }`}
+                    >
+                      {tx.type === "credit" || tx.type === "refund" ? "+" : "-"} ₹
+                      {(tx.amount || 0).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 transition-transform group-hover:scale-105 duration-300">
+                      <StatusBadge status={getTransactionStatus(tx)} />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </ResponsiveDataTable>
       </div>
 
       {/* RECHARGE MODAL - Enhanced Real-World Design */}
@@ -783,8 +826,8 @@ export default function CorporateWallet() {
                   size={14}
                 />
                 <p className="text-xs text-blue-800">
-                  Minimum recharge amount is ₹100. Funds will be credited
-                  only after backend verification completes.
+                  Minimum recharge amount is ₹100. Funds will be credited only
+                  after backend verification completes.
                 </p>
               </div>
             </div>
@@ -814,6 +857,203 @@ export default function CorporateWallet() {
                 <FiPlusCircle size={16} />
                 {loading ? "Starting payment..." : "Continue with PhonePe"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* TRANSACTION DETAILS MODAL */}
+      {selectedTx && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md transition-all duration-300">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300 border border-white/20">
+            {/* Modal Header */}
+            <div className="relative bg-slate-900 px-8 py-10 text-white overflow-hidden shrink-0">
+               <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-500/20 to-transparent pointer-events-none" />
+               <div className="relative z-10 flex justify-between items-start">
+                  <div>
+                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-4 inline-block ${selectedTx.type === 'credit' || selectedTx.type === 'refund' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                      {selectedTx.type} Transaction
+                    </span>
+                    <h3 className="text-3xl font-black tracking-tighter leading-none">
+                      {selectedTx.type === 'credit' || selectedTx.type === 'refund' ? '+' : '-'} ₹{(selectedTx.amount || 0).toLocaleString()}
+                    </h3>
+                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-2">
+                      Order ID: {selectedTx.orderId || selectedTx.reference || selectedTx.bookingId || selectedTx._id}
+                    </p>
+                  </div>
+                  <button onClick={() => setSelectedTx(null)} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white">
+                    <FiX size={20} />
+                  </button>
+               </div>
+            </div>
+
+            {/* Modal Body - Scrollable */}
+            <div className="p-10 space-y-10 bg-slate-50/50 overflow-y-auto custom-scrollbar">
+               {/* Core Info */}
+               <div className="grid grid-cols-2 gap-10">
+                  <div>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 italic">Processed Date</p>
+                    <p className="text-lg font-black text-slate-900 leading-tight">
+                      {new Date(selectedTx.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 italic">Current Status</p>
+                    <span className={`px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest inline-block shadow-sm ${
+                      getTransactionStatus(selectedTx) === 'completed' || getTransactionStatus(selectedTx) === 'success' 
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                      : getTransactionStatus(selectedTx) === 'failed'
+                      ? 'bg-rose-50 text-rose-600 border border-rose-100'
+                      : 'bg-amber-50 text-amber-600 border border-amber-100'
+                    }`}>
+                      {selectedTx.status || 'pending'}
+                    </span>
+                  </div>
+               </div>
+
+               {/* Balance Impact */}
+               <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-500" />
+                  <div className="relative z-10 grid grid-cols-2 gap-8 divide-x divide-slate-100">
+                    <div className="pr-4">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Balance Before</p>
+                      <p className="text-xl font-black text-slate-900 font-mono italic">₹{(selectedTx.balanceBefore || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                    </div>
+                    <div className="pl-8 text-right">
+                      <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-2">Balance After</p>
+                      <p className="text-xl font-black text-indigo-600 font-mono">₹{(selectedTx.balanceAfter || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                    </div>
+                  </div>
+               </div>
+
+               {/* Description */}
+               <div className="space-y-3">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Description</p>
+                  <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+                    <p className="text-base font-bold text-slate-700 leading-relaxed">
+                      {selectedTx.description || 'No description available'}
+                    </p>
+                  </div>
+               </div>
+
+               {/* Gateway / Metadata */}
+               {(selectedTx.paymentGateway || selectedTx.metadata || selectedTx.transactionId) && (
+                 <div className="space-y-4">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Payment & Gateway Details</p>
+                    <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm space-y-6">
+                       <div className="grid grid-cols-2 gap-8">
+                          <div>
+                             <p className="text-xs font-bold text-slate-400 uppercase italic mb-1.5">Gateway Name</p>
+                             <p className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                                {selectedTx.paymentGateway?.name || selectedTx.metadata?.gateway || '—'}
+                             </p>
+                          </div>
+                          <div>
+                             <p className="text-xs font-bold text-slate-400 uppercase italic mb-1.5">Payment Mode</p>
+                             <p className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                                {selectedTx.metadata?.gatewayResponse?.statusResponse?.paymentDetails?.[0]?.paymentMode || '—'}
+                             </p>
+                          </div>
+                       </div>
+
+                       {/* Technical Traceability */}
+                       <div className="pt-6 border-t border-slate-50 space-y-5">
+                          <div>
+                             <p className="text-xs font-bold text-slate-400 uppercase italic mb-2">Payment ID / Txn ID</p>
+                             <p className="text-sm font-mono font-black text-indigo-600 break-all bg-indigo-50 px-3 py-2 rounded-xl">
+                                {selectedTx.transactionId || selectedTx.paymentGateway?.paymentId || '—'}
+                             </p>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                             <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase italic mb-1.5">Provider Order ID</p>
+                                <p className="text-xs font-mono font-bold text-slate-500 break-all">
+                                   {selectedTx.paymentGateway?.providerOrderId || '—'}
+                                </p>
+                             </div>
+                             <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase italic mb-1.5">ARN / Bank Ref</p>
+                                <p className="text-xs font-mono font-bold text-slate-500 break-all">
+                                   {selectedTx.metadata?.gatewayResponse?.statusResponse?.paymentDetails?.[0]?.splitInstruments?.[0]?.instrument?.arn || '—'}
+                                </p>
+                             </div>
+                          </div>
+                       </div>
+
+                       {/* Rail & Instrument Details */}
+                       {selectedTx.metadata?.gatewayResponse?.statusResponse?.paymentDetails?.[0]?.splitInstruments?.[0] && (
+                         <div className="pt-6 border-t border-slate-50">
+                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Gateway Rail & Instrument</p>
+                            <div className="grid grid-cols-1 gap-4 bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100">
+                               {selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].rail && (
+                                 <div className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Rail Type</span>
+                                       <span className="text-xs font-black text-slate-900 uppercase bg-white px-2 py-1 rounded border border-slate-100">{selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].rail.type || '—'}</span>
+                                    </div>
+                                    {selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].rail.utr && (
+                                      <div className="flex justify-between items-center">
+                                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">UTR Number</span>
+                                         <span className="text-sm font-mono font-black text-indigo-600 bg-white px-2 py-1 rounded border border-slate-100">{selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].rail.utr}</span>
+                                      </div>
+                                    )}
+                                    {selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].rail.vpa && (
+                                      <div className="flex justify-between items-center">
+                                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">VPA / UPI ID</span>
+                                         <span className="text-sm font-mono font-black text-slate-600 bg-white px-2 py-1 rounded border border-slate-100">{selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].rail.vpa}</span>
+                                      </div>
+                                    )}
+                                 </div>
+                               )}
+                               
+                               {selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].instrument && (
+                                 <div className="pt-4 border-t border-slate-200 mt-2 space-y-3">
+                                    <div className="flex justify-between items-center">
+                                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Instrument</span>
+                                       <span className="text-xs font-black text-slate-900 uppercase bg-white px-2 py-1 rounded border border-slate-100">{selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].instrument.type || '—'}</span>
+                                    </div>
+                                    {selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].instrument.bankId && (
+                                      <div className="flex justify-between items-center">
+                                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bank ID</span>
+                                         <span className="text-sm font-black text-slate-900">{selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].instrument.bankId}</span>
+                                      </div>
+                                    )}
+                                    {selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].instrument.maskedAccountNumber && (
+                                      <div className="flex justify-between items-center">
+                                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Account</span>
+                                         <span className="text-sm font-black text-slate-900">{selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].instrument.maskedAccountNumber}</span>
+                                      </div>
+                                    )}
+                                    {selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].instrument.accountHolderName && (
+                                      <div className="flex justify-between items-center">
+                                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Holder</span>
+                                         <span className="text-sm font-black text-slate-900">{selectedTx.metadata.gatewayResponse.statusResponse.paymentDetails[0].splitInstruments[0].instrument.accountHolderName}</span>
+                                      </div>
+                                    )}
+                                 </div>
+                               )}
+                            </div>
+                         </div>
+                       )}
+
+                       {selectedTx.metadata?.creditedAt && (
+                         <div className="pt-6 border-t border-slate-50">
+                            <p className="text-xs font-bold text-slate-400 uppercase italic mb-2">Funds Credited On</p>
+                            <p className="text-base font-black text-emerald-600">
+                                {new Date(selectedTx.metadata.creditedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                            </p>
+                          </div>
+                       )}
+                    </div>
+                 </div>
+               )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-8 py-6 bg-white border-t border-slate-100 flex justify-end">
+               <button onClick={() => setSelectedTx(null)} className="px-8 py-2.5 bg-slate-900 text-white text-xs font-black uppercase tracking-widest rounded-full hover:bg-slate-800 transition-all shadow-lg active:scale-95">
+                  Dismiss
+               </button>
             </div>
           </div>
         </div>

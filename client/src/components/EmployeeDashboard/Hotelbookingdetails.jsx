@@ -31,6 +31,7 @@ import {
   FiSend,
   FiClock,
   FiXCircle,
+  FiTag,
 } from "react-icons/fi";
 import {
   MdHotel,
@@ -763,11 +764,11 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Booking References                                             */
+/*  Order ID                                                       */
 /* ─────────────────────────────────────────────────────────────── */
 function BookingReferencesSection({ booking, bookingDetail, result }) {
   const refs = [
-    { label: "Booking Ref", val: booking.bookingReference || "—", hash: true },
+    { label: "Order ID", val: booking.orderId || "—", hash: true },
     {
       label: "Confirmation No.",
       val: bookingDetail?.ConfirmationNo || result?.hotelBookingId || "—",
@@ -911,7 +912,7 @@ function GuestSection({ travellers = [] }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  08 Fare Breakdown (Travel Admin Only)                          */
 /* ─────────────────────────────────────────────────────────────── */
-function FareBreakdownSection({ priceBreakUp, totalFare }) {
+function FareBreakdownSection({ priceBreakUp, totalFare, detailRoom }) {
   if (!priceBreakUp) return null;
 
   return (
@@ -922,9 +923,11 @@ function FareBreakdownSection({ priceBreakUp, totalFare }) {
         </div>
         <div className="flex flex-col gap-3">
           <div className="flex justify-between text-[14px]">
-            <span className="text-[#7A7068]">Room Rate</span>
+            <span className="text-[#7A7068]">Base Price (Per Night/Person)</span>
             <span className="font-semibold">
-              ₹{priceBreakUp.RoomRate?.toLocaleString("en-IN")}
+              ₹{(detailRoom?.DayRates?.[0]?.[0]?.BasePrice || 
+                 detailRoom?.DayRates?.[0]?.[0]?.RoomRate || 
+                 priceBreakUp.RoomRate)?.toLocaleString("en-IN")}
             </span>
           </div>
           {priceBreakUp.RoomExtraGuestCharges > 0 && (
@@ -957,7 +960,7 @@ function FareBreakdownSection({ priceBreakUp, totalFare }) {
           Final Invoice Amount
         </span>
         <span className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">
-          ₹{Number(totalFare).toLocaleString("en-IN")}
+          ₹{(totalFare).toLocaleString("en-IN")}
         </span>
       </div>
     </div>
@@ -1763,11 +1766,11 @@ export default function HotelBookingDetails() {
               <MdVerifiedUser size={11} /> Voucher Issued
             </span>
           )}
-          {booking.bookingReference && (
+          {(booking.orderId || booking.bookingReference) && (
             <span className="text-[11px] text-[#A89F94]">
-              Ref:{" "}
+              Order ID:{" "}
               <strong className="text-[#1A1714] font-['DM_Mono']">
-                {booking.bookingReference}
+                {booking.orderId || booking.bookingReference}
               </strong>
             </span>
           )}
@@ -1863,7 +1866,7 @@ export default function HotelBookingDetails() {
         <section className="mb-12">
           <SectionHeader
             num={5}
-            title="Booking References"
+            title="Order ID"
           />
           <BookingReferencesSection
             booking={booking}
@@ -1893,6 +1896,7 @@ export default function HotelBookingDetails() {
             <FareBreakdownSection
               priceBreakUp={priceBreakUp}
               totalFare={totalFare}
+              detailRoom={detailRoom}
             />
           </section>
         )}
@@ -1910,14 +1914,167 @@ export default function HotelBookingDetails() {
             totalFare={totalFare}
           />
         </section>
-      </main>
 
-      {/* Sticky bottom total price bar */}
-      {/* <TotalPriceBar
-        totalFare={totalFare}
-        isCancelled={isCancelled}
-        onDownload={() => dispatch(generateHotelVoucher(booking.bookingId))}
-      /> */}
+        {/* 09 Booking History */}
+        <BookingHistory booking={booking} />
+      </main>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Booking History / Timeline                                     */
+/* ─────────────────────────────────────────────────────────────── */
+const ensureUTC = (d) => {
+  if (!d) return null;
+  if (d instanceof Date) return d;
+  if (typeof d !== "string") return d;
+  
+  // 1. Handle TBO specific format: "DD/MM/YYYY HH:MM:SS"
+  if (d.includes("/") && d.includes(":")) {
+    const parts = d.split(" ");
+    if (parts.length >= 2) {
+      const [datePart, timePart] = parts;
+      const [day, month, year] = datePart.split("/");
+      return new Date(`${year}-${month}-${day}T${timePart}Z`);
+    }
+  }
+  
+  // 2. Handle ISO format without timezone: "YYYY-MM-DDTHH:MM:SS"
+  if (d.includes("-") && d.includes(":") && !d.includes("Z") && !d.includes("+")) {
+    return new Date(`${d}Z`);
+  }
+  
+  return new Date(d);
+};
+
+const getVoucherDate = (b) => {
+  if (b.voucheredAt) return ensureUTC(b.voucheredAt);
+  const tboVoucherDate = b.bookingResult?.providerResponse?.VoucherDate || 
+                         b.bookingResult?.providerResponse?.Response?.VoucherDate ||
+                         b.raw?.BookingDate || 
+                         b.raw?.InvoiceCreatedOn;
+  if (tboVoucherDate) return ensureUTC(tboVoucherDate);
+  if (["voucher_generated", "confirmed", "booked"].includes((b.executionStatus || "").toLowerCase())) return ensureUTC(b.updatedAt);
+  return null;
+};
+
+function BookingHistory({ booking }) {
+  const isCancelled = ["cancelled", "cancel_requested"].includes((booking.executionStatus || "").toLowerCase()) || !!booking.cancellation;
+  const isConfirmed = ["voucher_generated", "confirmed", "booked"].includes((booking.executionStatus || "").toLowerCase()) || (isCancelled && !!booking.bookingResult?.hotelBookingId);
+
+  const steps = [
+    {
+      label: "Request Created",
+      date: ensureUTC(booking.createdAt),
+      desc: "Booking request was successfully created.",
+      icon: <FiClock size={14} />,
+      active: true,
+    },
+    {
+      label: "Approval Status",
+      date: ensureUTC(booking.approvedAt || booking.rejectedAt) || (["approved", "rejected"].includes(booking.requestStatus) ? ensureUTC(booking.updatedAt || booking.createdAt) : null),
+      desc: (() => {
+        const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
+        const isApproved = booking.approvedAt || booking.requestStatus === "approved";
+        
+        if (isRejected) {
+          const fullName = `${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""}`.trim();
+          const email = booking.approvedBy?.email || booking.approverEmail;
+          return `Rejected by ${fullName || "Manager"}${email ? ` (${email})` : ""}`;
+        }
+        if (isApproved) {
+          const reqEmail =
+            booking.userId?.email || booking.requesterDetails?.email;
+          const appEmail = booking.approvedBy?.email || booking.approverEmail;
+          const isSameUser = reqEmail && appEmail && reqEmail === appEmail;
+
+          // If explicitly auto-approved, or same user (self-approved), or no approver info exists
+          if (
+            booking.approverName === "Auto Approve" ||
+            isSameUser ||
+            (!booking.approvedBy && !booking.approverName)
+          ) {
+            return "Auto Approved";
+          }
+
+          const firstName =
+            booking.approvedBy?.name?.firstName || booking.approverName || "";
+          const lastName = booking.approvedBy?.name?.lastName || "";
+          const fullName = `${firstName} ${lastName}`.trim();
+          const email = booking.approvedBy?.email || booking.approverEmail;
+
+          if (!fullName && !email) return "Auto Approved";
+
+          return `Approved by ${fullName}${email ? ` (${email})` : ""}`;
+        }
+        return "Waiting for manager approval";
+      })(),
+      icon: <FiShield size={14} />,
+      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
+    },
+    {
+      label: "Voucher Issued",
+      date: getVoucherDate(booking) || (isConfirmed ? (booking.updatedAt || booking.createdAt) : null),
+      desc: isConfirmed ? "Hotel voucher generated and sent" : "Final confirmation pending",
+      icon: <FiTag size={14} />,
+      active: isConfirmed,
+    },
+    {
+      label: "Cancellation",
+      date: ensureUTC(booking.cancelledAt) || (isCancelled ? ensureUTC(booking.updatedAt) : null),
+      desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
+      icon: <FiXCircle size={14} />,
+      active: isCancelled,
+      isLast: true,
+    },
+  ];
+
+  const formatDateStr = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const formatTimeStr = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  return (
+    <div className="bg-white border border-[#EAE4D9] p-8 mt-12 mb-8">
+      <div className="flex items-center gap-4 mb-10">
+        <div className="w-10 h-10 rounded-full bg-[#B5862A]/10 flex items-center justify-center">
+          <FiRefreshCw size={18} className="text-[#B5862A]" />
+        </div>
+        <div>
+          <h3 className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">Booking Lifecycle</h3>
+          <p className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-[0.2em] mt-1">Audit Trail & Timeline</p>
+        </div>
+      </div>
+
+      <div className="relative">
+        {/* Vertical line */}
+        <div className="absolute left-[13px] top-2 bottom-2 w-[1px] bg-gradient-to-b from-[#B5862A]/40 via-[#EAE4D9] to-transparent" />
+
+        <div className="space-y-10">
+          {steps.map((step, idx) => (
+            <div key={idx} className="relative flex gap-8">
+              <div className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center border transition-colors duration-500 ${
+                step.active ? "bg-[#B5862A] border-[#B5862A] text-white shadow-lg" : "bg-white border-[#EAE4D9] text-[#EAE4D9]"
+              }`}>
+                {step.icon}
+              </div>
+
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                  <p className={`text-[12px] font-bold uppercase tracking-[0.15em] ${step.active ? "text-[#1A1714]" : "text-[#A89F94]"}`}>
+                    {step.label}
+                  </p>
+                  {step.date && step.active && (
+                    <span className="text-[10px] font-bold text-[#B5862A] px-3 py-1 bg-[#FAF8F4] border border-[#EAE4D9] rounded-sm uppercase tracking-wider">
+                      {formatDateStr(step.date)} · {formatTimeStr(step.date)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[#A89F94] text-[13px] leading-relaxed">{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

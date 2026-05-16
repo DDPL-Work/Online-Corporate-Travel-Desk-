@@ -21,8 +21,11 @@ import {
   StatCard,
   selectCls,
   Th,
+  CustomDropdown,
 } from "./Shared/CommonComponents";
 import { Pagination } from "./Shared/Pagination";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
+import { FiRefreshCw, FiX } from "react-icons/fi";
 
 // ── Dummy Data ────────────────────────────────────────────────────────────────
 const DUMMY_EMPLOYEES = [
@@ -536,27 +539,85 @@ export default function PromoteEmployee() {
     setConfirmAction({ action, employee });
   }
 
+  const handleExport = () => {
+    if (!filtered.length) return;
+    const headers = [
+      "Employee Name",
+      "Email",
+      "Role",
+      "Status",
+      "Department",
+      "Joined Date",
+    ];
+    const rows = filtered.map((e) => [
+      e.name || "N/A",
+      e.email || "N/A",
+      e.role || "N/A",
+      e.status || "N/A",
+      e.department || "N/A",
+      e.joinedDate || "N/A",
+    ]);
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `employees-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 font-sans">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-5">
         {/* Page Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shrink-0">
-            <FiUsers size={18} className="text-white" />
+        {/* HEADER CARD */}
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white shrink-0">
+              <FiUsers size={24} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase leading-none truncate">
+                Employee Management
+              </h1>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 font-bold uppercase tracking-widest truncate">
+                Manage roles and access for <strong className="text-slate-500 font-bold">acme.com</strong> domain
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">
-              Employee Management
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Manage roles and access for{" "}
-              <strong className="text-slate-500">acme.com</strong> domain
-            </p>
-          </div>
+
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full md:w-auto shrink-0 inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold transition-all shadow-sm border bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100 active:scale-95"
+          >
+            <FiRefreshCw size={14} />
+            Refresh
+          </button>
         </div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
           <StatCard
             label="Total Employees"
             value={totalEmployees}
@@ -590,188 +651,184 @@ export default function PromoteEmployee() {
             iconBgCls="bg-red-50"
             iconColorCls="text-red-500"
           />
-          {/* <StatCard label="Departments" value={deptCount} Icon={FaUserTie} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" /> */}
         </div>
 
-        {/* Filters */}
         <div className="bg-white rounded-xl shadow-sm p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-            <LabeledField
-              label={
-                <>
-                  <FiSearch size={10} /> Search Employee
-                </>
-              }
-            >
-              <div className="relative">
-                <FiSearch
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                  size={14}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <div className="md:col-span-4">
+              <LabeledField
+                label={
+                  <>
+                    <FiSearch size={10} /> Search Employee
+                  </>
+                }
+              >
+                <div className="relative">
+                  <FiSearch
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    size={14}
+                  />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Name, email, department…"
+                    className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white outline-none transition-colors focus:border-[#0A4D68] placeholder:text-slate-400 shadow-sm"
+                  />
+                </div>
+              </LabeledField>
+            </div>
+            <div className="md:col-span-2">
+              <LabeledField
+                label={
+                  <>
+                    <FiFilter size={10} /> Role
+                  </>
+                }
+              >
+                <CustomDropdown
+                  value={roleFilter}
+                  onChange={setRoleFilter}
+                  options={["All", "Manager", "Employee"]}
                 />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Name, email, ID, department…"
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white outline-none transition-colors focus:border-[#0A4D68] placeholder:text-slate-400"
+              </LabeledField>
+            </div>
+            <div className="md:col-span-2">
+              <LabeledField
+                label={
+                  <>
+                    <FiFilter size={10} /> Status
+                  </>
+                }
+              >
+                <CustomDropdown
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  options={["All", "Active", "Inactive"]}
                 />
-              </div>
-            </LabeledField>
-            <LabeledField
-              label={
-                <>
-                  <FiFilter size={10} /> Role
-                </>
-              }
-            >
-              <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className={selectCls}
+              </LabeledField>
+            </div>
+            <div className="md:col-span-2">
+              <LabeledField
+                label={
+                  <>
+                    <FiCalendar size={10} /> Joined
+                  </>
+                }
               >
-                {["All", "Manager", "Employee"].map((r) => (
-                  <option key={r}>{r}</option>
-                ))}
-              </select>
-            </LabeledField>
-            <LabeledField
-              label={
-                <>
-                  <FiFilter size={10} /> Status
-                </>
-              }
-            >
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className={selectCls}
+                <div className="flex items-center gap-1">
+                  <input
+                    type="date"
+                    value={joinedFrom}
+                    onChange={(e) => setJoinedFrom(e.target.value)}
+                    className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[11px] text-slate-800 bg-white outline-none focus:border-[#0A4D68] transition-colors"
+                  />
+                  <span className="text-slate-300">-</span>
+                  <input
+                    type="date"
+                    value={joinedTo}
+                    onChange={(e) => setJoinedTo(e.target.value)}
+                    className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[11px] text-slate-800 bg-white outline-none focus:border-[#0A4D68] transition-colors"
+                  />
+                </div>
+              </LabeledField>
+            </div>
+            <div className="md:col-span-2">
+              <button
+                onClick={() => {
+                  setSearch("");
+                  setRoleFilter("All");
+                  setStatusFilter("All");
+                  setJoinedFrom("");
+                  setJoinedTo("");
+                }}
+                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold text-slate-500 bg-slate-100 rounded-lg hover:bg-slate-200 hover:text-slate-700 transition-colors"
               >
-                {["All", "Active", "Inactive"].map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </LabeledField>
-            <LabeledField
-              label={
-                <>
-                  <FiCalendar size={10} /> Joined From
-                </>
-              }
-            >
-              <input
-                type="date"
-                value={joinedFrom}
-                onChange={(e) => setJoinedFrom(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white outline-none focus:border-slate-400 transition-colors"
-              />
-            </LabeledField>
-
-            <LabeledField
-              label={
-                <>
-                  <FiCalendar size={10} /> Joined To
-                </>
-              }
-            >
-              <input
-                type="date"
-                value={joinedTo}
-                onChange={(e) => setJoinedTo(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white outline-none focus:border-slate-400 transition-colors"
-              />
-            </LabeledField>
-
-            {/* <LabeledField
-              label={
-                <>
-                  <FiFilter size={10} /> Department
-                </>
-              }
-            >
-              <select
-                value={deptFilter}
-                onChange={(e) => setDeptFilter(e.target.value)}
-                className={selectCls}
-              >
-                {departments.map((d) => (
-                  <option key={d}>{d}</option>
-                ))}
-              </select>
-            </LabeledField> */}
+                <FiX size={12} /> Reset
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[900px]">
-              <thead>
-                <tr className="bg-[#0A4D68] text-[#bfdbfe]">
-                  <Th>Employee</Th>
-                  <Th>Employee Mail ID</Th>
-                  {/* <Th>Department</Th> */}
-                  <Th>Role</Th>
-                  <Th>Status</Th>
-                  <Th>Joined Date</Th>
-                  <Th>Actions</Th>
+        <ResponsiveDataTable
+          title="Employees"
+          subtitle={`${filtered.length} record${filtered.length !== 1 ? "s" : ""} found`}
+          tableMinWidth="950px"
+          onExport={handleExport}
+          exportLabel="Export"
+          exportBgClass="bg-[#0A4D68] hover:bg-[#083d52]"
+          arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+          pagination={
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filtered.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setCurrentPage}
+            />
+          }
+        >
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-[#0A4D68] text-white">
+                <Th>Employee</Th>
+                <Th>Employee Mail ID</Th>
+                <Th>Role</Th>
+                <Th>Status</Th>
+                <Th>Joined Date</Th>
+                <Th className="text-center">Actions</Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {paginated.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="py-16 text-center text-slate-400">
+                    <div className="flex justify-center mb-3">
+                      <FiUsers size={32} className="opacity-20" />
+                    </div>
+                    <p className="font-semibold text-sm">No employees found</p>
+                    <p className="text-xs mt-1">
+                      Try adjusting filters or search query
+                    </p>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {paginated.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan="7"
-                      className="py-16 text-center text-slate-400"
+              ) : (
+                paginated.map((emp, i) => {
+                  const fullName = `${emp.name.firstName} ${emp.name.lastName}`;
+                  const isManager = emp.role === "manager";
+                  const isActive = emp.status === "active";
+                  return (
+                    <tr
+                      key={emp._id}
+                      className={`transition-colors hover:bg-sky-50/60 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}
                     >
-                      <div className="flex justify-center mb-3">
-                        <FiUsers size={32} className="opacity-20" />
-                      </div>
-                      <p className="font-semibold text-sm">
-                        No employees found
-                      </p>
-                      <p className="text-xs mt-1">
-                        Try adjusting filters or search query
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  paginated.map((emp, i) => {
-                    const fullName = `${emp.name.firstName} ${emp.name.lastName}`;
-                    const isManager = emp.role === "manager";
-                    const isActive = emp.status === "active";
-                    return (
-                      <tr
-                        key={emp._id}
-                        className={`transition-colors hover:bg-sky-50/60 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}
-                      >
-                        {/* Employee name + email */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${getAvatarColor(emp._id)}`}
-                            >
-                              {emp.avatar}
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-[13px] text-slate-800">
-                                {fullName}
-                              </span>
-                              <span className="text-[11px] text-slate-400">
-                                #{emp._id}
-                                {emp.email}
-                              </span>
-                            </div>
+                      {/* Employee name + email */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${getAvatarColor(emp._id)}`}
+                          >
+                            {emp.avatar}
                           </div>
-                        </td>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-[13px] text-slate-800">
+                              {fullName}
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                              #{emp._id}
+                              {emp.email}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
 
-                        {/* Employee ID */}
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded tracking-wide">
-                            {emp.email}
-                          </span>
-                        </td>
+                      {/* Employee ID */}
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded tracking-wide">
+                          {emp.email}
+                        </span>
+                      </td>
 
-                        {/* Department */}
-                        {/* <td className="px-4 py-3">
+                      {/* Department */}
+                      {/* <td className="px-4 py-3">
                           <span
                             className={`px-2.5 py-0.5 text-xs rounded-full font-semibold ${DEPT_COLORS[emp.department] || "bg-slate-100 text-slate-600"}`}
                           >
@@ -779,91 +836,63 @@ export default function PromoteEmployee() {
                           </span>
                         </td> */}
 
-                        {/* Role badge */}
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                              isManager
-                                ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
-                                : "bg-slate-100 text-slate-600 ring-1 ring-slate-200"
-                            }`}
-                          >
-                            {isManager ? (
-                              <FiShield size={10} />
-                            ) : (
-                              <FaUser size={9} />
-                            )}
-                            {isManager ? "Manager" : "Employee"}
-                          </span>
-                        </td>
-
-                        {/* Status toggle */}
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => handleToggleStatus(emp)}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold transition-colors ${
-                              isActive
-                                ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
-                                : "bg-red-50 text-red-600 ring-1 ring-red-200 hover:bg-red-100"
-                            }`}
-                          >
-                            {isActive ? (
-                              <FiToggleRight size={13} />
-                            ) : (
-                              <FiToggleLeft size={13} />
-                            )}
-                            {isActive ? "Active" : "Inactive"}
-                          </button>
-                        </td>
-
-                        {/* Joined date */}
-                        <td className="px-4 py-3 text-[13px] text-slate-500">
-                          {new Date(emp.joinedDate).toLocaleDateString(
-                            "en-IN",
-                            {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            },
+                      {/* Role badge */}
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                            isManager
+                              ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
+                              : "bg-slate-100 text-slate-600 ring-1 ring-slate-200"
+                          }`}
+                        >
+                          {isManager ? (
+                            <FiShield size={10} />
+                          ) : (
+                            <FaUser size={9} />
                           )}
-                        </td>
+                          {isManager ? "Manager" : "Employee"}
+                        </span>
+                      </td>
 
-                        {/* Action menu */}
-                        <td className="px-4 py-3">
-                          <ActionMenu employee={emp} onAction={handleAction} />
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                      {/* Status toggle */}
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleToggleStatus(emp)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold transition-colors ${
+                            isActive
+                              ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
+                              : "bg-red-50 text-red-600 ring-1 ring-red-200 hover:bg-red-100"
+                          }`}
+                        >
+                          {isActive ? (
+                            <FiToggleRight size={13} />
+                          ) : (
+                            <FiToggleLeft size={13} />
+                          )}
+                          {isActive ? "Active" : "Inactive"}
+                        </button>
+                      </td>
 
-          {/* Footer */}
-          <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-            <span>
-              Showing{" "}
-              <strong className="text-slate-600">
-                {filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–
-                {Math.min(currentPage * PAGE_SIZE, filtered.length)}
-              </strong>{" "}
-              of <strong className="text-slate-600">{filtered.length}</strong>{" "}
-              employees
-            </span>
-            <span>
-              Domain: <strong className="text-[#0A4D68]">acme.com</strong>
-            </span>
-          </div>
+                      {/* Joined date */}
+                      <td className="px-4 py-3 text-[13px] text-slate-500">
+                        {new Date(emp.joinedDate).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </td>
 
-          <Pagination
-            currentPage={currentPage}
-            totalItems={filtered.length}
-            pageSize={PAGE_SIZE}
-            onPageChange={setCurrentPage}
-            accentCls="bg-[#0A4D68]"
-          />
-        </div>
+                      {/* Action menu */}
+                      <td className="px-4 py-3">
+                        <ActionMenu employee={emp} onAction={handleAction} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </ResponsiveDataTable>
       </div>
 
       {/* Confirm Modal */}

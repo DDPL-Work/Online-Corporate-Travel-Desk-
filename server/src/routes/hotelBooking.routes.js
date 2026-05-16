@@ -34,6 +34,13 @@ router.post(
   hotelBookingController.createHotelBookingRequest,
 );
 
+router.post(
+  "/instant-book",
+  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  corporateContext,
+  hotelBookingController.instantHotelBooking,
+);
+
 /* ======================================================
    FETCH HOTEL BOOKING REQUESTS
 ====================================================== */

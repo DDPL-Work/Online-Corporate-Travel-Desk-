@@ -297,7 +297,6 @@ function MobileCard({ emp, onAction, onToggleStatus }) {
                 {fullName}
               </p>
               <p className="text-[11px] text-slate-400 truncate">{emp.email}</p>
-              <p className="text-[11px] text-slate-400">#{emp._id}</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -452,7 +451,9 @@ function TableRow({
               <span className="font-semibold text-[13px] text-slate-800 truncate">
                 {fullName}
               </span>
-              <span className="text-[11px] text-slate-400">#{emp._id}</span>
+              <span className="text-[11px] text-slate-400 truncate">
+                {emp.email}
+              </span>
             </div>
           </div>
         </td>

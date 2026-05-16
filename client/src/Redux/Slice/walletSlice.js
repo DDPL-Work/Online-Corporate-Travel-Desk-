@@ -29,6 +29,34 @@ export const fetchWalletTransactions = createAsyncThunk(
   },
 );
 
+export const fetchRechargeHistory = createAsyncThunk(
+  "wallet/fetchRechargeHistory",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const res = await api.get("/wallet/transactions/recharge", { params });
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch recharge history",
+      );
+    }
+  },
+);
+
+export const fetchBookingTransactions = createAsyncThunk(
+  "wallet/fetchBookingTransactions",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const res = await api.get("/wallet/transactions/booking", { params });
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch booking transactions",
+      );
+    }
+  },
+);
+
 export const initiateWalletRecharge = createAsyncThunk(
   "wallet/initiateRecharge",
   async ({ amount }, { rejectWithValue }) => {
@@ -151,6 +179,32 @@ const walletSlice = createSlice({
         state.pagination = action.payload.pagination;
       })
       .addCase(fetchWalletTransactions.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      .addCase(fetchRechargeHistory.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchRechargeHistory.fulfilled, (state, action) => {
+        state.loading = false;
+        state.transactions = action.payload.transactions;
+        state.pagination = action.payload.pagination;
+      })
+      .addCase(fetchRechargeHistory.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      .addCase(fetchBookingTransactions.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchBookingTransactions.fulfilled, (state, action) => {
+        state.loading = false;
+        state.transactions = action.payload.transactions;
+        state.pagination = action.payload.pagination;
+      })
+      .addCase(fetchBookingTransactions.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })

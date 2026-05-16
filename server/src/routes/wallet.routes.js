@@ -16,6 +16,8 @@ router.use(authorizeRoles("travel-admin", "super-admin", "ops-member"));
 
 router.get("/balance", walletController.getWalletBalance);
 router.get("/transactions", walletController.getWalletTransactions);
+router.get("/transactions/recharge", walletController.getRechargeHistory);
+router.get("/transactions/booking", walletController.getBookingTransactions);
 router.get("/payment-options", walletController.getPaymentOptions);
 router.get(
   "/payment-status/:orderId",

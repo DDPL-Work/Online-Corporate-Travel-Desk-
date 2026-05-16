@@ -47,7 +47,10 @@ class RoundRobinAssignmentService {
       ],
     };
     if (department) {
-      query.department = { $in: [department, "Both"] };
+      query.$or = [
+        { servicingScope: { $in: [department, "Both"] } },
+        { servicingScope: { $exists: false }, department: { $in: [department, "Both"] } },
+      ];
     }
 
     return OpsMember.find(query)

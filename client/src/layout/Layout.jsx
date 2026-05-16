@@ -48,11 +48,8 @@ export default function Layout() {
   }
 
   // =============================
-  // REDIRECT IF NOT AUTHENTICATED
+  // AUTH REDIRECTS (HANDLED BY PROTECTEDROUTE)
   // =============================
-  if (!isAuthenticated || !token) {
-    return <Navigate to="/platform/flight-booking-info" replace />;
-  }
 
   // =============================
   // ROLE-BASED ROOT REDIRECTS
@@ -83,7 +80,7 @@ export default function Layout() {
         </div>
 
         {/* ===== MAIN AREA ===== */}
-        <div className="flex-1 flex flex-col lg:ml-64">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden lg:ml-64">
           {/* ===== STICKY HEADER ===== */}
           <header className="sticky top-0 z-40 bg-white shadow-sm">
             <Header
@@ -94,8 +91,8 @@ export default function Layout() {
           </header>
 
           {/* ===== SCROLLABLE CONTENT ===== */}
-          <main className="flex-1 overflow-y-auto px-4 md:px-6 py-6">
-            <div className="max-w-7xl mx-auto">
+          <main className="flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden px-4 md:px-6 py-6">
+            <div className="w-full min-w-0 max-w-7xl mx-auto">
               <Outlet />
             </div>
           </main>

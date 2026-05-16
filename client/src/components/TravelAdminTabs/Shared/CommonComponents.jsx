@@ -1,6 +1,5 @@
-// ── shared small components ───────────────────────────────────────────────────
-
-import { FiClock, FiSearch } from "react-icons/fi";
+import React, { useState, useEffect, useRef } from "react";
+import { FiClock, FiSearch, FiChevronDown } from "react-icons/fi";
 
 export const IdCell = ({ id }) => (
   <span className="font-mono text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded tracking-wide">
@@ -23,8 +22,8 @@ export const SearchBar = ({ value, onChange, placeholder }) => (
   </div>
 );
 
-export const LabeledField = ({ label, children }) => (
-  <div className="flex flex-col gap-1">
+export const LabeledField = ({ label, children, className = "" }) => (
+  <div className={`flex flex-col gap-1 ${className}`}>
     <label className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
       {label}
     </label>
@@ -100,6 +99,76 @@ export const DualCell = ({ primary, secondary }) => (
     <span className="font-mono text-[11px] text-slate-400">{secondary}</span>
   </div>
 );
+
+export const CustomDropdown = ({ value, onChange, options, placeholder = "Select option" }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full px-3 py-2 border rounded-lg text-[13px] text-slate-800 bg-white flex items-center justify-between transition-all outline-none ${
+          isOpen ? "border-slate-400 ring-2 ring-slate-50" : "border-slate-200 hover:border-slate-300"
+        }`}
+      >
+        <span className={!value ? "text-slate-400" : "text-slate-700 font-medium"}>
+          {value || placeholder}
+        </span>
+        <FiChevronDown
+          size={14}
+          className={`text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl py-1 animate-in fade-in zoom-in duration-100 origin-top max-h-60 overflow-y-auto custom-scrollbar">
+          {options.map((opt) => {
+            const isObject = typeof opt === "object";
+            const label = isObject ? opt.label : opt;
+            const subLabel = isObject ? opt.subLabel : null;
+            const optValue = isObject ? opt.value : opt;
+            const isSelected = value === optValue;
+
+            return (
+              <button
+                key={optValue}
+                type="button"
+                onClick={() => {
+                  onChange(optValue);
+                  setIsOpen(false);
+                }}
+                className={`w-full px-3 py-2 text-left transition-colors hover:bg-slate-50 flex flex-col gap-0.5 ${
+                  isSelected ? "bg-cyan-50/50" : ""
+                }`}
+              >
+                <span className={`text-[13px] ${isSelected ? "text-[#0A4D68] font-bold" : "text-slate-700 font-medium"}`}>
+                  {label}
+                </span>
+                {subLabel && (
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {subLabel}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const Avatar = ({ name, bgClass, textClass }) => (
   <div

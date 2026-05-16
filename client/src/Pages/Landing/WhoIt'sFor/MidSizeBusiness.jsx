@@ -264,14 +264,35 @@ export default function MidSizeBusiness() {
         </div>
 
         {/* TICKER BAR */}
-        <div className="w-full bg-[#020617] border-t border-white/10 py-6 px-6 overflow-hidden">
-          <div className="max-w-7xl mx-auto">
-            {/* On Mobile: animate-infinite-scroll and w-max 
-        On Desktop (lg): static layout with justify-between 
-    */}
-            <div className="flex w-max lg:w-full lg:justify-between items-center gap-10 animate-infinite-scroll lg:animate-none">
-              {/* First Set of Items */}
-              <div className="flex items-center gap-10">
+        <div className="w-full bg-[#020617] border-t border-white/10 py-6 overflow-hidden">
+          <div className="max-w-[1200px] mx-auto px-6 md:px-10 relative">
+            
+            {/* Desktop Layout: Evenly spread across the full width */}
+            <div className="hidden lg:flex w-full justify-between items-center">
+              {[
+                { b: "200 to 500 people", r: "— fully supported" },
+                { b: "CFO dashboard", r: "— live spend by project" },
+                { b: "Full role hierarchy", r: "— MD to employee" },
+                { b: "Audit ready", r: "— every trip documented" },
+              ].map((item, i) => (
+                <div
+                  key={`desktop-${i}`}
+                  className="flex items-center gap-1 whitespace-nowrap"
+                >
+                  <span className="text-white font-bold text-sm">
+                    {item.b}
+                  </span>
+                  <span className="text-white/70 font-normal text-sm">
+                    {item.r}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Mobile / Tablet Layout: Seamless Infinite Scroll */}
+            <div className="flex lg:hidden w-max animate-infinite-scroll items-center">
+              {/* Group 1 */}
+              <div className="flex items-center gap-10 pr-10">
                 {[
                   { b: "200 to 500 people", r: "— fully supported" },
                   { b: "CFO dashboard", r: "— live spend by project" },
@@ -292,8 +313,8 @@ export default function MidSizeBusiness() {
                 ))}
               </div>
 
-              {/* Second Set of Items (Hidden on Desktop, used for mobile loop) */}
-              <div className="flex lg:hidden items-center gap-10">
+              {/* Group 2 */}
+              <div className="flex items-center gap-10 pr-10">
                 {[
                   { b: "200 to 500 people", r: "— fully supported" },
                   { b: "CFO dashboard", r: "— live spend by project" },
@@ -314,6 +335,7 @@ export default function MidSizeBusiness() {
                 ))}
               </div>
             </div>
+
           </div>
         </div>
 

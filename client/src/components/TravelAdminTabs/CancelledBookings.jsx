@@ -1,17 +1,17 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { FaPlane, FaHotel } from "react-icons/fa";
 import {
   FiSearch,
   FiXCircle,
-  FiDollarSign,
   FiCalendar,
   FiFilter,
   FiRefreshCw,
   FiClock,
+  FiX,
+  FiEye,
 } from "react-icons/fi";
-import { BsBuilding } from "react-icons/bs";
+import { FaPlane, FaHotel, FaRupeeSign } from "react-icons/fa";
 import {
   getAllFlightBookingsAdmin,
   getCancelledHotelBookingsAdmin,
@@ -22,10 +22,11 @@ import {
   dateCls,
   IdCell,
   SearchBar,
-  selectCls,
   Th,
   DualCell,
+  CustomDropdown,
 } from "./Shared/CommonComponents";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { Pagination } from "./Shared/Pagination";
 
 // ── shared small components ───────────────────────────────────────────────────
@@ -70,7 +71,7 @@ function CancelledFlightSection() {
   const [endDate, setEndDate] = useState("");
   const [travelDate, setTravelDate] = useState("");
   const [cancelStatusFilter, setCancelStatus] = useState("All");
-  const [corpFilter, setCorp] = useState("All");
+  const [empFilter, setEmp] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
@@ -79,22 +80,18 @@ function CancelledFlightSection() {
   const flightBookings = useSelector(
     (state) => state.adminBooking.flightBookings,
   );
+  const loading = useSelector((state) => state.adminBooking.loading);
 
   useEffect(() => {
     dispatch(getAllFlightBookingsAdmin());
   }, [dispatch]);
-
-  // Reset to page 1 whenever filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, startDate, endDate, cancelStatusFilter, travelDate]);
 
   const formatFlight = (b) => {
     const traveller = b.travellers?.length
       ? `${b.travellers[0].title || ""} ${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim()
       : "N/A";
 
-    const employeeId = b.userId?._id;
+    const employeeId = b.userId?.email || "N/A";
 
     const cancelStatus = b.amendment?.status;
 
@@ -114,7 +111,9 @@ function CancelledFlightSection() {
 
     return {
       ...b,
-      travellerName: traveller,
+      travellerName: b.userId?.name
+        ? `${b.userId.name.firstName} ${b.userId.name.lastName}`.trim()
+        : b.userId?.email || traveller,
       employeeId,
       status: b.executionStatus,
       cancelStatus,
@@ -140,12 +139,18 @@ function CancelledFlightSection() {
       );
   }, [flightBookings]);
 
+  const employees = useMemo(
+    () => ["All", ...new Set(cancelledFlights.map((b) => b.travellerName))],
+    [cancelledFlights],
+  );
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return cancelledFlights.filter((b) => {
       const displayStatus = mapCancelStatus(b.cancelStatus || b.status);
       const statusOk =
         cancelStatusFilter === "All" || displayStatus === cancelStatusFilter;
+      const empOk = empFilter === "All" || b.travellerName === empFilter;
 
       const fromOk =
         !startDate ||
@@ -157,12 +162,22 @@ function CancelledFlightSection() {
       const searchOk =
         !q ||
         b.travellerName?.toLowerCase().includes(q) ||
+        b.employeeId?.toLowerCase().includes(q) ||
         b.pnr?.toLowerCase().includes(q) ||
         b.providerBookingId?.toString().toLowerCase().includes(q);
 
-      return statusOk && fromOk && toOk && searchOk;
+      const travelOk =
+        !travelDate ||
+        (b.hotelRequest?.checkInDate &&
+          new Date(b.hotelRequest.checkInDate).toISOString().slice(0, 10) ===
+            travelDate) ||
+        (b.flightRequest?.departureDate &&
+          new Date(b.flightRequest.departureDate).toISOString().slice(0, 10) ===
+            travelDate);
+
+      return statusOk && empOk && fromOk && toOk && searchOk && travelOk;
     });
-  }, [search, startDate, endDate, cancelStatusFilter, cancelledFlights]);
+  }, [search, startDate, endDate, travelDate, cancelStatusFilter, empFilter, cancelledFlights]);
 
   const paginated = useMemo(
     () =>
@@ -183,10 +198,51 @@ function CancelledFlightSection() {
 
   const total = filtered.reduce((s, b) => s + b.amount, 0);
 
+  const handleExportFlights = () => {
+    if (!filtered.length) return;
+    const headers = ["Order ID", "Traveller", "Booked Date", "Cancelled Date", "Status", "PNR"];
+    const rows = filtered.map((b) => [
+      b.orderId || "N/A",
+      b.travellerName || "N/A",
+      new Date(b.bookedDate).toLocaleDateString("en-IN"),
+      new Date(b.cancelledDate || b.bookedDate).toLocaleDateString("en-IN"),
+      mapCancelStatus(b.cancelStatus || b.status),
+      b.pnr || "N/A",
+    ]);
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cancelled-flights-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-0">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
         <StatCard
           label="Total Cancelled"
           value={filtered.length}
@@ -214,7 +270,7 @@ function CancelledFlightSection() {
         <StatCard
           label="Total Refund Value"
           value={`₹${totalRefund.toLocaleString()}`}
-          Icon={FiDollarSign}
+          Icon={FaRupeeSign}
           borderCls="border-violet-500"
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
@@ -233,7 +289,10 @@ function CancelledFlightSection() {
           >
             <SearchBar
               value={search}
-              onChange={setSearch}
+              onChange={(value) => {
+                setSearch(value);
+                setCurrentPage(1);
+              }}
               placeholder="Name, PNR, booking ID…"
             />
           </LabeledField>
@@ -247,7 +306,10 @@ function CancelledFlightSection() {
             <input
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setCurrentPage(1);
+              }}
               className={dateCls}
             />
           </LabeledField>
@@ -261,7 +323,10 @@ function CancelledFlightSection() {
             <input
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setCurrentPage(1);
+              }}
               className={dateCls}
             />
           </LabeledField>
@@ -275,7 +340,10 @@ function CancelledFlightSection() {
             <input
               type="date"
               value={travelDate}
-              onChange={(e) => setTravelDate(e.target.value)}
+              onChange={(e) => {
+                setTravelDate(e.target.value);
+                setCurrentPage(1);
+              }}
               className={dateCls}
             />
           </LabeledField>
@@ -286,146 +354,184 @@ function CancelledFlightSection() {
               </>
             }
           >
-            <select
+            <CustomDropdown
               value={cancelStatusFilter}
-              onChange={(e) => setCancelStatus(e.target.value)}
-              className={selectCls}
-            >
-              {["All", "Cancelled", "Refunded", "Refund Pending"].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
+              onChange={(value) => {
+                setCancelStatus(value);
+                setCurrentPage(1);
+              }}
+              options={["All", "Cancelled", "Refunded", "Refund Pending"]}
+            />
           </LabeledField>
+          <LabeledField
+            label={
+              <>
+                <FiFilter size={10} /> Employee
+              </>
+            }
+          >
+            <CustomDropdown
+              value={empFilter}
+              onChange={(value) => {
+                setEmp(value);
+                setCurrentPage(1);
+              }}
+              options={employees}
+            />
+          </LabeledField>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => dispatch(getAllFlightBookingsAdmin())}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-[#0A4D68] bg-cyan-50 rounded-lg hover:bg-cyan-100 transition-colors border border-cyan-100"
+              title="Refresh data"
+            >
+              <FiRefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
+            </button>
+            <button
+              onClick={() => {
+                setSearch("");
+                setStartDate("");
+                setEndDate("");
+                setTravelDate("");
+                setCancelStatus("All");
+                setEmp("All");
+                setCurrentPage(1);
+              }}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold text-slate-500 bg-slate-100 rounded-lg hover:bg-slate-200 hover:text-slate-700 transition-colors"
+            >
+              <FiX size={12} /> Reset
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[960px]">
-            <thead>
-              <tr className="bg-red-800 text-red-100">
-                <Th>Order ID</Th>
-                <Th>Traveller Name</Th>
-                <Th>Booked Date</Th>
-                <Th>Cancelled Date</Th>
-                <Th>Cancel Status</Th>
-                <Th>PNR</Th>
-                <Th>Action</Th>
+      <ResponsiveDataTable
+        title="Cancelled Flight Bookings"
+        subtitle={`${filtered.length} record${filtered.length !== 1 ? "s" : ""} found`}
+        tableMinWidth="1000px"
+        onExport={handleExportFlights}
+        exportLabel="Export"
+        exportBgClass="bg-[#0A4D68] hover:bg-[#083d52]"
+        arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+        footer={
+          <div className="px-4 py-2.5 flex justify-between text-xs text-slate-400">
+            <span>
+              Showing <strong className="text-slate-600">{Math.min((currentPage - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}</strong> of <strong className="text-slate-600">{filtered.length}</strong> flight bookings
+            </span>
+            <span>
+              Total: <strong className="text-[#0A4D68]">₹{total.toLocaleString()}</strong>
+            </span>
+          </div>
+        }
+        pagination={
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setCurrentPage}
+          />
+        }
+      >
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-[#0f9041] text-[#ffffff]">
+              <Th>Order ID</Th>
+              <Th>Traveller Name</Th>
+              <Th>Booked Date</Th>
+              <Th>Cancelled Date</Th>
+              <Th>Cancel Status</Th>
+              <Th>PNR</Th>
+              <Th>Action</Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan="8" className="py-16 text-center text-slate-400">
+                  <div className="flex justify-center mb-3">
+                    <FaPlane size={32} className="opacity-20" />
+                  </div>
+                  <p className="font-semibold text-sm">
+                    No cancelled flight bookings found
+                  </p>
+                  <p className="text-xs mt-1">
+                    Try adjusting the filters or search query
+                  </p>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="py-16 text-center text-slate-400">
-                    <div className="flex justify-center mb-3">
-                      <FaPlane size={32} className="opacity-20" />
+            ) : (
+              paginated.map((b, i) => (
+                <tr
+                  key={b._id}
+                  className={`transition-colors hover:bg-red-50 ${
+                    i % 2 === 0 ? "bg-white" : "bg-slate-50/50"
+                  }`}
+                >
+                  <td className="px-4 py-3">
+                    <IdCell id={b.orderId || "N/A"} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-[13px] text-slate-800">
+                        {b.travellerName}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {b.employeeId}
+                      </span>
                     </div>
-                    <p className="font-semibold text-sm">
-                      No cancelled flight bookings found
-                    </p>
-                    <p className="text-xs mt-1">
-                      Try adjusting the filters or search query
-                    </p>
+                  </td>
+                  <td className="px-4 py-3 text-[13px] text-slate-500">
+                    {new Date(b.bookedDate).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </td>
+                  <td className="px-4 py-3 text-[13px] text-slate-500">
+                    {b.cancelledDate
+                      ? new Date(b.cancelledDate).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "—"}
+                  </td>
+
+                  <td className="px-4 py-3">
+                    <CancelStatusBadge
+                      status={mapCancelStatus(b.cancelStatus || b.status)}
+                    />
+                  </td>
+                  <td className="px-4 py-3">{b.pnr}</td>
+
+                  {/* <td className="px-4 py-3">
+                    {b.cancellationReason ? (
+                      <span className="text-[11px] bg-red-50 text-red-700 px-2 py-0.5 rounded">
+                        {b.cancellationReason}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-300">—</span>
+                    )}
+                  </td> */}
+                  <td>
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/employee-flight-booking/${b._id}?source=cancelled`,
+                          )
+                        }
+                        className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] flex items-center gap-1"
+                      >
+                        <FiEye size={12} /> View
+                      </button>
                   </td>
                 </tr>
-              ) : (
-                paginated.map((b, i) => (
-                  <tr
-                    key={b._id}
-                    className={`transition-colors hover:bg-red-50 ${
-                      i % 2 === 0 ? "bg-white" : "bg-slate-50/50"
-                    }`}
-                  >
-                    <td className="px-4 py-3">
-                      <IdCell id={b.orderId || "N/A"} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-[13px] text-slate-800">
-                          {b.travellerName}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          {b.employeeId}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {new Date(b.bookedDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500">
-                      {b.cancelledDate
-                        ? new Date(b.cancelledDate).toLocaleDateString(
-                            "en-IN",
-                            {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            },
-                          )
-                        : "—"}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <CancelStatusBadge
-                        status={mapCancelStatus(b.cancelStatus || b.status)}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      {b.pnr}
-                    </td>
-
-                    {/* <td className="px-4 py-3">
-                      {b.cancellationReason ? (
-                        <span className="text-[11px] bg-red-50 text-red-700 px-2 py-0.5 rounded">
-                          {b.cancellationReason}
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-slate-300">—</span>
-                      )}
-                    </td> */}
-                    <td>
-                      <button
-                        onClick={() => navigate(`/employee-flight-booking/${b._id}?source=cancelled`)}
-                        className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50]"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-          <span>
-            Showing{" "}
-            <strong className="text-slate-600">
-              {Math.min((currentPage - 1) * PAGE_SIZE + 1, filtered.length)}–
-              {Math.min(currentPage * PAGE_SIZE, filtered.length)}
-            </strong>{" "}
-            of <strong className="text-slate-600">{filtered.length}</strong>{" "}
-            flight bookings
-          </span>
-          <span>
-            Total:{" "}
-            <strong className="text-[#0A4D68]">
-              ₹{total.toLocaleString()}
-            </strong>
-          </span>
-        </div>
-        <Pagination
-          currentPage={currentPage}
-          totalItems={filtered.length}
-          pageSize={PAGE_SIZE}
-          onPageChange={setCurrentPage}
-        />
-      </div>
+              ))
+            )}
+          </tbody>
+        </table>
+      </ResponsiveDataTable>
     </div>
   );
 }
@@ -438,7 +544,7 @@ function CancelledHotelSection() {
   const [checkInDate, setCheckInDate] = useState("");
   const [checkOutDate, setCheckOutDate] = useState("");
   const [cancelStatusFilter, setCancelStatus] = useState("All");
-  const [corpFilter, setCorp] = useState("All");
+  const [empFilter, setEmp] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
 
@@ -447,21 +553,18 @@ function CancelledHotelSection() {
   const hotelBookings = useSelector(
     (state) => state.adminBooking.cancelledHotelBookings,
   );
+  const loading = useSelector((state) => state.adminBooking.loading);
 
   useEffect(() => {
     dispatch(getCancelledHotelBookingsAdmin());
   }, [dispatch]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, startDate, endDate, cancelStatusFilter]);
 
   const formatHotel = (b) => {
     const guest = b.travellers?.length
       ? `${b.travellers[0].title || ""} ${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim()
       : "N/A";
 
-    const employeeId = b.userId?._id;
+    const employeeId = b.userId?.email || "N/A";
 
     const hotelName = b.hotelRequest?.selectedHotel?.hotelName || "—";
 
@@ -483,7 +586,9 @@ function CancelledHotelSection() {
 
     return {
       ...b,
-      guestName: guest,
+      guestName: b.userId?.name
+        ? `${b.userId.name.firstName} ${b.userId.name.lastName}`.trim()
+        : b.userId?.email || guest,
       employeeId,
       hotelName,
       checkIn,
@@ -511,12 +616,18 @@ function CancelledHotelSection() {
     });
   }, [hotelBookings]);
 
+  const employees = useMemo(
+    () => ["All", ...new Set(cancelledHotels.map((b) => b.guestName))],
+    [cancelledHotels],
+  );
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return cancelledHotels.filter((b) => {
       const displayStatus = mapCancelStatus(b.cancelStatus || b.status);
       const statusOk =
         cancelStatusFilter === "All" || displayStatus === cancelStatusFilter;
+      const empOk = empFilter === "All" || b.guestName === empFilter;
 
       const fromOk =
         !startDate ||
@@ -528,11 +639,30 @@ function CancelledHotelSection() {
       const searchOk =
         !q ||
         b.guestName?.toLowerCase().includes(q) ||
+        b.employeeId?.toLowerCase().includes(q) ||
         b.providerBookingId?.toString().toLowerCase().includes(q);
 
-      return statusOk && fromOk && toOk && searchOk;
+      const ciOk =
+        !checkInDate ||
+        (b.checkIn &&
+          new Date(b.checkIn).toISOString().slice(0, 10) === checkInDate);
+      const coOk =
+        !checkOutDate ||
+        (b.checkOut &&
+          new Date(b.checkOut).toISOString().slice(0, 10) === checkOutDate);
+
+      return statusOk && empOk && fromOk && toOk && searchOk && ciOk && coOk;
     });
-  }, [search, startDate, endDate, cancelStatusFilter, cancelledHotels]);
+  }, [
+    search,
+    startDate,
+    endDate,
+    checkInDate,
+    checkOutDate,
+    cancelStatusFilter,
+    empFilter,
+    cancelledHotels,
+  ]);
 
   const paginated = useMemo(
     () =>
@@ -553,10 +683,51 @@ function CancelledHotelSection() {
 
   const total = filtered.reduce((s, b) => s + b.amount, 0);
 
+  const handleExportHotels = () => {
+    if (!filtered.length) return;
+    const headers = ["Booking ID", "Guest Name", "Hotel", "Booked Date", "Cancelled Date", "Status"];
+    const rows = filtered.map((b) => [
+      b.orderId || b.providerBookingId || "N/A",
+      b.guestName || "N/A",
+      b.hotelName || "N/A",
+      new Date(b.bookedDate).toLocaleDateString("en-IN"),
+      new Date(b.cancelledDate || b.bookedDate).toLocaleDateString("en-IN"),
+      mapCancelStatus(b.cancelStatus || b.status),
+    ]);
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cancelled-hotels-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-0">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
         <StatCard
           label="Total Cancelled"
           value={filtered.length}
@@ -583,8 +754,8 @@ function CancelledHotelSection() {
         />
         <StatCard
           label="Total Refund Value"
-          value={`₹${totalRefund.toLocaleString()}`}
-          Icon={FiDollarSign}
+          value={`${totalRefund.toLocaleString()}`}
+          Icon={FaRupeeSign}
           borderCls="border-violet-500"
           iconBgCls="bg-violet-50"
           iconColorCls="text-violet-600"
@@ -603,7 +774,10 @@ function CancelledHotelSection() {
           >
             <SearchBar
               value={search}
-              onChange={setSearch}
+              onChange={(value) => {
+                setSearch(value);
+                setCurrentPage(1);
+              }}
               placeholder="Name, booking ID…"
             />
           </LabeledField>
@@ -617,7 +791,10 @@ function CancelledHotelSection() {
             <input
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setCurrentPage(1);
+              }}
               className={dateCls}
             />
           </LabeledField>
@@ -631,7 +808,10 @@ function CancelledHotelSection() {
             <input
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setCurrentPage(1);
+              }}
               className={dateCls}
             />
           </LabeledField>
@@ -645,7 +825,10 @@ function CancelledHotelSection() {
             <input
               type="date"
               value={checkInDate}
-              onChange={(e) => setCheckInDate(e.target.value)}
+              onChange={(e) => {
+                setCheckInDate(e.target.value);
+                setCurrentPage(1);
+              }}
               className={dateCls}
             />
           </LabeledField>
@@ -659,7 +842,10 @@ function CancelledHotelSection() {
             <input
               type="date"
               value={checkOutDate}
-              onChange={(e) => setCheckOutDate(e.target.value)}
+              onChange={(e) => {
+                setCheckOutDate(e.target.value);
+                setCurrentPage(1);
+              }}
               className={dateCls}
             />
           </LabeledField>
@@ -670,35 +856,99 @@ function CancelledHotelSection() {
               </>
             }
           >
-            <select
+            <CustomDropdown
               value={cancelStatusFilter}
-              onChange={(e) => setCancelStatus(e.target.value)}
-              className={selectCls}
-            >
-              {["All", "Cancelled", "Refunded", "Refund Pending"].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
+              onChange={(value) => {
+                setCancelStatus(value);
+                setCurrentPage(1);
+              }}
+              options={["All", "Cancelled", "Refunded", "Refund Pending"]}
+            />
           </LabeledField>
+          <LabeledField
+            label={
+              <>
+                <FiFilter size={10} /> Employee
+              </>
+            }
+          >
+            <CustomDropdown
+              value={empFilter}
+              onChange={(value) => {
+                setEmp(value);
+                setCurrentPage(1);
+              }}
+              options={employees}
+            />
+          </LabeledField>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => dispatch(getCancelledHotelBookingsAdmin())}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-[#0A4D68] bg-cyan-50 rounded-lg hover:bg-cyan-100 transition-colors border border-cyan-100"
+              title="Refresh data"
+            >
+              <FiRefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
+            </button>
+            <button
+              onClick={() => {
+                setSearch("");
+                setStartDate("");
+                setEndDate("");
+                setCheckInDate("");
+                setCheckOutDate("");
+                setCancelStatus("All");
+                setEmp("All");
+                setCurrentPage(1);
+              }}
+              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold text-slate-500 bg-slate-100 rounded-lg hover:bg-slate-200 hover:text-slate-700 transition-colors"
+            >
+              <FiX size={12} /> Reset
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[960px]">
-            <thead>
-              <tr className="bg-red-800 text-red-100">
-                <Th>Order ID</Th>
-                <Th>Guest Name</Th>
-                <Th>Booked Date</Th>
-                <Th>Cancelled Date</Th>
-                <Th>Cancel Status</Th>
-                <Th>Change Request ID</Th>
-                <Th>Reason</Th>
-                <Th>Action</Th>
-              </tr>
-            </thead>
+      <ResponsiveDataTable
+        title="Cancelled Hotel Bookings"
+        subtitle={`${filtered.length} record${filtered.length !== 1 ? "s" : ""} found`}
+        tableMinWidth="1050px"
+        onExport={handleExportHotels}
+        exportLabel="Export"
+        exportBgClass="bg-[#0A4D68] hover:bg-[#083d52]"
+        arrowBgClass="bg-teal-50 border-teal-200 text-[#088395] hover:bg-teal-100"
+        footer={
+          <div className="px-4 py-2.5 flex justify-between text-xs text-slate-400">
+            <span>
+              Showing <strong className="text-slate-600">{Math.min((currentPage - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}</strong> of <strong className="text-slate-600">{filtered.length}</strong> hotel bookings
+            </span>
+            <span>
+              Total: <strong className="text-[#088395]">₹{total.toLocaleString()}</strong>
+            </span>
+          </div>
+        }
+        pagination={
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setCurrentPage}
+          />
+        }
+      >
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-[#0f9041] text-[#ccfbf1]">
+              <Th>Order ID</Th>
+              <Th>Guest Name</Th>
+              <Th>Booked Date</Th>
+              <Th>Cancelled Date</Th>
+              <Th>Cancel Status</Th>
+              <Th>Change Request ID</Th>
+              <Th>Reason</Th>
+              <Th>Action</Th>
+            </tr>
+          </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
@@ -723,7 +973,7 @@ function CancelledHotelSection() {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <IdCell id={b._id} />
+                      <IdCell id={b.orderId || b.providerBookingId || "N/A"} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
@@ -775,9 +1025,9 @@ function CancelledHotelSection() {
                     <td>
                       <button
                         onClick={() => navigate(`/employee-hotel-booking/${b._id}?source=cancelled`)}
-                        className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50]"
+                        className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] flex items-center gap-1"
                       >
-                        View
+                        <FiEye size={12} /> View
                       </button>
                     </td>
                   </tr>
@@ -785,105 +1035,97 @@ function CancelledHotelSection() {
               )}
             </tbody>
           </table>
-        </div>
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-          <span>
-            Showing{" "}
-            <strong className="text-slate-600">
-              {Math.min((currentPage - 1) * PAGE_SIZE + 1, filtered.length)}–
-              {Math.min(currentPage * PAGE_SIZE, filtered.length)}
-            </strong>{" "}
-            of <strong className="text-slate-600">{filtered.length}</strong>{" "}
-            flight bookings
-          </span>
-          <span>
-            Total:{" "}
-            <strong className="text-[#0A4D68]">
-              ₹{total.toLocaleString()}
-            </strong>
-          </span>
-        </div>
-        <Pagination
-          currentPage={currentPage}
-          totalItems={filtered.length}
-          pageSize={PAGE_SIZE}
-          onPageChange={setCurrentPage}
-        />
-      </div>
+        </ResponsiveDataTable>
     </div>
   );
 }
 
 // ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function CancelledBookings() {
+  const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState("flight");
 
   const tabs = [
     {
       id: "flight",
-      label: "Flight Cancellations",
+      label: "Flight Bookings",
       Icon: FaPlane,
-      activeText: "text-red-700",
-      activeBorder: "border-b-red-700",
+      activeText: "text-[#0A4D68]",
+      activeBorder: "border-b-[#0A4D68]",
     },
     {
       id: "hotel",
-      label: "Hotel Cancellations",
+      label: "Hotel Bookings",
       Icon: FaHotel,
-      activeText: "text-red-700",
-      activeBorder: "border-b-red-700",
+      activeText: "text-[#088395]",
+      activeBorder: "border-b-[#088395]",
     },
   ];
 
+  const handleRefresh = () => {
+    if (activeTab === "flight") {
+      dispatch(getAllFlightBookingsAdmin());
+    } else {
+      dispatch(getCancelledHotelBookingsAdmin());
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-100 font-sans">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Page Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-linear-to-br from-red-700 to-red-500 flex items-center justify-center shrink-0">
+    <div className="w-full min-w-0 space-y-6 font-sans">
+      <div className="flex items-center justify-between gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shrink-0 shadow-sm">
             <FiXCircle size={18} className="text-white" />
           </div>
-          <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">
+          <div className="min-w-0">
+            <h1 className="text-xl font-black text-slate-900 tracking-tight truncate">
               Cancelled Bookings
             </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              View &amp; track cancelled flight and hotel bookings
+            <p className="text-xs text-slate-400 mt-0.5 truncate">
+              Review all cancelled or amended flight &amp; hotel records
             </p>
           </div>
         </div>
-
-        {/* Tab Bar */}
-        <div className="flex items-end gap-0 mb-5 border-b-2 border-slate-200">
-          {tabs.map((tab) => {
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 px-5 py-2.5 text-[13px] font-bold transition-all border-b-2 -mb-0.5 rounded-t-lg
-                  ${
-                    active
-                      ? `bg-white ${tab.activeText} ${tab.activeBorder} shadow-sm`
-                      : "text-slate-400 border-transparent hover:text-slate-600 hover:bg-white/60"
-                  }
-                `}
-              >
-                <tab.Icon size={14} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Tab Content */}
-        {activeTab === "flight" ? (
-          <CancelledFlightSection />
-        ) : (
-          <CancelledHotelSection />
-        )}
+        <button
+          onClick={handleRefresh}
+          className={`shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-bold transition-all shadow-sm border ${
+            activeTab === "hotel"
+              ? "bg-teal-50 border-teal-200 text-[#088395] hover:bg-teal-100"
+              : "bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+          }`}
+        >
+          <FiRefreshCw size={14} />
+          Refresh
+        </button>
       </div>
+
+      {/* Tab Bar */}
+      <div className="flex items-end gap-0 border-b-2 border-slate-200">
+        {tabs.map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-5 py-2.5 text-[13px] font-bold transition-all border-b-2 -mb-0.5 rounded-t-lg ${
+                active
+                  ? `bg-white ${tab.activeText} ${tab.activeBorder} shadow-sm`
+                  : "text-slate-400 border-transparent hover:text-slate-600 hover:bg-white/60"
+              }`}
+            >
+              <tab.Icon size={14} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === "flight" ? (
+        <CancelledFlightSection />
+      ) : (
+        <CancelledHotelSection />
+      )}
     </div>
   );
 }

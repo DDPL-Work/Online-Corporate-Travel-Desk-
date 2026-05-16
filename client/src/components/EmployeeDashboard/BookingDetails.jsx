@@ -1425,7 +1425,7 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
 
       const payload = {
         bookingId: booking._id,
-        bookingReference: booking.bookingReference,
+        orderId: booking.orderId || booking.bookingReference,
         priority: queryPriority,
         remarks:
           queryRemarks || "User requested cancellation but charges API failed",
@@ -1527,7 +1527,7 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
                 {step === "reissue" ? "Reissue Flight" : "Cancellation"}
               </h2>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Booking · {booking.bookingReference}
+                Order ID · {booking.orderId || booking.bookingReference}
               </p>
             </div>
           </div>
@@ -2686,8 +2686,7 @@ export default function BookingDetails() {
     !isCancelled &&
     !isTravelPassed;
 
-  const handleDownloadTicket = async (journeyType) => {
-    if (!pnrsByJourney[journeyType]) return;
+  const handleDownloadTicket = async (journeyType = "full") => {
     setDownloading(journeyType);
     await dispatch(downloadTicketPdf({ bookingId: booking._id, journeyType }));
     setDownloading(null);
@@ -2726,33 +2725,21 @@ export default function BookingDetails() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-500 font-mono">
-                {booking.bookingReference}
+                <span className="font-medium text-md text-green-500">Order ID:</span> {booking.orderId || booking.bookingReference}
               </span>
               <StatusPill status={executionStatus} />
             </div>
 
             {paymentSuccessful && !isCancelled && (
               <div className="flex items-center gap-2 border-l border-gray-200 pl-4 ml-1">
-                {pnrsByJourney.onward && (
-                  <button
-                    onClick={() => handleDownloadTicket("onward")}
-                    disabled={downloading === "onward"}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition disabled:opacity-50 shadow-sm"
-                  >
-                    <FiDownload size={13} className="text-teal-400" />
-                    {downloading === "onward" ? "Downloading" : isRoundTrip ? "Ticket (Onward)" : "Download Ticket"}
-                  </button>
-                )}
-                {isRoundTrip && pnrsByJourney.return && (
-                  <button
-                    onClick={() => handleDownloadTicket("return")}
-                    disabled={downloading === "return"}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition disabled:opacity-50 shadow-sm"
-                  >
-                    <FiDownload size={13} className="text-teal-400" />
-                    {downloading === "return" ? "Downloading" : "Ticket (Return)"}
-                  </button>
-                )}
+                <button
+                  onClick={() => handleDownloadTicket("full")}
+                  disabled={downloading === "full"}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition disabled:opacity-50 shadow-sm"
+                >
+                  <FiDownload size={13} className="text-teal-400" />
+                  {downloading === "full" ? "Downloading" : "Download E-Ticket"}
+                </button>
               </div>
             )}
           </div>
@@ -3596,6 +3583,7 @@ export default function BookingDetails() {
               )}
             </div>
           )} */}
+        <BookingHistory booking={booking} />
       </main>
 
       {/* Modals – keep your existing modal components */}
@@ -3635,6 +3623,120 @@ export default function BookingDetails() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Booking History / Timeline                                     */
+/* ─────────────────────────────────────────────────────────────── */
+const getTicketDate = (b) => {
+  if (b.ticketedAt) return b.ticketedAt;
+  const onwardIssueDate = b.bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
+  if (onwardIssueDate) return onwardIssueDate;
+  const providerIssueDate = b.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
+  if (providerIssueDate) return providerIssueDate;
+  if (b.executionStatus === "ticketed") return b.updatedAt;
+  return null;
+};
+
+function BookingHistory({ booking }) {
+  const isCancelled = booking.executionStatus === "cancelled" || !!booking.cancellation;
+  const isTicketed = booking.executionStatus === "ticketed" || (isCancelled && !!booking.bookingResult?.pnr);
+
+  const steps = [
+    {
+      label: "Request Created",
+      date: booking.createdAt,
+      desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
+      icon: <FiClock size={14} />,
+      active: true,
+    },
+    {
+      label: "Approval Status",
+      date: booking.approvedAt || booking.rejectedAt || (["approved", "rejected"].includes(booking.requestStatus) ? booking.updatedAt : null),
+      desc: (() => {
+        const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
+        const isApproved = booking.approvedAt || booking.requestStatus === "approved";
+        
+        if (isRejected) {
+          return `Rejected by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        if (isApproved) {
+          const reqEmail = booking.userId?.email || booking.requesterDetails?.email;
+          const appEmail = booking.approvedBy?.email || booking.approverEmail;
+          const isSameUser = reqEmail && appEmail && reqEmail === appEmail;
+          if (booking.approverName === "Auto Approve" || isSameUser) {
+             return "Auto Approved by System (Travel Policy)";
+          }
+          return `Approved by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        return "Waiting for manager approval";
+      })(),
+      icon: <FiShield size={14} />,
+      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
+    },
+    {
+      label: "Ticketing",
+      date: getTicketDate(booking),
+      desc: isTicketed ? "E-ticket generated and sent to employee" : "Final ticketing pending",
+      icon: <FiTag size={14} />,
+      active: isTicketed,
+    },
+    {
+      label: "Cancellation",
+      date: booking.cancelledAt || (isCancelled ? booking.updatedAt : null),
+      desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
+      icon: <FiXCircle size={14} />,
+      active: isCancelled,
+      isLast: true,
+    },
+  ];
+
+  const formatDateStr = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const formatTimeStr = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  return (
+    <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-6 mt-6">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="w-8 h-8 rounded-full bg-[#A07840]/10 flex items-center justify-center">
+          <FiRefreshCw size={14} className="text-[#A07840]" />
+        </div>
+        <div>
+          <h3 className="text-[14px] font-black text-gray-900 uppercase tracking-tight">Booking Lifecycle</h3>
+          <p className="text-[10px] text-[#8B7355] font-bold uppercase tracking-widest mt-0.5">Audit Trail & Timeline</p>
+        </div>
+      </div>
+
+      <div className="relative pl-1.5">
+        <div className="absolute left-[13px] top-3 bottom-3 w-[1.5px] bg-gradient-to-b from-[#A07840]/40 via-[#E8E0D0] to-transparent" />
+        
+        <div className="space-y-8">
+          {steps.map((step, idx) => (
+            <div key={idx} className="relative flex gap-6">
+              <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center transition-colors duration-500 mt-0.5 ${
+                step.active ? "bg-[#A07840] text-white shadow-md shadow-[#A07840]/20" : "bg-white border-2 border-[#E8E0D0] text-[#D8CEB8]"
+              }`}>
+                {step.icon}
+              </div>
+
+              <div className="flex-1 pb-2">
+                <div className="flex items-center gap-3 mb-1.5">
+                  <p className={`text-[11px] font-bold uppercase tracking-widest ${step.active ? "text-gray-900" : "text-gray-400"}`}>
+                    {step.label}
+                  </p>
+                  {step.date && step.active && (
+                    <span className="text-[10px] font-semibold text-[#8B7355] bg-white border border-[#E8E0D0] px-2 py-0.5 rounded uppercase tracking-wide shadow-sm">
+                      {formatDateStr(step.date)} · {formatTimeStr(step.date)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[13px] text-gray-500 font-medium leading-relaxed">{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

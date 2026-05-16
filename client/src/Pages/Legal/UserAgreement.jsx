@@ -199,6 +199,20 @@ export default function UserAgreement() {
     return () => observers.forEach(o => o.disconnect());
   }, []);
 
+  // Guarantee 100% on mobile if scrolled to the absolute bottom
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + Math.ceil(window.scrollY) >=
+        document.documentElement.scrollHeight - 50
+      ) {
+        setReviewedSections(new Set(SECTIONS.map((s) => s.id)));
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const scrollTo = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -222,7 +236,7 @@ export default function UserAgreement() {
       </div>
 
       {/* ── Body ── */}
-      <div className="flex-1 max-w-[1340px] mx-auto w-full px-4 py-8 pb-28">
+      <div className="flex-1 max-w-[1340px] mx-auto w-full px-4 py-8 pb-48 md:pb-28">
         <div className="flex gap-8 items-start">
 
           {/* ── LEFT: Quick Navigation ── */}

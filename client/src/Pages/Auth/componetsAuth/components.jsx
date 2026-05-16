@@ -61,10 +61,7 @@ export const MicrosoftIcon = ({ size = 22 }) => (
 );
 
 export const ZohoIcon = ({ size = 22 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <path d="M21 10.5V16.5L12 21L3 16.5V10.5L12 15L21 10.5Z" fill="#089949" />
-    <path d="M12 15L3 10.5V4.5L12 9L21 4.5V10.5L12 15Z" fill="#089949" />
-  </svg>
+  <img src="/Zoho.svg" alt="Zoho" className="w-full h-full object-contain" />
 );
 
 // ── Images ────────────────────────────────────────────────────────────────────
@@ -239,10 +236,10 @@ export const RichSelect = ({ value, onChange, options, icon }) => {
         setOpen(false);
       }
     };
-    
+
     const handleScroll = (e) => {
       // Don't close if scrolling inside the dropdown itself
-      if (e.target.closest('.rich-select-menu')) return;
+      if (e.target.closest(".rich-select-menu")) return;
       if (open) setOpen(false);
     };
 
@@ -251,7 +248,7 @@ export const RichSelect = ({ value, onChange, options, icon }) => {
       setCoords({
         top: rect.bottom,
         left: rect.left,
-        width: rect.width
+        width: rect.width,
       });
     }
 
@@ -290,10 +287,10 @@ export const RichSelect = ({ value, onChange, options, icon }) => {
       {open && (
         <div
           className="fixed z-[100] mt-2 rounded-xl border border-slate-200 bg-white shadow-2xl overflow-y-auto max-h-60 animate-in fade-in zoom-in-95 origin-top rich-select-menu"
-          style={{ 
-            top: coords.top, 
-            left: coords.left, 
-            width: coords.width 
+          style={{
+            top: coords.top,
+            left: coords.left,
+            width: coords.width,
           }}
         >
           {options.map((o) => {
@@ -412,7 +409,7 @@ export const LeftPanel = ({ step }) => {
   const img = PANEL_IMAGES[Math.min(step, PANEL_IMAGES.length - 1)];
 
   return (
-    <div className="relative w-[340px] shrink-0 overflow-hidden rounded-l-3xl">
+    <div className="hidden md:block relative w-[340px] shrink-0 overflow-hidden rounded-l-3xl">
       {/* Bg image */}
       <img
         src={img}
@@ -424,12 +421,15 @@ export const LeftPanel = ({ step }) => {
       <div className="absolute inset-0 bg-linear-to-br from-[#000D26]/95 via-[#000D26]/85 to-slate-900/90" />
       <div className="absolute inset-0 bg-linear-to-t from-[#000D26]/90 via-transparent to-transparent" />
 
-
       {/* Content */}
       <div className="relative z-10 h-full flex flex-col justify-between p-8">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <img src="/logo-traveamer.svg" alt="Traveamer Logo" className="w-20 h-auto object-contain" />
+          <img
+            src="/logo-traveamer.svg"
+            alt="Traveamer Logo"
+            className="w-20 h-auto object-contain"
+          />
         </div>
 
         {/* Middle content */}
@@ -485,7 +485,7 @@ export const StepTracker = ({ step }) => {
   const progress = ((step - 1) / (onboardSteps.length - 1)) * 100;
 
   return (
-    <div className="px-8 pt-5 pb-4 border-b border-slate-50">
+    <div className="px-5 md:px-8 pt-5 pb-4 border-b border-slate-50">
       {/* Step pills */}
       <div className="flex items-center gap-1 overflow-x-auto pb-2 scrollbar-hide">
         {onboardSteps.map((s, i) => {

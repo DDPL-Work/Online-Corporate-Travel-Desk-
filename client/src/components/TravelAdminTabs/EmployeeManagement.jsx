@@ -13,6 +13,7 @@ import {
   FiArrowDown,
   FiCalendar,
   FiRefreshCw,
+  FiX,
 } from "react-icons/fi";
 import { FaUser } from "react-icons/fa";
 import {
@@ -20,7 +21,9 @@ import {
   StatCard,
   selectCls,
   Th,
+  CustomDropdown,
 } from "./Shared/CommonComponents";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { Pagination } from "./Shared/Pagination";
 import {
   getAllEmployeesAdmin,
@@ -175,6 +178,7 @@ export default function EmployeeManagement() {
   const [confirmAction, setConfirmAction] = useState(null);
   const [joinedFrom, setJoinedFrom] = useState("");
   const [joinedTo, setJoinedTo] = useState("");
+  const [selectedEmployee, setSelectedEmployee] = useState("All Employees");
 
   // ── Fetch on mount
   useEffect(() => {
@@ -221,14 +225,18 @@ export default function EmployeeManagement() {
         (!joinedFrom || joined >= joinedFrom) &&
         (!joinedTo || joined <= joinedTo);
 
-      return searchOk && roleOk && statusOk && joinedOk;
+      const employeeOk =
+        selectedEmployee === "All Employees" ||
+        `${e?.name?.firstName || ""} ${e?.name?.lastName || ""}`.trim() === selectedEmployee;
+
+      return searchOk && roleOk && statusOk && joinedOk && employeeOk;
     });
-  }, [employees, search, roleFilter, statusFilter, joinedFrom, joinedTo]);
+  }, [employees, search, roleFilter, statusFilter, joinedFrom, joinedTo, selectedEmployee]);
 
   // Reset page on filter change
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, roleFilter, statusFilter, joinedFrom, joinedTo]);
+  }, [search, roleFilter, statusFilter, joinedFrom, joinedTo, selectedEmployee]);
 
   const paginated = useMemo(
     () =>
@@ -327,33 +335,95 @@ export default function EmployeeManagement() {
     setConfirmAction({ action, employee });
   }
 
-  function handleRefresh() {
+  // ── Export
+  const handleExport = () => {
+    if (!filtered.length) return;
+    const headers = ["Employee", "Email", "Role", "Status", "Joined Date"];
+    const rows = filtered.map((emp) => [
+      `${emp.name?.firstName || ""} ${emp.name?.lastName || ""}`.trim(),
+      emp.email || "—",
+      emp.role || "—",
+      emp.isActive ? "Active" : "Inactive",
+      emp.joinedDate || emp.createdAt?.slice(0, 10) || "—",
+    ]);
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `employee-directory-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRefresh = () => {
     setLocalOverrides({});
     dispatch(getAllEmployeesAdmin());
-  }
+  };
+
+  const allEmployeeNames = useMemo(() => {
+    const list = allEmployees.map((e) => ({
+      label: `${e?.name?.firstName || ""} ${e?.name?.lastName || ""}`.trim(),
+      subLabel: e.email || "No email",
+      value: `${e?.name?.firstName || ""} ${e?.name?.lastName || ""}`.trim(),
+    }));
+    
+    // Sort and remove duplicates by name
+    const unique = [];
+    const seen = new Set();
+    [...list].sort((a, b) => a.label.localeCompare(b.label)).forEach(item => {
+      if (!seen.has(item.label)) {
+        seen.add(item.label);
+        unique.push(item);
+      }
+    });
+
+    return [{ label: "All Employees", value: "All Employees" }, ...unique];
+  }, [allEmployees]);
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-5">
-        {/* Page Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shrink-0">
-              <FiUsers size={18} className="text-white" />
+        {/* HEADER CARD */}
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white shrink-0">
+              <FiUsers size={24} />
             </div>
-            <div>
-              <h1 className="text-xl font-black text-slate-900 tracking-tight">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase leading-none truncate">
                 Employee Management
               </h1>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 font-bold uppercase tracking-widest truncate">
                 Manage roles and access for all employees
               </p>
             </div>
           </div>
+
           <button
             onClick={handleRefresh}
             disabled={loadingEmployees}
-            className="flex items-center gap-2 px-3 py-2 text-[13px] font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+            className="w-full md:w-auto shrink-0 inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold transition-all shadow-sm border bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100 active:scale-95 disabled:opacity-50"
           >
             <FiRefreshCw
               size={14}
@@ -378,7 +448,7 @@ export default function EmployeeManagement() {
         )}
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
           <StatCard
             label="Total Employees"
             value={loadingEmployees ? "—" : totalEmployees}
@@ -420,7 +490,7 @@ export default function EmployeeManagement() {
 
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-sm p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
             <LabeledField
               label={
                 <>
@@ -445,19 +515,29 @@ export default function EmployeeManagement() {
             <LabeledField
               label={
                 <>
+                  <FiUsers size={10} /> Select Employee
+                </>
+              }
+            >
+              <CustomDropdown
+                value={selectedEmployee}
+                onChange={setSelectedEmployee}
+                options={allEmployeeNames}
+              />
+            </LabeledField>
+
+            <LabeledField
+              label={
+                <>
                   <FiFilter size={10} /> Role
                 </>
               }
             >
-              <select
+              <CustomDropdown
                 value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className={selectCls}
-              >
-                {["All", "Manager", "Employee"].map((r) => (
-                  <option key={r}>{r}</option>
-                ))}
-              </select>
+                onChange={setRoleFilter}
+                options={["All", "Manager", "Employee"]}
+              />
             </LabeledField>
 
             <LabeledField
@@ -467,15 +547,11 @@ export default function EmployeeManagement() {
                 </>
               }
             >
-              <select
+              <CustomDropdown
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className={selectCls}
-              >
-                {["All", "Active", "Inactive"].map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
+                onChange={setStatusFilter}
+                options={["All", "Active", "Inactive"]}
+              />
             </LabeledField>
 
             <LabeledField
@@ -489,7 +565,7 @@ export default function EmployeeManagement() {
                 type="date"
                 value={joinedFrom}
                 onChange={(e) => setJoinedFrom(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white outline-none focus:border-slate-400 transition-colors"
+                className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[11px] outline-none transition-colors focus:border-[#0A4D68]"
               />
             </LabeledField>
 
@@ -504,181 +580,189 @@ export default function EmployeeManagement() {
                 type="date"
                 value={joinedTo}
                 onChange={(e) => setJoinedTo(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white outline-none focus:border-slate-400 transition-colors"
+                className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[11px] outline-none transition-colors focus:border-[#0A4D68]"
               />
             </LabeledField>
+
+            <div className="lg:col-span-6 flex justify-end mt-2">
+              <button
+                onClick={() => {
+                  setSearch("");
+                  setRoleFilter("All");
+                  setStatusFilter("All");
+                  setJoinedFrom("");
+                  setJoinedTo("");
+                  setSelectedEmployee("All Employees");
+                }}
+                className="inline-flex items-center justify-center gap-2 px-8 py-2 text-xs font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors border border-slate-200 shadow-sm"
+              >
+                <FiX size={14} /> Reset
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[900px]">
-              <thead>
-                <tr className="bg-[#0A4D68] text-[#bfdbfe]">
-                  <Th>Employee</Th>
-                  <Th>Employee Mail ID</Th>
-                  <Th>Role</Th>
-                  <Th>Status</Th>
-                  <Th>Joined Date</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+        <ResponsiveDataTable
+          title="Employee Directory"
+          subtitle={`${filtered.length} record${filtered.length !== 1 ? "s" : ""} found`}
+          tableMinWidth="900px"
+          onExport={handleExport}
+          exportLabel="Export"
+          exportBgClass="bg-[#0A4D68] hover:bg-[#083a50]"
+          arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+          footer={
+            <div className="px-4 py-2.5 flex justify-between text-xs text-slate-400">
+              <span>
                 {loadingEmployees ? (
-                  <TableSkeleton />
-                ) : paginated.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan="5"
-                      className="py-16 text-center text-slate-400"
-                    >
-                      <div className="flex justify-center mb-3">
-                        <FiUsers size={32} className="opacity-20" />
-                      </div>
-                      <p className="font-semibold text-sm">
-                        No employees found
-                      </p>
-                      <p className="text-xs mt-1">
-                        {errorEmployees
-                          ? "Failed to load employees. Please retry."
-                          : "Try adjusting filters or search query"}
-                      </p>
-                    </td>
-                  </tr>
+                  "Loading employees…"
                 ) : (
-                  paginated.map((emp, i) => {
-                    const firstName = emp?.name?.firstName || "";
-                    const lastName = emp?.name?.lastName || "";
-                    const fullName =
-                      `${firstName} ${lastName}`.trim() || "Unknown";
-                    const isManager = emp.role === "manager";
-                    const isActive = emp.isActive === true;
-                    const joinedRaw =
-                      emp.joinedDate || emp.createdAt?.slice(0, 10) || "";
-                    const statusBusy = !!statusLoading[emp._id];
-
-                    return (
-                      <tr
-                        key={emp._id}
-                        className={`transition-colors hover:bg-sky-50/60 ${
-                          i % 2 === 0 ? "bg-white" : "bg-slate-50/40"
-                        }`}
-                      >
-                        {/* Employee name */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${getAvatarColor(emp._id)}`}
-                            >
-                              {getInitials(emp)}
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-[13px] text-slate-800">
-                                {fullName}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Email */}
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded tracking-wide">
-                            {emp.email || "—"}
-                          </span>
-                        </td>
-
-                        {/* Role badge */}
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                              isManager
-                                ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
-                                : "bg-slate-100 text-slate-600 ring-1 ring-slate-200"
-                            }`}
-                          >
-                            {isManager ? (
-                              <FiShield size={10} />
-                            ) : (
-                              <FaUser size={9} />
-                            )}
-                            {isManager ? "Manager" : "Employee"}
-                          </span>
-                        </td>
-
-                        {/* Status toggle */}
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => handleToggleStatus(emp)}
-                            disabled={statusBusy}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
-                              isActive
-                                ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
-                                : "bg-red-50 text-red-600 ring-1 ring-red-200 hover:bg-red-100"
-                            }`}
-                          >
-                            {statusBusy ? (
-                              <>
-                                <FiRefreshCw size={13} className="animate-spin" />
-                                Updating...
-                              </>
-                            ) : isActive ? (
-                              <FiToggleRight size={13} />
-                            ) : (
-                              <FiToggleLeft size={13} />
-                            )}
-                            {!statusBusy && (isActive ? "Active" : "Inactive")}
-                          </button>
-                        </td>
-
-                        {/* Joined date */}
-                        <td className="px-4 py-3 text-[13px] text-slate-500">
-                          {joinedRaw
-                            ? new Date(joinedRaw).toLocaleDateString("en-IN", {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              })
-                            : "—"}
-                        </td>
-
-                      </tr>
-                    );
-                  })
+                  <>
+                    Showing{" "}
+                    <strong className="text-slate-600">
+                      {filtered.length === 0
+                        ? 0
+                        : (currentPage - 1) * PAGE_SIZE + 1}
+                      –{Math.min(currentPage * PAGE_SIZE, filtered.length)}
+                    </strong>{" "}
+                    of{" "}
+                    <strong className="text-slate-600">
+                      {filtered.length}
+                    </strong>{" "}
+                    employees
+                  </>
                 )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Footer */}
-          <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-between text-xs text-slate-400">
-            <span>
+              </span>
+            </div>
+          }
+          pagination={
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filtered.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setCurrentPage}
+            />
+          }
+        >
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-[#0A4D68] text-[#ffffff]">
+                <Th>Employee</Th>
+                <Th>Employee Mail ID</Th>
+                <Th>Role</Th>
+                <Th>Status</Th>
+                <Th>Joined Date</Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
               {loadingEmployees ? (
-                "Loading employees…"
+                <TableSkeleton />
+              ) : paginated.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="py-16 text-center text-slate-400">
+                    <div className="flex justify-center mb-3">
+                      <FiUsers size={32} className="opacity-20" />
+                    </div>
+                    <p className="font-semibold text-sm">No employees found</p>
+                    <p className="text-xs mt-1">
+                      {errorEmployees
+                        ? "Failed to load employees. Please retry."
+                        : "Try adjusting filters or search query"}
+                    </p>
+                  </td>
+                </tr>
               ) : (
-                <>
-                  Showing{" "}
-                  <strong className="text-slate-600">
-                    {filtered.length === 0
-                      ? 0
-                      : (currentPage - 1) * PAGE_SIZE + 1}
-                    –{Math.min(currentPage * PAGE_SIZE, filtered.length)}
-                  </strong>{" "}
-                  of{" "}
-                  <strong className="text-slate-600">{filtered.length}</strong>{" "}
-                  employees
-                </>
-              )}
-            </span>
-          </div>
+                paginated.map((emp, i) => {
+                  const firstName = emp?.name?.firstName || "";
+                  const lastName = emp?.name?.lastName || "";
+                  const fullName =
+                    `${firstName} ${lastName}`.trim() || "Unknown";
+                  const isManager = emp.role === "manager";
+                  const isActive = emp.isActive === true;
+                  const joinedRaw =
+                    emp.joinedDate || emp.createdAt?.slice(0, 10) || "";
+                  const statusBusy = !!statusLoading[emp._id];
 
-          <Pagination
-            currentPage={currentPage}
-            totalItems={filtered.length}
-            pageSize={PAGE_SIZE}
-            onPageChange={setCurrentPage}
-            accentCls="bg-[#0A4D68]"
-          />
-        </div>
+                  return (
+                    <tr
+                      key={emp._id}
+                      className={`transition-colors hover:bg-sky-50/60 ${
+                        i % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                      }`}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${getAvatarColor(emp._id)}`}
+                          >
+                            {getInitials(emp)}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-[13px] text-slate-800">
+                              {fullName}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded tracking-wide">
+                          {emp.email || "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                            isManager
+                              ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
+                              : "bg-slate-100 text-slate-600 ring-1 ring-slate-200"
+                          }`}
+                        >
+                          {isManager ? (
+                            <FiShield size={10} />
+                          ) : (
+                            <FaUser size={9} />
+                          )}
+                          {isManager ? "Manager" : "Employee"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleToggleStatus(emp)}
+                          disabled={statusBusy}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                            isActive
+                              ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
+                              : "bg-red-50 text-red-600 ring-1 ring-red-200 hover:bg-red-100"
+                          }`}
+                        >
+                          {statusBusy ? (
+                            <>
+                              <FiRefreshCw size={13} className="animate-spin" />
+                              Updating...
+                            </>
+                          ) : isActive ? (
+                            <FiToggleRight size={13} />
+                          ) : (
+                            <FiToggleLeft size={13} />
+                          )}
+                          {!statusBusy && (isActive ? "Active" : "Inactive")}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-[13px] text-slate-500">
+                        {joinedRaw
+                          ? new Date(joinedRaw).toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "—"}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </ResponsiveDataTable>
       </div>
 
       {/* Confirm Modal */}

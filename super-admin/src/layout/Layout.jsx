@@ -9,12 +9,18 @@ import {
 
 import Sidebar from "./Sidebar";
 import Header from "./Header";
-import { loginUser } from "../Redux/Slice/authSlice";
+import { logoutUser } from "../Redux/Slice/authSlice";
+import { fetchUserProfile } from "../Redux/Slice/profileSlice";
+import {
+  getDefaultDashboardPath,
+  normalizePermissions,
+} from "../constants/rbac";
 
 export default function Layout() {
   const dispatch = useDispatch();
   const location = useLocation();
-  const { token, role, isAuthenticated } = useSelector((state) => state.auth);
+  const { token, role, user, isAuthenticated } = useSelector((state) => state.auth);
+  const profileUser = useSelector((state) => state.profile.user);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -24,8 +30,38 @@ export default function Layout() {
 
   // ✅ Logout handler
   const handleLogout = () => {
-    dispatch(loginUser());
+    dispatch(logoutUser());
   };
+
+  const storedToken = sessionStorage.getItem("token");
+  const storedRole = sessionStorage.getItem("role");
+  const storedUser = (() => {
+    try {
+      const raw = sessionStorage.getItem("user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  })();
+  const effectiveToken = token || storedToken;
+  const effectiveRole =
+    role ||
+    profileUser?.role ||
+    user?.role ||
+    user?.userRole ||
+    storedUser?.role ||
+    storedUser?.userRole ||
+    storedRole ||
+    null;
+  const permissions = normalizePermissions(
+    profileUser?.permissions || user?.permissions || storedUser?.permissions || [],
+  );
+
+  useEffect(() => {
+    if (!effectiveToken) return;
+
+    dispatch(fetchUserProfile()).catch(() => {});
+  }, [dispatch, effectiveToken]);
 
   // 📱 Responsive Sidebar Reset on Resize
   useEffect(() => {
@@ -50,7 +86,7 @@ export default function Layout() {
   // =============================
   // REDIRECT IF NOT AUTHENTICATED
   // =============================
-  if (!isAuthenticated || !token) {
+  if (!isAuthenticated && !effectiveToken) {
     return <Navigate to="/login" replace />;
   }
 
@@ -58,20 +94,15 @@ export default function Layout() {
   // ROLE-BASED ROOT REDIRECTS
   // =============================
   if (location.pathname === "/") {
-    if (role === "super-admin")
-      return <Navigate to="/pending-corporates" replace />;
-    
-    if (role === "ops-member") {
-      const perms = user?.permissions || [];
-      let target = "/bookings-summary"; // fallback
-      
-      if (perms.includes("Manage Corporates")) target = "/pending-corporates";
-      else if (perms.includes("View Bookings")) target = "/bookings-summary";
-      else if (perms.includes("Manage Cancellations")) target = "/cancellation-summary";
-      else if (perms.includes("View Finance")) target = "/corporate-revenue";
-      
-      return <Navigate to={target} replace />;
-    }
+    return (
+      <Navigate
+        to={getDefaultDashboardPath({
+          role: effectiveRole,
+          permissions,
+        })}
+        replace
+      />
+    );
   }
 
   // =============================
@@ -85,7 +116,8 @@ export default function Layout() {
         {/* ===== FIXED SIDEBAR ===== */}
         <div className="fixed top-0 left-0 h-full z-50">
           <Sidebar
-            role={role}
+            role={effectiveRole}
+            permissions={permissions}
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen(false)}
           />

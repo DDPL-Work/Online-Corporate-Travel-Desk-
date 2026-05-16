@@ -31,7 +31,10 @@ class OpsAssignmentService {
       };
 
       if (department) {
-        query.department = department;
+        query.$or = [
+          { servicingScope: department },
+          { servicingScope: { $exists: false }, department },
+        ];
       }
 
       // Get all eligible agents sorted by last assignment sequence

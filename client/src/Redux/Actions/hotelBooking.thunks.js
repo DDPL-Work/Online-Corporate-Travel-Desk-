@@ -13,6 +13,9 @@ export const preBookHotel = createAsyncThunk(
   async (payload, { rejectWithValue }) => {
     try {
       const res = await api.post("/hotel-booking/prebook", payload);
+      if (res.data.success === false) {
+        return rejectWithValue(res.data.message || "PreBook failed");
+      }
       return res.data.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.error || err.response?.data?.message || err.message);
@@ -31,6 +34,26 @@ export const createHotelBookingRequest = createAsyncThunk(
       return res.data.data; // { bookingRequestId, bookingReference, requestStatus }
     } catch (err) {
       return rejectWithValue(err.response?.data?.error || err.response?.data?.message || err.message);
+    }
+  }
+);
+
+/* ================================
+   INSTANT HOTEL BOOKING
+================================ */
+export const instantHotelBooking = createAsyncThunk(
+  "hotelBookings/instantHotelBooking",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const res = await api.post("/hotel-booking/instant-book", payload);
+      if (res.data.success === false) {
+        return rejectWithValue(res.data.message || "Instant booking failed");
+      }
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.error || err.response?.data?.message || err.message,
+      );
     }
   }
 );

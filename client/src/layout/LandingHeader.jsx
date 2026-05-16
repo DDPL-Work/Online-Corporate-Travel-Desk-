@@ -7,7 +7,7 @@ import AuthModal from "../Pages/Auth/AuthModal";
 import { LuWorkflow, LuPlane } from "react-icons/lu";
 import NotificationBell from "../components/common/NotificationBell";
 
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { logoutUser } from "../Redux/Slice/authSlice";
 import { useEffect, useRef, useState } from "react";
@@ -113,7 +113,10 @@ function NavDropdown({ label, items, isOpen, onToggle, dropdownRef }) {
 /* ── Main Header ── */
 export default function LandingHeader() {
   const navigate = useNavigate();
+  const { slug } = useParams();
   const dispatch = useDispatch();
+  const storedSlug = localStorage.getItem("companySlug");
+  const activeSlug = slug || storedSlug;
   const { user, isAuthenticated } = useSelector((s) => s.auth);
   const { publicBranding } = useSelector((s) => s.landingPage);
   const branding = publicBranding;
@@ -143,7 +146,12 @@ export default function LandingHeader() {
 
   const handleLogout = () => {
     dispatch(logoutUser());
-    navigate("/login");
+    const storedSlug = localStorage.getItem("companySlug");
+    if (storedSlug) {
+      navigate(`/${storedSlug}`);
+    } else {
+      navigate("/platform/flight-booking-info");
+    }
   };
 
   let dashboardRoute = "/my-bookings";
@@ -217,7 +225,7 @@ export default function LandingHeader() {
           }
         }}
       >
-        {isAuthenticated && branding?.branding?.logo?.url ? (
+        {branding?.branding?.logo?.url ? (
           <img
             src={branding.branding.logo.url}
             alt={branding.corporateName || "Logo"}
@@ -231,6 +239,14 @@ export default function LandingHeader() {
       {/* Desktop Nav */}
       {!isAuthenticated && (
         <nav className="hidden md:flex items-center gap-8">
+          {activeSlug && (
+            <a
+              href={`/${activeSlug}`}
+              className="text-sm font-bold font-['Plus_Jakarta_Sans'] text-[#C9A84C] hover:text-[#C9A84C] transition-colors"
+            >
+              Home
+            </a>
+          )}
           <NavDropdown
             label="Platform"
             items={platformLinks}
@@ -256,6 +272,12 @@ export default function LandingHeader() {
             className="text-sm font-medium font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors"
           >
             FAQs
+          </a>
+          <a
+            href="/blog"
+            className="text-sm font-medium font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors"
+          >
+            Blog
           </a>
          
         </nav>
@@ -317,19 +339,25 @@ export default function LandingHeader() {
                 setAuthStep(0); // login flow start
                 setShowAuth(true);
               }}
-              className="text-black text-sm font-medium font-['Plus_Jakarta_Sans'] hover:text-[#C9A84C] transition-colors"
+              className={
+                activeSlug
+                  ? "h-10 px-6 bg-[#C9A84C] text-black text-sm font-bold font-['Plus_Jakarta_Sans'] rounded-full shadow-lg shadow-[#C9A84C]/20 hover:bg-[#b8963d] transition-all hover:scale-105 active:scale-95"
+                  : "text-black text-sm font-medium font-['Plus_Jakarta_Sans'] hover:text-[#C9A84C] transition-colors"
+              }
             >
               Login
             </button>
-            <button
-              onClick={() => {
-                setAuthStep(1); // start at step 1 for sign up
-                setShowAuth(true);
-              }}
-              className="h-10 px-5 bg-[#C9A84C] text-black text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-full shadow-[0px_0px_40px_0px_rgba(60,131,246,0.15)] hover:bg-[#b8963d] transition-colors"
-            >
-              Sign Up
-            </button>
+            {!localStorage.getItem("companySlug") && (
+              <button
+                onClick={() => {
+                  setAuthStep(1); // start at step 1 for sign up
+                  setShowAuth(true);
+                }}
+                className="h-10 px-5 bg-[#C9A84C] text-black text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-full shadow-[0px_0px_40px_0px_rgba(60,131,246,0.15)] hover:bg-[#b8963d] transition-colors"
+              >
+                Sign Up
+              </button>
+            )}
           </>
         )}
       </div>
@@ -353,7 +381,15 @@ export default function LandingHeader() {
           {/* Nav Links - Only show if guest */}
           {!isAuthenticated && (
             <>
-              {/* Platform accordion */}
+              {activeSlug && (
+            <a
+              href={`/${activeSlug}`}
+              className="flex items-center w-full px-3 py-2.5 text-[#C9A84C] text-sm font-bold font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
+            >
+              Home
+            </a>
+          )}
+          {/* Platform accordion */}
               <button
                 onClick={() => setMobilePlatformOpen(!mobilePlatformOpen)}
                 className="flex items-center justify-between w-full px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
@@ -414,6 +450,12 @@ export default function LandingHeader() {
                 className="px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
               >
                 FAQ
+              </a>
+              <a
+                href="/blog"
+                className="px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
+              >
+                Blog
               </a>
             </>
           )}

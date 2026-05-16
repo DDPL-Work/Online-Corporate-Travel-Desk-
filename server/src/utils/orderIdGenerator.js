@@ -1,12 +1,12 @@
 // utils/orderIdGenerator.js
 
 const Sequence = require("../models/Sequence.model");
-const incrementAlpha = require("./incrementAlpha");
 
 /**
- * Format:
- * TVR + F/H + 3-digit number + 3-letter alpha
- * Example: TVRF000AAA
+ * Optimized Order ID Generator
+ * Uses a single atomic operation to increment a global sequence.
+ * Format: TVR + F/H + 3-digit number + 3-letter alpha
+ * Total combinations: 1,000 * 26^3 = 17,576,000
  */
 
 const generateSequentialOrderId = async (type) => {
@@ -17,47 +17,38 @@ const generateSequentialOrderId = async (type) => {
   }
 
   const prefix = bookingType === "flight" ? "TVRF" : "TVRH";
-  const sequenceKey = `${bookingType}_order_id`;
+  const sequenceKey = `${bookingType}_order_id_v2`; // Use a new key for the optimized version
 
-  // Step 1: Get current sequence (atomic)
+  // Step 1: Increment global sequence atomically (Single DB Call)
   const sequence = await Sequence.findOneAndUpdate(
     { key: sequenceKey },
-    {},
+    { $inc: { seq: 1 } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
-  let { number, alpha } = sequence;
-
-  // Step 2: Increment alpha
-  let newAlpha = incrementAlpha(alpha);
-  let newNumber = number;
-
-  // Step 3: Handle rollover
-  if (alpha === "ZZZ") {
-    newAlpha = "AAA";
-    newNumber += 1;
-
-    if (newNumber > 999) {
-      throw new Error("Order ID limit reached (999ZZZ)");
-    }
+  const currentSeq = sequence.seq || 0;
+  
+  if (currentSeq >= 17576000) {
+    throw new Error("Order ID limit reached (999ZZZ)");
   }
 
-  // Step 4: Update atomically again
-  const updated = await Sequence.findOneAndUpdate(
-    { key: sequenceKey, number, alpha }, // condition ensures no race overwrite
-    { $set: { number: newNumber, alpha: newAlpha } },
-    { new: true }
-  );
+  // Step 2: Convert sequence integer to (number + alpha) format
+  // Example: 0 -> 000AAA, 1 -> 000AAB, ..., 17575 -> 000ZZZ, 17576 -> 001AAA
+  
+  const alphaPartSeq = currentSeq % 17576;
+  const numberPart = Math.floor(currentSeq / 17576);
 
-  if (!updated) {
-    // Retry (rare race condition fallback)
-    return generateSequentialOrderId(type);
+  // Convert alphaPartSeq to 3-letter base-26 string (AAA-ZZZ)
+  let alpha = "";
+  let temp = alphaPartSeq;
+  for (let i = 0; i < 3; i++) {
+    alpha = String.fromCharCode(65 + (temp % 26)) + alpha;
+    temp = Math.floor(temp / 26);
   }
 
-  // Step 5: Format output
-  const paddedNumber = String(updated.number).padStart(3, "0");
+  const paddedNumber = String(numberPart).padStart(3, "0");
 
-  return `${prefix}${paddedNumber}${updated.alpha}`;
+  return `${prefix}${paddedNumber}${alpha}`;
 };
 
 module.exports = { generateSequentialOrderId };

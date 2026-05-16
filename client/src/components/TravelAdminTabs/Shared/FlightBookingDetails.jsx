@@ -1089,6 +1089,121 @@ function FareRulesSection({ bookingResult }) {
 }
 
 /* ─────────────────────────────────────────────────────────────── */
+/*  Booking History / Timeline                                     */
+/* ─────────────────────────────────────────────────────────────── */
+const getTicketDate = (b) => {
+  if (b.ticketedAt) return b.ticketedAt;
+  const onwardIssueDate = b.bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
+  if (onwardIssueDate) return onwardIssueDate;
+  const providerIssueDate = b.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
+  if (providerIssueDate) return providerIssueDate;
+  if (b.executionStatus === "ticketed") return b.updatedAt;
+  return null;
+};
+
+function BookingHistory({ booking }) {
+  const isCancelled = booking.executionStatus === "cancelled" || !!booking.cancellation;
+  const isTicketed = booking.executionStatus === "ticketed" || (isCancelled && !!booking.bookingResult?.pnr);
+
+  const steps = [
+    {
+      label: "Request Created",
+      date: booking.createdAt,
+      desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
+      icon: <FiClock size={14} />,
+      active: true,
+    },
+    {
+      label: "Approval Status",
+      date: booking.approvedAt || booking.rejectedAt || (["approved", "rejected"].includes(booking.requestStatus) ? booking.updatedAt : null),
+      desc: (() => {
+        const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
+        const isApproved = booking.approvedAt || booking.requestStatus === "approved";
+        
+        if (isRejected) {
+          return `Rejected by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        if (isApproved) {
+          const reqEmail = booking.userId?.email || booking.requesterDetails?.email;
+          const appEmail = booking.approvedBy?.email || booking.approverEmail;
+          const isSameUser = reqEmail && appEmail && reqEmail === appEmail;
+          if (booking.approverName === "Auto Approve" || isSameUser) {
+             return "Auto Approved by System (Travel Policy)";
+          }
+          return `Approved by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        return "Waiting for manager approval";
+      })(),
+      icon: <FiShield size={14} />,
+      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
+    },
+    {
+      label: "Ticketing",
+      date: getTicketDate(booking),
+      desc: isTicketed ? "E-ticket generated and sent to employee" : "Final ticketing pending",
+      icon: <FiTag size={14} />,
+      active: isTicketed,
+    },
+    {
+      label: "Cancellation",
+      date: booking.cancelledAt || (isCancelled ? booking.updatedAt : null),
+      desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
+      icon: <FiXCircle size={14} />,
+      active: isCancelled,
+      isLast: true,
+    },
+  ];
+
+  const formatDate = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const formatTime = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  return (
+    <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-6 mb-6">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="w-8 h-8 rounded-full bg-[#A07840]/10 flex items-center justify-center">
+          <FiRefreshCw size={14} className="text-[#A07840]" />
+        </div>
+        <div>
+          <h3 className="text-[14px] font-black text-gray-900 uppercase tracking-tight">Booking Lifecycle</h3>
+          <p className="text-[10px] text-[#8B7355] font-bold uppercase tracking-widest mt-0.5">Audit Trail & Timeline</p>
+        </div>
+      </div>
+
+      <div className="relative">
+        {/* Vertical line */}
+        <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-[#A07840]/30 via-[#E0D8C8] to-transparent" />
+
+        <div className="space-y-8">
+          {steps.map((step, idx) => (
+            <div key={idx} className="relative flex gap-6">
+              <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-colors duration-300 ${
+                step.active ? "bg-[#A07840] border-[#A07840] text-white shadow-lg shadow-[#A07840]/20" : "bg-white border-[#E0D8C8] text-gray-300"
+              }`}>
+                {step.icon}
+              </div>
+
+              <div className="flex-1 pt-0.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                  <p className={`text-[13px] font-black uppercase tracking-tight ${step.active ? "text-gray-900" : "text-gray-400"}`}>
+                    {step.label}
+                  </p>
+                  {step.date && (
+                    <span className="text-[10px] font-black text-[#A07840] px-2 py-0.5 bg-[#FAF7F2] border border-[#EDE8E0] rounded uppercase tracking-tight">
+                      {formatDate(step.date)} · {formatTime(step.date)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[12px] text-gray-500 font-medium">{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
 /*  Main page component                                            */
 /* ─────────────────────────────────────────────────────────────── */
 export default function FlightBookingDetails() {
@@ -1228,8 +1343,8 @@ export default function FlightBookingDetails() {
           </button>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-500 font-mono">
-                {booking.orderId}
+              <span className="font-mono">
+              <span className="font-medium text-md text-green-500">Order ID:</span> {booking.orderId}
               </span>
               <StatusPill status={executionStatus} />
             </div>
@@ -1257,6 +1372,8 @@ export default function FlightBookingDetails() {
             </p>
           </div>
         </div>
+
+
         {/* Flight cards */}
         {journeyTypes.map((jt) => (
           <FlightCard
@@ -2007,6 +2124,7 @@ export default function FlightBookingDetails() {
               )}
             </div>
           )} */}
+        <BookingHistory booking={booking} />
       </main>
 
       {/* Modals */}
@@ -2255,8 +2373,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
 
       const payload = {
         bookingId: booking._id,
-        bookingReference: booking.bookingReference,
-        orderId: booking.orderId,
+        orderId: booking.orderId || booking.bookingReference,
         priority: queryPriority,
         remarks: queryRemarks || "User requested cancellation but charges API failed",
         corporate: {
@@ -2335,7 +2452,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                 {step === "reissue" ? "Reissue Flight" : "Cancellation"}
               </h2>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Booking · {booking.bookingReference}
+                Order ID · {booking.orderId || booking.bookingReference}
               </p>
             </div>
           </div>

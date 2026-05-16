@@ -3,9 +3,7 @@ const path = require("path");
 const logger = require("../../../../utils/logger");
 const ApiError = require("../../../../utils/ApiError");
 const BookingRequest = require("../../../../models/BookingRequest");
-const {
-  generateFlightTicketPdfKit,
-} = require("../../../../services/templates/flight_ticket_pdfkit");
+const pdfService = require("../../../../services/pdf.service");
 
 class ReissueTicketGenerationService {
   constructor() {
@@ -271,10 +269,11 @@ class ReissueTicketGenerationService {
     });
 
     try {
-      const generatedTicketPath = await generateFlightTicketPdfKit({
+      const generatedTicketPath = await pdfService.generateFlightTicketFile({
         booking: syntheticBooking,
         journeyType: "onward",
         outputDir: this.baseUploadPath,
+        fileName: `reissued-ticket-${request.requestId}.pdf`,
       });
 
       const fileName = path.basename(generatedTicketPath);

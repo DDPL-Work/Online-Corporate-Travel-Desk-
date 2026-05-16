@@ -2,6 +2,13 @@
 
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const {
+  DEFAULT_OPS_ROLE,
+  DEFAULT_OPS_SERVICING_SCOPE,
+  OPS_MEMBER_ACCESS_ROLES,
+  OPS_MEMBER_SERVICING_SCOPES,
+  normalizeOpsMemberInput,
+} = require("../utils/opsMember.util");
 
 const OpsMemberSchema = new mongoose.Schema(
   {
@@ -25,12 +32,25 @@ const OpsMemberSchema = new mongoose.Schema(
     role: {
       type: String,
       required: [true, "Role is required"],
-      enum: ["Booking Manager", "Support Agent", "Finance OPS", "ops-member"],
+      enum: OPS_MEMBER_ACCESS_ROLES,
+      default: DEFAULT_OPS_ROLE,
+      trim: true,
     },
     department: {
       type: String,
       required: [true, "Department is required"],
-      enum: ["Flights", "Hotels", "Both"],
+      trim: true,
+    },
+    designation: {
+      type: String,
+      required: [true, "Designation is required"],
+      trim: true,
+    },
+    servicingScope: {
+      type: String,
+      enum: OPS_MEMBER_SERVICING_SCOPES,
+      default: DEFAULT_OPS_SERVICING_SCOPE,
+      trim: true,
     },
     permissions: {
       type: [String],
@@ -126,6 +146,20 @@ const OpsMemberSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+OpsMemberSchema.pre("validate", function () {
+  const normalized = normalizeOpsMemberInput({
+    role: this.role,
+    department: this.department,
+    designation: this.designation,
+    servicingScope: this.servicingScope,
+  });
+
+  this.role = normalized.role;
+  this.department = normalized.department;
+  this.designation = normalized.designation;
+  this.servicingScope = normalized.servicingScope;
+});
 
 // Hash password before saving
 OpsMemberSchema.pre("save", function () {

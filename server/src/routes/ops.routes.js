@@ -3,17 +3,9 @@
 const express = require("express");
 const router = express.Router();
 const opsController = require("../controllers/ops.controller");
-const { verifyToken, verifySuperAdmin, authorizeRoles } = require("../middleware/auth.middleware");
+const { verifyToken, verifySuperAdmin } = require("../middleware/auth.middleware");
 
-// Live OPS heartbeat for session tracking
-router.post(
-  "/heartbeat",
-  verifyToken,
-  authorizeRoles("ops-member"),
-  opsController.opsHeartbeat,
-);
-
-// All remaining routes here require Super Admin access
+// All routes here require Super Admin access
 router.use(verifyToken);
 router.use(verifySuperAdmin);
 

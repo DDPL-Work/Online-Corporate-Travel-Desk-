@@ -745,6 +745,117 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
   );
 }
 
+const getTicketDate = (b) => {
+  if (b.ticketedAt) return b.ticketedAt;
+  const onwardIssueDate = b.bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
+  if (onwardIssueDate) return onwardIssueDate;
+  const providerIssueDate = b.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
+  if (providerIssueDate) return providerIssueDate;
+  if (b.executionStatus === "ticketed") return b.updatedAt;
+  return null;
+};
+
+/* ────────────────────────────────────────────────────────────── */
+/*  Booking History / Timeline                                    */
+/* ────────────────────────────────────────────────────────────── */
+function BookingHistory({ booking }) {
+  const isCancelled = booking.executionStatus === "cancelled" || !!booking.cancellation;
+  const isTicketed = booking.executionStatus === "ticketed" || (isCancelled && !!booking.bookingResult?.pnr);
+
+
+
+  const steps = [
+    {
+      label: "Request Created",
+      date: booking.createdAt,
+      desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
+      icon: <FiClock size={14} />,
+      active: true,
+    },
+    {
+      label: "Approval Status",
+      date: booking.approvedAt || booking.rejectedAt,
+      desc: (() => {
+        if (booking.rejectedAt) {
+          return `Rejected by ${booking.approvedBy?.name?.firstName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        if (booking.approvedAt) {
+          const requesterId = booking.userId?._id || booking.userId;
+          const approverId = booking.approverId || booking.approvedBy?._id || booking.approvedBy;
+          
+          if (booking.approverName === "Auto Approve" || (requesterId && approverId && requesterId.toString() === approverId.toString())) {
+            return "Auto Approved by System (Travel Policy)";
+          }
+          
+          return `Approved by ${booking.approvedBy?.name?.firstName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        return "Awaiting approval";
+      })(),
+      icon: <FiCheckCircle size={14} />,
+      active: !!(booking.approvedAt || booking.rejectedAt),
+    },
+    {
+      label: "Ticketing",
+      date: getTicketDate(booking),
+      desc: isTicketed ? "E-ticket generated and sent to employee" : "Final ticketing pending",
+      icon: <FiTag size={14} />,
+      active: isTicketed,
+    }
+  ];
+
+  if (isCancelled) {
+    steps.push({
+      label: "Cancelled",
+      date: booking.cancelledAt || booking.cancellation?.cancelledAt || booking.updatedAt,
+      desc: `Booking cancelled. ${booking.cancellation?.reason ? `Reason: ${booking.cancellation.reason}` : ""}`,
+      icon: <FiXCircle size={14} className="text-red-500" />,
+      active: true,
+      isError: true,
+    });
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-[#E8E0D0] p-6 shadow-sm">
+      <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355] mb-8 flex items-center gap-2">
+        <FiRefreshCw size={14} /> Booking Timeline & History
+      </h3>
+      
+      <div className="relative">
+        {/* Vertical line */}
+        <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-gray-100" />
+        
+        <div className="space-y-8">
+          {steps.map((step, idx) => (
+            <div key={idx} className="relative pl-10">
+              {/* Dot */}
+              <div className={`absolute left-0 top-0 w-8 h-8 rounded-full border-2 flex items-center justify-center bg-white z-10 transition-colors ${
+                step.isError ? "border-red-500 text-red-600 shadow-sm" :
+                step.active ? "border-teal-500 text-teal-600 shadow-sm" : "border-gray-100 text-gray-300"
+              }`}>
+                {step.icon}
+              </div>
+              
+              <div className={step.active ? "opacity-100" : "opacity-40"}>
+                <div className="flex flex-wrap items-center gap-3 mb-1">
+                  <p className={`text-[13px] font-bold ${step.active ? "text-gray-900" : "text-gray-400"}`}>
+                    {step.label}
+                  </p>
+                  {step.date && (
+                    <span className="text-[10px] font-black text-[#A07840] px-2 py-0.5 bg-[#FAF7F2] border border-[#EDE8E0] rounded uppercase tracking-tight">
+                      {formatDate(step.date)} · {formatTime(step.date)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[12px] text-gray-500 font-medium">{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ────────────────────────────────────────────────────────────── */
 /*  Booking Summary card (restyled)                               */
 /* ────────────────────────────────────────────────────────────── */
@@ -756,11 +867,30 @@ function BookingSummaryCard({ booking, displayPnr }) {
     approvalStatus === "Approved" ||
     booking.executionStatus === "ticketed";
 
+  const isTicketed =
+    booking.executionStatus === "ticketed" ||
+    (booking.executionStatus === "cancelled" && !!booking.bookingResult?.pnr);
+
   const topFields = [
     {
       icon: <FiHash size={11} className="text-[#A07840]" />,
       label: "Order ID",
-      value: booking.orderId || "N/A",
+      value: booking.orderId || "—",
+    },
+    ...(isTicketed ? [{
+      icon: <FiClock size={11} className="text-[#A07840]" />,
+      label: "Ticketed At",
+      value: getTicketDate(booking) ? `${formatDate(getTicketDate(booking))} ${formatTime(getTicketDate(booking))}` : "—",
+    }] : []),
+    {
+      icon: <FiUser size={11} className="text-[#A07840]" />,
+      label: "Requester Name",
+      value: booking.userId?.name ? `${booking.userId.name.firstName} ${booking.userId.name.lastName}` : "—",
+    },
+    {
+      icon: <FiMail size={11} className="text-[#A07840]" />,
+      label: "Requester Email",
+      value: booking.userId?.email || "—",
     },
     {
       icon: <FiBriefcase size={11} className="text-[#A07840]" />,
@@ -778,9 +908,21 @@ function BookingSummaryCard({ booking, displayPnr }) {
       value: booking.projectClient,
     },
     {
+      icon: <FiUser size={11} className="text-[#A07840]" />,
+      label: "Approver Name",
+      value: (() => {
+        const requesterId = booking.userId?._id || booking.userId;
+        const approverId = booking.approverId || booking.approvedBy?._id || booking.approvedBy;
+        if (booking.approverName === "Auto Approve" || (requesterId && approverId && requesterId.toString() === approverId.toString())) {
+          return "Auto Approved (System)";
+        }
+        return booking.approvedBy?.name ? `${booking.approvedBy.name.firstName} ${booking.approvedBy.name.lastName}` : (booking.approverName || "—");
+      })(),
+    },
+    {
       icon: <FiMail size={11} className="text-[#A07840]" />,
       label: "Approver Email",
-      value: booking.approverEmail,
+      value: booking.approvedBy?.email || booking.approverEmail || "—",
     },
     {
       icon: <FiShield size={11} className="text-[#A07840]" />,
@@ -1606,7 +1748,7 @@ export default function TeamBookingDetails() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-500 font-mono">
-                {booking.bookingReference}
+                <span className="font-medium text-md text-green-500">Order ID:</span> {booking.orderId || booking.bookingReference}
               </span>
               <StatusPill status={executionStatus} />
             </div>
@@ -2340,50 +2482,7 @@ export default function TeamBookingDetails() {
               </p>
             </div>
           )}
-
-        {/* ── Sticky Download Button (bottom-right) ── */}
-        {/* {paymentSuccessful && !isCancelled &&
-          (pnrsByJourney.onward || pnrsByJourney.return) && (
-            <div className="fixed bottom-6 right-6 z-30 flex flex-col gap-2 items-end">
-              {isRoundTrip ? (
-                <>
-                  <button
-                    onClick={() => handleDownloadTicket("onward")}
-                    disabled={downloading === "onward"}
-                    className="flex items-center gap-2 px-5 py-3 bg-[#C49B44] text-white rounded-full text-[12px] font-bold shadow-lg hover:bg-[#a8832f] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <FiDownload size={14} />
-                    {downloading === "onward"
-                      ? "Downloading…"
-                      : "Download · Onward"}
-                  </button>
-                  {pnrsByJourney.return && (
-                    <button
-                      onClick={() => handleDownloadTicket("return")}
-                      disabled={downloading === "return"}
-                      className="flex items-center gap-2 px-5 py-3 bg-white border border-[#D8CEB8] text-gray-800 rounded-full text-[12px] font-bold shadow-lg hover:bg-[#F5F0E8] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <FiDownload size={14} />
-                      {downloading === "return"
-                        ? "Downloading…"
-                        : "Download · Return"}
-                    </button>
-                  )}
-                </>
-              ) : (
-                <button
-                  onClick={() => handleDownloadTicket("onward")}
-                  disabled={downloading === "onward"}
-                  className="flex items-center gap-2 px-5 py-3 bg-[#C49B44] text-white rounded-full text-[12px] font-bold shadow-lg hover:bg-[#a8832f] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <FiDownload size={14} />
-                  {downloading === "onward"
-                    ? "Downloading…"
-                    : "Download Ticket"}
-                </button>
-              )}
-            </div>
-          )} */}
+        <BookingHistory booking={booking} />
       </main>
 
       {/* Modals */}
@@ -2632,8 +2731,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
 
       const payload = {
         bookingId: booking._id,
-        bookingReference: booking.bookingReference,
-        orderId: booking.orderId,
+        orderId: booking.orderId || booking.bookingReference,
         priority: queryPriority,
         remarks: queryRemarks || "User requested cancellation but charges API failed",
         corporate: {
@@ -2712,7 +2810,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
                 {step === "reissue" ? "Reissue Flight" : "Cancellation"}
               </h2>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Booking · {booking.bookingReference}
+                Order ID · {booking.orderId || booking.bookingReference}
               </p>
             </div>
           </div>

@@ -30,7 +30,7 @@ import {
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import Swal from "sweetalert2";
 import { Country } from "country-state-city";
-import { CorporateNavbar } from "../../../layout/CorporateNavbar";
+import LandingHeader from "../../../layout/LandingHeader";
 
 /* ─── Helpers ─── */
 const countries = Country.getAllCountries();
@@ -175,10 +175,12 @@ const HotelBookNow = () => {
 
   const checkIn = hotelReq.checkInDate || snapshot.checkInDate;
   const checkOut = hotelReq.checkOutDate || snapshot.checkOutDate;
-  const roomNames = selectedRooms.map((r) => r.name?.[0] || "Room");
+  const roomNames = selectedRooms.map((r) => r.name || "Room");
+  const nights = calculateNights(checkIn, checkOut);
 
   const room = {
     typeName: roomNames.join(", "),
+    nights: nights,
     currency: selectedRooms[0]?.price?.currency || "INR",
     cancellationPolicies: selectedRooms[0]?.cancelPolicies || [],
     inclusions: [],
@@ -190,7 +192,7 @@ const HotelBookNow = () => {
   const totalAdults =
     hotelReq.roomGuests?.reduce((sum, r) => sum + (r.noOfAdults || 0), 0) ||
     travelers.length;
-  const baseFare = selectedRooms.reduce(
+  const totalFare = selectedRooms.reduce(
     (sum, r) => sum + (r.totalFare || r.price?.totalFare || 0),
     0,
   );
@@ -199,8 +201,7 @@ const HotelBookNow = () => {
     (sum, r) => sum + (r.totalTax || r.price?.tax || 0),
     0,
   );
-
-  const totalFare = baseFare + tax;
+  const baseFare = totalFare - tax;
 
   const isApproved = bookingRequest?.requestStatus === "approved";
 
@@ -337,7 +338,7 @@ const HotelBookNow = () => {
   if (fetching)
     return (
       <div className="min-h-screen bg-slate-50">
-        <CorporateNavbar />
+        <LandingHeader />
         <div className="h-64 bg-slate-200 animate-pulse" />
         <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3 space-y-4">
@@ -355,7 +356,7 @@ const HotelBookNow = () => {
   if (loadError || !bookingRequest)
     return (
       <div className="min-h-screen bg-slate-50">
-        <CorporateNavbar />
+        <LandingHeader />
         <div className="max-w-6xl mx-auto px-4 py-24 flex flex-col items-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-100 flex items-center justify-center">
             <FiAlertCircle size={26} className="text-red-400" />
@@ -376,7 +377,7 @@ const HotelBookNow = () => {
   /* ── Main ── */
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      <CorporateNavbar />
+      <LandingHeader />
 
       {/* ══════════════════════════════════
           HERO BAND
@@ -535,10 +536,13 @@ const HotelBookNow = () => {
                   <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center">
                     <MdHotel size={14} className="text-[#0A203E]" />
                   </div>
-                  <div>
+                  <div className="flex flex-col">
                     {selectedRooms.map((r, i) => (
-                      <div key={i} className="text-sm font-bold text-slate-800">
-                        {r.name?.[0]}
+                      <div
+                        key={i}
+                        className="text-sm font-bold text-slate-800 line-clamp-1"
+                      >
+                        {r.name}
                       </div>
                     ))}
                   </div>
@@ -676,25 +680,6 @@ const HotelBookNow = () => {
                 </div>
               ))}
             </div>
-
-            {/* Purpose of Travel */}
-            {purposeOfTravel && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/5 p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center">
-                    <FiShield size={12} className="text-[#0A203E]" />
-                  </div>
-                  <h3 className="text-sm font-bold text-slate-800">
-                    Purpose of Travel
-                  </h3>
-                </div>
-                <div className="relative pl-3 border-l-2 border-[#0A203E]/20">
-                  <p className="text-sm text-slate-600 leading-relaxed">
-                    {purposeOfTravel}
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* ─── RIGHT (2/5) sticky ─── */}
@@ -815,70 +800,27 @@ const HotelBookNow = () => {
                       </>
                     )}
                   </button>
-
-                  <p className="text-[10px] text-slate-400 text-center mt-3 leading-relaxed">
-                    By confirming you agree to the{" "}
-                    <span className="text-slate-500 hover:text-[#C9A84C] cursor-pointer underline decoration-dotted">
-                      Terms
-                    </span>{" "}
-                    &amp;{" "}
-                    <span className="text-slate-500 hover:text-[#C9A84C] cursor-pointer underline decoration-dotted">
-                      Cancellation Policy
-                    </span>
-                    .
-                  </p>
                 </div>
               </div>
 
-              {/* Quick summary strip */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/5 divide-y divide-slate-100 overflow-hidden">
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <MdCalendarToday
-                    size={14}
-                    className="text-slate-400 shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                      Stay Duration
-                    </p>
-                    <p className="text-sm font-bold text-slate-700">
-                      {fmt(checkIn, { day: "2-digit", month: "short" })} —{" "}
-                      {fmt(checkOut, {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </p>
+              {/* Purpose of Travel */}
+              {purposeOfTravel && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/5 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center">
+                      <FiShield size={16} className="text-[#C9A84C]" />
+                    </div>
+                    <h3 className="text-lg font-bold text-[#C9A84C]">
+                      Purpose of Travel
+                    </h3>
                   </div>
-                  <span className="text-xs font-black text-[#0A203E] bg-[#0A203E]/5 px-2 py-0.5 rounded-lg">
-                    {room.nights}N
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <FiUser size={14} className="text-slate-400 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                      Guests
-                    </p>
-                    <p className="text-sm font-bold text-slate-700">
-                      {travelers.length} traveller
-                      {travelers.length !== 1 ? "s" : ""} · {roomCount} room
-                      {roomCount !== 1 ? "s" : ""}
+                  <div className="pl-1">
+                    <p className="text-md font-medium text-[#0A203E] leading-relaxed">
+                      {purposeOfTravel}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <MdHotel size={14} className="text-slate-400 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                      Room Type
-                    </p>
-                    <p className="text-sm font-bold text-slate-700">
-                      {room.typeName}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

@@ -276,11 +276,25 @@ function InfoBar() {
 
   return (
     <div className="bg-slate-950 border-t border-white/10 py-6 overflow-hidden">
-      <div className="max-w-7xl mx-auto">
-        {/* Added md:gap-x-20 to increase spacing for Tablets/iPads */}
-        <div className="flex w-max lg:w-full lg:justify-center items-center gap-x-10 md:gap-x-20 animate-infinite-scroll lg:animate-none">
-          {/* First Set of Items */}
-          <div className="flex items-center gap-x-10 md:gap-x-20">
+      <div className="max-w-[1200px] mx-auto px-6 md:px-10 relative">
+        
+        {/* Desktop Layout: Evenly spread across the full width */}
+        <div className="hidden lg:flex w-full justify-between items-center">
+          {items.map((it, idx) => (
+            <p
+              key={`desktop-${idx}`}
+              className="text-sm text-white/60 whitespace-nowrap"
+            >
+              <span className="text-white/80 font-bold">{it.bold}</span>
+              {it.rest}
+            </p>
+          ))}
+        </div>
+
+        {/* Mobile / Tablet Layout: Seamless Infinite Scroll */}
+        <div className="flex lg:hidden w-max animate-infinite-scroll items-center">
+          {/* Group 1 */}
+          <div className="flex items-center gap-x-10 md:gap-x-20 pr-10 md:pr-20">
             {items.map((it, idx) => (
               <p
                 key={`set1-${idx}`}
@@ -292,8 +306,8 @@ function InfoBar() {
             ))}
           </div>
 
-          {/* Second Set of Items */}
-          <div className="flex lg:hidden items-center gap-x-10 md:gap-x-20">
+          {/* Group 2 */}
+          <div className="flex items-center gap-x-10 md:gap-x-20 pr-10 md:pr-20">
             {items.map((it, idx) => (
               <p
                 key={`set2-${idx}`}
@@ -305,6 +319,7 @@ function InfoBar() {
             ))}
           </div>
         </div>
+
       </div>
     </div>
   );

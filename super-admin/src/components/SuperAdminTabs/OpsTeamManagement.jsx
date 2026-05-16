@@ -1,30 +1,34 @@
-// super-admin/src/components/SuperAdminTabs/OpsTeamManagement.jsx
-
 import React, { useEffect, useRef, useState } from "react";
 import {
-  FiSearch, FiPlus, FiFilter, FiEdit2, FiTrash2,
-  FiMoreVertical, FiUserPlus, FiShield, FiCheckCircle, FiXCircle, FiLock
+  FiSearch,
+  FiEdit2,
+  FiTrash2,
+  FiUserPlus,
+  FiShield,
+  FiCheckCircle,
+  FiXCircle,
 } from "react-icons/fi";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { listOpsMembers, updateOpsStatus, deleteOpsMember } from "../../API/opsAPI";
 import OpsMemberModal from "../../Modal/OpsMemberModal";
 import { ToastConfirm } from "../../utils/ToastConfirm";
 import { useSelector } from "react-redux";
 import { Navigate } from "react-router-dom";
 import TableActionBar from "../Shared/TableActionBar";
+import {
+  normalizeOpsMemberRecord,
+  OPS_DEPARTMENT_OPTIONS,
+  OPS_DESIGNATION_OPTIONS,
+} from "../../constants/opsMember";
 
 const colors = {
-  primary: "#0A4D68",
-  secondary: "#088395",
-  accent: "#05BFDB",
   light: "#F8FAFC",
-  dark: "#1E293B",
 };
 
 export default function OpsTeamManagement() {
   const tableScrollRef = useRef(null);
   const { role } = useSelector((state) => state.auth);
-  
+
   if (role !== "super-admin") {
     return <Navigate to="/unauthorized" replace />;
   }
@@ -33,21 +37,19 @@ export default function OpsTeamManagement() {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
-
-  // Filter states
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [deptFilter, setDeptFilter] = useState("");
+  const [designationFilter, setDesignationFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
   const fetchMembers = async () => {
     setLoading(true);
     try {
-      const res = await listOpsMembers({ 
-        search, 
-        role: roleFilter, 
-        department: deptFilter, 
-        status: statusFilter 
+      const res = await listOpsMembers({
+        search,
+        designation: designationFilter,
+        department: departmentFilter,
+        status: statusFilter,
       });
       setMembers(res.data || []);
     } catch (err) {
@@ -60,7 +62,7 @@ export default function OpsTeamManagement() {
   useEffect(() => {
     const timer = setTimeout(fetchMembers, 300);
     return () => clearTimeout(timer);
-  }, [search, roleFilter, deptFilter, statusFilter]);
+  }, [search, designationFilter, departmentFilter, statusFilter]);
 
   const handleToggleStatus = (member) => {
     const newStatus = member.status === "Active" ? "Inactive" : "Active";
@@ -74,7 +76,7 @@ export default function OpsTeamManagement() {
         } catch (err) {
           toast.error("Failed to update status");
         }
-      }
+      },
     });
   };
 
@@ -89,83 +91,94 @@ export default function OpsTeamManagement() {
         } catch (err) {
           toast.error("Failed to delete member");
         }
-      }
+      },
     });
   };
 
   return (
     <div className="min-h-screen p-6 font-sans" style={{ backgroundColor: colors.light }}>
-      <div className="max-w-7xl mx-auto space-y-6 animate-fadeIn">
-        
-        {/* PAGE HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="mx-auto max-w-7xl space-y-6 animate-fadeIn">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0A4D68] to-[#088395] text-white shadow-lg">
               <FiShield size={28} />
             </div>
             <div className="text-left">
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">
+              <h1 className="text-3xl font-black leading-none tracking-tight text-slate-900">
                 OPS TEAM
               </h1>
-              <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-widest flex items-center gap-1">
-                Access Control & Member Management
+              <p className="mt-1 flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-slate-400">
+                Access Control and Member Management
               </p>
             </div>
           </div>
           <button
-            onClick={() => { setSelectedMember(null); setShowModal(true); }}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-[#0A4D68] text-white rounded-xl font-bold uppercase text-xs tracking-widest shadow-xl hover:shadow-teal-500/20 hover:scale-[1.02] transition-all"
+            onClick={() => {
+              setSelectedMember(null);
+              setShowModal(true);
+            }}
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#0A4D68] px-6 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-xl transition-all hover:scale-[1.02] hover:shadow-teal-500/20"
           >
             <FiUserPlus size={18} />
             Add New Member
           </button>
         </div>
 
-        {/* STATS PREVIEW */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatTile label="Total Members" value={members.length} color="border-[#0A4D68]" />
-          <StatTile label="Active" value={members.filter(m => m.status === 'Active').length} color="border-emerald-500" />
-          <StatTile label="Inactive" value={members.filter(m => m.status === 'Inactive').length} color="border-rose-500" />
+          <StatTile
+            label="Active"
+            value={members.filter((member) => member.status === "Active").length}
+            color="border-emerald-500"
+          />
+          <StatTile
+            label="Inactive"
+            value={members.filter((member) => member.status === "Inactive").length}
+            color="border-rose-500"
+          />
         </div>
 
-        {/* FILTERS */}
-        <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-100 flex flex-wrap items-end gap-4">
+        <div className="flex flex-wrap items-end gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
           <FilterItem label="Search">
             <div className="relative">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
               <input
                 type="text"
-                placeholder="Name or email..."
+                placeholder="Name, email, department..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-slate-50 border-none rounded-xl text-sm w-full md:w-64 focus:ring-2 focus:ring-[#0A4D68]/10"
+                className="w-full rounded-xl border-none bg-slate-50 py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-[#0A4D68]/10 md:w-64"
               />
             </div>
           </FilterItem>
 
-          <FilterItem label="Role">
+          <FilterItem label="Designation">
             <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-[#0A4D68]/10 cursor-pointer"
+              value={designationFilter}
+              onChange={(e) => setDesignationFilter(e.target.value)}
+              className="cursor-pointer rounded-xl border-none bg-slate-50 px-4 py-2 text-sm focus:ring-2 focus:ring-[#0A4D68]/10"
             >
-              <option value="">All Roles</option>
-              <option value="Booking Manager">Booking Manager</option>
-              <option value="Support Agent">Support Agent</option>
-              <option value="Finance OPS">Finance OPS</option>
+              <option value="">All Designations</option>
+              {OPS_DESIGNATION_OPTIONS.map((designation) => (
+                <option key={designation} value={designation}>
+                  {designation}
+                </option>
+              ))}
             </select>
           </FilterItem>
 
           <FilterItem label="Department">
             <select
-              value={deptFilter}
-              onChange={(e) => setDeptFilter(e.target.value)}
-              className="px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-[#0A4D68]/10 cursor-pointer"
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              className="cursor-pointer rounded-xl border-none bg-slate-50 px-4 py-2 text-sm focus:ring-2 focus:ring-[#0A4D68]/10"
             >
               <option value="">All Departments</option>
-              <option value="Flights">Flights</option>
-              <option value="Hotels">Hotels</option>
-              <option value="Both">Both</option>
+              {OPS_DEPARTMENT_OPTIONS.map((department) => (
+                <option key={department} value={department}>
+                  {department}
+                </option>
+              ))}
             </select>
           </FilterItem>
 
@@ -173,7 +186,7 @@ export default function OpsTeamManagement() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-[#0A4D68]/10 cursor-pointer"
+              className="cursor-pointer rounded-xl border-none bg-slate-50 px-4 py-2 text-sm focus:ring-2 focus:ring-[#0A4D68]/10"
             >
               <option value="">All Status</option>
               <option value="Active">Active</option>
@@ -186,87 +199,116 @@ export default function OpsTeamManagement() {
           scrollRef={tableScrollRef}
           exportLabel="Export Team"
           onExport={() => {}}
-          exportClassName="bg-[#7C2D12] hover:bg-[#9A3412] shadow-[#7C2D12]/20"
-          arrowClassName="border-orange-100 bg-orange-50 text-[#9A3412] hover:bg-orange-100 hover:border-orange-200 hover:text-[#7C2D12] disabled:hover:bg-orange-50"
+          exportClassName="bg-[#7C2D12] shadow-[#7C2D12]/20 hover:bg-[#9A3412]"
+          arrowClassName="border-orange-100 bg-orange-50 text-[#9A3412] hover:border-orange-200 hover:bg-orange-100 hover:text-[#7C2D12] disabled:hover:bg-orange-50"
         />
 
-        {/* TABLE */}
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl">
           <div ref={tableScrollRef} className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-[#0A4D68] text-white">
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Name & Role</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Contact</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Department</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Status</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Joined Date</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Actions</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">
+                    Name and Designation
+                  </th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">
+                    Contact
+                  </th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">
+                    Status
+                  </th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">
+                    Joined Date
+                  </th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {loading ? (
                   <tr>
-                    <td colSpan="6" className="py-20 text-center">
+                    <td colSpan="5" className="py-20 text-center">
                       <div className="flex flex-col items-center gap-2">
-                        <div className="w-8 h-8 border-4 border-[#0A4D68]/20 border-t-[#0A4D68] rounded-full animate-spin"></div>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Loading members...</span>
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#0A4D68]/20 border-t-[#0A4D68]"></div>
+                        <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                          Loading members...
+                        </span>
                       </div>
                     </td>
                   </tr>
                 ) : members.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="py-20 text-center">
-                      <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">No members found</span>
+                    <td colSpan="5" className="py-20 text-center">
+                      <span className="text-xs font-bold uppercase tracking-widest text-slate-300">
+                        No members found
+                      </span>
                     </td>
                   </tr>
                 ) : (
-                  members.map((member) => (
-                    <tr key={member._id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-800 text-sm">{member.name}</span>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{member.role}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="text-xs text-slate-600 font-medium">{member.email}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">{member.phone}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-2 py-1 rounded-md bg-teal-50 text-teal-700 text-[10px] font-bold uppercase tracking-wide">
-                          {member.department}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <MemberStatusBadge status={member.status} />
-                      </td>
-                      <td className="px-6 py-4 text-xs text-slate-500">
-                        {new Date(member.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <ActionButton 
-                            icon={<FiEdit2 size={14} />} 
-                            onClick={() => { setSelectedMember(member); setShowModal(true); }}
-                            className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white"
-                          />
-                          <ActionButton 
-                            icon={member.status === 'Active' ? <FiXCircle size={14} /> : <FiCheckCircle size={14} />} 
-                            onClick={() => handleToggleStatus(member)}
-                            className={member.status === 'Active' ? "bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white"}
-                          />
-                          <ActionButton 
-                            icon={<FiTrash2 size={14} />} 
-                            onClick={() => handleDelete(member)}
-                            className="bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white"
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                  members.map((member) => {
+                    const normalizedMember = normalizeOpsMemberRecord(member);
+
+                    return (
+                      <tr key={member._id} className="group transition-colors hover:bg-slate-50/50">
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-slate-800">{member.name}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-tighter text-slate-400">
+                              {normalizedMember.designation}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {normalizedMember.department} | {normalizedMember.servicingScope}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-medium text-slate-600">{member.email}</span>
+                            <span className="font-mono text-[10px] text-slate-400">{member.phone}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <MemberStatusBadge status={member.status} />
+                        </td>
+                        <td className="px-6 py-4 text-xs text-slate-500">
+                          {new Date(member.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <ActionButton
+                              icon={<FiEdit2 size={14} />}
+                              onClick={() => {
+                                setSelectedMember(member);
+                                setShowModal(true);
+                              }}
+                              className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white"
+                            />
+                            <ActionButton
+                              icon={
+                                member.status === "Active" ? (
+                                  <FiXCircle size={14} />
+                                ) : (
+                                  <FiCheckCircle size={14} />
+                                )
+                              }
+                              onClick={() => handleToggleStatus(member)}
+                              className={
+                                member.status === "Active"
+                                  ? "bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white"
+                                  : "bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                              }
+                            />
+                            <ActionButton
+                              icon={<FiTrash2 size={14} />}
+                              onClick={() => handleDelete(member)}
+                              className="bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -275,9 +317,9 @@ export default function OpsTeamManagement() {
       </div>
 
       {showModal && (
-        <OpsMemberModal 
-          member={selectedMember} 
-          onClose={() => setShowModal(false)} 
+        <OpsMemberModal
+          member={selectedMember}
+          onClose={() => setShowModal(false)}
           onSuccess={fetchMembers}
         />
       )}
@@ -286,25 +328,33 @@ export default function OpsTeamManagement() {
 }
 
 const StatTile = ({ label, value, color }) => (
-  <div className={`bg-white p-5 rounded-2xl shadow-sm border-b-4 ${color}`}>
-    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-    <p className="text-2xl font-black text-slate-900 leading-none">{value}</p>
+  <div className={`rounded-2xl border-b-4 bg-white p-5 shadow-sm ${color}`}>
+    <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+      {label}
+    </p>
+    <p className="text-2xl font-black leading-none text-slate-900">{value}</p>
   </div>
 );
 
 const FilterItem = ({ label, children }) => (
-  <div className="flex flex-col gap-1.5 flex-1 min-w-[150px]">
-    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
+  <div className="flex min-w-[150px] flex-1 flex-col gap-1.5">
+    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+      {label}
+    </label>
     {children}
   </div>
 );
 
 const MemberStatusBadge = ({ status }) => {
-  const isActive = status === 'Active';
+  const isActive = status === "Active";
   return (
-    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tight border ${
-      isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'
-    }`}>
+    <span
+      className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-tight ${
+        isActive
+          ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+          : "border-rose-100 bg-rose-50 text-rose-700"
+      }`}
+    >
       {status}
     </span>
   );
@@ -313,7 +363,7 @@ const MemberStatusBadge = ({ status }) => {
 const ActionButton = ({ icon, onClick, className }) => (
   <button
     onClick={onClick}
-    className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200 focus:scale-95 ${className}`}
+    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 focus:scale-95 ${className}`}
   >
     {icon}
   </button>

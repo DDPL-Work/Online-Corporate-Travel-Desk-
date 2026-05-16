@@ -71,6 +71,14 @@ const hotelBookingRequestSchema = new mongoose.Schema(
     approverName: String,
     approverRole: String,
 
+    /* ================= REQUESTER DETAILS ================= */
+    requesterDetails: {
+      name: String,
+      email: String,
+      role: String,
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    },
+
     /* ================= GST DETAILS ================= */
 
     gstDetails: {
@@ -208,6 +216,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       default: "not_started",
       index: true,
     },
+    voucheredAt: Date,
 
     bookingResult: {
       hotelBookingId: String,

@@ -9,16 +9,26 @@ const bcrypt = require("bcryptjs");
 const emailService = require("../services/email.service");
 const { notify } = require("../notifications/orchestrator");
 const EVENTS = require("../events/eventConstants");
+const { normalizeOpsMemberInput } = require("../utils/opsMember.util");
+const cache = require("../utils/cache");
 
 
 // @desc    Create new OPS team member
 // @route   POST /ops/create
 // @access  Super Admin
 exports.createOpsMember = asyncHandler(async (req, res) => {
-  const { name, email, phone, role, department, permissions, password } = req.body;
+  const { name, email, phone, permissions, password } = req.body;
+  const normalizedOpsFields = normalizeOpsMemberInput(req.body);
 
   // Validation
-  if (!name || !email || !phone || !role || !department) {
+  if (
+    !name ||
+    !email ||
+    !phone ||
+    !normalizedOpsFields.role ||
+    !normalizedOpsFields.department ||
+    !normalizedOpsFields.designation
+  ) {
     throw new ApiError(400, "All required fields must be filled");
   }
 
@@ -35,8 +45,10 @@ exports.createOpsMember = asyncHandler(async (req, res) => {
     name,
     email: email.toLowerCase(),
     phone,
-    role,
-    department,
+    role: normalizedOpsFields.role,
+    department: normalizedOpsFields.department,
+    designation: normalizedOpsFields.designation,
+    servicingScope: normalizedOpsFields.servicingScope,
     permissions: permissions || [],
     password: actualPassword,
   });
@@ -48,7 +60,6 @@ exports.createOpsMember = asyncHandler(async (req, res) => {
       email: newMember.email,
       name: newMember.name,
       role: newMember.role,
-      department: newMember.department,
       permissions: newMember.permissions,
       password: actualPassword,
       dashboardUrl: process.env.SUPER_ADMIN_URL || `${process.env.FRONTEND_URL}/ops-login`,
@@ -64,6 +75,10 @@ exports.createOpsMember = asyncHandler(async (req, res) => {
         id: newMember._id,
         name: newMember.name,
         email: newMember.email,
+        role: newMember.role,
+        department: newMember.department,
+        designation: newMember.designation,
+        servicingScope: newMember.servicingScope,
         generatedPassword: password ? undefined : actualPassword,
       },
       "OPS team member created successfully"
@@ -75,7 +90,7 @@ exports.createOpsMember = asyncHandler(async (req, res) => {
 // @route   GET /ops/list
 // @access  Super Admin
 exports.listOpsMembers = asyncHandler(async (req, res) => {
-  const { search, role, department, status } = req.query;
+  const { search, role, status, department, designation } = req.query;
 
   let query = { isDeleted: false };
 
@@ -83,18 +98,31 @@ exports.listOpsMembers = asyncHandler(async (req, res) => {
     query.$or = [
       { name: { $regex: search, $options: "i" } },
       { email: { $regex: search, $options: "i" } },
+      { department: { $regex: search, $options: "i" } },
+      { designation: { $regex: search, $options: "i" } },
     ];
   }
 
   if (role) query.role = role;
   if (department) query.department = department;
+  if (designation) query.designation = designation;
   if (status) query.status = status;
 
   const members = await OpsMember.find(query)
     .sort({ createdAt: -1 })
     .select("-password");
 
-  res.status(200).json(new ApiResponse(200, members, "OPS members fetched successfully"));
+  const normalizedMembers = members.map((member) => {
+    const normalizedOpsFields = normalizeOpsMemberInput(member.toObject());
+    return {
+      ...member.toObject(),
+      ...normalizedOpsFields,
+    };
+  });
+
+  res.status(200).json(
+    new ApiResponse(200, normalizedMembers, "OPS members fetched successfully")
+  );
 });
 
 // @desc    Update OPS member details
@@ -102,12 +130,14 @@ exports.listOpsMembers = asyncHandler(async (req, res) => {
 // @access  Super Admin
 exports.updateOpsMember = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, phone, role, department, permissions, email } = req.body;
+  const { name, phone, permissions, email } = req.body;
 
   const member = await OpsMember.findOne({ _id: id, isDeleted: false });
   if (!member) {
     throw new ApiError(404, "OPS team member not found");
   }
+
+  const normalizedOpsFields = normalizeOpsMemberInput(req.body, member);
 
   // Check if email is being changed and if it's unique
   if (email && email.toLowerCase() !== member.email) {
@@ -120,21 +150,28 @@ exports.updateOpsMember = asyncHandler(async (req, res) => {
 
   if (name) member.name = name;
   if (phone) member.phone = phone;
-  if (role) member.role = role;
-  if (department) member.department = department;
+  member.role = normalizedOpsFields.role;
+  member.department = normalizedOpsFields.department;
+  member.designation = normalizedOpsFields.designation;
+  member.servicingScope = normalizedOpsFields.servicingScope;
   
   let permissionsChanged = false;
   let oldPermissions = [...member.permissions];
   
-  if (permissions) {
+  if (Array.isArray(permissions)) {
+    const nextPermissions = [...permissions];
     // Check if permissions actually changed
-    if (JSON.stringify(permissions.sort()) !== JSON.stringify(oldPermissions.sort())) {
+    if (
+      JSON.stringify([...nextPermissions].sort()) !==
+      JSON.stringify([...oldPermissions].sort())
+    ) {
       permissionsChanged = true;
     }
-    member.permissions = permissions;
+    member.permissions = nextPermissions;
   }
 
   await member.save();
+  await cache.del(`user:ops-member:${member._id}`);
   
   if (permissionsChanged) {
     notify(EVENTS.OPS_PERMISSION_CHANGED, {
@@ -171,6 +208,8 @@ exports.updateOpsStatus = asyncHandler(async (req, res) => {
     throw new ApiError(404, "OPS team member not found");
   }
 
+  await cache.del(`user:ops-member:${member._id}`);
+
   res.status(200).json(new ApiResponse(200, member, `OPS team member is now ${status}`));
 });
 
@@ -189,6 +228,8 @@ exports.deleteOpsMember = asyncHandler(async (req, res) => {
   if (!member) {
     throw new ApiError(404, "OPS team member not found");
   }
+
+  await cache.del(`user:ops-member:${member._id}`);
 
   res.status(200).json(new ApiResponse(200, null, "OPS team member deleted successfully"));
 });
@@ -209,6 +250,7 @@ exports.resetPassword = asyncHandler(async (req, res) => {
 
   member.password = actualPassword;
   await member.save();
+  await cache.del(`user:ops-member:${member._id}`);
 
   // Send email with new password via orchestrator
   try {
@@ -217,7 +259,6 @@ exports.resetPassword = asyncHandler(async (req, res) => {
       email: member.email,
       name: member.name,
       role: member.role,
-      department: member.department,
       permissions: member.permissions,
       password: actualPassword,
       dashboardUrl: process.env.SUPER_ADMIN_URL || `${process.env.FRONTEND_URL}/ops-login`,

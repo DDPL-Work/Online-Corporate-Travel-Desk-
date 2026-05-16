@@ -25,8 +25,20 @@ import {
 } from "react-icons/hi2";
 import { MdOutlineFolder } from "react-icons/md";
 import { FaPlane, FaHotel } from "react-icons/fa";
-import { FiSearch, FiCalendar, FiX } from "react-icons/fi";
-import TableScrollWrapper from "../common/TableScrollWrapper";
+import { FiRefreshCw, FiX, FiSearch, FiCalendar } from "react-icons/fi";
+import {
+  LabeledField,
+  CustomDropdown,
+} from "./Shared/CommonComponents";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
+import { Pagination } from "./Shared/Pagination";
+
+// ─── Table Scroll Wrapper ───────────────────────────────────────────────────
+const TableScrollWrapper = ({ children }) => (
+  <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+    {children}
+  </div>
+);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const AVATAR_PALETTES = [
@@ -486,6 +498,53 @@ export default function ProjectsTable({ projects, setProjects }) {
     return matchQ && matchC;
   });
 
+  // ── Export
+  const handleExport = () => {
+    if (!effectiveProjects.length) return;
+    const headers = ["Project ID", "Project Name", "Client Name", "Start Date", "End Date"];
+    const rows = effectiveProjects.map((p) => [
+      p.projectCodeId || p.projectId || p.code || "N/A",
+      p.projectName || p.name || "N/A",
+      p.clientName || "N/A",
+      fmtDate(p.startDate),
+      fmtDate(p.endDate),
+    ]);
+    const tableRows = rows
+      .map(
+        (row) =>
+          `<tr>${row
+            .map(
+              (cell) =>
+                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
+                  cell ?? "",
+                )
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `projects-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRefresh = () => {
+    if (corporateId) {
+      dispatch(fetchProjects(corporateId));
+    }
+  };
+
   // ────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-screen bg-slate-100 font-sans" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -498,94 +557,145 @@ export default function ProjectsTable({ projects, setProjects }) {
           />
         )}
 
-        {/* Page heading */}
-        <div className="flex items-center justify-between mb-7">
-          <div className="flex items-start gap-4">
-            <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-              <HiTableCells className="w-6 h-6 text-indigo-500" />
+        {/* HEADER CARD */}
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-7">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white shrink-0">
+              <HiTableCells size={24} />
             </div>
-            <div>
-              <h1 className="text-[22px] font-semibold text-slate-800">Projects Directory</h1>
-              <p className="text-[13px] text-slate-500 mt-0.5">
-                All uploaded project records for <strong className="text-slate-700">acme.com</strong>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase leading-none truncate">
+                Projects Directory
+              </h1>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 font-bold uppercase tracking-widest truncate">
+                Manage and monitor corporate project records
               </p>
             </div>
           </div>
 
-          {/* Back button */}
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 hover:bg-slate-50 transition"
-          >
-            <HiArrowLeft className="w-4 h-4" />
-            Back to Upload
-          </button>
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              onClick={handleRefresh}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold transition-all shadow-sm border bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100 active:scale-95"
+            >
+              <FiRefreshCw size={14} />
+              Refresh
+            </button>
+            <button
+              onClick={() => navigate(-1)}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 hover:bg-slate-50 transition shadow-sm active:scale-95"
+            >
+              <HiArrowLeft className="w-4 h-4" />
+              Back
+            </button>
+          </div>
         </div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-4 gap-4 mb-7">
-          <StatCard label="Total Projects" value={effectiveProjects.length} icon={HiTableCells}  borderColor="border-[#2a9d8f]"  iconBg="bg-teal-50"    iconColor="text-[#2a9d8f]" />
-          <StatCard label="Total Clients"  value={totalClients}    icon={HiUsers}        borderColor="border-violet-500"  iconBg="bg-violet-50"  iconColor="text-violet-500" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
+          <StatCard
+            label="Total Projects"
+            value={effectiveProjects.length}
+            icon={HiTableCells}
+            borderColor="border-[#0A4D68]"
+            iconBg="bg-[#0A4D68]/10"
+            iconColor="text-[#0A4D68]"
+          />
+          <StatCard
+            label="Total Clients"
+            value={totalClients}
+            icon={HiUsers}
+            borderColor="border-violet-500"
+            iconBg="bg-violet-50"
+            iconColor="text-violet-600"
+          />
         </div>
 
-        {/* Projects Table */}
-        <div className="bg-white rounded-xl shadow-sm">
+        {/* Filters */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-6 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <div className="md:col-span-5">
+              <LabeledField
+                label={
+                  <>
+                    <HiMagnifyingGlass size={12} /> Search Projects
+                  </>
+                }
+              >
+                <div className="relative group">
+                  <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0A4D68] transition-colors" />
+                  <input
+                    type="text"
+                    placeholder="Search by name, code or client..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#0A4D68]/10 focus:border-[#0A4D68] transition-all"
+                  />
+                </div>
+              </LabeledField>
+            </div>
 
-          {/* Toolbar */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-            <h2 className="text-[15px] font-semibold text-slate-800 flex items-center gap-2">
-              Projects
-              <span className="px-2 py-0.5 text-[11px] font-semibold bg-slate-100 text-slate-500 rounded-full">
-                {filtered.length} record{filtered.length !== 1 ? "s" : ""}
-              </span>
-            </h2>
-            <div className="flex items-center gap-3">
-              {/* Search */}
-              <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg w-56">
-                <HiMagnifyingGlass className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Search projects…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="bg-transparent border-none outline-none text-[13px] text-slate-700 placeholder-slate-400 w-full"
+            <div className="md:col-span-4">
+              <LabeledField
+                label={
+                  <>
+                    <HiTableCells size={12} /> Client Filter
+                  </>
+                }
+              >
+                <CustomDropdown
+                  value={clientFilter || "All Clients"}
+                  onChange={(val) =>
+                    setClientFilter(val === "All Clients" ? "" : val)
+                  }
+                  options={["All Clients", ...clients]}
                 />
-              </div>
+              </LabeledField>
+            </div>
 
-              {/* Client filter */}
-              <div className="relative">
-                <select
-                  value={clientFilter}
-                  onChange={(e) => setClientFilter(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[13px] text-slate-600 outline-none cursor-pointer"
-                >
-                  <option value="">All Clients</option>
-                  {clients.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-                <HiChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-
+            <div className="md:col-span-3">
+              <button
+                onClick={() => {
+                  setSearch("");
+                  setClientFilter("");
+                }}
+                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 hover:text-slate-700 transition-colors shadow-sm"
+              >
+                <FiX size={14} /> Reset Filters
+              </button>
             </div>
           </div>
+        </div>
 
-          {/* Table */}
-          <TableScrollWrapper>
-            <table className="w-full min-w-[800px]">
-              <thead>
-                <tr style={{ background: "#1b3a4b" }}>
-                  {["Project Code ID", "Project", "Client Name", "Added On", "Actions"].map((h) => (
-                    <th
-                      key={h}
-                      className={`px-5 py-3.5 text-[11px] font-semibold text-white/80 uppercase tracking-wider whitespace-nowrap
-                        ${h === "Actions" ? "text-center" : "text-left"}`}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+        <ResponsiveDataTable
+          title="Projects Directory"
+          subtitle={`${filtered.length} record${filtered.length !== 1 ? "s" : ""} found`}
+          tableMinWidth="950px"
+          onExport={handleExport}
+          exportLabel="Export"
+          exportBgClass="bg-[#0A4D68] hover:bg-[#083d52]"
+          arrowBgClass="bg-cyan-50 border-cyan-200 text-[#0A4D68] hover:bg-cyan-100"
+        >
+          <table className="w-full">
+            <thead>
+              <tr className="bg-[#0A4D68] text-white">
+                <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-left">
+                  Project Code ID
+                </th>
+                <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-left">
+                  Project
+                </th>
+                <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-left">
+                  Client Name
+                </th>
+                <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-left">
+                  Added On
+                </th>
+                <th className="px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-center">
+                  Actions
+                </th>
+              </tr>
+            </thead>
               <tbody>
                 {filtered.map((p, i) => {
                   const projectName = p.projectName || p.name || "Untitled Project";
@@ -644,25 +754,8 @@ export default function ProjectsTable({ projects, setProjects }) {
                 })}
               </tbody>
             </table>
-
-            {/* Empty state */}
-            {filtered.length === 0 && (
-              <div className="py-16 text-center">
-                <HiDocumentText className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-[14px] text-slate-400 font-medium">
-                  {effectiveProjects.length === 0 ? "No projects yet" : "No projects match your search"}
-                </p>
-                <p className="text-[12px] text-slate-300 mt-1">
-                  {effectiveProjects.length === 0
-                    ? "Upload an Excel file on the previous page to get started"
-                    : "Try adjusting your search or filters"}
-                </p>
-              </div>
-            )}
-          </TableScrollWrapper>
-        </div>
-
-      </main>
-    </div>
+          </ResponsiveDataTable>
+        </main>
+      </div>
   );
 }

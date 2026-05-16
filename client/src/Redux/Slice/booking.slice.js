@@ -12,6 +12,7 @@ import {
   executeApprovedFlightBooking,
   fetchApprovedFlightBookingStatus,
   manualTicketNonLcc,
+  instantFlightBooking,
   // ticketFlight,
 } from "../Actions/booking.thunks";
 
@@ -246,6 +247,21 @@ const bookingSlice = createSlice({
         state.error = action.payload;
       })
 
+      /* ================= INSTANT FLIGHT BOOKING ================= */
+      .addCase(instantFlightBooking.pending, (state) => {
+        state.actionLoading = true;
+        state.error = null;
+      })
+      .addCase(instantFlightBooking.fulfilled, (state, action) => {
+        state.actionLoading = false;
+        state.selected = action.payload;
+      })
+      .addCase(instantFlightBooking.rejected, (state, action) => {
+        state.actionLoading = false;
+        state.error = action.payload;
+      })
+
+      /* ================= FETCH MY REQUESTS (EMPLOYEE) ================= */
       .addCase(fetchMyBookingRequests.pending, (state) => {
         state.loading = true;
         state.error = null;

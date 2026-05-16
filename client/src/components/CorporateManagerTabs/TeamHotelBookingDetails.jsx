@@ -33,6 +33,7 @@ import {
   FiXCircle,
   FiUsers,
   FiHash,
+  FiTag,
 } from "react-icons/fi";
 import {
   MdHotel,
@@ -50,21 +51,6 @@ import {
   sendHotelAmendment,
   getHotelAmendmentStatus,
 } from "../../Redux/Actions/hotelAmendment.thunks";
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Design tokens Mapping (for reference during conversion)        */
-/* ─────────────────────────────────────────────────────────────── */
-// bg: "#FAF8F4"         -> bg-[#FAF8F4]
-// surface: "#FFFFFF"    -> bg-white
-// border: "#EAE4D9"     -> border-[#EAE4D9]
-// gold: "#B5862A"       -> text-[#B5862A] / bg-[#B5862A]
-// text: "#1A1714"       -> text-[#1A1714]
-// textMuted: "#7A7068"  -> text-[#7A7068]
-// textLight: "#A89F94"  -> text-[#A89F94]
-// green: "#2C7A4B"      -> text-[#2C7A4B] / bg-[#2C7A4B]
-// red: "#B5341A"        -> text-[#B5341A] / bg-[#B5341A]
-// amber: "#8A6200"      -> text-[#8A6200] / bg-[#8A6200]
-// blue: "#1A4A7A"       -> text-[#1A4A7A] / bg-[#1A4A7A]
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Helpers                                                        */
@@ -749,7 +735,6 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
 function BookingReferencesSection({ booking, bookingDetail, result }) {
   const refs = [
     { label: "Order ID", val: booking.orderId || "—", hash: true },
-    { label: "Booking Ref", val: booking.bookingReference || "—", hash: true },
     {
       label: "Confirmation No.",
       val: bookingDetail?.ConfirmationNo || result?.hotelBookingId || "—",
@@ -944,6 +929,124 @@ function FareBreakdownSection({ priceBreakUp, totalFare }) {
         <span className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">
           ₹{Number(totalFare).toLocaleString("en-IN")}
         </span>
+      </div>
+    </div>
+  );
+}
+
+const getVoucherDate = (b) => {
+  if (b.voucheredAt) return b.voucheredAt;
+  const tboVoucherDate = b.bookingResult?.providerResponse?.VoucherDate || b.bookingResult?.providerResponse?.Response?.VoucherDate;
+  if (tboVoucherDate) return tboVoucherDate;
+  if (["voucher_generated", "confirmed", "booked"].includes((b.executionStatus || "").toLowerCase())) return b.updatedAt;
+  return null;
+};
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Booking History / Timeline                                     */
+/* ─────────────────────────────────────────────────────────────── */
+function BookingHistory({ booking }) {
+  const isCancelled = booking.executionStatus === "cancelled" || !!booking.cancellation;
+  const isConfirmed = ["voucher_generated", "confirmed", "booked"].includes((booking.executionStatus || "").toLowerCase()) || (isCancelled && !!booking.bookingResult?.hotelBookingId);
+  
+
+
+  const steps = [
+    {
+      label: "Request Created",
+      date: booking.createdAt,
+      desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
+      icon: <FiClock size={14} />,
+      active: true,
+    },
+    {
+      label: "Approval Status",
+      date: booking.approvedAt || booking.rejectedAt,
+      desc: (() => {
+        if (booking.rejectedAt) {
+          return `Rejected by ${booking.approvedBy?.name?.firstName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        if (booking.approvedAt) {
+          const requesterId = booking.userId?._id || booking.userId;
+          const approverId = booking.approverId || booking.approvedBy?._id || booking.approvedBy;
+          
+          if (booking.approverName === "Auto Approve" || (requesterId && approverId && requesterId.toString() === approverId.toString())) {
+            return "Auto Approved by System (Travel Policy)";
+          }
+          
+          return `Approved by ${booking.approvedBy?.name?.firstName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        return "Awaiting approval";
+      })(),
+      icon: <FiCheckCircle size={14} />,
+      active: !!(booking.approvedAt || booking.rejectedAt),
+    },
+    {
+      label: "Payment & Booking",
+      date: booking.payment?.paidAt,
+      desc: booking.payment?.paidAt ? "Payment successful, booking confirmed" : "Pending payment processing",
+      icon: <FiCreditCard size={14} />,
+      active: !!booking.payment?.paidAt,
+    },
+    {
+      label: "Voucher Issued",
+      date: getVoucherDate(booking),
+      desc: isConfirmed ? "Hotel voucher generated and sent" : "Final confirmation pending",
+      icon: <FiTag size={14} />,
+      active: isConfirmed,
+    }
+  ];
+
+  if (isCancelled) {
+    steps.push({
+      label: "Cancelled",
+      date: booking.cancelledAt || booking.cancellation?.cancelledAt || booking.updatedAt,
+      desc: `Hotel booking cancelled. ${booking.cancellation?.reason ? `Reason: ${booking.cancellation.reason}` : ""}`,
+      icon: <FiXCircle size={14} className="text-[#B5341A]" />,
+      active: true,
+      isError: true,
+    });
+  }
+
+  return (
+    <div className="bg-white border border-[#EAE4D9] p-8">
+      <div className="flex items-center pb-3 border-b border-[#EAE4D9] mb-8">
+        <span className="font-['DM_Mono'] text-[#B5862A] text-[11px] tracking-wider mr-3">06</span>
+        <h2 className="font-['Cormorant_Garamond'] text-[22px] font-semibold text-[#1A1714] md:text-[18px]">
+          Booking Timeline & History
+        </h2>
+      </div>
+      
+      <div className="relative">
+        <div className="absolute left-[15px] top-2 bottom-2 w-[1px] bg-[#EAE4D9]" />
+        
+        <div className="space-y-10">
+          {steps.map((step, idx) => (
+            <div key={idx} className="relative pl-12">
+              {/* Dot */}
+              <div className={`absolute left-0 top-0 w-8 h-8 rounded-full border border-[#EAE4D9] flex items-center justify-center bg-white z-10 transition-colors ${
+                step.isError ? "text-[#B5341A] border-[#B5341A]" :
+                step.active ? "text-[#B5862A] border-[#B5862A]" : "text-[#A89F94]"
+              }`}>
+                {step.icon}
+              </div>
+              
+              <div className={step.active ? "opacity-100" : "opacity-40"}>
+                <div className="flex flex-wrap items-center gap-3 mb-1">
+                  <p className={`text-[13px] font-semibold tracking-wide ${step.active ? "text-[#1A1714]" : "text-[#A89F94]"}`}>
+                    {step.label}
+                  </p>
+                  {step.date && (
+                    <span className="font-['DM_Mono'] text-[10px] text-[#B5862A] px-2 py-0.5 bg-[#FAF8F4] border border-[#EAE4D9] uppercase tracking-wider">
+                      {fmtDate(step.date)} · {fmtTime(step.date)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[12px] text-[#7A7068] leading-relaxed">{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -1686,6 +1789,90 @@ function TotalPriceBar({ totalFare, onDownload, isCancelled }) {
   );
 }
 
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Corporate Audit / Summary                                       */
+/* ─────────────────────────────────────────────────────────────── */
+function CorporateAuditSection({ booking }) {
+  const isConfirmed =
+    booking.executionStatus === "voucher_generated" ||
+    booking.executionStatus === "confirmed" ||
+    booking.executionStatus === "booked";
+
+  const auditFields = [
+    {
+      label: "Project Name",
+      value: booking.projectName || "—",
+      icon: <FiBriefcase size={12} />,
+    },
+    {
+      label: "Project Code",
+      value: booking.projectCodeId || "—",
+      icon: <FiTag size={12} />,
+    },
+    {
+      label: "Project Client",
+      value: booking.projectClient || "—",
+      icon: <FiBriefcase size={12} />,
+    },
+    {
+      label: "Requester Name",
+      value: booking.userId?.name ? `${booking.userId.name.firstName} ${booking.userId.name.lastName}` : "—",
+      icon: <FiUser size={12} />,
+    },
+    {
+      label: "Requester Email",
+      value: booking.userId?.email || "—",
+      icon: <FiMail size={12} />,
+    },
+    {
+      label: "Approver Name",
+      value: (() => {
+        const requesterId = booking.userId?._id || booking.userId;
+        const approverId = booking.approverId || booking.approvedBy?._id || booking.approvedBy;
+        if (booking.approverName === "Auto Approve" || (requesterId && approverId && requesterId.toString() === approverId.toString())) {
+          return "Auto Approved (System)";
+        }
+        return booking.approvedBy?.name ? `${booking.approvedBy.name.firstName} ${booking.approvedBy.name.lastName}` : (booking.approverName || "—");
+      })(),
+      icon: <FiUser size={12} />,
+    },
+    {
+      label: "Approver Email",
+      value: booking.approvedBy?.email || booking.approverEmail || "—",
+      icon: <FiMail size={12} />,
+    },
+    {
+      label: "Approver Role",
+      value: booking.approverRole || "—",
+      icon: <FiShield size={12} />,
+    },
+    ...(isConfirmed ? [{
+      label: "Vouchered At",
+      value: getVoucherDate(booking) ? `${fmtDate(getVoucherDate(booking))} ${fmtTime(getVoucherDate(booking))}` : "—",
+      icon: <FiClock size={12} />,
+    }] : []),
+  ];
+
+  return (
+    <div className="bg-white border border-[#EAE4D9] p-8">
+      <div className="grid grid-cols-4 gap-y-8 gap-x-6">
+        {auditFields.map((field, i) => (
+          <div key={i}>
+            <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2 flex items-center gap-1.5">
+              <span className="text-[#B5862A]">{field.icon}</span>
+              {field.label}
+            </div>
+            <div className="text-[14px] font-semibold text-[#1A1714]">
+              {field.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────────────────────────────────────────────────────── */
 /*  Main Page                                                      */
 /* ─────────────────────────────────────────────────────────────── */
@@ -1819,11 +2006,11 @@ export default function TeamHotelBookingDetails() {
               <MdVerifiedUser size={11} /> Voucher Issued
             </span>
           )}
-          {booking.bookingReference && (
+          {(booking.orderId || booking.bookingReference) && (
             <span className="text-[11px] text-[#A89F94]">
-              Ref:{" "}
+              Order ID:{" "}
               <strong className="text-[#1A1714] font-['DM_Mono']">
-                {booking.bookingReference}
+                {booking.orderId || booking.bookingReference}
               </strong>
             </span>
           )}
@@ -1868,33 +2055,20 @@ export default function TeamHotelBookingDetails() {
           </section>
         )}
 
-        {/* 02 Amenities */}
-        {/* {amenities.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={2}
-              title="Amenities"
-            />
-            <AmenitiesSection amenities={amenities} />
-          </section>
-        )} */}
+        {/* 02 Corporate Audit */}
+        <section className="mb-12">
+          <SectionHeader
+            num={2}
+            title="Corporate Audit"
+          />
+          <CorporateAuditSection booking={booking} />
+        </section>
 
-        {/* 03 Check-in Instructions */}
-        {/* {rateConditions.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={3}
-              title="Check-in Instructions"
-            />
-            <CheckInInstructions conditions={rateConditions} />
-          </section>
-        )} */}
-
-        {/* 04 Cancellation Policy */}
+        {/* 03 Cancellation Policy */}
         {cancelPolicies.length > 0 && (
           <section className="mb-12">
             <SectionHeader
-              num={2}
+              num={3}
               title="Cancellation Policy"
             />
             <CancellationPolicySection
@@ -1907,11 +2081,11 @@ export default function TeamHotelBookingDetails() {
           </section>
         )}
 
-        {/* 05 Booking References */}
+        {/* 04 Booking References */}
         <section className="mb-12">
           <SectionHeader
-            num={3}
-            title="Booking References"
+            num={4}
+            title="Order ID"
           />
           <BookingReferencesSection
             booking={booking}
@@ -1920,22 +2094,22 @@ export default function TeamHotelBookingDetails() {
           />
         </section>
 
-        {/* 06 Guest */}
+        {/* 05 Guest */}
         {travellers.length > 0 && (
           <section className="mb-12">
             <SectionHeader
-              num={4}
+              num={5}
               title="Guest"
             />
             <GuestSection travellers={travellers} />
           </section>
         )}
 
-        {/* 08 Fare Breakdown (Travel Admin) */}
+        {/* 07 Fare Breakdown (Travel Admin) */}
         {isTravelAdmin && priceBreakUp && (
           <section className="mb-12">
             <SectionHeader
-              num={6}
+              num={7}
               title="Fare Breakdown"
             />
             <FareBreakdownSection
@@ -1945,10 +2119,10 @@ export default function TeamHotelBookingDetails() {
           </section>
         )}
 
-        {/* 07 Cancellation Request */}
+        {/* 06 Cancellation Request */}
         <section className="mb-12">
           <SectionHeader
-            num={5}
+            num={6}
             title="Cancellation Request"
           />
           <CancellationSection
@@ -1957,6 +2131,15 @@ export default function TeamHotelBookingDetails() {
             cancelPolicies={cancelPolicies}
             totalFare={totalFare}
           />
+        </section>
+
+        {/* 08 Booking History */}
+        <section>
+          <SectionHeader
+            num={8}
+            title="Audit Trail"
+          />
+          <BookingHistory booking={booking} />
         </section>
       </main>
 

@@ -50,20 +50,116 @@ import {
   getHotelAmendmentStatus,
 } from "../../../Redux/Actions/hotelAmendment.thunks";
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Design tokens Mapping (for reference during conversion)        */
-/* ─────────────────────────────────────────────────────────────── */
-// bg: "#FAF8F4"         -> bg-[#FAF8F4]
-// surface: "#FFFFFF"    -> bg-white
-// border: "#EAE4D9"     -> border-[#EAE4D9]
-// gold: "#B5862A"       -> text-[#B5862A] / bg-[#B5862A]
-// text: "#1A1714"       -> text-[#1A1714]
-// textMuted: "#7A7068"  -> text-[#7A7068]
-// textLight: "#A89F94"  -> text-[#A89F94]
-// green: "#2C7A4B"      -> text-[#2C7A4B] / bg-[#2C7A4B]
-// red: "#B5341A"        -> text-[#B5341A] / bg-[#B5341A]
-// amber: "#8A6200"      -> text-[#8A6200] / bg-[#8A6200]
-// blue: "#1A4A7A"       -> text-[#1A4A7A] / bg-[#1A4A7A]
+
+const getVoucherDate = (b) => {
+  if (b.voucheredAt) return b.voucheredAt;
+  const tboVoucherDate = b.bookingResult?.providerResponse?.VoucherDate || b.bookingResult?.providerResponse?.Response?.VoucherDate;
+  if (tboVoucherDate) return tboVoucherDate;
+  if (["voucher_generated", "confirmed", "booked"].includes((b.executionStatus || "").toLowerCase())) return b.updatedAt;
+  return null;
+};
+
+function BookingHistory({ booking }) {
+  const isCancelled = ["cancelled", "cancel_requested"].includes((booking.executionStatus || "").toLowerCase()) || !!booking.cancellation;
+  const isConfirmed = ["voucher_generated", "confirmed", "booked"].includes((booking.executionStatus || "").toLowerCase()) || (isCancelled && !!booking.bookingResult?.hotelBookingId);
+
+  const steps = [
+    {
+      label: "Request Created",
+      date: booking.createdAt,
+      desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
+      icon: <FiClock size={14} />,
+      active: true,
+    },
+    {
+      label: "Approval Status",
+      date: booking.approvedAt || booking.rejectedAt || (["approved", "rejected"].includes(booking.requestStatus) ? booking.updatedAt : null),
+      desc: (() => {
+        const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
+        const isApproved = booking.approvedAt || booking.requestStatus === "approved";
+        
+        if (isRejected) {
+          return `Rejected by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        if (isApproved) {
+          const reqEmail = booking.userId?.email || booking.requesterDetails?.email;
+          const appEmail = booking.approvedBy?.email || booking.approverEmail;
+          const isSameUser = reqEmail && appEmail && reqEmail === appEmail;
+          if (booking.approverName === "Auto Approve" || isSameUser) {
+             return "Auto Approved by System (Travel Policy)";
+          }
+          return `Approved by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        return "Waiting for manager approval";
+      })(),
+      icon: <FiShield size={14} />,
+      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
+    },
+    {
+      label: "Voucher Issued",
+      date: getVoucherDate(booking),
+      desc: isConfirmed ? "Hotel voucher generated and sent" : "Final confirmation pending",
+      icon: <FiTag size={14} />,
+      active: isConfirmed,
+    },
+    {
+      label: "Cancellation",
+      date: booking.cancelledAt || (isCancelled ? booking.updatedAt : null),
+      desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
+      icon: <FiXCircle size={14} />,
+      active: isCancelled,
+      isLast: true,
+    },
+  ];
+
+  const formatDate = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const formatTime = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  return (
+    <div className="bg-white border border-[#EAE4D9] p-8 mb-8">
+      <div className="flex items-center gap-4 mb-10">
+        <div className="w-10 h-10 rounded-full bg-[#B5862A]/10 flex items-center justify-center">
+          <FiRefreshCw size={18} className="text-[#B5862A]" />
+        </div>
+        <div>
+          <h3 className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">Booking Lifecycle</h3>
+          <p className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-[0.2em] mt-1">Audit Trail & Timeline</p>
+        </div>
+      </div>
+
+      <div className="relative">
+        {/* Vertical line */}
+        <div className="absolute left-[13px] top-2 bottom-2 w-[1px] bg-gradient-to-b from-[#B5862A]/40 via-[#EAE4D9] to-transparent" />
+
+        <div className="space-y-10">
+          {steps.map((step, idx) => (
+            <div key={idx} className="relative flex gap-8">
+              <div className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center border transition-colors duration-500 ${
+                step.active ? "bg-[#B5862A] border-[#B5862A] text-white shadow-lg" : "bg-white border-[#EAE4D9] text-[#EAE4D9]"
+              }`}>
+                {step.icon}
+              </div>
+
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                  <p className={`text-[12px] font-bold uppercase tracking-[0.15em] ${step.active ? "text-[#1A1714]" : "text-[#A89F94]"}`}>
+                    {step.label}
+                  </p>
+                  {step.date && (
+                    <span className="text-[10px] font-bold text-[#B5862A] px-3 py-1 bg-[#FAF8F4] border border-[#EAE4D9] rounded-sm uppercase tracking-wider">
+                      {formatDate(step.date)} · {formatTime(step.date)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[13px] text-[#7A7068] leading-relaxed font-medium">{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Helpers                                                        */
@@ -751,7 +847,6 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
 function BookingReferencesSection({ booking, bookingDetail, result }) {
   const refs = [
     { label: "Order ID", val: booking.orderId || "—", hash: true },
-    { label: "Booking Ref", val: booking.bookingReference || "—", hash: true },
     {
       label: "Confirmation No.",
       val: bookingDetail?.ConfirmationNo || result?.hotelBookingId || "—",
@@ -1898,7 +1993,7 @@ export default function HotelBookingDetails() {
           )}
           { (booking.orderId || booking.bookingReference) && (
             <span className="text-[11px] text-[#A89F94]">
-              Ref:{" "}
+              Order ID:{" "}
               <strong className="text-[#1A1714] font-['DM_Mono']">
                 {booking.orderId || booking.bookingReference}
               </strong>
@@ -1966,7 +2061,7 @@ export default function HotelBookingDetails() {
         <section className="mb-12">
           <SectionHeader
             num={3}
-            title="Booking References"
+            title="Order ID"
           />
           <BookingReferencesSection
             booking={booking}
@@ -2013,6 +2108,7 @@ export default function HotelBookingDetails() {
             totalFare={totalFare}
           />
         </section>
+        <BookingHistory booking={booking} />
       </main>
     </div>
   );

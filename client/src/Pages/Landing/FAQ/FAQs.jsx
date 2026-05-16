@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import LandingHeader from "../../../layout/LandingHeader";
 import { FiChevronDown, FiSearch } from "react-icons/fi";
+import LandingFooter from "../../../layout/LandingFooter";
 
 // ─── FAQ Data ─────────────────────────────────────────────────────────────────
 const FAQ_SECTIONS = [
@@ -329,9 +330,9 @@ export default function FAQs() {
       <section className="relative w-full bg-gradient-to-br from-[#051D8C] to-[#030E30] overflow-hidden">
         <div className="absolute top-[-80px] right-[-40px] w-[400px] h-[400px] rounded-full bg-[radial-gradient(ellipse_70%_70%_at_50%_50%,rgba(120,140,255,0.3)_0%,rgba(120,140,255,0)_70%)] blur-[10px] pointer-events-none" />
 
-        <div className="max-w-[1200px] mx-auto px-10 py-16 relative z-10 flex flex-col gap-6">
+        <div className="max-w-[1340px] mx-auto px-6 md:px-10 py-16 relative z-10 flex flex-col gap-6">
           {/* Label */}
-          <div className="w-[798px] px-2.5 py-0.5 bg-[#C9A240] inline-flex flex-col justify-center items-start">
+          <div className="w-full max-w-[798px] px-2.5 py-0.5 bg-[#C9A240] inline-flex flex-col justify-center items-start">
             <div className="inline-flex justify-start items-center gap-3">
               <div className="inline-flex flex-col justify-start items-start">
                 <div className="justify-center text-black/90 text-xs font-bold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.50px]">
@@ -341,8 +342,8 @@ export default function FAQs() {
             </div>
           </div>
 
-          <h1 className="text-white text-[60px] font-bold font-['DM_Sans'] leading-[1.1] max-w-[700px]">
-            Frequently Asked<br />Questions
+          <h1 className="text-white text-[42px] md:text-[60px] font-bold font-['DM_Sans'] leading-[1.1] max-w-[700px]">
+            Frequently Asked<br className="hidden md:block" />Questions
           </h1>
 
           <p className="text-white/80 text-[17px] font-light font-['Plus_Jakarta_Sans'] leading-[28px] max-w-[680px]">
@@ -366,24 +367,24 @@ export default function FAQs() {
       </section>
 
       {/* ── MAIN CONTENT ─────────────────────────────────────────────────── */}
-      <div className="max-w-[1200px] mx-auto px-10 py-16 flex gap-12 items-start">
+      <div className="max-w-[1340px] mx-auto px-6 md:px-10 py-16 flex flex-col md:flex-row gap-8 md:gap-12 items-start">
 
         {/* ── LEFT SIDEBAR ───────────────────────────────────────────────── */}
-        <aside className="w-[220px] shrink-0 sticky top-8">
-          <p className="text-[#0A0A0A] text-[12px] font-bold font-['Plus_Jakarta_Sans'] uppercase tracking-[2px] mb-4">
+        <aside className="w-full md:w-[220px] shrink-0 md:sticky top-8 overflow-x-auto md:overflow-visible scrollbar-hide border-b border-black/[0.08] md:border-none pb-2 md:pb-0 z-20 bg-white">
+          <p className="text-[#0A0A0A] text-[12px] font-bold font-['Plus_Jakarta_Sans'] uppercase tracking-[2px] mb-4 hidden md:block">
             Categories
           </p>
-          <nav className="flex flex-col">
+          <nav className="flex md:flex-col gap-6 md:gap-0 whitespace-nowrap md:whitespace-normal">
             {FAQ_SECTIONS.map((section) => {
               const isActive = activeCategory === section.id;
               return (
                 <button
                   key={section.id}
                   onClick={() => handleCategoryClick(section.id)}
-                  className={`flex items-center gap-0 text-left py-3 border-l-[3px] pl-3 transition-all ${
+                  className={`flex items-center gap-0 text-left pb-3 md:pb-0 md:py-3 border-b-[3px] md:border-b-0 md:border-l-[3px] md:pl-3 transition-all ${
                     isActive
                       ? "border-[#051D8C] text-[#051D8C] font-bold"
-                      : "border-black/[0.08] text-[#3A3A3A] font-normal hover:border-[#051D8C]/40 hover:text-[#051D8C]"
+                      : "border-transparent md:border-black/[0.08] text-[#3A3A3A] font-normal hover:border-[#051D8C]/40 hover:text-[#051D8C]"
                   } text-[13px] font-['Plus_Jakarta_Sans'] leading-[20px]`}
                 >
                   {section.title}
@@ -402,13 +403,13 @@ export default function FAQs() {
                 <span className="text-[#051D8C] text-[13px] font-bold font-['DM_Sans'] tracking-[1px]">
                   {section.number}
                 </span>
-                <h2 className="text-[#0A0A0A] text-[26px] font-bold font-['DM_Sans'] leading-[34px]">
+                <h2 className="text-[#0A0A0A] text-[22px] md:text-[26px] font-bold font-['DM_Sans'] leading-[1.2] md:leading-[34px]">
                   {section.title}
                 </h2>
               </div>
 
               {/* Accordion items */}
-              <div className="border border-black/[0.08] px-6">
+              <div className="border border-black/[0.08] px-4 md:px-6">
                 {section.items.map((item, i) => (
                   <FAQItem key={i} q={item.q} a={item.a} />
                 ))}
@@ -429,10 +430,10 @@ export default function FAQs() {
       </div>
 
       {/* ── CTA BANNER ───────────────────────────────────────────────────── */}
-      <section className="max-w-[1200px] mx-auto px-10 pb-24">
-        <div className="relative w-full bg-gradient-to-br from-[#051D8C] to-[#030E30] overflow-hidden rounded-sm flex flex-col items-center justify-center gap-5 px-8 text-center py-14">
+      <section className="max-w-[1340px] mx-auto px-6 md:px-10 pb-24">
+        <div className="relative w-full bg-gradient-to-br from-[#051D8C] to-[#030E30] overflow-hidden rounded-sm flex flex-col items-center justify-center gap-5 px-6 md:px-8 text-center py-10 md:py-14">
           <div className="absolute top-[-60px] right-[-40px] w-[400px] h-[300px] rounded-full bg-[radial-gradient(ellipse_70%_70%_at_50%_50%,rgba(255,255,255,0.15)_0%,rgba(255,255,255,0)_70%)] pointer-events-none" />
-          <p className="relative z-10 text-white text-[34px] font-bold font-['DM_Sans'] leading-[44px]">
+          <p className="relative z-10 text-white text-[26px] md:text-[34px] font-bold font-['DM_Sans'] leading-[1.2] md:leading-[44px]">
             Still have questions?
           </p>
           <p className="relative z-10 text-white/75 text-[16px] font-['Plus_Jakarta_Sans'] leading-[27px] max-w-[480px]">
@@ -448,27 +449,7 @@ export default function FAQs() {
       </section>
 
       {/* ── FOOTER ───────────────────────────────────────────────────────── */}
-      <footer className="border-t border-[#000D26] mx-12 py-8 flex flex-col md:flex-row items-center justify-between gap-6">
-        <img src="/logo-traveamer.svg" alt="Traveamer" className="h-6" />
-        <p className="text-[#04112F] text-[12px] font-['Plus_Jakarta_Sans'] leading-[16px]">
-          © 2026 Traveamer. All rights reserved.
-        </p>
-        <div className="flex items-center gap-6">
-          {[
-            { label: "Privacy", href: "/legal/privacy-policy" },
-            { label: "Terms", href: "/legal/terms-of-service" },
-            { label: "Contact", href: "/legal/contact-us" },
-          ].map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              className="text-[#04112F] text-[12px] font-['Plus_Jakarta_Sans'] leading-[16px] hover:underline"
-            >
-              {link.label}
-            </a>
-          ))}
-        </div>
-      </footer>
+      <LandingFooter />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
-import { CorporateNavbar } from "../../../layout/CorporateNavbar";
+import LandingHeader  from "../../../layout/LandingHeader";
 import FlightFilterSidebar from "./Filter-Sidebar";
 import OneWayFlightCard from "./One-wayFlightCard";
 import MultiCityFlightCard from "./Multi-cityFlightCard";
@@ -1004,7 +1004,7 @@ export default function FlightSearchResults() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      <CorporateNavbar />
+      <LandingHeader />
 
       {loading && (
         <SearchLoadingModal
