@@ -128,10 +128,10 @@ export const FareDetailsModal = ({
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 bg-[#0A203E]/60 backdrop-blur-md flex items-center justify-center z-50 animate-fadeIn p-4">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden border border-white/20">
+        <div className="fixed inset-0 bg-[#0A203E]/60 backdrop-blur-md flex items-center justify-center z-[100] animate-fadeIn sm:p-4">
+          <div className="bg-white sm:rounded-[2rem] shadow-2xl w-full h-full sm:h-auto max-h-[100dvh] sm:max-h-[90vh] lg:max-w-5xl flex flex-col overflow-hidden border border-white/20">
             {/* Header */}
-            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 bg-white">
+            <div className="flex items-center justify-between px-6 py-5 sm:px-8 sm:py-6 border-b border-slate-100 bg-white shrink-0">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-[#C9A84C] rounded-2xl flex items-center justify-center shadow-lg shadow-[#C9A84C]/20">
                   <AiOutlineInfoCircle className="text-[#0A203E] text-2xl" />
@@ -150,7 +150,7 @@ export const FareDetailsModal = ({
             </div>
 
             {/* Tabs */}
-            <div className="flex bg-slate-50/50 px-8 border-b border-slate-100">
+            <div className="flex bg-slate-50/50 px-4 sm:px-8 border-b border-slate-100 shrink-0 overflow-x-auto custom-scrollbar">
               {[
                 { id: "summary", label: "Fare Summary" },
                 { id: "rules", label: "Fare Rules & Policies" },
@@ -174,7 +174,7 @@ export const FareDetailsModal = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-8 bg-white custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-white custom-scrollbar min-h-0 relative">
               {/* FARE SUMMARY TABLE */}
               {activeTab === "summary" && (
                 <div className="bg-slate-50/30 rounded-3xl p-1 border border-slate-100">
@@ -254,7 +254,7 @@ export const FareDetailsModal = ({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end px-8 py-6 border-t border-slate-100 bg-white">
+            <div className="flex justify-end px-6 py-4 sm:px-8 sm:py-6 border-t border-slate-100 bg-white shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
               <button
                 onClick={toggleModal}
                 className="px-8 py-3 bg-[#0A203E] text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:brightness-110 shadow-lg shadow-[#0A203E]/20 transition-all active:scale-95"

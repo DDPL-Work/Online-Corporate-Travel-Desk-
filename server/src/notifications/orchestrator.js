@@ -36,6 +36,19 @@ const CHANNEL_MAP = {
   [EVENTS.BOOKING_REQUEST_CREATED]:         { email: true,  inapp: true  },
   [EVENTS.BOOKING_CANCELLED]:               { email: true,  inapp: true  },
   [EVENTS.BOOKING_REISSUED]:                { email: false, inapp: true  },
+  [EVENTS.REISSUE_CREATED]:                 { email: true,  inapp: true  },
+  [EVENTS.REISSUE_ELIGIBILITY_CHECKED]:     { email: true,  inapp: true  },
+  [EVENTS.REISSUE_SEARCH_COMPLETED]:        { email: false, inapp: true  },
+  [EVENTS.REISSUE_QUOTE_RECEIVED]:          { email: true,  inapp: true  },
+  [EVENTS.REISSUE_BILLING_RESERVED]:        { email: false, inapp: true  },
+  [EVENTS.REISSUE_PROCESSING_STARTED]:      { email: false, inapp: true  },
+  [EVENTS.REISSUE_COMPLETED]:               { email: true,  inapp: true  },
+  [EVENTS.REISSUE_FAILED]:                  { email: true,  inapp: true  },
+  [EVENTS.REISSUE_OPS_ASSIGNED]:            { email: true,  inapp: true  },
+  [EVENTS.REISSUE_TICKET_UPLOADED]:         { email: true,  inapp: true  },
+  [EVENTS.OFFLINE_REISSUE_CREATED]:         { email: true,  inapp: true  },
+  [EVENTS.OFFLINE_REISSUE_UPDATED]:         { email: true,  inapp: true  },
+  [EVENTS.OFFLINE_TICKET_GENERATED]:        { email: true,  inapp: true  },
   [EVENTS.CREDIT_CYCLE_END]:                { email: true,  inapp: true  },
   [EVENTS.MANAGER_ASSIGNED_TO_EMPLOYEE]:    { email: true,  inapp: true  },
   [EVENTS.CORPORATE_APPROVED]:              { email: true,  inapp: true  },
@@ -60,6 +73,32 @@ const CHANNEL_MAP = {
 // Returns array of: { userId, email, recipientRole, corporateId }
 // ─────────────────────────────────────────────────────────────────────────────
 const resolveRecipients = async (event, data) => {
+  if (Array.isArray(data?.strictRecipients) && data.strictRecipients.length) {
+    return data.strictRecipients
+      .filter((recipient) => recipient?.userId || recipient?.email)
+      .map((recipient) => ({
+        userId: recipient.userId || null,
+        email: recipient.email || null,
+        corporateId: recipient.corporateId || data.corporateId || null,
+        role: recipient.role || recipient.recipientRole || null,
+      }));
+  }
+
+  if (data?.recipientId && data?.recipientRole) {
+    return [
+      {
+        userId: data.recipientId,
+        email:
+          data.recipientEmail ||
+          data.employeeEmail ||
+          data.opsUserEmail ||
+          null,
+        corporateId: data.corporateId || null,
+        role: data.recipientRole,
+      },
+    ];
+  }
+
   const recipients = [];
 
   switch (event) {
@@ -70,6 +109,14 @@ const resolveRecipients = async (event, data) => {
     case EVENTS.BOOKING_CONFIRMED:
     case EVENTS.BOOKING_CANCELLED:
     case EVENTS.BOOKING_REISSUED:
+    case EVENTS.REISSUE_CREATED:
+    case EVENTS.REISSUE_ELIGIBILITY_CHECKED:
+    case EVENTS.REISSUE_SEARCH_COMPLETED:
+    case EVENTS.REISSUE_BILLING_RESERVED:
+    case EVENTS.REISSUE_PROCESSING_STARTED:
+    case EVENTS.REISSUE_COMPLETED:
+    case EVENTS.REISSUE_FAILED:
+    case EVENTS.REISSUE_TICKET_UPLOADED:
     case EVENTS.BOOKING_OFFLINE_CANCELLED: {
       // 1. Employee
       if (data.employeeId || data.recipientId) {
@@ -106,6 +153,25 @@ const resolveRecipients = async (event, data) => {
           corporateId: data.corporateId || 'system',
         });
       });
+      break;
+    }
+
+    case EVENTS.REISSUE_OPS_ASSIGNED: {
+      if (data.employeeId || data.recipientId) {
+        recipients.push({
+          userId: data.employeeId || data.recipientId,
+          email: data.employeeEmail,
+          corporateId: data.corporateId,
+        });
+      }
+      if (data.opsUserId) {
+        recipients.push({
+          userId: data.opsUserId,
+          email: data.opsUserEmail,
+          corporateId: data.corporateId || "system",
+          role: "ops-member",
+        });
+      }
       break;
     }
 

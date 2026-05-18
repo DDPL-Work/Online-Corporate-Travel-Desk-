@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import Layout from "../layout/Layout";
 import ProtectedRoute from "./ProtectedRoute";
@@ -29,6 +29,11 @@ import BlogListPage from '../components/Blog/AllBlogs'
 import BlogEditPage from '../components/Blog/BlogEditPage'
 import CreateBlogPage from '../components/Blog/CreateNewBlog'
 
+function FallbackRoute() {
+  const token = sessionStorage.getItem("token");
+  return <Navigate to={token ? "/" : "/login"} replace />;
+}
+
 export const appRouter = createBrowserRouter([
   // -------------------------------
   // PUBLIC ROUTES
@@ -52,15 +57,21 @@ export const appRouter = createBrowserRouter([
         path: "/",
         element: <Layout />,
         children: [
-          { path: "/onboarded-corporates", element: <OnboardedCorporates /> },
+          { path: "/all-corporates", element: <OnboardedCorporates /> },
+          { path: "/financial-approvals", element: <Navigate to="/corporate-revenue" replace /> },
+          { path: "/corporate-access-control", element: <CorporateAccessControl /> },
+          { path: "/cancellation-queries", element: <CancellationQueries /> },
+          { path: "/credit-status-alerts", element: <CreditStatusAlerts /> },
+
+          { path: "/onboarded-corporates", element: <Navigate to="/all-corporates" replace /> },
           { path: "/bookings-summary", element: <BookingsSummary /> },
           { path: "/cancellation-summary", element: <CancellationDashboard /> },
-          { path: "/cancellation-query", element: <CancellationQueries /> },
+          { path: "/cancellation-query", element: <Navigate to="/cancellation-queries" replace /> },
           { path: "/all-reissue-requests", element: <AllReissueRequests /> },
           { path: "/corporate-revenue", element: <CorporateRevenue /> },
-          { path: "/credit-status", element: <CreditStatusAlerts /> },
+          { path: "/credit-status", element: <Navigate to="/credit-status-alerts" replace /> },
           { path: "/wallet-recharge-logs", element: <WalletRechargeLogs /> },
-          { path: "/active-corporates", element: <CorporateAccessControl /> },
+          { path: "/active-corporates", element: <Navigate to="/all-corporates" replace /> },
           { path: "/pending-corporates", element: <PendingCorporates /> },
           { path: "/pending-amendments", element: <PendingAmendments /> },
           { path: "/commission-settings", element: <CommissionSettings /> },
@@ -88,6 +99,6 @@ export const appRouter = createBrowserRouter([
   // DEFAULT REDIRECT
   {
     path: "*",
-    element: <Login />,
+    element: <FallbackRoute />,
   },
 ]);

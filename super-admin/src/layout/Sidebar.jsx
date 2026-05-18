@@ -1,30 +1,24 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { jwtDecode } from "jwt-decode";
 import {
   FaClipboardList,
   FaTimes,
   FaWallet,
   FaCreditCard,
   FaBuilding,
-  FaCog,
-  FaFileAlt,
   FaMoneyBillWave,
   FaExchangeAlt,
   FaListAlt,
   FaShieldAlt,
-  FaIdCard,
   FaUser,
-  FaBars,
   FaBlog,
-  FaPlus,
-  FaTags,
   FaChevronDown,
   FaChevronUp,
 } from "react-icons/fa";
 import { MdCancelScheduleSend } from "react-icons/md";
+import { canAccessMenuItem, DASHBOARD_ROLES, OPS_PERMISSIONS } from "../constants/rbac";
 
-export default function Sidebar({ isOpen, onClose, role, loading }) {
+export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
   const location = useLocation();
   const [openMenus, setOpenMenus] = useState({});
 
@@ -54,106 +48,100 @@ export default function Sidebar({ isOpen, onClose, role, loading }) {
       to: "/all-corporates",
       label: "All Corporates",
       icon: <FaBuilding />,
-      permission: "View Corporates",
+      requiredPermissions: [OPS_PERMISSIONS.MANAGE_CORPORATES],
     },
     {
       to: "/pending-corporates",
       label: "Pending Corporates",
       icon: <FaClipboardList />,
-      permission: "Manage Corporates",
+      requiredPermissions: [OPS_PERMISSIONS.MANAGE_CORPORATES],
     },
     {
-      to: "/financial-approvals",
-      label: "Financial Approvals",
+      to: "/bookings-summary",
+      label: "Bookings Summary",
       icon: <FaMoneyBillWave />,
-      permission: "Manage Finance",
+      requiredPermissions: [OPS_PERMISSIONS.VIEW_BOOKINGS],
     },
     {
       to: "/corporate-access-control",
       label: "Access Control",
       icon: <FaShieldAlt />,
-      permission: "Super Admin Only",
+      superAdminOnly: true,
     },
     {
       to: "/credit-status-alerts",
       label: "Credit Alerts",
       icon: <FaShieldAlt />,
-      permission: "Super Admin Only",
+      superAdminOnly: true,
     },
     {
       to: "/all-reissue-requests",
       label: "Reissue Requests",
       icon: <FaExchangeAlt />,
-      permission: "Manage Operations",
+      requiredPermissions: [OPS_PERMISSIONS.MANAGE_REISSUES],
+    },
+    {
+      to: "/cancellation-summary",
+      label: "Cancellation Summary",
+      icon: <MdCancelScheduleSend />,
+      requiredPermissions: [OPS_PERMISSIONS.MANAGE_CANCELLATIONS],
     },
     {
       to: "/cancellation-queries",
       label: "Cancel Queries",
       icon: <MdCancelScheduleSend />,
-      permission: "Manage Operations",
+      requiredPermissions: [OPS_PERMISSIONS.MANAGE_CANCELLATIONS],
     },
     {
       to: "/corporate-revenue",
       label: "Corporate Revenue",
       icon: <FaCreditCard />,
-      permission: "View Finance",
+      requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
     },
     {
       to: "/wallet-recharge-logs",
       label: "Wallet Recharge Logs",
       icon: <FaWallet />,
-      permission: "View Finance",
+      requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
     },
     {
       to: "/api-configurations",
       label: "API Configurations",
       icon: <FaListAlt />,
-      permission: "Super Admin Only",
+      superAdminOnly: true,
     },
     {
       to: "/ops-management",
       label: "OPS Team Management",
       icon: <FaShieldAlt />,
-      permission: "Super Admin Only",
+      superAdminOnly: true,
     },
     {
       label: "Blog Section",
       icon: <FaBlog />,
       to: "/blog-and-articles",
-      permission: "SEO Management",
+      requiredPermissions: [OPS_PERMISSIONS.SEO_MANAGEMENT],
     },
   ];
 
   const menus = {
     "super-admin": travelCompanyMenu,
-    "ops-member": travelCompanyMenu.filter((m) => {
-      // 1. Super Admin items are never shown to Ops Members
-      if (m.permission === "Super Admin Only") return false;
-      
-      // 2. Public items (no permission required)
-      if (!m.permission) return true;
-
-      // 3. Check if user has the specific permission
-      let permissions = [];
-      try {
-        const userRaw = sessionStorage.getItem("user");
-        if (userRaw) {
-          const user = JSON.parse(userRaw);
-          permissions = user.permissions || [];
-        }
-      } catch (err) {
-        console.error("Error parsing user permissions", err);
-      }
-      return permissions.includes(m.permission);
-    }),
+    "ops-member": travelCompanyMenu.filter((item) =>
+      canAccessMenuItem({
+        role,
+        permissions,
+        requiredPermissions: item.requiredPermissions,
+        superAdminOnly: item.superAdminOnly,
+      }),
+    ),
   };
 
   // Re-evaluating ops-member filtering logic based on your existing pattern
   const activeMenu = menus[role] || [];
 
   const roleLabels = {
-    "super-admin": "Super Admin",
-    "ops-member": "OPS Team Member",
+    [DASHBOARD_ROLES.SUPER_ADMIN]: "Super Admin",
+    [DASHBOARD_ROLES.OPS_MEMBER]: "OPS Team Member",
   };
 
   return (

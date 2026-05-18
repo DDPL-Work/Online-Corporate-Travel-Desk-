@@ -3,6 +3,7 @@ const User = require("../models/User");
 const SuperAdmin = require("../models/SuperAdmin.model");
 const ApiError = require("../utils/ApiError");
 const cache = require("../utils/cache");
+const { normalizeOpsMemberInput } = require("../utils/opsMember.util");
 
 const SECRET = process.env.JWT_SECRET;
 const USER_CACHE_TTL = 10 * 60; // 10 minutes
@@ -65,20 +66,25 @@ exports.verifyToken = async (req, res, next) => {
         if (!account || account.status !== "Active" || account.isDeleted) {
           return res.status(401).json({ success: false, message: "OPS Member not found, inactive, or suspended" });
         }
+        const normalizedOpsFields = normalizeOpsMemberInput(account.toObject());
         userData = {
           _id: account._id,
           id: account._id.toString(),
           role: "ops-member",
-          specificRole: account.role,
-          department: account.department,
+          specificRole: normalizedOpsFields.designation || account.role,
+          department: normalizedOpsFields.department,
+          designation: normalizedOpsFields.designation,
+          servicingScope: normalizedOpsFields.servicingScope,
           permissions: account.permissions,
           email: account.email,
           name: account.name,
+          status: account.status,
         };
         await cache.set(cacheKey, userData, USER_CACHE_TTL);
       }
 
       req.user = userData;
+      req.opsMember = { _id: userData._id, permissions: userData.permissions, status: userData.status };
       return next();
     }
 

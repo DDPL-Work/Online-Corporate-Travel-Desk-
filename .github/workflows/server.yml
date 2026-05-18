@@ -1,0 +1,44 @@
+name: Deploy Server
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'server/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install
+        working-directory: server
+        run: npm install
+
+      - name: Validate
+        working-directory: server
+        run: node --check src/index.js
+
+      - name: Deploy Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /var/www/Online-Corporate-Travel-Desk/server
+
+            git pull origin main
+
+            npm install
+
+            pm2 restart travel-api
+
+            pm2 save
