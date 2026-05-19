@@ -80,6 +80,7 @@ import TermsOfService from "../Pages/Legal/TermsOfService";
 import PrivacyPolicy from "../Pages/Legal/PrivacyPolicy";
 import ContactUs from "../Pages/Legal/ContactUs";
 import MyReissueRequests from "../components/EmployeeDashboard/MyReissuedRequests";
+import LegacyReissueDetailPage from "../components/EmployeeDashboard/LegacyReissueDetailPage";
 import TeamBookingDetails from "../components/CorporateManagerTabs/TeamBookingDetails";
 import TeamHotelBookingDetails from "../components/CorporateManagerTabs/TeamHotelBookingDetails";
 import FlightBookingDetails from "../components/TravelAdminTabs/Shared/FlightBookingDetails";
@@ -270,6 +271,7 @@ export const appRouter = createBrowserRouter([
                 element: <BookingDetails />,
               },
               { path: "/my-reissued", element: <MyReissueRequests /> },
+              { path: "/my-reissue/:id", element: <LegacyReissueDetailPage /> },
               {
                 path: "/my-offline-cancellations",
                 element: <OfflineCancellationQueries />,

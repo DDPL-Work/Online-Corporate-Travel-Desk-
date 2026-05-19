@@ -15,6 +15,11 @@ router.post("/create", controller.createReissueRequest);
 router.get("/list", controller.getReissueRequests);
 
 /**
+ * 2️⃣.5️⃣ Get Single Reissue Request by ID
+ */
+router.get("/:requestId", controller.getReissueRequestById);
+
+/**
  * 3️⃣ Update Reissue Status (Approve/Reject - Corporate Admin)
  */
 router.patch("/status/:requestId", controller.updateReissueStatus);

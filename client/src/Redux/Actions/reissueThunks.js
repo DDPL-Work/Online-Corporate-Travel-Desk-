@@ -227,6 +227,22 @@ export const fetchReissueRequestById = createAsyncThunk(
   },
 );
 
+// ── Fetch single legacy reissue request by ID ──
+export const fetchLegacyReissueRequestById = createAsyncThunk(
+  "reissue/fetchLegacyById",
+  async (requestId, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`/flights/reissue/${requestId}`);
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        getErrorMessage(error, "Failed to fetch legacy reissue request"),
+      );
+    }
+  },
+);
+
+
 // ── Update Reissue Status (Approve/Reject) ──
 export const updateReissueStatus = createAsyncThunk(
   "reissue/updateStatus",

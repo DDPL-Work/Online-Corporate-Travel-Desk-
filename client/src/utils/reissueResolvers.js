@@ -245,7 +245,12 @@ export const resolveTotalFare = (req = {}) =>
 
 export const resolveOldFare = (req = {}) =>
   req?.oldFare ||
+  req?.reissuePricingSnapshot?.oldFare ||
   req?.pricingSnapshot?.oldFare ||
+  req?.bookingId?.pricingSnapshot?.totalAmount ||
+  req?.bookingId?.pricingSnapshot?.totalFare ||
+  req?.booking?.pricingSnapshot?.totalAmount ||
+  req?.booking?.pricingSnapshot?.totalFare ||
   req?.fareAudit?.oldFare ||
   req?.bookingSnapshot?.oldFare ||
   // Online DTO: oldJourney may hold the original fare
@@ -254,9 +259,13 @@ export const resolveOldFare = (req = {}) =>
 
 export const resolveNewFare = (req = {}) =>
   req?.newFare ||
-  req?.pricingSnapshot?.newFare ||
-  req?.pricingSnapshot?.totalAmount ||
   req?.reissuePricingSnapshot?.newFare ||
+  req?.pricingSnapshot?.newFare ||
+  req?.selectedFlight?.newFare ||
+  req?.selectedFlight?.fare ||
+  req?.preferredJourney?.newFare ||
+  req?.preferredJourney?.fare ||
+  req?.pricingSnapshot?.totalAmount ||
   resolveTotalFare(req);
 
 export const resolveFareDifference = (req = {}) => {
@@ -289,6 +298,10 @@ export const resolveBookingRef = (req = {}) =>
   req?.bookingReference ||
   req?.orderId ||
   req?.metadata?.orderId ||
+  req?.bookingId?.orderId ||
+  req?.bookingId?.bookingReference ||
+  req?.booking?.orderId ||
+  req?.booking?.bookingReference ||
   req?.bookingSnapshot?.bookingReference ||
   req?.bookingResult?.orderId ||
   req?.bookingRef ||
@@ -423,12 +436,14 @@ export const getRoute = (req) => {
 export const getBookingRef = (req) => {
   if (!req) return "N/A";
   return (
-    req?.metadata?.orderId ||
     req?.bookingReference ||
     req?.orderId ||
-    req?.bookingRef ||
+    req?.metadata?.orderId ||
+    req?.bookingId?.orderId ||
+    req?.bookingId?.bookingReference ||
     req?.booking?.orderId ||
-    req?.bookingId ||
+    req?.booking?.bookingReference ||
+    req?.bookingRef ||
     "N/A"
   );
 };

@@ -4,40 +4,70 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
 import {
-  FiArrowLeft, FiCheck, FiCheckCircle, FiClock,
-  FiDownload, FiEye, FiList, FiRefreshCw, FiRepeat, FiXCircle,
-  FiSearch
+  FiArrowLeft,
+  FiCheckCircle,
+  FiClock,
+  FiDownload,
+  FiEye,
+  FiList,
+  FiRefreshCw,
+  FiRepeat,
+  FiXCircle,
+  FiSearch,
+  FiX,
+  FiUser,
 } from "react-icons/fi";
 
-import { 
-  fetchLegacyReissueRequests, 
+import {
+  fetchLegacyReissueRequests,
   updateReissueStatus,
   fetchReissueRequests,
   fetchOfflineReissueRequests,
-  fetchCompanyReissueRequests
+  fetchCompanyReissueRequests,
 } from "../../Redux/Actions/reissueThunks";
-import { 
-  getRequestId, getPnr, getUserName, getUserEmail, getJourneyType, 
-  getAirline, getTotalFare, getCurrency, getRoute, getTicketUrl, 
-  getStatus, getRequestedDate, getFareDifference, getSegments, getStatusTone
+import {
+  getRequestId,
+  getPnr,
+  getUserName,
+  getUserEmail,
+  getAirline,
+  getRoute,
+  getTicketUrl,
+  getStatus,
+  getRequestedDate,
+  getStatusTone,
+  resolvePrimarySegment,
 } from "../../utils/reissueResolvers";
-import { IdCell } from "../TravelAdminTabs/Shared/CommonComponents";
-import LegacyReissueDetailModal from "./LegacyReissueDetailModal";
+import { airlineLogo } from "../../utils/formatter";
+import {
+  LabeledField,
+  StatCard,
+  dateCls,
+  IdCell,
+  SearchBar,
+  Th,
+  CustomDropdown,
+} from "../TravelAdminTabs/Shared/CommonComponents";
+import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
+import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
+import { C } from "../Shared/color";
 
 /* ─────────────────────────────────────────────────────────────────
    STATUS BADGE
    ───────────────────────────────────────────────────────────────── */
-const StatusBadge = ({ req }) => {
+const ReissueStatusBadge = ({ req }) => {
   const status = getStatus(req);
   const tone = getStatusTone(status);
   const icons = {
-    PENDING:   <FiClock size={11} />,
-    APPROVED:  <FiCheckCircle size={11} />,
+    PENDING: <FiClock size={11} />,
+    APPROVED: <FiCheckCircle size={11} />,
     COMPLETED: <FiCheckCircle size={11} />,
-    REJECTED:  <FiXCircle size={11} />,
+    REJECTED: <FiXCircle size={11} />,
   };
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${tone}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${tone}`}
+    >
       {icons[status] || null}
       {status}
     </span>
@@ -60,7 +90,7 @@ const TicketActions = ({ req }) => {
   }
 
   if (!downloadUrl) {
-     return (
+    return (
       <span className="text-[10px] font-bold text-slate-400 italic">
         Processing
       </span>
@@ -71,162 +101,94 @@ const TicketActions = ({ req }) => {
     window.open(downloadUrl, "_blank", "noopener,noreferrer");
   };
 
-  const handleDownload = () => {
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = `reissue-ticket-${getRequestId(req)}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(downloadUrl);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `reissue-ticket-${getRequestId(req)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Failed to download ticket:", error);
+      window.open(downloadUrl, "_blank");
+    }
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex items-center gap-1.5">
       <button
         onClick={handleView}
-        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-slate-50 hover:text-[#0A2D45] transition-all w-full"
+        className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-slate-50 hover:text-[#000D26] hover:border-[#000D26] transition-all cursor-pointer"
         title="View ticket in browser"
       >
-        <FiEye size={12} /> View
+        <FiEye size={11} /> View
       </button>
       <button
         onClick={handleDownload}
-        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#0A2D45] text-white rounded-lg text-[11px] font-bold hover:bg-[#071f30] transition-all w-full"
+        className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-[#000D26] text-white rounded-lg text-[10px] font-bold hover:bg-[#04112F] transition-all cursor-pointer"
         title="Download ticket"
       >
-        <FiDownload size={12} /> Download
+        <FiDownload size={11} /> DL
       </button>
     </div>
   );
 };
 
-/* ─────────────────────────────────────────────────────────────────
-   LEDGER STAT CARD
-   ───────────────────────────────────────────────────────────────── */
-const LedgerStatCard = ({ label, value, Icon, color }) => {
-  const borderColors = {
-    blue: "border-l-blue-500",
-    orange: "border-l-amber-500",
-    green: "border-l-emerald-500",
-    red: "border-l-rose-500"
-  };
-  const iconColors = {
-    blue: "bg-blue-50 text-blue-500",
-    orange: "bg-amber-50 text-amber-500",
-    green: "bg-emerald-50 text-emerald-500",
-    red: "bg-rose-50 text-rose-500"
-  };
-
-  return (
-    <div className={`bg-white rounded-xl shadow-md p-5 border border-slate-100 border-l-4 ${borderColors[color] || borderColors.blue} flex items-center gap-4`}>
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${iconColors[color] || iconColors.blue}`}>
-        <Icon size={18} strokeWidth={2.5} />
-      </div>
-      <div>
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
-        <p className="text-2xl font-black text-slate-800 leading-none mt-1">{value}</p>
-      </div>
-    </div>
-  );
-};
-
-/* ─────────────────────────────────────────────────────────────────
-   REISSUE CARD — "My Reissued" view
-   ───────────────────────────────────────────────────────────────── */
-const ReissueCard = ({ req, onView }) => {
-  const route = getRoute(req);
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-all flex flex-col gap-4 relative overflow-hidden">
-      {/* Type ribbon */}
-      <div className="absolute top-0 right-0">
-        <span className="px-3 py-1 bg-[#0A2D45] text-white text-[9px] font-black uppercase tracking-widest rounded-bl-xl">
-          {req.reissueType || req.type || "REISSUE"}
-        </span>
-      </div>
-
-      {/* Header */}
-      <div className="flex items-start justify-between pr-24">
-        <div>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Request ID</span>
-          <IdCell id={getRequestId(req)} />
-        </div>
-        <div className="text-right">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Requested</span>
-          <p className="text-[12px] font-semibold text-slate-600 mt-0.5">{getRequestedDate(req)}</p>
-        </div>
-      </div>
-
-      {/* PNR / Booking Ref */}
-      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between">
-        <div>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">PNR</span>
-          <p className="text-sm font-black text-slate-900 uppercase tracking-tight mt-0.5">{getPnr(req)}</p>
-        </div>
-        <div className="h-8 w-px bg-slate-200 mx-2" />
-        <div className="text-right">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Booking Ref</span>
-          <p className="text-sm font-black text-slate-900 uppercase tracking-tight mt-0.5">
-            {req?.metadata?.orderId || req?.bookingReference || req?.orderId || req?.bookingRef || "N/A"}
-          </p>
-        </div>
-      </div>
-
-      {/* Route */}
-      {route !== "N/A" && (
-        <div className="bg-slate-50/50 rounded-lg px-3 py-1.5 border border-slate-100">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Route</span>
-          <p className="text-sm font-bold text-slate-800 mt-0.5">{route}</p>
-        </div>
-      )}
-
-      {/* Reason */}
-      <div>
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Reason</span>
-        <p className="text-[12px] text-slate-600 leading-relaxed mt-1 italic bg-slate-50/50 p-2 rounded-lg border border-slate-100 line-clamp-2">
-          &ldquo;{req.reason || req.remarks || "N/A"}&rdquo;
-        </p>
-      </div>
-
-      {/* Ticket */}
-      <div className="mt-2">
-        <TicketActions req={req} />
-      </div>
-
-      {/* Footer */}
-      <div className="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between">
-        <StatusBadge req={req} />
-        <button
-          onClick={() => onView(req)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-slate-50 hover:text-[#0A2D45] hover:border-[#0A2D45] transition-all"
-        >
-          <FiEye size={13} /> Details
-        </button>
-      </div>
-    </div>
-  );
+const getAirlineCode = (req) => {
+  const segment = resolvePrimarySegment(req) || {};
+  const code =
+    segment?.airlineCode ||
+    segment?.airline ||
+    req?.selectedFlight?.airlineCode ||
+    req?.newJourney?.segments?.[0]?.airlineCode ||
+    req?.oldJourney?.segments?.[0]?.airlineCode ||
+    req?.airlineCode ||
+    req?.airline ||
+    "AI";
+  if (typeof code === "string") {
+    const lower = code.toLowerCase();
+    if (lower.includes("indigo")) return "6E";
+    if (lower.includes("vistara")) return "UK";
+    if (lower.includes("air india")) return "AI";
+    if (lower.includes("spicejet")) return "SG";
+    if (lower.includes("airasia")) return "I5";
+    if (lower.includes("go first")) return "G8";
+    if (lower.includes("akasa")) return "QP";
+    return code.substring(0, 2).toUpperCase();
+  }
+  return "AI";
 };
 
 /* ─────────────────────────────────────────────────────────────────
    MAIN COMPONENT
    ───────────────────────────────────────────────────────────────── */
 const MyReissueRequests = () => {
-  const dispatch  = useDispatch();
-  const navigate  = useNavigate();
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const { 
-    legacyRequests, legacyLoading,
-    requests: onlineRequests, loading: onlineLoading,
-    offlineRequests, offlineLoading,
-    companyRequests, companyLoading
+  const {
+    legacyRequests,
+    legacyLoading,
+    requests: onlineRequests,
+    loading: onlineLoading,
+    offlineRequests,
+    offlineLoading,
+    companyRequests,
+    companyLoading,
   } = useSelector((s) => s.reissue);
 
   // If URL has ?scope=company (e.g. from sidebar), start on company tab
   const initialTab = searchParams.get("scope") === "company" ? "company" : "my";
-  const [activeTab,     setActiveTab]     = useState(initialTab);
-  const [filter,        setFilter]        = useState("All");
-  const [currentPage,   setCurrentPage]   = useState(1);
-  const [selectedReq,   setSelectedReq]   = useState(null);
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [filter, setFilter] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedReq, setSelectedReq] = useState(null);
 
   // Search and Timeline state (visual for now)
   const [searchQuery, setSearchQuery] = useState("");
@@ -234,7 +196,9 @@ const MyReissueRequests = () => {
   const [dateTo, setDateTo] = useState("");
 
   // Decode token
-  let userId = null, corporateId = null, role = "employee";
+  let userId = null,
+    corporateId = null,
+    role = "employee";
   try {
     const token = sessionStorage.getItem("token");
     if (token) {
@@ -258,7 +222,9 @@ const MyReissueRequests = () => {
       dispatch(fetchOfflineReissueRequests(params));
     } else {
       dispatch(fetchCompanyReissueRequests({ ...params, corporateId }));
-      dispatch(fetchLegacyReissueRequests({ ...params, companyId: corporateId }));
+      dispatch(
+        fetchLegacyReissueRequests({ ...params, companyId: corporateId }),
+      );
     }
   };
 
@@ -274,13 +240,21 @@ const MyReissueRequests = () => {
       let actionByName = "Admin";
       try {
         const u = JSON.parse(sessionStorage.getItem("user") || "{}");
-        actionByName = typeof u.name === "string"
-          ? u.name
-          : [u.name?.firstName, u.name?.lastName].filter(Boolean).join(" ") || "Admin";
+        actionByName =
+          typeof u.name === "string"
+            ? u.name
+            : [u.name?.firstName, u.name?.lastName].filter(Boolean).join(" ") ||
+              "Admin";
       } catch {}
-      await dispatch(updateReissueStatus({
-        requestId, status: newStatus, message, actionBy: userId, actionByName
-      })).unwrap();
+      await dispatch(
+        updateReissueStatus({
+          requestId,
+          status: newStatus,
+          message,
+          actionBy: userId,
+          actionByName,
+        }),
+      ).unwrap();
       toast.success(`Request ${newStatus} successfully!`);
       load();
     } catch (err) {
@@ -294,7 +268,7 @@ const MyReissueRequests = () => {
       const merged = [...(companyRequests || []), ...(legacyRequests || [])];
       // Deduplicate by ID
       const uniqueMap = new Map();
-      merged.forEach(r => {
+      merged.forEach((r) => {
         const uid = r.requestId || r.id || r._id;
         if (uid && !uniqueMap.has(uid)) uniqueMap.set(uid, r);
       });
@@ -302,7 +276,7 @@ const MyReissueRequests = () => {
     } else {
       baseRequests = [...(onlineRequests || []), ...(offlineRequests || [])];
     }
-    
+
     // Sort
     let sorted = baseRequests.sort((a, b) => {
       const d1 = new Date(a.createdAt || a.date);
@@ -313,22 +287,57 @@ const MyReissueRequests = () => {
     // Client-side search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      sorted = sorted.filter(r => 
-        (r.pnr || "").toLowerCase().includes(q) || 
-        (r.requestId || r.id || r._id || "").toString().toLowerCase().includes(q)
+      sorted = sorted.filter(
+        (r) =>
+          (r.pnr || "").toLowerCase().includes(q) ||
+          (r.requestId || r.id || r._id || "")
+            .toString()
+            .toLowerCase()
+            .includes(q),
       );
     }
+
+    // Client-side date filter
+    if (dateFrom || dateTo) {
+      sorted = sorted.filter((r) => {
+        const d = new Date(r.createdAt || r.date).toISOString().slice(0, 10);
+        return (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo);
+      });
+    }
+
     return sorted;
-  }, [activeTab, companyRequests, legacyRequests, onlineRequests, offlineRequests, searchQuery]);
+  }, [
+    activeTab,
+    companyRequests,
+    legacyRequests,
+    onlineRequests,
+    offlineRequests,
+    searchQuery,
+    dateFrom,
+    dateTo,
+  ]);
 
-  const loading = legacyLoading || onlineLoading || offlineLoading || companyLoading;
+  const paginatedRequests = useMemo(() => {
+    return currentRequests.slice((currentPage - 1) * 10, currentPage * 10);
+  }, [currentRequests, currentPage]);
 
-  const stats = useMemo(() => ({
-    total:    currentRequests.length,
-    pending:  currentRequests.filter((r) => getStatus(r) === "PENDING").length,
-    approved: currentRequests.filter((r) => ["APPROVED", "COMPLETED", "TICKET_GENERATED", "IN_PROGRESS"].includes(getStatus(r))).length,
-    rejected: currentRequests.filter((r) => getStatus(r) === "REJECTED").length,
-  }), [currentRequests]);
+  const loading =
+    legacyLoading || onlineLoading || offlineLoading || companyLoading;
+
+  const stats = useMemo(
+    () => ({
+      total: currentRequests.length,
+      pending: currentRequests.filter((r) => getStatus(r) === "PENDING").length,
+      approved: currentRequests.filter((r) =>
+        ["APPROVED", "COMPLETED", "TICKET_GENERATED", "IN_PROGRESS"].includes(
+          getStatus(r),
+        ),
+      ).length,
+      rejected: currentRequests.filter((r) => getStatus(r) === "REJECTED")
+        .length,
+    }),
+    [currentRequests],
+  );
 
   const resetFilters = () => {
     setSearchQuery("");
@@ -337,251 +346,439 @@ const MyReissueRequests = () => {
     setFilter("All");
   };
 
+  const handleExport = () => {
+    if (!currentRequests.length) return;
+    const headers = [
+      "Request ID",
+      "PNR",
+      "Booking Ref",
+      "Employee",
+      "Route",
+      "Type",
+      "Reason",
+      "Date",
+      "Status",
+    ];
+    const rows = currentRequests.map((r) => [
+      getRequestId(r),
+      getPnr(r),
+      r.bookingReference || r.bookingRef || "N/A",
+      getUserName(r),
+      getRoute(r),
+      r.reissueType || r.type || "REISSUE",
+      r.reason || r.remarks || "N/A",
+      getRequestedDate(r),
+      getStatus(r),
+    ]);
+    const tableHtml = rows
+      .map(
+        (r) =>
+          `<tr>${r.map((c) => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `reissue_requests.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   return (
-    <div className="min-h-screen bg-[#F4F7F9] font-sans flex flex-col">
-      {/* ─────────────────────────────────────────────────────────────────
-          TOP HEADER SECTION (Dark Navy)
-          ───────────────────────────────────────────────────────────────── */}
-      <div className="bg-[#0A2D45] w-full pt-8 pb-16 px-6 relative overflow-hidden">
-        {/* Subtle background pattern/gradient if desired */}
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-        
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <button onClick={() => navigate(-1)} className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-lg text-white hover:bg-white/20 transition-colors">
-                <FiArrowLeft size={18} />
+    <div
+      className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6"
+      style={{ background: C.offWhite }}
+    >
+      {/* Navy Header Section */}
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 cursor-pointer"
+              >
+                <FiArrowLeft className="text-white" size={20} />
               </button>
-              <button onClick={load} className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-lg text-white hover:bg-white/20 transition-colors" title="Refresh">
-                <FiRefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              <button
+                onClick={load}
+                className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 cursor-pointer ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                disabled={loading}
+              >
+                <div className={loading ? "animate-spin" : ""}>
+                  <FiRefreshCw size={20} />
+                </div>
               </button>
-              <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-white ml-2">
-                <FiRepeat size={20} />
+            </div>
+
+            <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
+                <FiRepeat size={28} />
               </div>
-              <div className="ml-1">
-                <h1 className="text-2xl font-black text-white tracking-tight leading-none">Amendment Ledger</h1>
-                <p className="text-[9px] font-bold text-slate-300 mt-1.5 uppercase tracking-widest">Management of Flight Reissue Requests and Travel Document Modifications</p>
+              <div>
+                <h1 className="text-3xl font-black tracking-tight leading-none">
+                  Amendment Ledger
+                </h1>
+                <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                  Management of Flight Reissue Requests and Travel Document
+                  Modifications
+                </p>
               </div>
             </div>
-            
-            <button onClick={load} className="h-10 px-4 bg-white/10 border border-white/20 rounded-lg text-white text-xs font-bold hover:bg-white/20 transition-colors flex items-center gap-2">
-              <FiRefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              REFRESH
-            </button>
-          </div>
-
-          {/* Stat Cards - Overlapping the bottom edge */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 translate-y-12">
-            <LedgerStatCard label="TOTAL REQUESTS" value={loading ? "—" : stats.total} Icon={FiList} color="blue" />
-            <LedgerStatCard label="PENDING REVIEW" value={loading ? "—" : stats.pending} Icon={FiClock} color="orange" />
-            <LedgerStatCard label="PROCESSED" value={loading ? "—" : stats.approved} Icon={FiCheckCircle} color="green" />
-            <LedgerStatCard label="REJECTED" value={loading ? "—" : stats.rejected} Icon={FiXCircle} color="red" />
           </div>
         </div>
       </div>
 
-      {/* ─────────────────────────────────────────────────────────────────
-          MAIN CONTENT AREA
-          ───────────────────────────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto w-full px-6 pt-16 pb-12 flex-1 space-y-6">
-        
-        {/* Tabs and Filter */}
-        <div className="flex items-center justify-between">
-          <div className="flex bg-white rounded-xl shadow-sm p-1 border border-slate-200">
-             <button onClick={() => { setActiveTab("my"); setCurrentPage(1); }} 
-               className={`px-6 py-2.5 rounded-lg text-[11px] font-bold tracking-wider transition-all ${activeTab === "my" ? "bg-[#0A2D45] text-white shadow-md" : "text-slate-500 hover:text-slate-700 bg-transparent"}`}>
-               MY REQUESTS
-             </button>
-             {role !== "employee" && (
-               <button onClick={() => { setActiveTab("company"); setCurrentPage(1); }}
-                 className={`px-6 py-2.5 rounded-lg text-[11px] font-bold tracking-wider transition-all ${activeTab === "company" ? "bg-[#0A2D45] text-white shadow-md" : "text-slate-500 hover:text-slate-700 bg-transparent"}`}>
-                 CORPORATE VIEW
-               </button>
-             )}
-          </div>
-          <div>
-            <select 
-              value={filter} 
-              onChange={(e) => { setFilter(e.target.value); setCurrentPage(1); }}
-              className="bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-[#0A2D45] cursor-pointer shadow-sm min-w-[120px]"
-            >
-              <option value="All">ALL STATUS ▼</option>
-              <option value="PENDING">PENDING</option>
-              <option value="APPROVED">APPROVED</option>
-              <option value="REJECTED">REJECTED</option>
-              <option value="COMPLETED">COMPLETED</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Search & Timeline Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col md:flex-row gap-6 items-end">
-          <div className="flex-1 w-full">
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Search Ledger</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                <FiSearch size={16} />
-              </span>
-              <input 
-                type="text" 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="PNR, Request ID..." 
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#0A2D45] focus:ring-1 focus:ring-[#0A2D45] transition-all" 
-              />
-            </div>
-          </div>
-          <div className="flex-1 w-full flex flex-col md:flex-row gap-4">
-             <div className="flex-1">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Request Timeline</label>
-                <div className="flex items-center gap-3">
-                  <input 
-                    type="date" 
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 font-medium outline-none focus:border-[#0A2D45] focus:ring-1 focus:ring-[#0A2D45]" 
-                  />
-                  <span className="text-xs text-slate-400 font-medium">to</span>
-                  <input 
-                    type="date" 
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 font-medium outline-none focus:border-[#0A2D45] focus:ring-1 focus:ring-[#0A2D45]" 
-                  />
-                </div>
-             </div>
-             <div className="flex items-end shrink-0 mt-4 md:mt-0">
-                <button onClick={resetFilters} className="h-[42px] px-6 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap w-full md:w-auto shadow-sm">
-                  <span>×</span> RESET
-                </button>
-             </div>
-          </div>
-        </div>
-
-        {/* Inventory Header */}
-        <div className="flex items-end justify-between pt-4">
-           <div>
-              <h2 className="text-lg font-black text-slate-900 tracking-tight">Amendment Inventory</h2>
-              <p className="text-[11px] text-slate-500 font-medium mt-0.5">{currentRequests.length} reissue records</p>
-           </div>
-           <button className="px-5 py-2.5 bg-[#C9A227] text-slate-900 rounded-lg text-[11px] font-black tracking-wide hover:bg-[#b59123] transition-all flex items-center gap-2 shadow-sm">
-             <FiDownload size={14} /> EXPORT
-           </button>
-        </div>
-
-        {/* Content */}
-        {loading ? (
-          <div className="py-20 text-center bg-white rounded-2xl shadow-sm border border-slate-200">
-            <FiRefreshCw size={32} className="mx-auto text-[#0A2D45] animate-spin opacity-30" />
-            <p className="text-sm font-bold text-slate-400 mt-4">Loading ledger...</p>
-          </div>
-        ) : !currentRequests?.length ? (
-          <div className="py-20 text-center bg-white rounded-2xl shadow-sm border border-slate-200">
-            <FiRepeat size={40} className="mx-auto text-slate-200 mb-3" />
-            <p className="text-sm font-bold text-slate-400">No reissue records found</p>
-          </div>
-        ) : activeTab === "my" ? (
-          /* MY REQUESTS CARD GRID */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {currentRequests.map((req) => (
-              <ReissueCard key={getRequestId(req)} req={req} onView={setSelectedReq} />
+      <div className="w-full px-4 md:px-10 -mt-10 space-y-8">
+        {/* Tab Switcher */}
+        {role !== "employee" && (
+          <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+            {[
+              ["my", "My Requests", FiUser],
+              ["company", "Corporate View", FiList],
+            ].map(([k, lbl, Icon]) => (
+              <button
+                key={k}
+                onClick={() => {
+                  setActiveTab(k);
+                  setCurrentPage(1);
+                }}
+                className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all cursor-pointer ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+              >
+                <Icon size={14} /> {lbl}
+              </button>
             ))}
           </div>
-        ) : (
-          /* CORPORATE VIEW TABLE */
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[1000px]">
-                <thead>
-                  <tr className="bg-[#0A2D45] text-white">
-                    <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest">Request ID</th>
-                    <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest">Employee / Context</th>
-                    <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest">PNR / Reference</th>
-                    <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest">Airline & Route</th>
-                    <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest">Type & Reason</th>
-                    <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest">Status</th>
-                    <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-widest">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {currentRequests.map((req, i) => {
-                    const requestId = getRequestId(req);
-                    const userName = getUserName(req);
-                    const userEmail = getUserEmail(req);
-                    const pnr = getPnr(req);
-                    const route = getRoute(req);
-                    const airline = getAirline(req);
-                    const status = getStatus(req);
-                    const requestedAt = getRequestedDate(req);
-                    
-                    return (
-                      <tr key={requestId} className={`hover:bg-slate-50 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`}>
-                        <td className="px-5 py-4 align-top">
-                          <IdCell id={requestId} />
-                          <p className="text-[10px] font-semibold text-slate-400 mt-1">{requestedAt}</p>
-                        </td>
-                        <td className="px-5 py-4 align-top">
+        )}
+
+        {/* Stats Section */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard
+            label="Total Requests"
+            value={loading ? "—" : stats.total}
+            Icon={FiList}
+            borderCls="border-[#000D26]"
+            iconBgCls="bg-slate-100"
+            iconColorCls="text-[#000D26]"
+          />
+          <StatCard
+            label="Pending Review"
+            value={loading ? "—" : stats.pending}
+            Icon={FiClock}
+            borderCls="border-amber-500"
+            iconBgCls="bg-amber-50"
+            iconColorCls="text-amber-600"
+          />
+          <StatCard
+            label="Processed"
+            value={loading ? "—" : stats.approved}
+            Icon={FiCheckCircle}
+            borderCls="border-emerald-500"
+            iconBgCls="bg-emerald-50"
+            iconColorCls="text-emerald-600"
+          />
+          <StatCard
+            label="Rejected"
+            value={loading ? "—" : stats.rejected}
+            Icon={FiXCircle}
+            borderCls="border-rose-500"
+            iconBgCls="bg-rose-50"
+            iconColorCls="text-rose-600"
+          />
+        </div>
+
+        {/* Search & Filter section */}
+        <div
+          className="bg-white rounded-2xl p-6 border shadow-sm"
+          style={{ borderColor: C.border }}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+            <LabeledField
+              label={
+                <>
+                  <FiSearch size={10} /> Request Search
+                </>
+              }
+              className="lg:col-span-4"
+            >
+              <SearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="PNR, Request ID..."
+              />
+            </LabeledField>
+            <LabeledField label="Status" className="lg:col-span-3">
+              <CustomDropdown
+                value={filter}
+                onChange={setFilter}
+                options={[
+                  "All",
+                  "PENDING",
+                  "APPROVED",
+                  "REJECTED",
+                  "COMPLETED",
+                ]}
+              />
+            </LabeledField>
+            <LabeledField label="Request Window" className="lg:col-span-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className={dateCls}
+                  style={{ borderColor: C.border }}
+                />
+                <span className="text-slate-300">to</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className={dateCls}
+                  style={{ borderColor: C.border }}
+                />
+              </div>
+            </LabeledField>
+            <div className="flex items-end lg:col-span-2">
+              <button
+                onClick={resetFilters}
+                className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest cursor-pointer"
+                style={{
+                  background: C.white,
+                  borderColor: C.border,
+                  color: C.muted,
+                }}
+              >
+                <FiX /> Reset
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Table Ledger */}
+        <ResponsiveDataTable
+          title={
+            activeTab === "my" ? "Amendment Ledger" : "Corporate Amendments"
+          }
+          subtitle={`${currentRequests.length} active records`}
+          onExport={handleExport}
+          wrapperClass="!border-none !shadow-none"
+          pagination={
+            <Pagination
+              currentPage={currentPage}
+              totalItems={currentRequests.length}
+              pageSize={10}
+              onPageChange={setCurrentPage}
+            />
+          }
+        >
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+                <Th className="!px-6 !py-5">Request ID</Th>
+                {activeTab === "company" && (
+                  <Th className="!px-6 !py-5">Employee / Context</Th>
+                )}
+                <Th className="!px-6 !py-5">PNR / Ref</Th>
+                <Th className="!px-6 !py-5">Airline & Route</Th>
+                <Th className="!px-6 !py-5">Type & Reason</Th>
+                <Th className="!px-6 !py-5">Status</Th>
+                <Th className="!px-6 !py-5">Ticket</Th>
+                <Th className="!px-6 !py-5 !text-left">Action</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={activeTab === "company" ? 8 : 7}
+                    className="!px-6 !py-20 text-center"
+                  >
+                    <div className="flex flex-col items-center gap-3 text-slate-400">
+                      <FiRefreshCw size={28} className="animate-spin" />
+                      <p className="text-sm font-semibold">Loading ledger...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginatedRequests.length > 0 ? (
+                paginatedRequests.map((req, i) => {
+                  const requestId = getRequestId(req);
+                  const userName = getUserName(req);
+                  const userEmail = getUserEmail(req);
+                  const pnr = getPnr(req);
+                  const route = getRoute(req);
+                  const airline = getAirline(req);
+                  const status = getStatus(req);
+                  const requestedAt = getRequestedDate(req);
+                  const bookingRef =
+                    req.bookingReference || req.bookingRef || "N/A";
+
+                  return (
+                    <tr
+                      key={requestId}
+                      className="hover:bg-slate-100 transition-colors"
+                      style={{
+                        background: i % 2 === 0 ? C.white : C.lightGray,
+                      }}
+                    >
+                      {/* Request ID */}
+                      <td className="!px-6 !py-5">
+                        <IdCell id={requestId} />
+                        <p className="text-[10px] font-semibold text-slate-400 mt-1">
+                          {requestedAt}
+                        </p>
+                      </td>
+
+                      {/* Employee (Corporate View Only) */}
+                      {activeTab === "company" && (
+                        <td className="!px-6 !py-5">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-[#0A2D45]/10 text-[#0A2D45] flex items-center justify-center text-[11px] font-black shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-[#000D26]/10 text-[#000D26] flex items-center justify-center text-[11px] font-black shrink-0">
                               {userName?.[0]?.toUpperCase() || "?"}
                             </div>
                             <div>
-                              <p className="font-bold text-[13px] text-slate-800 leading-tight">{userName}</p>
-                              <p className="text-[11px] text-slate-500 mt-0.5">{userEmail}</p>
+                              <p className="font-bold text-[13px] text-slate-800 leading-tight">
+                                {userName}
+                              </p>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                {userEmail}
+                              </p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-4 align-top">
-                          <p className="font-black text-sm text-slate-900 uppercase">{pnr}</p>
-                          <p className="text-[11px] font-bold text-slate-400 font-mono mt-0.5">{req.bookingReference || req.bookingRef || "N/A"}</p>
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <p className="text-xs font-bold text-slate-800">{airline}</p>
-                          <p className="text-[11px] font-semibold text-slate-500 mt-0.5">{route}</p>
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded text-[9px] font-black uppercase tracking-wider inline-block mb-1">
-                            {req.reissueType || req.type || "REISSUE"}
-                          </span>
-                          <p className="text-[11px] text-slate-600 italic line-clamp-2 leading-snug" title={req.reason || req.remarks || "N/A"}>
-                            &ldquo;{req.reason || req.remarks || "N/A"}&rdquo;
-                          </p>
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <StatusBadge req={req} />
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <div className="flex flex-col gap-2">
-                            <button onClick={() => setSelectedReq(req)} className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-slate-50 hover:text-[#0A2D45] hover:border-[#0A2D45] transition-all">
-                              <FiEye size={12} /> View Details
-                            </button>
-                            {status === "PENDING" && (
-                              <div className="flex gap-1.5 mt-1">
-                                <button onClick={() => handleStatusUpdate(req._id || req.id || req.requestId, "APPROVED")} className="flex-1 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black transition-colors">Approve</button>
-                                <button onClick={() => handleStatusUpdate(req._id || req.id || req.requestId, "REJECTED")} className="flex-1 py-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-[10px] font-black transition-colors">Reject</button>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
+                      )}
 
-      {/* Detail Modal */}
-      {selectedReq && (
-        <LegacyReissueDetailModal
-          request={selectedReq}
-          onClose={() => setSelectedReq(null)}
-          onStatusUpdate={handleStatusUpdate}
-          userRole={role}
-        />
-      )}
+                      {/* PNR / Ref */}
+                      <td className="!px-6 !py-5">
+                        <p className="font-black text-sm text-slate-900 uppercase">
+                          {pnr}
+                        </p>
+                        <p className="text-[11px] font-bold text-slate-400 font-mono mt-0.5">
+                          {bookingRef}
+                        </p>
+                      </td>
+
+                      {/* Airline & Route */}
+                      <td className="!px-6 !py-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden shrink-0">
+                            <img
+                              src={airlineLogo(getAirlineCode(req))}
+                              alt={airline}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src =
+                                  "https://cdn-icons-png.flaticon.com/512/3114/3114883.png";
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">
+                              {airline}
+                            </p>
+                            <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                              {route}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Type & Reason */}
+                      <td className="!px-6 !py-5">
+                        <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded text-[9px] font-black uppercase tracking-wider inline-block mb-1">
+                          {req.reissueType || req.type || "REISSUE"}
+                        </span>
+                        <p
+                          className="text-[11px] text-slate-600 italic line-clamp-1 max-w-[200px]"
+                          title={req.reason || req.remarks || "N/A"}
+                        >
+                          &ldquo;{req.reason || req.remarks || "N/A"}&rdquo;
+                        </p>
+                      </td>
+
+                      {/* Status */}
+                      <td className="!px-6 !py-5">
+                        <ReissueStatusBadge req={req} />
+                      </td>
+
+                      {/* Ticket */}
+                      <td className="!px-6 !py-5">
+                        <TicketActions req={req} />
+                      </td>
+
+                      {/* Action */}
+                      <td className="!px-6 !py-5 !text-left">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => navigate(`/my-reissue/${req._id || req.id}`)}
+                            className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group cursor-pointer"
+                            title="View Details"
+                          >
+                            <FiEye
+                              size={18}
+                              className="text-[#E7C695] group-hover:text-[#000d26] transition-colors"
+                            />
+                          </button>
+                          {status === "PENDING" && activeTab === "company" && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  handleStatusUpdate(
+                                    req._id || req.id || req.requestId,
+                                    "APPROVED",
+                                  )
+                                }
+                                className="px-3 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all rounded-xl text-[10px] font-black tracking-wide border border-emerald-100 hover:border-emerald-500 cursor-pointer"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleStatusUpdate(
+                                    req._id || req.id || req.requestId,
+                                    "REJECTED",
+                                  )
+                                }
+                                className="px-3 py-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all rounded-xl text-[10px] font-black tracking-wide border border-rose-100 hover:border-rose-500 cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td
+                    colSpan={activeTab === "company" ? 8 : 7}
+                    className="!px-6 !py-20 text-center"
+                  >
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                        <FiSearch size={32} />
+                      </div>
+                      <p className="text-sm font-bold text-slate-400">
+                        No reissue requests found for the selected criteria.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </ResponsiveDataTable>
+      </div>
     </div>
   );
 };

@@ -12,6 +12,7 @@ import {
   previewReissueQuote,
   searchOfflineReissueOptions,
   fetchCompanyReissueRequests,
+  fetchLegacyReissueRequestById,
 } from "../Actions/reissueThunks";
 
 const initialPagination = {
@@ -250,6 +251,20 @@ const reissueSlice = createSlice({
         upsertRequest(state, action.payload);
       })
       .addCase(fetchReissueRequestById.rejected, (state, action) => {
+        state.detailLoading = false;
+        state.error = action.payload;
+      })
+
+      // ── Legacy: fetch single request by ID ──
+      .addCase(fetchLegacyReissueRequestById.pending, (state) => {
+        state.detailLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchLegacyReissueRequestById.fulfilled, (state, action) => {
+        state.detailLoading = false;
+        state.requestDetail = action.payload;
+      })
+      .addCase(fetchLegacyReissueRequestById.rejected, (state, action) => {
         state.detailLoading = false;
         state.error = action.payload;
       })

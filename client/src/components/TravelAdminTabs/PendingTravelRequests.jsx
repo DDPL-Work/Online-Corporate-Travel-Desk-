@@ -654,8 +654,8 @@ export default function PendingTravelRequests() {
         <PendingFlightDetailsModal 
           booking={selectedRequest.originalData} 
           onClose={() => setSelectedRequest(null)} 
-          onApprove={(id, action) => { handleAction(id, "flight", action); setSelectedRequest(null); }} 
-          onReject={(id, action) => { handleAction(id, "flight", action); setSelectedRequest(null); }} 
+          onApprove={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
+          onReject={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
           isDiscarded={selectedRequest.isTravelPassed} 
         />
       )}
@@ -664,8 +664,8 @@ export default function PendingTravelRequests() {
         <PendingHotelDetailsModal 
           booking={selectedRequest.originalData} 
           onClose={() => setSelectedRequest(null)} 
-          onApprove={(id, action) => { handleAction(id, "hotel", action); setSelectedRequest(null); }} 
-          onReject={(id, action) => { handleAction(id, "hotel", action); setSelectedRequest(null); }} 
+          onApprove={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
+          onReject={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
           isDiscarded={selectedRequest.isTravelPassed} 
         />
       )}
