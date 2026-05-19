@@ -15,7 +15,7 @@ import {
   FiUserCheck, 
   FiPhone 
 } from "react-icons/fi";
-import logo from "../../public/logo-traveamer.svg";
+const logo = "/logo-traveamer.svg";
 import { useFlightSearch } from "../context/FlightSearchContext";
 
 export default function LandingFooter({ onTabChange }) {
@@ -27,14 +27,12 @@ export default function LandingFooter({ onTabChange }) {
 
   const handleSearchClick = (tab) => {
     if (onTabChange) {
-      onTabChange(tab); // use the prop if provided
+      onTabChange(tab);
     } else {
-      setActiveTab(tab); // fallback to context
+      setActiveTab(tab);
     }
     navigate(`/travel`);
-    if (location.pathname === "/travel") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const GOLD = "#C9A84C";
@@ -64,6 +62,7 @@ export default function LandingFooter({ onTabChange }) {
     {
       head: "Resources",
       links: [
+        { label: "Traveamer", icon: <FiAirplay size={14} />, href: "/traveamer" },
         { label: "About Us", icon: <FiInfo size={14} />, href: "/about-us" },
         { label: "FAQs", icon: <FiHelpCircle size={14} />, href: "/faq" },
         { label: "Blog", icon: <FiBookOpen size={14} />, href: "/blog" },
@@ -244,6 +243,7 @@ export default function LandingFooter({ onTabChange }) {
                     ) : (
                       <Link
                         to={href}
+                        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
                         className="text-[13px] font-semibold transition-all hover:translate-x-1 flex items-center gap-3 group no-underline"
                         style={{
                           color: C.muted,
@@ -270,9 +270,9 @@ export default function LandingFooter({ onTabChange }) {
           © {new Date().getFullYear()} {branding?.corporateName || "Traveamer"}. All rights reserved.
         </p>
         <div className="flex items-center gap-8">
-          <Link to="/legal/privacy-policy" className="text-[12px] font-semibold no-underline hover:text-[#C9A84C] transition-colors" style={{ color: C.muted }}>Privacy Policy</Link>
-          <Link to="/legal/terms-of-service" className="text-[12px] font-semibold no-underline hover:text-[#C9A84C] transition-colors" style={{ color: C.muted }}>Terms of Service</Link>
-          <Link to="/legal/cookie-policy" className="text-[12px] font-semibold no-underline hover:text-[#C9A84C] transition-colors" style={{ color: C.muted }}>Cookies</Link>
+          <Link to="/legal/privacy-policy" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="text-[12px] font-semibold no-underline hover:text-[#C9A84C] transition-colors" style={{ color: C.muted }}>Privacy Policy</Link>
+          <Link to="/legal/terms-of-service" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="text-[12px] font-semibold no-underline hover:text-[#C9A84C] transition-colors" style={{ color: C.muted }}>Terms of Service</Link>
+          <Link to="/legal/user-agreement" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="text-[12px] font-semibold no-underline hover:text-[#C9A84C] transition-colors" style={{ color: C.muted }}>User Agreement</Link>
         </div>
       </div>
     </footer>

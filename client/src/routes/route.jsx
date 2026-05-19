@@ -88,6 +88,7 @@ import WalletPhonePeStatusPage from "../Pages/Payments/WalletPhonePeStatusPage";
 import CompanyLandingPage from "../Pages/Landing/CompanySpecific/CompanyLandingPage";
 import BlogList from "../Pages/Landing/Blog/BlogList";
 import BlogDetails from "../Pages/Landing/Blog/BlogDetails";
+import Traveamer from "../Pages/Landing/Traveamer/Traveamer";
 // import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 
 const HomeRedirect = () => {
@@ -339,6 +340,8 @@ export const appRouter = createBrowserRouter([
       { path: "/faq", element: <FAQs /> },
       { path: "/:slug", element: <CompanyLandingPage /> },
       { path: "/company-specific", element: <CompanyLandingPage /> },
+      { path: "/traveamer", element: <Traveamer /> },
+
       {
         path: "*",
         element: <FlightBookingInfo />,

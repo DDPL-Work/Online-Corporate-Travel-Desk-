@@ -1,6 +1,41 @@
+/**
+ * toReissueDto — Online ReissueRequest transformer
+ *
+ * After adding .populate("userId", "name email") to the repository,
+ * item.userId is now a populated User object { _id, name: nameSchema, email }
+ * where nameSchema = { firstName, lastName } (User model shape).
+ *
+ * We normalize it into a plain user: { name: String, email: String } so
+ * the frontend never needs to know the User model internals.
+ */
+
+function normalizeUserName(nameField) {
+  if (!nameField) return null;
+  if (typeof nameField === "string") return nameField.trim() || null;
+  if (typeof nameField === "object") {
+    const parts = [nameField.firstName, nameField.lastName].filter(Boolean);
+    return parts.length ? parts.join(" ") : null;
+  }
+  return null;
+}
+
 function toReissueDto(doc) {
   if (!doc) return null;
   const item = doc.toObject ? doc.toObject() : doc;
+
+  // userId is populated → a User object; or raw ObjectId string if not populated
+  const populatedUser =
+    item.userId && typeof item.userId === "object" && item.userId.email
+      ? item.userId
+      : null;
+
+  const user = populatedUser
+    ? {
+        id: populatedUser._id,
+        name: normalizeUserName(populatedUser.name),
+        email: populatedUser.email || null,
+      }
+    : null;
 
   return {
     id: item._id,
@@ -10,7 +45,9 @@ function toReissueDto(doc) {
     originalPnr: item.originalPnr,
     newBookingId: item.newBookingId,
     newPnr: item.newPnr,
-    userId: item.userId,
+    userId: populatedUser ? populatedUser._id : item.userId,
+    // Normalized user object — frontend reads req.user.name (always a String or null)
+    user,
     corporateId: item.corporateId,
     companyId: item.companyId,
     supplier: item.supplier,

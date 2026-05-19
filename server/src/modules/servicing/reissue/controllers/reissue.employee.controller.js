@@ -2,6 +2,7 @@ const asyncHandler = require("../../../../utils/asyncHandler");
 const ApiResponse = require("../../../../utils/ApiResponse");
 const reissueWorkflowService = require("../services/reissueWorkflow.service");
 const { toReissueDto } = require("../transformers/reissue.dto");
+const { toOfflineReissueDto } = require("../transformers/offlineReissue.dto");
 const { REISSUE_STATUSES } = require("../constants/reissue.constants");
 
 /**
@@ -148,17 +149,57 @@ exports.getMyRequests = asyncHandler(async (req, res) => {
   });
 
   res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        data: result.data.map(toReissueDto),
-        pagination: result.pagination,
-      },
-      "Reissue requests fetched",
-    ),
+    new ApiResponse(200, {
+      data: result.data.map(toReissueDto),
+      pagination: result.pagination,
+    }, "My reissue requests fetched"),
   );
 });
 
+exports.getCompanyRequests = asyncHandler(async (req, res) => {
+  const corporateId = req.query.corporateId || req.user.corporateId;
+  if (!corporateId) {
+    return res.status(400).json(new ApiResponse(400, null, "Corporate ID missing"));
+  }
+
+  const query = { ...req.query, corporateId };
+
+  // Lazy-require repositories to avoid circular deps
+  const reissueRepository = require("../repositories/reissue.repository");
+  const offlineReissueRepository = require("../repositories/offlineReissue.repository");
+
+  const mongoQuery = { corporateId };
+  if (query.status) mongoQuery.status = query.status;
+
+  const [onlineRes, offlineRes] = await Promise.all([
+    reissueRepository.list(mongoQuery, {
+      page: Number(query.page || 1),
+      limit: Number(query.limit || 20),
+    }),
+    offlineReissueRepository.list(mongoQuery, {
+      page: Number(query.page || 1),
+      limit: Number(query.limit || 20),
+    }),
+  ]);
+
+  // ── CRITICAL: Use the correct transformer per record type ──────────────────
+  // Online records  → toReissueDto        (oldJourney / newJourney structure)
+  // Offline records → toOfflineReissueDto (selectedSegments / preferredJourney / pricingSnapshot)
+  // Mixing transformers strips all flight/pricing fields from offline records.
+  const onlineDtos  = (onlineRes.data  || []).map(toReissueDto);
+  const offlineDtos = (offlineRes.data || []).map(toOfflineReissueDto);
+
+  const combined = [...onlineDtos, ...offlineDtos].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  );
+
+  res.status(200).json(
+    new ApiResponse(200, {
+      data: combined,
+      pagination: { total: combined.length, page: 1, pages: 1 },
+    }, "Company reissue requests fetched"),
+  );
+});
 exports.getById = asyncHandler(async (req, res) => {
   const request = await reissueWorkflowService.getById({
     actor: req.user,

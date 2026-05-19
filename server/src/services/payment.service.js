@@ -1517,11 +1517,12 @@ class PaymentService {
       await WalletTransaction.create({
         corporateId: corporate._id,
         bookingId: booking._id,
+        bookingModel: booking.constructor.modelName || "BookingRequest",
         type: "debit",
         amount,
         balanceBefore,
         balanceAfter: corporate.walletBalance,
-        description: "Wallet debited for booking",
+        description: booking.bookingType === 'flight' ? "Wallet debited for flight booking" : "Wallet debited for booking",
         status: "completed",
       });
 
@@ -1594,6 +1595,7 @@ class PaymentService {
         corporateId: corporate._id,
         userId: booking.userId,
         bookingId: booking._id,
+        bookingModel: booking.constructor.modelName || (booking.bookingType === "hotel" ? "HotelBookingRequest" : "BookingRequest"),
         bookingReference: booking.bookingReference,
         amount,
         type: "booking",

@@ -1,6 +1,31 @@
+function normalizeUserName(nameField) {
+  if (!nameField) return null;
+  if (typeof nameField === "string") return nameField.trim() || null;
+  if (typeof nameField === "object") {
+    const parts = [nameField.firstName, nameField.lastName].filter(Boolean);
+    return parts.length ? parts.join(" ") : null;
+  }
+  return null;
+}
+
 function toOfflineReissueDto(doc) {
   if (!doc) return null;
   const item = doc.toObject ? doc.toObject() : doc;
+
+  // employeeId is populated by repository: { _id, name: nameSchema, email, role, corporateId }
+  const populatedEmployee =
+    item.employeeId && typeof item.employeeId === "object" && item.employeeId.email
+      ? item.employeeId
+      : null;
+
+  const user = populatedEmployee
+    ? {
+        id: populatedEmployee._id,
+        name: normalizeUserName(populatedEmployee.name),
+        email: populatedEmployee.email || null,
+        role: populatedEmployee.role || null,
+      }
+    : null;
   const terminalStatuses = new Set(["COMPLETED", "FAILED", "REJECTED"]);
   const now = Date.now();
   const slaDeadline = item.slaDeadline ? new Date(item.slaDeadline).getTime() : null;
@@ -50,7 +75,9 @@ function toOfflineReissueDto(doc) {
     id: item._id,
     requestId: item.requestId,
     bookingId: item.bookingId,
-    employeeId: item.employeeId,
+    employeeId: populatedEmployee ? populatedEmployee._id : item.employeeId,
+    // Normalized user object — always { name: String, email: String } or null
+    user,
     corporateId: item.corporateId,
     pnr: item.pnr,
     originalPnr: item.originalPnr || item.pnr,

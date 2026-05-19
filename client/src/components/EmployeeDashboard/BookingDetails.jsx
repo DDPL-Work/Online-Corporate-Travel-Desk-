@@ -302,17 +302,17 @@ function FlightCard({
 
       {/* Main flight row */}
       <div className="px-5 pt-5 pb-4">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+        <div className="flex flex-col md:grid md:grid-cols-[1fr_auto_1fr] items-center gap-6 md:gap-4">
           {/* Origin */}
-          <div>
+          <div className="w-full md:w-auto text-center md:text-left">
             <p className="text-[11px] font-bold text-[#8B7355] uppercase tracking-wider mb-2">
               {formatDate(firstSeg?.departureDateTime)}
             </p>
-            <p className="text-[44px] font-black tracking-tight leading-none text-gray-900">
+            <p className="text-[32px] md:text-[44px] font-black tracking-tight leading-none text-gray-900">
               {departureTime}
             </p>
             <div className="flex flex-col gap-0.5 mt-2">
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-baseline gap-2 justify-center md:justify-start">
                 <span className="text-[15px] font-bold text-gray-900">
                   {journeyOrigin?.airportCode}
                 </span>
@@ -342,15 +342,15 @@ function FlightCard({
           </div>
 
           {/* Destination */}
-          <div className="text-right">
+          <div className="w-full md:w-auto text-center md:text-right">
             <p className="text-[11px] font-bold text-[#8B7355] uppercase tracking-wider mb-2">
               {formatDate(lastSeg?.arrivalDateTime)}
             </p>
-            <p className="text-[44px] font-black tracking-tight leading-none text-gray-900">
+            <p className="text-[32px] md:text-[44px] font-black tracking-tight leading-none text-gray-900">
               {arrivalTime}
             </p>
             <div className="flex flex-col gap-0.5 mt-2">
-              <div className="flex items-baseline gap-2 justify-end">
+              <div className="flex items-baseline gap-2 justify-center md:justify-end">
                 <span className="text-[12px] text-[#8B7355] font-medium uppercase tracking-wide">
                   {journeyDestination?.city}
                 </span>
@@ -659,7 +659,7 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
 /* ────────────────────────────────────────────────────────────── */
 /*  Booking Summary card (restyled)                               */
 /* ────────────────────────────────────────────────────────────── */
-function BookingSummaryCard({ booking, displayPnr }) {
+function BookingSummaryCard({ booking, displayPnr, isEmployee, userRole }) {
   const approvalStatus = booking.approvalStatus || booking.status;
   const isApproved =
     approvalStatus === "approved" ||
@@ -732,7 +732,7 @@ function BookingSummaryCard({ booking, displayPnr }) {
         </div>
 
         {/* 3-column fields grid */}
-        <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
           {topFields.map((field, i) => (
             <div key={i}>
               <div className="flex items-center gap-1 mb-1">
@@ -750,7 +750,7 @@ function BookingSummaryCard({ booking, displayPnr }) {
       </div>
 
       {/* ── Bottom: Payment Status row ── */}
-      <div className="border-t border-[#E0D8C8] grid grid-cols-2 divide-x divide-[#E0D8C8]">
+      <div className={`border-t border-[#E0D8C8] grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[#E0D8C8]`}>
         {[
           {
             label: "Status",
@@ -767,17 +767,9 @@ function BookingSummaryCard({ booking, displayPnr }) {
             value: amountPaid,
             valueClass: "text-gray-900",
           },
-          // {
-          //   label: "Method",
-          //   value: paymentMethod,
-          //   valueClass: "text-gray-900",
-          // },
-          // {
-          //   label: "Transaction",
-          //   value: transactionId,
-          //   valueClass: "text-gray-900 font-mono text-[11px]",
-          // },
-        ].map((col, i) => (
+        ]
+        .filter(col => !(col.label === "Amount Paid" && userRole === "employee"))
+        .map((col, i) => (
           <div key={i} className="px-4 py-3">
             <p className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355] mb-1">
               {col.label}
@@ -2996,7 +2988,9 @@ export default function BookingDetails() {
         <div className="lg:col-span-1">
           <BookingSummaryCard
             booking={booking}
-            displayPnr={pnrsByJourney.onward || null}
+            displayPnr={pnrsByJourney}
+            isEmployee={isEmployee}
+            userRole={userRole}
           />
         </div>
         {/* SSR Section */}
@@ -3140,7 +3134,7 @@ export default function BookingDetails() {
               );
             })()}
 
-            {pricingSnap?.totalAmount != null && (
+            {pricingSnap?.totalAmount != null && userRole !== "employee" && (
               <div className="mt-4 bg-teal-50 rounded-lg p-4 flex justify-between items-center">
                 <span className="font-semibold text-teal-800">Total Paid</span>
                 <span className="text-2xl font-black text-gray-900">
@@ -3183,8 +3177,8 @@ export default function BookingDetails() {
             )}
           </div>
 
-          {/* 3-column status grid */}
-          <div className="grid grid-cols-3 divide-x divide-[#E0D8C8]">
+          {/* Responsive status grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#E0D8C8]">
             {!isEmployee && (
             <div className="px-5 py-4">
               <p className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">

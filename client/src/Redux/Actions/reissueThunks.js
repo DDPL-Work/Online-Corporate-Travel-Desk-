@@ -95,13 +95,35 @@ export const createOfflineReissueRequest = createAsyncThunk(
   },
 );
 
-// ── Fetch employee's online reissue requests ──
+// ── Fetch employee's online reissue requests (module API — ReissueRequest schema) ──
 export const fetchReissueRequests = createAsyncThunk(
   "reissue/fetchAll",
   async (params = {}, { rejectWithValue }) => {
     try {
       const response = await axios.get("/reissue/my", { params });
       return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        getErrorMessage(error, "Failed to fetch reissue requests"),
+      );
+    }
+  },
+);
+
+// ── Fetch FlightReissueRequest records (legacy API — has reason, PNR, user.name, corporate) ──
+// Used by: MyReissuedRequests, TravelAdminTabs/ReissueRequests, approval workflows
+// Response: { success, data: FlightReissueRequest[], pagination: {} }
+export const fetchLegacyReissueRequests = createAsyncThunk(
+  "reissue/fetchLegacyAll",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const response = await axios.get("/flights/reissue/list", { params });
+      // Response shape: { success, data: [], pagination: {} }
+      // response.data = that object; response.data.data = the array
+      return {
+        data: response.data.data || [],
+        pagination: response.data.pagination || {},
+      };
     } catch (error) {
       return rejectWithValue(
         getErrorMessage(error, "Failed to fetch reissue requests"),
@@ -120,6 +142,51 @@ export const fetchOfflineReissueRequests = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(
         getErrorMessage(error, "Failed to fetch offline reissue requests"),
+      );
+    }
+  },
+);
+
+// ── Fetch all online reissue requests (Admin) ──
+export const fetchAdminReissueRequests = createAsyncThunk(
+  "reissue/fetchAdminAll",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const response = await axios.get("/reissue/admin/requests", { params });
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        getErrorMessage(error, "Failed to fetch admin reissue requests"),
+      );
+    }
+  },
+);
+
+// ── Fetch company reissue requests (Online + Offline combined for Travel Admin) ──
+export const fetchCompanyReissueRequests = createAsyncThunk(
+  "reissue/fetchCompanyAll",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const response = await axios.get("/reissue/company", { params });
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        getErrorMessage(error, "Failed to fetch company reissue requests"),
+      );
+    }
+  },
+);
+
+// ── Fetch all online reissue requests (Ops) ──
+export const fetchOpsReissueRequests = createAsyncThunk(
+  "reissue/fetchOpsAll",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const response = await axios.get("/reissue/ops/requests", { params });
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        getErrorMessage(error, "Failed to fetch ops reissue requests"),
       );
     }
   },
@@ -158,6 +225,24 @@ export const fetchReissueRequestById = createAsyncThunk(
       );
     }
   },
+);
+
+// ── Update Reissue Status (Approve/Reject) ──
+export const updateReissueStatus = createAsyncThunk(
+  "reissue/updateStatus",
+  async ({ requestId, status, message, actionBy, actionByName }, { rejectWithValue }) => {
+    try {
+      const response = await axios.patch(`/flights/reissue/status/${requestId}`, {
+        status,
+        message,
+        actionBy,
+        actionByName
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "Failed to update status");
+    }
+  }
 );
 
 // ── Preview fare quote ──

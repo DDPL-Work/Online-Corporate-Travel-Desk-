@@ -7,7 +7,7 @@ class ReissueRepository {
   }
 
   async findById(id, options = {}) {
-    return ReissueRequest.findById(id, null, options);
+    return ReissueRequest.findById(id, null, options).populate("userId", "name email");
   }
 
   async findOne(query, options = {}) {
@@ -28,7 +28,7 @@ class ReissueRepository {
   async list(query = {}, { page = 1, limit = 20, sort = { createdAt: -1 } } = {}) {
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
-      ReissueRequest.find(query).sort(sort).skip(skip).limit(limit),
+      ReissueRequest.find(query).sort(sort).skip(skip).limit(limit).populate("userId", "name email"),
       ReissueRequest.countDocuments(query),
     ]);
 

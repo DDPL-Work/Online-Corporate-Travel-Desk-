@@ -43,6 +43,7 @@ exports.getRechargeHistory = asyncHandler(async (req, res) => {
   }
 
   const transactions = await WalletTransaction.find(query)
+    .populate("processedBy", "name email profilePicture")
     .sort({ createdAt: -1 });
 
   res.status(200).json(
@@ -69,7 +70,8 @@ exports.getBookingTransactions = asyncHandler(async (req, res) => {
   }
 
   const transactions = await WalletTransaction.find(query)
-    .populate("bookingId", "bookingReference")
+    .populate("bookingId", "orderId status pricingSnapshot")
+    .populate("processedBy", "name email profilePicture")
     .sort({ createdAt: -1 });
 
   res.status(200).json(
@@ -101,7 +103,8 @@ exports.getWalletTransactions = asyncHandler(async (req, res) => {
   }
 
   const transactions = await WalletTransaction.find(query)
-    .populate("bookingId", "bookingReference")
+    .populate("bookingId", "orderId status pricingSnapshot")
+    .populate("processedBy", "name email profilePicture")
     .sort({ createdAt: -1 });
 
   res.status(200).json(

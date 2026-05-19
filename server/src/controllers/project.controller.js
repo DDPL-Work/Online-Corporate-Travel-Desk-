@@ -149,7 +149,6 @@ exports.getProjectsByCorporate = async (req, res) => {
       });
     }
 
-    // ✅ Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(corporateId)) {
       return res.status(400).json({
         success: false,
@@ -157,7 +156,6 @@ exports.getProjectsByCorporate = async (req, res) => {
       });
     }
 
-    // 🔐 SECURITY CHECK (VERY IMPORTANT)
     if (req.user.corporateId.toString() !== corporateId) {
       return res.status(403).json({
         success: false,
@@ -165,12 +163,69 @@ exports.getProjectsByCorporate = async (req, res) => {
       });
     }
 
-    const projects = await Project.find({
-      corporateId,
-    })
-      .select("projectName projectCodeId clientName createdAt")
-      .sort({ createdAt: -1 })
-      .lean();
+    // ✅ Aggregation to fetch projects with booking counts
+    const projects = await Project.aggregate([
+      {
+        $match: { corporateId: new mongoose.Types.ObjectId(corporateId) }
+      },
+      {
+        $lookup: {
+          from: "bookingrequests",
+          let: { pCode: "$projectCodeId", cId: "$corporateId" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$projectId", "$$pCode"] },
+                    { $eq: ["$corporateId", "$$cId"] }
+                  ]
+                }
+              }
+            }
+          ],
+          as: "flightBookings"
+        }
+      },
+      {
+        $lookup: {
+          from: "hotelbookingrequests",
+          let: { pCode: "$projectCodeId", cId: "$corporateId" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$projectId", "$$pCode"] },
+                    { $eq: ["$corporateId", "$$cId"] }
+                  ]
+                }
+              }
+            }
+          ],
+          as: "hotelBookings"
+        }
+      },
+      {
+        $addFields: {
+          bookingCount: {
+            $add: [{ $size: "$flightBookings" }, { $size: "$hotelBookings" }]
+          }
+        }
+      },
+      {
+        $project: {
+          projectName: 1,
+          projectCodeId: 1,
+          clientName: 1,
+          createdAt: 1,
+          bookingCount: 1
+        }
+      },
+      {
+        $sort: { createdAt: -1 }
+      }
+    ]);
 
     return res.status(200).json({
       success: true,

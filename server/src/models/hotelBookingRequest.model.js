@@ -122,6 +122,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
     hotelRequest: {
       cityId: String,
       cityName: String,
+      countryName: String,
       countryCode: String,
 
       checkInDate: Date,
@@ -246,6 +247,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       hotelName: String,
       hotelImage: String,
       city: String,
+      country: String,
       checkInDate: Date,
       checkOutDate: Date,
       roomCount: Number,

@@ -1215,8 +1215,31 @@ export default function FlightBookingDetails() {
   // Detect where we came from: cancelled bookings table or total bookings table
   const searchParams = new URLSearchParams(location.search);
   const source = searchParams.get("source"); // "cancelled" | null
-  const backPath = source === "cancelled" ? "/total-cancelled-bookings" : source === "past" ? "/past-trips" : source === "upcoming" ? "/upcoming-trips" : "/total-bookings";
-  const backLabel = source === "cancelled" ? "Cancelled Bookings" : source === "past" ? "Past Trips" : source === "upcoming" ? "Upcoming Trips" : "Total Bookings";
+    const backPath =
+    source === "cancelled"
+      ? "/total-cancelled-bookings"
+      : source === "past"
+        ? "/past-trips"
+        : source === "upcoming"
+          ? "/upcoming-trips"
+          : source === "wallet"
+            ? "/corporate-wallet"
+            : source === "postpaid"
+              ? "/credit-utilization"
+              : "/total-bookings";
+
+  const backLabel =
+    source === "cancelled"
+      ? "Cancelled Bookings"
+      : source === "past"
+        ? "Past Trips"
+        : source === "upcoming"
+          ? "Upcoming Trips"
+          : source === "wallet"
+            ? "Corporate Wallet"
+            : source === "postpaid"
+              ? "Postpaid Credit Ledger"
+              : "Total Bookings";
 
   const {
     singleBooking: booking,
@@ -1334,7 +1357,7 @@ export default function FlightBookingDetails() {
     <div className="min-h-screen bg-gray-50">
       {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
+        <div className="max-w-[1440px] mx-auto px-5 h-14 flex items-center justify-between">
           <button
             onClick={() => navigate(backPath)}
             className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
@@ -1352,7 +1375,7 @@ export default function FlightBookingDetails() {
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-5 py-8 pb-24 space-y-6">
+      <main className="max-w-[1440px] mx-auto px-5 py-8 pb-24 space-y-6">
         {/* ── Header: "The trip is confirmed" ── */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

@@ -4,12 +4,14 @@ import {
   confirmReissueRequest,
   createOfflineReissueRequest,
   createReissueRequest,
+  fetchLegacyReissueRequests,
   fetchOfflineReissueRequestByBooking,
   fetchOfflineReissueRequests,
   fetchReissueRequestById,
   fetchReissueRequests,
   previewReissueQuote,
   searchOfflineReissueOptions,
+  fetchCompanyReissueRequests,
 } from "../Actions/reissueThunks";
 
 const initialPagination = {
@@ -25,7 +27,7 @@ const initialState = {
   eligibilityLoading: false,
   eligibilityError: null,
 
-  // ── Online reissue ──
+  // ── Online reissue (module API) ──
   requests: [],
   pagination: initialPagination,
   requestDetail: null,
@@ -37,6 +39,12 @@ const initialState = {
   error: null,
   success: false,
   lastCreated: null,
+
+  // ── Legacy FlightReissueRequest (approval flow) ──
+  legacyRequests: [],
+  legacyPagination: initialPagination,
+  legacyLoading: false,
+  legacyError: null,
 
   // ── Offline reissue ──
   offlineRequests: [],
@@ -52,16 +60,68 @@ const initialState = {
   offlineSearchError: null,
   bookingOfflineRequest: null,
   bookingOfflineRequestLoading: false,
+
+  // ── Company Reissue (Travel Admin Tab) ──
+  companyRequests: [],
+  companyPagination: initialPagination,
+  companyLoading: false,
+  companyError: null,
 };
 
+/**
+ * Upsert a request into the list.
+ * ⚠️ FIXED: Online module DTO uses `id` (mapped from _id in toReissueDto).
+ *            Legacy FlightReissueRequest uses `_id`.
+ *            Support both so no data is lost.
+ */
 const upsertRequest = (state, request) => {
-  if (!request?.id) return;
-  const index = state.requests.findIndex((item) => item.id === request.id);
+  if (!request) return;
+  const uid = request.id || request._id;
+  if (!uid) return;
+  const index = state.requests.findIndex(
+    (item) => (item.id || item._id)?.toString() === uid.toString()
+  );
   if (index === -1) {
     state.requests.unshift(request);
   } else {
     state.requests[index] = request;
   }
+};
+
+/**
+ * Extract the requests array and pagination from different payload shapes:
+ *
+ * Shape A — Module API (/reissue/my):
+ *   response.data = { data: ReissueDto[], pagination: { total, page, pages, limit } }
+ *   thunk returns: response.data.data = { data: [], pagination: {} }
+ *   So payload = { data: [], pagination: {} }
+ *
+ * Shape B — Legacy API (/flights/reissue/list):
+ *   response.data = { success, data: ReissueDoc[], pagination: {} }
+ *   thunk returns: response.data.data = [] (an array directly)
+ *   So payload = []
+ *
+ * The thunk does: return response.data.data;
+ * Module API: response.data = ApiResponse wrapper → .data = { data: [], pagination: {} }
+ * Legacy API: response.data = { success, data: [], pagination: {} } → .data = []
+ */
+const extractRequestsAndPagination = (payload) => {
+  if (!payload) return { data: [], pagination: initialPagination };
+
+  // Shape A: { data: [...], pagination: {} }
+  if (payload && typeof payload === "object" && Array.isArray(payload.data)) {
+    return {
+      data: payload.data,
+      pagination: payload.pagination || initialPagination,
+    };
+  }
+
+  // Shape B: payload IS the array
+  if (Array.isArray(payload)) {
+    return { data: payload, pagination: initialPagination };
+  }
+
+  return { data: [], pagination: initialPagination };
 };
 
 const reissueSlice = createSlice({
@@ -113,19 +173,52 @@ const reissueSlice = createSlice({
         state.eligibilityError = action.payload;
       })
 
-      // ── Online: fetch requests ──
+      // ── Online: fetch requests (module API) ──
       .addCase(fetchReissueRequests.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchReissueRequests.fulfilled, (state, action) => {
         state.loading = false;
-        state.requests = action.payload?.data || [];
-        state.pagination = action.payload?.pagination || initialPagination;
+        const { data, pagination } = extractRequestsAndPagination(action.payload);
+        state.requests = data;
+        state.pagination = pagination;
       })
       .addCase(fetchReissueRequests.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+
+      // ── Legacy: fetch FlightReissueRequest records (approval flow) ──
+      .addCase(fetchLegacyReissueRequests.pending, (state) => {
+        state.legacyLoading = true;
+        state.legacyError = null;
+      })
+      .addCase(fetchLegacyReissueRequests.fulfilled, (state, action) => {
+        state.legacyLoading = false;
+        const { data, pagination } = extractRequestsAndPagination(action.payload);
+        state.legacyRequests = data;
+        state.legacyPagination = pagination;
+      })
+      .addCase(fetchLegacyReissueRequests.rejected, (state, action) => {
+        state.legacyLoading = false;
+        state.legacyError = action.payload;
+      })
+
+      // ── Company Reissues (Online + Offline) ──
+      .addCase(fetchCompanyReissueRequests.pending, (state) => {
+        state.companyLoading = true;
+        state.companyError = null;
+      })
+      .addCase(fetchCompanyReissueRequests.fulfilled, (state, action) => {
+        state.companyLoading = false;
+        const { data, pagination } = extractRequestsAndPagination(action.payload);
+        state.companyRequests = data;
+        state.companyPagination = pagination;
+      })
+      .addCase(fetchCompanyReissueRequests.rejected, (state, action) => {
+        state.companyLoading = false;
+        state.companyError = action.payload;
       })
 
       // ── Online: create (search) ──
@@ -201,8 +294,10 @@ const reissueSlice = createSlice({
         state.offlineCreateLoading = false;
         state.offlineSuccess = true;
         state.lastOfflineCreated = action.payload;
-        state.offlineRequests.unshift(action.payload);
-        state.bookingOfflineRequest = action.payload;
+        if (action.payload) {
+          state.offlineRequests.unshift(action.payload);
+          state.bookingOfflineRequest = action.payload;
+        }
       })
       .addCase(createOfflineReissueRequest.rejected, (state, action) => {
         state.offlineCreateLoading = false;
@@ -216,8 +311,9 @@ const reissueSlice = createSlice({
       })
       .addCase(searchOfflineReissueOptions.fulfilled, (state, action) => {
         state.offlineSearchLoading = false;
-        state.offlineSearchResults = action.payload.results || [];
-        state.offlineSearchPagination = action.payload.pagination || initialPagination;
+        state.offlineSearchResults = action.payload?.results || [];
+        state.offlineSearchPagination =
+          action.payload?.pagination || initialPagination;
       })
       .addCase(searchOfflineReissueOptions.rejected, (state, action) => {
         state.offlineSearchLoading = false;
@@ -231,8 +327,10 @@ const reissueSlice = createSlice({
       })
       .addCase(fetchOfflineReissueRequests.fulfilled, (state, action) => {
         state.offlineLoading = false;
-        state.offlineRequests = action.payload?.data || [];
-        state.offlinePagination = action.payload?.pagination || initialPagination;
+        // Offline controller returns { data: OfflineDto[], pagination: {} }
+        const { data, pagination } = extractRequestsAndPagination(action.payload);
+        state.offlineRequests = data;
+        state.offlinePagination = pagination;
       })
       .addCase(fetchOfflineReissueRequests.rejected, (state, action) => {
         state.offlineLoading = false;

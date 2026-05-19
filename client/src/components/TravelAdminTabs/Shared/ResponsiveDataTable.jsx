@@ -1,16 +1,6 @@
-/**
- * ResponsiveDataTable — Travel Admin
- *
- * Built on the same architecture as the working super-admin TableActionBar.
- * The scrollRef is passed directly to the overflow-x-auto div; the toolbar
- * reads that ref to detect overflow and control the scroll buttons.
- *
- * Outer card: overflow:hidden, no flex — always stays within available width.
- * Inner scroll div: overflow-x-auto, w-full — ONLY this scrolls.
- */
-
 import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { FiChevronLeft, FiChevronRight, FiDownload } from "react-icons/fi";
+import { C } from "../../Shared/color";
 
 // ─── Scroll step per button click (px) ────────────────────────────────────────
 const SCROLL_PX = 320;
@@ -79,8 +69,8 @@ export function TableActionBar({
   subtitle,
   exportLabel = "Export",
   onExport,
-  exportBgClass = "bg-[#0A4D68] hover:bg-[#083d52]",
-  arrowBgClass = "bg-slate-50 border-slate-200 text-slate-600 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600",
+  exportBgClass = "",
+  arrowBgClass = "",
   children,
 }) {
   const { hasOverflow, canScrollLeft, canScrollRight } = useScrollState(scrollRef);
@@ -91,15 +81,19 @@ export function TableActionBar({
     el.scrollBy({ left: dir === "left" ? -SCROLL_PX : SCROLL_PX, behavior: "smooth" });
   };
 
+  const defaultExportBg = { background: C.navy, color: C.white };
+  const defaultArrowBg = { background: C.offWhite, borderColor: C.border, color: C.muted };
+  const activeArrowBg = { background: `${C.gold}10`, borderColor: `${C.gold}40`, color: C.gold };
+
   return (
-    <div className="flex flex-nowrap items-center justify-between gap-3 px-4 py-3 border-b border-slate-100 bg-white">
+    <div className="flex flex-nowrap items-center justify-between gap-3 px-4 py-3 bg-white">
       {/* LEFT: title */}
       <div className="min-w-0">
         {title && (
-          <p className="text-sm font-bold text-slate-800 truncate leading-tight">{title}</p>
+          <p className="text-sm font-bold truncate leading-tight" style={{ color: C.navy }}>{title}</p>
         )}
         {subtitle && (
-          <p className="text-[11px] text-slate-400 truncate leading-tight">{subtitle}</p>
+          <p className="text-[11px] truncate leading-tight" style={{ color: C.muted }}>{subtitle}</p>
         )}
       </div>
 
@@ -112,7 +106,8 @@ export function TableActionBar({
           <button
             type="button"
             onClick={onExport}
-            className={`inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-white rounded-lg text-[11px] font-bold uppercase tracking-widest shadow transition-all cursor-pointer hover:scale-[1.02] active:scale-95 ${exportBgClass}`}
+            className={`inline-flex shrink-0 items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest shadow transition-all cursor-pointer hover:scale-[1.02] active:scale-95 ${exportBgClass}`}
+            style={!exportBgClass ? defaultExportBg : {}}
           >
             <FiDownload size={13} />
             <span>{exportLabel}</span>
@@ -121,13 +116,14 @@ export function TableActionBar({
 
         {/* Scroll nav — only when overflow exists */}
         {hasOverflow && (
-          <div className="flex shrink-0 items-center gap-1.5 pl-2 border-l border-slate-100">
+          <div className="flex shrink-0 items-center gap-1.5 pl-2 border-l" style={{ borderColor: C.border }}>
             <button
               type="button"
               onClick={() => scroll("left")}
               disabled={!canScrollLeft}
               aria-label="Scroll table left"
               className={`w-9 h-9 shrink-0 rounded-lg border flex items-center justify-center transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${arrowBgClass}`}
+              style={!arrowBgClass ? (canScrollLeft ? activeArrowBg : defaultArrowBg) : {}}
             >
               <FiChevronLeft size={17} />
             </button>
@@ -137,6 +133,7 @@ export function TableActionBar({
               disabled={!canScrollRight}
               aria-label="Scroll table right"
               className={`w-9 h-9 shrink-0 rounded-lg border flex items-center justify-center transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${arrowBgClass}`}
+              style={!arrowBgClass ? (canScrollRight ? activeArrowBg : defaultArrowBg) : {}}
             >
               <FiChevronRight size={17} />
             </button>
@@ -148,21 +145,6 @@ export function TableActionBar({
 }
 
 // ─── ResponsiveDataTable ───────────────────────────────────────────────────────
-/**
- * Props:
- *  title          {string}    - toolbar title
- *  subtitle       {string}    - toolbar subtitle (e.g. "20 records found")
- *  toolbarRight   {ReactNode} - extra controls inserted before export in toolbar
- *  exportLabel    {string}    - export button label (default "Export")
- *  onExport       {function}  - called when export button clicked; omit to hide button
- *  exportBgClass  {string}    - Tailwind bg classes for export button
- *  arrowBgClass   {string}    - Tailwind classes for scroll arrow buttons
- *  tableMinWidth  {string}    - CSS min-width for inner table wrapper (default "700px")
- *  wrapperClass   {string}    - extra Tailwind class on outer card
- *  showToolbar    {boolean}   - show/hide the toolbar row (default true)
- *  children       {ReactNode} - the <table> element
- *  footer         {ReactNode} - rendered below the scroll area (pagination, row count)
- */
 const ResponsiveDataTable = forwardRef(function ResponsiveDataTable(
   {
     title,
@@ -170,8 +152,8 @@ const ResponsiveDataTable = forwardRef(function ResponsiveDataTable(
     toolbarRight,
     exportLabel = "Export",
     onExport,
-    exportBgClass = "bg-[#0A4D68] hover:bg-[#083d52]",
-    arrowBgClass  = "bg-slate-50 border-slate-200 text-slate-600 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600",
+    exportBgClass = "",
+    arrowBgClass  = "",
     tableMinWidth = "700px",
     wrapperClass  = "",
     showToolbar   = true,
@@ -191,10 +173,7 @@ const ResponsiveDataTable = forwardRef(function ResponsiveDataTable(
   }));
 
   return (
-    // Outer card: overflow:hidden keeps rounded corners crisp and prevents
-    // any child from leaking outside. NO display:flex here — that's what
-    // was causing the card to expand to fit the table's minWidth.
-    <div className={`bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden w-full ${wrapperClass}`}>
+    <div className={`bg-white rounded-xl shadow-sm border overflow-hidden w-full ${wrapperClass}`} style={{ borderColor: C.border }}>
 
       {/* ── Toolbar ────────────────────────────────────────────────────────── */}
       {showToolbar && (
@@ -211,10 +190,7 @@ const ResponsiveDataTable = forwardRef(function ResponsiveDataTable(
         </TableActionBar>
       )}
 
-      {/* ── Scroll container ─────────────────────────────────────────────────
-          ref lives HERE — same as super-admin's <div ref={tableScrollRef}>.
-          w-full + overflow-x-auto = fills card width, inner content scrolls.
-          The card's overflow:hidden ensures this div never bleeds outside.   */}
+      {/* ── Scroll container ───────────────────────────────────────────────── */}
       <div
         ref={scrollRef}
         className="w-full overflow-x-auto"
@@ -224,7 +200,7 @@ const ResponsiveDataTable = forwardRef(function ResponsiveDataTable(
         style={{
           WebkitOverflowScrolling: "touch",  // momentum scrolling on iOS
           scrollbarWidth: "thin",
-          scrollbarColor: "#cbd5e1 transparent",
+          scrollbarColor: `${C.border} transparent`,
         }}
       >
         {/* Inner wrapper — enforces minimum width so columns don't squish */}
@@ -235,14 +211,14 @@ const ResponsiveDataTable = forwardRef(function ResponsiveDataTable(
 
       {/* ── Footer ────────────────────────────────────────────────────────── */}
       {footer && (
-        <div className="border-t border-slate-100 bg-slate-50/60">
+        <div style={{ background: `${C.offWhite}80` }}>
           {footer}
         </div>
       )}
 
       {/* ── Pagination ────────────────────────────────────────────────────── */}
       {pagination && (
-        <div className="border-t border-slate-100">
+        <div>
           {pagination}
         </div>
       )}

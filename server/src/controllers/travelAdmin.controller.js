@@ -484,19 +484,52 @@ exports.getAllEmployees = async (req, res, next) => {
     };
 
     // ✅ Scope filter (corporate OR domain)
-    if (corporateId && domain) {
-      query.$or = [{ corporateId }, { domain }];
-    } else if (corporateId) {
-      query.corporateId = corporateId;
+    // 💡 Aggregation doesn't auto-cast strings to ObjectIds, so we must do it manually
+    const _cId = corporateId ? new mongoose.Types.ObjectId(corporateId) : null;
+
+    if (_cId && domain) {
+      query.$or = [{ corporateId: _cId }, { domain }];
+    } else if (_cId) {
+      query.corporateId = _cId;
     } else if (domain) {
       query.domain = domain;
     }
 
-    // ✅ Fetch users
-    const employees = await User.find(query)
-      .select("-password -__v") // 🔒 remove sensitive fields
-      .sort({ createdAt: -1 }) // optional
-      .lean();
+    // ✅ Fetch users with Employee details (department, designation, etc.) via aggregation
+    const employees = await User.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: "employees", 
+          localField: "_id",
+          foreignField: "userId",
+          as: "empProfile",
+        },
+      },
+      {
+        $addFields: {
+          profile: { $arrayElemAt: ["$empProfile", 0] },
+        },
+      },
+      {
+        $project: {
+          password: 0,
+          __v: 0,
+          empProfile: 0,
+        },
+      },
+      {
+        $addFields: {
+          // Merge Employee fields into the top level if they exist
+          department: { $ifNull: ["$profile.department", "Administration"] },
+          designation: { $ifNull: ["$profile.designation", "$role"] },
+          employeeCode: { $ifNull: ["$profile.employeeCode", "ADMIN"] },
+          mobile: { $ifNull: ["$profile.mobile", "$phone"] },
+        },
+      },
+      { $unset: "profile" },
+      { $sort: { createdAt: -1 } },
+    ]);
 
     res.status(200).json({
       success: true,

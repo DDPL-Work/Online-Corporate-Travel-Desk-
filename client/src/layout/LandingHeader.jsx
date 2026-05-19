@@ -11,6 +11,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { logoutUser } from "../Redux/Slice/authSlice";
 import { useEffect, useRef, useState } from "react";
+import { FaBars } from "react-icons/fa";
+import { C } from "../components/Shared/color";
+import { toggleSidebar } from "../Redux/Slice/layoutSlice";
 
 /* ── Dropdown Data ── */
 const platformLinks = [
@@ -112,6 +115,7 @@ function NavDropdown({ label, items, isOpen, onToggle, dropdownRef }) {
 
 /* ── Main Header ── */
 export default function LandingHeader() {
+  const { isSidebarOpen } = useSelector((state) => state.layout);
   const navigate = useNavigate();
   const { slug } = useParams();
   const dispatch = useDispatch();
@@ -212,33 +216,41 @@ export default function LandingHeader() {
   const toggle = (menu) => setOpenMenu((prev) => (prev === menu ? null : menu));
 
   return (
-    <header className="w-full px-6 py-4 bg-[#F5F5F5] flex justify-between items-center z-50 sticky top-0 shadow-sm">
-
-      {/* Logo */}
-      <div
-        className="flex items-center cursor-pointer"
-        onClick={() => {
-          if (isAuthenticated) {
-            navigate("/travel");
-          } else {
-            navigate("/platform/flight-booking-info");
-          }
-        }}
-      >
-        {branding?.branding?.logo?.url ? (
-          <img
-            src={branding.branding.logo.url}
-            alt={branding.corporateName || "Logo"}
-            className="h-8 object-contain"
-          />
-        ) : (
-          <img src="/logo-traveamer.svg" alt="Traveamer" className="h-7" />
-        )}
+    <header className="w-full px-6 py-4 flex justify-between items-center z-50 sticky top-0 shadow-sm transition-all" style={{ background: "#FFFFFF" }}>
+      
+      <div className="flex items-center gap-4">
+        {/* Logo */}
+        <div
+          className="flex items-center cursor-pointer"
+          onClick={() => {
+            if (isAuthenticated) {
+              navigate("/travel");
+            } else {
+              navigate("/platform/flight-booking-info");
+            }
+          }}
+        >
+          {branding?.branding?.logo?.url ? (
+            <img
+              src={branding.branding.logo.url}
+              alt={branding.corporateName || "Logo"}
+              className="h-8 object-contain"
+            />
+          ) : (
+            <img src="/logo-traveamer.svg" alt="Traveamer" className="h-7" />
+          )}
+        </div>
       </div>
 
       {/* Desktop Nav */}
       {!isAuthenticated && (
         <nav className="hidden md:flex items-center gap-8">
+           <a
+            href="/traveamer"
+            className="text-sm font-semibold font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors px-3 py-1.5 rounded-full border border-[#C9A84C]/40 hover:border-[#C9A84C] hover:bg-[#C9A84C]/8"
+          >
+            Traveamer
+          </a>
           {activeSlug && (
             <a
               href={`/${activeSlug}`}
@@ -261,6 +273,7 @@ export default function LandingHeader() {
             onToggle={() => toggle("whoFor")}
             dropdownRef={whoForRef}
           />
+         
           <a
             href="/about-us"
             className="text-sm font-medium font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors"
@@ -279,12 +292,12 @@ export default function LandingHeader() {
           >
             Blog
           </a>
-         
         </nav>
       )}
 
       {/* CTA Buttons / Auth State */}
-      <div className="hidden md:flex items-center gap-4">
+      {/* CTA Buttons / Auth State */}
+      <div className={`${isAuthenticated ? "flex" : "hidden md:flex"} items-center gap-4`}>
         {isAuthenticated && user ? (
           <div className="flex items-center gap-3">
             <NotificationBell />
@@ -317,12 +330,6 @@ export default function LandingHeader() {
                     {user?.role?.replace("-", " ")}
                   </p>
                 </div>
-                <button
-                  onClick={() => navigate(dashboardRoute)}
-                  className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 border-none cursor-pointer"
-                >
-                  <RiBriefcaseLine size={15} /> Dashboard
-                </button>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 border-none cursor-pointer"
@@ -360,23 +367,41 @@ export default function LandingHeader() {
             )}
           </>
         )}
+        {/* Sidebar Toggle (Always Visible if Logged In) */}
+        {isAuthenticated && (
+          <button
+            onClick={() => dispatch(toggleSidebar())}
+            className="p-2 rounded-lg hover:bg-slate-200 transition-colors text-slate-700 flex items-center justify-center ml-2"
+            title={isSidebarOpen ? "Close Menu" : "Open Menu"}
+          >
+            <FaBars size={20} />
+          </button>
+        )}
       </div>
 
-      {/* Mobile toggle */}
-      <button
-        className="md:hidden text-[#000D26]"
-        onClick={() => setMobileOpen(!mobileOpen)}
-      >
-        <div className="w-5 flex flex-col gap-1">
-          <span className="block h-0.5 bg-current" />
-          <span className="block h-0.5 bg-current" />
-          <span className="block h-0.5 bg-current" />
-        </div>
-      </button>
+      {/* Mobile toggle (Only show if guest) */}
+      {!isAuthenticated && (
+        <button
+          className="md:hidden text-[#000D26]"
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
+          <div className="w-5 flex flex-col gap-1">
+            <span className="block h-0.5 bg-current" />
+            <span className="block h-0.5 bg-current" />
+            <span className="block h-0.5 bg-current" />
+          </div>
+        </button>
+      )}
 
       {/* Mobile Menu */}
       {mobileOpen && (
         <div className="absolute top-full left-0 w-full bg-[#F5F5F5] shadow-lg md:hidden flex flex-col gap-1 p-4 z-50">
+           <a
+            href="/traveamer"
+            className="text-sm font-semibold font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors px-3 py-1.5 rounded-full border border-[#C9A84C]/40 hover:border-[#C9A84C] hover:bg-[#C9A84C]/8"
+          >
+            Traveamer
+          </a>
 
           {/* Nav Links - Only show if guest */}
           {!isAuthenticated && (
@@ -439,6 +464,7 @@ export default function LandingHeader() {
                 </div>
               )}
 
+             
               <a
                 href="/about-us"
                 className="px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"

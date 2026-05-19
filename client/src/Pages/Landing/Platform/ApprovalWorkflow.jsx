@@ -27,6 +27,13 @@ import { BsBell, BsSend } from "react-icons/bs";
 import { CiCircleCheck, CiStar } from "react-icons/ci";
 import { TbPointFilled, TbUsers } from "react-icons/tb";
 import { AiOutlineThunderbolt } from "react-icons/ai";
+import { 
+  BsGrid, 
+  BsWallet2, 
+  BsArrowRepeat, 
+  BsLightningCharge 
+} from "react-icons/bs";
+import { RiHashtag } from "react-icons/ri";
 
 // ─── Brand Color Constants ────────────────────────────────────────────────────
 const C = {
@@ -814,83 +821,87 @@ const WhoApprovesSection = () => (
   </section>
 );
 
-// ─── 5. Why It Matters ────────────────────────────────────────────────────────
-const STATS = [
+// ─── 5. Everything is Connected ─────────────────────────────────────────────
+const CONNECTED_FEATURES = [
   {
-    icon: <AiOutlineThunderbolt color={ORANGE} size={24} />,
-    value: "60s",
-    label: "Average Approval Time",
+    icon: <RiHashtag size={20} />,
+    title: "Project Cost IDs",
+    desc: "Mandatory tagging on every single booking. Every rupee is automatically allocated to the exact client or project. Goodbye, manual cost allocation.",
   },
   {
-    icon: <RiFileTextLine className="text-blue-400" size={24} />,
-    value: "100%",
-    label: "Auditable trail of approvals",
+    icon: <BsWallet2 size={20} />,
+    title: "The Travel Wallet",
+    desc: "Finance recharges via UPI, NEFT, or IMPS. Approved bookings deduct automatically. Zero out-of-pocket expenses.",
   },
   {
-    icon: <RiMailCloseLine className="text-green-400" size={24} />,
-    value: "0",
-    label: "Manual Reconciliation",
+    icon: <BsArrowRepeat size={20} />,
+    title: "Auto-Reconciled Refunds",
+    desc: "Cancellation charges shown upfront. Refunds instantly credit your Travel Wallet and auto-adjust the project ledger.",
   },
   {
-    icon: <RiClipboardLine color={ORANGE} size={24} />,
-    value: "1",
-    label: "Consolidated Report",
+    icon: <RiFlightTakeoffLine size={20} />,
+    title: "Massive Inventory",
+    desc: "500+ airlines (IndiGo, Vistara, Air India) and 800,000+ global properties. Your team books directly in 60 seconds.",
+  },
+  {
+    icon: <RiUserLine size={20} />,
+    title: "EA & Secretary Bookings",
+    desc: "Designated secretaries can book on behalf of senior leadership with a clear, auditable trail of who booked for whom.",
+  },
+  {
+    icon: <BsLightningCharge size={20} />,
+    title: "Zero IT Setup",
+    desc: "Live in under 2 hours. Connect Google Workspace or Microsoft 365 for seamless SSO. No deployment required.",
   },
 ];
 
-const WhyItMattersSection = () => {
+const ConnectedInfrastructureSection = () => {
   return (
-    <section className="relative w-full min-h-[600px] bg-gradient-to-b from-slate-950 to-blue-900 py-16 lg:py-24 px-6 lg:px-12 flex flex-col justify-center overflow-hidden">
-      {/* Background Large Text Overlay */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5">
-        <h1 className="text-[80px] lg:text-[180px] font-bold font-sans whitespace-nowrap text-white/20">
-          Always on Record
-        </h1>
-      </div>
-
-      <div className="relative z-10 max-w-7xl mx-auto w-full">
+    <section className="w-full py-20 px-6 lg:px-12 bg-white">
+      <div className="max-w-7xl mx-auto">
         {/* Header Section */}
-        <div className="mb-12 lg:mb-16">
+        <div className="mb-16">
           <div
             style={{ background: ORANGE }}
-            className="w-full md:w-[519px] px-2.5 py-1 inline-flex flex-col justify-start items-start"
+            className="w-full md:w-[519px] px-2.5 py-1 flex flex-col justify-start items-start mb-6"
           >
             <div className="text-black text-[10px] lg:text-xs font-semibold font-['Plus_Jakarta_Sans'] uppercase leading-4 tracking-[2.40px]">
-              Why It Matters
+              Core Infrastructure
             </div>
           </div>
 
-          <h2 className="text-white text-3xl md:text-5xl font-normal font-['DM_Serif_Display'] leading-tight my-4">
-            Every trip. Every approval.
-            <br />
-            Always on record.
+          <h2 className="text-slate-900 text-4xl md:text-5xl font-normal font-['DM_Serif_Display'] leading-tight mb-6">
+            Everything is connected.
           </h2>
 
-          <div className="max-w-2xl text-white/50 text-sm lg:text-base font-normal font-['Plus_Jakarta_Sans'] leading-relaxed">
-            Whether you are a startup or a growing business, stay organized.
-            Know exactly who approved what — and keep travel on track.
+          <div className="max-w-3xl text-slate-500 text-base lg:text-lg font-normal font-['Plus_Jakarta_Sans'] leading-relaxed">
+            When travel is structured, everything connected to it becomes structured too. 
+            Approvals are documented. Costs are allocated. Reports are ready.
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-          {STATS.map((stat, index) => (
+        {/* Features Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {CONNECTED_FEATURES.map((feature, index) => (
             <div
               key={index}
-              className="border-2 border-white rounded-xl p-4 sm:p-6 md:p-8 flex flex-col items-center justify-center"
+              className="bg-white rounded-2xl p-8 border border-gray-100 flex flex-col items-start shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]"
             >
-              <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mb-6">
-                {stat.icon}
-              </div>
-              <div
-                style={{ color: ORANGE }}
-                className=" text-4xl font-serif mb-2"
+              <div 
+                className="w-12 h-12 rounded-full flex items-center justify-center mb-6 text-white"
+                style={{ background: C.navyDeep }}
               >
-                {stat.value}
+                {feature.icon}
               </div>
-              <div className="text-white/50 text-sm text-center font-sans">
-                {stat.label}
-              </div>
+              <h3 
+                className="text-xl font-bold mb-3"
+                style={{ color: C.navyDeep, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+              >
+                {feature.title}
+              </h3>
+              <p className="text-slate-500 text-sm leading-relaxed font-['Plus_Jakarta_Sans']">
+                {feature.desc}
+              </p>
             </div>
           ))}
         </div>
@@ -975,7 +986,7 @@ export default function ApprovalWorkflow() {
         <Features />
         <HowItWorksSection />
         <WhoApprovesSection />
-        <WhyItMattersSection />
+        <ConnectedInfrastructureSection />
         <CTASection />
       </>
       <LandingFooter />

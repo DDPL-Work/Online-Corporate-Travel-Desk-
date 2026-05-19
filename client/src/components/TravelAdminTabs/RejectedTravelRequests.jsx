@@ -1,875 +1,513 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   FiXCircle,
-  FiHome,
-  FiUser,
-  FiCalendar,
-  FiDollarSign,
-  FiFilter,
-  FiEye,
-  FiMessageCircle,
-  FiX,
-  FiSearch,
-  FiAlertTriangle,
-  FiList,
   FiRefreshCw,
+  FiSearch,
+  FiArrowRight,
+  FiX,
+  FiAlertTriangle,
+  FiList
 } from "react-icons/fi";
-import { FaPlane, FaHotel } from "react-icons/fa";
-import { useDispatch, useSelector } from "react-redux";
+import { FaPlane, FaHotel, FaRupeeSign } from "react-icons/fa";
 import {
   fetchApprovals,
   selectApprovals,
   selectApprovalLoading,
 } from "../../Redux/Actions/approval.thunks";
-import {
-  formatDate,
-  formatDuration,
-  formatTime,
-  getCabinClassLabel,
-  getDateInIST,
-} from "../../utils/formatter";
+import { fetchEmployees } from "../../Redux/Slice/employeeActionSlice";
 import {
   PendingFlightDetailsModal,
   PendingHotelDetailsModal,
 } from "./Modal/PendingHotelDetailsModal";
 import {
+  LabeledField,
+  StatCard,
   dateCls,
   IdCell,
-  LabeledField,
   SearchBar,
-  selectCls,
-  StatCard,
   Th,
   CustomDropdown,
 } from "./Shared/CommonComponents";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
+import { airlineLogo } from "../../utils/formatter";
+import { C } from "../Shared/color";
 
-// ── normalize helper ──────────────────────────────────────────────────────────
-function normalize(rejectedRequests) {
-  return rejectedRequests.map((r) => {
-    const isHotel = r.bookingType === "hotel";
-    const segments = r.flightRequest?.segments || [];
+/* ─────────────────────────────────────────────────────────────── */
+/*  Shared Components                                              */
+/* ─────────────────────────────────────────────────────────────── */
+const RouteCell = ({ routes, airline }) => {
+  if (!routes || routes.length === 0) return <span className="text-slate-400">No Route</span>;
+  
+  const airlineCode = (airline?.airlineCode || "AI").toUpperCase();
+  const airlineName = airline?.airlineName || "Airline";
+  const logoUrl = airlineLogo(airlineCode);
 
-    const estimatedCost = (() => {
-      if (isHotel) {
-        const rooms = r.hotelRequest?.selectedRoom?.rawRoomData || [];
-        if (!Array.isArray(rooms)) return 0;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
+        <img 
+          src={logoUrl} 
+          alt={airlineName} 
+          className="w-full h-full object-contain"
+          onError={(e) => { 
+            e.target.onerror = null;
+            e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
+          }} 
+        />
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-tight">
+            {routes[0].fromCode} → {routes[routes.length - 1].toCode}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{airlineName}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
-        return rooms.reduce((total, room) => {
-          if (room.TotalFare) return total + room.TotalFare;
-          if (room.Price?.totalFare) return total + room.Price.totalFare;
-          if (Array.isArray(room.DayRates)) {
-            const roomTotal = room.DayRates.flat().reduce(
-              (sum, day) => sum + (day.BasePrice || 0),
-              0,
-            );
-            return total + roomTotal;
-          }
-          return total;
-        }, 0);
+/* ───────────────────────────────────────────────────────────────────────────── */
+/* FLIGHT REJECTIONS SECTION                                                     */
+/* ───────────────────────────────────────────────────────────────────────────── */
+function FlightRejectionsSection({ requests, refreshing, employeeOptions }) {
+  const [search, setSearch] = useState("");
+  const [empFilter, setEmp] = useState("All Employees");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [selected, setSelected] = useState(null);
+
+  const filtered = useMemo(() => {
+    return requests.filter(r => {
+      const q = search.toLowerCase();
+      const matchesSearch = r.employee.toLowerCase().includes(q) || 
+                           r.employeeId.toLowerCase().includes(q) || 
+                           r.orderId.toLowerCase().includes(q) || 
+                           (r.bookingRef && r.bookingRef.toLowerCase().includes(q));
+      if (!matchesSearch) return false;
+      if (empFilter !== "All Employees" && r.employee !== empFilter) return false;
+      if (dateFrom && new Date(r.rejectedDate) < new Date(dateFrom)) return false;
+      if (dateTo) {
+        const dTo = new Date(dateTo);
+        dTo.setHours(23, 59, 59, 999);
+        if (new Date(r.rejectedDate) > dTo) return false;
       }
-      return (
-        r.pricingSnapshot?.totalAmount ||
-        r.bookingSnapshot?.amount ||
-        r.flightRequest?.fareSnapshot?.publishedFare ||
-        0
-      );
-    })();
-
-    return {
-      id: r._id,
-      orderId: r.orderId || "N/A",
-      raw: r,
-      employee: r.userId?.name
-        ? `${r.userId.name.firstName} ${r.userId.name.lastName}${r.userId.email ? ` (${r.userId.email})` : ""}`
-        : r.userId?.email || "Employee",
-      department: r.userId?.department || "N/A",
-      type: isHotel ? "Hotel" : "Flight",
-      destination: isHotel
-        ? r.hotelRequest?.selectedHotel?.hotelName || r.hotelRequest?.selectedHotel?.city || "N/A"
-        : segments.length
-          ? `${segments[0].origin.city} → ${segments[segments.length - 1].destination.city}`
-          : "N/A",
-      rejectedDate: r.rejectedAt,
-      rejectedBy:
-        r.rejectedBy?.name?.firstName && r.rejectedBy?.name?.lastName
-          ? `${r.rejectedBy.name.firstName} ${r.rejectedBy.name.lastName}`
-          : "Admin",
-      reason: r.approverComments || "No reason provided",
-      estimatedCost,
-      status: "Rejected",
-    };
-  });
-}
-
-// ── FLIGHT SECTION ────────────────────────────────────────────────────────────
-function FlightSection({ allRequests, loading }) {
-  const today = new Date();
-  const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState(
-    new Date(today.getFullYear(), 0, 1).toISOString().split("T")[0],
-  );
-  const [endDate, setEndDate] = useState(
-    new Date(today.getFullYear(), 11, 31).toISOString().split("T")[0],
-  );
-  const [deptFilter, setDept] = useState("All");
-  const [empFilter, setEmp] = useState("All");
-  const [selectedRequest, setSelectedRequest] = useState(null);
-
-  const flightRequests = allRequests.filter((r) => r.type === "Flight");
-  const departments = useMemo(() => [
-    "All",
-    ...new Set(flightRequests.map((r) => r.department)),
-  ], [flightRequests]);
-
-  const employees = useMemo(() => [
-    "All",
-    ...new Set(flightRequests.map((r) => r.employee)),
-  ], [flightRequests]);
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return flightRequests.filter((r) => {
-      const rejDate = new Date(r.rejectedDate);
-      const dateOk =
-        rejDate >= new Date(startDate) && rejDate <= new Date(endDate);
-      const deptOk = deptFilter === "All" || r.department === deptFilter;
-      const empOk = empFilter === "All" || r.employee === empFilter;
-      const searchOk =
-        !q ||
-        r.employee.toLowerCase().includes(q) ||
-        r.destination.toLowerCase().includes(q) ||
-        r.rejectedBy.toLowerCase().includes(q) ||
-        r.orderId.toLowerCase().includes(q);
-      return dateOk && deptOk && empOk && searchOk;
+      return true;
     });
-  }, [search, startDate, endDate, deptFilter, empFilter, flightRequests]);
+  }, [requests, search, empFilter, dateFrom, dateTo]);
 
-  const totalCost = filtered.reduce((s, r) => s + r.estimatedCost, 0);
-
-  const handleExportFlights = () => {
+  const handleExport = () => {
     if (!filtered.length) return;
-    const headers = ["Order ID", "Employee", "Dept", "Destination", "Rejected Date", "Rejected By", "Reason", "Cost"];
-    const rows = filtered.map((r) => [
-      r.orderId,
-      r.employee,
-      r.department,
-      r.destination,
-      r.rejectedDate ? new Date(r.rejectedDate).toLocaleDateString("en-IN") : "—",
-      r.rejectedBy,
-      r.reason,
-      `₹${r.estimatedCost.toLocaleString()}`,
-    ]);
-    const tableRows = rows
-      .map(
-        (row) =>
-          `<tr>${row
-            .map(
-              (cell) =>
-                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
-                  cell ?? "",
-                )
-                  .replace(/&/g, "&amp;")
-                  .replace(/</g, "&lt;")
-                  .replace(/>/g, "&gt;")}</td>`,
-            )
-            .join("")}</tr>`,
-      )
-      .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
+    const headers = ["Order ID", "Personnel", "Email", "Route", "Rejected Date", "Reason", "Cost"];
+    const rows = filtered.map(r => [r.orderId, r.employee, r.employeeId, `${r.routes[0]?.fromCode} → ${r.routes[r.routes.length-1]?.toCode}`, r.rejectedDate.toLocaleDateString(), r.reason, `₹${r.estimatedCost.toLocaleString()}`]);
+    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `rejected-flights-${new Date().toISOString().slice(0, 10)}.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const a = document.createElement("a"); a.href = url; a.download = `rejected-flights.xls`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
   return (
-    <div className="space-y-4 min-w-0">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
-        <StatCard
-          label="Total Rejected"
-          value={filtered.length}
-          Icon={FiXCircle}
-          borderCls="border-red-500"
-          iconBgCls="bg-red-50"
-          iconColorCls="text-red-500"
-        />
-        <StatCard
-          label="Flight Requests"
-          value={filtered.length}
-          Icon={FaPlane}
-          borderCls="border-[#0A4D68]"
-          iconBgCls="bg-[#0A4D68]/10"
-          iconColorCls="text-[#0A4D68]"
-        />
-        <StatCard
-          label="Est. Cost Lost"
-          value={`₹${totalCost.toLocaleString()}`}
-          Icon={FiDollarSign}
-          borderCls="border-violet-500"
-          iconBgCls="bg-violet-50"
-          iconColorCls="text-violet-600"
-        />
-        <StatCard
-          label="Departments"
-          value={new Set(filtered.map((r) => r.department)).size}
-          Icon={FiUser}
-          borderCls="border-amber-500"
-          iconBgCls="bg-amber-50"
-          iconColorCls="text-amber-600"
-        />
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard label="Rejected Flights" value={filtered.length} Icon={FiXCircle} borderCls="border-rose-500" iconBgCls="bg-rose-50" iconColorCls="text-rose-600" />
+        <StatCard label="Est. Loss Value" value={`₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
+        <StatCard label="Critical Rejections" value={filtered.filter(r => r.reason.length > 50).length} Icon={FiAlertTriangle} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Depts Affected" value={new Set(filtered.map(r => r.originalData?.userId?.department)).size} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <LabeledField
-            label={
-              <>
-                <FiSearch size={10} /> Search Employee / Destination
-              </>
-            }
-          >
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Name, destination, ID…"
-            />
+      <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+          <LabeledField label={<><FiSearch size={10} /> Universal Search</>} className="lg:col-span-4">
+            <SearchBar value={search} onChange={setSearch} placeholder="Reference, Route or Name..." />
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> From Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={dateCls}
-            />
+          <LabeledField label="Personnel" className="lg:col-span-3">
+            <CustomDropdown value={empFilter} onChange={setEmp} options={employeeOptions} />
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> To Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={dateCls}
-            />
+          <LabeledField label="Rejection Window" className="lg:col-span-3">
+             <div className="flex items-center gap-2">
+                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+                <span className="text-slate-300">to</span>
+                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+             </div>
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiFilter size={10} /> Department
-              </>
-            }
-          >
-            <CustomDropdown
-              value={deptFilter}
-              onChange={setDept}
-              options={departments}
-            />
-          </LabeledField>
-
-          <LabeledField
-            label={
-              <>
-                <FiUser size={10} /> Employee
-              </>
-            }
-          >
-            <CustomDropdown
-              value={empFilter}
-              onChange={setEmp}
-              options={employees}
-            />
-          </LabeledField>
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                setSearch("");
-                setStartDate(new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0]);
-                setEndDate(new Date(new Date().getFullYear(), 11, 31).toISOString().split("T")[0]);
-                setDept("All");
-                setEmp("All");
-              }}
-              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold text-slate-500 bg-slate-100 rounded-lg hover:bg-slate-200 hover:text-slate-700 transition-colors"
-            >
-              <FiX size={12} /> Reset
-            </button>
+          <div className="flex items-end lg:col-span-2">
+             <button onClick={() => { setSearch(""); setEmp("All Employees"); setDateFrom(""); setDateTo(""); }} className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest" style={{ background: C.white, borderColor: C.border, color: C.muted }}><FiX /> Reset Archive</button>
           </div>
         </div>
       </div>
 
-      <ResponsiveDataTable
-        title="Rejected Flight Requests"
-        subtitle={`${filtered.length} record${filtered.length !== 1 ? "s" : ""} found`}
-        tableMinWidth="1100px"
-        onExport={handleExportFlights}
-        exportLabel="Export"
-        exportBgClass="bg-[#0A4D68] hover:bg-[#083d52]"
-        arrowBgClass="bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
-        footer={
-          <div className="px-4 py-2.5 flex justify-between text-xs text-slate-400">
-            <span>
-              Showing <strong className="text-slate-600">{filtered.length}</strong> of <strong className="text-slate-600">{flightRequests.length}</strong> rejected flight requests
-            </span>
-            <span>
-              Est. Cost Lost: <strong className="text-red-600">₹{totalCost.toLocaleString()}</strong>
-            </span>
-          </div>
-        }
-      >
-        <table className="w-full border-collapse">
+      <ResponsiveDataTable title="Flight Rejection Ledger" subtitle={`${filtered.length} denied authorizations`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+        <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-[#0f9041] text-red-100">
-              <Th>Order ID</Th>
-              <Th>Employee</Th>
-              <Th>Department</Th>
-              <Th>Destination</Th>
-              <Th>Rejected Date</Th>
-              <Th>Rejected By</Th>
-              <Th>Reason</Th>
-              <Th>Est. Cost</Th>
-              <Th>Action</Th>
+            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="!px-6 !py-5">Order ID</Th>
+              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Route</Th>
+              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Reason for Denial</Th>
+              <Th className="!px-6 !py-5">Rejected Date & Time</Th>
+              <Th className="!px-6 !py-5">Amount</Th>
+              <Th className="!px-6 !py-5 text-center">Action</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading ? (
-              <tr>
-                <td colSpan="9" className="py-16 text-center text-slate-400">
-                  <p className="text-sm font-semibold">Loading...</p>
+          <tbody>
+            {filtered.length > 0 ? filtered.map((r, i) => (
+              <tr key={r.id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
+                <td className="!px-6 !py-5"><IdCell id={r.orderId} /></td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{r.employee}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                  <RouteCell routes={r.routes} airline={r.airline} />
+                </td>
+                <td className="!px-6 !py-5">
+                   <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{r.employeeId}</span>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-[10px] font-bold text-rose-500 line-clamp-2 italic max-w-[200px]" title={r.reason}>"{r.reason}"</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-[11px] font-black text-slate-700">{r.rejectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{r.rejectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                </td>
+                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{r.estimatedCost.toLocaleString()}</td>
+                <td className="!px-6 !py-5 text-center">
+                  <button onClick={() => setSelected(r.originalData)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group">
+                    <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
+                  </button>
                 </td>
               </tr>
-            ) : filtered.length === 0 ? (
+            )) : (
               <tr>
-                <td colSpan="9" className="py-16 text-center text-slate-400">
-                  <div className="flex justify-center mb-3">
-                    <FaPlane size={32} className="opacity-20" />
-                  </div>
-                  <p className="font-semibold text-sm">
-                    No rejected flight requests found
-                  </p>
-                  <p className="text-xs mt-1">
-                    Try adjusting the filters or search query
-                  </p>
-                </td>
-              </tr>
-            ) : (
-              filtered.map((r, i) => (
-                <tr
-                  key={r.id}
-                  className={`transition-colors hover:bg-red-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
-                >
-                  <td className="px-4 py-3">
-                    <IdCell id={r.orderId} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-red-100 flex items-center justify-center text-[11px] font-black text-red-600 shrink-0">
-                        {r.employee[0]}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-[13px] text-slate-800">
-                          {r.employee}
-                        </span>
-                      </div>
+                <td colSpan={8} className="!px-6 !py-20 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                      <FiSearch size={32} />
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="px-2.5 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600 font-medium">
-                      {r.department}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-[13px] text-slate-700 font-medium">
-                    {r.destination}
-                  </td>
-                  <td className="px-4 py-3 text-[13px] text-slate-500">
-                    {r.rejectedDate
-                      ? new Date(r.rejectedDate).toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })
-                      : "N/A"}
-                  </td>
-                  <td className="px-4 py-3 text-[13px] text-slate-600">
-                    {r.rejectedBy}
-                  </td>
-                  <td className="px-4 py-3 max-w-[180px]">
-                    <p
-                      className="text-[12px] text-red-600 truncate"
-                      title={r.reason}
-                    >
-                      {r.reason}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 font-bold text-slate-900">
-                    ₹{r.estimatedCost.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => setSelectedRequest(r)}
-                      className="px-3 py-1 text-xs font-semibold bg-[#0A4D68] text-white rounded-md hover:bg-[#083a50] flex items-center gap-1"
-                    >
-                      <FiEye size={12} /> View
-                    </button>
-                  </td>
-                </tr>
-              ))
+                    <p className="text-sm font-bold text-slate-400">No rejected flight requests found.</p>
+                  </div>
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
       </ResponsiveDataTable>
-
-      {selectedRequest?.raw?.bookingType === "flight" && (
-        <PendingFlightDetailsModal
-          booking={selectedRequest.raw}
-          onClose={() => setSelectedRequest(null)}
-        />
-      )}
+      {selected && <PendingFlightDetailsModal booking={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
 
-// ── HOTEL SECTION ─────────────────────────────────────────────────────────────
-function HotelSection({ allRequests, loading }) {
-  const today = new Date();
+/* ───────────────────────────────────────────────────────────────────────────── */
+/* HOTEL REJECTIONS SECTION                                                      */
+/* ───────────────────────────────────────────────────────────────────────────── */
+function HotelRejectionsSection({ requests, refreshing, employeeOptions }) {
   const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState(
-    new Date(today.getFullYear(), 0, 1).toISOString().split("T")[0],
-  );
-  const [endDate, setEndDate] = useState(
-    new Date(today.getFullYear(), 11, 31).toISOString().split("T")[0],
-  );
-  const [deptFilter, setDept] = useState("All");
-  const [empFilter, setEmp] = useState("All");
-  const [selectedRequest, setSelectedRequest] = useState(null);
-
-  const hotelRequests = allRequests.filter((r) => r.type === "Hotel");
-  const departments = useMemo(() => [
-    "All",
-    ...new Set(hotelRequests.map((r) => r.department)),
-  ], [hotelRequests]);
-
-  const employees = useMemo(() => [
-    "All",
-    ...new Set(hotelRequests.map((r) => r.employee)),
-  ], [hotelRequests]);
+  const [empFilter, setEmp] = useState("All Employees");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [selected, setSelected] = useState(null);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return hotelRequests.filter((r) => {
-      const rejDate = new Date(r.rejectedDate);
-      const dateOk =
-        rejDate >= new Date(startDate) && rejDate <= new Date(endDate);
-      const deptOk = deptFilter === "All" || r.department === deptFilter;
-      const empOk = empFilter === "All" || r.employee === empFilter;
-      const searchOk =
-        !q ||
-        r.employee.toLowerCase().includes(q) ||
-        r.destination.toLowerCase().includes(q) ||
-        r.rejectedBy.toLowerCase().includes(q) ||
-        r.orderId.toLowerCase().includes(q);
-      return dateOk && deptOk && empOk && searchOk;
+    return requests.filter(r => {
+      const q = search.toLowerCase();
+      const matchesSearch = r.employee.toLowerCase().includes(q) || 
+                           r.employeeId.toLowerCase().includes(q) || 
+                           r.orderId.toLowerCase().includes(q) || 
+                           (r.bookingRef && r.bookingRef.toLowerCase().includes(q)) ||
+                           (r.hotelName && r.hotelName.toLowerCase().includes(q));
+      if (!matchesSearch) return false;
+      if (empFilter !== "All Employees" && r.employee !== empFilter) return false;
+      if (dateFrom && new Date(r.rejectedDate) < new Date(dateFrom)) return false;
+      if (dateTo) {
+        const dTo = new Date(dateTo);
+        dTo.setHours(23, 59, 59, 999);
+        if (new Date(r.rejectedDate) > dTo) return false;
+      }
+      return true;
     });
-  }, [search, startDate, endDate, deptFilter, empFilter, hotelRequests]);
+  }, [requests, search, empFilter, dateFrom, dateTo]);
 
-  const totalCost = filtered.reduce((s, r) => s + r.estimatedCost, 0);
-
-  const handleExportHotels = () => {
+  const handleExport = () => {
     if (!filtered.length) return;
-    const headers = ["Order ID", "Employee", "Dept", "Hotel Name", "Rejected Date", "Rejected By", "Reason", "Cost"];
-    const rows = filtered.map((r) => [
-      r.orderId,
-      r.employee,
-      r.department,
-      r.destination,
-      r.rejectedDate ? new Date(r.rejectedDate).toLocaleDateString("en-IN") : "—",
-      r.rejectedBy,
-      r.reason,
-      `₹${r.estimatedCost.toLocaleString()}`,
-    ]);
-    const tableRows = rows
-      .map(
-        (row) =>
-          `<tr>${row
-            .map(
-              (cell) =>
-                `<td style="border:1px solid #dbe4f0;padding:8px;">${String(
-                  cell ?? "",
-                )
-                  .replace(/&/g, "&amp;")
-                  .replace(/</g, "&lt;")
-                  .replace(/>/g, "&gt;")}</td>`,
-            )
-            .join("")}</tr>`,
-      )
-      .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
+    const headers = ["Order Reference", "Personnel", "Email", "Hotel", "Rejected Date", "Reason", "Cost"];
+    const rows = filtered.map(r => [r.orderId, r.employee, r.employeeId, r.hotelName, r.rejectedDate.toLocaleDateString(), r.reason, `₹${r.estimatedCost.toLocaleString()}`]);
+    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `rejected-hotels-${new Date().toISOString().slice(0, 10)}.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const a = document.createElement("a"); a.href = url; a.download = `rejected-hotels.xls`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
   return (
-    <div className="space-y-4 min-w-0">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
-        <StatCard
-          label="Total Rejected"
-          value={filtered.length}
-          Icon={FiXCircle}
-          borderCls="border-red-500"
-          iconBgCls="bg-red-50"
-          iconColorCls="text-red-500"
-        />
-        <StatCard
-          label="Hotel Requests"
-          value={filtered.length}
-          Icon={FaHotel}
-          borderCls="border-[#088395]"
-          iconBgCls="bg-[#088395]/10"
-          iconColorCls="text-[#088395]"
-        />
-        <StatCard
-          label="Est. Cost Lost"
-          value={`₹${totalCost.toLocaleString()}`}
-          Icon={FiDollarSign}
-          borderCls="border-violet-500"
-          iconBgCls="bg-violet-50"
-          iconColorCls="text-violet-600"
-        />
-        <StatCard
-          label="Departments"
-          value={new Set(filtered.map((r) => r.department)).size}
-          Icon={FiUser}
-          borderCls="border-amber-500"
-          iconBgCls="bg-amber-50"
-          iconColorCls="text-amber-600"
-        />
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard label="Rejected Hotels" value={filtered.length} Icon={FiXCircle} borderCls="border-rose-500" iconBgCls="bg-rose-50" iconColorCls="text-rose-600" />
+        <StatCard label="Est. Revenue Loss" value={`₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
+        <StatCard label="Compliance Blocks" value={filtered.filter(r => r.reason.toLowerCase().includes('policy')).length} Icon={FiAlertTriangle} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Assets Affected" value={new Set(filtered.map(r => r.hotelName)).size} Icon={FaHotel} borderCls="border-[#000D26]" iconBgCls="bg-[#000D26]10" iconColorCls="text-[#000D26]" />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <LabeledField
-            label={
-              <>
-                <FiSearch size={10} /> Search Employee / Destination
-              </>
-            }
-          >
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Name, destination, ID…"
-            />
+      <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+          <LabeledField label={<><FiSearch size={10} /> Universal Search</>} className="lg:col-span-4">
+            <SearchBar value={search} onChange={setSearch} placeholder="Hotel, Personnel or ID..." />
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> From Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={dateCls}
-            />
+          <LabeledField label="Personnel" className="lg:col-span-3">
+            <CustomDropdown value={empFilter} onChange={setEmp} options={employeeOptions} />
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiCalendar size={10} /> To Date
-              </>
-            }
-          >
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={dateCls}
-            />
+          <LabeledField label="Rejection Window" className="lg:col-span-3">
+             <div className="flex items-center gap-2">
+                <input type="date" value={dateFrom} onChange={setDateFrom} className={dateCls} style={{ borderColor: C.border }} />
+                <span className="text-slate-300">to</span>
+                <input type="date" value={dateTo} onChange={setDateTo} className={dateCls} style={{ borderColor: C.border }} />
+             </div>
           </LabeledField>
-          <LabeledField
-            label={
-              <>
-                <FiFilter size={10} /> Department
-              </>
-            }
-          >
-            <CustomDropdown
-              value={deptFilter}
-              onChange={setDept}
-              options={departments}
-            />
-          </LabeledField>
-
-          <LabeledField
-            label={
-              <>
-                <FiUser size={10} /> Employee
-              </>
-            }
-          >
-            <CustomDropdown
-              value={empFilter}
-              onChange={setEmp}
-              options={employees}
-            />
-          </LabeledField>
-
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                setSearch("");
-                setStartDate(new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0]);
-                setEndDate(new Date(new Date().getFullYear(), 11, 31).toISOString().split("T")[0]);
-                setDept("All");
-                setEmp("All");
-              }}
-              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold text-slate-500 bg-slate-100 rounded-lg hover:bg-slate-200 hover:text-slate-700 transition-colors"
-            >
-              <FiX size={12} /> Reset
-            </button>
+          <div className="flex items-end lg:col-span-2">
+             <button onClick={() => { setSearch(""); setEmp("All Employees"); setDateFrom(""); setDateTo(""); }} className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest" style={{ background: C.white, borderColor: C.border, color: C.muted }}><FiX /> Reset Archive</button>
           </div>
         </div>
       </div>
 
-      <ResponsiveDataTable
-        title="Rejected Hotel Requests"
-        subtitle={`${filtered.length} record${filtered.length !== 1 ? "s" : ""} found`}
-        tableMinWidth="1100px"
-        onExport={handleExportHotels}
-        exportLabel="Export"
-        exportBgClass="bg-[#088395] hover:bg-[#066b78]"
-        arrowBgClass="bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
-        footer={
-          <div className="px-4 py-2.5 flex justify-between text-xs text-slate-400">
-            <span>
-              Showing <strong className="text-slate-600">{filtered.length}</strong> of <strong className="text-slate-600">{hotelRequests.length}</strong> rejected hotel requests
-            </span>
-            <span>
-              Est. Cost Lost: <strong className="text-red-600">₹{totalCost.toLocaleString()}</strong>
-            </span>
-          </div>
-        }
-      >
-        <table className="w-full border-collapse">
+      <ResponsiveDataTable title="Hotel Rejection Ledger" subtitle={`${filtered.length} denied authorizations`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+        <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-[#0f9041] text-red-100">
-              <Th>Order ID</Th>
-              <Th>Employee</Th>
-              <Th>Rejected Date</Th>
-              <Th>Rejected By</Th>
-              <Th>Reason</Th>
-              <Th>Est. Cost</Th>
-              <Th>Action</Th>
+            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="!px-6 !py-5">Order Reference</Th>
+              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Asset Detail</Th>
+              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Reason for Denial</Th>
+              <Th className="!px-6 !py-5">Rejected Date & Time</Th>
+              <Th className="!px-6 !py-5">Amount</Th>
+              <Th className="!px-6 !py-5 text-center">Action</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading ? (
-              <tr>
-                <td colSpan="9" className="py-16 text-center text-slate-400">
-                  <p className="text-sm font-semibold">Loading...</p>
+          <tbody>
+            {filtered.length > 0 ? filtered.map((r, i) => (
+              <tr key={r.id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
+                <td className="!px-6 !py-5"><IdCell id={r.orderId} /></td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{r.employee}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-xs font-black" style={{ color: C.navy }}>{r.hotelName}</p>
+                   <p className="text-[10px] font-bold text-gold uppercase">{r.city}</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{r.employeeId}</span>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-[10px] font-bold text-rose-500 line-clamp-2 italic max-w-[200px]" title={r.reason}>"{r.reason}"</p>
+                </td>
+                <td className="!px-6 !py-5">
+                   <p className="text-[11px] font-black text-slate-700">{r.rejectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{r.rejectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                </td>
+                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{r.estimatedCost.toLocaleString()}</td>
+                <td className="!px-6 !py-5 text-center">
+                  <button onClick={() => setSelected(r.originalData)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group">
+                    <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
+                  </button>
                 </td>
               </tr>
-            ) : filtered.length === 0 ? (
+            )) : (
               <tr>
-                <td colSpan="9" className="py-16 text-center text-slate-400">
-                  <div className="flex justify-center mb-3">
-                    <FaHotel size={32} className="opacity-20" />
-                  </div>
-                  <p className="font-semibold text-sm">
-                    No rejected hotel requests found
-                  </p>
-                  <p className="text-xs mt-1">
-                    Try adjusting the filters or search query
-                  </p>
-                </td>
-              </tr>
-            ) : (
-              filtered.map((r, i) => (
-                <tr
-                  key={r.id}
-                  className={`transition-colors hover:bg-red-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}
-                >
-                  <td className="px-4 py-3">
-                    <IdCell id={r.orderId} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-[13px] text-slate-800">
-                          {r.employee}
-                        </span>
-                        <span className="font-mono text-[11px] text-slate-400">
-                          {r.raw?.userId?._id || "N/A"}
-                        </span>
-                      </div>
+                <td colSpan={8} className="!px-6 !py-20 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                      <FiSearch size={32} />
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-[13px] text-slate-500">
-                    {r.rejectedDate
-                      ? new Date(r.rejectedDate).toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })
-                      : "N/A"}
-                  </td>
-                  <td className="px-4 py-3 text-[13px] text-slate-600">
-                    {r.rejectedBy}
-                  </td>
-                  <td className="px-4 py-3 max-w-[180px]">
-                    <p
-                      className="text-[12px] text-red-600 truncate"
-                      title={r.reason}
-                    >
-                      {r.reason}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 font-bold text-slate-900">
-                    ₹{r.estimatedCost.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => setSelectedRequest(r)}
-                      className="px-3 py-1 text-xs font-semibold bg-[#088395] text-white rounded-md hover:bg-[#066b78] flex items-center gap-1"
-                    >
-                      <FiEye size={12} /> View
-                    </button>
-                  </td>
-                </tr>
-              ))
+                    <p className="text-sm font-bold text-slate-400">No rejected hotel requests found.</p>
+                  </div>
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
       </ResponsiveDataTable>
-
-      {selectedRequest && (
-        <PendingHotelDetailsModal
-          booking={selectedRequest.raw}
-          onClose={() => setSelectedRequest(null)}
-        />
-      )}
+      {selected && <PendingHotelDetailsModal booking={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
 
-// ── ROOT ──────────────────────────────────────────────────────────────────────
+/* ───────────────────────────────────────────────────────────────────────────── */
+/* ROOT                                                                          */
+/* ───────────────────────────────────────────────────────────────────────────── */
 export default function RejectedTravelRequests() {
-  const [activeTab, setActiveTab] = useState("flight");
-
   const dispatch = useDispatch();
-  const rejectedRequests = useSelector(selectApprovals);
+  const navigate = useNavigate();
+  const rawApprovals = useSelector(selectApprovals);
   const loading = useSelector(selectApprovalLoading);
+  const { employees } = useSelector((state) => state.employeeAction);
+
+  const [activeTab, setActiveTab] = useState("flight");
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsSyncing(true);
+    try {
+      await Promise.all([
+        dispatch(fetchApprovals({ status: "rejected" })),
+        dispatch(fetchEmployees()),
+      ]);
+    } finally {
+      setTimeout(() => setIsSyncing(false), 500);
+    }
+  };
 
   useEffect(() => {
     dispatch(fetchApprovals({ status: "rejected" }));
+    dispatch(fetchEmployees());
   }, [dispatch]);
 
-  const allRequests = useMemo(
-    () => normalize(rejectedRequests),
-    [rejectedRequests],
-  );
+  const allCorporateEmployees = useMemo(() => {
+    const names = new Set(employees.map(e => {
+       if (typeof e.name === "string") return e.name;
+       return `${e.name?.firstName || ""} ${e.name?.lastName || ""}`.trim();
+    }));
+    return ["All Employees", ...Array.from(names).sort()];
+  }, [employees]);
 
-  const tabs = [
-    {
-      id: "flight",
-      label: "Flight Requests",
-      Icon: FaPlane,
-      activeText: "text-red-700",
-      activeBorder: "border-b-red-700",
-    },
-    {
-      id: "hotel",
-      label: "Hotel Requests",
-      Icon: FaHotel,
-      activeText: "text-red-600",
-      activeBorder: "border-b-red-600",
-    },
-  ];
+  const requests = useMemo(() => {
+    return rawApprovals.map((b) => {
+      const isHotel = b.bookingType === "hotel";
+      const isFlight = b.bookingType === "flight";
+      const estimatedCost = (() => {
+        if (isHotel) {
+          if (b.pricingSnapshot?.totalAmount) return b.pricingSnapshot.totalAmount;
+          if (b.bookingSnapshot?.amount) return b.bookingSnapshot.amount;
+          const hr = b.hotelRequest || {};
+          const sr = hr.selectedRoom || {};
+          if (sr.Price?.totalFare) return sr.Price.totalFare;
+          if (sr.totalFare && sr.totalTax) return sr.totalFare + sr.totalTax;
+          if (sr.totalFare) return sr.totalFare;
+          if (Array.isArray(sr.rawRoomData)) {
+            return sr.rawRoomData.reduce((sum, room) => sum + (room.TotalFare || room.Price?.totalFare || 0), 0);
+          }
+          if (sr.rawRoomData?.TotalFare) return sr.rawRoomData.TotalFare;
+          if (sr.rawRoomData?.Price?.totalFare) return sr.rawRoomData.Price.totalFare;
+          return 0;
+        }
+        return b.pricingSnapshot?.totalAmount || b.bookingSnapshot?.amount || b.flightRequest?.fareSnapshot?.publishedFare || 0;
+      })();
+
+      const common = {
+        id: b._id, 
+        orderId: b.orderId || "N/A", 
+        bookingRef: b.bookingReference, 
+        type: b.bookingType,
+        employee: b.userId?.name ? `${b.userId.name.firstName} ${b.userId.name.lastName}`.trim() : "Employee",
+        employeeId: b.userId?.email || "—", 
+        rejectedDate: b.rejectedAt ? new Date(b.rejectedAt) : (b.updatedAt ? new Date(b.updatedAt) : new Date()), 
+        estimatedCost, 
+        reason: b.approverComments || "No reason provided",
+        originalData: b, 
+      };
+
+      if (isHotel) {
+        const hotelReq = b.hotelRequest || {};
+        return { 
+          ...common, 
+          hotelName: hotelReq.selectedHotel?.hotelName || "N/A", 
+          city: hotelReq.selectedHotel?.city || "N/A", 
+        };
+      }
+
+      const segments = b.flightRequest?.segments || [];
+      const onwardSegments = segments.filter(s => s.journeyType === "onward");
+      const returnSegments = segments.filter(s => s.journeyType === "return");
+      const buildLeg = (segs, label) => {
+        if (!segs.length) return null;
+        const first = segs[0]; 
+        const last = segs[segs.length - 1];
+        return { 
+          label, 
+          fromCity: first?.origin?.city || first?.origin?.airportCode || "N/A", 
+          toCity: last?.destination?.city || last?.destination?.airportCode || "N/A", 
+          fromCode: first?.origin?.airportCode || "", 
+          toCode: last?.destination?.airportCode || "" 
+        };
+      };
+      const routes = []; 
+      const onwardLeg = buildLeg(onwardSegments, "Onward"); 
+      const returnLeg = buildLeg(returnSegments, "Return");
+      if (onwardLeg) routes.push(onwardLeg); 
+      if (returnLeg) routes.push(returnLeg);
+      if (!routes.length) { 
+        const fallbackLeg = buildLeg(segments, "Route"); 
+        if (fallbackLeg) routes.push(fallbackLeg); 
+      }
+
+      const airline = segments[0] ? { 
+        airlineCode: segments[0].airlineCode || segments[0].airline?.airlineCode, 
+        airlineName: segments[0].airlineName || segments[0].airline?.airlineName 
+      } : null;
+
+      return { 
+        ...common, 
+        routes,
+        airline
+      };
+    });
+  }, [rawApprovals]);
 
   return (
-    <div className="w-full min-w-0 space-y-6 font-sans">
-      <div className="flex items-center justify-between gap-3 min-w-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-red-400 flex items-center justify-center shrink-0 shadow-sm">
-            <FiXCircle size={18} className="text-white" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-xl font-black text-slate-900 tracking-tight truncate">
-              Rejected Travel Requests
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5 truncate">
-              Review and analyze all rejected or cancelled travel requests
-            </p>
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
+      {/* Navy Header Section */}
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+             <div className="flex items-center gap-3">
+               <button onClick={() => navigate(-1)} className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10">
+                 <FiArrowRight className="rotate-180" size={20} />
+               </button>
+               <button onClick={handleRefresh} className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${(isSyncing || loading) ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`} disabled={isSyncing || loading}>
+                 <div className={(isSyncing || loading) ? "animate-spin" : ""}>
+                   <FiRefreshCw size={20} />
+                 </div>
+               </button>
+             </div>
+             
+             <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+
+             <div className="flex items-center gap-5">
+               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
+                 <FiXCircle size={28} />
+               </div>
+               <div>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Denial Archive</h1>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                   Analyze and Audit Rejected Corporate Travel Authorizations
+                 </p>
+               </div>
+             </div>
           </div>
         </div>
-        <button
-          onClick={() => dispatch(fetchApprovals({ status: "rejected" }))}
-          className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-bold transition-all shadow-sm border bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
-        >
-          <FiRefreshCw size={14} />
-          Refresh
-        </button>
       </div>
 
-        {/* Tab Bar */}
-        <div className="flex items-end gap-0 mb-5 border-b-2 border-slate-200">
-          {tabs.map((tab) => {
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 px-5 py-2.5 text-[13px] font-bold transition-all border-b-2 -mb-0.5 rounded-t-lg
-                  ${
-                    active
-                      ? `bg-white ${tab.activeText} ${tab.activeBorder} shadow-sm`
-                      : "text-slate-400 border-transparent hover:text-slate-600 hover:bg-white/60"
-                  }
-                `}
-              >
-                <tab.Icon size={14} />
-                {tab.label}
-              </button>
-            );
-          })}
+      <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
+        {/* Tab Switcher */}
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+           {[["flight", "Flight Denials", FaPlane], ["hotel", "Hotel Denials", FaHotel]].map(([k, lbl, Icon]) => (
+             <button key={k} onClick={() => setActiveTab(k)} className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
+                <Icon size={14} /> {lbl}
+             </button>
+           ))}
         </div>
 
-        {/* Tab Content */}
         {activeTab === "flight" ? (
-          <FlightSection allRequests={allRequests} loading={loading} />
+          <FlightRejectionsSection requests={requests.filter(r => r.type === "flight")} refreshing={isSyncing} employeeOptions={allCorporateEmployees} />
         ) : (
-          <HotelSection allRequests={allRequests} loading={loading} />
+          <HotelRejectionsSection requests={requests.filter(r => r.type === "hotel")} refreshing={isSyncing} employeeOptions={allCorporateEmployees} />
         )}
+      </div>
     </div>
   );
 }
