@@ -1683,7 +1683,7 @@ export default function HotelBookingDetails() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const { selectedBookingDetails: booking, loading } = useSelector(
+  const { selectedBookingDetails: booking, loading, voucherLoading } = useSelector(
     (s) => s.hotelBookings,
   );
   const user = useSelector((state) => state.auth?.user);
@@ -1777,10 +1777,20 @@ export default function HotelBookingDetails() {
           {paymentSuccessful && !isCancelled && (
             <button
               onClick={() => dispatch(generateHotelVoucher(booking.bookingId))}
-              className="inline-flex items-center gap-[6px] px-4 py-[7px] bg-[#B5862A] text-white border-none cursor-pointer font-['DM_Sans'] text-[11px] font-semibold tracking-[0.05em] uppercase transition-colors hover:bg-[#D4A843]"
+              disabled={voucherLoading}
+              className="inline-flex items-center gap-[6px] px-4 py-[7px] bg-[#B5862A] text-white border-none cursor-pointer font-['DM_Sans'] text-[11px] font-semibold tracking-[0.05em] uppercase transition-colors hover:bg-[#D4A843] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <FiDownload size={12} />
-              Download Voucher
+              {voucherLoading ? (
+                <>
+                  <FiRefreshCw size={12} className="animate-spin" />
+                  Downloading…
+                </>
+              ) : (
+                <>
+                  <FiDownload size={12} />
+                  Download Voucher
+                </>
+              )}
             </button>
           )}
         </div>

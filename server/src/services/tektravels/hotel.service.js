@@ -196,7 +196,7 @@ class HotelService {
         },
       );
 
-      logger.info("[TOKEN POST RESPONSE]", data);
+      // logger.info("[TOKEN POST RESPONSE]", data);
 
       return data;
     } catch (err) {
@@ -237,7 +237,7 @@ class HotelService {
         }
       );
 
-      logger.info("[BASIC AUTH RESPONSE]", data);
+      // logger.info("[BASIC AUTH RESPONSE]", data);
 
       return data;
     } catch (err) {

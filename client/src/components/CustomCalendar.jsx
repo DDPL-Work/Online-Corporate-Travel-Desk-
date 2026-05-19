@@ -21,11 +21,12 @@ export default function CustomCalendar({
 
   const [viewDate, setViewDate] = useState(new Date(selectedStart || minDate));
   const [hoverDate, setHoverDate] = useState(null);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
 
   const months = useMemo(() => {
     const m1 = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
-    const m2 = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
-    return [m1, m2];
+    return [m1];
   }, [viewDate]);
 
   const handleMonthChange = (offset) => {
@@ -122,21 +123,71 @@ export default function CustomCalendar({
     }
 
     return (
-      <div className="flex-1 min-w-[280px]">
-        <div className="text-center font-black text-slate-900 mb-6 text-base tracking-tight uppercase">
-          {monthName} {year}
+      <div className="flex-1 min-w-0 sm:min-w-[280px]">
+        <div className="flex items-center justify-center gap-2 mb-6 text-base font-black text-slate-900 tracking-tight uppercase">
+          <button 
+             onClick={() => { setShowMonthPicker(!showMonthPicker); setShowYearPicker(false); }}
+             className={`px-3 py-1 rounded-lg transition-colors ${showMonthPicker ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-100 hover:text-blue-600'}`}
+          >
+             {monthName}
+          </button>
+          <button 
+             onClick={() => { setShowYearPicker(!showYearPicker); setShowMonthPicker(false); }}
+             className={`px-3 py-1 rounded-lg transition-colors ${showYearPicker ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-100 hover:text-blue-600'}`}
+          >
+             {year}
+          </button>
         </div>
-        <div className="grid grid-cols-7 gap-y-0.5 text-center">
-          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
-            <div
-              key={day}
-              className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-[0.1em]"
-            >
-              {day}
-            </div>
-          ))}
-          {days}
-        </div>
+
+        {showMonthPicker ? (
+           <div className="grid grid-cols-3 gap-3 p-2">
+             {Array.from({length: 12}).map((_, i) => {
+                const mName = new Date(year, i, 1).toLocaleString("default", { month: "short" });
+                return (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setViewDate(new Date(year, i, 1));
+                      setShowMonthPicker(false);
+                    }}
+                    className={`py-3 text-sm font-bold rounded-xl transition-all ${i === month ? "bg-blue-600 text-white shadow-md shadow-blue-200" : "hover:bg-blue-50 text-slate-700 bg-slate-50 border border-slate-100"}`}
+                  >
+                    {mName}
+                  </button>
+                )
+             })}
+           </div>
+        ) : showYearPicker ? (
+           <div className="grid grid-cols-3 gap-3 p-2 max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+             {Array.from({length: 20}).map((_, i) => {
+                const y = new Date().getFullYear() - 5 + i; 
+                return (
+                  <button
+                    key={y}
+                    onClick={() => {
+                      setViewDate(new Date(y, month, 1));
+                      setShowYearPicker(false);
+                    }}
+                    className={`py-3 text-sm font-bold rounded-xl transition-all ${y === year ? "bg-blue-600 text-white shadow-md shadow-blue-200" : "hover:bg-blue-50 text-slate-700 bg-slate-50 border border-slate-100"}`}
+                  >
+                    {y}
+                  </button>
+                )
+             })}
+           </div>
+        ) : (
+          <div className="grid grid-cols-7 gap-y-0.5 text-center">
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+              <div
+                key={day}
+                className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-[0.1em]"
+              >
+                {day}
+              </div>
+            ))}
+            {days}
+          </div>
+        )}
       </div>
     );
   };
@@ -150,10 +201,10 @@ export default function CustomCalendar({
       : "---";
 
   return (
-    <div className="bg-white rounded-[2rem] shadow-[0_32px_80px_rgba(0,0,0,0.2)] border border-slate-100 overflow-hidden w-[680px] max-w-[95vw] animate-premium-pop">
+    <div className="bg-white rounded-[2rem] shadow-[0_32px_80px_rgba(0,0,0,0.2)] border border-slate-100 overflow-hidden w-full sm:w-fit sm:min-w-[320px] max-w-[400px] animate-premium-pop mx-auto">
       {/* Premium Header */}
-      <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-        <div className="flex items-center gap-6">
+      <div className="px-5 py-4 sm:px-8 sm:py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
           <div className="flex flex-col">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
               Departure
@@ -195,43 +246,27 @@ export default function CustomCalendar({
         )}
       </div>
 
-      <div className="relative p-8 flex flex-col sm:flex-row gap-12 sm:gap-16">
-        <button
-          onClick={() => handleMonthChange(-1)}
-          className="absolute left-6 top-10 w-10 h-10 rounded-full bg-white border border-slate-100 flex items-center justify-center text-blue-600 z-20 transition-all hover:shadow-md hover:scale-110 active:scale-95"
-        >
-          <FaChevronLeft size={12} />
-        </button>
-        <button
-          onClick={() => handleMonthChange(1)}
-          className="absolute right-6 top-10 w-10 h-10 rounded-full bg-white border border-slate-100 flex items-center justify-center text-blue-600 z-20 transition-all hover:shadow-md hover:scale-110 active:scale-95"
-        >
-          <FaChevronRight size={12} />
-        </button>
+      <div className="relative p-5 sm:p-8 flex flex-col gap-6">
+        {!showMonthPicker && !showYearPicker && (
+          <>
+            <div
+              onClick={() => handleMonthChange(-1)}
+              className="absolute left-2 top-6 sm:left-6 sm:top-10 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white border border-slate-100 flex items-center justify-center text-blue-600 z-20 transition-all hover:shadow-md hover:scale-110 active:scale-95 cursor-pointer"
+            >
+              <FaChevronLeft size={10} className="sm:text-[12px]" />
+            </div>
+            <div
+              onClick={() => handleMonthChange(1)}
+              className="absolute right-2 top-6 sm:right-6 sm:top-10 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white border border-slate-100 flex items-center justify-center text-blue-600 z-20 transition-all hover:shadow-md hover:scale-110 active:scale-95 cursor-pointer"
+            >
+              <FaChevronRight size={10} className="sm:text-[12px]" />
+            </div>
+          </>
+        )}
 
         {months.map((m, i) => (
           <React.Fragment key={i}>{renderMonth(m)}</React.Fragment>
         ))}
-      </div>
-
-      <div className="px-8 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-          Best corporate rates applied
-        </p>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-blue-600" />
-            <span className="text-[10px] font-bold text-slate-500 uppercase">
-              Selected
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-blue-50" />
-            <span className="text-[10px] font-bold text-slate-500 uppercase">
-              Range
-            </span>
-          </div>
-        </div>
       </div>
 
       <style

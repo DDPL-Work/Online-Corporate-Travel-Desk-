@@ -193,7 +193,7 @@ const LandingDateField = ({
         </span>
       </div>
       {isOpen && (
-        <div className="absolute top-full lg:right-0 right-10 z-[1000] mt-2 shadow-2xl rounded-xl overflow-hidden">
+        <div className="absolute top-full left-0 w-full md:w-auto md:left-auto md:right-0 z-[1000] mt-2 shadow-2xl rounded-xl overflow-hidden">
           <CustomCalendar
             range={range}
             value={range ? { start: value, end: valueEnd } : value}
@@ -1174,13 +1174,14 @@ const HeroWithSearch = ({
                       <FieldBox label="Departure" icon={<FaCalendarAlt />}>
                         <LandingDateField
                           value={departureDate}
-                          valueEnd={
-                            tripType === "round-trip" ? returnDate : null
-                          }
-                          range={tripType === "round-trip"}
+                          range={false}
                           min={today}
-                          onChange={setDepartureDate}
-                          onChangeEnd={setReturnDate}
+                          onChange={(val) => {
+                            setDepartureDate(val);
+                            if (tripType === "round-trip") {
+                              setTimeout(() => setOpenCalendarId("return"), 50);
+                            }
+                          }}
                           isOpen={openCalendarId === "departure"}
                           onToggle={(st) =>
                             handleCalendarToggle("departure", st)
@@ -1190,19 +1191,17 @@ const HeroWithSearch = ({
                       {tripType === "round-trip" && (
                         <FieldBox label="Return" icon={<FaExchangeAlt />}>
                           <LandingDateField
-                            value={departureDate}
-                            valueEnd={returnDate}
-                            range={true}
-                            min={today}
-                            onChange={setDepartureDate}
-                            onChangeEnd={setReturnDate}
+                            value={returnDate}
+                            range={false}
+                            min={departureDate || today}
+                            onChange={(val) => {
+                              setReturnDate(val);
+                            }}
                             placeholder="Select Return"
-                            displayValue={returnDate}
                             isOpen={openCalendarId === "return"}
                             onToggle={(st) =>
                               handleCalendarToggle("return", st)
                             }
-                            focus="end"
                           />
                         </FieldBox>
                       )}
