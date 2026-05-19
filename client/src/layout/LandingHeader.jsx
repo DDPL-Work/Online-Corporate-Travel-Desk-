@@ -238,7 +238,7 @@ export default function LandingHeader() {
               className="h-8 object-contain"
             />
           ) : (
-            <img src={logo} alt="Traveamer" className="h-7" />
+            <img src="/logo-traveamer.svg" alt="Traveamer" className="h-7" />
           )}
         </div>
       </div>

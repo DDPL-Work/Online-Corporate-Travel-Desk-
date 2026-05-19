@@ -425,21 +425,18 @@ class PDFService {
 
       // ── Prepare Consolidated Passenger Data (Global for the journey) ──
       const consolidatedTravellers = await Promise.all(
-// <<<<<<< HEAD
-//         booking.travellers.map(async (traveller, tIdx) => {
-//           const tboPaxOnward =
-//             onwardData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
-//           const tboPaxReturn =
-//             returnData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
-// =======
         (Array.isArray(booking.travellers) ? booking.travellers : []).map(async (traveller, tIdx) => {
-          const tboPaxOnward = onwardData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
-          const tboPaxReturn = returnData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
-          
-          const onwardTicket = tboPaxOnward?.Ticket ? {
-            id: tboPaxOnward.Ticket.TicketId || "—",
-            no: tboPaxOnward.Ticket.TicketNumber || "—"
-          } : null;
+          const tboPaxOnward =
+            onwardData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
+          const tboPaxReturn =
+            returnData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
+
+          const onwardTicket = tboPaxOnward?.Ticket
+            ? {
+                id: tboPaxOnward.Ticket.TicketId || "—",
+                no: tboPaxOnward.Ticket.TicketNumber || "—",
+              }
+            : null;
 
           const returnTicket = tboPaxReturn?.Ticket
             ? {

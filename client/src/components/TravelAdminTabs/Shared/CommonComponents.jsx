@@ -247,16 +247,14 @@ export const ExecStatusBadge = ({ status }) => {
     ticketed: { background: `${C.navy}10`, color: C.navy },
     booking_initiated: { background: `${C.gold}10`, color: C.gold, text: "Booking Initiated" },
     discarded: { background: "#F1F5F9", color: "#64748B", text: "Discarded" },
+    TICKET_GENERATED: { background: `${C.navy}10`, color: C.navy, text: "Ticket Generated" },
+    COMPLETED: { background: `${C.emerald}10`, color: C.emerald, text: "Completed" },
+    IN_PROGRESS: { background: `${C.gold}10`, color: C.gold, text: "In Progress" },
   };
-  const config = map[status] || { background: C.offWhite, color: C.muted };
-  const label = config.text || status?.replace(/_/g, " ") || "—";
-
+  const m = map[status] || { background: C.offWhite, color: C.muted };
   return (
-    <span
-      className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tight"
-      style={{ background: config.background, color: config.color }}
-    >
-      {label}
+    <span className="px-2 py-1 text-[10px] font-black uppercase tracking-widest rounded shadow-sm inline-block whitespace-nowrap" style={{ background: m.background, color: m.color }}>
+      {m.text || status?.replace(/_/g, ' ') || "UNKNOWN"}
     </span>
   );
 };

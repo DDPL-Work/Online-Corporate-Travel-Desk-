@@ -44,6 +44,12 @@ router.post("/create", controller.create);
 router.get("/my", controller.getMyRequests);
 
 /**
+ * GET /company
+ * Get all company reissue requests (online + offline)
+ */
+router.get("/company", controller.getCompanyRequests);
+
+/**
  * GET /:id
  * Get details of a specific reissue request
  */

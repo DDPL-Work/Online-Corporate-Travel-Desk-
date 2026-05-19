@@ -38,8 +38,8 @@ import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { airlineLogo } from "../../utils/formatter";
 import { C } from "../Shared/color";
 
-const FLIGHT_EXCLUDE = new Set(["ticketed", "cancel_requested", "cancelled"]);
-const HOTEL_EXCLUDE = new Set(["voucher_generated", "cancelled"]);
+const FLIGHT_EXCLUDE = new Set(["ticketed", "cancel_requested", "cancelled", "TICKET_GENERATED", "COMPLETED"]);
+const HOTEL_EXCLUDE = new Set(["voucher_generated", "cancelled", "COMPLETED"]);
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Shared Components                                              */
