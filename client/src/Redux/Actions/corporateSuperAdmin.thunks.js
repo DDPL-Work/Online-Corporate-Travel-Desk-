@@ -25,7 +25,7 @@ export const toggleUserStatus = createAsyncThunk(
   "corporateSuperAdmin/toggleUserStatus",
   async (userId, { rejectWithValue }) => {
     try {
-      const { data } = await API.patch(`/corporate-super-admin/users/${userId}/toggle`);
+      const { data } = await api.patch(`/corporate-super-admin/users/${userId}/toggle`);
       return data.data;
     } catch (error) {
       return rejectWithValue(
@@ -42,7 +42,7 @@ export const changeTravelAdmin = createAsyncThunk(
   "corporateSuperAdmin/changeTravelAdmin",
   async (payload, { rejectWithValue }) => {
     try {
-      const { data } = await API.patch("/corporate-super-admin/travel-admin", payload);
+      const { data } = await api.patch("/corporate-super-admin/travel-admin", payload);
       return data.data;
     } catch (error) {
       return rejectWithValue(
@@ -59,7 +59,7 @@ export const updateTravelPolicy = createAsyncThunk(
   "corporateSuperAdmin/updateTravelPolicy",
   async (policyData, { rejectWithValue }) => {
     try {
-      const { data } = await API.patch("/corporate-super-admin/travel-policy", policyData);
+      const { data } = await api.patch("/corporate-super-admin/travel-policy", policyData);
       return data.data;
     } catch (error) {
       return rejectWithValue(
@@ -76,7 +76,7 @@ export const fetchCorporateDashboard = createAsyncThunk(
   "corporateSuperAdmin/fetchDashboard",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await API.get("/corporate-super-admin/dashboard");
+      const { data } = await api.get("/corporate-super-admin/dashboard");
       return data.data;
     } catch (error) {
       return rejectWithValue(

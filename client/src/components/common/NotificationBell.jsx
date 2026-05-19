@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import NotificationDrawer from "./NotificationDrawer";
 
-const NotificationBell = () => {
+const NotificationBell = ({ onOpen }) => {
   const {
     notifications,
     unreadCount,
@@ -28,8 +28,13 @@ const NotificationBell = () => {
         setIsOpen(false);
       }
     };
+    const handleCustomClose = () => setIsOpen(false);
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    window.addEventListener("closeNotificationBell", handleCustomClose);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("closeNotificationBell", handleCustomClose);
+    };
   }, []);
 
   const handleNotificationClick = (notification) => {
@@ -48,6 +53,7 @@ const NotificationBell = () => {
   const toggleDropdown = () => {
     if (!isOpen) {
       fetchNotifications();
+      if (onOpen) onOpen();
     }
     setIsOpen(!isOpen);
   };

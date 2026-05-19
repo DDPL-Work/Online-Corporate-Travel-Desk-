@@ -1,0 +1,14 @@
+name: Production Health Check
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check API
+        run: |
+          curl -f https://api.yourdomain.com/health || exit 1

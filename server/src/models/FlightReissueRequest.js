@@ -147,6 +147,27 @@ const flightReissueRequestSchema = new mongoose.Schema(
       changeRequestId: String,
     },
 
+    /* OPS ASSIGNMENT */
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "OpsMember",
+      index: true,
+    },
+    assignedAt: Date,
+    assignmentMethod: {
+      type: String,
+      enum: ["AUTO", "MANUAL"],
+      default: "AUTO",
+    },
+    assignmentSequence: Number, // Round-robin sequence number
+
+    /* PREFERRED TIME SUPPORT */
+    preferredTime: String, // e.g., "08:00 AM", "Morning", "Afternoon", "Evening", "Night"
+    preferredTimeSlot: {
+      type: String,
+      enum: ["MORNING", "AFTERNOON", "EVENING", "NIGHT"],
+    },
+
     /* LOGS */
     logs: {
       type: [logSchema],

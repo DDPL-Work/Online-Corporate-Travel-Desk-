@@ -6,6 +6,10 @@ const Corporate = require("../../models/Corporate");
 const redis = require("../../config/redis");
 const ApiError = require("../../utils/ApiError");
 const logger = require("../../utils/logger");
+const {
+  resolvePnr,
+  resolveSupplierBookingId,
+} = require("../../utils/bookingResolver.util");
 const tboService = require("../tektravels/flight.service");
 const {
   buildPassengersFromBooking,
@@ -18,6 +22,13 @@ const bookingReconstructionService = require("./bookingReconstruction.service");
 const SEARCH_CACHE_TTL_SECONDS = 90;
 const LOCK_TTL_MS = 2 * 60 * 1000;
 const RETRY_DELAY_MS = 1500;
+const DUPLICATE_BLOCK_WINDOW_HOURS = 24;
+const ACTIVE_DUPLICATE_EXECUTION_STATUSES = new Set([
+  "ticketed",
+  "completed",
+  "confirmed",
+  "active",
+]);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -47,6 +58,8 @@ const normalizeDateMinute = (value) => {
 const normalizeAirlineCode = (value) => String(value || "").trim().toUpperCase();
 const normalizeFlightNumber = (value) => String(value || "").trim().toUpperCase();
 const normalizeAirportCode = (value) => String(value || "").trim().toUpperCase();
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const normalizePhone = (value) => String(value || "").replace(/\D/g, "");
 
 const toMoney = (value) => Number(Number(value || 0).toFixed(2));
 
@@ -94,6 +107,109 @@ const buildLooseSupplierSegmentSignature = (segment = {}) =>
     normalizeFlightNumber(segment.Airline?.FlightNumber || segment.FlightNumber),
     normalizeDateMinute(segment.Origin?.DepTime),
   ].join("|");
+
+const normalizeDateDay = (value) => {
+  const normalizedMinute = normalizeDateMinute(value);
+  if (normalizedMinute.length >= 10) {
+    return normalizedMinute.slice(0, 10);
+  }
+
+  return "";
+};
+
+const buildDuplicateSegmentSignature = (segment = {}) =>
+  [
+    normalizeAirportCode(segment.origin?.airportCode),
+    normalizeAirportCode(segment.destination?.airportCode),
+    normalizeDateDay(segment.departureDateTime),
+    normalizeAirlineCode(segment.airlineCode),
+    normalizeFlightNumber(segment.flightNumber),
+  ].join("|");
+
+const buildPassengerIdentityToken = (traveller = {}) => {
+  const passportNumber = String(
+    traveller.passportNumber ||
+      traveller.passportNo ||
+      traveller.idNumber ||
+      traveller.identityNumber ||
+      "",
+  )
+    .trim()
+    .toUpperCase();
+
+  if (passportNumber) {
+    return `document:${passportNumber}`;
+  }
+
+  const dateOfBirth = normalizeDateDay(traveller.dateOfBirth || traveller.dob);
+  const email = normalizeEmail(traveller.email);
+  const phone = normalizePhone(traveller.phoneWithCode || traveller.phone);
+  const paxType = String(traveller.paxType || "ADULT").trim().toUpperCase();
+
+  if (dateOfBirth && (email || phone)) {
+    return `profile:${dateOfBirth}:${email || phone}:${paxType}`;
+  }
+
+  return null;
+};
+
+const getDuplicateComparisonKey = (booking = {}) => {
+  const segments = Array.isArray(booking.flightRequest?.segments)
+    ? booking.flightRequest.segments
+    : [];
+  const travellers = Array.isArray(booking.travellers) ? booking.travellers : [];
+
+  const segmentTokens = segments.map(buildDuplicateSegmentSignature).filter(Boolean);
+  const passengerTokens = travellers.map(buildPassengerIdentityToken).filter(Boolean);
+
+  return {
+    segmentTokens,
+    segmentKey: segmentTokens.join("::"),
+    passengerTokens: passengerTokens.sort(),
+    passengerKey: passengerTokens.sort().join("::"),
+    departureDate: normalizeDateDay(segments[0]?.departureDateTime || booking.bookingSnapshot?.travelDate),
+    hasStablePassengerIdentity:
+      travellers.length > 0 && passengerTokens.length === travellers.length,
+  };
+};
+
+const isBlockingDuplicateStatus = (status) =>
+  ACTIVE_DUPLICATE_EXECUTION_STATUSES.has(String(status || "").trim().toLowerCase());
+
+const isProviderDuplicateError = (error) => {
+  const text = String(error?.message || error?.providerMessage || "").toLowerCase();
+
+  return [
+    "already done for the same criteria",
+    "duplicate booking",
+    "already booked",
+    "confirmed booking already exists",
+  ].some((token) => text.includes(token));
+};
+
+const createDuplicateBookingError = ({
+  currentBooking,
+  existingBooking,
+  source,
+  providerMessage,
+}) => {
+  const error = new ApiError(
+    409,
+    "You already have a confirmed booking for this flight.",
+  );
+
+  error.code = "DUPLICATE_CONFIRMED_BOOKING";
+  error.providerMessage = providerMessage || null;
+  error.data = {
+    bookingId: currentBooking?._id || null,
+    existingBookingId: existingBooking?._id || null,
+    existingPnr: resolvePnr(existingBooking) || null,
+    existingProviderBookingId: resolveSupplierBookingId(existingBooking) || null,
+    duplicateSource: source,
+  };
+
+  return error;
+};
 
 const getStoredJourneyGroups = (booking) => {
   const segments = booking.flightRequest?.segments || [];
@@ -225,6 +341,7 @@ const isSilentRevalidationError = (error) => {
     "result index",
     "fare quote",
     "no fare",
+    "supplier",
   ].some((token) => text.includes(token));
 };
 
@@ -272,24 +389,29 @@ const buildBookingContextPayload = (context = {}) => ({
 const buildSuccessResponse = (booking, bookingResult, metadata = {}) => ({
   status: "SUCCESS",
   bookingRequestId: booking._id,
+  bookingId: booking._id,
   executionStatus: booking.executionStatus,
   pnr:
     bookingResult?.pnr ||
     booking.bookingResult?.pnr ||
     extractPnr(booking.bookingResult?.providerResponse),
+  idempotent: metadata?.idempotent === true,
   metadata,
 });
 
 const buildExistingOutcomeResponse = (booking) => ({
   status: "SUCCESS",
   bookingRequestId: booking._id,
+  bookingId: booking._id,
   executionStatus: booking.executionStatus,
   pnr:
     booking.bookingResult?.pnr ||
     booking.bookingResult?.onwardPNR ||
     extractPnr(booking.bookingResult?.providerResponse),
+  idempotent: true,
   metadata: {
     replayed: true,
+    idempotent: true,
   },
 });
 
@@ -412,6 +534,30 @@ const markFailedAttempt = async (booking, error, idempotencyKey) => {
   await saveSystemMutation(booking);
 };
 
+const markBusinessBlocked = async (
+  booking,
+  error,
+  idempotencyKey,
+  executionStatus = "not_started",
+) => {
+  booking.orchestration = {
+    ...(booking.orchestration || {}),
+    processing: false,
+    processingCompletedAt: new Date(),
+    lockExpiresAt: null,
+    idempotencyKey,
+    lastError: {
+      message: error.message,
+      code: error.code || String(error.statusCode || 409),
+      at: new Date(),
+      data: error.data || null,
+    },
+  };
+
+  booking.executionStatus = executionStatus;
+  await saveSystemMutation(booking);
+};
+
 const buildPendingRevalidation = ({ reconstructed, matchedFlight }) => ({
   status: reconstructed.status === "SUCCESS" ? "REVALIDATED" : reconstructed.status,
   generatedAt: new Date(),
@@ -495,6 +641,92 @@ const applyRevalidatedContextToBooking = ({ booking, reconstructed, matchedFligh
 };
 
 class FlightOrchestrationService {
+  async inspectPotentialDuplicateBookings(
+    booking,
+    { includeOutsideWindow = false } = {},
+  ) {
+    const duplicateKey = getDuplicateComparisonKey(booking);
+
+    if (!duplicateKey.segmentTokens.length || !duplicateKey.hasStablePassengerIdentity) {
+      return {
+        blockingBooking: null,
+        retryableMatches: [],
+        skipped: true,
+      };
+    }
+
+    const travelDate = new Date(
+      booking.bookingSnapshot?.travelDate ||
+        booking.flightRequest?.segments?.[0]?.departureDateTime ||
+        booking.createdAt,
+    );
+
+    if (Number.isNaN(travelDate.getTime())) {
+      return {
+        blockingBooking: null,
+        retryableMatches: [],
+        skipped: true,
+      };
+    }
+
+    const dayStart = new Date(travelDate);
+    dayStart.setUTCHours(0, 0, 0, 0);
+
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+
+    const query = {
+      _id: { $ne: booking._id },
+      bookingType: "flight",
+      corporateId: booking.corporateId,
+      userId: booking.userId,
+      requestStatus: { $in: ["approved"] },
+      "bookingSnapshot.travelDate": {
+        $gte: dayStart,
+        $lt: dayEnd,
+      },
+    };
+
+    if (!includeOutsideWindow) {
+      query.createdAt = {
+        $gte: new Date(Date.now() - DUPLICATE_BLOCK_WINDOW_HOURS * 60 * 60 * 1000),
+      };
+    }
+
+    const candidates = await BookingRequest.find(query)
+      .select(
+        "_id corporateId userId requestStatus executionStatus travellers flightRequest bookingResult bookingSnapshot cancellation createdAt updatedAt",
+      )
+      .lean();
+
+    const matches = candidates.filter((candidate) => {
+      const candidateKey = getDuplicateComparisonKey(candidate);
+
+      return (
+        candidateKey.hasStablePassengerIdentity &&
+        candidateKey.segmentKey === duplicateKey.segmentKey &&
+        candidateKey.passengerKey === duplicateKey.passengerKey
+      );
+    });
+
+    const blockingMatches = matches
+      .filter(
+        (candidate) =>
+          isBlockingDuplicateStatus(candidate.executionStatus) &&
+          !candidate.cancellation?.cancelledAt &&
+          !!resolvePnr(candidate),
+      )
+      .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt));
+
+    return {
+      blockingBooking: blockingMatches[0] || null,
+      retryableMatches: matches.filter(
+        (candidate) => !blockingMatches.some((blocking) => String(blocking._id) === String(candidate._id)),
+      ),
+      skipped: false,
+    };
+  }
+
   async searchFlights(booking) {
     const payload = getJourneySearchPayload(booking);
     const cacheKey = searchResponseCacheKey(payload);
@@ -699,6 +931,174 @@ class FlightOrchestrationService {
     );
   }
 
+  async getBookingLifecycle(bookingId) {
+    const booking = await BookingRequest.findById(bookingId);
+    if (!booking) {
+      throw new ApiError(404, "Booking not found");
+    }
+
+    const pendingRevalidation = booking.orchestration?.pendingRevalidation || null;
+    const lastOutcome = booking.orchestration?.lastOutcome || null;
+    const idempotencyKey =
+      booking.orchestration?.idempotencyKey || lastOutcome?.idempotencyKey || null;
+
+    if (booking.orchestration?.processing) {
+      return {
+        ...buildProcessingResponse(booking, idempotencyKey),
+        message: lastOutcome?.message || "Booking is being processed",
+        bookingContext: pendingRevalidation?.bookingContext || null,
+        priceChange: pendingRevalidation?.priceChange || null,
+        ssrChange: pendingRevalidation?.ssrChange || null,
+        notifications: pendingRevalidation?.notifications || [],
+        revalidation: pendingRevalidation,
+      };
+    }
+
+    if (lastOutcome?.status === "SUCCESS") {
+      return {
+        ...buildSuccessResponse(booking, booking.bookingResult, lastOutcome.metadata),
+        idempotencyKey,
+      };
+    }
+
+    if (lastOutcome?.status === "REVALIDATED") {
+      return {
+        ...buildRevalidatedResponse(
+          booking,
+          lastOutcome.bookingContext || pendingRevalidation?.bookingContext || null,
+          {
+            ...lastOutcome.metadata,
+            revalidation: lastOutcome.revalidation,
+            notifications: lastOutcome.notifications,
+          },
+        ),
+        idempotencyKey,
+      };
+    }
+
+    if (lastOutcome?.status === "PRICE_CHANGED") {
+      return {
+        ...buildPriceChangedResponse(booking, lastOutcome.priceChange, {
+          ...lastOutcome.metadata,
+          bookingContext:
+            lastOutcome.bookingContext || pendingRevalidation?.bookingContext || null,
+          revalidation: lastOutcome.revalidation,
+          notifications: lastOutcome.notifications,
+          ssrChange: lastOutcome.ssrChange,
+        }),
+        idempotencyKey,
+      };
+    }
+
+    if (lastOutcome?.status === "SSR_CHANGED") {
+      return {
+        ...buildSsrChangedResponse(
+          booking,
+          lastOutcome.priceChange,
+          lastOutcome.ssrChange,
+          {
+            ...lastOutcome.metadata,
+            bookingContext:
+              lastOutcome.bookingContext || pendingRevalidation?.bookingContext || null,
+            revalidation: lastOutcome.revalidation,
+            notifications: lastOutcome.notifications,
+          },
+        ),
+        idempotencyKey,
+      };
+    }
+
+    if (lastOutcome?.status === "FLIGHT_UNAVAILABLE") {
+      return {
+        ...buildFlightUnavailableResponse(booking, {
+          ...lastOutcome.metadata,
+          revalidation: lastOutcome.revalidation,
+          notifications: lastOutcome.notifications,
+        }),
+        idempotencyKey,
+      };
+    }
+
+    if (pendingRevalidation?.status === "REVALIDATED") {
+      return {
+        ...buildRevalidatedResponse(booking, pendingRevalidation.bookingContext || null, {
+          revalidation: pendingRevalidation,
+          notifications: pendingRevalidation.notifications || [],
+        }),
+        idempotencyKey,
+      };
+    }
+
+    if (pendingRevalidation?.status === "PRICE_CHANGED") {
+      return {
+        ...buildPriceChangedResponse(booking, pendingRevalidation.priceChange, {
+          bookingContext: pendingRevalidation.bookingContext || null,
+          ssrChange: pendingRevalidation.ssrChange || null,
+          revalidation: pendingRevalidation,
+          notifications: pendingRevalidation.notifications || [],
+        }),
+        idempotencyKey,
+      };
+    }
+
+    if (pendingRevalidation?.status === "SSR_CHANGED") {
+      return {
+        ...buildSsrChangedResponse(
+          booking,
+          pendingRevalidation.priceChange,
+          pendingRevalidation.ssrChange,
+          {
+            bookingContext: pendingRevalidation.bookingContext || null,
+            revalidation: pendingRevalidation,
+            notifications: pendingRevalidation.notifications || [],
+          },
+        ),
+        idempotencyKey,
+      };
+    }
+
+    if (pendingRevalidation?.status === "FLIGHT_UNAVAILABLE") {
+      return {
+        ...buildFlightUnavailableResponse(booking, {
+          revalidation: pendingRevalidation,
+          notifications: pendingRevalidation.notifications || [],
+        }),
+        idempotencyKey,
+      };
+    }
+
+    if (
+      ["booked", "ticket_pending", "ticketed"].includes(booking.executionStatus) &&
+      (
+        booking.bookingResult?.pnr ||
+        booking.bookingResult?.onwardPNR ||
+        extractPnr(booking.bookingResult?.providerResponse)
+      )
+    ) {
+      return {
+        ...buildExistingOutcomeResponse(booking),
+        idempotencyKey,
+      };
+    }
+
+    if (booking.orchestration?.lastError?.message) {
+      return {
+        status: "FAILED",
+        bookingRequestId: booking._id,
+        executionStatus: booking.executionStatus,
+        message: booking.orchestration.lastError.message,
+        idempotencyKey,
+      };
+    }
+
+    return {
+      status: "IDLE",
+      bookingRequestId: booking._id,
+      executionStatus: booking.executionStatus,
+      idempotencyKey,
+    };
+  }
+
   async processBooking({
     bookingId,
     actorId,
@@ -773,6 +1173,12 @@ class FlightOrchestrationService {
         );
       }
 
+      logger.info("idempotent_booking_execution", {
+        bookingId,
+        idempotencyKey: resolvedKey,
+        executionStatus: initialContext.booking.executionStatus,
+      });
+
       return buildExistingOutcomeResponse(initialContext.booking);
     }
 
@@ -785,7 +1191,47 @@ class FlightOrchestrationService {
         initialContext.booking.bookingResult?.onwardPNR
       )
     ) {
+      logger.info("idempotent_booking_execution", {
+        bookingId,
+        idempotencyKey: resolvedKey,
+        executionStatus: initialContext.booking.executionStatus,
+      });
+
       return buildExistingOutcomeResponse(initialContext.booking);
+    }
+
+    const duplicateInspection = await this.inspectPotentialDuplicateBookings(
+      initialContext.booking,
+    );
+
+    if (duplicateInspection.retryableMatches.length) {
+      logger.info("duplicate_booking_allowed_retry", {
+        bookingId,
+        matchingBookingIds: duplicateInspection.retryableMatches.map((candidate) =>
+          String(candidate._id),
+        ),
+        executionStatuses: duplicateInspection.retryableMatches.map(
+          (candidate) => candidate.executionStatus,
+        ),
+      });
+    }
+
+    if (duplicateInspection.blockingBooking) {
+      logger.warn("duplicate_booking_detected", {
+        bookingId,
+        existingBookingId: duplicateInspection.blockingBooking._id,
+        existingPnr: resolvePnr(duplicateInspection.blockingBooking),
+        existingProviderBookingId: resolveSupplierBookingId(
+          duplicateInspection.blockingBooking,
+        ),
+        executionStatus: duplicateInspection.blockingBooking.executionStatus,
+      });
+
+      throw createDuplicateBookingError({
+        currentBooking: initialContext.booking,
+        existingBooking: duplicateInspection.blockingBooking,
+        source: "local_guard",
+      });
     }
 
     const lockedBooking = await this.tryAcquireLock(
@@ -803,13 +1249,16 @@ class FlightOrchestrationService {
     const { booking, corporate } = context;
     const pendingRevalidation = booking.orchestration?.pendingRevalidation || null;
 
-    booking.orchestration.lastOutcome = {
-      status: "PROCESSING",
-      message: queued ? "Booking queued for processing" : "Booking is being processed",
-      queued,
-      idempotencyKey: resolvedKey,
-      metadata: {
+    booking.orchestration = {
+      ...(booking.orchestration || {}),
+      lastOutcome: {
+        status: "PROCESSING",
+        message: queued ? "Booking queued for processing" : "Booking is being processed",
         queued,
+        idempotencyKey: resolvedKey,
+        metadata: {
+          queued,
+        },
       },
     };
     await saveSystemMutation(booking);
@@ -853,6 +1302,56 @@ class FlightOrchestrationService {
         bookingId,
         message: error.message,
       });
+
+      if (isProviderDuplicateError(error)) {
+        const providerDuplicate =
+          (await this.inspectPotentialDuplicateBookings(booking, {
+            includeOutsideWindow: true,
+          })) || null;
+
+        if (providerDuplicate?.blockingBooking) {
+          logger.warn("duplicate_booking_detected", {
+            bookingId,
+            existingBookingId: providerDuplicate.blockingBooking._id,
+            existingPnr: resolvePnr(providerDuplicate.blockingBooking),
+            existingProviderBookingId: resolveSupplierBookingId(
+              providerDuplicate.blockingBooking,
+            ),
+            executionStatus: providerDuplicate.blockingBooking.executionStatus,
+            source: "provider_duplicate_error",
+          });
+
+          const duplicateError = createDuplicateBookingError({
+            currentBooking: booking,
+            existingBooking: providerDuplicate.blockingBooking,
+            source: "provider_duplicate_error",
+            providerMessage: error.message,
+          });
+
+          await markBusinessBlocked(
+            booking,
+            duplicateError,
+            resolvedKey,
+            "not_started",
+          );
+          throw duplicateError;
+        }
+
+        const duplicateError = createDuplicateBookingError({
+          currentBooking: booking,
+          existingBooking: null,
+          source: "provider_duplicate_error_unresolved",
+          providerMessage: error.message,
+        });
+
+        await markBusinessBlocked(
+          booking,
+          duplicateError,
+          resolvedKey,
+          "not_started",
+        );
+        throw duplicateError;
+      }
 
       if (!isSilentRevalidationError(error)) {
         await markFailedAttempt(booking, error, resolvedKey);

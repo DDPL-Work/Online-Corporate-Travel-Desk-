@@ -18,7 +18,6 @@ import {
   TravelerForm,
   SelectedSSRSummary,
 } from "./CommonComponents";
-import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import {
   getRTFareQuote,
   getRTFareRule,
@@ -40,6 +39,9 @@ import api from "../../../API/axios";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
 import Swal from "sweetalert2";
+import LandingHeader from "../../../layout/LandingHeader";
+
+import { clearFareDetails } from "../../../Redux/Slice/flightSearchSliceRT";
 
 export default function RoundTripFlightBooking() {
   const location = useLocation();
@@ -47,7 +49,16 @@ export default function RoundTripFlightBooking() {
   const dispatch = useDispatch();
   const { setActiveTab } = useFlightSearch();
 
-  const hasState = Boolean(location.state);
+  useEffect(() => {
+    dispatch(clearFareDetails());
+  }, [dispatch]);
+
+  const localState = useMemo(() => {
+    const localStateStr = localStorage.getItem("flightBookingState");
+    return localStateStr ? JSON.parse(localStateStr) : {};
+  }, []);
+
+  const hasState = Boolean(location.state) || Object.keys(localState).length > 0;
   useEffect(() => {
     if (!hasState) {
       navigate("/search-flight", { replace: true });
@@ -60,8 +71,8 @@ export default function RoundTripFlightBooking() {
     // rawFlightData,
     tripType = "round-trip",
     isInternational = false,
-  } = location.state || {};
-  const originalSearchData = location.state?.rawFlightData;
+  } = location.state || localState;
+  const originalSearchData = location.state?.rawFlightData || localState?.rawFlightData;
   const passengerCounts =
     searchParams?.passengers ||
     location.state?.passengers ||
@@ -149,7 +160,7 @@ export default function RoundTripFlightBooking() {
   const approvalRequired =
     !isTravelAdmin && myPolicy?.approvalRequired !== false;
 
-  const traceId = location.state?.traceId || reduxTraceId || null;
+  const traceId = location.state?.traceId || localState?.traceId || reduxTraceId || null;
 
   const adultCount = passengerCounts?.adults ?? searchParams?.adults ?? 1;
   const childCount = passengerCounts?.children ?? searchParams?.children ?? 0;
@@ -167,7 +178,7 @@ export default function RoundTripFlightBooking() {
 
   // ✅ INTERNATIONAL NORMALIZATION (ADD THIS)
   const rawFlightData = useMemo(() => {
-    const raw = location.state?.rawFlightData;
+    const raw = location.state?.rawFlightData || localState?.rawFlightData;
     if (!raw) return null;
 
     if (
@@ -183,7 +194,7 @@ export default function RoundTripFlightBooking() {
     }
 
     return raw;
-  }, [location.state?.rawFlightData, isInternational]);
+  }, [location.state?.rawFlightData, localState?.rawFlightData, isInternational]);
 
   const extractFareParts = (quote) => {
     const fare = quote?.Response?.Results?.Fare;
@@ -554,17 +565,33 @@ export default function RoundTripFlightBooking() {
       return false;
     };
 
+    const checkGenericError = (quote) => {
+      const quoteResponse = quote?.Response;
+      return quoteResponse?.ResponseStatus === 2;
+    };
+
     if (
-      checkExpiration(fareQuote?.onward) ||
-      checkExpiration(fareQuote?.return)
+      checkGenericError(fareQuote?.onward) ||
+      checkGenericError(fareQuote?.return)
     ) {
+      const activeQuote = checkGenericError(fareQuote?.onward) ? fareQuote?.onward : fareQuote?.return;
+      const errorMsg = activeQuote?.Response?.Error?.ErrorMessage || "Failed to fetch fare details.";
+      const isSessionExp = checkExpiration(activeQuote);
+
       Swal.fire({
-        title: "Session Expired",
-        text: "Your search session has expired. Please search again.",
+        title: isSessionExp ? "Session Expired" : "Fare Revalidation Failed",
+        text: isSessionExp ? "Your search session has expired. Please search again." : errorMsg,
         icon: "warning",
         confirmButtonColor: "#0A4D68",
       }).then(() => {
-        navigate("/travel");
+        window.close();
+        setTimeout(() => {
+          if (window.history.length > 1) {
+            navigate(-1);
+          } else {
+            navigate("/travel");
+          }
+        }, 300);
       });
     }
   }, [fareQuote, navigate]);
@@ -1399,14 +1426,22 @@ export default function RoundTripFlightBooking() {
       return;
     }
 
+    if (!projectApproverData.project) {
+      ToastWithTimer({
+        type: "error",
+        message: "Please select a project.",
+      });
+      return;
+    }
+
     if (
       approvalRequired &&
       !isTravelAdmin &&
-      (!projectApproverData.project || !projectApproverData.approver)
+      !projectApproverData.approver
     ) {
       ToastWithTimer({
         type: "error",
-        message: "Please select a project and approver",
+        message: "Please select an approver.",
       });
       return;
     }
@@ -1548,12 +1583,17 @@ export default function RoundTripFlightBooking() {
     gstDetails,
   ]);
 
-  if (loading) {
+  const onwardIdx = rawFlightData?.onward?.ResultIndex?.toString().trim();
+  const returnIdx = rawFlightData?.return?.ResultIndex?.toString().trim();
+  const isFareQuoteLoading = !fareQuote?.onward || (onwardIdx !== returnIdx && !fareQuote?.return);
+
+  if (loading || isFareQuoteLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="h-14 w-14 border-4 border-slate-200 border-t-[#0A203E] rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-600 font-medium">Loading flight details…</p>
+      <div className="min-h-screen bg-[#0A203E] flex items-center justify-center">
+        <div className="text-center p-8 bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-700/50 shadow-2xl">
+          <div className="h-16 w-16 border-4 border-slate-600 border-t-[#C9A84C] rounded-full animate-spin mx-auto mb-6 shadow-inner" />
+          <p className="text-white font-semibold text-lg mb-2">Revalidating Round-Trip Flight & Fares...</p>
+          <p className="text-slate-400 text-sm">Please wait while we fetch the latest fare details and seat maps.</p>
         </div>
       </div>
     );
@@ -1591,7 +1631,7 @@ export default function RoundTripFlightBooking() {
   // Readiness check for submit button
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      <CorporateNavbar />
+      <LandingHeader />
       <RTSeatSelectionModal
         isOpen={showSeatModal.show}
         onClose={closeSeatModal}
@@ -1610,29 +1650,41 @@ export default function RoundTripFlightBooking() {
         flightIndex={showSeatModal.segmentIndex}
       />
 
-      {/* Top Bar */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#0A203E] transition group"
-          >
-            <span className="size-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center group-hover:border-[#0A203E]/30 transition-colors">
-              <MdArrowBack size={18} />
+      {/* Top Bar - Journey Details */}
+      <div className="bg-[#0A203E] border-b border-[#0A203E]/80 sticky top-0 z-40 shadow-md">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-widest">
+              Journey Info
             </span>
-            Back to results
-          </button>
+            <div className="h-4 w-[1px] bg-slate-500/50"></div>
+            <div className="flex flex-wrap gap-2">
+              <span className="px-3 py-1 text-xs font-black rounded-lg bg-[#C9A84C] text-[#0A203E] uppercase tracking-wider shadow-sm flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#0A203E] animate-pulse"></span>
+                {tripType?.replace("-", " ")}
+              </span>
+              <span className={`px-3 py-1 text-xs font-black rounded-lg uppercase tracking-wider border ${
+                isInternational 
+                  ? "bg-purple-950/40 text-purple-300 border-purple-800/40" 
+                  : "bg-blue-950/40 text-blue-300 border-blue-800/40"
+              }`}>
+                {isInternational ? "International" : "Domestic"}
+              </span>
+            </div>
+          </div>
 
-          <button
-            onClick={() => {
-              setActiveTab("hotel");
-              navigate("/travel", { state: { activeTab: "hotel" } });
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            className="flex items-center gap-1.5 font-bold cursor-pointer bg-[#C9A84C] hover:bg-[#b5953e] transition-colors px-3 py-1.5 rounded-md text-[#0A203E] shadow-sm"
-          >
-            Search Hotels
-          </button>
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="px-3 py-1 text-xs font-black rounded-lg bg-[#1a3a5a]/60 text-slate-100 border border-[#1a3a5a] uppercase tracking-wider flex items-center gap-1">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase">Cabin:</span>{" "}
+              {CABIN_MAP[rawFlightData?.onward?.Segments?.[0]?.[0]?.CabinClass || rawFlightData?.Segments?.[0]?.[0]?.CabinClass || selectedFlight?.Segments?.[0]?.[0]?.CabinClass] || "Economy"}
+            </span>
+            {(rawFlightData?.onward?.Segments?.[0]?.[0]?.SupplierFareClass || rawFlightData?.Segments?.[0]?.[0]?.SupplierFareClass || selectedFlight?.Segments?.[0]?.[0]?.SupplierFareClass) && (
+              <span className="px-3 py-1 text-xs font-black rounded-lg bg-amber-950/30 text-[#C9A84C] border border-[#C9A84C]/30 uppercase tracking-wider flex items-center gap-1">
+                <span className="text-[10px] text-amber-500/70 font-semibold uppercase">Class:</span>{" "}
+                {rawFlightData?.onward?.Segments?.[0]?.[0]?.SupplierFareClass || rawFlightData?.Segments?.[0]?.[0]?.SupplierFareClass || selectedFlight?.Segments?.[0]?.[0]?.SupplierFareClass}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

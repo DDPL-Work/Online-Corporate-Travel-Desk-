@@ -803,16 +803,6 @@ export default function ResearchableFlightHeader({
           <span className="bg-[#C9A84C]/20 border border-[#C9A84C]/30 rounded-full px-2.5 py-0.5 text-[#C9A84C] font-bold text-[11px] tracking-[0.04em]">
             {journeyLabel}
           </span>
-          <button
-            onClick={() => {
-              setActiveTab("hotel");
-              navigate("/travel", { state: { activeTab: "hotel" } });
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            className="flex items-center gap-1.5 font-bold cursor-pointer bg-[#C9A84C] hover:bg-[#b5953e] transition-colors px-3 py-1 rounded-md text-[#0A203E] shadow-sm ml-2"
-          >
-            Search Hotels
-          </button>
         </div>
       </div>
 

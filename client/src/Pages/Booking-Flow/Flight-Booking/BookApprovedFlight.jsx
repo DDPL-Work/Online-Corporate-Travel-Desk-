@@ -29,6 +29,7 @@ import {
 } from "../../../utils/formatter";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
 import Swal from "sweetalert2";
+import LandingHeader from "../../../layout/LandingHeader";
 
 export default function BookApprovedFlight() {
   const { id } = useParams();
@@ -54,6 +55,30 @@ export default function BookApprovedFlight() {
   }, [dispatch, id]);
 
   const flight = booking?.flightRequest;
+
+  const getErrorMessage = (error) => {
+    if (typeof error === "string") return error;
+    return error?.message || "Something went wrong while booking";
+  };
+
+  const handleDuplicateBookingError = async (error) => {
+    const existingBookingId = error?.data?.existingBookingId;
+
+    const result = await Swal.fire({
+      icon: "info",
+      title: "Confirmed Booking Exists",
+      text: "You already have a confirmed booking for this flight.",
+      showCancelButton: true,
+      confirmButtonText: existingBookingId ? "View Booking" : "OK",
+      cancelButtonText: "Stay Here",
+      confirmButtonColor: "#0A4D68",
+      cancelButtonColor: "#64748B",
+    });
+
+    if (result.isConfirmed && existingBookingId) {
+      navigate(`/my-booking/${existingBookingId}`);
+    }
+  };
 
   const handleBookFlight = async () => {
     try {
@@ -110,6 +135,133 @@ export default function BookApprovedFlight() {
         icon: "error",
         title: "Booking Failed",
         text: err?.message || "Something went wrong while booking",
+        confirmButtonColor: "#DC2626",
+      });
+    }
+  };
+
+  const handleUnifiedBookFlight = async () => {
+    try {
+      const response = await dispatch(
+        executeApprovedFlightBooking(id),
+      ).unwrap();
+
+      if (response?.status === "PROCESSING") {
+        ToastWithTimer({
+          type: "info",
+          message: "Booking is being processed. We will keep this page updated.",
+        });
+
+        navigate(`/bookings/${id}/revalidated`, {
+          replace: true,
+          state: {
+            bookingId: id,
+            status: response.status,
+            bookingContext: response.bookingContext || null,
+            priceChange: response.priceChange || null,
+            ssrChange: response.ssrChange || null,
+            notifications: response.notifications || [],
+          },
+        });
+        return;
+      }
+
+      if (
+        ["REVALIDATED", "PRICE_CHANGED", "SSR_CHANGED"].includes(response?.status)
+      ) {
+        navigate(`/bookings/${id}/revalidated`, {
+          replace: true,
+          state: {
+            bookingId: id,
+            status: response.status,
+            bookingContext: response.bookingContext || null,
+            priceChange: response.priceChange || null,
+            ssrChange: response.ssrChange || null,
+            notifications: response.notifications || [],
+          },
+        });
+        return;
+      }
+
+      if (response?.status === "FLIGHT_UNAVAILABLE") {
+        const result = await Swal.fire({
+          icon: "warning",
+          title: "Flight Unavailable",
+          text:
+            response?.message ||
+            "This itinerary is no longer available. Please search again.",
+          showCancelButton: true,
+          confirmButtonText: "Search New Flight",
+          cancelButtonText: "Back",
+          confirmButtonColor: "#0A4D68",
+          cancelButtonColor: "#64748B",
+        });
+
+        if (result.isConfirmed) {
+          await handleCreateNewRequest();
+        }
+        return;
+      }
+
+      const priceCheck = response?.priceCheck;
+      if (priceCheck?.message) {
+        await Swal.fire({
+          icon: priceCheck.priceChanged ? "warning" : "success",
+          title: priceCheck.priceChanged ? "Fare Updated" : "Fare Verified",
+          text: priceCheck.message,
+          confirmButtonText: "Continue",
+          confirmButtonColor: "#0A4D68",
+        });
+      }
+
+      ToastWithTimer({
+        type: "success",
+        message: "Flight booked successfully!",
+      });
+
+      navigate("/my-bookings", { replace: true });
+    } catch (err) {
+      const message = getErrorMessage(err);
+      const errorMessage = message.toLowerCase();
+
+      if (err?.code === "DUPLICATE_CONFIRMED_BOOKING") {
+        await handleDuplicateBookingError(err);
+        return;
+      }
+
+      if (errorMessage.includes("insufficient balance")) {
+        ToastWithTimer({
+          type: "error",
+          message: "Insufficient wallet balance. Please recharge your account.",
+        });
+        return;
+      }
+
+      if (
+        errorMessage.includes("revalidate") ||
+        errorMessage.includes("session expired") ||
+        errorMessage.includes("search again")
+      ) {
+        const result = await Swal.fire({
+          icon: "warning",
+          title: "Flight Needs Refresh",
+          text: message,
+          showCancelButton: true,
+          confirmButtonText: "Search Again",
+          cancelButtonText: "Stay Here",
+          confirmButtonColor: "#0A4D68",
+        });
+
+        if (result.isConfirmed) {
+          await handleCreateNewRequest();
+        }
+        return;
+      }
+
+      Swal.fire({
+        icon: "error",
+        title: "Booking Failed",
+        text: message,
         confirmButtonColor: "#DC2626",
       });
     }
@@ -364,7 +516,7 @@ export default function BookApprovedFlight() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-10 font-sans">
-      {/* <CorporateNavbar /> */}
+      {/* <LandingHeader /> */}
 
       {/* 🔙 BACK BUTTON */}
       <div className="max-w-7xl mx-auto mt-4 px-4">
@@ -452,7 +604,7 @@ export default function BookApprovedFlight() {
               disabled={
                 actionLoading || isApprovalExpired || !statusInfo.canBook
               }
-              onClick={handleBookFlight}
+              onClick={handleUnifiedBookFlight}
               className={`mt-6 px-5 py-4 rounded-xl text-white font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg ${
                 statusInfo.canBook
                   ? "bg-[#0A203E] hover:brightness-110 shadow-[#0A203E]/20"

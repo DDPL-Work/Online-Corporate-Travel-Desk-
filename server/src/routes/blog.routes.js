@@ -9,10 +9,11 @@ const {
 const router = express.Router();
 
 const { verifyToken } = require("../middleware/auth.middleware");
+const { requireOpsPermission } = require("../middleware/requireOpsPermission.middleware");
 const cloudinaryUpload = require("../middleware/cloudinaryUpload");
 
-router.post("/create", verifyToken, cloudinaryUpload.single("featured_image"), createBlog);
-router.post("/upload-editor-image", verifyToken, cloudinaryUpload.single("image"), (req, res) => {
+router.post("/create", verifyToken, requireOpsPermission("SEO Management"), cloudinaryUpload.single("featured_image"), createBlog);
+router.post("/upload-editor-image", verifyToken, requireOpsPermission("SEO Management"), cloudinaryUpload.single("image"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: "No file uploaded" });
   }
@@ -21,7 +22,7 @@ router.post("/upload-editor-image", verifyToken, cloudinaryUpload.single("image"
 });
 router.get("/all", getAllBlogs);
 router.get("/one", getOneBlog);
-router.delete("/delete/:id", verifyToken, deleteBlog);
-router.put("/update/:id", verifyToken, cloudinaryUpload.single("featured_image"), updateBlog);
+router.delete("/delete/:id", verifyToken, requireOpsPermission("SEO Management"), deleteBlog);
+router.put("/update/:id", verifyToken, requireOpsPermission("SEO Management"), cloudinaryUpload.single("featured_image"), updateBlog);
 
 module.exports = router;

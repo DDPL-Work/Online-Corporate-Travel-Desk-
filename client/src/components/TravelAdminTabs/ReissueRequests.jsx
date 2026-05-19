@@ -1,268 +1,595 @@
-import React, { useEffect, useState, useMemo } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import React, { useEffect, useMemo, useState } from "react";
+import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import {
-  fetchReissueRequests,
-  updateReissueStatus,
-} from "../../Redux/Actions/reissueThunks";
-import {
+  FiCheck,
   FiCheckCircle,
-  FiXCircle,
   FiClock,
+  FiDownload,
   FiEye,
-  FiArrowLeft,
   FiRefreshCw,
   FiRepeat,
-  FiList,
-  FiCheck,
-  FiX,
-  FiFilter,
-  FiArrowRight,
-  FiActivity,
+  FiXCircle,
 } from "react-icons/fi";
-import { toast } from "react-toastify";
-import { jwtDecode } from "jwt-decode";
-import { useNavigate } from "react-router-dom";
+import axios from "axios";
+
+import { updateReissueStatus } from "../../Redux/Actions/reissueThunks";
 import {
-  StatCard,
-  IdCell,
-  Th,
-  LabeledField,
-  CustomDropdown,
-} from "./Shared/CommonComponents";
-import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
-import { C } from "../Shared/color";
-import Swal from "sweetalert2";
+  getRequestId,
+  getPnr,
+  getUserName,
+  getUserEmail,
+  getJourneyType,
+  getAirline,
+  getTotalFare,
+  getCurrency,
+  getRoute,
+  getTicketUrl,
+  getStatus,
+  getRequestedDate,
+  getFareDifference,
+  getSegments,
+  getStatusTone,
+  extractRequestArray,
+} from "../../utils/reissueResolvers";
+import { IdCell, Th } from "./Shared/CommonComponents";
 
-export default function ReissueRequests() {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const { requests, loading } = useSelector((state) => state.reissue);
-
-  const [activeTab, setActiveTab] = useState("my");
-  const [filter, setFilter] = useState("All");
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const token = sessionStorage.getItem("token");
-  let userId = null;
-  let corporateId = null;
-  let role = "employee";
-
-  if (token) {
-    try {
-      const decoded = jwtDecode(token);
-      userId = decoded.id;
-      corporateId = decoded.corporateId;
-      role = decoded.role || decoded.userRole || "employee";
-    } catch (e) { console.error("Token decode error:", e); }
-  }
-
-  useEffect(() => {
-    if (!corporateId) return;
-    const params = {
-      page: currentPage,
-      limit: 10,
-      status: filter !== "All" ? filter : undefined,
-    };
-    if (activeTab === "my") params.userId = userId;
-    else params.companyId = corporateId;
-    dispatch(fetchReissueRequests(params));
-  }, [dispatch, activeTab, currentPage, filter, corporateId, userId]);
-
-  const handleStatusUpdate = async (requestId, newStatus) => {
-    const { value: message, isDismissed } = await Swal.fire({
-      title: `Confirm ${newStatus}`,
-      input: 'textarea',
-      inputLabel: `Internal remarks for ${newStatus.toLowerCase()} (optional)`,
-      inputPlaceholder: 'Enter processing details...',
-      showCancelButton: true,
-      confirmButtonColor: newStatus === 'APPROVED' ? '#10B981' : '#EF4444',
-      cancelButtonColor: '#64748B',
-      confirmButtonText: `Proceed with ${newStatus}`
-    });
-
-    if (isDismissed) return;
-
-    try {
-      const userStr = sessionStorage.getItem("user");
-      const user = userStr ? JSON.parse(userStr) : {};
-      const actionByName = typeof user.name === "string" ? user.name : user.name?.firstName ? `${user.name.firstName} ${user.name.lastName || ""}`.trim() : "Admin";
-
-      await dispatch(updateReissueStatus({
-        requestId, status: newStatus, message, actionBy: user._id || userId, actionByName,
-      })).unwrap();
-
-      toast.success(`Request ${newStatus} successfully!`);
-      dispatch(fetchReissueRequests({
-        page: currentPage, limit: 10, status: filter !== "All" ? filter : undefined,
-        userId: activeTab === "my" ? userId : undefined, companyId: corporateId,
-      }));
-    } catch (err) { toast.error(err || "Failed to update status"); }
+/* ─────────────────────────────────────────────────────────────────
+   STATUS BADGE
+   ───────────────────────────────────────────────────────────────── */
+const StatusBadge = ({ req }) => {
+  const status = getStatus(req);
+  const tone = getStatusTone(status);
+  const icons = {
+    PENDING: <FiClock size={11} />,
+    APPROVED: <FiCheckCircle size={11} />,
+    COMPLETED: <FiCheckCircle size={11} />,
+    REJECTED: <FiXCircle size={11} />,
   };
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${tone}`}
+    >
+      {icons[status] || null}
+      {status || "—"}
+    </span>
+  );
+};
 
-  const stats = useMemo(() => {
-    if (!requests) return { total: 0, pending: 0, approved: 0, rejected: 0 };
-    return {
-      total: requests.length,
-      pending: requests.filter((r) => r.status === "PENDING").length,
-      approved: requests.filter((r) => r.status === "APPROVED" || r.status === "COMPLETED").length,
-      rejected: requests.filter((r) => r.status === "REJECTED").length,
-    };
-  }, [requests]);
+/* ─────────────────────────────────────────────────────────────────
+   TICKET ACTIONS
+   ───────────────────────────────────────────────────────────────── */
+const TicketActions = ({ req }) => {
+  const downloadUrl = getTicketUrl(req);
+  const status = getStatus(req);
 
-  const getStatusBadgeLocal = (status) => {
-    const map = {
-      PENDING:   { bg: "#FFFBEB", text: "#92400E", border: "#FDE68A", icon: <FiClock /> },
-      APPROVED:  { bg: "#EFF6FF", text: "#1E40AF", border: "#BFDBFE", icon: <FiCheckCircle /> },
-      COMPLETED: { bg: "#ECFDF5", text: "#065F46", border: "#A7F3D0", icon: <FiCheckCircle /> },
-      REJECTED:  { bg: "#FEF2F2", text: "#991B1B", border: "#FECACA", icon: <FiXCircle /> },
-    };
-    const s = map[status] || { bg: "#F8FAFC", text: "#64748B", border: "#E2E8F0", icon: <FiActivity /> };
+  if (!downloadUrl && !["COMPLETED", "TICKET_GENERATED"].includes(status)) {
     return (
-      <span className="px-3 py-1 rounded-full text-[10px] font-black flex items-center gap-1.5 border shadow-sm uppercase tracking-wider" style={{ background: s.bg, color: s.text, borderColor: s.border }}>
-        {s.icon} {status}
+      <span className="text-[10px] font-bold text-slate-400 italic">
+        Ticket Pending
       </span>
     );
-  };
+  }
 
-  const handleExport = () => {
-    if (!requests?.length) return;
-    const headers = ["Request ID", "Employee", "Email", "PNR", "Type", "Status", "Requested At"];
-    const rows = requests.map((req) => {
-      const empName = typeof req.user?.name === "string" ? req.user.name : `${req.user?.name?.firstName || ""} ${req.user?.name?.lastName || ""}`.trim();
-      return [req.reissueId || "—", empName || "—", req.user?.email || "—", req.bookingSnapshot?.pnr || req.bookingReference || "—", req.reissueType?.replace("_", " ") || "—", req.status || "—", new Date(req.requestedAt).toLocaleDateString("en-IN")];
-    });
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;font-weight:700;text-align:left;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `reissue-ledger.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  if (!downloadUrl) {
+    return (
+      <span className="text-[10px] font-bold text-slate-400 italic">
+        Processing
+      </span>
+    );
+  }
+
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(downloadUrl);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `reissue-${getRequestId(req)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Failed to download ticket:", error);
+      window.open(downloadUrl, "_blank");
+    }
   };
 
   return (
-    <div className="min-h-screen font-sans pb-20 px-6 pt-8" style={{ background: C.offWhite }}>
-      <div className="max-w-7xl mx-auto space-y-8">
-        
+    <div className="flex items-center gap-1.5">
+      <button
+        onClick={() => window.open(downloadUrl, "_blank")}
+        className="inline-flex items-center gap-1 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 hover:text-[#0A4D68] transition"
+        title="View"
+      >
+        <FiEye size={11} /> View
+      </button>
+      <button
+        onClick={handleDownload}
+        className="inline-flex items-center gap-1 px-2 py-1.5 bg-[#0A4D68] text-white rounded-lg text-[10px] font-bold hover:bg-[#08394d] transition"
+        title="Download"
+      >
+        <FiDownload size={11} /> DL
+      </button>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   MAIN — Travel Admin view of all company reissue requests
+   ───────────────────────────────────────────────────────────────── */
+export default function ReissueRequests() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedReq, setSelectedReq] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const token = sessionStorage.getItem("token");
+      let corporateId = null;
+      if (token) {
+        const d = require("jwt-decode").jwtDecode(token);
+        corporateId = d.corporateId;
+      }
+
+      // Safe fetchers that return [] on 403 or error
+      const fetchSafe = async (url, params) => {
+        try {
+          const res = await axios.get(url, { params });
+          return extractRequestArray(res);
+        } catch (e) {
+          return [];
+        }
+      };
+
+      const [companyRequests, legacyRequests] = await Promise.all([
+        fetchSafe("/api/v1/reissue/company", { corporateId, limit: 100 }),
+        fetchSafe("/api/v1/flights/reissue/list", {
+          companyId: corporateId,
+          limit: 100,
+        }), // Legacy fallback
+      ]);
+
+      const merged = [...companyRequests, ...legacyRequests];
+
+      // Deduplicate by ID
+      const uniqueMap = new Map();
+      merged.forEach((r) => {
+        const uid = r.requestId || r.id || r._id;
+        if (uid && !uniqueMap.has(uid)) uniqueMap.set(uid, r);
+      });
+
+      setRequests(
+        Array.from(uniqueMap.values()).sort(
+          (a, b) =>
+            new Date(getRequestedDate(b)) - new Date(getRequestedDate(a)),
+        ),
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch requests");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, []);
+
+  const handleStatusUpdate = async (requestId, newStatus) => {
+    const message = prompt(`Reason for ${newStatus} (optional):`) ?? "";
+    if (message === null) return;
+    try {
+      await dispatch(
+        updateReissueStatus({ requestId, status: newStatus, message }),
+      ).unwrap();
+      toast.success(`Request ${newStatus} successfully`);
+      load();
+    } catch (err) {
+      toast.error(typeof err === "string" ? err : "Failed to update status");
+    }
+  };
+
+  /* Stat counts */
+  const stats = useMemo(
+    () => ({
+      total: requests.length,
+      pending: requests.filter((r) => getStatus(r) === "PENDING").length,
+      approved: requests.filter((r) =>
+        ["APPROVED", "COMPLETED", "TICKET_GENERATED", "IN_PROGRESS"].includes(
+          getStatus(r),
+        ),
+      ).length,
+      rejected: requests.filter((r) => getStatus(r) === "REJECTED").length,
+    }),
+    [requests],
+  );
+
+  /* Client-side search filter */
+  const filtered = useMemo(() => {
+    let result = requests;
+    if (statusFilter !== "All") {
+      // Allow mapping multiple valid statuses for APPROVED queue filtering if necessary
+      if (statusFilter === "APPROVED") {
+        result = result.filter((r) =>
+          [
+            "APPROVED",
+            "COMPLETED",
+            "TICKET_GENERATED",
+            "IN_PROGRESS",
+            "ASSIGNED",
+          ].includes(getStatus(r)),
+        );
+      } else {
+        result = result.filter((r) => getStatus(r) === statusFilter);
+      }
+    }
+
+    const t = search.trim().toLowerCase();
+    if (!t) return result;
+    return result.filter((r) => {
+      const empName = getUserName(r).toLowerCase();
+      const pnr = getPnr(r).toLowerCase();
+      const ref = (
+        r?.metadata?.orderId ||
+        r?.bookingReference ||
+        r?.orderId ||
+        r?.bookingRef ||
+        ""
+      ).toLowerCase();
+      const reason = (r.reason || r.remarks || "").toLowerCase();
+      const id = getRequestId(r).toLowerCase();
+      return [empName, pnr, ref, reason, id].some((v) => v.includes(t));
+    });
+  }, [requests, search, statusFilter]);
+
+  /* CSV export */
+  const handleExport = () => {
+    const rows = [
+      [
+        "Request ID",
+        "PNR",
+        "Booking Ref",
+        "Employee",
+        "Route",
+        "Type",
+        "Reason",
+        "Date",
+        "Status",
+      ],
+      ...filtered.map((r) => [
+        getRequestId(r),
+        getPnr(r),
+        r.bookingReference || r.bookingRef || "N/A",
+        getUserName(r),
+        getRoute(r),
+        r.reissueType || r.type || "REISSUE",
+        r.reason || r.remarks || "N/A",
+        getRequestedDate(r),
+        getStatus(r),
+      ]),
+    ];
+    const csv = rows
+      .map((row) =>
+        row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","),
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "reissue_requests.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <>
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-2xl border shadow-sm" style={{ borderColor: C.border }}>
-          <div className="flex items-center gap-6">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg text-white" style={{ background: `linear-gradient(135deg, ${C.navy}, ${C.gold})` }}>
-              <FiRepeat size={32} />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#0A4D68]/10 text-[#0A4D68] flex items-center justify-center">
+              <FiRepeat size={18} />
             </div>
             <div>
-              <h1 className="text-3xl font-black tracking-tight" style={{ color: C.navy }}>Reissue Control</h1>
-              <p className="text-xs mt-1 font-bold uppercase tracking-widest" style={{ color: C.muted }}>Manage Flight Reissues & Amendment Protocol</p>
+              <h2 className="text-lg font-black text-slate-900">
+                Reissue Requests
+              </h2>
+              <p className="text-xs text-slate-400">
+                Flight amendment and date-change requests
+              </p>
             </div>
           </div>
-          <button
-            onClick={() => dispatch(fetchReissueRequests({ page: currentPage, limit: 10, status: filter !== "All" ? filter : undefined, userId: activeTab === "my" ? userId : undefined, companyId: corporateId }))}
-            disabled={loading}
-            className="px-6 py-3 rounded-xl font-bold text-xs flex items-center gap-2 border transition-all shadow-sm"
-            style={{ background: C.white, borderColor: C.border, color: C.navy }}
-          >
-            <FiRefreshCw className={loading ? "animate-spin" : ""} />
-            {loading ? "Syncing..." : "Sync Records"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExport}
+              className="px-3 py-2 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
+            >
+              Export CSV
+            </button>
+            <button
+              onClick={() => load()}
+              className="flex items-center gap-2 px-3 py-2 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
+            >
+              <FiRefreshCw
+                size={12}
+                className={loading ? "animate-spin" : ""}
+              />{" "}
+              Refresh
+            </button>
+          </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard label="Total Inquiries" value={loading ? "—" : stats.total} Icon={FiList} borderCls="border-[#000D26]" iconBgCls="bg-[#000D26]10" iconColorCls="text-[#000D26]" />
-          <StatCard label="Pending Action" value={loading ? "—" : stats.pending} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-          <StatCard label="Authorization Granted" value={loading ? "—" : stats.approved} Icon={FiCheck} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-          <StatCard label="Declined Requests" value={loading ? "—" : stats.rejected} Icon={FiXCircle} borderCls="border-rose-500" iconBgCls="bg-rose-50" iconColorCls="text-rose-600" />
+        {/* Stat pills */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            {
+              label: "Total",
+              value: stats.total,
+              color: "bg-[#0A4D68]/10 text-[#0A4D68]",
+            },
+            {
+              label: "Pending",
+              value: stats.pending,
+              color: "bg-amber-50 text-amber-700",
+            },
+            {
+              label: "Approved",
+              value: stats.approved,
+              color: "bg-emerald-50 text-emerald-700",
+            },
+            {
+              label: "Rejected",
+              value: stats.rejected,
+              color: "bg-rose-50 text-rose-700",
+            },
+          ].map(({ label, value, color }) => (
+            <div
+              key={label}
+              className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex items-center gap-3"
+            >
+              <span
+                className={`h-10 w-10 rounded-xl flex items-center justify-center text-lg font-black ${color}`}
+              >
+                {value}
+              </span>
+              <span className="text-[13px] font-bold text-slate-600">
+                {label}
+              </span>
+            </div>
+          ))}
         </div>
 
-        {/* Filters Panel */}
-        <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-            {role !== "employee" && (
-              <div className="md:col-span-5">
-                <div className="flex p-1 bg-slate-100 rounded-xl border" style={{ borderColor: C.border }}>
-                  <button onClick={() => { setActiveTab("my"); setCurrentPage(1); }} className={`flex-1 px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === "my" ? "bg-white shadow-sm" : "text-slate-400"}`} style={{ color: activeTab === "my" ? C.navy : "" }}>Personal</button>
-                  <button onClick={() => { setActiveTab("company"); setCurrentPage(1); }} className={`flex-1 px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === "company" ? "bg-white shadow-sm" : "text-slate-400"}`} style={{ color: activeTab === "company" ? C.navy : "" }}>Enterprise</button>
-                </div>
-              </div>
+        {/* Search + Filter */}
+        <div className="flex flex-col md:flex-row gap-3">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by employee, PNR, booking ref, reason, or request ID…"
+            className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-sm outline-none focus:border-[#0A4D68] bg-white"
+          />
+          <div className="flex gap-2 flex-wrap">
+            {["All", "PENDING", "APPROVED", "REJECTED", "COMPLETED"].map(
+              (s) => (
+                <button
+                  key={s}
+                  onClick={() => {
+                    setStatusFilter(s);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider border transition ${statusFilter === s ? "bg-[#0A4D68] text-white border-[#0A4D68]" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}`}
+                >
+                  {s}
+                </button>
+              ),
             )}
-            <div className={role !== "employee" ? "md:col-span-5" : "md:col-span-10"}>
-              <LabeledField label={<><FiFilter size={10} /> Filter by Status</>}>
-                <CustomDropdown value={filter} onChange={(s) => { setFilter(s); setCurrentPage(1); }} options={["All", "PENDING", "APPROVED", "REJECTED", "COMPLETED"]} />
-              </LabeledField>
-            </div>
-            <div className="md:col-span-2">
-              <button onClick={() => { setFilter("All"); setActiveTab("my"); setCurrentPage(1); }} className="w-full py-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest" style={{ background: C.white, borderColor: C.border, color: C.muted }}><FiX /> Reset</button>
-            </div>
           </div>
         </div>
 
-        {/* Data Table */}
-        <ResponsiveDataTable title="Amendment Ledger" subtitle={`${requests?.length || 0} active inquiries`} tableMinWidth="1100px" onExport={handleExport}>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr style={{ background: C.navy, color: C.white }}>
-                <Th className="px-6 py-5">Request ID</Th>
-                <Th className="px-6 py-5">Personnel</Th>
-                <Th className="px-6 py-5">Email Identifier</Th>
-                <Th className="px-6 py-5">PNR / Ref</Th>
-                <Th className="px-6 py-5">Amendment Detail</Th>
-                <Th className="px-6 py-5">Flow Status</Th>
-                <Th className="px-6 py-5 text-center">Governance</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y" style={{ borderColor: C.border }}>
-              {loading ? (
-                <tr><td colSpan="7" className="py-24 text-center"><FiRefreshCw className="animate-spin mx-auto mb-4" size={40} style={{ color: C.gold }} /><p className="font-black uppercase tracking-widest text-slate-300">Synchronizing Matrix...</p></td></tr>
-              ) : requests?.length === 0 ? (
-                <tr><td colSpan="7" className="py-24 text-center opacity-20"><FiRepeat size={64} className="mx-auto" /><p className="font-black uppercase mt-4">No Inquiries Found</p></td></tr>
-              ) : (
-                requests?.map((req, i) => {
-                  const empName = typeof req.user?.name === "string" ? req.user.name : `${req.user?.name?.firstName || ""} ${req.user?.name?.lastName || ""}`.trim() || "Staff Member";
-                  return (
-                    <tr key={req._id} className="hover:bg-slate-50 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.offWhite }}>
-                      <td className="px-6 py-5">
-                         <code className="text-[10px] font-black px-2 py-1 rounded border" style={{ background: C.white, borderColor: C.border, color: C.muted }}>
-                            R-{String(req.reissueId || req._id).slice(-6).toUpperCase()}
-                         </code>
-                         <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">{new Date(req.requestedAt).toLocaleDateString()}</p>
-                      </td>
-                      <td className="px-6 py-5">
-                        <div className="flex items-center gap-3">
-                           <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-black shadow-sm" style={{ background: `${C.navy}10`, color: C.navy }}>{empName[0]}</div>
-                           <span className="font-black text-xs" style={{ color: C.navy }}>{empName}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-5">
-                         <span className="text-[11px] font-bold text-slate-500 font-mono bg-slate-100 px-2 py-1 rounded">{req.user?.email || "—"}</span>
-                      </td>
-                      <td className="px-6 py-5">
-                         <p className="text-xs font-black" style={{ color: C.navy }}>{req.bookingSnapshot?.pnr || "N/A"}</p>
-                         <p className="text-[10px] font-bold text-slate-400 uppercase">{req.bookingReference}</p>
-                      </td>
-                      <td className="px-6 py-5">
-                         <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest" style={{ background: `${C.gold}15`, color: C.gold }}>{req.reissueType?.replace("_", " ")}</span>
-                         <p className="text-[11px] font-medium text-slate-500 mt-1 line-clamp-1 italic">"{req.reason}"</p>
-                      </td>
-                      <td className="px-6 py-5">{getStatusBadgeLocal(req.status)}</td>
-                      <td className="px-6 py-5">
-                        <div className="flex items-center justify-center gap-2">
-                          {((activeTab === "company" || role !== "employee") && req.status === "PENDING") ? (
-                            <>
-                              <button onClick={() => handleStatusUpdate(req._id, "APPROVED")} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-emerald-700 transition-all">Approve</button>
-                              <button onClick={() => handleStatusUpdate(req._id, "REJECTED")} className="px-4 py-2 bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-rose-700 transition-all">Reject</button>
-                            </>
-                          ) : (
-                            <button className="p-3 rounded-xl bg-slate-100 text-slate-400 hover:text-navy transition-all"><FiEye size={18} /></button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </ResponsiveDataTable>
+        {/* Table */}
+        {loading ? (
+          <div className="py-20 text-center bg-white rounded-2xl shadow-sm border border-slate-200">
+            <FiRefreshCw
+              size={32}
+              className="mx-auto text-[#0A4D68] animate-spin opacity-30"
+            />
+            <p className="text-sm font-bold text-slate-400 mt-4">Loading...</p>
+          </div>
+        ) : !filtered.length ? (
+          <div className="py-20 text-center bg-white rounded-2xl shadow-sm border border-slate-200">
+            <FiRepeat size={40} className="mx-auto text-slate-200 mb-3" />
+            <p className="text-sm font-bold text-slate-400">
+              No reissue requests found
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse min-w-[1000px]">
+                <thead>
+                  <tr className="bg-[#dac448] text-slate-900 border-b border-slate-200">
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">
+                      Request ID
+                    </th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">
+                      Employee
+                    </th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">
+                      PNR / Ref
+                    </th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">
+                      Route
+                    </th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">
+                      Type & Reason
+                    </th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">
+                      Status
+                    </th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">
+                      Ticket
+                    </th>
+                    <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-widest">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map((r, i) => {
+                    const requestId = getRequestId(r);
+                    const userName = getUserName(r);
+                    const userEmail = getUserEmail(r);
+                    const pnr = getPnr(r);
+                    const route = getRoute(r);
+                    const requestedAt = getRequestedDate(r);
+                    const status = getStatus(r);
+                    const bookingRef =
+                      r?.metadata?.orderId ||
+                      r?.bookingReference ||
+                      r?.orderId ||
+                      r?.bookingRef ||
+                      "N/A";
+                    return (
+                      <tr
+                        key={requestId}
+                        className={`hover:bg-sky-50/40 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`}
+                      >
+                        <td className="px-4 py-4">
+                          <p className="font-mono text-[12px] font-bold text-slate-800">
+                            {requestId}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {requestedAt}
+                          </p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0A4D68] to-[#088395] text-white flex items-center justify-center text-[11px] font-black shrink-0 shadow-sm">
+                              {userName?.[0]?.toUpperCase() || "?"}
+                            </div>
+                            <div>
+                              <p className="font-bold text-[13px] text-slate-800 leading-tight">
+                                {userName}
+                              </p>
+                              <p className="text-[11px] text-slate-400">
+                                {userEmail}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="font-black text-sm text-slate-900 uppercase tracking-wide">
+                            {pnr}
+                          </p>
+                          <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                            {bookingRef}
+                          </p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="text-[13px] font-bold text-slate-700">
+                            {route}
+                          </p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-black uppercase tracking-wider">
+                            {r.reissueType || r.type || "REISSUE"}
+                          </span>
+                          <p
+                            className="text-[11px] text-slate-500 mt-1.5 italic line-clamp-1 max-w-[200px]"
+                            title={r.reason || r.remarks || "N/A"}
+                          >
+                            &ldquo;{r.reason || r.remarks || "N/A"}&rdquo;
+                          </p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <StatusBadge req={r} />
+                        </td>
+                        <td className="px-4 py-4">
+                          <TicketActions req={r} />
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => navigate(`/my-reissue/${r._id || r.id}`)}
+                              className="p-2 text-slate-400 hover:text-[#0A4D68] hover:bg-[#0A4D68]/5 transition-all rounded-lg"
+                              title="View Details"
+                            >
+                              <FiEye size={16} />
+                            </button>
+                            {status === "PENDING" && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    handleStatusUpdate(
+                                      r._id || r.id || r.requestId,
+                                      "APPROVED",
+                                    )
+                                  }
+                                  className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all rounded-lg text-[11px] font-black tracking-wide border border-emerald-100 hover:border-emerald-500"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleStatusUpdate(
+                                      r._id || r.id || r.requestId,
+                                      "REJECTED",
+                                    )
+                                  }
+                                  className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white transition-all rounded-lg text-[11px] font-black tracking-wide border border-rose-100 hover:border-rose-500"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {1 > 1 && (
+          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+            <p className="text-[12px] text-slate-400">
+              Showing page {currentPage}
+            </p>
+            <div className="flex gap-2">
+              <button
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-[12px] font-bold disabled:opacity-40 hover:bg-slate-50"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-[12px] font-bold disabled:opacity-40 hover:bg-slate-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </>
   );
 }

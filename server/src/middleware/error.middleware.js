@@ -66,8 +66,21 @@ const errorHandler = (err, req, res, next) => {
   const response = {
     success: false,
     error: message,
-    statusCode
+    message,
+    statusCode,
   };
+
+  if (error.code) {
+    response.code = error.code;
+  }
+
+  if (error.providerMessage) {
+    response.providerMessage = error.providerMessage;
+  }
+
+  if (error.data) {
+    response.data = error.data;
+  }
 
   // Include stack trace in development
   if (config.env === 'development') {

@@ -75,7 +75,7 @@ export default function Sidebar({ isOpen, onClose }) {
           { to: "/total-bookings", label: "Total Bookings", icon: <FaClipboardList /> },
           { to: "/total-cancelled-bookings", label: "Cancelled Bookings", icon: <FaClipboardList /> },
           { to: "/pending-requests", label: "Pending Requests", icon: <FaClock /> },
-          { to: "/reissue-requests", label: "Reissue Requests", icon: <FaExchangeAlt /> },
+          { to: "/my-reissued?scope=company", label: "Reissue Requests", icon: <FaExchangeAlt /> },
           { to: "/offline-cancellations", label: "Offline Cancellations", icon: <FaClock /> },
           { to: "/approved-requests", label: "Approved Requests", icon: <FaCheck /> },
           { to: "/rejected-requests", label: "Rejected Requests", icon: <FaTimes /> },
@@ -115,9 +115,9 @@ export default function Sidebar({ isOpen, onClose }) {
         { to: "/my-cancelled-bookings", label: "Cancelled Bookings", icon: <MdCancel /> },
         { to: "/my-reissued", label: "My Reissued", icon: <FaExchangeAlt /> },
         { to: "/my-offline-cancellations", label: "Offline Cancellations", icon: <FaClock /> },
-        { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
       ],
     },
+    { to: "/my-profile", label: "My Profile", icon: <FaUser /> },
   ];
 
   const managerMenu = useMemo(() => [
@@ -129,7 +129,7 @@ export default function Sidebar({ isOpen, onClose }) {
         { to: "/manager/total-bookings", label: "Total Bookings", icon: <FaClipboardList /> },
         { to: "/manager/total-cancelled-bookings", label: "Cancelled Bookings", icon: <FaClipboardList /> },
         { to: "/manager/pending-requests", label: "Pending Requests", icon: <FaClock /> },
-        { to: "/manager/reissue-requests", label: "Reissue Requests", icon: <FaExchangeAlt /> },
+        { to: "/my-reissued?scope=company", label: "Reissue Requests", icon: <FaExchangeAlt /> },
         { to: "/manager/offline-cancellations", label: "Offline Cancellations", icon: <FaClock /> },
         { to: "/manager/approved-requests", label: "Approved Requests", icon: <FaCheck /> },
         { to: "/manager/rejected-requests", label: "Rejected Requests", icon: <FaTimes /> },
@@ -148,7 +148,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { to: "/my-cancelled-bookings", label: "Cancelled Bookings", icon: <MdCancel /> },
     { to: "/my-reissued", label: "My Reissued", icon: <FaExchangeAlt /> },
     { to: "/my-offline-cancellations", label: "Offline Cancellations", icon: <FaClock /> },
-    { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
+    { to: "/my-profile", label: "My Profile", icon: <FaUser /> },
   ];
 
   const menus = {

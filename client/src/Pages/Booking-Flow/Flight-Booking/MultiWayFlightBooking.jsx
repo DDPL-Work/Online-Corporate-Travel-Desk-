@@ -15,7 +15,6 @@ import {
   MultiCityFlightTimeline,
   SelectedSSRSummary,
 } from "./CommonComponents";
-import { CorporateNavbar } from "../../../layout/CorporateNavbar";
 import { useDispatch, useSelector } from "react-redux";
 import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApproverBlock";
 import { useFlightSearch } from "../../../context/FlightSearchContext";
@@ -38,12 +37,19 @@ import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { CABIN_MAP } from "../../../utils/formatter";
 import { FareDetailsModal } from "./FareDetailsModal";
 import Swal from "sweetalert2";
+import LandingHeader from "../../../layout/LandingHeader";
+
+import { clearFareDetails } from "../../../Redux/Slice/flightSearchSlice";
 
 export default function MultiCityFlightBooking() {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { setActiveTab } = useFlightSearch();
+
+  useEffect(() => {
+    dispatch(clearFareDetails());
+  }, [dispatch]);
 
   const { traceId, fareQuote, fareRule, ssr } = useSelector(
     (state) => state.flights,
@@ -64,13 +70,18 @@ export default function MultiCityFlightBooking() {
     }
   }, [dispatch, user]);
 
+  const localState = useMemo(() => {
+    const localStateStr = localStorage.getItem("flightBookingState");
+    return localStateStr ? JSON.parse(localStateStr) : {};
+  }, []);
+
   const {
     selectedFlight,
     searchParams,
     rawFlightData,
     tripType = "multi-city",
     isInternational = false,
-  } = location.state || {};
+  } = location.state || localState;
 
   const [parsedFlightData, setParsedFlightData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -256,20 +267,26 @@ export default function MultiCityFlightBooking() {
     const quoteResponse = fareQuote?.Response;
     if (quoteResponse?.ResponseStatus === 2) {
       const errorMsg = quoteResponse?.Error?.ErrorMessage || "";
-      if (
+      const isSessionExp =
         errorMsg.toLowerCase().includes("traceid") ||
         errorMsg.toLowerCase().includes("expired") ||
-        errorMsg.toLowerCase().includes("invalid")
-      ) {
-        Swal.fire({
-          title: "Session Expired",
-          text: "Your search session has expired. Please search again.",
-          icon: "warning",
-          confirmButtonColor: "#0A4D68",
-        }).then(() => {
-          navigate("/travel");
-        });
-      }
+        errorMsg.toLowerCase().includes("invalid");
+
+      Swal.fire({
+        title: isSessionExp ? "Session Expired" : "Fare Revalidation Failed",
+        text: isSessionExp ? "Your search session has expired. Please search again." : errorMsg,
+        icon: "warning",
+        confirmButtonColor: "#0A4D68",
+      }).then(() => {
+        window.close();
+        setTimeout(() => {
+          if (window.history.length > 1) {
+            navigate(-1);
+          } else {
+            navigate("/travel");
+          }
+        }, 300);
+      });
     }
   }, [fareQuote, navigate]);
 
@@ -931,12 +948,13 @@ export default function MultiCityFlightBooking() {
     }
   };
 
-  if (loading) {
+  if (loading || !fareQuote) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="h-14 w-14 border-4 border-slate-200 border-t-[#0A203E] rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-600 font-medium">Loading flight details…</p>
+      <div className="min-h-screen bg-[#0A203E] flex items-center justify-center">
+        <div className="text-center p-8 bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-700/50 shadow-2xl">
+          <div className="h-16 w-16 border-4 border-slate-600 border-t-[#C9A84C] rounded-full animate-spin mx-auto mb-6 shadow-inner" />
+          <p className="text-white font-semibold text-lg mb-2">Revalidating Multi-City Flight & Fares...</p>
+          <p className="text-slate-400 text-sm">Please wait while we fetch the latest fare details and seat maps.</p>
         </div>
       </div>
     );
@@ -995,31 +1013,43 @@ export default function MultiCityFlightBooking() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      <CorporateNavbar />
+      <LandingHeader />
 
-      {/* Top Bar */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#0A203E] transition group"
-          >
-            <span className="size-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center group-hover:border-[#0A203E]/30 transition-colors">
-              <MdArrowBack size={18} />
+      {/* Top Bar - Journey Details */}
+      <div className="bg-[#0A203E] border-b border-[#0A203E]/80 sticky top-0 z-40 shadow-md">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-widest">
+              Journey Info
             </span>
-            Back to results
-          </button>
+            <div className="h-4 w-[1px] bg-slate-500/50"></div>
+            <div className="flex flex-wrap gap-2">
+              <span className="px-3 py-1 text-xs font-black rounded-lg bg-[#C9A84C] text-[#0A203E] uppercase tracking-wider shadow-sm flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#0A203E] animate-pulse"></span>
+                {tripType?.replace("-", " ")}
+              </span>
+              <span className={`px-3 py-1 text-xs font-black rounded-lg uppercase tracking-wider border ${
+                isInternational 
+                  ? "bg-purple-950/40 text-purple-300 border-purple-800/40" 
+                  : "bg-blue-950/40 text-blue-300 border-blue-800/40"
+              }`}>
+                {isInternational ? "International" : "Domestic"}
+              </span>
+            </div>
+          </div>
 
-          <button
-            onClick={() => {
-              setActiveTab("hotel");
-              navigate("/travel", { state: { activeTab: "hotel" } });
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            className="flex items-center gap-1.5 font-bold cursor-pointer bg-[#C9A84C] hover:bg-[#b5953e] transition-colors px-3 py-1.5 rounded-md text-[#0A203E] shadow-sm"
-          >
-            Search Hotels
-          </button>
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="px-3 py-1 text-xs font-black rounded-lg bg-[#1a3a5a]/60 text-slate-100 border border-[#1a3a5a] uppercase tracking-wider flex items-center gap-1">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase">Cabin:</span>{" "}
+              {CABIN_MAP[selectedFlight?.Segments?.[0]?.[0]?.CabinClass] || "Economy"}
+            </span>
+            {selectedFlight?.Segments?.[0]?.[0]?.SupplierFareClass && (
+              <span className="px-3 py-1 text-xs font-black rounded-lg bg-amber-950/30 text-[#C9A84C] border border-[#C9A84C]/30 uppercase tracking-wider flex items-center gap-1">
+                <span className="text-[10px] text-amber-500/70 font-semibold uppercase">Class:</span>{" "}
+                {selectedFlight.Segments[0][0].SupplierFareClass}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

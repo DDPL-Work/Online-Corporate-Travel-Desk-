@@ -1,13 +1,16 @@
 const ApiError = require("../../utils/ApiError");
 const logger = require("../../utils/logger");
+const {
+  resolvePnr,
+  resolveSupplierBookingId,
+} = require("../../utils/bookingResolver.util");
 const paymentService = require("../payment.service");
 const tboService = require("../tektravels/flight.service");
 
 const extractPnr = (response = {}) =>
-  response?.Response?.Response?.PNR ||
-  response?.Response?.Response?.FlightItinerary?.PNR ||
-  response?.raw?.Response?.Response?.PNR ||
-  response?.raw?.Response?.Response?.FlightItinerary?.PNR ||
+  resolvePnr(response) ||
+  resolvePnr(response?.Response?.Response) ||
+  resolvePnr(response?.raw?.Response?.Response) ||
   null;
 
 const getFareResults = (fareQuote = {}) => {
@@ -145,6 +148,15 @@ const persistBookedState = async ({
   bookingResult,
   executionStatus,
 }) => {
+  if (!bookingResult.providerBookingId) {
+    const inferredBookingId =
+      resolveSupplierBookingId(bookingResult) ||
+      resolveSupplierBookingId(bookingResult?.providerResponse);
+    if (inferredBookingId) {
+      bookingResult.providerBookingId = inferredBookingId;
+    }
+  }
+
   booking.bookingResult = bookingResult;
   booking.executionStatus = executionStatus;
   await booking.save();
@@ -544,7 +556,9 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       rawResultIndex,
     );
 
-    const latestFare = freshFare?.Response?.Results;
+    const latestFare = Array.isArray(freshFare?.Response?.Results)
+      ? freshFare.Response.Results[0]
+      : freshFare?.Response?.Results;
 
     const ticketResponse = await tboService.ticketFlight({
       traceId: booking.flightRequest.traceId,

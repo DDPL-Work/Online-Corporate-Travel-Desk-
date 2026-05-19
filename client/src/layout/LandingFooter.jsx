@@ -15,7 +15,7 @@ import {
   FiUserCheck, 
   FiPhone 
 } from "react-icons/fi";
-import logo from "../../public/logo-traveamer.svg";
+const logo = "/logo-traveamer.svg";
 import { useFlightSearch } from "../context/FlightSearchContext";
 
 export default function LandingFooter({ onTabChange }) {

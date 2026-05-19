@@ -10,9 +10,6 @@ const handlebars = require("handlebars");
 const axios = require("axios");
 
 const {
-  generateFlightTicketPdfKit,
-} = require("./templates/flight_ticket_pdfkit");
-const {
   generateHotelVoucherPdfKit,
 } = require("./templates/hotel_voucher_pdfkit");
 
@@ -143,23 +140,6 @@ class PDFService {
      FLIGHT TICKET PDF (HTML → PUPPETEER → PDF)
   ====================================================== */
 
-  // OLD PDFKIT IMPLEMENTATION
-  /*
-  async generateFlightTicketPdf({ booking, journeyType }) {
-    try {
-      return await generateFlightTicketPdfKit({
-        booking,
-        journeyType,
-        outputDir: this.ticketDir,
-      });
-    } catch (error) {
-      logger.error("Flight ticket PDF generation failed", error);
-      throw error;
-    }
-  }
-  */
-
-  // NEW PUPPETEER IMPLEMENTATION
   async generateFlightTicketPdf({ booking, journeyType }) {
     let browser;
     try {
@@ -313,6 +293,11 @@ class PDFService {
               "Airport",
             originTerminal:
               seg.Origin?.Airport?.Terminal || seg.origin?.terminal || "",
+            originGate:
+              seg.Origin?.Airport?.Gate ||
+              seg.Origin?.Gate ||
+              seg.origin?.gate ||
+              "",
             departureTime: depTime.toLocaleTimeString("en-GB", {
               hour: "2-digit",
               minute: "2-digit",
@@ -440,7 +425,7 @@ class PDFService {
 
       // ── Prepare Consolidated Passenger Data (Global for the journey) ──
       const consolidatedTravellers = await Promise.all(
-        booking.travellers.map(async (traveller, tIdx) => {
+        (Array.isArray(booking.travellers) ? booking.travellers : []).map(async (traveller, tIdx) => {
           const tboPaxOnward =
             onwardData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
           const tboPaxReturn =
@@ -559,6 +544,11 @@ class PDFService {
         baggageCharges: `₹ ${baggageTotal.toLocaleString()}`,
         totalFare: `₹ ${(booking.pricingSnapshot?.totalAmount || journeyResponse.FlightItinerary.Fare.PublishedFare + ssrTotal).toLocaleString()}`,
         currency: journeyResponse.FlightItinerary.Fare.Currency || "INR",
+        ticketTypeTitle:
+          booking?.reissueMeta?.headerTitle ||
+          (booking?.reissueMeta?.isReissued
+            ? "Reissued Flight E-ticket"
+            : "Flight E-ticket"),
         segments: segmentsData,
         travellers: consolidatedTravellers,
         barcodeBase64,
@@ -567,6 +557,7 @@ class PDFService {
         rulesImg,
         traveamerLogo,
         iataLogo,
+        inlineCss: cssContent,
         ticketedDate,
         generatedAt: new Date().toLocaleString(),
         generatedAtDate: new Date().toLocaleDateString("en-GB", {
@@ -583,9 +574,9 @@ class PDFService {
       browser = await this._launchBrowser();
       const page = await browser.newPage();
 
-      // Set content and inject CSS
+      // Inline CSS in the rendered template so PDF/email/browser previews do not
+      // depend on resolving a separate stylesheet file at render time.
       await page.setContent(finalHtml, { waitUntil: "networkidle0" });
-      await page.addStyleTag({ content: cssContent });
 
       const pdfBuffer = await page.pdf({
         format: "A4",
@@ -600,6 +591,33 @@ class PDFService {
     } catch (error) {
       if (browser) await browser.close();
       logger.error("Flight ticket Puppeteer PDF generation failed", error);
+      throw error;
+    }
+  }
+
+  async generateFlightTicketFile({
+    booking,
+    journeyType,
+    outputDir = this.ticketDir,
+    fileName = null,
+  }) {
+    try {
+      fs.mkdirSync(outputDir, { recursive: true });
+
+      const pdfBuffer = await this.generateFlightTicketPdf({
+        booking,
+        journeyType,
+      });
+
+      const resolvedFileName =
+        fileName ||
+        `ticket-${booking?.bookingReference || "flight"}-${randomUUID()}.pdf`;
+      const filePath = path.join(outputDir, resolvedFileName);
+
+      await fs.promises.writeFile(filePath, pdfBuffer);
+      return filePath;
+    } catch (error) {
+      logger.error("Flight ticket file generation failed", error);
       throw error;
     }
   }

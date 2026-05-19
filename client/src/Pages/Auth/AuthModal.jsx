@@ -57,7 +57,6 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     gstin: "",
     gstLegalName: "",
     gstAddress: "",
-    gstAddress: "",
     gstEmail: "",
     gstEmailSource: "manual", // linked source: manual, primary, billing
     corporateType: "pvt-ltd",

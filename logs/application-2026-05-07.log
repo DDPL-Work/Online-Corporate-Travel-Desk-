@@ -1,0 +1,14 @@
+{"level":"warn","message":"Firebase Admin initialization failed. Push notifications will be disabled. Please place firebase-service-account.json in src/config/.","timestamp":"2026-05-07 18:04:11"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-05-07 18:04:11"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-05-07 18:04:12"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-05-07 18:04:13"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-05-07 18:04:14"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-05-07 18:04:16"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-05-07 18:04:19"}
+{"level":"warn","message":"Firebase Admin initialization failed. Push notifications will be disabled. Please place firebase-service-account.json in src/config/.","timestamp":"2026-05-07 18:22:56"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-05-07 18:22:56"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-05-07 18:22:57"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-05-07 18:22:58"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-05-07 18:22:59"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-05-07 18:23:01"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-05-07 18:23:04"}

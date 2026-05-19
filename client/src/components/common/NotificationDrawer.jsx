@@ -45,11 +45,11 @@ export default function NotificationDrawer({
         onClick={onClose}
       />
 
-      <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-[0_20px_80px_rgba(15,23,42,0.2)] border-l border-slate-200 flex flex-col">
-        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200 bg-slate-50">
+      <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-[#04112F] shadow-[[-20px_0_80px_rgba(0,0,0,0.5)] border-l border-[#C9A84C]/20 flex flex-col">
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[#C9A84C]/20 bg-[#04112F]">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">All Notifications</h2>
-            <p className="text-xs text-slate-500">
+            <h2 className="text-lg font-bold text-white tracking-widest uppercase flex items-center gap-2">All Notifications</h2>
+            <p className="text-[10px] uppercase font-bold tracking-wider text-[#C9A84C] mt-0.5">
               {unreadCount} unread notification{unreadCount === 1 ? "" : "s"}
             </p>
           </div>
@@ -59,7 +59,7 @@ export default function NotificationDrawer({
               <button
                 type="button"
                 onClick={onMarkAllAsRead}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                className="rounded-lg border border-[#C9A84C]/40 px-3 py-2 text-xs font-semibold text-[#C9A84C] hover:bg-[#C9A84C]/10 transition-colors"
               >
                 Mark all as read
               </button>
@@ -67,24 +67,24 @@ export default function NotificationDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              className="rounded-lg p-2 text-slate-400 hover:bg-[#C9A84C]/10 hover:text-white transition-colors"
             >
               <IoClose size={20} />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           {loading ? (
-            <div className="p-8 text-center text-sm text-slate-500">
+            <div className="p-8 text-center text-xs font-bold uppercase tracking-widest text-slate-500">
               Loading notifications...
             </div>
           ) : notifications.length > 0 ? (
             notifications.map((notification) => (
               <div
                 key={notification._id}
-                className={`group border-b border-slate-100 px-5 py-4 transition-colors ${
-                  !notification.isRead ? "bg-blue-50/30" : "bg-white"
+                className={`group border-b border-[#C9A84C]/10 px-5 py-4 transition-colors hover:bg-[#C9A84C]/5 ${
+                  !notification.isRead ? "bg-[#C9A84C]/10" : "bg-transparent"
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -98,21 +98,21 @@ export default function NotificationDrawer({
                         <h3
                           className={`text-sm ${
                             !notification.isRead
-                              ? "font-bold text-slate-900"
-                              : "font-medium text-slate-700"
+                              ? "font-bold text-white"
+                              : "font-medium text-slate-300"
                           }`}
                         >
                           {notification.title}
                         </h3>
-                        <p className="mt-1 text-sm text-slate-600 leading-6">
+                        <p className="mt-1 text-sm text-slate-400 leading-6">
                           {notification.message}
                         </p>
                       </div>
                       {!notification.isRead ? (
-                        <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />
+                        <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#C9A84C] shadow-[0_0_8px_rgba(201,168,76,0.6)]" />
                       ) : null}
                     </div>
-                    <p className="mt-3 text-xs text-slate-400">
+                    <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                       {formatDistanceToNow(new Date(notification.createdAt), {
                         addSuffix: true,
                       })}
@@ -123,7 +123,7 @@ export default function NotificationDrawer({
                     type="button"
                     aria-label="Delete notification"
                     onClick={() => onDeleteNotification(notification._id)}
-                    className="mt-1 rounded-lg p-2 text-slate-400 opacity-0 transition group-hover:opacity-100 hover:bg-slate-100 hover:text-slate-600"
+                    className="mt-1 rounded-lg p-2 text-slate-500 opacity-0 transition group-hover:opacity-100 hover:bg-rose-500/10 hover:text-rose-400"
                   >
                     <IoTrashOutline size={18} />
                   </button>
@@ -132,13 +132,13 @@ export default function NotificationDrawer({
             ))
           ) : (
             <div className="flex h-full flex-col items-center justify-center px-8 text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
-                <IoNotificationsOutline className="text-slate-400" size={26} />
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-[#C9A84C]/10 border border-[#C9A84C]/20">
+                <IoNotificationsOutline className="text-[#C9A84C]" size={26} />
               </div>
-              <h3 className="text-base font-semibold text-slate-700">
+              <h3 className="text-base font-semibold text-white">
                 No notifications yet
               </h3>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-slate-400">
                 New wallet, booking, and activity alerts will appear here.
               </p>
             </div>

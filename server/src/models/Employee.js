@@ -32,6 +32,7 @@ const EmployeeSchema = new mongoose.Schema(
     department: { type: String, trim: true, default: "" },
     designation: { type: String, trim: true, default: "" },
     employeeCode: { type: String, trim: true, default: "" },
+    dob: { type: Date, default: null },
 
     status: {
       type: String,

@@ -24,6 +24,8 @@ const sandboxEndpoints = {
   flightCancel: "/BookingEngineService_Air/AirService.svc/rest/Cancel",
   flightCancellationCharges:
     "/BookingEngineService_Air/AirService.svc/rest/GetCancellationCharges",
+  flightTicketReissue:
+    "/BookingEngineService_Air/AirService.svc/rest/TicketReIssue",
   flightSendChangeRequest:
     "/BookingEngineService_Air/AirService.svc/rest/SendChangeRequest",
   flightGetChangeRequestStatus:
@@ -52,6 +54,7 @@ const productionEndpoints = {
     "/AirAPI_V10/AirService.svc/rest/GetBookingDetails",
   flightCancel: "/AirAPI_V10/AirService.svc/rest/Cancel",
   flightCancellationCharges: "/AirAPI_V10/AirService.svc/rest/GetCancellationCharges",
+  flightTicketReissue: "/AirAPI_V10/AirService.svc/rest/TicketReIssue",
   flightSendChangeRequest:
     "/AirAPI_V10/AirService.svc/rest/SendChangeRequest",
   flightGetChangeRequestStatus:
@@ -66,6 +69,7 @@ const bookingEndpoints = new Set([
   "flightBookingDetails",
   "flightCancel",
   "flightCancellationCharges",
+  "flightTicketReissue",
   "flightSendChangeRequest",
   "flightGetChangeRequestStatus",
   "flightReleasePNR",

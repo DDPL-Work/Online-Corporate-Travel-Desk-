@@ -492,20 +492,16 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
         );
       }
     } catch (execErr) {
-      bookingRequest.executionStatus = "failed";
-      await bookingRequest.save();
-      return res.status(200).json({
-        success: true,
-        message:
-          "Request created but instant booking failed: " + execErr.message,
-        data: {
-          bookingRequestId: bookingRequest._id,
-          bookingReference: bookingRequest.bookingReference,
-          requestStatus: "approved",
-          executionStatus: "failed",
-          error: execErr.message,
-        },
+      console.error("❌ Instant hotel booking execution failed", {
+        bookingId: bookingRequest._id,
+        error: execErr.message,
       });
+      // Delete the created booking request so it is not saved in DB
+      await HotelBookingRequest.deleteOne({ _id: bookingRequest._id });
+      throw new ApiError(
+        400,
+        execErr.message || "Instant hotel booking failed on TBO"
+      );
     }
   }
 

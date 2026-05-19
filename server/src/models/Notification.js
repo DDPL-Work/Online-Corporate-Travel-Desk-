@@ -4,7 +4,13 @@ const notificationSchema = new mongoose.Schema(
   {
     recipient: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      refPath: "recipientType",
+      index: true,
+    },
+    recipientType: {
+      type: String,
+      enum: ["User", "OpsMember", "SuperAdmin"],
+      default: "User",
       index: true,
     },
     recipientRole: {

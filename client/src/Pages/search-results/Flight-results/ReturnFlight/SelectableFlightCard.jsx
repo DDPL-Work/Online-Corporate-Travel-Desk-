@@ -34,6 +34,7 @@ export default function SelectableFlightCard({
     group.flightOptionsByResultIndex[viewingResultIndex] || group.flightInfo;
   const journey = parseSingleJourney(activeFlight.Segments[0]);
   const currentFare = Math.ceil(activeFlight.Fare?.PublishedFare);
+  const noOfSeatAvailable = activeFlight.Segments?.[0]?.[0]?.NoOfSeatAvailable;
 
   const isCardActivelySelected =
     selected && selectedFlight?.ResultIndex === activeFlight.ResultIndex;
@@ -75,6 +76,7 @@ export default function SelectableFlightCard({
           data={journey} 
           fare={currentFare} 
           selected={selected} 
+          noOfSeatAvailable={noOfSeatAvailable}
         />
       </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import {
   FiCheckCircle,
   FiClock,
@@ -37,8 +38,8 @@ import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { airlineLogo } from "../../utils/formatter";
 import { C } from "../Shared/color";
 
-const FLIGHT_EXCLUDE = new Set(["ticketed", "cancel_requested", "cancelled"]);
-const HOTEL_EXCLUDE = new Set(["voucher_generated", "cancelled"]);
+const FLIGHT_EXCLUDE = new Set(["ticketed", "cancel_requested", "cancelled", "TICKET_GENERATED", "COMPLETED"]);
+const HOTEL_EXCLUDE = new Set(["voucher_generated", "cancelled", "COMPLETED"]);
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Shared Components                                              */
@@ -204,7 +205,7 @@ function FlightApprovalsSection({ requests, refreshing, employeeOptions }) {
           </tbody>
         </table>
       </ResponsiveDataTable>
-      {selected && <PendingFlightDetailsModal booking={selected} onClose={() => setSelected(null)} />}
+      {selected && createPortal(<PendingFlightDetailsModal booking={selected} onClose={() => setSelected(null)} />, document.body)}
     </div>
   );
 }
@@ -338,7 +339,7 @@ function HotelApprovalsSection({ requests, refreshing, employeeOptions }) {
           </tbody>
         </table>
       </ResponsiveDataTable>
-      {selected && <PendingHotelDetailsModal booking={selected} onClose={() => setSelected(null)} />}
+      {selected && createPortal(<PendingHotelDetailsModal booking={selected} onClose={() => setSelected(null)} />, document.body)}
     </div>
   );
 }

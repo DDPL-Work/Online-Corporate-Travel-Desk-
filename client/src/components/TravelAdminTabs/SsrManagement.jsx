@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   FiSearch,
   FiShield,
@@ -21,6 +22,8 @@ import {
   FiDownload,
   FiChevronRight,
   FiInfo,
+  FiClock,
+  FiArrowRight,
 } from "react-icons/fi";
 import {
   MdAirlineSeatReclineNormal,
@@ -37,8 +40,38 @@ import { fetchEmployees } from "../../Redux/Slice/employeeActionSlice";
 import { clearLookup, clearSaveState } from "../../Redux/Slice/ssrPolicy.slice";
 import Swal from "sweetalert2";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
-import { Th } from "./Shared/CommonComponents";
+import { Th, LabeledField, SearchBar } from "./Shared/CommonComponents";
 import { C } from "../Shared/color";
+
+const Avatar = ({ name = "", size = "md" }) => {
+  const nameStr = typeof name === "string" ? name : String(name || "");
+  const initials = nameStr
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  
+  const colors = [
+    "from-[#003399] to-[#000d26]",
+    "from-violet-600 to-indigo-500",
+    "from-rose-500 to-pink-400",
+    "from-amber-500 to-orange-400",
+    "from-teal-600 to-emerald-500",
+  ];
+  
+  const seed = nameStr.length > 0 ? nameStr.charCodeAt(0) : 0;
+  const color = colors[seed % colors.length];
+  const sz = size === "lg" ? "w-10 h-10 text-[11px]" : "w-9 h-9 text-[10px]";
+  
+  return (
+    <div
+      className={`${sz} rounded-xl bg-gradient-to-br ${color} flex items-center justify-center font-black text-white shrink-0 shadow-sm border border-white/20`}
+    >
+      {initials || "?"}
+    </div>
+  );
+};
 
 /* ─── Shared primitives ─────────────────────────────────────────────────────── */
 
@@ -337,48 +370,52 @@ function PolicyList({
   if (listLoading) return <div className="grid gap-4">{[1, 2, 3].map(i => <div key={i} className="h-20 bg-white rounded-2xl border animate-pulse" />)}</div>;
 
   return (
-    <ResponsiveDataTable title={title} subtitle={subtitle} onExport={onExport}
+    <ResponsiveDataTable 
+      title={title} 
+      subtitle={subtitle} 
+      onExport={onExport}
+      wrapperClass="!border-none !shadow-none"
       toolbarRight={onRefresh && <button onClick={onRefresh} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all" style={{ background: C.white, borderColor: C.border, color: C.navy, border: "1px solid" }}><FiRefreshCw size={14} /> Sync Policies</button>}
     >
-      <table className="w-full border-collapse">
+      <table className="w-full text-left border-collapse">
         <thead>
-          <tr style={{ background: C.navy, color: C.white }}>
-            <Th className="text-left px-6 py-5">Employee Ledger</Th>
-            <Th className="text-center px-6 py-5">Seat Access</Th>
-            <Th className="text-center px-6 py-5">Meal Access</Th>
-            <Th className="text-center px-6 py-5">Baggage Access</Th>
-            <Th className="text-center px-6 py-5">Auth Flow</Th>
-            <Th className="text-center px-6 py-5">Management</Th>
+          <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+            <Th className="!px-6 !py-5">Employee Ledger</Th>
+            <Th className="!px-6 !py-5 !text-center">Seat Access</Th>
+            <Th className="!px-6 !py-5 !text-center">Meal Access</Th>
+            <Th className="!px-6 !py-5 !text-center">Baggage Access</Th>
+            <Th className="!px-6 !py-5 !text-center">Auth Flow</Th>
+            <Th className="!px-6 !py-5 !text-center">Management</Th>
           </tr>
         </thead>
-        <tbody className="divide-y" style={{ borderColor: C.border }}>
+        <tbody>
           {policies.map((p, i) => (
-            <tr key={p._id} className="hover:bg-slate-50 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.offWhite }}>
-              <td className="px-6 py-5">
-                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400"><FiUser size={20} /></div>
-                    <div>
-                       <p className="text-xs font-black" style={{ color: C.navy }}>{p.employeeEmail}</p>
+            <tr key={p._id} className="hover:bg-slate-50 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
+              <td className="!px-6 !py-5">
+                 <div className="flex items-center gap-4">
+                    <Avatar name={p.employeeEmail} />
+                    <div className="min-w-0">
+                       <p className="text-xs font-black uppercase tracking-tight" style={{ color: C.navy }}>{p.employeeEmail}</p>
                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Policy Active</p>
                     </div>
                  </div>
               </td>
-              <td className="px-6 py-5 text-center">
+              <td className="!px-6 !py-5 text-center">
                 <StatusBadge text={p.allowSeat ? "✓ Allowed" : "✗ Blocked"} color={p.allowSeat ? "green" : "red"} />
-                {p.allowSeat && <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">₹{p.seatPriceRange?.min}–₹{p.seatPriceRange?.max}</p>}
+                {p.allowSeat && <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tighter font-mono">₹{p.seatPriceRange?.min}–₹{p.seatPriceRange?.max}</p>}
               </td>
-              <td className="px-6 py-5 text-center">
+              <td className="!px-6 !py-5 text-center">
                 <StatusBadge text={p.allowMeal ? "✓ Allowed" : "✗ Blocked"} color={p.allowMeal ? "green" : "red"} />
-                {p.allowMeal && <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">₹{p.mealPriceRange?.min}–₹{p.mealPriceRange?.max}</p>}
+                {p.allowMeal && <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tighter font-mono">₹{p.mealPriceRange?.min}–₹{p.mealPriceRange?.max}</p>}
               </td>
-              <td className="px-6 py-5 text-center">
+              <td className="!px-6 !py-5 text-center">
                 <StatusBadge text={p.allowBaggage ? "✓ Allowed" : "✗ Blocked"} color={p.allowBaggage ? "green" : "red"} />
-                {p.allowBaggage && <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">₹{p.baggagePriceRange?.min}–₹{p.baggagePriceRange?.max}</p>}
+                {p.allowBaggage && <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tighter font-mono">₹{p.baggagePriceRange?.min}–₹{p.baggagePriceRange?.max}</p>}
               </td>
-              <td className="px-6 py-5 text-center">
+              <td className="!px-6 !py-5 text-center">
                 <StatusBadge text={p.approvalRequired ? "Manual" : "Auto"} color={p.approvalRequired ? "amber" : "green"} />
               </td>
-              <td className="px-6 py-5 text-center">
+              <td className="!px-6 !py-5 text-center">
                 <div className="flex items-center justify-center gap-2">
                   <button onClick={() => onView(p)} className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"><FiEye size={16} /></button>
                   <button onClick={() => onEdit(p)} className="p-2 rounded-xl transition-colors" style={{ background: `${C.gold}15`, color: C.gold }}><FiEdit2 size={16} /></button>
@@ -396,14 +433,21 @@ function PolicyList({
 /* ─── Main Component ────────────────────────────────────────────────────────── */
 export default function SsrManagement() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const {
-    lookedUp, lookupLoading, policies, listLoading, saving, saveSuccess,
+    lookedUp, lookupLoading, lookupError, policies, listLoading, saving, saveSuccess,
   } = useSelector((s) => s.ssrPolicy);
   const { employees } = useSelector((s) => s.employeeAction);
 
   const [emailInput, setEmailInput] = useState("");
   const [activeTab, setActiveTab] = useState("configure");
   const [viewPolicy, setViewPolicy] = useState(null);
+  const [search, setSearch] = useState("");
+
+  const filteredPolicies = React.useMemo(() => {
+    const q = search.toLowerCase();
+    return policies.filter(p => !q || p.employeeEmail?.toLowerCase().includes(q));
+  }, [policies, search]);
 
   const [allowSeat, setAllowSeat] = useState(false);
   const [allowMeal, setAllowMeal] = useState(false);
@@ -479,33 +523,64 @@ export default function SsrManagement() {
   };
 
   return (
-    <div className="min-h-screen font-sans pb-20 px-6 pt-8" style={{ background: C.offWhite }}>
-      <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-2xl border shadow-sm" style={{ borderColor: C.border }}>
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
+      {/* Navy Header Section */}
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg text-white" style={{ background: `linear-gradient(135deg, ${C.navy}, ${C.gold})` }}>
-              <FiShield size={32} />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black tracking-tight" style={{ color: C.navy }}>SSR Governance</h1>
-              <p className="text-xs mt-1 font-bold uppercase tracking-widest" style={{ color: C.muted }}>Configure Paid Seat, Meal & Baggage Policies</p>
-            </div>
-          </div>
-          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
-             {[["configure", "Configuration", FiSettings], ["list", "Active Policies", FiList]].map(([k, lbl, Icon]) => (
-               <button key={k} onClick={() => setActiveTab(k)} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all ${activeTab === k ? "bg-white text-navy shadow-sm" : "text-slate-400 hover:text-slate-600"}`} style={{ color: activeTab === k ? C.navy : "" }}>
-                  <Icon size={14} /> {lbl}
+             <div className="flex items-center gap-3">
+               <button 
+                  onClick={() => navigate(-1)} 
+                  className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"
+               >
+                 <FiArrowRight className="rotate-180" size={20} />
                </button>
-             ))}
+               <button 
+                  onClick={() => dispatch(fetchAllSSRPolicies())} 
+                  className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${listLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                  disabled={listLoading}
+               >
+                 <div className={listLoading ? "animate-spin" : ""}>
+                   <FiRefreshCw size={20} />
+                 </div>
+               </button>
+             </div>
+             
+             <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+
+             <div className="flex items-center gap-5">
+               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
+                 <FiShield size={28} />
+               </div>
+               <div>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">SSR Governance</h1>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                   Configure Paid Seat, Meal & Baggage Policies
+                 </p>
+               </div>
+             </div>
           </div>
         </div>
+      </div>
 
+      <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
+        {/* Tab Switcher - Aligned with TotalBookings */}
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+          {[
+            ["configure", "Configuration", FiSettings],
+            ["list", "Active Policies", FiList],
+          ].map(([k, lbl, Icon]) => (
+            <button
+              key={k}
+              onClick={() => setActiveTab(k)}
+              className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+            >
+              <Icon size={14} /> {lbl}
+            </button>
+          ))}
+        </div>
         {activeTab === "configure" ? (
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-            {/* Left Form */}
-            <div className="lg:col-span-3 space-y-8">
+          <div className="w-full space-y-8 animate-in slide-in-from-bottom-4 duration-300">
                <div className="bg-white rounded-2xl border shadow-sm p-8" style={{ borderColor: C.border }}>
                   <SectionHeader icon={FiSearch} title="Policy Lookup" sub="Identify employee for configuration" />
                   <div className="flex flex-col sm:flex-row gap-4 items-start">
@@ -518,7 +593,7 @@ export default function SsrManagement() {
                </div>
 
                {lookedUp && (
-                 <div className="bg-white rounded-2xl border shadow-sm overflow-hidden animate-in slide-in-from-bottom-4" style={{ borderColor: C.border }}>
+                 <div className="bg-white rounded-2xl border shadow-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-500" style={{ borderColor: C.border }}>
                     <div className="p-8 space-y-10">
                        <div>
                           <SectionHeader icon={FiToggleRight} title="Entitlement Matrix" sub="Define what services are pre-approved" />
@@ -558,39 +633,25 @@ export default function SsrManagement() {
                  </div>
                )}
             </div>
-
-            {/* Right Instructions */}
-            <div className="lg:col-span-2 space-y-8">
-               <div className="bg-white rounded-2xl border shadow-sm p-8" style={{ borderColor: C.border }}>
-                  <h3 className="text-sm font-black uppercase tracking-widest mb-6" style={{ color: C.navy }}>Implementation Guide</h3>
-                  <div className="space-y-6">
-                     {[
-                       { t: "Policy Lookup", d: "Start by entering an employee's email. If no policy exists, defaults are shown." },
-                       { t: "Permissions", d: "Toggling a permission off completely blocks that service for the user." },
-                       { t: "Price Thresholds", d: "Bookings above the max threshold will always require admin review." }
-                     ].map((item, idx) => (
-                       <div key={idx} className="flex gap-4">
-                          <span className="text-2xl font-black italic opacity-20" style={{ color: C.gold }}>0{idx+1}</span>
-                          <div>
-                             <p className="text-xs font-black" style={{ color: C.navy }}>{item.t}</p>
-                             <p className="text-[11px] text-slate-400 font-bold mt-1 leading-relaxed">{item.d}</p>
-                          </div>
-                       </div>
-                     ))}
-                  </div>
-               </div>
-            </div>
-          </div>
         ) : (
-          <div className="animate-in fade-in duration-500">
+          <div className="space-y-10 animate-in fade-in duration-500">
+            {/* Filters */}
+            <div className="bg-white rounded-2xl p-6 border shadow-sm animate-in fade-in duration-300" style={{ borderColor: C.border }}>
+              <div className="grid grid-cols-1 gap-6">
+                <LabeledField label={<><FiSearch size={10} /> Search Governance Ledger</>}>
+                  <SearchBar value={search} onChange={(val) => setSearch(val)} placeholder="Search employee email..." />
+                </LabeledField>
+              </div>
+            </div>
+
             <PolicyList
-              policies={policies}
+              policies={filteredPolicies}
               listLoading={listLoading}
               onDelete={handleDelete}
               onView={setViewPolicy}
               onEdit={handleEdit}
               title="Active Governance Ledger"
-              subtitle={`${policies.length} custom policies in effect`}
+              subtitle={`${filteredPolicies.length} custom policies in effect`}
               onRefresh={() => dispatch(fetchAllSSRPolicies())}
               onExport={() => {}}
             />

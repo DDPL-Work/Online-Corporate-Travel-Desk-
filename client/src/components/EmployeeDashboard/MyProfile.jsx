@@ -17,6 +17,7 @@ import {
   FiRefreshCw,
   FiFileText,
   FiCreditCard,
+  FiCalendar,
 } from "react-icons/fi";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -32,12 +33,14 @@ import { jwtDecode } from "jwt-decode";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { C } from "../Shared/color";
+import CustomDatePicker from "../Shared/CustomDatePicker";
 
 const PERSONAL_FIELDS = [
   { key: "firstName", label: "First Name", icon: FiUser, type: "text", editable: true },
   { key: "lastName", label: "Last Name", icon: FiUser, type: "text", editable: true },
-  { key: "email", label: "Email", icon: FiMail, type: "email", editable: true },
+  { key: "email", label: "Email", icon: FiMail, type: "email", editable: false },
   { key: "phone", label: "Phone", icon: FiPhone, type: "tel", editable: true },
+  { key: "dob", label: "Date of Birth", icon: FiCalendar, type: "date", editable: true },
 ];
 
 const CORPORATE_FIELDS = [
@@ -88,6 +91,7 @@ export default function MyProfile() {
         firstName,
         lastName,
         managerId: myProfile.manager?._id || myProfile.managerId,
+        dob: myProfile.dob ? myProfile.dob.split("T")[0] : "",
       });
     }
   }, [myProfile]);
@@ -98,13 +102,14 @@ export default function MyProfile() {
     const fullName = `${localProfile.firstName || ""} ${localProfile.lastName || ""}`.trim();
     const payload = {
       name: fullName,
-      email: localProfile.email,
+      // email: localProfile.email,
       phone: localProfile.phone,
       employeeId: localProfile.employeeId,
       department: localProfile.department,
       designation: localProfile.designation,
       managerId: localProfile.managerId,
       projectId: localProfile.projectId,
+      dob: localProfile.dob,
     };
 
     try {
@@ -203,6 +208,7 @@ export default function MyProfile() {
                   <InfoRow icon={FiHash} value={localProfile.employeeId || "—"} label="Employee ID" />
                   <InfoRow icon={FiMail} value={localProfile.email || "—"} label="Email Address" />
                   <InfoRow icon={FiPhone} value={localProfile.phone && !localProfile.phone.toString().startsWith("+") ? `+${localProfile.phone}` : localProfile.phone || "—"} label="Mobile Number" />
+                  <InfoRow icon={FiCalendar} value={localProfile.dob || "—"} label="Date of Birth" />
                 </div>
 
                 {/* ── Travel Documents Shortcut ── */}
@@ -232,8 +238,8 @@ export default function MyProfile() {
           <div className="lg:col-span-3 space-y-8">
             
             {/* Personal & Corporate Info Combined */}
-            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden">
-               <div className="p-8 border-b border-slate-50 flex items-center justify-between" style={{ background: `linear-gradient(to right, white, ${C.gold}11)` }}>
+            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl">
+               <div className="p-8 border-b border-slate-50 flex items-center justify-between rounded-t-[2rem]" style={{ background: `linear-gradient(to right, white, ${C.gold}11)` }}>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: C.gold + "22" }}>
                       <FiUser style={{ color: C.navy }} />
@@ -483,22 +489,36 @@ function Field({ field, value, editing, onChange }) {
               containerStyle={{ width: "100%" }}
             />
           </div>
+        ) : field.key === "dob" ? (
+          <CustomDatePicker
+            value={value || ""}
+            onChange={(v) => onChange(v)}
+            placeholder="Select Date of Birth"
+          />
         ) : (
           <input
             type={field.type}
             value={value || ""}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full px-5 py-3 text-sm text-slate-900 border-1.5 rounded-[1.25rem] outline-none transition-all font-bold shadow-sm"
+            readOnly={!field.editable}
+            className={`w-full px-5 py-3 text-sm text-slate-900 border-1.5 rounded-[1.25rem] outline-none transition-all font-bold shadow-sm ${!field.editable ? "cursor-not-allowed text-slate-500" : ""}`}
             style={{ 
-              backgroundColor: C.gold + "11", 
-              borderColor: C.gold + "44",
-              focus: { borderColor: C.gold }
+              backgroundColor: field.editable ? C.gold + "11" : "#f8fafc", 
+              borderColor: field.editable ? C.gold + "44" : "#e2e8f0",
             }}
           />
         )
       ) : (
         <div className="px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all" style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
-          {field.key === "phone" && value && !value.toString().startsWith("+") ? `+${value}` : value || (
+          {field.key === "phone" && value && !value.toString().startsWith("+") ? (
+            `+${value}`
+          ) : field.key === "dob" && value ? (
+            new Date(value).toLocaleDateString("en-IN", {
+              day: "numeric",
+              month: "short",
+              year: "numeric"
+            })
+          ) : value || (
             <span className="text-slate-400 italic font-bold">Not configured</span>
           )}
         </div>

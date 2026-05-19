@@ -1,4 +1,6 @@
 // server/src/controllers/booking.controller.js
+const fs = require("fs");
+const path = require("path");
 const Booking = require("../models/Booking");
 const BookingRequest = require("../models/BookingRequest");
 const HotelBookingRequest = require("../models/hotelBookingRequest.model");
@@ -23,6 +25,9 @@ const logger = require("../utils/logger");
 const paymentService = require("../services/payment.service");
 const BookingIntent = require("../models/BookingIntent");
 const { generateSequentialOrderId } = require("../utils/orderIdGenerator");
+const flightOrchestrationService = require("../services/booking/flightOrchestration.service");
+const { resolvePnr } = require("../utils/bookingResolver.util");
+const { resolveBookingContext } = require("../utils/activeBookingResolver.util");
 
 // @desc    Create booking request (Approval-first)
 // @route   POST /api/v1/bookings
@@ -86,6 +91,61 @@ const sanitizeFlightRequest = (flightRequest) => ({
     ? new Date(flightRequest.fareExpiry)
     : null,
 });
+
+const normalizeBookingForResponse = (booking, requestedBookingId = null) => {
+  if (!booking) return booking;
+
+  const providerResponse =
+    booking?.bookingResult?.providerResponse?.Response?.Response ||
+    booking?.bookingResult?.providerResponse?.raw?.Response?.Response ||
+    booking?.bookingResult?.providerResponse?.Response ||
+    booking?.bookingResult?.providerResponse?.raw?.Response ||
+    null;
+
+  const normalized = {
+    ...booking,
+    pnr: resolvePnr(booking),
+    amendment: booking.amendment
+      ? {
+          type: booking.amendment.type,
+          status: booking.amendment.status,
+          changeRequestId: booking.amendment.changeRequestId,
+          requestedAt: booking.updatedAt,
+          raw: booking.amendment.response || null,
+        }
+      : null,
+    amendmentHistory:
+      booking.amendmentHistory?.map((item) => ({
+        type: item.type,
+        status: item.status,
+        changeRequestId: item.changeRequestId,
+        createdAt: item.createdAt,
+      })) || [],
+    isReissued: Boolean(booking.isReissued || booking.originalBookingId),
+    reissueContext: {
+      requestedBookingId: requestedBookingId || booking._id,
+      activeBookingId: booking._id,
+      latestReissueBookingId: booking.latestReissueBookingId || null,
+      originalBookingId: booking.originalBookingId || null,
+      originalPnr:
+        booking?.servicing?.reissue?.originalPnr || resolvePnr(booking) || null,
+      activePnr: resolvePnr(booking) || null,
+    },
+  };
+
+  if (providerResponse?.FlightItinerary?.PNR && !normalized.pnr) {
+    normalized.pnr = providerResponse.FlightItinerary.PNR;
+  }
+
+  return normalized;
+};
+
+const resolveStoredTicketPath = (ticketUrl) => {
+  if (!ticketUrl || typeof ticketUrl !== "string") return null;
+  if (!ticketUrl.startsWith("/")) return null;
+  const absolutePath = path.resolve(process.cwd(), ticketUrl.replace(/^\//, ""));
+  return fs.existsSync(absolutePath) ? absolutePath : null;
+};
 
 exports.createBookingRequest = asyncHandler(async (req, res) => {
   const {
@@ -1059,6 +1119,16 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
         bookingId: bookingRequest._id,
         error: execErr.message,
       });
+      // Delete the created booking request so it is not saved in DB
+      await BookingRequest.deleteOne({ _id: bookingRequest._id });
+      // Delete the booking intent if created
+      if (intent) {
+        await BookingIntent.deleteOne({ _id: intent._id });
+      }
+      throw new ApiError(
+        400,
+        execErr.message || "Instant booking failed on TBO"
+      );
     }
   }
 
@@ -1956,8 +2026,55 @@ const findBestMatchingFlight = ({ searchResp, intent }) => {
   return matched[0];
 };
 
+const getExecutionMessage = (status) => {
+  switch (status) {
+    case "SUCCESS":
+      return "Flight booked successfully";
+    case "PROCESSING":
+      return "Flight booking is being processed";
+    case "REVALIDATED":
+      return "Flight was revalidated. Please review and confirm the updated booking";
+    case "PRICE_CHANGED":
+      return "Fare changed during revalidation. Please review the updated booking";
+    case "SSR_CHANGED":
+      return "SSR availability changed during revalidation. Please review the updated booking";
+    case "FLIGHT_UNAVAILABLE":
+      return "Flight is no longer available. Please search again";
+    case "FAILED":
+      return "Flight booking failed";
+    default:
+      return "Flight booking status fetched successfully";
+  }
+};
+
 exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
+
+  const bookingOwner = await BookingRequest.findById(bookingId).select("userId");
+  if (!bookingOwner) {
+    throw new ApiError(404, "Booking not found");
+  }
+
+  if (bookingOwner.userId.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "Not authorized to execute this booking");
+  }
+
+  const orchestrationResult = await flightOrchestrationService.processBooking({
+    bookingId,
+    actorId: req.user._id,
+    confirmPendingRevalidation: req.body?.confirmPendingRevalidation === true,
+  });
+
+  const orchestrationStatusCode =
+    orchestrationResult.status === "PROCESSING" ? 202 : 200;
+
+  return res.status(orchestrationStatusCode).json(
+    new ApiResponse(
+      orchestrationStatusCode,
+      orchestrationResult,
+      getExecutionMessage(orchestrationResult.status),
+    ),
+  );
 
   const booking = await BookingRequest.findById(bookingId);
   if (!booking) throw new ApiError(404, "Booking not found");
@@ -2097,6 +2214,25 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
   }
 });
 
+exports.getApprovedFlightBookingStatus = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+
+  const booking = await BookingRequest.findById(bookingId).select("userId");
+  if (!context?.requestedBooking) {
+    throw new ApiError(404, "Booking not found");
+  }
+
+  if (booking.userId.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "Not authorized to view this booking status");
+  }
+
+  const result = await flightOrchestrationService.getBookingLifecycle(bookingId);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result, getExecutionMessage(result.status)));
+});
+
 exports.manualTicketNonLcc = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
 
@@ -2179,22 +2315,29 @@ exports.manualTicketNonLcc = asyncHandler(async (req, res) => {
 // @access  Private (Employee)
 exports.downloadTicketPdf = asyncHandler(async (req, res) => {
   const { journeyType } = req.query;
-  const booking = await BookingRequest.findById(req.params.id);
+  const context = await resolveBookingContext(req.params.id);
 
-  if (!booking) {
+  if (!context?.requestedBooking) {
     throw new ApiError(404, "Booking not found");
   }
 
   // 🔐 ownership check
-  if (booking.userId.toString() !== req.user._id.toString()) {
+  if (context.requestedBooking.userId.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "Not authorized");
   }
+
+  const booking = context.activeBooking;
 
   if (booking.executionStatus !== "ticketed") {
     throw new ApiError(400, "Ticket not available yet");
   }
 
-  const pnr = booking.bookingResult?.pnr;
+  const storedTicketPath = resolveStoredTicketPath(booking?.documents?.ticketUrl);
+  if (storedTicketPath) {
+    return res.download(storedTicketPath);
+  }
+
+  const pnr = resolvePnr(booking);
   if (!pnr) {
     throw new ApiError(400, "PNR missing");
   }
@@ -2263,41 +2406,39 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
   ]);
 
   /* ================= TRANSFORM ================= */
-  const bookings = rawBookings.map((booking) => {
-    const providerResponse =
-      booking?.bookingResult?.providerResponse?.Response?.Response;
+  const bookingById = new Map(
+    rawBookings.map((booking) => [booking._id.toString(), booking]),
+  );
+  const latestByRoot = new Map();
 
-    const flightItinerary = providerResponse?.FlightItinerary;
-
-    /* ---------- PNR RESOLUTION ---------- */
-    let pnr = null;
-
-    if (booking.bookingResult?.pnr) {
-      pnr = booking.bookingResult.pnr;
-    } else if (booking.bookingResult?.onwardPNR) {
-      pnr = `${booking.bookingResult.onwardPNR} / ${booking.bookingResult.returnPNR}`;
-    } else if (providerResponse?.PNR) {
-      pnr = providerResponse.PNR;
-    } else if (flightItinerary?.PNR) {
-      pnr = flightItinerary.PNR;
+  rawBookings.forEach((booking) => {
+    const rootId =
+      booking.originalBookingId?.toString?.() || booking._id.toString();
+    const existing = latestByRoot.get(rootId);
+    if (!existing) {
+      latestByRoot.set(rootId, booking);
+      return;
     }
 
-    /* ---------- AMENDMENT NORMALIZATION ---------- */
-    const amendment = booking.amendment
-      ? {
-          type: booking.amendment.type,
-          status: booking.amendment.status,
-          changeRequestId: booking.amendment.changeRequestId,
-          requestedAt: booking.updatedAt,
-        }
-      : null;
-
-    return {
-      ...booking,
-      pnr,
-      amendment,
-    };
+    const existingIsActiveChild = Boolean(existing.originalBookingId);
+    const currentIsActiveChild = Boolean(booking.originalBookingId);
+    if (currentIsActiveChild && !existingIsActiveChild) {
+      latestByRoot.set(rootId, booking);
+      return;
+    }
+    if (new Date(booking.createdAt).getTime() > new Date(existing.createdAt).getTime()) {
+      latestByRoot.set(rootId, booking);
+    }
   });
+
+  const bookings = Array.from(latestByRoot.values())
+    .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))
+    .map((booking) => {
+      const originalBookingId =
+        booking.originalBookingId?.toString?.() || booking._id.toString();
+      const originalBooking = bookingById.get(originalBookingId) || booking;
+      return normalizeBookingForResponse(booking, originalBooking._id);
+    });
 
   /* ================= RESPONSE ================= */
   return res.status(200).json(
@@ -2306,7 +2447,7 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
       {
         bookings,
         pagination: {
-          total,
+          total: bookings.length,
           // page: Number(page),
           // pages: Math.ceil(total / limit),
         },
@@ -2321,55 +2462,21 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
 // @access  Private (Employee)
 
 exports.getMyBookingById = asyncHandler(async (req, res) => {
-  const booking = await BookingRequest.findById(req.params.id).lean();
+  const context = await resolveBookingContext(req.params.id, { lean: true });
 
-  if (!booking) {
+  if (!context?.requestedBooking || !context?.activeBooking) {
     throw new ApiError(404, "Booking not found");
   }
 
   // 🔐 Ownership check
-  if (booking.userId.toString() !== req.user._id.toString()) {
+  if (context.requestedBooking.userId.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "Not authorized to view this booking");
   }
 
-  /* ================= PNR RESOLUTION ================= */
-  const providerResponse =
-    booking?.bookingResult?.providerResponse?.Response?.Response;
-
-  const flightItinerary = providerResponse?.FlightItinerary;
-
-  let pnr = null;
-
-  if (booking.bookingResult?.pnr) {
-    pnr = booking.bookingResult.pnr;
-  } else if (booking.bookingResult?.onwardPNR) {
-    pnr = `${booking.bookingResult.onwardPNR} / ${booking.bookingResult.returnPNR}`;
-  } else if (providerResponse?.PNR) {
-    pnr = providerResponse.PNR;
-  } else if (flightItinerary?.PNR) {
-    pnr = flightItinerary.PNR;
-  }
-
-  booking.pnr = pnr;
-
-  /* ================= AMENDMENT NORMALIZATION ================= */
-  booking.amendment = booking.amendment
-    ? {
-        type: booking.amendment.type,
-        status: booking.amendment.status,
-        changeRequestId: booking.amendment.changeRequestId,
-        requestedAt: booking.updatedAt,
-        raw: booking.amendment.response, // full TBO response (optional)
-      }
-    : null;
-
-  booking.amendmentHistory =
-    booking.amendmentHistory?.map((item) => ({
-      type: item.type,
-      status: item.status,
-      changeRequestId: item.changeRequestId,
-      createdAt: item.createdAt,
-    })) || [];
+  const booking = normalizeBookingForResponse(
+    context.activeBooking,
+    context.requestedBooking._id,
+  );
 
   /* ================= PAYMENT LOGIC ================= */
 
@@ -2596,6 +2703,7 @@ module.exports = {
   getMyRequestById: exports.getMyRequestById,
   getMyRejectedRequests: exports.getMyRejectedRequests,
   executeApprovedFlightBooking: exports.executeApprovedFlightBooking,
+  getApprovedFlightBookingStatus: exports.getApprovedFlightBookingStatus,
   manualTicketNonLcc: exports.manualTicketNonLcc,
   downloadTicketPdf: exports.downloadTicketPdf,
   getMyBookings: exports.getMyBookings,

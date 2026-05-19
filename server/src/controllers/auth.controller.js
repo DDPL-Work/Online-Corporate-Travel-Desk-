@@ -15,6 +15,7 @@ const emailService = require("../services/email.service");
 const { notify } = require("../notifications/orchestrator");
 const EVENTS = require("../events/eventConstants");
 const { default: mongoose } = require("mongoose");
+const { normalizeOpsMemberInput } = require("../utils/opsMember.util");
 
 // Map collections to roles
 const USER_TYPES = [
@@ -131,8 +132,11 @@ exports.login = asyncHandler(async (req, res) => {
   };
 
   if (foundUser.role === "ops-member") {
+    const normalizedOpsFields = normalizeOpsMemberInput(foundUser.user.toObject());
     tokenPayload.permissions = foundUser.user.permissions;
-    tokenPayload.department = foundUser.user.department;
+    tokenPayload.department = normalizedOpsFields.department;
+    tokenPayload.designation = normalizedOpsFields.designation;
+    tokenPayload.servicingScope = normalizedOpsFields.servicingScope;
   }
 
   const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: "1d" });
@@ -146,8 +150,18 @@ exports.login = asyncHandler(async (req, res) => {
   };
 
   if (foundUser.role === "ops-member") {
+    const normalizedOpsFields = normalizeOpsMemberInput(foundUser.user.toObject());
     userResponse.permissions = foundUser.user.permissions;
-    userResponse.department = foundUser.user.department;
+    userResponse.department = normalizedOpsFields.department;
+    userResponse.designation = normalizedOpsFields.designation;
+    userResponse.servicingScope = normalizedOpsFields.servicingScope;
+  }
+
+  if (foundUser.role === "ops-member") {
+    foundUser.user.lastLoginAt = new Date();
+    foundUser.user.lastSeenAt = new Date();
+    foundUser.user.isOnline = true;
+    await foundUser.user.save();
   }
 
   // Fire-and-forget login success email (never blocks the login response)

@@ -14,6 +14,16 @@ const getStoredUser = () => {
   }
 };
 
+const getStoredRole = () => {
+  const storedRole = sessionStorage.getItem("role");
+  if (storedRole && storedRole !== "undefined" && storedRole !== "null") {
+    return storedRole;
+  }
+
+  const storedUser = getStoredUser();
+  return storedUser?.role || storedUser?.userRole || null;
+};
+
 // ---------------- LOGIN (PASSWORD) ----------------
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
@@ -36,7 +46,7 @@ const authSlice = createSlice({
   initialState: {
     loading: false,
     token: sessionStorage.getItem("token"),
-    role: sessionStorage.getItem("role"),
+    role: getStoredRole(),
     user: getStoredUser(),
     isAuthenticated: !!sessionStorage.getItem("token"),
     error: null,
@@ -46,15 +56,20 @@ const authSlice = createSlice({
     // ✅ SSO SUCCESS HANDLER
     ssoLoginSuccess: (state, action) => {
       const { token, user } = action.payload;
+      const resolvedRole = user?.role || user?.userRole || null;
 
       state.token = token;
       state.user = user;
-      state.role = user.role;
+      state.role = resolvedRole;
       state.isAuthenticated = true;
 
       sessionStorage.setItem("token", token);
       sessionStorage.setItem("user", JSON.stringify(user));
-      sessionStorage.setItem("role", user.role);
+      if (resolvedRole) {
+        sessionStorage.setItem("role", resolvedRole);
+      } else {
+        sessionStorage.removeItem("role");
+      }
     },
 
     logoutUser: (state) => {
@@ -62,7 +77,9 @@ const authSlice = createSlice({
       state.role = null;
       state.user = null;
       state.isAuthenticated = false;
-      sessionStorage.clear();
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("role");
+      sessionStorage.removeItem("user");
     },
   },
 
@@ -75,16 +92,21 @@ const authSlice = createSlice({
 
       .addCase(loginUser.fulfilled, (state, action) => {
         const { token, role, user } = action.payload;
+        const resolvedRole = role || user?.role || user?.userRole || null;
 
         state.loading = false;
         state.token = token;
-        state.role = role;
+        state.role = resolvedRole;
         state.user = user;
         state.isAuthenticated = true;
 
         sessionStorage.setItem("token", token);
-        sessionStorage.setItem("role", role);
         sessionStorage.setItem("user", JSON.stringify(user));
+        if (resolvedRole) {
+          sessionStorage.setItem("role", resolvedRole);
+        } else {
+          sessionStorage.removeItem("role");
+        }
       })
 
       .addCase(loginUser.rejected, (state, action) => {

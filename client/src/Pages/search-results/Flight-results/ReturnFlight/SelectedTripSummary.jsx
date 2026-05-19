@@ -1,6 +1,7 @@
 // SelectedTripSummary.jsx (Enhanced – MakeMyTrip Style)
 import { MdOutlineFlight } from "react-icons/md";
 import { useState } from "react";
+import Swal from "sweetalert2";
 import {
   airlineLogo,
   formatDate,
@@ -138,6 +139,7 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
               disabled={!ret || isLoadingMoreFares}
               onClick={async () => {
                 if (!ret || isLoadingMoreFares) return;
+                const newTab = window.open("/fare-upsell", "_blank");
                 setIsLoadingMoreFares(true);
                 try {
                   const isDomesticRoundTrip =
@@ -146,7 +148,10 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
 
                   // ✅ CASE 1: DOMESTIC ROUND TRIP → DUAL API
                   if (isDomesticRoundTrip) {
-                    if (!onward?.ResultIndex || !ret?.ResultIndex) return;
+                    if (!onward?.ResultIndex || !ret?.ResultIndex) {
+                      if (newTab) newTab.close();
+                      return;
+                    }
 
                     const onwardRes = await dispatch(
                       getFareUpsell({
@@ -161,6 +166,30 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                         resultIndex: ret.ResultIndex,
                       }),
                     );
+
+                    const onwardErr = onwardRes.payload?.Response;
+                    const returnErr = returnRes.payload?.Response;
+
+                    const onwardBlocked = onwardErr && (
+                      Number(onwardErr.ResponseStatus) === 2 ||
+                      (onwardErr.Error && onwardErr.Error.ErrorCode !== undefined && onwardErr.Error.ErrorCode !== 0)
+                    );
+                    const returnBlocked = returnErr && (
+                      Number(returnErr.ResponseStatus) === 2 ||
+                      (returnErr.Error && returnErr.Error.ErrorCode !== undefined && returnErr.Error.ErrorCode !== 0)
+                    );
+
+                    // If both fail or are not allowed, block navigation
+                    if (onwardBlocked && returnBlocked) {
+                      if (newTab) newTab.close();
+                      Swal.fire({
+                        title: "Fare Options",
+                        text: onwardErr?.Error?.ErrorMessage || "No extra fare options are available for this flight.",
+                        icon: "info",
+                        confirmButtonColor: "#0A203E",
+                      });
+                      return;
+                    }
 
                     localStorage.setItem(
                       "fareUpsellPayload",
@@ -183,6 +212,22 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                       }),
                     );
 
+                    const errorResponse = res.payload?.Response;
+                    const isBlocked = errorResponse && (
+                      Number(errorResponse.ResponseStatus) === 2 ||
+                      (errorResponse.Error && errorResponse.Error.ErrorCode !== undefined && errorResponse.Error.ErrorCode !== 0)
+                    );
+                    if (isBlocked) {
+                      if (newTab) newTab.close();
+                      Swal.fire({
+                        title: "Fare Options",
+                        text: errorResponse?.Error?.ErrorMessage || "No extra fare options are available for this flight.",
+                        icon: "info",
+                        confirmButtonColor: "#0A203E",
+                      });
+                      return;
+                    }
+
                     localStorage.setItem(
                       "fareUpsellPayload",
                       JSON.stringify({
@@ -192,8 +237,8 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
                       }),
                     );
                   }
-
-                  window.open("/fare-upsell", "_blank");
+                } catch (e) {
+                  if (newTab) newTab.close();
                 } finally {
                   setIsLoadingMoreFares(false);
                 }
