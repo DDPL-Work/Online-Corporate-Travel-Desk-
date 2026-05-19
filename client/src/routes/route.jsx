@@ -33,8 +33,8 @@ import MyProfile from "../components/EmployeeDashboard/MyProfile";
 import TravelDocuments from "../components/EmployeeDashboard/TravelDocuments";
 import ProfileSettings from "../Pages/Auth/ProfileSettings";
 import SSOCallback from "../Pages/Auth/SSOCallback";
-import FlightSearch from "../Pages/EmployeeDashboard/FlightSearch";
-import HotelSearchPage from "../Pages/EmployeeDashboard/HotelSearch";
+// import FlightSearch from "../Pages/EmployeeDashboard/FlightSearch";
+// import HotelSearchPage from "../Pages/EmployeeDashboard/HotelSearch";
 import FlightSearchResults from "../Pages/search-results/Flight-results/FlightSearchResults";
 import OneFlightBooking from "../Pages/Booking-Flow/Flight-Booking/OneFlightBooking";
 import RoundTripFlightBooking from "../Pages/Booking-Flow/Flight-Booking/RoundTripFlightBooking";
@@ -292,8 +292,8 @@ export const appRouter = createBrowserRouter([
                 element: <RevalidatedBookingPage />,
               },
               { path: "/update-profile", element: <ProfileSettings /> },
-              { path: "/search-flight", element: <FlightSearch /> },
-              { path: "/search-hotel", element: <HotelSearchPage /> },
+              // { path: "/search-flight", element: <FlightSearch /> },
+              // { path: "/search-hotel", element: <HotelSearchPage /> },
             ],
           },
           // SHARED SEARCH & BOOKING RESULTS (PROTECTED)

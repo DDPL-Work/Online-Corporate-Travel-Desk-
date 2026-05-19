@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { MdOutlineFlight, MdAirlineSeatReclineNormal } from "react-icons/md";
 import { BsSuitcase } from "react-icons/bs";
 import { BiSolidOffer } from "react-icons/bi";
+import Swal from "sweetalert2";
 
 import { FlightDetailsModal } from "../FlightDetailsModal";
 import {
@@ -71,6 +72,22 @@ export default function ReturnInternationalFlightCard({
 
       // ✅ STEP 3: STORE DATA
       if (res?.payload) {
+        const errorResponse = res.payload?.Response;
+        const isBlocked = errorResponse && (
+          Number(errorResponse.ResponseStatus) === 2 ||
+          (errorResponse.Error && errorResponse.Error.ErrorCode !== undefined && errorResponse.Error.ErrorCode !== 0)
+        );
+        if (isBlocked) {
+          if (newTab) newTab.close();
+          Swal.fire({
+            title: "Fare Options",
+            text: errorResponse?.Error?.ErrorMessage || "No extra fare options are available for this flight.",
+            icon: "info",
+            confirmButtonColor: "#0A203E",
+          });
+          return;
+        }
+
         localStorage.setItem(
           "fareUpsellPayload",
           JSON.stringify({
@@ -81,7 +98,9 @@ export default function ReturnInternationalFlightCard({
         );
 
         // ✅ OPTIONAL: refresh tab after data ready
-        newTab.location.reload();
+        if (newTab) newTab.location.reload();
+      } else {
+        if (newTab) newTab.close();
       }
     } finally {
       setIsLoadingMoreFares(false);
@@ -116,7 +135,7 @@ export default function ReturnInternationalFlightCard({
               <div className="text-xs text-slate-500 font-medium">
                 {airlineCode}-{flightNumber}
               </div>
-              <div className="flex gap-2 mt-1">
+              <div className="flex gap-2 mt-1 flex-wrap items-center">
                 {firstSeg?.Origin?.Airport?.Terminal && (
                   <span className="text-[10px] font-black text-[#C9A84C] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 uppercase tracking-wider">
                     T-{firstSeg.Origin.Airport.Terminal} (Dep)
@@ -125,6 +144,17 @@ export default function ReturnInternationalFlightCard({
                 {lastSeg?.Destination?.Airport?.Terminal && (
                   <span className="text-[10px] font-black text-[#C9A84C] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 uppercase tracking-wider">
                     T-{lastSeg.Destination.Airport.Terminal} (Arr)
+                  </span>
+                )}
+                {firstSeg?.NoOfSeatAvailable !== undefined && firstSeg?.NoOfSeatAvailable !== null && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border uppercase flex items-center gap-1 ${
+                    firstSeg.NoOfSeatAvailable <= 5
+                      ? "bg-red-50 text-red-700 border-red-200"
+                      : firstSeg.NoOfSeatAvailable <= 10
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  }`}>
+                    <MdAirlineSeatReclineNormal className="text-[12px]" /> {firstSeg.NoOfSeatAvailable} Seats Left
                   </span>
                 )}
               </div>

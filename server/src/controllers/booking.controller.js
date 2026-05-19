@@ -1119,6 +1119,16 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
         bookingId: bookingRequest._id,
         error: execErr.message,
       });
+      // Delete the created booking request so it is not saved in DB
+      await BookingRequest.deleteOne({ _id: bookingRequest._id });
+      // Delete the booking intent if created
+      if (intent) {
+        await BookingIntent.deleteOne({ _id: intent._id });
+      }
+      throw new ApiError(
+        400,
+        execErr.message || "Instant booking failed on TBO"
+      );
     }
   }
 

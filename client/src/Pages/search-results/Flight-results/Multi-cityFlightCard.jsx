@@ -58,10 +58,17 @@ export default function MultiCityFlightCard({
   const handleFareOptionsClick = async (resultIndex) => {
     if (!traceId || !resultIndex) return;
 
-    const res = await dispatch(getFareUpsell({ traceId, resultIndex }));
+    const newTab = window.open("/fare-upsell", "_blank");
+    try {
+      const res = await dispatch(getFareUpsell({ traceId, resultIndex }));
 
-    if (res?.payload && onOpenFareUpsell) {
-      onOpenFareUpsell(res.payload);
+      if (res?.payload && onOpenFareUpsell) {
+        onOpenFareUpsell(res.payload, newTab);
+      } else {
+        if (newTab) newTab.close();
+      }
+    } catch (e) {
+      if (newTab) newTab.close();
     }
   };
 
@@ -208,6 +215,17 @@ export default function MultiCityFlightCard({
                         <MdAirlineSeatReclineNormal className="text-[#C9A84C]" /> {travelClass}
                       </span>
                     )}
+                    {firstSegment?.NoOfSeatAvailable !== undefined && firstSegment?.NoOfSeatAvailable !== null && (
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg border uppercase ${
+                        firstSegment.NoOfSeatAvailable <= 5
+                          ? "bg-red-50 text-red-700 border-red-200"
+                          : firstSegment.NoOfSeatAvailable <= 10
+                          ? "bg-amber-50 text-amber-700 border-amber-200"
+                          : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      }`}>
+                        <MdAirlineSeatReclineNormal className="text-[14px]" /> {firstSegment.NoOfSeatAvailable} Seats Left
+                      </span>
+                    )}
                     <span className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200">
                       <BsSuitcase /> {baggage}
                     </span>
@@ -272,28 +290,37 @@ export default function MultiCityFlightCard({
                 ),
               );
 
-              navigate("/multi-city-flight/booking", {
-                state: {
-                  selectedFlight: {
-                    ResultIndex: resultIndex,
-                    Fare: fare,
-                  },
-                  rawFlightData: {
-                    Segments: segments,
-                  },
-                  searchParams: {
-                    traceId,
-                    passengers:
-                      searchPayload?.passengers || {
-                        adults: searchPayload?.adults || 1,
-                        children: searchPayload?.children || 0,
-                        infants: searchPayload?.infants || 0,
-                      },
-                  },
-                  tripType: "multi-city",
-                  isInternational,
+              const payload = {
+                selectedFlight: {
+                  ResultIndex: resultIndex,
+                  Fare: fare,
                 },
-              });
+                rawFlightData: {
+                  Segments: segments,
+                },
+                searchParams: {
+                  traceId,
+                  passengers:
+                    searchPayload?.passengers || {
+                      adults: searchPayload?.adults || 1,
+                      children: searchPayload?.children || 0,
+                      infants: searchPayload?.infants || 0,
+                    },
+                },
+                tripType: "multi-city",
+                isInternational,
+              };
+
+              localStorage.setItem("flightBookingState", JSON.stringify(payload));
+              
+              const token = sessionStorage.getItem("token");
+              if (token) {
+                localStorage.setItem("tab_sync_token", token);
+                localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
+                localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
+              }
+
+              window.open("/multi-city-flight/booking", "_blank");
             }}
             className="px-10 py-3.5 bg-[#0A203E] text-white rounded-xl font-black shadow-lg shadow-[#0A203E]/20 transition-all duration-300 hover:scale-[1.02] active:scale-95 uppercase tracking-widest text-xs"
           >

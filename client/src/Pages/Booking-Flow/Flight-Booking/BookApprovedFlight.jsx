@@ -29,6 +29,7 @@ import {
 } from "../../../utils/formatter";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
 import Swal from "sweetalert2";
+import LandingHeader from "../../../layout/LandingHeader";
 
 export default function BookApprovedFlight() {
   const { id } = useParams();
@@ -515,7 +516,7 @@ export default function BookApprovedFlight() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-10 font-sans">
-      {/* <CorporateNavbar /> */}
+      <LandingHeader />
 
       {/* 🔙 BACK BUTTON */}
       <div className="max-w-7xl mx-auto mt-4 px-4">

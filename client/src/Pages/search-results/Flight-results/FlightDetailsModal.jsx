@@ -674,6 +674,37 @@ export function FlightDetailsModal({
                 );
               })()}
 
+              {selectedFlight?.AirlineRemark && (
+                <div className="bg-[#C9A84C]/10 border border-[#C9A84C]/30 p-5 rounded-2xl flex items-start gap-3.5 shadow-sm mb-8">
+                  <div className="w-10 h-10 rounded-xl bg-[#C9A84C]/25 flex items-center justify-center text-[#0A203E] shrink-0">
+                    <AiOutlineInfoCircle size={20} className="text-[#0A203E]" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-xs font-black text-[#0A203E] uppercase tracking-widest mb-1.5">Airline Remark</h4>
+                    <div className="space-y-1.5">
+                      {selectedFlight.AirlineRemark.split(/,\s*/).map((item, idx) => {
+                        const cleanedItem = item.replace(/Segment\s*(\d+)/gi, (fullMatch, numStr) => {
+                          const segIdx = parseInt(numStr, 10);
+                          const flattenedSegs = segmentsArrays.flat();
+                          if (flattenedSegs[segIdx]) {
+                            const origin = flattenedSegs[segIdx].Origin?.Airport?.AirportCode || `Seg ${segIdx}`;
+                            const dest = flattenedSegs[segIdx].Destination?.Airport?.AirportCode || "";
+                            return dest ? `${origin} → ${dest}` : origin;
+                          }
+                          return fullMatch;
+                        });
+                        return (
+                          <div key={idx} className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] shrink-0" />
+                            <span className="text-xs text-slate-700 font-bold">{cleanedItem}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Rules Content */}
               {isFetchingRules ? (
                 <div className="flex flex-col items-center justify-center py-20 space-y-4 bg-slate-50 rounded-[3rem] border border-dashed border-slate-200">

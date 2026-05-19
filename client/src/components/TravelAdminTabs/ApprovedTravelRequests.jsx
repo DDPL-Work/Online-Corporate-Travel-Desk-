@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import {
   FiCheckCircle,
   FiClock,
@@ -204,7 +205,7 @@ function FlightApprovalsSection({ requests, refreshing, employeeOptions }) {
           </tbody>
         </table>
       </ResponsiveDataTable>
-      {selected && <PendingFlightDetailsModal booking={selected} onClose={() => setSelected(null)} />}
+      {selected && createPortal(<PendingFlightDetailsModal booking={selected} onClose={() => setSelected(null)} />, document.body)}
     </div>
   );
 }
@@ -338,7 +339,7 @@ function HotelApprovalsSection({ requests, refreshing, employeeOptions }) {
           </tbody>
         </table>
       </ResponsiveDataTable>
-      {selected && <PendingHotelDetailsModal booking={selected} onClose={() => setSelected(null)} />}
+      {selected && createPortal(<PendingHotelDetailsModal booking={selected} onClose={() => setSelected(null)} />, document.body)}
     </div>
   );
 }

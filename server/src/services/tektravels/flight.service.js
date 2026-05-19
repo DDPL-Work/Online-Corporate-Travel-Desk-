@@ -559,11 +559,11 @@ class FlightService {
     const env = this.getEnv();
 
     // 🔸 Log request
-    logger.info("TBO FARE UPSELL REQUEST", {
-      traceId,
-      resultIndex,
-      env,
-    });
+    // logger.info("TBO FARE UPSELL REQUEST", {
+    //   traceId,
+    //   resultIndex,
+    //   env,
+    // });
 
     const response = await this.postLive(
       "flightFareUpsell",
@@ -572,9 +572,9 @@ class FlightService {
     );
 
     // 🔥 FULL RAW RESPONSE LOG (MAIN DEBUG)
-    logger.info(
-      "TBO FARE UPSELL RESPONSE:\n" + JSON.stringify(response, null, 2),
-    );
+    // logger.info(
+    //   "TBO FARE UPSELL RESPONSE:\n" + JSON.stringify(response, null, 2),
+    // );
 
     // 🔥 ERROR HANDLING (IMPORTANT)
     if (response?.Response?.ResponseStatus !== 1) {

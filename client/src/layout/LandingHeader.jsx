@@ -12,7 +12,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { logoutUser } from "../Redux/Slice/authSlice";
 import { useEffect, useRef, useState } from "react";
-import { FaBars } from "react-icons/fa";
+import { FaBars, FaHotel, FaPlane } from "react-icons/fa";
 import { C } from "../components/Shared/color";
 import { toggleSidebar } from "../Redux/Slice/layoutSlice";
 
@@ -296,17 +296,42 @@ export default function LandingHeader() {
         </nav>
       )}
 
-      {/* CTA Buttons / Auth State */}
+      {isAuthenticated && (
+        <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-4">
+          <button
+            onClick={() => navigate("/travel", { state: { activeTab: "flight" } })}
+            className="group flex items-center justify-center gap-2 w-28 py-1.5 text-sm font-semibold rounded-full transition-all duration-500 ease-in-out text-[#000D26] bg-[#C9A84C] border border-[#000D26] group-hover:gap-0"
+            title="Search Flight"
+          >
+            <FaPlane size={16} className="transition-transform duration-500 ease-in-out group-hover:scale-110" />
+            <span className="transition-all duration-500 ease-in-out max-w-[100px] group-hover:max-w-0 group-hover:opacity-0 overflow-hidden whitespace-nowrap font-bold">Flight</span>
+          </button>
+          <button
+            onClick={() => navigate("/travel", { state: { activeTab: "hotel" } })}
+            className="group flex items-center justify-center gap-2 w-28 py-1.5 text-sm font-semibold rounded-full transition-all duration-500 ease-in-out text-[#000D26] bg-[#C9A84C] border border-[#000D26] group-hover:gap-0"
+            title="Search Hotel"
+          >
+            <FaHotel size={16} className="transition-transform duration-500 ease-in-out group-hover:scale-110" />
+            <span className="transition-all duration-500 ease-in-out max-w-[100px] group-hover:max-w-0 group-hover:opacity-0 overflow-hidden whitespace-nowrap font-bold">Hotel</span>
+          </button>
+        </div>
+      )}
+
       {/* CTA Buttons / Auth State */}
       <div className={`${isAuthenticated ? "flex" : "hidden md:flex"} items-center gap-4`}>
         {isAuthenticated && user ? (
           <div className="flex items-center gap-3">
-            <NotificationBell />
+            <NotificationBell onOpen={() => setProfileDropdownOpen(false)} />
 
             <div className="relative" ref={profileRef}>
               <div
                 className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer font-bold text-sm transition-all"
-                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                onClick={() => {
+                  if (!profileDropdownOpen) {
+                    window.dispatchEvent(new Event("closeNotificationBell"));
+                  }
+                  setProfileDropdownOpen(!profileDropdownOpen);
+                }}
                 style={{
                   background: GOLD,
                   color: C.navy,
@@ -331,6 +356,15 @@ export default function LandingHeader() {
                     {user?.role?.replace("-", " ")}
                   </p>
                 </div>
+                <button
+                  onClick={() => {
+                    setProfileDropdownOpen(false);
+                    navigate("/my-profile");
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2 border-b border-gray-100 cursor-pointer"
+                >
+                  <FiUser size={15} /> My Profile
+                </button>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 border-none cursor-pointer"
@@ -502,6 +536,24 @@ export default function LandingHeader() {
                 </div>
                 <NotificationBell />
               </div>
+              <button
+                onClick={() => {
+                  navigate("/travel", { state: { activeTab: "flight" } });
+                  setMobileOpen(false);
+                }}
+                className="flex items-center gap-2 px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
+              >
+                <MdOutlineFlight size={16} /> Search Flight
+              </button>
+              <button
+                onClick={() => {
+                  navigate("/travel", { state: { activeTab: "hotel" } });
+                  setMobileOpen(false);
+                }}
+                className="flex items-center gap-2 px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
+              >
+                <MdOutlineHotel size={16} /> Search Hotel
+              </button>
               <button
                 onClick={() => {
                   navigate(dashboardRoute);

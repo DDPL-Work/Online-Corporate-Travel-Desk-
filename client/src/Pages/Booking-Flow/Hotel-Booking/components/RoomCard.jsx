@@ -19,7 +19,7 @@ import {
 } from "react-icons/fa";
 import { RiRestaurant2Line } from "react-icons/ri";
 
-const RoomCard = ({ room, count, onAdd, onRemove, onSeeDetails }) => {
+const RoomCard = ({ room, count, requiredRooms, onAdd, onRemove, onSeeDetails }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [imgIndex, setImgIndex] = useState(0);
 
@@ -182,7 +182,7 @@ const RoomCard = ({ room, count, onAdd, onRemove, onSeeDetails }) => {
         </div>
 
         {/* BOOKING SECTION - Responsive */}
-        <div className="w-full lg:w-64 p-3 sm:p-4 lg:p-5 bg-slate-50/50 flex flex-col sm:flex-row lg:flex-col justify-between items-start sm:items-center lg:items-stretch gap-2 sm:gap-3 lg:gap-0">
+        <div className="w-full lg:w-64 p-3 sm:p-4 lg:p-5 bg-slate-50/50 flex flex-col sm:flex-row lg:flex-col justify-between items-start sm:items-center lg:items-stretch gap-2 sm:gap-3 lg:gap-0 lg:relative">
           {/* Price Information - Responsive */}
           <div className="flex-1 sm:flex-1 lg:flex-none space-y-0.5 sm:space-y-1 lg:space-y-1.5 w-full">
             <div className="text-[8px] sm:text-[9px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -214,21 +214,21 @@ const RoomCard = ({ room, count, onAdd, onRemove, onSeeDetails }) => {
           </div>
 
           {/* CTA Button - Responsive */}
-          <div className="w-full sm:w-auto lg:w-full">
+          <div className="w-full sm:flex-1 lg:absolute lg:bottom-5 lg:left-5 lg:w-[calc(100%-2.5rem)]">
             <div className="w-full flex items-center justify-center gap-2">
               {count > 0 ? (
                 <button
                   onClick={onRemove}
-                  className="w-full bg-green-700 text-white py-2 rounded-lg font-semibold flex items-center justify-center gap-2 cursor-pointer border-none"
+                  className="w-full bg-green-700 text-white py-3 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 cursor-pointer border-none text-xs uppercase tracking-wider"
                 >
-                  <MdCheckCircle /> SELECTED
+                  <MdCheckCircle /> SELECTED {count} {count > 1 ? "ROOMS" : "ROOM"}
                 </button>
               ) : (
                 <button
                   onClick={onAdd}
-                  className="w-full bg-[#C9A84C] text-[#0A203E] py-2 rounded-lg font-black cursor-pointer border-none"
+                  className="w-full bg-[#C9A84C] text-[#0A203E] py-3 px-4 rounded-lg font-black cursor-pointer border-none text-xs uppercase tracking-wider"
                 >
-                  ADD
+                  SELECT {requiredRooms} {requiredRooms > 1 ? "ROOMS" : "ROOM"}
                 </button>
               )}
             </div>

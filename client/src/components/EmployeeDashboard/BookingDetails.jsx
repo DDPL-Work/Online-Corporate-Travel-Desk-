@@ -2714,7 +2714,7 @@ export default function BookingDetails() {
     <div className="min-h-screen bg-gray-50">
       {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
+        <div className="w-full px-4 lg:px-10 h-14 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
@@ -2745,7 +2745,7 @@ export default function BookingDetails() {
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-5 py-8 pb-24 space-y-6">
+      <main className="w-full px-4 lg:px-10 py-8 pb-24 space-y-6">
         {/* ── Header: "Your trip is confirmed" ── */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

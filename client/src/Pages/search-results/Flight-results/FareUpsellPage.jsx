@@ -25,7 +25,7 @@ import {
   MdUpdate,
 } from "react-icons/md";
 import { BsStarFill } from "react-icons/bs";
-import { CorporateNavbar } from "../../../layout/CorporateNavbar";
+import LandingHeader from "../../../layout/LandingHeader";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n) => "₹" + Math.round(n).toLocaleString("en-IN");
@@ -240,7 +240,7 @@ function categorizeServices(servicesList = []) {
 function normalizeResults(results = [], traceId = "") {
   return results.map((r) => {
     const seg0 = r.Segments?.[0]?.[0];
-    const cabinClass = seg0?.CabinClass ?? 2;
+    const cabinClass = seg0?.CabinClass;
     const cabin = getCabinLabel(cabinClass);
 
     // Merge all services from UpsellList (deduplicated by label)
@@ -260,16 +260,15 @@ function normalizeResults(results = [], traceId = "") {
 
     // Baggage from FareBreakdown
     const seg0Baggage = r.FareBreakdown?.[0]?.SegmentDetails?.[0];
-    const checkedBagVal = seg0Baggage?.CheckedInBaggage?.Value || "0";
-    const cabinBagVal = seg0Baggage?.CabinBaggage?.Value || "0";
-    const checkedBagPieces = seg0Baggage?.CheckedInBaggage?.NoOfPiece || "1";
-    const checkedBagFreeText = seg0Baggage?.CheckedInBaggage?.FreeText || "";
+    const checkedBagVal = seg0Baggage?.CheckedInBaggage?.Value;
+    const cabinBagVal = seg0Baggage?.CabinBaggage?.Value;
+    const checkedBagPieces = seg0Baggage?.CheckedInBaggage?.NoOfPiece;
+    const checkedBagFreeText = seg0Baggage?.CheckedInBaggage?.FreeText;
 
     // Fare family name from UpsellList
     const fareFamilyName =
       r.UpsellOptionsList?.UpsellList?.[0]?.FareFamilyName ||
-      r.FareClassification?.Type ||
-      "Standard";
+      r.FareClassification?.Type;
 
     // Mini fare rules
     const miniRules = (r.MiniFareRules?.[0] || []).map((rule) => ({
@@ -286,22 +285,22 @@ function normalizeResults(results = [], traceId = "") {
       fareFamilyName,
       cabin,
       cabinClass,
-      offeredFare: r.Fare?.OfferedFare ?? 0,
-      publishedFare: r.Fare?.PublishedFare ?? 0,
-      baseFare: r.Fare?.BaseFare ?? 0,
-      tax: r.Fare?.Tax ?? 0,
+      offeredFare: r.Fare?.OfferedFare,
+      publishedFare: r.Fare?.PublishedFare,
+      baseFare: r.Fare?.BaseFare,
+      tax: r.Fare?.Tax,
       isRefundable: r.IsRefundable,
-      noOfSeats: seg0?.NoOfSeatAvailable ?? 9,
+      noOfSeats: seg0?.NoOfSeatAvailable,
       checkedBagVal,
       checkedBagPieces,
       checkedBagFreeText,
       cabinBagVal,
-      airlineRemark: r.AirlineRemark || "",
-      lastTicketDate: r.LastTicketDate || "",
+      airlineRemark: r.AirlineRemark,
+      lastTicketDate: r.LastTicketDate,
       categorizedServices,
       miniRules,
-      segments: r.Segments?.[0] || [],
-      ranking: r.SmartChoiceRanking ?? 99,
+      segments: r.Segments?.[0],
+      ranking: r.SmartChoiceRanking,
     };
   });
 }
@@ -310,8 +309,8 @@ function normalizeResults(results = [], traceId = "") {
 const CABIN_CFG = {
   Economy: {
     accent: "#0A203E",
-    accentLight: "#f8fafc",
-    accentRing: "#e2e8f0",
+    accentLight: "#f0f4f8",
+    accentRing: "#d0dbf0",
     popularBg: "from-[#0A203E] to-[#1a3a5a]",
     tabActive:
       "bg-[#0A203E] text-white border-transparent shadow-md shadow-[#0A203E]/20",
@@ -319,7 +318,7 @@ const CABIN_CFG = {
       "text-slate-500 border-slate-200 bg-white hover:text-[#0A203E] hover:bg-slate-50",
     selectBtn:
       "bg-[#0A203E] hover:bg-[#1a3a5a] text-white shadow-md shadow-[#0A203E]/20",
-    selectBtnOutline: "border-2 border-slate-200 text-slate-700 hover:bg-slate-50",
+    selectBtnOutline: "border-2 border-slate-200 text-[#0A203E] hover:bg-slate-50",
     icon: MdFlight,
   },
   "Premium Economy": {
@@ -338,32 +337,32 @@ const CABIN_CFG = {
     icon: MdAirlineSeatReclineExtra,
   },
   Business: {
-    accent: "#1e293b",
-    accentLight: "#f1f5f9",
-    accentRing: "#cbd5e1",
-    popularBg: "from-slate-800 to-slate-700",
+    accent: "#0A203E",
+    accentLight: "#f0f4f8",
+    accentRing: "#d0dbf0",
+    popularBg: "from-[#0A203E] to-[#1a3a5a]",
     tabActive:
-      "bg-slate-800 text-white border-transparent shadow-md shadow-slate-200",
+      "bg-[#0A203E] text-[#C9A84C] border-[#C9A84C]/30 shadow-md shadow-[#0A203E]/20",
     tabIdle:
-      "text-slate-500 border-slate-200 bg-white hover:text-slate-800 hover:bg-slate-50",
+      "text-slate-500 border-slate-200 bg-white hover:text-[#0A203E] hover:bg-slate-50",
     selectBtn:
-      "bg-slate-800 hover:bg-slate-900 text-white shadow-md shadow-slate-200/50",
+      "bg-[#0A203E] hover:bg-[#1a3a5a] text-[#C9A84C] shadow-md shadow-[#0A203E]/20 border border-[#C9A84C]/40",
     selectBtnOutline:
-      "border-2 border-slate-700 text-slate-700 hover:bg-slate-50",
+      "border-2 border-[#0A203E]/30 text-[#0A203E] hover:bg-slate-50",
     icon: MdWorkspacePremium,
   },
   First: {
-    accent: "#0A203E",
-    accentLight: "#f1f5f9",
-    accentRing: "#cbd5e1",
-    popularBg: "from-slate-900 to-slate-800",
+    accent: "#C9A84C",
+    accentLight: "#fcfaf4",
+    accentRing: "#f1e8d0",
+    popularBg: "from-[#C9A84C] to-[#b5953e]",
     tabActive:
-      "bg-slate-900 text-[#C9A84C] border-transparent shadow-md shadow-slate-200",
+      "bg-[#C9A84C] text-[#0A203E] border-transparent shadow-md shadow-[#C9A84C]/30",
     tabIdle:
-      "text-slate-500 border-slate-200 bg-white hover:text-slate-900 hover:bg-slate-50",
+      "text-slate-500 border-slate-200 bg-white hover:text-[#C9A84C] hover:bg-slate-50",
     selectBtn:
-      "bg-slate-900 hover:bg-black text-[#C9A84C] shadow-md shadow-slate-200/50",
-    selectBtnOutline: "border-2 border-slate-800 text-slate-800 hover:bg-slate-50",
+      "bg-[#C9A84C] hover:bg-[#b5953e] text-[#0A203E] shadow-md shadow-[#C9A84C]/30",
+    selectBtnOutline: "border-2 border-[#C9A84C] text-[#C9A84C] hover:bg-slate-50",
     icon: BsStarFill,
   },
 };
@@ -408,13 +407,13 @@ function SegmentRow({ segments }) {
   const stops = segments.length - 1;
 
   return (
-    <div className="flex items-center gap-4 bg-slate-50 rounded-2xl border border-slate-100 px-5 py-4 mt-4">
+    <div className="flex items-center gap-4 bg-white/5 rounded-2xl border border-white/10 px-5 py-4 mt-4 text-left">
       {/* Origin */}
       <div className="text-left min-w-[64px]">
-        <p className="text-xl font-bold text-slate-800 font-mono tracking-tight">
+        <p className="text-xl font-bold text-white font-mono tracking-tight">
           {fmtT(dep)}
         </p>
-        <p className="text-[11px] font-bold text-slate-500 mt-0.5">
+        <p className="text-[11px] font-bold text-slate-300 mt-0.5">
           {first.Origin?.Airport?.AirportCode}
         </p>
         <p className="text-[10px] text-slate-400">
@@ -425,18 +424,18 @@ function SegmentRow({ segments }) {
       {/* Line */}
       <div className="flex-1 flex flex-col items-center gap-1.5 px-2">
         <div className="flex items-center w-full gap-1.5">
-          <div className="flex-1 h-px bg-slate-300" />
-          <div className="size-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center shrink-0">
-            <MdFlightTakeoff size={14} className="text-slate-500" />
+          <div className="flex-1 h-px bg-white/20" />
+          <div className="size-7 rounded-full bg-white/10 border border-white/20 shadow-sm flex items-center justify-center shrink-0">
+            <MdFlightTakeoff size={14} className="text-[#C9A84C]" />
           </div>
-          <div className="flex-1 h-px bg-slate-300" />
+          <div className="flex-1 h-px bg-white/20" />
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold text-slate-500">
+          <span className="text-[10px] font-semibold text-slate-300">
             {hh}h {mm}m
           </span>
           {stops > 0 ? (
-            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-bold text-[#C9A84C] bg-[#C9A84C]/10 border border-[#C9A84C]/30 px-2 py-0.5 rounded-full">
               {stops} stop{stops > 1 ? "s" : ""} · via{" "}
               {segments
                 .slice(0, -1)
@@ -444,7 +443,7 @@ function SegmentRow({ segments }) {
                 .join(", ")}
             </span>
           ) : (
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/20 border border-emerald-800/30 px-2 py-0.5 rounded-full">
               Non-stop
             </span>
           )}
@@ -453,10 +452,10 @@ function SegmentRow({ segments }) {
 
       {/* Destination */}
       <div className="text-right min-w-[64px]">
-        <p className="text-xl font-bold text-slate-800 font-mono tracking-tight">
+        <p className="text-xl font-bold text-white font-mono tracking-tight">
           {fmtT(arr)}
         </p>
-        <p className="text-[11px] font-bold text-slate-500 mt-0.5">
+        <p className="text-[11px] font-bold text-slate-300 mt-0.5">
           {last.Destination?.Airport?.AirportCode}
         </p>
         <p className="text-[10px] text-slate-400">
@@ -466,13 +465,13 @@ function SegmentRow({ segments }) {
 
       {/* Per-leg detail */}
       {segments.length > 0 && (
-        <div className="hidden lg:flex flex-col gap-1 border-l border-slate-200 pl-4 ml-2">
+        <div className="hidden lg:flex flex-col gap-1 border-l border-white/10 pl-4 ml-2">
           {segments.map((seg, i) => (
             <div
               key={i}
               className="flex items-center gap-1.5 text-[10px] text-slate-400"
             >
-              <span className="font-semibold text-slate-600">
+              <span className="font-semibold text-slate-200">
                 {seg.Airline?.AirlineCode}
                 {seg.Airline?.FlightNumber}
               </span>
@@ -512,7 +511,7 @@ function MiniRulesBadges({ rules }) {
   );
 }
 
-function FareCard({ fare, cfg, isSelected, isPopular, onSelect, journeyTab }) {
+function FareCard({ fare, cfg, isSelected, isPopular, onSelect, journeyTab, bookingPath, bookingPayload }) {
   const [expanded, setExpanded] = useState(false);
 
   const servicesToUse =
@@ -531,42 +530,44 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, journeyTab }) {
 
   return (
     <div
-      className="relative flex flex-col rounded-2xl bg-white transition-all duration-300 overflow-hidden"
+      className={`relative flex flex-col rounded-2xl bg-white transition-all duration-300 hover:scale-[1.015] hover:shadow-xl ${
+        isSelected ? "scale-[1.01] shadow-2xl" : "shadow-md shadow-slate-100"
+      }`}
       style={{
-        border: isSelected ? `2px solid ${cfg.accent}` : "1.5px solid #e2e8f0",
+        border: isSelected ? "2.5px solid #C9A84C" : "1.5px solid #e2e8f0",
         boxShadow: isSelected
-          ? `0 0 0 4px ${cfg.accentRing}, 0 8px 24px rgba(0,0,0,0.08)`
-          : "0 1px 4px rgba(0,0,0,0.05)",
+          ? "0 12px 30px -10px rgba(199, 168, 76, 0.25), 0 0 0 1px #C9A84C"
+          : undefined,
       }}
     >
       {/* Popular banner */}
       {isPopular && (
         <div
-          className={`bg-gradient-to-r ${cfg.popularBg} text-white text-center text-[9px] font-bold tracking-[0.15em] py-1.5`}
+          className="bg-gradient-to-r from-[#0A203E] via-[#C9A84C] to-[#0A203E] text-white text-center text-[9.5px] font-black tracking-[0.18em] py-2 uppercase shadow-inner"
         >
-          ★ MOST POPULAR
+          ★ MOST POPULAR ★
         </div>
       )}
 
       {/* Accent bar */}
       {!isPopular && (
         <div
-          className="h-1 w-full"
-          style={{ background: isSelected ? cfg.accent : "#e2e8f0" }}
+          className="h-1.5 w-full"
+          style={{ background: isSelected ? "#C9A84C" : "#e2e8f0" }}
         />
       )}
 
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-slate-100">
+      <div className="px-4 pt-4 pb-3 border-b border-slate-100 text-left">
         {/* Fare family + badges */}
         <div className="flex items-start justify-between gap-2 mb-2">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
+          <div className="text-left">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400">
               {fare.cabin}
             </p>
             <p
-              className="text-[15px] font-bold mt-0.5"
-              style={{ color: isSelected ? cfg.accent : "#1e293b" }}
+              className="text-[15px] font-black mt-0.5"
+              style={{ color: isSelected ? "#C9A84C" : "#1e293b" }}
             >
               {fare.fareFamilyName}
             </p>
@@ -574,18 +575,13 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, journeyTab }) {
           <div className="flex flex-col items-end gap-1 shrink-0">
             {isSelected && (
               <span
-                className="text-[9px] px-2 py-0.5 rounded-full font-bold border"
-                style={{
-                  background: cfg.accentLight,
-                  borderColor: cfg.accentRing,
-                  color: cfg.accent,
-                }}
+                className="text-[9px] px-2 py-0.5 rounded-full font-black border bg-[#C9A84C]/10 border-[#C9A84C]/40 text-[#C9A84C]"
               >
                 ✓ Selected
               </span>
             )}
             {fare.isRefundable && (
-              <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold bg-emerald-50 border border-emerald-200 text-emerald-700">
+              <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-emerald-50 border border-emerald-200 text-emerald-700">
                 Refundable
               </span>
             )}
@@ -594,8 +590,8 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, journeyTab }) {
 
         {/* Price */}
         <p
-          className="text-[28px] font-extrabold leading-none tracking-tight"
-          style={{ color: isSelected ? cfg.accent : "#0f172a" }}
+          className="text-[28px] font-black leading-none tracking-tight"
+          style={{ color: isSelected ? "#0A203E" : "#0f172a" }}
         >
           {fmt(fare.publishedFare)}
         </p>
@@ -603,9 +599,10 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, journeyTab }) {
           per person · incl. taxes
         </p>
         {fare.offeredFare > 0 && fare.offeredFare < fare.publishedFare && (
-          <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">
+          <div className="mt-1.5 inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200/50 rounded-lg px-2.5 py-0.5 text-emerald-700 font-extrabold text-[10.5px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
             Net payable: {fmt(fare.offeredFare)}
-          </p>
+          </div>
         )}
 
         {/* Seats + included count */}
@@ -626,15 +623,15 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, journeyTab }) {
         </div>
 
         {/* Baggage summary — from FareBreakdown, always shown */}
-        <div className="mt-3 flex items-center gap-2.5 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
-          <MdLuggage size={16} className="text-slate-400 shrink-0" />
+        <div className="mt-3.5 flex items-center gap-2.5 bg-[#0a203e]/5 rounded-xl px-3.5 py-2.5 border border-dashed border-[#0a203e]/20 text-left">
+          <MdLuggage size={18} className="text-[#0a203e] shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-[10.5px] font-semibold text-slate-700">
+            <p className="text-[11px] font-extrabold text-[#0a203e]">
               Check-in: {fare.checkedBagPieces} pc × {fare.checkedBagVal} kg
               {" · "}Cabin: {fare.cabinBagVal} kg
             </p>
             {fare.checkedBagFreeText && (
-              <p className="text-[9.5px] text-slate-400 mt-0.5 leading-snug">
+              <p className="text-[9.5px] text-slate-500 mt-0.5 leading-snug">
                 {fare.checkedBagFreeText}
               </p>
             )}
@@ -719,20 +716,55 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, journeyTab }) {
 
       {/* Select button */}
       <div className="px-4 pb-4 pt-2 mt-auto">
-        <button
-          onClick={() => onSelect(fare)}
-          className={`w-full h-11 rounded-xl text-[13px] font-bold transition-all duration-150 cursor-pointer ${
-            isSelected ? cfg.selectBtn : cfg.selectBtnOutline
-          }`}
-        >
-          {isSelected ? (
-            <span className="flex items-center justify-center gap-2">
-              <MdCheck size={16} /> Selected
-            </span>
-          ) : (
-            "Select this fare"
-          )}
-        </button>
+        {bookingPath ? (
+          <a
+            href={bookingPath}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => {
+              if (bookingPayload) {
+                localStorage.setItem("flightBookingState", JSON.stringify(bookingPayload));
+                
+                const token = sessionStorage.getItem("token");
+                if (token) {
+                  localStorage.setItem("tab_sync_token", token);
+                  localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
+                  localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
+                }
+              }
+            }}
+            className={`w-full h-11 flex items-center justify-center rounded-xl text-[13px] font-black transition-all duration-150 cursor-pointer border ${
+              isSelected 
+                ? "bg-[#C9A84C] text-[#0A203E] border-[#C9A84C] hover:bg-[#b5953e] hover:scale-[1.02] shadow-md shadow-[#C9A84C]/25" 
+                : "border-2 border-[#0A203E]/20 text-[#0A203E] bg-white hover:bg-slate-50 hover:border-[#0A203E]/40"
+            }`}
+          >
+            {isSelected ? (
+              <span className="flex items-center justify-center gap-2">
+                <MdCheck size={16} /> Selected
+              </span>
+            ) : (
+              "Select this fare"
+            )}
+          </a>
+        ) : (
+          <button
+            onClick={() => onSelect(fare)}
+            className={`w-full h-11 rounded-xl text-[13px] font-black transition-all duration-150 cursor-pointer border ${
+              isSelected 
+                ? "bg-[#C9A84C] text-[#0A203E] border-[#C9A84C] hover:bg-[#b5953e] hover:scale-[1.02] shadow-md shadow-[#C9A84C]/25" 
+                : "border-2 border-[#0A203E]/20 text-[#0A203E] bg-white hover:bg-slate-50 hover:border-[#0A203E]/40"
+            }`}
+          >
+            {isSelected ? (
+              <span className="flex items-center justify-center gap-2">
+                <MdCheck size={16} /> Selected
+              </span>
+            ) : (
+              "Select this fare"
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -885,12 +917,12 @@ export default function FareUpsellPage() {
   const routeInfo = useMemo(() => {
     const first = allFares[0];
     if (!first) return {};
-    const segs = first.segments;
+    const segs = first.segments || [];
     const origin = segs[0]?.Origin?.Airport;
     const dest = segs[segs.length - 1]?.Destination?.Airport;
     const airline = segs[0]?.Airline?.AirlineName;
     const flightNos = segs
-      .map((s) => `${s.Airline?.AirlineCode}${s.Airline?.FlightNumber}`)
+      .map((s) => `${s.Airline?.AirlineCode || ""}${s.Airline?.FlightNumber || ""}`)
       .join(" + ");
     const depDate = segs[0]?.Origin?.DepTime
       ? new Date(segs[0].Origin.DepTime).toLocaleDateString("en-IN", {
@@ -920,6 +952,10 @@ export default function FareUpsellPage() {
 
   const [selectedOnwardFare, setSelectedOnwardFare] = useState(null);
   const [selectedReturnFare, setSelectedReturnFare] = useState(null);
+
+  const totalRoundTripPrice = useMemo(() => {
+    return (selectedOnwardFare?.publishedFare || 0) + (selectedReturnFare?.publishedFare || 0);
+  }, [selectedOnwardFare, selectedReturnFare]);
 
   function handleSelect(fare) {
     if (!isDomesticRT) {
@@ -958,12 +994,12 @@ export default function FareUpsellPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
-      <CorporateNavbar />
+    <div className="min-h-screen bg-slate-100/60 font-sans">
+      <LandingHeader />
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Back */}
-        <button
+        {/* <button
           onClick={() => navigate(-1)}
           className="mb-5 flex items-center gap-2 text-[13px] font-semibold text-slate-500 hover:text-slate-800 transition-colors group"
         >
@@ -971,38 +1007,38 @@ export default function FareUpsellPage() {
             <MdArrowBack size={15} />
           </span>
           Back to results
-        </button>
+        </button> */}
 
         {/* Card shell */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
           {/* ── Flight header ── */}
-          <div className="px-6 pt-6 pb-0">
-            <div className="flex flex-wrap items-start justify-between gap-4 pb-5 border-b border-slate-100">
+          <div className="px-6 py-6 bg-[#0A203E] text-white border-b border-[#0A203E]/95">
+            <div className="flex flex-wrap items-start justify-between gap-4 pb-5 border-b border-white/10">
               {/* Route */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-3">
+              <div className="text-left">
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#C9A84C] mb-3">
                   Select your fare
                 </p>
                 {routeInfo.origin && (
                   <div className="flex items-center gap-3">
-                    <div>
-                      <p className="text-3xl font-extrabold text-slate-900 font-mono tracking-tight leading-none">
+                    <div className="text-left">
+                      <p className="text-3xl font-extrabold text-white font-mono tracking-tight leading-none">
                         {routeInfo.origin.AirportCode}
                       </p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
+                      <p className="text-[11px] text-slate-300 mt-0.5">
                         {routeInfo.origin.CityName},{" "}
                         {routeInfo.origin.CountryCode}
                       </p>
                     </div>
                     <MdFlightTakeoff
                       size={20}
-                      className="text-slate-300 mx-1"
+                      className="text-[#C9A84C] mx-1 animate-pulse"
                     />
-                    <div>
-                      <p className="text-3xl font-extrabold text-slate-900 font-mono tracking-tight leading-none">
+                    <div className="text-left">
+                      <p className="text-3xl font-extrabold text-white font-mono tracking-tight leading-none">
                         {routeInfo.dest?.AirportCode}
                       </p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
+                      <p className="text-[11px] text-slate-300 mt-0.5">
                         {routeInfo.dest?.CityName},{" "}
                         {routeInfo.dest?.CountryCode}
                       </p>
@@ -1015,36 +1051,31 @@ export default function FareUpsellPage() {
               {routeInfo.origin && (
                 <div className="flex flex-wrap gap-2 pt-1">
                   {routeInfo.airline && (
-                    <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-full">
+                    <span className="text-[11px] font-semibold text-white bg-white/10 border border-white/20 px-3 py-1.5 rounded-full">
                       {routeInfo.airline}
                     </span>
                   )}
                   {routeInfo.flightNos && (
-                    <span className="text-[11px] font-mono text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-full">
+                    <span className="text-[11px] font-mono text-white bg-white/10 border border-white/20 px-3 py-1.5 rounded-full">
                       {routeInfo.flightNos}
                     </span>
                   )}
                   {routeInfo.aircraft && (
-                    <span className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full">
+                    <span className="text-[11px] text-slate-200 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
                       {routeInfo.aircraft}
                     </span>
                   )}
                   {routeInfo.depDate && (
                     <span
-                      className="text-[11px] font-bold px-3 py-1.5 rounded-full border"
-                      style={{
-                        background: cfg.accentLight,
-                        borderColor: cfg.accentRing,
-                        color: cfg.accent,
-                      }}
+                      className="text-[11px] font-black px-3 py-1.5 rounded-full border bg-[#C9A84C]/10 border-[#C9A84C]/30 text-[#C9A84C]"
                     >
                       {routeInfo.depDate}
                     </span>
                   )}
                   {lastTicketDate && (
-                    <span className="text-[11px] text-slate-400 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full">
+                    <span className="text-[11px] text-slate-300 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
                       Last ticket:{" "}
-                      <span className="font-semibold text-slate-600">
+                      <span className="font-semibold text-[#C9A84C]">
                         {lastTicketDate}
                       </span>
                     </span>
@@ -1167,6 +1198,14 @@ export default function FareUpsellPage() {
                         isPopular={globalIdx === popularIdx}
                         onSelect={handleSelect}
                         journeyTab={activeJourneyTab}
+                        bookingPath={!isDomesticRT ? (activeJourneyType === 2 ? "/round-trip-flight/booking" : "/one-way-flight/booking") : null}
+                        bookingPayload={!isDomesticRT ? {
+                          selectedFlight: fare.rawResult,
+                          rawFlightData: fare.rawResult,
+                          searchParams: { traceId, passengers: getPassengerCounts(searchPayload) },
+                          tripType: activeJourneyType === 2 ? "round-trip" : "one-way",
+                          isInternational: isInternationalFlight(fare.rawResult),
+                        } : null}
                       />
                     );
                   })}
@@ -1178,26 +1217,26 @@ export default function FareUpsellPage() {
                     <button
                       onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))}
                       disabled={!canScrollPrev}
-                      className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-5 w-9 h-9 rounded-full bg-white border border-slate-200 shadow-md flex items-center justify-center transition-all z-10 ${
+                      className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-5 w-10 h-10 rounded-full border shadow-lg flex items-center justify-center transition-all z-10 cursor-pointer ${
                         canScrollPrev
-                          ? "text-slate-600 hover:bg-slate-50 hover:shadow-lg"
-                          : "text-slate-300 cursor-not-allowed opacity-40"
+                          ? "bg-[#0A203E] border-[#0A203E] text-white hover:bg-[#1a3a5a] hover:scale-105"
+                          : "bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-40"
                       }`}
                     >
-                      <MdChevronLeft size={22} />
+                      <MdChevronLeft size={24} />
                     </button>
                     <button
                       onClick={() =>
                         setCurrentIndex((p) => Math.min(maxIndex, p + 1))
                       }
                       disabled={!canScrollNext}
-                      className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-5 w-9 h-9 rounded-full bg-white border border-slate-200 shadow-md flex items-center justify-center transition-all z-10 ${
+                      className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-5 w-10 h-10 rounded-full border shadow-lg flex items-center justify-center transition-all z-10 cursor-pointer ${
                         canScrollNext
-                          ? "text-slate-600 hover:bg-slate-50 hover:shadow-lg"
-                          : "text-slate-300 cursor-not-allowed opacity-40"
+                          ? "bg-[#0A203E] border-[#0A203E] text-white hover:bg-[#1a3a5a] hover:scale-105"
+                          : "bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-40"
                       }`}
                     >
-                      <MdChevronRight size={22} />
+                      <MdChevronRight size={24} />
                     </button>
                   </>
                 )}
@@ -1205,11 +1244,29 @@ export default function FareUpsellPage() {
             )}
 
             {isDomesticRT && (
-              <button
-                disabled={!selectedOnwardFare || !selectedReturnFare}
-                onClick={() => {
-                  navigate("/round-trip-flight/booking", {
-                    state: {
+              <div className="mt-6 p-5 bg-[#0a203e]/5 border border-[#0a203e]/10 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Combined Fare</span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-black text-[#0A203E]">
+                      {fmt(totalRoundTripPrice)}
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">for 1 traveler</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Onward: <span className="font-semibold text-slate-700">{selectedOnwardFare ? fmt(selectedOnwardFare.publishedFare) : "Not selected"}</span> · Return: <span className="font-semibold text-slate-700">{selectedReturnFare ? fmt(selectedReturnFare.publishedFare) : "Not selected"}</span>
+                  </p>
+                </div>
+                <a
+                  href={(!selectedOnwardFare || !selectedReturnFare) ? "#" : "/round-trip-flight/booking"}
+                  target={(!selectedOnwardFare || !selectedReturnFare) ? "_self" : "_blank"}
+                  rel="noreferrer"
+                  onClick={(e) => {
+                    if (!selectedOnwardFare || !selectedReturnFare) {
+                      e.preventDefault();
+                      return;
+                    }
+                    const stateObj = {
                       onward: {
                         ...selectedOnwardFare.rawResult,
                         ResultIndex: selectedOnwardFare.ResultIndex,
@@ -1220,13 +1277,25 @@ export default function FareUpsellPage() {
                       },
                       traceId,
                       journeyType: 2,
-                    },
-                  });
-                }}
-                className="w-full mt-6 h-14 bg-[#C9A84C] text-[#0A203E] font-black rounded-xl uppercase tracking-widest shadow-xl hover:brightness-110 transition-all cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
-              >
-                Continue with Selected Fares
-              </button>
+                    };
+                    localStorage.setItem("flightBookingState", JSON.stringify(stateObj));
+                    
+                    const token = sessionStorage.getItem("token");
+                    if (token) {
+                      localStorage.setItem("tab_sync_token", token);
+                      localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
+                      localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
+                    }
+                  }}
+                  className={`flex items-center justify-center px-8 h-13 font-black rounded-xl uppercase tracking-widest transition-all cursor-pointer ${
+                    (!selectedOnwardFare || !selectedReturnFare)
+                      ? "bg-slate-100 text-slate-400 shadow-none pointer-events-none"
+                      : "bg-[#C9A84C] text-[#0A203E] shadow-xl hover:bg-[#b5953e] hover:scale-[1.02]"
+                  }`}
+                >
+                  Continue with Selected Fares
+                </a>
+              </div>
             )}
           </div>
 

@@ -46,6 +46,11 @@ const flightSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    clearFareDetails: (state) => {
+      state.fareQuoteRT = { onward: null, return: null };
+      state.fareRuleRT = { onward: null, return: null };
+      state.ssrRT = { onward: {}, return: {} };
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -110,5 +115,5 @@ const flightSlice = createSlice({
   },
 });
 
-export const { resetFlights, clearError } = flightSlice.actions;
+export const { resetFlights, clearError, clearFareDetails } = flightSlice.actions;
 export default flightSlice.reducer;

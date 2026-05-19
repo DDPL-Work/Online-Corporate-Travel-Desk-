@@ -49,6 +49,7 @@ exports.getProfile = async (req, res, next) => {
       // Relations
       managerId: employeeDoc?.managerId,
       status: employeeDoc?.status || (user.isActive ? "active" : "inactive"),
+      dob: employeeDoc?.dob || null,
     };
 
     // Check for all "Manager Selection" requests for this employee (including project-specific)
@@ -143,6 +144,8 @@ exports.updateProfile = async (req, res, next) => {
       updates.designation = req.body.designation;
     if (req.body.employeeId !== undefined)
       updates.employeeCode = req.body.employeeId;
+    if (req.body.dob !== undefined)
+      updates.dob = req.body.dob ? new Date(req.body.dob) : null;
 
     if (!Object.keys(updates).length && !req.body.managerId && !req.body.email)
       return next(new ApiError(400, "No valid fields to update"));
@@ -284,6 +287,7 @@ exports.updateProfile = async (req, res, next) => {
         employeeCode: emp.employeeCode,
         department: emp.department,
         designation: emp.designation,
+        dob: emp.dob,
         manager: finalManager,
         approvalChain: {
           level1: finalManager,

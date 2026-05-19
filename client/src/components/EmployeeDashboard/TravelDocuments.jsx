@@ -138,7 +138,7 @@ export default function TravelDocuments() {
     return documents.filter(d => d.type === (activeTab === "visa" ? "visa" : activeTab));
   }, [documents, activeTab]);
 
-  const expiringCount = documents.filter((d) => getStatus(d.expiry)?.label === "Expiring Soon").length;
+
 
   return (
     <div className="min-h-screen font-sans pb-24 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
@@ -165,11 +165,6 @@ export default function TravelDocuments() {
               <div className="text-center">
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Items</p>
                   <p className="text-xl font-black">{documents.length}</p>
-              </div>
-              <div className="w-[1px] h-8 bg-white/10 mx-2" />
-              <div className="text-center">
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-60" style={{ color: C.gold }}>Soon</p>
-                  <p className="text-xl font-black" style={{ color: C.gold }}>{expiringCount}</p>
               </div>
           </div>
         </div>
@@ -211,12 +206,6 @@ export default function TravelDocuments() {
                     {activeTab === tab.id && <FiChevronRight size={16} className="text-[#003399]" />}
                   </button>
                 ))}
-              </div>
-
-              <div className="mt-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">
-                   Authorized credentials are used for <span style={{ color: C.gold }}>Instant Booking</span> verification.
-                 </p>
               </div>
             </div>
           </div>

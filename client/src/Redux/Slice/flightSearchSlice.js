@@ -29,6 +29,7 @@ const initialState = {
   bookingDetails: null,
 
   loading: false,
+  isUpsellLoading: false,
   error: null,
 };
 
@@ -43,6 +44,12 @@ const flightSlice = createSlice({
     selectFareFamily: (state, action) => {
       state.selectedFareFamily = action.payload;
     },
+    clearFareDetails: (state) => {
+      state.fareQuote = null;
+      state.fareRule = null;
+      state.ssr = null;
+      state.selectedFareFamily = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -50,6 +57,7 @@ const flightSlice = createSlice({
       /* SEARCH */
       .addCase(searchFlights.pending, (state) => {
         state.loading = true;
+        state.isUpsellLoading = false;
       })
       .addCase(searchFlights.fulfilled, (state, action) => {
         state.loading = false;
@@ -83,13 +91,16 @@ const flightSlice = createSlice({
       /* FARE UP SHELL */
       .addCase(getFareUpsell.pending, (state) => {
         state.loading = true;
+        state.isUpsellLoading = true;
       })
       .addCase(getFareUpsell.fulfilled, (state, action) => {
         state.loading = false;
+        state.isUpsellLoading = false;
         state.fareUpsell = action.payload;
       })
       .addCase(getFareUpsell.rejected, (state) => {
         state.loading = false;
+        state.isUpsellLoading = false;
       })
 
       /* BOOK */
@@ -109,6 +120,6 @@ const flightSlice = createSlice({
   },
 });
 
-export const { resetFlights, clearError, selectFareFamily } =
+export const { resetFlights, clearError, selectFareFamily, clearFareDetails } =
   flightSlice.actions;
 export default flightSlice.reducer;

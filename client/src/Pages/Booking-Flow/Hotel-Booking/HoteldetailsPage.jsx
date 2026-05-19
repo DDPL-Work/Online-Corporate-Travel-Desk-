@@ -50,17 +50,23 @@ const HotelDetailsPage = () => {
   const [selectedRoomForDetails, setSelectedRoomForDetails] = useState(null);
   const [preBookData, setPreBookData] = useState(null);
   const [loadingPreBook, setLoadingPreBook] = useState(false);
-  const hotelCode = location.state?.hotelCode;
+  const localState = useMemo(() => {
+    const localStateStr = localStorage.getItem("hotelDetailsState");
+    return localStateStr ? JSON.parse(localStateStr) : {};
+  }, []);
+  const hotelCode = location.state?.hotelCode || localState?.hotelCode;
 
-  const { hotels, hotelDetailsById, searchPayload, loading } = useSelector(
+  const { hotels, hotelDetailsById, searchPayload: reduxSearchPayload, loading } = useSelector(
     (state) => state.hotel,
   );
   const { publicBranding } = useSelector((s) => s.landingPage);
+  
+  const searchPayload = reduxSearchPayload || localState?.searchPayload;
   const requiredRooms = searchPayload?.PaxRooms?.length || 1;
 
   const hotelFromSearch = useMemo(
-    () => hotels?.find((h) => h.HotelCode === hotelCode),
-    [hotels, hotelCode],
+    () => (hotels?.find((h) => h.HotelCode === hotelCode)) || localState?.hotelFromSearch,
+    [hotels, hotelCode, localState?.hotelFromSearch],
   );
 
   useEffect(() => {
@@ -122,6 +128,7 @@ const HotelDetailsPage = () => {
         : hotelFromSearch?.Images || [],
       facilities:
         hotelFromDetails?.HotelFacilities || hotelFromSearch?.Amenities || [],
+      hotelFees: hotelDetailsById?.[hotelCode]?.hotelFees || hotelFromDetails?.hotelFees || hotelFromDetails?.HotelFees || { optional: [], mandatory: [] },
       attractions: extractAttractions(hotelFromDetails?.Description || ""),
       contact: {
         phone: hotelFromDetails?.PhoneNumber || "",
@@ -218,6 +225,7 @@ const HotelDetailsPage = () => {
         })),
         city: hotelFromSearch?.CityName,
         guestNationality: searchPayload?.GuestNationality || "",
+        traceId: localState?.traceId || location.state?.traceId || "",
       },
     };
 
@@ -329,7 +337,7 @@ const HotelDetailsPage = () => {
 
       {/* ── Hotel Header ── */}
       <div className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="">
           <HotelHeader
             name={mergedHotel.name}
             address={`${mergedHotel.address}${mergedHotel.pinCode ? `, ${mergedHotel.pinCode}` : ""}`}
@@ -384,6 +392,34 @@ const HotelDetailsPage = () => {
               contact={mergedHotel.contact}
               map={mergedHotel.map}
             />
+
+            {/* Optional Fees */}
+            {mergedHotel.hotelFees?.optional?.length > 0 && (
+              <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden p-8 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#E7C695]/10 flex items-center justify-center text-[#E7C695] shadow-sm">
+                    <FiInfo size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-none">Optional Hotel Fees</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Additional charges that may apply</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  {mergedHotel.hotelFees.optional.map((fee, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-slate-800">{fee.FeesType}</span>
+                        <span className="text-[10px] text-slate-500">{fee.ChargeType}</span>
+                      </div>
+                      <span className="text-sm font-black text-[#C9A84C]">
+                        {fee.Currency} {fee.FeesValue}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Amenities */}
             <Amenities amenities={mergedHotel.facilities} />

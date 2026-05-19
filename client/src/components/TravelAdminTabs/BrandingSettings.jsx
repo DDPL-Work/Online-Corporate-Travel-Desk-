@@ -6,39 +6,34 @@ import {
   FiType,
   FiSave,
   FiUpload,
-  FiChevronRight,
   FiDroplet,
-  FiPhone,
-  FiMail,
-  FiLifeBuoy,
   FiEdit3,
+  FiArrowRight,
+  FiRefreshCw,
 } from "react-icons/fi";
+import { FaBuilding } from "react-icons/fa";
 import { toast } from "sonner";
 import { getBrandingDetails, updateBrandingDetails } from "../../Redux/Actions/landingPageThunks";
 import { C } from "../Shared/color";
 
-const BrandingSettings = () => {
+const DEFAULTS = {
+  landingPageTitle: "Corporate Travel Desk",
+  welcomeMessage: "Welcome to our Travel Portal",
+  companyType: "Private Limited",
+};
+
+export default function BrandingSettings() {
   const dispatch = useDispatch();
   const { branding, isLoading, isUpdating } = useSelector((state) => state.landingPage);
 
   const [isEditing, setIsEditing] = useState(false);
   const fileInputRef = useRef(null);
 
-  const DEFAULTS = {
-    landingPageTitle: "Corporate Travel Desk",
-    welcomeMessage: "Welcome to our Travel Portal",
-    companyType: "Private Limited",
-    supportEmail: "support@traveldesk.com",
-    supportPhone: "+1 800 123 4567",
-  };
-
   const [formData, setFormData] = useState({
     corporateName: "",
     landingPageTitle: "",
     welcomeMessage: "",
     companyType: "",
-    supportEmail: "",
-    supportPhone: "",
     logo: null,
   });
 
@@ -57,8 +52,6 @@ const BrandingSettings = () => {
         landingPageTitle: bObj.landingPageTitle || DEFAULTS.landingPageTitle,
         welcomeMessage: bObj.welcomeMessage || DEFAULTS.welcomeMessage,
         companyType: branding.classification || DEFAULTS.companyType,
-        supportEmail: bObj.supportEmail || DEFAULTS.supportEmail,
-        supportPhone: bObj.supportPhone || DEFAULTS.supportPhone,
         logo: null,
       });
       setLogoPreview(bObj.logo?.url || null);
@@ -86,15 +79,12 @@ const BrandingSettings = () => {
 
   const toggleEdit = () => {
     if (isEditing && branding) {
-      // Revert changes on cancel
       const bObj = branding.branding || {};
       setFormData({
         corporateName: branding.corporateName || "",
         landingPageTitle: bObj.landingPageTitle || DEFAULTS.landingPageTitle,
         welcomeMessage: bObj.welcomeMessage || DEFAULTS.welcomeMessage,
         companyType: branding.classification || DEFAULTS.companyType,
-        supportEmail: bObj.supportEmail || DEFAULTS.supportEmail,
-        supportPhone: bObj.supportPhone || DEFAULTS.supportPhone,
         logo: null,
       });
       setLogoPreview(bObj.logo?.url || null);
@@ -108,8 +98,6 @@ const BrandingSettings = () => {
     data.append("landingPageTitle", formData.landingPageTitle);
     data.append("welcomeMessage", formData.welcomeMessage);
     data.append("companyType", formData.companyType);
-    data.append("supportEmail", formData.supportEmail);
-    data.append("supportPhone", formData.supportPhone);
     if (formData.logo) {
       data.append("companyLogo", formData.logo);
     }
@@ -126,270 +114,205 @@ const BrandingSettings = () => {
 
   if (isLoading && !branding) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin h-8 w-8 border-4 border-slate-200 border-t-gold rounded-full" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: C.offWhite }}>
+         <div className="flex flex-col items-center gap-4">
+            <FiRefreshCw className="animate-spin" size={32} style={{ color: C.gold }} />
+            <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: C.navy }}>Synchronizing Branding...</p>
+         </div>
       </div>
     );
   }
 
+  if (!branding) return null;
+
   return (
-    <div className="min-h-screen pb-12" style={{ background: C.offWhite }}>
-      {/* ── HEADER BAND ── */}
-      <div className="bg-white border-b shadow-sm mb-8 sticky top-0 z-30">
-        <div className="w-full px-6 py-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-black flex items-center gap-2" style={{ color: C.navy }}>
-              <FiLayout style={{ color: C.gold }} />
-              Branding & Portal Identity
-            </h1>
-            <p className="text-xs font-medium mt-1" style={{ color: C.muted }}>
-              {isEditing 
-                ? "Configure your organization's look and feel for employees." 
-                : "Manage your corporate identity and contact information."}
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            {isEditing ? (
-              <>
-                <button
-                  onClick={toggleEdit}
-                  className="px-5 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all active:scale-95 text-sm"
-                >
-                  Discard Changes
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isUpdating}
-                  className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg active:scale-95 disabled:opacity-50 text-sm"
-                  style={{ background: C.gold, color: C.navy }}
-                >
-                  {isUpdating ? (
-                    <div className="animate-spin h-4 w-4 border-2 border-navy/30 border-t-navy rounded-full" />
-                  ) : (
-                    <FiSave size={16} />
-                  )}
-                  {isUpdating ? "Saving..." : "Save Branding"}
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={toggleEdit}
-                className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg active:scale-95 text-sm"
-                style={{ background: C.navy, color: "white" }}
-              >
-                <FiEdit3 size={16} style={{ color: C.gold }} />
-                Edit Settings
-              </button>
-            )}
+    <div className="min-h-screen font-sans pb-24 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
+      {/* ── Page Header ── */}
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+             <div className="flex items-center gap-3">
+               <button onClick={() => window.history.back()} className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"><FiArrowRight className="rotate-180" size={20} /></button>
+               <div className={`p-3 rounded-xl bg-white/10 border border-white/10 ${isLoading ? "animate-spin" : ""}`}>
+                  <FiRefreshCw size={20} />
+               </div>
+             </div>
+             <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+             <div className="flex items-center gap-5">
+               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiLayout size={28} /></div>
+               <div>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Branding & Identity</h1>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Configure your organization's look and feel for employees</p>
+               </div>
+             </div>
           </div>
         </div>
       </div>
 
-      {/* ── CONTENT AREA ── */}
-      <div className="w-full px-6 space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          {/* LEFT COLUMN: Logo & Identity */}
-          <div className="lg:col-span-8 space-y-8">
-            
-            {/* Logo Card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="p-5 border-b border-slate-50 bg-slate-50/50 flex items-center gap-2">
-                <FiImage style={{ color: C.gold }} />
-                <h2 className="font-bold text-[11px] uppercase tracking-widest" style={{ color: C.navy }}>Corporate Brand Mark</h2>
-              </div>
-              <div className="p-8">
-                <div className="flex flex-col md:flex-row items-center gap-10">
-                  <div className="relative group">
-                    <div className="w-40 h-40 rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-gold/50 relative">
-                      {logoPreview ? (
-                        <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-4 transition-transform duration-500 group-hover:scale-105" />
-                      ) : (
-                        <div className="text-center p-4">
-                          <FiImage className="text-4xl text-slate-200 mx-auto" />
-                          <span className="text-[10px] font-bold text-slate-400 block mt-2 uppercase">No Logo</span>
-                        </div>
-                      )}
-                    </div>
-                    {isEditing && (
-                      <button
-                        onClick={() => fileInputRef.current.click()}
-                        className="absolute -bottom-3 -right-3 w-10 h-10 rounded-xl shadow-xl flex items-center justify-center transition-all hover:scale-110"
-                        style={{ background: C.gold, color: C.navy }}
-                      >
-                        <FiUpload size={16} />
-                      </button>
-                    )}
-                    <input type="file" ref={fileInputRef} onChange={handleLogoChange} className="hidden" accept="image/*" />
-                  </div>
-                  <div className="flex-1 text-center md:text-left">
-                    <h3 className="text-lg font-black" style={{ color: C.navy }}>Brand Identity</h3>
-                    <p className="text-sm mt-1 leading-relaxed" style={{ color: C.muted }}>
-                      Upload your organization's official logo. This will appear on all booking itineraries, the employee dashboard, and the login portal.
-                    </p>
-                    {isEditing && (
-                      <button 
-                        onClick={() => fileInputRef.current.click()}
-                        className="mt-4 inline-flex items-center gap-1.5 font-bold text-sm hover:underline"
-                        style={{ color: C.gold }}
-                      >
-                        Browse Files <FiChevronRight />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Content Card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="p-5 border-b border-slate-50 bg-slate-50/50 flex items-center gap-2">
-                <FiType style={{ color: C.gold }} />
-                <h2 className="font-bold text-[11px] uppercase tracking-widest" style={{ color: C.navy }}>Portal Personalization</h2>
-              </div>
-              <div className="p-8 space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest px-1" style={{ color: C.muted }}>Organization Name</label>
-                    {isEditing ? (
-                      <input
-                        name="corporateName"
-                        value={formData.corporateName}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-gold outline-none transition-all font-bold text-sm"
-                        placeholder="e.g. Traveamer Tech"
-                      />
-                    ) : (
-                      <p className="px-5 py-3.5 bg-slate-50/50 rounded-xl font-black text-sm border border-transparent" style={{ color: C.navy }}>
-                        {formData.corporateName || "—"}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest px-1" style={{ color: C.muted }}>Portal Display Title</label>
-                    {isEditing ? (
-                      <input
-                        name="landingPageTitle"
-                        value={formData.landingPageTitle}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-gold outline-none transition-all font-bold text-sm"
-                        placeholder="e.g. Employee Travel Hub"
-                      />
-                    ) : (
-                      <p className="px-5 py-3.5 bg-slate-50/50 rounded-xl font-black text-sm border border-transparent" style={{ color: C.navy }}>
-                        {formData.landingPageTitle || "—"}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest px-1" style={{ color: C.muted }}>Welcome Message</label>
-                  {isEditing ? (
-                    <textarea
-                      name="welcomeMessage"
-                      value={formData.welcomeMessage}
-                      onChange={handleInputChange}
-                      rows={4}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-gold outline-none transition-all font-medium text-sm leading-relaxed"
-                      placeholder="Enter a greeting for your employees..."
-                    />
+      <div className="w-full px-4 md:px-10 -mt-10">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* ── LEFT: Identity Card ── */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden sticky top-8">
+              <div className="h-24" style={{ background: `linear-gradient(to right, ${C.navy}, ${C.navyMid})` }}/>
+              <div className="px-6 pb-8 -mt-12 flex flex-col items-center text-center">
+                <div className="w-24 h-24 rounded-[2rem] bg-white border-8 border-white shadow-xl flex items-center justify-center text-2xl font-black overflow-hidden relative">
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-2" />
                   ) : (
-                    <div className="px-5 py-4 bg-slate-50/50 rounded-xl font-medium text-sm leading-relaxed border border-transparent" style={{ color: C.navy }}>
-                      {formData.welcomeMessage || <span className="italic opacity-30">No custom message set.</span>}
-                    </div>
+                    <FiImage size={32} className="text-slate-300" />
                   )}
+                  {isEditing && (
+                    <button
+                      onClick={() => fileInputRef.current.click()}
+                      className="absolute inset-0 bg-black/50 flex items-center justify-center text-white opacity-0 hover:opacity-100 transition-opacity"
+                    >
+                      <FiUpload size={20} />
+                    </button>
+                  )}
+                </div>
+                <input type="file" ref={fileInputRef} onChange={handleLogoChange} className="hidden" accept="image/*" />
+                
+                <h2 className="mt-4 text-lg font-black text-slate-800 leading-tight">
+                  {formData.corporateName || "Corporate Name"}
+                </h2>
+                <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-wider">{formData.landingPageTitle || "Portal Title"}</p>
+                
+                <div className="mt-4 w-full">
+                  <span className="inline-block text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full" style={{ color: C.navy, background: C.gold + "22" }}>
+                    {formData.companyType || "Classification"}
+                  </span>
+                </div>
+
+                <div className="mt-8 w-full border-t border-slate-100 pt-6 text-left">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black mb-1">Welcome Message</p>
+                  <p className="text-[11px] font-black text-slate-900 line-clamp-3">{formData.welcomeMessage}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Info & Support */}
-          <div className="lg:col-span-4 space-y-8">
+          {/* ── RIGHT: Content Panels ── */}
+          <div className="lg:col-span-3 space-y-8">
             
-            {/* Contact Details */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="p-5 border-b border-slate-50 bg-slate-50/50 flex items-center gap-2">
-                <FiLifeBuoy style={{ color: C.gold }} />
-                <h2 className="font-bold text-[11px] uppercase tracking-widest" style={{ color: C.navy }}>Helpdesk & Support</h2>
-              </div>
-              <div className="p-6 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest px-1 flex items-center gap-1.5" style={{ color: C.muted }}>
-                    <FiMail /> Support Email
-                  </label>
-                  {isEditing ? (
-                    <input
-                      type="email"
-                      name="supportEmail"
-                      value={formData.supportEmail}
+            {/* Portal Personalization */}
+            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl">
+               <div className="p-8 border-b border-slate-50 flex items-center justify-between rounded-t-[2rem]" style={{ background: `linear-gradient(to right, white, ${C.gold}11)` }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: C.gold + "22" }}>
+                      <FiType style={{ color: C.navy }} />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-none">Portal Personalization</h3>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Configure Display Text & Messaging</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {isEditing ? (
+                      <div className="flex gap-2">
+                         <button onClick={toggleEdit} className="px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-rose-500 transition">Cancel</button>
+                         <button 
+                          onClick={handleSubmit} 
+                          disabled={isUpdating}
+                          className="px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-[1.02] transition-all disabled:opacity-50 shadow-md" style={{ background: C.gold, color: C.navy }}
+                         >
+                          {isUpdating ? "Saving..." : "Save Changes"}
+                         </button>
+                      </div>
+                    ) : (
+                      <button onClick={toggleEdit} className="flex items-center gap-2 px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm hover:shadow-md" style={{ background: C.offWhite, color: C.navy }}>
+                        <FiEdit3 size={12} /> Edit Settings
+                      </button>
+                    )}
+                  </div>
+               </div>
+               
+               <div className="p-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                    <Field
+                      label="Organization Name"
+                      name="corporateName"
+                      value={formData.corporateName}
+                      editing={isEditing}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-gold outline-none transition-all font-bold text-sm"
+                      icon={FaBuilding}
                     />
-                  ) : (
-                    <p className="px-4 py-3 bg-slate-50/50 rounded-xl font-bold text-sm" style={{ color: C.navy }}>
-                      {formData.supportEmail || "—"}
-                    </p>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest px-1 flex items-center gap-1.5" style={{ color: C.muted }}>
-                    <FiPhone /> Helpline Number
-                  </label>
-                  {isEditing ? (
-                    <input
-                      name="supportPhone"
-                      value={formData.supportPhone}
+                    <Field
+                      label="Portal Display Title"
+                      name="landingPageTitle"
+                      value={formData.landingPageTitle}
+                      editing={isEditing}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-gold outline-none transition-all font-bold text-sm"
+                      icon={FiType}
                     />
-                  ) : (
-                    <p className="px-4 py-3 bg-slate-50/50 rounded-xl font-bold text-sm" style={{ color: C.navy }}>
-                      {formData.supportPhone || "—"}
-                    </p>
-                  )}
-                </div>
+                    <div className="md:col-span-2">
+                      <Field
+                        label="Welcome Message"
+                        name="welcomeMessage"
+                        value={formData.welcomeMessage}
+                        editing={isEditing}
+                        onChange={handleInputChange}
+                        icon={FiType}
+                        type="textarea"
+                      />
+                    </div>
+                  </div>
+               </div>
+            </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest px-1 flex items-center gap-1.5" style={{ color: C.muted }}>
-                    <FiDroplet /> Company Classification
-                  </label>
-                  {isEditing ? (
-                    <select
-                      name="companyType"
-                      value={formData.companyType}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-gold outline-none transition-all font-bold text-sm cursor-pointer appearance-none"
-                    >
-                      <option value="Private Limited">Private Limited</option>
-                      <option value="Limited">Limited</option>
-                      <option value="Proprietorship">Proprietorship</option>
-                      <option value="NGO">NGO</option>
-                      <option value="Government">Government</option>
-                    </select>
-                  ) : (
-                    <p className="px-4 py-3 bg-slate-50/50 rounded-xl font-bold text-sm" style={{ color: C.navy }}>
-                      {formData.companyType || "—"}
-                    </p>
-                  )}
+            {/* Classification */}
+            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden">
+              <div className="p-8 border-b border-slate-50 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 shadow-sm">
+                  <FiDroplet />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Corporate Classification</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Organization Type for Billing & Analytics</p>
+                </div>
+              </div>
+
+              <div className="p-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                  <div className="flex flex-col gap-2 text-left">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+                      <FiDroplet size={10} style={{ color: C.gold }} />
+                      Company Classification
+                    </label>
+                    {isEditing ? (
+                      <select
+                        name="companyType"
+                        value={formData.companyType}
+                        onChange={handleInputChange}
+                        className="w-full px-5 py-3 text-sm text-slate-900 border-1.5 rounded-[1.25rem] outline-none transition-all font-bold shadow-sm"
+                        style={{ backgroundColor: C.gold + "11", borderColor: C.gold + "44" }}
+                      >
+                        <option value="Private Limited">Private Limited</option>
+                        <option value="Limited">Limited</option>
+                        <option value="Proprietorship">Proprietorship</option>
+                        <option value="NGO">NGO</option>
+                        <option value="Government">Government</option>
+                      </select>
+                    ) : (
+                      <div className="px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all" style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
+                        {formData.companyType || "—"}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Tips Card */}
-            <div className="rounded-2xl p-6 border border-gold/20" style={{ background: `${C.gold}08` }}>
-              <h4 className="font-black text-sm mb-2" style={{ color: C.navy }}>Why Branding Matters?</h4>
-              <p className="text-xs leading-relaxed" style={{ color: C.muted }}>
+            <div className="rounded-[2rem] p-8 border border-gold/20" style={{ background: `${C.gold}08` }}>
+              <div className="flex items-center gap-3 mb-2">
+                <FiImage style={{ color: C.gold }} size={20} />
+                <h4 className="font-black text-sm uppercase tracking-widest" style={{ color: C.navy }}>Why Branding Matters?</h4>
+              </div>
+              <p className="text-xs leading-relaxed font-medium" style={{ color: C.muted }}>
                 Consistent branding builds trust within your organization. Your logo and portal title will be visible to all employees throughout their booking journey.
               </p>
-              <div className="mt-4 flex items-center gap-4">
-                <div className="flex -space-x-2">
-                  {[1,2,3].map(i => <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-slate-200" />)}
-                </div>
-                <span className="text-[10px] font-bold" style={{ color: C.navy }}>Used by 500+ Corporates</span>
-              </div>
             </div>
 
           </div>
@@ -397,6 +320,40 @@ const BrandingSettings = () => {
       </div>
     </div>
   );
-};
+}
 
-export default BrandingSettings;
+function Field({ label, name, value, editing, onChange, icon: Icon, type = "text" }) {
+  return (
+    <div className="flex flex-col gap-2 text-left">
+      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+        {Icon && <Icon size={10} style={{ color: C.gold }} />}
+        {label}
+      </label>
+      {editing ? (
+        type === "textarea" ? (
+          <textarea
+            name={name}
+            value={value || ""}
+            onChange={onChange}
+            rows={4}
+            className="w-full px-5 py-3 text-sm text-slate-900 border-1.5 rounded-[1.25rem] outline-none transition-all font-bold shadow-sm"
+            style={{ backgroundColor: C.gold + "11", borderColor: C.gold + "44" }}
+          />
+        ) : (
+          <input
+            type={type}
+            name={name}
+            value={value || ""}
+            onChange={onChange}
+            className="w-full px-5 py-3 text-sm text-slate-900 border-1.5 rounded-[1.25rem] outline-none transition-all font-bold shadow-sm"
+            style={{ backgroundColor: C.gold + "11", borderColor: C.gold + "44" }}
+          />
+        )
+      ) : (
+        <div className={`px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all ${type === "textarea" ? "items-start" : ""}`} style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
+          {value || <span className="text-slate-400 italic font-bold">Not configured</span>}
+        </div>
+      )}
+    </div>
+  );
+}
