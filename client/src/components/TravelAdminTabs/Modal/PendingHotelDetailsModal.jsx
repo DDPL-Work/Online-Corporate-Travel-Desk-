@@ -135,10 +135,23 @@ const TravellerField = ({ icon, label, value }) => (
   </div>
 );
 
-const TimelineItem = ({ title, time, status, description, active, horizontal }) => (
-  <div className={`flex ${horizontal ? "flex-col items-center text-center flex-1" : "gap-6"} relative group`}>
-    <div className={`flex ${horizontal ? "w-full items-center mb-4" : "flex-col items-center"}`}>
-      {horizontal && <div className="flex-1 h-[2px] bg-slate-100 group-first:bg-transparent" />}
+const TimelineItem = ({
+  title,
+  time,
+  status,
+  description,
+  active,
+  horizontal,
+}) => (
+  <div
+    className={`flex ${horizontal ? "flex-col items-center text-center flex-1" : "gap-6"} relative group`}
+  >
+    <div
+      className={`flex ${horizontal ? "w-full items-center mb-4" : "flex-col items-center"}`}
+    >
+      {horizontal && (
+        <div className="flex-1 h-[2px] bg-slate-100 group-first:bg-transparent" />
+      )}
       <div
         className={`w-4 h-4 rounded-full border-2 z-10 transition-all duration-300 shadow-sm shrink-0 ${
           status === "completed"
@@ -150,7 +163,9 @@ const TimelineItem = ({ title, time, status, description, active, horizontal }) 
                 : "bg-slate-200 border-[#EAE4D9]"
         }`}
       />
-      {horizontal && <div className="flex-1 h-[2px] bg-slate-100 group-last:bg-transparent" />}
+      {horizontal && (
+        <div className="flex-1 h-[2px] bg-slate-100 group-last:bg-transparent" />
+      )}
     </div>
     <div className={`${horizontal ? "px-4" : "-mt-1 pb-10"}`}>
       <p
@@ -519,8 +534,12 @@ export const PendingHotelDetailsModal = ({
                               <h4 className="text-lg font-black text-[#1A1714] tracking-tight uppercase">
                                 {r.count > 1 ? (
                                   <span className="mr-2 inline-flex items-center">
-                                    <span className="text-[#1A1714]">{r.count}</span>
-                                    <span className="text-[#C9A84C] ml-1">x</span>
+                                    <span className="text-[#1A1714]">
+                                      {r.count}
+                                    </span>
+                                    <span className="text-[#C9A84C] ml-1">
+                                      x
+                                    </span>
                                   </span>
                                 ) : (
                                   ""
@@ -610,7 +629,9 @@ export const PendingHotelDetailsModal = ({
                                 <div className="grid grid-cols-1 gap-2">
                                   {r.Supplements.map((supItem, j) => {
                                     // Handle both flat and nested structures
-                                    const sups = Array.isArray(supItem) ? supItem : [supItem];
+                                    const sups = Array.isArray(supItem)
+                                      ? supItem
+                                      : [supItem];
                                     return sups.map((sup, k) => (
                                       <div
                                         key={`${j}-${k}`}
@@ -622,20 +643,34 @@ export const PendingHotelDetailsModal = ({
                                           </div>
                                           <div>
                                             <p className="text-[11px] font-black leading-tight uppercase tracking-tight">
-                                              {sup.Type?.replace(/([A-Z])/g, " $1").trim() || "Supplement"}
+                                              {sup.Type?.replace(
+                                                /([A-Z])/g,
+                                                " $1",
+                                              ).trim() || "Supplement"}
                                             </p>
                                             <p className="text-[9px] font-bold text-blue-500/80 uppercase mt-0.5">
-                                              {sup.Description?.replace(/_/g, " ") || "Service Charge"} · {sup.ChargeType === "Fixed" ? "Fixed Fee" : "Per Person"}
+                                              {sup.Description?.replace(
+                                                /_/g,
+                                                " ",
+                                              ) || "Service Charge"}{" "}
+                                              ·{" "}
+                                              {sup.ChargeType === "Fixed"
+                                                ? "Fixed Fee"
+                                                : "Per Person"}
                                             </p>
                                           </div>
                                         </div>
                                         <div className="text-right">
                                           <p className="text-xs font-black text-blue-800">
-                                            ₹{sup.Price?.toLocaleString() || "0"}
+                                            ₹
+                                            {sup.Price?.toLocaleString() || "0"}
                                           </p>
-                                          {sup.Currency && sup.Currency !== "INR" && (
-                                            <p className="text-[8px] font-bold opacity-60 uppercase">{sup.Currency}</p>
-                                          )}
+                                          {sup.Currency &&
+                                            sup.Currency !== "INR" && (
+                                              <p className="text-[8px] font-bold opacity-60 uppercase">
+                                                {sup.Currency}
+                                              </p>
+                                            )}
                                         </div>
                                       </div>
                                     ));
@@ -1593,8 +1628,6 @@ export const PendingFlightDetailsModal = ({
                             </tfoot>
                           </table>
                         </div>
-
-                        
                       </div>
                     </div>
                   )}
@@ -1947,7 +1980,7 @@ export const PendingFlightDetailsModal = ({
                     {booking.requestStatus === "approved" ? (
                       <TimelineItem
                         horizontal
-                      title={
+                        title={
                           approver.name === "Auto Approved"
                             ? "Auto Approved"
                             : "Request Approved"
@@ -1963,7 +1996,7 @@ export const PendingFlightDetailsModal = ({
                     ) : booking.requestStatus === "rejected" ? (
                       <TimelineItem
                         horizontal
-                      title="Request Rejected"
+                        title="Request Rejected"
                         time={formatDateTime(booking.updatedAt)}
                         status="rejected"
                         description={`Request was rejected by ${approver.name}.`}
@@ -1971,7 +2004,7 @@ export const PendingFlightDetailsModal = ({
                     ) : (
                       <TimelineItem
                         horizontal
-                      title="Awaiting Review"
+                        title="Awaiting Review"
                         time="Present"
                         status="pending"
                         active={true}

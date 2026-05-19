@@ -384,6 +384,142 @@ class EmailService {
 
     return this.sendEmail({ to: email, subject, html });
   }
+
+  // -----------------------------------------------------
+  // NEW CONTACT LEAD ALERT (SENT TO SUPER ADMIN)
+  // -----------------------------------------------------
+  async sendContactLeadAlert(lead, adminEmail) {
+    const subject = `🔥 New Lead Received: ${lead.companyName}`;
+    const html = `
+      <div style="font-family: 'DM Sans', 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #051D8C 0%, #030E30 100%); padding: 35px 30px; text-align: center; border-bottom: 3px solid #C9A240;">
+          <img src="https://cotd-lyart-kappa.vercel.app/logo-traveamer.svg" alt="Traveamer Logo" style="height: 32px; width: auto; display: inline-block; vertical-align: middle;" />
+          <h2 style="color: #ffffff; margin: 15px 0 0 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px;">Super Admin Notification</h2>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 40px 35px; line-height: 1.6;">
+          <h3 style="color: #030E30; margin-top: 0; font-size: 22px; font-weight: 700; border-bottom: 2px solid #f1f5f9; padding-bottom: 15px;">
+            New Corporate Lead
+          </h3>
+          <p style="font-size: 15px; color: #475569; margin-bottom: 24px;">
+            A new business has requested onboarding information. Please review the requirements and reach out <strong>ASAP</strong>.
+          </p>
+
+          <!-- Details Card -->
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; margin-bottom: 30px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+              <tr>
+                <td style="padding: 6px 0; color: #64748b; width: 35%;"><strong>Lead Name:</strong></td>
+                <td style="padding: 6px 0; color: #334155; font-weight: 600;">${lead.fullName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #64748b;"><strong>Company Name:</strong></td>
+                <td style="padding: 6px 0; color: #334155; font-weight: 600;">${lead.companyName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #64748b;"><strong>Work Email:</strong></td>
+                <td style="padding: 6px 0; color: #334155; font-weight: 600;"><a href="mailto:${lead.workEmail}" style="color: #051D8C; text-decoration: none;">${lead.workEmail}</a></td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #64748b;"><strong>Phone Number:</strong></td>
+                <td style="padding: 6px 0; color: #334155; font-weight: 600;">+${lead.phone}</td>
+              </tr>
+              <tr>
+                <td style="padding: 12px 0 6px 0; color: #64748b; vertical-align: top;" colspan="2">
+                  <strong>Requirement / Message:</strong>
+                  <div style="margin-top: 8px; font-weight: 400; color: #475569; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; font-style: italic; white-space: pre-wrap; line-height: 1.5;">${lead.message}</div>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0 10px 0;">
+            <a href="${process.env.SUPER_ADMIN_URL || 'http://localhost:5174'}/leads"
+               style="background: linear-gradient(135deg, #051D8C 0%, #030E30 100%); color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 700; font-size: 15px; box-shadow: 0 4px 15px rgba(5, 29, 140, 0.25);">
+              Manage Lead Dashboard
+            </a>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color: #f8fafc; padding: 25px 30px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0;">
+          <p style="margin: 0;">IP Address: ${lead.ipAddress || "Unknown"} | Timestamp: ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</p>
+        </div>
+      </div>
+    `;
+    return this.sendEmail({ to: adminEmail, subject, html });
+  }
+
+  // -----------------------------------------------------
+  // LEAD CONFIRMATION EMAIL (SENT TO CLIENT/COMPANY WHO FILLED FORM)
+  // -----------------------------------------------------
+  async sendLeadConfirmation(lead) {
+    const subject = `We have received your request — ${lead.companyName}`;
+    const html = `
+      <div style="font-family: 'DM Sans', 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #051D8C 0%, #030E30 100%); padding: 35px 30px; text-align: center; border-bottom: 3px solid #C9A240;">
+          <img src="https://cotd-lyart-kappa.vercel.app/logo-traveamer.svg" alt="Traveamer Logo" style="height: 32px; width: auto; display: inline-block; vertical-align: middle;" />
+          <h2 style="color: #ffffff; margin: 15px 0 0 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px;">Corporate Onboarding</h2>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 40px 35px; line-height: 1.6;">
+          <h3 style="color: #030E30; margin-top: 0; font-size: 22px; font-weight: 700;">Hello ${lead.fullName},</h3>
+          <p style="font-size: 15px; color: #475569; margin-bottom: 24px;">
+            Thank you for reaching out to Traveamer. We have successfully received your inquiry for <strong>${lead.companyName}</strong>.
+          </p>
+
+          <p style="font-size: 15px; color: #475569; margin-bottom: 24px;">
+            Our dedicated corporate onboarding specialist is currently reviewing your details and will reach out to you <strong>ASAP</strong> to assist in setting up your corporate travel portal.
+          </p>
+
+          <!-- Details Card -->
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; margin-bottom: 30px;">
+            <h4 style="color: #030E30; margin-top: 0; margin-bottom: 15px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+              Submission Summary
+            </h4>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+              <tr>
+                <td style="padding: 6px 0; color: #64748b; width: 35%;"><strong>Contact Name:</strong></td>
+                <td style="padding: 6px 0; color: #334155; font-weight: 600;">${lead.fullName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #64748b;"><strong>Company Name:</strong></td>
+                <td style="padding: 6px 0; color: #334155; font-weight: 600;">${lead.companyName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #64748b;"><strong>Work Email:</strong></td>
+                <td style="padding: 6px 0; color: #334155; font-weight: 600;">${lead.workEmail}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #64748b;"><strong>Phone Number:</strong></td>
+                <td style="padding: 6px 0; color: #334155; font-weight: 600;">+${lead.phone}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="background-color: #fffbeb; border-left: 4px solid #C9A240; padding: 15px 20px; border-radius: 8px; margin-bottom: 30px;">
+            <p style="margin: 0; font-size: 14px; color: #713f12; font-weight: 500;">
+              ✨ <strong>What's Next?</strong> We will set up a custom sandbox environment mapped to your corporate domain so you can test flight/hotel searches with no upfront commitments.
+            </p>
+          </div>
+
+          <p style="font-size: 15px; color: #475569; margin-bottom: 5px;">Best regards,</p>
+          <p style="font-size: 15px; color: #030E30; font-weight: 700; margin-top: 0;">The Traveamer Team</p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color: #f8fafc; padding: 25px 30px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
+          <p style="margin: 0 0 8px 0;">Need immediate assistance? Email us at <a href="mailto:contact@traveamer.com" style="color: #051D8C; text-decoration: none; font-weight: 600;">contact@traveamer.com</a></p>
+          <p style="margin: 0;">&copy; ${new Date().getFullYear()} Traveamer. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+    return this.sendEmail({ to: lead.workEmail, subject, html });
+  }
 }
 
 module.exports = new EmailService();

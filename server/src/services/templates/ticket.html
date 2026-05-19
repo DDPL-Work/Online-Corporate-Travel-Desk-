@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Boarding Pass — Traveamer</title>
+    <style>
+      {{{inlineCss}}}
+    </style>
     <link rel="stylesheet" href="ticket.css" />
     <link
       href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@300;400;500;600;700&display=swap"
@@ -18,7 +21,7 @@
       <div class="top-ticket-header__meta">
         <span class="top-ticket-header__date">Ticketed Date: {{ticketedDate}}</span>
         <div class="top-ticket-header__type-group">
-          <span class="top-ticket-header__type">Flight E-ticket</span>
+          <span class="top-ticket-header__type">{{ticketTypeTitle}}</span>
           <span class="top-ticket-header__badge">{{journeyTypeLabel}}</span>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   FiAlertTriangle,
@@ -102,8 +102,9 @@ export default function RevalidatedBookingPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const handledLifecycleRef = useRef(null);
+  const params = useParams();
 
-  const bookingId = location.state?.bookingId || null;
+  const bookingId = params.id || location.state?.bookingId || null;
   const {
     selected: booking,
     revalidatedBookingContext,
@@ -149,7 +150,7 @@ export default function RevalidatedBookingPage() {
     }
 
     const navigateToLatestBooking = (payload = {}) => {
-      navigate("/booking", {
+      navigate(`/bookings/${bookingId}/revalidated`, {
         replace: true,
         state: {
           bookingId,
@@ -179,6 +180,18 @@ export default function RevalidatedBookingPage() {
         case "ssr_changed":
           handledLifecycleRef.current = bookingLifecycle.updatedAt;
           navigateToLatestBooking(bookingLifecycle.payload);
+          break;
+
+        case "flight_unavailable":
+          handledLifecycleRef.current = bookingLifecycle.updatedAt;
+          await Swal.fire({
+            icon: "warning",
+            title: "Flight Unavailable",
+            text:
+              bookingLifecycle.message ||
+              "This itinerary is no longer available. Please start a new search.",
+            confirmButtonColor: "#0A4D68",
+          });
           break;
 
         case "failed":
@@ -225,6 +238,8 @@ export default function RevalidatedBookingPage() {
     booking?.orchestration?.pendingRevalidation?.notifications ||
     [];
   const isProcessing = bookingLifecycle.state === "processing";
+  const isFlightUnavailable =
+    status === "FLIGHT_UNAVAILABLE" || bookingLifecycle.state === "flight_unavailable";
 
   const groupedSegments = useMemo(
     () => {
@@ -238,6 +253,25 @@ export default function RevalidatedBookingPage() {
     },
     [bookingContext],
   );
+
+  const handleDuplicateBookingError = async (error) => {
+    const existingBookingId = error?.data?.existingBookingId;
+
+    const result = await Swal.fire({
+      icon: "info",
+      title: "Confirmed Booking Exists",
+      text: "You already have a confirmed booking for this flight.",
+      showCancelButton: true,
+      confirmButtonText: existingBookingId ? "View Booking" : "OK",
+      cancelButtonText: "Stay Here",
+      confirmButtonColor: "#0A4D68",
+      cancelButtonColor: "#64748B",
+    });
+
+    if (result.isConfirmed && existingBookingId) {
+      navigate(`/my-booking/${existingBookingId}`, { replace: true });
+    }
+  };
 
   const handleConfirmBooking = async () => {
     if (!bookingId) {
@@ -259,15 +293,54 @@ export default function RevalidatedBookingPage() {
           confirmPendingRevalidation: true,
         }),
       ).unwrap();
-    } catch {
-      return undefined;
+    } catch (error) {
+      if (error?.code === "DUPLICATE_CONFIRMED_BOOKING") {
+        await handleDuplicateBookingError(error);
+        return;
+      }
+
+      await Swal.fire({
+        icon: "error",
+        title: "Booking Failed",
+        text:
+          (typeof error === "string" ? error : error?.message) ||
+          "Unable to confirm the revalidated booking.",
+        confirmButtonColor: "#DC2626",
+      });
     }
   };
 
-  if (loading && !bookingContext) {
+  if ((loading || isProcessing) && !bookingContext) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-50">
-        <div className="h-12 w-12 border-4 border-[#0A4D68]/30 border-t-[#0A4D68] rounded-full animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center max-w-lg">
+          <div className="mx-auto h-12 w-12 border-4 border-[#0A4D68]/30 border-t-[#0A4D68] rounded-full animate-spin" />
+          <h1 className="mt-5 text-2xl font-semibold text-[#0A4D68]">Processing Booking</h1>
+          <p className="mt-3 text-sm text-gray-600">
+            We are waiting for the supplier to finish the booking attempt. Please keep this
+            page open for the latest status.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!bookingContext && isFlightUnavailable) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center max-w-lg">
+          <h1 className="text-2xl font-semibold text-[#0A4D68]">Flight Unavailable</h1>
+          <p className="mt-3 text-sm text-gray-600">
+            This itinerary could not be reconstructed from the supplier. Please start a new
+            flight search from your pending approvals.
+          </p>
+          <button
+            onClick={() => navigate("/my-pending-approvals", { replace: true })}
+            className="mt-6 px-4 py-2 rounded-lg bg-[#0A4D68] text-white font-medium"
+          >
+            Back to Pending Approvals
+          </button>
+        </div>
       </div>
     );
   }

@@ -33,12 +33,13 @@ import MyProfile from "../components/EmployeeDashboard/MyProfile";
 import TravelDocuments from "../components/EmployeeDashboard/TravelDocuments";
 import ProfileSettings from "../Pages/Auth/ProfileSettings";
 import SSOCallback from "../Pages/Auth/SSOCallback";
-import FlightSearch from "../Pages/EmployeeDashboard/FlightSearch";
-import HotelSearchPage from "../Pages/EmployeeDashboard/HotelSearch";
+// import FlightSearch from "../Pages/EmployeeDashboard/FlightSearch";
+// import HotelSearchPage from "../Pages/EmployeeDashboard/HotelSearch";
 import FlightSearchResults from "../Pages/search-results/Flight-results/FlightSearchResults";
 import OneFlightBooking from "../Pages/Booking-Flow/Flight-Booking/OneFlightBooking";
 import RoundTripFlightBooking from "../Pages/Booking-Flow/Flight-Booking/RoundTripFlightBooking";
 import BookApprovedFlight from "../Pages/Booking-Flow/Flight-Booking/BookApprovedFlight";
+import RevalidatedBookingPage from "../Pages/Booking-Flow/Flight-Booking/RevalidatedBookingPage";
 import BookingDetails from "../components/EmployeeDashboard/BookingDetails";
 import MultiCityFlightBooking from "../Pages/Booking-Flow/Flight-Booking/MultiWayFlightBooking";
 import FareUpsellPage from "../Pages/search-results/Flight-results/FareUpsellPage";
@@ -286,9 +287,13 @@ export const appRouter = createBrowserRouter([
               { path: "/my-profile", element: <MyProfile /> },
               { path: "/travel-documents", element: <TravelDocuments /> },
               { path: "/bookings/:id/book", element: <BookApprovedFlight /> },
+              {
+                path: "/bookings/:id/revalidated",
+                element: <RevalidatedBookingPage />,
+              },
               { path: "/update-profile", element: <ProfileSettings /> },
-              { path: "/search-flight", element: <FlightSearch /> },
-              { path: "/search-hotel", element: <HotelSearchPage /> },
+              // { path: "/search-flight", element: <FlightSearch /> },
+              // { path: "/search-hotel", element: <HotelSearchPage /> },
             ],
           },
           // SHARED SEARCH & BOOKING RESULTS (PROTECTED)

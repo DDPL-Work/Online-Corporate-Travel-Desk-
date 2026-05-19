@@ -407,10 +407,10 @@ export function FlightDetailsModal({
   const cabinClassLabel = getCabinClassLabel(selectedFlight?.Fare?.CabinClass);
 
   return (
-    <div className="fixed inset-0 bg-[#0A203E]/75 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+    <div className="fixed inset-0 bg-[#0A203E]/75 backdrop-blur-sm flex items-center justify-center z-[100] sm:p-4">
+      <div className="bg-white sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto max-h-[100dvh] sm:max-h-[90vh] lg:max-w-5xl flex flex-col overflow-hidden border border-slate-200">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-[#0A203E]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-[#0A203E] shrink-0">
           <div className="flex items-center gap-4">
             {/* Airline Logo */}
             {airlineCode && (
@@ -470,7 +470,7 @@ export function FlightDetailsModal({
         </div>
 
         {/* Tab Navigation */}
-        <div className="bg-slate-50/50 px-8 border-b border-slate-100">
+        <div className="bg-slate-50/50 px-8 border-b border-slate-100 shrink-0 overflow-x-auto custom-scrollbar">
           <div className="flex gap-8">
             {[
               { id: "flight", label: "Flight Details", icon: <FaPlane /> },
@@ -505,7 +505,7 @@ export function FlightDetailsModal({
         </div>
 
         {/* Modal Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50 custom-scrollbar min-h-0 relative">
           {activeTab === "flight" && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {segmentsArrays.map((segments, legIdx) => (
@@ -590,26 +590,27 @@ export function FlightDetailsModal({
               {/* Quick Info Grid — all values from real data */}
               {(() => {
                 const seg = segmentsArrays[0]?.[0];
-                const checkInBaggage =
-                  seg?.Baggage || selectedFlight?.Fare?.Baggage?.iB;
-                const cabinBaggage =
-                  seg?.CabinBaggage ||
-                  selectedFlight?.Fare?.Baggage?.cB ||
-                  "7 Kg";
-                const fareClass = seg?.Airline?.FareClass;
+                const checkInBaggage = seg?.Baggage || selectedFlight?.Fare?.Baggage?.iB;
+                const cabinBaggage = seg?.CabinBaggage || selectedFlight?.Fare?.Baggage?.cB || "7 Kg";
+
+                // FareInclusions from result level (TBO NDC / supplier-direct fares)
+                const inclObj =
+                  selectedFlight?.FareInclusions ||
+                  selectedFlight?.Fare?.FareInclusions ||
+                  seg?.FareInclusions ||
+                  null;
+                const mealIncluded =
+                  inclObj?.MealIncluded === true ||
+                  inclObj?.Meal === true ||
+                  (inclObj?.Meal && typeof inclObj.Meal === "string" && inclObj.Meal !== "No Meal");
+                const seatIncluded = inclObj?.SeatIncluded === true || inclObj?.Seat === true;
 
                 const infoCards = [
                   {
                     label: "Refund Status",
                     value: isRefundable ? "Refundable" : "Non-Refundable",
-                    valueClass: isRefundable
-                      ? "text-emerald-600"
-                      : "text-red-500",
-                    icon: (
-                      <FaPlane
-                        className={`${isRefundable ? "text-emerald-500" : "text-red-500"} rotate-180`}
-                      />
-                    ),
+                    valueClass: isRefundable ? "text-emerald-600" : "text-red-500",
+                    icon: <FaPlane className={`${isRefundable ? "text-emerald-500" : "text-red-500"} rotate-180`} />,
                     iconBg: isRefundable ? "bg-emerald-50" : "bg-red-50",
                     show: true,
                   },
@@ -629,37 +630,41 @@ export function FlightDetailsModal({
                     iconBg: "bg-blue-50",
                     show: !!cabinBaggage,
                   },
-                  // {
-                  //   label: "Fare Class",
-                  //   value: fareClass,
-                  //   valueClass: "text-[#C9A84C]",
-                  //   icon: <BiSolidOffer className="text-[#C9A84C]" />,
-                  //   iconBg: "bg-[#C9A84C]/10",
-                  //   show: !!fareClass,
-                  // },
+                  {
+                    label: "Meal Service",
+                    value: mealIncluded ? "Included" : "Not Included",
+                    valueClass: mealIncluded ? "text-emerald-600" : "text-slate-500",
+                    icon: <FiCheckCircle className={mealIncluded ? "text-emerald-500" : "text-slate-400"} />,
+                    iconBg: mealIncluded ? "bg-emerald-50" : "bg-slate-50",
+                    show: inclObj !== null,
+                  },
+                  {
+                    label: "Seat Selection",
+                    value: seatIncluded ? "Included" : "Standard",
+                    valueClass: seatIncluded ? "text-emerald-600" : "text-slate-500",
+                    icon: <FiCheckCircle className={seatIncluded ? "text-emerald-500" : "text-slate-400"} />,
+                    iconBg: seatIncluded ? "bg-emerald-50" : "bg-slate-50",
+                    show: inclObj !== null,
+                  },
                 ].filter((c) => c.show);
 
+                const cols = infoCards.length >= 4 ? "md:grid-cols-4" : infoCards.length >= 3 ? "md:grid-cols-3" : infoCards.length === 2 ? "md:grid-cols-2" : "md:grid-cols-1";
+
                 return (
-                  <div
-                    className={`grid grid-cols-1 gap-4 mb-8 ${infoCards.length >= 3 ? "md:grid-cols-3" : infoCards.length === 2 ? "md:grid-cols-2" : "md:grid-cols-1"}`}
-                  >
+                  <div className={`grid grid-cols-2 gap-3 mb-8 ${cols}`}>
                     {infoCards.map((card, i) => (
                       <div
                         key={i}
                         className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3"
                       >
-                        <div
-                          className={`w-9 h-9 rounded-lg ${card.iconBg} flex items-center justify-center shrink-0`}
-                        >
+                        <div className={`w-9 h-9 rounded-lg ${card.iconBg} flex items-center justify-center shrink-0`}>
                           {card.icon}
                         </div>
                         <div>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                             {card.label}
                           </p>
-                          <p
-                            className={`text-xs font-black uppercase mt-0.5 ${card.valueClass}`}
-                          >
+                          <p className={`text-xs font-black uppercase mt-0.5 ${card.valueClass}`}>
                             {card.value}
                           </p>
                         </div>
@@ -668,6 +673,37 @@ export function FlightDetailsModal({
                   </div>
                 );
               })()}
+
+              {selectedFlight?.AirlineRemark && (
+                <div className="bg-[#C9A84C]/10 border border-[#C9A84C]/30 p-5 rounded-2xl flex items-start gap-3.5 shadow-sm mb-8">
+                  <div className="w-10 h-10 rounded-xl bg-[#C9A84C]/25 flex items-center justify-center text-[#0A203E] shrink-0">
+                    <AiOutlineInfoCircle size={20} className="text-[#0A203E]" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-xs font-black text-[#0A203E] uppercase tracking-widest mb-1.5">Airline Remark</h4>
+                    <div className="space-y-1.5">
+                      {selectedFlight.AirlineRemark.split(/,\s*/).map((item, idx) => {
+                        const cleanedItem = item.replace(/Segment\s*(\d+)/gi, (fullMatch, numStr) => {
+                          const segIdx = parseInt(numStr, 10);
+                          const flattenedSegs = segmentsArrays.flat();
+                          if (flattenedSegs[segIdx]) {
+                            const origin = flattenedSegs[segIdx].Origin?.Airport?.AirportCode || `Seg ${segIdx}`;
+                            const dest = flattenedSegs[segIdx].Destination?.Airport?.AirportCode || "";
+                            return dest ? `${origin} → ${dest}` : origin;
+                          }
+                          return fullMatch;
+                        });
+                        return (
+                          <div key={idx} className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] shrink-0" />
+                            <span className="text-xs text-slate-700 font-bold">{cleanedItem}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Rules Content */}
               {isFetchingRules ? (
@@ -867,7 +903,7 @@ export function FlightDetailsModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-8 py-6 border-t border-slate-100 bg-white flex justify-between items-center shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+        <div className="px-6 py-4 sm:px-8 sm:py-6 border-t border-slate-100 bg-white flex justify-between items-center shadow-[0_-10px_20px_rgba(0,0,0,0.02)] shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
               Summary:

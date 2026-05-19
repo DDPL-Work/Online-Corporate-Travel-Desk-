@@ -1,8 +1,9 @@
 // FlightSegment.jsx (Updated MakeMyTrip Style)
 import { FaPlane, FaSuitcase } from "react-icons/fa";
+import { MdAirlineSeatReclineNormal } from "react-icons/md";
 import { formatDuration, formatStops, formatTime, getCabinClassLabel } from "../../../../utils/formatter";
 
-export const FlightSegment = ({ data, label, fare, selected }) => (
+export const FlightSegment = ({ data, label, fare, selected, noOfSeatAvailable }) => (
   <div className="flex flex-col w-full">
     {/* Main Flight Info Row */}
     <div className="flex items-center justify-between gap-4">
@@ -92,10 +93,21 @@ export const FlightSegment = ({ data, label, fare, selected }) => (
     </div>
 
     {/* Bottom Tags Row */}
-    <div className="flex items-center gap-2 mt-3 pt-3">
+    <div className="flex items-center gap-2 mt-3 pt-3 flex-wrap">
       {data.cabinClassCode && (
         <span className="inline-flex items-center text-[10px] text-gray-600 bg-white border border-gray-200 px-2 py-0.5 rounded font-medium shadow-sm">
           {getCabinClassLabel(data.cabinClassCode)}
+        </span>
+      )}
+      {noOfSeatAvailable !== undefined && noOfSeatAvailable !== null && (
+        <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-bold shadow-sm border uppercase ${
+          noOfSeatAvailable <= 5
+            ? "bg-red-50 text-red-700 border-red-200"
+            : noOfSeatAvailable <= 10
+            ? "bg-amber-50 text-amber-700 border-amber-200"
+            : "bg-emerald-50 text-emerald-700 border-emerald-200"
+        }`}>
+          <MdAirlineSeatReclineNormal className="text-[12px]" /> {noOfSeatAvailable} Seats Left
         </span>
       )}
       <span className="inline-flex items-center gap-1.5 text-[10px] text-gray-600 bg-white border border-gray-200 px-2 py-0.5 rounded font-medium shadow-sm">

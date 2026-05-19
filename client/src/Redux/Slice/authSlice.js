@@ -4,6 +4,19 @@ import axios from "axios";
 const API_URL = import.meta.env.VITE_API_BASE_URL;
 
 // ---------------- SAFE PARSER ----------------
+
+// Allow new tabs opened via target="_blank" to inherit session
+if (!sessionStorage.getItem("token") && localStorage.getItem("tab_sync_token")) {
+  sessionStorage.setItem("token", localStorage.getItem("tab_sync_token"));
+  sessionStorage.setItem("role", localStorage.getItem("tab_sync_role"));
+  sessionStorage.setItem("user", localStorage.getItem("tab_sync_user"));
+  
+  // Clean up so it doesn't linger
+  localStorage.removeItem("tab_sync_token");
+  localStorage.removeItem("tab_sync_role");
+  localStorage.removeItem("tab_sync_user");
+}
+
 const getStoredUser = () => {
   try {
     const raw = sessionStorage.getItem("user");

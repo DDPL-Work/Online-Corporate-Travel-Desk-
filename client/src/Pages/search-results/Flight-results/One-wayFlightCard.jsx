@@ -143,6 +143,7 @@ export default function OneWayFlightCard({
   const handleFareOptionsClick = async () => {
     if (selectedResultIndex == null || isLoadingMoreFares) return;
     
+    const newTab = window.open("/fare-upsell", "_blank");
     setIsLoadingMoreFares(true);
     try {
       const res = await dispatch(
@@ -152,8 +153,12 @@ export default function OneWayFlightCard({
         }),
       );
       if (res?.payload && typeof onOpenFareUpsell === "function") {
-        onOpenFareUpsell(res.payload);
+        onOpenFareUpsell(res.payload, newTab);
+      } else {
+        if (newTab) newTab.close();
       }
+    } catch (e) {
+      if (newTab) newTab.close();
     } finally {
       setIsLoadingMoreFares(false);
     }
@@ -243,11 +248,24 @@ export default function OneWayFlightCard({
                 </div>
               </div>
 
-               {travelClass && (
-                  <span className="mb-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 uppercase">
-                    <MdAirlineSeatReclineNormal className="text-[#C9A84C]" /> {travelClass}
-                  </span>
-                )}
+               <div className="flex flex-wrap gap-2 items-center">
+                 {travelClass && (
+                    <span className="mb-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 uppercase">
+                      <MdAirlineSeatReclineNormal className="text-[#C9A84C]" /> {travelClass}
+                    </span>
+                  )}
+                 {firstSegment?.NoOfSeatAvailable !== undefined && firstSegment?.NoOfSeatAvailable !== null && (
+                    <span className={`mb-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border uppercase ${
+                      firstSegment.NoOfSeatAvailable <= 5
+                        ? "bg-red-50 text-red-700 border-red-200"
+                        : firstSegment.NoOfSeatAvailable <= 10
+                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    }`}>
+                      <MdAirlineSeatReclineNormal className="text-[14px]" /> {firstSegment.NoOfSeatAvailable} Seats Left
+                    </span>
+                  )}
+               </div>
 
               {/* <div className="flex flex-col text-center sm:text-right bg-gray-200 rounded-xl p-2">
                 <div className="flex items-baseline justify-center sm:justify-start gap-2">
@@ -418,15 +436,24 @@ export default function OneWayFlightCard({
                           s.Origin.Airport.CountryCode !==
                             s.Destination.Airport.CountryCode,
                       );
-                      navigate("/one-way-flight/booking", {
-                        state: {
-                          selectedFlight,
-                          rawFlightData: selectedFlight,
-                          searchParams: { traceId, passengers },
-                          tripType: "one-way",
-                          isInternational,
-                        },
-                      });
+                      const payload = {
+                        selectedFlight,
+                        rawFlightData: selectedFlight,
+                        searchParams: { traceId, passengers },
+                        tripType: "one-way",
+                        isInternational,
+                      };
+                      
+                      localStorage.setItem("flightBookingState", JSON.stringify(payload));
+                      
+                      const token = sessionStorage.getItem("token");
+                      if (token) {
+                        localStorage.setItem("tab_sync_token", token);
+                        localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
+                        localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
+                      }
+                      
+                      window.open("/one-way-flight/booking", "_blank");
                     }}
                     className="relative group px-8 py-3 bg-[#0A203E] text-white rounded-xl font-black shadow-lg shadow-[#0A203E]/20 transition-all duration-300 hover:scale-[1.02] active:scale-95 uppercase tracking-widest text-xs"
                   >

@@ -505,6 +505,17 @@ async function generateFlightTicketPdfKit({
 
       const downloadDate = fmtLong(new Date());
       const bookingDate = fmtShort(booking.createdAt);
+      const reissueMeta = booking?.reissueMeta || null;
+      const generatedAtText = reissueMeta?.generatedAt
+        ? new Date(reissueMeta.generatedAt).toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          })
+        : null;
 
       // const fareBreakup =
       //   booking.bookingResult?.providerResponse?.Response?.Response
@@ -583,7 +594,7 @@ async function generateFlightTicketPdfKit({
         .font("Helvetica-Bold")
         .fontSize(9.5)
         .fillColor(C.primary)
-        .text("Flight E-Ticket", rightX, Y, {
+        .text(reissueMeta?.headerTitle || "Flight E-Ticket", rightX, Y, {
           width: rightW,
           align: "right",
           lineBreak: false,
@@ -594,10 +605,13 @@ async function generateFlightTicketPdfKit({
         .fontSize(8)
         .fillColor(C.muted)
         .text(
-          " (One way)",
+          reissueMeta?.isReissued ? " (Reissued ticket)" : " (One way)",
           rightX +
             rightW -
-            doc.font("Helvetica").fontSize(8).widthOfString(" (One way)"),
+            doc
+              .font("Helvetica")
+              .fontSize(8)
+              .widthOfString(reissueMeta?.isReissued ? " (Reissued ticket)" : " (One way)"),
           Y - 7,
           { lineBreak: false },
         );
@@ -628,7 +642,38 @@ async function generateFlightTicketPdfKit({
           Y + 16,
         );
 
-      Y += 34;
+      if (reissueMeta?.isReissued) {
+        doc
+          .font("Helvetica")
+          .fontSize(7.5)
+          .fillColor(C.muted)
+          .text(
+            `Original PNR: ${reissueMeta.originalPnr || pnr}   Reissued On: ${generatedAtText || downloadDate}`,
+            rightX,
+            Y + 28,
+            {
+              width: rightW,
+              align: "right",
+            },
+          );
+        if (reissueMeta?.reissueReferenceId) {
+          doc
+            .font("Helvetica")
+            .fontSize(7.5)
+            .fillColor(C.muted)
+            .text(
+              `Reissue Reference: ${reissueMeta.reissueReferenceId}`,
+              rightX,
+              Y + 38,
+              {
+                width: rightW,
+                align: "right",
+              },
+            );
+        }
+      }
+
+      Y += reissueMeta?.isReissued ? 56 : 34;
 
       // 3. BARCODE CARD
       const bcCardH = 72;

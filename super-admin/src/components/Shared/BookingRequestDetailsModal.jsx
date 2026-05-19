@@ -8,7 +8,6 @@ import {
   amendBooking,
   fetchChangeStatus,
 } from "../../Redux/Actions/corporate.related.thunks";
-import { createReissueRequest } from "../../Redux/Actions/reissueThunks";
 import { resetAmendmentState } from "../../Redux/Slice/corporate.related.slice";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import {
@@ -240,9 +239,6 @@ const AmountRow = ({ label, value, bold }) => (
 export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
   const dispatch = useDispatch();
   const [cancelRemarks, setCancelRemarks] = React.useState(
-    "Requested by super admin",
-  );
-  const [reissueRemarks, setReissueRemarks] = React.useState(
     "Requested by super admin",
   );
   const [selectedPaxIds, setSelectedPaxIds] = React.useState([]);
@@ -1496,11 +1492,6 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                       sub: "Select passengers",
                     },
                     {
-                      id: "reissue",
-                      label: "Request reissue",
-                      sub: "Request modification",
-                    },
-                    {
                       id: "status",
                       label: "Check status",
                       sub: "Amendment status",
@@ -1955,70 +1946,6 @@ export const FlightBookingModal = ({ booking: rawProp, onClose }) => {
                         {partialCancellationLoading
                           ? "Processing…"
                           : `Cancel ${selectedPaxIds.length || ""} passenger${selectedPaxIds.length !== 1 ? "s" : ""} on ${selectedSegmentKeys?.length || 0} segment${(selectedSegmentKeys?.length || 0) !== 1 ? "s" : ""}`}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* ── Reissue ── */}
-                  {actionTab === "reissue" && (
-                    <div className="space-y-4">
-                      <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-800">
-                        <FiInfo size={13} className="mt-0.5 shrink-0" />
-                        Submit a reissue request. This will create a pending request in the system which can be tracked and executed from the "All Reissue Requests" dashboard.
-                      </div>
-
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1.5">
-                          Reissue Type
-                        </p>
-                        <select
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
-                          defaultValue="FULL_JOURNEY"
-                          id="superAdminReissueType"
-                        >
-                          <option value="FULL_JOURNEY">Full Journey</option>
-                          <option value="ONWARD">Onward Only</option>
-                          <option value="RETURN">Return Only</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1.5">
-                          Reason for Reissue
-                        </p>
-                        <textarea
-                          value={reissueRemarks}
-                          onChange={(e) => setReissueRemarks(e.target.value)}
-                          placeholder="Describe the required modification — date change, route change, upgrade, etc."
-                          rows={3}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
-                        />
-                      </div>
-
-                      <button
-                        onClick={() => {
-                          const userStr = sessionStorage.getItem("adminUser") || sessionStorage.getItem("user");
-                          const user = userStr ? JSON.parse(userStr) : {};
-                          const rType = document.getElementById("superAdminReissueType").value;
-
-                          dispatch(
-                            createReissueRequest({
-                              bookingId: raw._id,
-                              reissueType: rType,
-                              reason: reissueRemarks || "Requested by admin",
-                              userId: user._id,
-                            }),
-                          )
-                            .unwrap()
-                            .then(() => toast.success("Reissue requested successfully"))
-                            .catch((err) =>
-                              toast.error(err.message || err || "Failed to submit request"),
-                            )
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-                      >
-                        <FiRepeat size={13} />
-                        Submit Reissue Request
                       </button>
                     </div>
                   )}

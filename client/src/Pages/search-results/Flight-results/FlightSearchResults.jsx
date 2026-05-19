@@ -338,6 +338,7 @@ export default function FlightSearchResults() {
     journeyType,
     cabinClass,
     loading,
+    isUpsellLoading,
     error,
   } = useSelector((state) => state.flights);
 
@@ -937,7 +938,22 @@ export default function FlightSearchResults() {
               infants: searchPayload?.infants || 0,
             }
           }
-          onOpenFareUpsell={(fareData) => {
+          onOpenFareUpsell={(fareData, newTab) => {
+            const errorResponse = fareData?.Response;
+            const isBlocked = errorResponse && (
+              Number(errorResponse.ResponseStatus) === 2 ||
+              (errorResponse.Error && errorResponse.Error.ErrorCode !== undefined && errorResponse.Error.ErrorCode !== 0)
+            );
+            if (isBlocked) {
+              if (newTab) newTab.close();
+              Swal.fire({
+                title: "Fare Options",
+                text: errorResponse?.Error?.ErrorMessage || "No extra fare options are available for this flight.",
+                icon: "info",
+                confirmButtonColor: "#0A203E",
+              });
+              return;
+            }
             const payloadData = {
               fareUpsellData: fareData,
               searchPayload: searchPayload || location.state?.searchPayload,
@@ -948,7 +964,15 @@ export default function FlightSearchResults() {
               "fareUpsellPayload",
               JSON.stringify(payloadData),
             );
-            window.open("/fare-upsell", "_blank");
+            const token = sessionStorage.getItem("token");
+            if (token) {
+              localStorage.setItem("tab_sync_token", token);
+              localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
+              localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
+            }
+            if (!newTab) {
+              window.open("/fare-upsell", "_blank");
+            }
           }}
         />
       );
@@ -964,7 +988,22 @@ export default function FlightSearchResults() {
           travelClass={cabinClass}
           resultIndex={flight.ResultIndex}
           searchPayload={searchPayload}
-          onOpenFareUpsell={(fareData) => {
+          onOpenFareUpsell={(fareData, newTab) => {
+            const errorResponse = fareData?.Response;
+            const isBlocked = errorResponse && (
+              Number(errorResponse.ResponseStatus) === 2 ||
+              (errorResponse.Error && errorResponse.Error.ErrorCode !== undefined && errorResponse.Error.ErrorCode !== 0)
+            );
+            if (isBlocked) {
+              if (newTab) newTab.close();
+              Swal.fire({
+                title: "Fare Options",
+                text: errorResponse?.Error?.ErrorMessage || "No extra fare options are available for this flight.",
+                icon: "info",
+                confirmButtonColor: "#0A203E",
+              });
+              return;
+            }
             const payloadData = {
               fareUpsellData: fareData,
               searchPayload: searchPayload || location.state?.searchPayload,
@@ -975,7 +1014,15 @@ export default function FlightSearchResults() {
               "fareUpsellPayload",
               JSON.stringify(payloadData),
             );
-            window.open("/fare-upsell", "_blank");
+            const token = sessionStorage.getItem("token");
+            if (token) {
+              localStorage.setItem("tab_sync_token", token);
+              localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
+              localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
+            }
+            if (!newTab) {
+              window.open("/fare-upsell", "_blank");
+            }
           }}
         />
       );
@@ -1008,7 +1055,7 @@ export default function FlightSearchResults() {
 
       {loading && (
         <SearchLoadingModal
-          type="flight"
+          type={isUpsellLoading ? "upsell" : "flight"}
           origin={searchPayload?.origin || fromCity || "Origin"}
           destination={searchPayload?.destination || toCity || "Destination"}
           date={departureDate || (searchPayload?.departureDate ? new Date(searchPayload.departureDate).toLocaleDateString("en-IN", { day: '2-digit', month: 'short' }) : "")}
@@ -1167,22 +1214,42 @@ export default function FlightSearchResults() {
                     key={groupedFlight.flightKey}
                     group={groupedFlight}
                     traceId={traceId} 
-                    onContinue={(selectedVariant) =>
-                      navigate("/round-trip-flight/booking", {
-                        state: {
-                          rawFlightData: selectedVariant, // Pass the specific fare variant
-                          traceId,
-                          journeyType: 2,
-                          isInternational: true,
-                          passengers: searchPayload?.passengers || {
-                            adults: searchPayload?.adults || 1,
-                            children: searchPayload?.children || 0,
-                            infants: searchPayload?.infants || 0,
-                          },
+                    onContinue={(selectedVariant) => {
+                      const payload = {
+                        rawFlightData: selectedVariant, // Pass the specific fare variant
+                        traceId,
+                        journeyType: 2,
+                        isInternational: true,
+                        passengers: searchPayload?.passengers || {
+                          adults: searchPayload?.adults || 1,
+                          children: searchPayload?.children || 0,
+                          infants: searchPayload?.infants || 0,
                         },
-                      })
-                    }
+                      };
+                      localStorage.setItem("flightBookingState", JSON.stringify(payload));
+                      const token = sessionStorage.getItem("token");
+                      if (token) {
+                        localStorage.setItem("tab_sync_token", token);
+                        localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
+                        localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
+                      }
+                      window.open("/round-trip-flight/booking", "_blank");
+                    }}
                     onOpenFareUpsell={(fareData) => {
+                      const errorResponse = fareData?.Response;
+                      const isBlocked = errorResponse && (
+                        Number(errorResponse.ResponseStatus) === 2 ||
+                        (errorResponse.Error && errorResponse.Error.ErrorCode !== undefined && errorResponse.Error.ErrorCode !== 0)
+                      );
+                      if (isBlocked) {
+                        Swal.fire({
+                          title: "Fare Options",
+                          text: errorResponse?.Error?.ErrorMessage || "No extra fare options are available for this flight.",
+                          icon: "info",
+                          confirmButtonColor: "#0A203E",
+                        });
+                        return;
+                      }
                       const payloadData = {
                         fareUpsellData: fareData,
                         searchPayload:
@@ -1195,7 +1262,12 @@ export default function FlightSearchResults() {
                         "fareUpsellPayload",
                         JSON.stringify(payloadData),
                       );
-
+                      const token = sessionStorage.getItem("token");
+                      if (token) {
+                        localStorage.setItem("tab_sync_token", token);
+                        localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
+                        localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
+                      }
                       window.open("/fare-upsell", "_blank");
                     }}
                   />
@@ -1269,21 +1341,27 @@ export default function FlightSearchResults() {
                             s.Destination.Airport.CountryCode,
                       );
 
-                    navigate("/round-trip-flight/booking", {
-                      state: {
-                        rawFlightData: {
-                          onward: selectedOnward,
-                          return: selectedReturn,
-                        },
-                        traceId,
-                        isInternational,
-                        passengers: searchPayload?.passengers || {
-                          adults: searchPayload?.adults || 1,
-                          children: searchPayload?.children || 0,
-                          infants: searchPayload?.infants || 0,
-                        },
+                    const payload = {
+                      rawFlightData: {
+                        onward: selectedOnward,
+                        return: selectedReturn,
                       },
-                    });
+                      traceId,
+                      isInternational,
+                      passengers: searchPayload?.passengers || {
+                        adults: searchPayload?.adults || 1,
+                        children: searchPayload?.children || 0,
+                        infants: searchPayload?.infants || 0,
+                      },
+                    };
+                    localStorage.setItem("flightBookingState", JSON.stringify(payload));
+                    const token = sessionStorage.getItem("token");
+                    if (token) {
+                      localStorage.setItem("tab_sync_token", token);
+                      localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
+                      localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
+                    }
+                    window.open("/round-trip-flight/booking", "_blank");
                   }}
                 />
               </>

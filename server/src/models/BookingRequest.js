@@ -131,6 +131,20 @@ const bookingRequestSchema = new mongoose.Schema(
       capturedAt: Date,
     },
 
+    priceAudit: {
+      previousAmount: Number,
+      newAmount: Number,
+      difference: Number,
+      currency: { type: String, default: "INR" },
+      checkedAt: Date,
+      matchedTraceId: String,
+    },
+
+    orchestration: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+
     /* ================= EXECUTION ================= */
 
     executionStatus: {
@@ -143,6 +157,14 @@ const bookingRequestSchema = new mongoose.Schema(
         "on_hold",
         "ticketed",
         "failed",
+        "payment_failed",
+        "provider_failed",
+        "session_timeout",
+        "expired",
+        "abandoned",
+        "completed",
+        "confirmed",
+        "active",
         "cancel_requested", // ✅ ADD
         "cancelled",
       ],
@@ -174,6 +196,76 @@ const bookingRequestSchema = new mongoose.Schema(
 
       ticketNumbers: [String],
       providerBookingId: String,
+    },
+
+    isReissued: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    latestReissueBookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BookingRequest",
+      default: null,
+      index: true,
+    },
+    originalBookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BookingRequest",
+      default: null,
+      index: true,
+    },
+    reissueHistory: [
+      {
+        requestId: {
+          type: mongoose.Schema.Types.ObjectId,
+          default: null,
+        },
+        requestRef: String,
+        mode: String,
+        originalBookingId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "BookingRequest",
+          default: null,
+        },
+        reissuedBookingId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "BookingRequest",
+          default: null,
+        },
+        originalPnr: String,
+        activePnr: String,
+        supplierBookingId: String,
+        reissuedAt: Date,
+        reissuedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          default: null,
+        },
+        fareDifference: Number,
+        reissueCharge: Number,
+        totalCollection: Number,
+        ticketUrl: String,
+        metadata: mongoose.Schema.Types.Mixed,
+      },
+    ],
+    reissueLocked: {
+      isLocked: {
+        type: Boolean,
+        default: false,
+      },
+      reason: String,
+      requestId: {
+        type: mongoose.Schema.Types.ObjectId,
+        default: null,
+      },
+      requestRef: String,
+      mode: String,
+      correlationId: String,
+      lockedAt: Date,
+      lockedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        default: null,
+      },
     },
 
     /* ================= PAYMENT ================= */
@@ -264,6 +356,31 @@ const bookingRequestSchema = new mongoose.Schema(
         },
       },
     ],
+
+    servicing: {
+      reissue: {
+        currentRequestId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "ReissueRequest",
+        },
+        offlineRequestId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "OfflineReissueRequest",
+        },
+        status: String,
+        originalBookingId: String,
+        originalPnr: String,
+        reissuedBookingId: String,
+        activeBookingId: String,
+        activePnr: String,
+        revisedTicketUrl: String,
+        revisedInvoiceUrl: String,
+        partiallyUsedTicket: {
+          type: Boolean,
+          default: false,
+        },
+      },
+    },
   },
   { timestamps: true },
 );

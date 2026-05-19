@@ -253,7 +253,7 @@ const HotelImageGallery = ({ images = [] }) => {
           .gallery-grid {
             display: grid;
             gap: 6px;
-            height: 400px;
+            height: 280px;
             grid-template-columns: 1.5fr 1fr;
             grid-template-rows: 1fr 1fr;
             grid-auto-flow: dense;
@@ -283,7 +283,7 @@ const HotelImageGallery = ({ images = [] }) => {
           .gallery-grid {
             display: grid;
             gap: 6px;
-            height: 500px;
+            height: 350px;
             grid-template-columns: 2.2fr 1fr 1fr;
             grid-template-rows: 1fr 1fr;
           }

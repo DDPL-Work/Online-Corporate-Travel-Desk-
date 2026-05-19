@@ -1,71 +1,86 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "../../API/axios";
 
-/**
- * 1️⃣ Create Reissue Request
- */
-export const createReissueRequest = createAsyncThunk(
-  "reissue/create",
-  async (data, { rejectWithValue }) => {
-    try {
-      const response = await axios.post("/flights/reissue/create", data);
-      return response.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to create reissue request");
-    }
-  }
-);
+const getErrorMessage = (error, fallback) =>
+  error?.response?.data?.message ||
+  error?.response?.data?.error ||
+  error?.message ||
+  fallback;
 
-/**
- * 2️⃣ Fetch Reissue Requests
- */
 export const fetchReissueRequests = createAsyncThunk(
   "reissue/fetchAll",
-  async (params, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
-      const response = await axios.get("/flights/reissue/list", { params });
-      return response.data;
+      const response = await axios.get("/reissue/offline/admin/list", { params });
+      return response.data.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to fetch reissue requests");
+      return rejectWithValue(
+        getErrorMessage(error, "Failed to fetch offline reissue requests"),
+      );
     }
-  }
+  },
 );
 
-/**
- * 3️⃣ Update Reissue Status (Approve/Reject)
- */
 export const updateReissueStatus = createAsyncThunk(
   "reissue/updateStatus",
-  async ({ requestId, status, message, actionBy, actionByName }, { rejectWithValue }) => {
+  async ({ requestId, status, message, assignedTo }, { rejectWithValue }) => {
     try {
-      const response = await axios.patch(`/flights/reissue/status/${requestId}`, {
+      const response = await axios.patch(`/reissue/offline/${requestId}/status`, {
         status,
         message,
-        actionBy,
-        actionByName
+        assignedTo,
       });
-      return response.data;
+      return response.data.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to update status");
+      return rejectWithValue(
+        getErrorMessage(error, "Failed to update offline reissue status"),
+      );
     }
-  }
+  },
 );
 
-/**
- * 4️⃣ Execute Reissue (TBO Call)
- */
-export const executeReissue = createAsyncThunk(
-  "reissue/execute",
-  async ({ requestId, actionBy, actionByName, remarks }, { rejectWithValue }) => {
+export const generateReissueTicket = createAsyncThunk(
+  "reissue/generateTicket",
+  async ({ requestId, message }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`/flights/reissue/execute/${requestId}`, {
-        actionBy,
-        actionByName,
-        remarks
+      const response = await axios.post(`/reissue/offline/${requestId}/generate-ticket`, {
+        message,
       });
-      return response.data;
+      return response.data.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to execute reissue");
+      return rejectWithValue(
+        getErrorMessage(error, "Failed to generate revised ticket"),
+      );
     }
-  }
+  },
+);
+
+export const reassignReissueRequest = createAsyncThunk(
+  "reissue/reassign",
+  async ({ requestId, assignedTo, message }, { rejectWithValue }) => {
+    try {
+      const response = await axios.patch(`/reissue/offline/${requestId}/reassign`, {
+        assignedTo,
+        message,
+      });
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        getErrorMessage(error, "Failed to reassign offline reissue request"),
+      );
+    }
+  },
+);
+
+export const fetchReissueAnalytics = createAsyncThunk(
+  "reissue/fetchAnalytics",
+  async (_, { rejectWithValue }) => {
+    try {
+      return null;
+    } catch (error) {
+      return rejectWithValue(
+        getErrorMessage(error, "Failed to fetch offline reissue analytics"),
+      );
+    }
+  },
 );

@@ -30,6 +30,23 @@ const extractSegmentsFromFareQuote = (fareQuote) => {
   return [...onwardSegs, ...returnSegs];
 };
 
+const extractAirlineRemark = (fareQuote) => {
+  // ONE-WAY / MULTI-CITY
+  if (fareQuote?.Response?.Results?.AirlineRemark) {
+    return fareQuote.Response.Results.AirlineRemark;
+  }
+
+  // ROUND-TRIP
+  const onwardRemark = fareQuote?.onward?.Response?.Results?.AirlineRemark;
+  const returnRemark = fareQuote?.return?.Response?.Results?.AirlineRemark;
+
+  if (onwardRemark && returnRemark && onwardRemark !== returnRemark) {
+    return `Onward: ${onwardRemark} | Return: ${returnRemark}`;
+  }
+
+  return onwardRemark || returnRemark || "";
+};
+
 const extractFareFromQuote = (fareQuote, index) => {
   // Per-segment fare is usually SAME for all segments
   if (fareQuote?.Response?.Results?.Fare) {
@@ -128,10 +145,10 @@ export const FareDetailsModal = ({
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 bg-[#0A203E]/60 backdrop-blur-md flex items-center justify-center z-50 animate-fadeIn p-4">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden border border-white/20">
+        <div className="fixed inset-0 bg-[#0A203E]/60 backdrop-blur-md flex items-center justify-center z-[100] animate-fadeIn sm:p-4">
+          <div className="bg-white sm:rounded-[2rem] shadow-2xl w-full h-full sm:h-auto max-h-[100dvh] sm:max-h-[90vh] lg:max-w-5xl flex flex-col overflow-hidden border border-white/20">
             {/* Header */}
-            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 bg-white">
+            <div className="flex items-center justify-between px-6 py-5 sm:px-8 sm:py-6 border-b border-slate-100 bg-white shrink-0">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-[#C9A84C] rounded-2xl flex items-center justify-center shadow-lg shadow-[#C9A84C]/20">
                   <AiOutlineInfoCircle className="text-[#0A203E] text-2xl" />
@@ -150,7 +167,7 @@ export const FareDetailsModal = ({
             </div>
 
             {/* Tabs */}
-            <div className="flex bg-slate-50/50 px-8 border-b border-slate-100">
+            <div className="flex bg-slate-50/50 px-4 sm:px-8 border-b border-slate-100 shrink-0 overflow-x-auto custom-scrollbar">
               {[
                 { id: "summary", label: "Fare Summary" },
                 { id: "rules", label: "Fare Rules & Policies" },
@@ -174,7 +191,7 @@ export const FareDetailsModal = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-8 bg-white custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-white custom-scrollbar min-h-0 relative">
               {/* FARE SUMMARY TABLE */}
               {activeTab === "summary" && (
                 <div className="bg-slate-50/30 rounded-3xl p-1 border border-slate-100">
@@ -231,6 +248,23 @@ export const FareDetailsModal = ({
                       <h3 className="text-lg font-black uppercase tracking-widest mb-2">Policy Overview</h3>
                       <p className="text-xs text-[#C9A84C] font-bold">Standard airline regulations apply based on your selected fare class.</p>
                    </div>
+                   {(() => {
+                     const remark = extractAirlineRemark(fareQuote);
+                     if (!remark) return null;
+                     return (
+                       <div className="bg-[#C9A84C]/10 border border-[#C9A84C]/30 p-5 rounded-2xl flex items-start gap-3.5 shadow-sm">
+                         <div className="w-10 h-10 rounded-xl bg-[#C9A84C]/25 flex items-center justify-center text-[#0A203E] shrink-0">
+                           <AiOutlineInfoCircle size={20} className="text-[#0A203E]" />
+                         </div>
+                         <div className="flex-1">
+                           <h4 className="text-xs font-black text-[#0A203E] uppercase tracking-widest mb-1.5">Airline Remark</h4>
+                           <div className="space-y-1.5 mt-1.5">
+                             {remark.split(/,\s*/).map((item, idx) => <div key={idx} className="flex items-center gap-2 mt-1 first:mt-0"><span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] shrink-0" /><span className="text-xs text-slate-700 font-bold">{item.replace(/Segment\s*(\d+)/gi, (m, n) => segments[parseInt(n, 10)] ? `${segments[parseInt(n, 10)].Origin?.Airport?.AirportCode || `Seg ${n}`} → ${segments[parseInt(n, 10)].Destination?.Airport?.AirportCode || ""}` : m)}</span></div>)}
+                           </div>
+                         </div>
+                       </div>
+                     );
+                   })()}
                    <FareRulesAccordion parsedRules={onwardFareData} title={isRoundTrip ? "Onward Flight Fare Rules" : ""} />
                    {isRoundTrip && <FareRulesAccordion parsedRules={returnFareData} title="Return Flight Fare Rules" />}
                 </div>
@@ -254,7 +288,7 @@ export const FareDetailsModal = ({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end px-8 py-6 border-t border-slate-100 bg-white">
+            <div className="flex justify-end px-6 py-4 sm:px-8 sm:py-6 border-t border-slate-100 bg-white shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
               <button
                 onClick={toggleModal}
                 className="px-8 py-3 bg-[#0A203E] text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:brightness-110 shadow-lg shadow-[#0A203E]/20 transition-all active:scale-95"

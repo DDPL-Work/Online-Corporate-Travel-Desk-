@@ -111,6 +111,118 @@ const templates = {
     link: '/my-bookings?type=flight',
   }),
 
+  [EVENTS.REISSUE_CREATED]: (d) => ({
+    title: 'Reissue Request Created',
+    message: `Reissue request ${d.reissueId} has been created in ${d.requestedMode || 'servicing'} mode.`,
+    link: '/my-reissued',
+  }),
+
+  [EVENTS.REISSUE_ELIGIBILITY_CHECKED]: (d) => ({
+    title: 'Reissue Eligibility Checked',
+    message: `Reissue ${d.reissueId} is ${d.requestedMode === 'ONLINE' ? 'available for self-service' : 'queued for operations support'}.`,
+    link: '/my-reissued',
+  }),
+
+  [EVENTS.REISSUE_SEARCH_COMPLETED]: (d) => ({
+    title: 'Reissue Search Completed',
+    message: `Updated flight options are ready for reissue ${d.reissueId}.`,
+    link: '/my-reissued',
+  }),
+
+  [EVENTS.REISSUE_QUOTE_RECEIVED]: (d) => ({
+    title: 'Reissue Quote Ready',
+    message: `Final fare quote is ready for reissue ${d.reissueId}.`,
+    link: '/my-reissued',
+  }),
+
+  [EVENTS.REISSUE_BILLING_RESERVED]: (d) => ({
+    title: 'Internal Billing Reserved',
+    message: `Internal billing reservation has been created for reissue ${d.reissueId}.`,
+    link: '/my-reissued',
+  }),
+
+  [EVENTS.REISSUE_PROCESSING_STARTED]: (d) => ({
+    title: 'Reissue Processing Started',
+    message: `Reissue ${d.reissueId} is being processed with the supplier.`,
+    link: '/my-reissued',
+  }),
+
+  [EVENTS.REISSUE_COMPLETED]: (d) => ({
+    title: 'Reissue Completed',
+    message: `Reissue ${d.reissueId} completed successfully.${d.newPnr ? ` New PNR: ${d.newPnr}` : ''}`,
+    link: '/my-reissued',
+  }),
+
+  [EVENTS.REISSUE_FAILED]: (d) => ({
+    title: 'Reissue Failed',
+    message: `Reissue ${d.reissueId} could not be completed.`,
+    link: '/my-reissued',
+  }),
+
+  [EVENTS.REISSUE_OPS_ASSIGNED]: (d) => ({
+    title: 'Ops Assigned to Reissue',
+    message: `Operations has been assigned to reissue ${d.reissueId}.`,
+    link: '/reissue-requests',
+  }),
+
+  [EVENTS.REISSUE_TICKET_UPLOADED]: (d) => ({
+    title: 'Revised Ticket Uploaded',
+    message: `Updated ticket for reissue ${d.reissueId} is now available.`,
+    link: '/my-reissued',
+  }),
+
+  [EVENTS.OFFLINE_REISSUE_CREATED]: (d) => ({
+    title: 'Offline Reissue Requested',
+    message: `Offline reissue ${d.reissueId} has been submitted successfully and is now queued for operations review.`,
+    link: '/my-reissued',
+  }),
+
+  [EVENTS.OFFLINE_REISSUE_UPDATED]: (d) => {
+    if (d.status === 'ASSIGNED') {
+      return {
+        title: 'Ops Assigned',
+        message: `Offline reissue ${d.reissueId} is now assigned to our servicing team.`,
+        link: '/my-reissued',
+      };
+    }
+
+    if (d.status === 'REJECTED') {
+      return {
+        title: 'Offline Reissue Rejected',
+        message: `Offline reissue ${d.reissueId} was rejected by operations.`,
+        link: '/my-reissued',
+      };
+    }
+
+    if (d.status === 'COMPLETED') {
+      return {
+        title: 'Offline Reissue Completed',
+        message: `Offline reissue ${d.reissueId} has been completed successfully. Your reissued ticket remains available in your dashboard.`,
+        link: '/my-reissued',
+      };
+    }
+
+    if (d.status === 'TICKET_GENERATED') {
+      return {
+        title: 'Reissued Ticket Ready',
+        message: `Your reissued ticket for offline reissue ${d.reissueId} is ready to download.`,
+        link: '/my-reissued',
+      };
+    }
+
+    return {
+      title: 'Offline Reissue Updated',
+      message: `Offline reissue ${d.reissueId} moved to ${String(d.status || 'processing').replace(/_/g, ' ').toLowerCase()}.`,
+      link: '/my-reissued',
+    };
+  },
+
+  [EVENTS.OFFLINE_TICKET_GENERATED]: (d) => ({
+    title: 'Reissued Ticket Ready',
+    message: `Your reissued ticket for offline reissue ${d.reissueId} is ready to download.`,
+    link: '/my-reissued',
+  }),
+
   [EVENTS.BOOKING_OFFLINE_CANCELLED]: (d) => ({
     title: '🚫 Offline Cancellation Processed',
     message: `Booking (${d.orderId}) has been cancelled offline by ${d.cancelledBy || 'Admin'}.`,

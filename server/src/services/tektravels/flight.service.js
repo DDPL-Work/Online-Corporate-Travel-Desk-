@@ -119,8 +119,10 @@ const toTboFare = (fare = {}, currency = "INR") => ({
 });
 
 const getFareForPassenger = (result, passenger) => {
-  const fareBreakdown = Array.isArray(result?.FareBreakdown)
-    ? result.FareBreakdown
+  const normalizedResult = Array.isArray(result) ? result[0] : result;
+
+  const fareBreakdown = Array.isArray(normalizedResult?.FareBreakdown)
+    ? normalizedResult.FareBreakdown
     : [];
 
   const paxType = getPassengerTypeCode(
@@ -131,19 +133,20 @@ const getFareForPassenger = (result, passenger) => {
   );
 
   return toTboFare(
-    matchedFare || fareBreakdown[0] || result?.Fare,
-    result?.Fare?.Currency,
+    matchedFare || fareBreakdown[0] || normalizedResult?.Fare,
+    normalizedResult?.Fare?.Currency,
   );
 };
 
 const getLccFareForPassenger = (result, passenger) => {
+  const normalizedResult = Array.isArray(result) ? result[0] : result;
   const inlineFare = passenger?.Fare || passenger?.fare;
 
   if (inlineFare) {
-    return toTboFare(inlineFare, inlineFare.Currency || result?.Fare?.Currency);
+    return toTboFare(inlineFare, inlineFare.Currency || normalizedResult?.Fare?.Currency);
   }
 
-  return getFareForPassenger(result, passenger);
+  return getFareForPassenger(normalizedResult, passenger);
 };
 
 function buildLccTicketSsrPayload({ ssr, liveSsrResponse, passengers }) {
@@ -556,11 +559,11 @@ class FlightService {
     const env = this.getEnv();
 
     // 🔸 Log request
-    logger.info("TBO FARE UPSELL REQUEST", {
-      traceId,
-      resultIndex,
-      env,
-    });
+    // logger.info("TBO FARE UPSELL REQUEST", {
+    //   traceId,
+    //   resultIndex,
+    //   env,
+    // });
 
     const response = await this.postLive(
       "flightFareUpsell",
@@ -569,9 +572,9 @@ class FlightService {
     );
 
     // 🔥 FULL RAW RESPONSE LOG (MAIN DEBUG)
-    logger.info(
-      "TBO FARE UPSELL RESPONSE:\n" + JSON.stringify(response, null, 2),
-    );
+    // logger.info(
+    //   "TBO FARE UPSELL RESPONSE:\n" + JSON.stringify(response, null, 2),
+    // );
 
     // 🔥 ERROR HANDLING (IMPORTANT)
     if (response?.Response?.ResponseStatus !== 1) {

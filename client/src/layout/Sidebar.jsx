@@ -115,9 +115,9 @@ export default function Sidebar({ isOpen, onClose }) {
         { to: "/my-cancelled-bookings", label: "Cancelled Bookings", icon: <MdCancel /> },
         { to: "/my-reissued", label: "My Reissued", icon: <FaExchangeAlt /> },
         { to: "/my-offline-cancellations", label: "Offline Cancellations", icon: <FaClock /> },
-        { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
       ],
     },
+    { to: "/my-profile", label: "My Profile", icon: <FaUser /> },
   ];
 
   const managerMenu = useMemo(() => [
@@ -148,7 +148,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { to: "/my-cancelled-bookings", label: "Cancelled Bookings", icon: <MdCancel /> },
     { to: "/my-reissued", label: "My Reissued", icon: <FaExchangeAlt /> },
     { to: "/my-offline-cancellations", label: "Offline Cancellations", icon: <FaClock /> },
-    { to: "/my-profile", label: "Profile Details", icon: <FaUser /> },
+    { to: "/my-profile", label: "My Profile", icon: <FaUser /> },
   ];
 
   const menus = {

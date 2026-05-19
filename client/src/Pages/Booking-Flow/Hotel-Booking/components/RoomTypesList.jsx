@@ -156,6 +156,7 @@ const RoomTypesList = ({
               key={bookingCode}
               room={room}
               count={count}
+              requiredRooms={requiredRooms}
               onAdd={() => onSelectRoom(room, "add")}
               onRemove={() => onSelectRoom(room, "remove")}
               onSeeDetails={onSeeDetails}

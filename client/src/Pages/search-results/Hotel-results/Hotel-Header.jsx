@@ -280,18 +280,7 @@ const Header = () => {
           >
             <MdArrowBack /> Back to Search
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              navigate(`/travel`, { state: { activeTab: "flight" } });
-            }}
-            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition shadow-sm"
-            style={{ background: ORANGE, color: DARK }}
-          >
-            <MdSearch /> Search Flight
-          </button>
         </div>
-
         {/* Title row */}
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <MdBed className="text-2xl" style={{ color: ORANGE }} />

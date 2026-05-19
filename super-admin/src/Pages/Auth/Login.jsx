@@ -3,7 +3,7 @@ import { MdEmail, MdLock, MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { loginUser } from "../../Redux/Slice/authSlice";
 import { useNavigate } from "react-router-dom";
-import { jwtDecode } from "jwt-decode";
+import { getDefaultDashboardPath } from "../../constants/rbac";
 
 const travelStack =
   "https://plus.unsplash.com/premium_photo-1661962174396-e6d539b5c0d8?fm=jpg&q=60&w=2400";
@@ -30,45 +30,12 @@ const Login = () => {
     )
       .unwrap()
       .then((data) => {
-        // token already saved by authSlice
-        const token = sessionStorage.getItem("token");
-
-        if (!token) {
-          console.error("Token missing after login");
-          return;
-        }
-
-        try {
-          const decoded = jwtDecode(token);
-          const role = decoded.role || decoded.userRole;
-
-          switch (role) {
-            case "super-admin":
-              navigate("/active-corporates");
-              break;
-
-            case "ops-member":
-              // Dynamic redirect based on permissions
-              const perms = data.user?.permissions || [];
-              let target = "/unauthorized";
-
-              if (perms.includes("Manage Corporates")) target = "/pending-corporates";
-              else if (perms.includes("View Bookings")) target = "/bookings-summary";
-              else if (perms.includes("Manage Cancellations")) target = "/cancellation-summary";
-              else if (perms.includes("View Finance")) target = "/corporate-revenue";
-              else if (perms.includes("SEO Management")) target = "/blog-and-articles";
-              
-              navigate(target);
-              break;
-
-            default:
-              console.warn("Unknown role:", role);
-              navigate("/login");
-          }
-        } catch (err) {
-          console.error("Invalid token:", err);
-          navigate("/login");
-        }
+        navigate(
+          getDefaultDashboardPath({
+            role: data.role || data.user?.role || data.user?.userRole,
+            permissions: data.user?.permissions || [],
+          }),
+        );
       });
   };
 

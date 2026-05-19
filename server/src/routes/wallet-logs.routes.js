@@ -2,9 +2,11 @@ const express = require("express");
 const router = express.Router();
 const WalletRechargeLog = require("../models/WalletActivityLog");
 const { verifyToken, authorizeRoles } = require("../middleware/auth.middleware");
+const { requireOpsPermission } = require("../middleware/requireOpsPermission.middleware");
 
 router.use(verifyToken);
 router.use(authorizeRoles("super-admin", "ops-member"));
+router.use(requireOpsPermission("View Finance"));
 
 router.get(
   "/",

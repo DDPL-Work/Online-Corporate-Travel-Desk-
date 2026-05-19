@@ -3,22 +3,30 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../API/axios"; // axios instance with auth token
 
+const buildThunkError = (err, fallbackMessage) => ({
+  message:
+    err.response?.data?.message ||
+    err.response?.data?.error ||
+    err.message ||
+    fallbackMessage,
+  statusCode: err.response?.status || err.statusCode || 500,
+  code: err.response?.data?.code || null,
+  providerMessage: err.response?.data?.providerMessage || null,
+  data: err.response?.data?.data || null,
+});
+
 // CREATE booking request (approval-first)
 export const createBookingRequest = createAsyncThunk(
   "bookings/createBookingRequest",
   async (payload, { rejectWithValue }) => {
     try {
       console.log("🔥 API PAYLOAD:", payload);
-
       const { data } = await api.post("/bookings", payload);
       console.log("✅ API RESPONSE:", data);
-      return data.data; // { bookingRequestId, approvalId, bookingReference }
+      return data.data;
     } catch (err) {
       console.error("❌ API ERROR:", err);
-      return rejectWithValue(
-        err.response?.data?.message ||
-          "Failed to submit booking request for approval",
-      );
+      return rejectWithValue(buildThunkError(err, "Failed to submit booking request for approval"));
     }
   },
 );
@@ -29,11 +37,9 @@ export const instantFlightBooking = createAsyncThunk(
   async (payload, { rejectWithValue }) => {
     try {
       const { data } = await api.post("/bookings/instant-flight-book", payload);
-      return data.data; // { bookingRequestId, orderId, autoApproved, bookingResult }
+      return data.data;
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data?.message || "Instant flight booking failed",
-      );
+      return rejectWithValue(buildThunkError(err, "Instant flight booking failed"));
     }
   },
 );
@@ -84,13 +90,32 @@ export const fetchMyRejectedRequests = createAsyncThunk(
 // CONFIRM booking after approval
 export const executeApprovedFlightBooking = createAsyncThunk(
   "bookings/executeFlight",
+  async (input, { rejectWithValue }) => {
+    try {
+      const bookingId = typeof input === "string" ? input : input?.bookingId;
+      const confirmPendingRevalidation =
+        typeof input === "object" && input?.confirmPendingRevalidation === true;
+
+      const { data } = await api.post(`/bookings/${bookingId}/execute-flight`, {
+        confirmPendingRevalidation,
+      });
+
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(buildThunkError(err, "Flight booking failed"));
+    }
+  },
+);
+
+export const fetchApprovedFlightBookingStatus = createAsyncThunk(
+  "bookings/fetchApprovedFlightBookingStatus",
   async (bookingId, { rejectWithValue }) => {
     try {
-      const { data } = await api.post(`/bookings/${bookingId}/execute-flight`);
+      const { data } = await api.get(`/bookings/${bookingId}/execute-flight-status`);
       return data.data;
     } catch (err) {
       return rejectWithValue(
-        err.response?.data?.message || "Flight booking failed",
+        buildThunkError(err, "Failed to fetch approved booking status"),
       );
     }
   },
@@ -158,10 +183,10 @@ export const manualTicketNonLcc = createAsyncThunk(
   async (bookingId, { rejectWithValue }) => {
     try {
       const res = await api.post(`/bookings/${bookingId}/manual-ticket`);
-
       return res.data.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
+      // Structured error so booking.slice can surface statusCode and code
+      return rejectWithValue(buildThunkError(err, "Manual ticket generation failed"));
     }
   },
 );
@@ -190,7 +215,10 @@ export const downloadTicketPdf = createAsyncThunk(
 
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      return rejectWithValue("Failed to download ticket");
+      // Surface real server error message (e.g. 409 "Ticket generation is not allowed from status COMPLETED")
+      return rejectWithValue(
+        buildThunkError(err, "Failed to download ticket PDF"),
+      );
     }
   },
 );

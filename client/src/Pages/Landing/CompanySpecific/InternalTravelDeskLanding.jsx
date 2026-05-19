@@ -1,5 +1,4 @@
 // InternalTravelDeskLanding.jsx — Company-Specific Internal Portal
-// Full flight + hotel search logic ported from FlightSearch.jsx & HotelSearch.jsx
 import React, { useState, useEffect, useRef } from "react";
 import {
   FaExchangeAlt,

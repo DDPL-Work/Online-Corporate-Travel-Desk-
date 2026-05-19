@@ -13,6 +13,7 @@ import {
 } from "react-icons/fa";
 import { MdLocationOn, MdBreakfastDining } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 /* ─── Color Tokens ─── */
 const ORANGE = "#C9A84C";
@@ -32,6 +33,7 @@ const Stars = ({ rating = 0 }) =>
 /* 🏨 Main Card */
 const HotelCard = ({ hotel }) => {
   const navigate = useNavigate();
+  const { hotels, searchPayload } = useSelector((state) => state.hotel);
   const [imgIndex, setImgIndex] = useState(0);
   const [wishlisted, setWishlisted] = useState(false);
 
@@ -211,17 +213,33 @@ const HotelCard = ({ hotel }) => {
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              navigate("/one-hotel-details", {
-                state: { hotelCode: hotel.id, traceId: hotel.traceId },
-              });
+          <a
+            href="/one-hotel-details"
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => {
+              // We don't preventDefault so the link opens
+              const rawHotel = hotels?.find((h) => h.HotelCode === hotel.id) || null;
+              const stateObj = { 
+                hotelCode: hotel.id, 
+                traceId: hotel.traceId,
+                searchPayload,
+                hotelFromSearch: rawHotel
+              };
+              localStorage.setItem("hotelDetailsState", JSON.stringify(stateObj));
+              
+              const token = sessionStorage.getItem("token");
+              if (token) {
+                localStorage.setItem("tab_sync_token", token);
+                localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
+                localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
+              }
             }}
-            className="w-full py-2 font-bold text-xs uppercase tracking-widest rounded-lg shadow mt-3 transition-all active:scale-95 hover:brightness-110"
+            className="w-full py-2 font-bold text-xs uppercase tracking-widest rounded-lg shadow mt-3 transition-all active:scale-95 hover:brightness-110 flex justify-center items-center cursor-pointer"
             style={{ background: ORANGE, color: DARK }}
           >
             Check Availability
-          </button>
+          </a>
         </div>
       </div>
     </div>
