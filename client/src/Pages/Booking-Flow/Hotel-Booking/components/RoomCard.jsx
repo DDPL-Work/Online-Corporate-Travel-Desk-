@@ -91,7 +91,13 @@ const RoomCard = ({ room, count, requiredRooms, onAdd, onRemove, onSeeDetails })
               <h3 className="text-lg sm:text-xl lg:text-2xl font-black text-[#0A203E] tracking-tight leading-tight">
                 {room.RoomTypeName || room.Name?.[0] || "Standard Room"}
               </h3>
-              <div className="mt-2">
+              {room.BeddingGroup && (
+                <div className="mt-1.5 flex items-start gap-1.5 text-xs text-slate-600">
+                  <FaBed className="text-slate-400 text-[14px] flex-shrink-0 mt-0.5" />
+                  <span className="leading-snug">{room.BeddingGroup}</span>
+                </div>
+              )}
+              <div className="mt-2.5">
                 <span
                   className={`text-[9px] lg:text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest shadow-sm inline-block ${
                     room.IsRefundable

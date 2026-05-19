@@ -226,6 +226,14 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       providerResponse: mongoose.Schema.Types.Mixed,
     },
 
+    voucher: {
+      bookingRefNo: String,
+      confirmationNo: String,
+      invoiceNumber: String,
+      filePath: String,
+      raw: mongoose.Schema.Types.Mixed,
+    },
+
     /* ================= PAYMENT ================= */
 
     payment: {

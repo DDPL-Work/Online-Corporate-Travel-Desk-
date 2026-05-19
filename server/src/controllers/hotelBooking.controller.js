@@ -14,6 +14,7 @@ const { notify } = require("../notifications/orchestrator");
 const EVENTS = require("../events/eventConstants");
 const User = require("../models/User");
 const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
+const logger = require("../utils/logger");
 
 // @desc    PreBook Hotel (TBO)
 // @route   POST /api/v1/hotel-bookings/prebook
@@ -1758,14 +1759,6 @@ exports.generateHotelVoucher = asyncHandler(async (req, res) => {
   }
 
   /* =====================================================
-     ✅ STEP 1: IF PDF ALREADY EXISTS → DIRECT DOWNLOAD
-  ====================================================== */
-
-  if (booking.voucher?.filePath) {
-    return res.download(booking.voucher.filePath);
-  }
-
-  /* =====================================================
      ✅ STEP 2: ALLOW BOTH STATES
   ====================================================== */
 
@@ -1774,65 +1767,149 @@ exports.generateHotelVoucher = asyncHandler(async (req, res) => {
   }
 
   /* =====================================================
-     ✅ STEP 3: CALL TBO ONLY IF NOT VOUCHERED
+     ✅ STEP 3: CALL LIVE BOOKING DETAILS API & LOG RESPONSE
+  ====================================================== */
+  const leadPassenger = booking.travellers?.find((t) => t.isLeadPassenger) || booking.travellers?.[0] || {};
+  const bookResult = booking.bookingResult?.providerResponse?.BookResult || {};
+  const bookingIdTBO = bookResult?.BookingId || booking.bookingResult?.hotelBookingId;
+  const confirmationNo = bookResult?.ConfirmationNo || booking.bookingResult?.hotelBookingId;
+  const traceId = bookResult?.TraceId;
+
+  console.log("------------------- [TBO DETAILS API REQUEST] -------------------");
+  console.log({
+    bookingId: bookingIdTBO,
+    confirmationNo,
+    traceId,
+    firstName: leadPassenger?.firstName,
+    lastName: leadPassenger?.lastName,
+  });
+
+  try {
+    const tboBookingDetails = await hotelService.getBookingDetails({
+      bookingId: bookingIdTBO,
+      confirmationNo,
+      traceId,
+      firstName: leadPassenger?.firstName,
+      lastName: leadPassenger?.lastName,
+    });
+
+    const detailResult = tboBookingDetails?.GetBookingDetailResult || tboBookingDetails || {};
+    const liveRooms = Array.isArray(detailResult.Rooms) ? detailResult.Rooms : [];
+    
+    if (liveRooms.length > 0) {
+      // Merge live rooms data into selectedRoom.rawRoomData!
+      const normalizedRoomsRaw = liveRooms.map((liveRoom) => {
+        const hasBreakfast = liveRoom.Inclusion && liveRoom.Inclusion.toLowerCase().includes("breakfast");
+        return {
+          Name: [liveRoom.RoomTypeName || liveRoom.Name || "Standard Room"],
+          Inclusion: liveRoom.Inclusion || liveRoom.Inclusions || "Room Only",
+          MealType: liveRoom.MealType || (hasBreakfast ? "Breakfast Included" : "Room Only"),
+          IsRefundable: liveRoom.IsRefundable ?? true,
+          DayRates: liveRoom.DayRates || [],
+          Description: liveRoom.RoomDescription || "",
+          Amenities: Array.isArray(liveRoom.Amenities) ? liveRoom.Amenities : []
+        };
+      });
+      
+      booking.hotelRequest.selectedRoom.rawRoomData = normalizedRoomsRaw;
+      booking.hotelRequest.selectedRoom.roomTypeName = liveRooms[0].RoomTypeName;
+      booking.hotelRequest.selectedRoom.inclusion = liveRooms[0].Inclusion || liveRooms[0].Inclusions;
+      booking.hotelRequest.selectedRoom.mealType = normalizedRoomsRaw[0].MealType;
+      booking.hotelRequest.selectedRoom.isRefundable = liveRooms[0].IsRefundable;
+      
+      // Mark selectedRoom as modified for mongoose to pick up changes
+      booking.markModified("hotelRequest.selectedRoom");
+    }
+  } catch (err) {
+    console.error("FAILED TO FETCH LIVE TBO BOOKED DETAILS:", err.message);
+    logger.error("FAILED TO FETCH LIVE TBO BOOKED DETAILS:", err);
+  }
+
+  /* =====================================================
+     ✅ STEP 4: PDF CACHE BYPASS (DISABLED PER USER REQUEST)
+  ====================================================== */
+  // Caching disabled: We generate a fresh PDF on every single download request.
+
+  /* =====================================================
+     ✅ STEP 5: CALL TBO ONLY IF NOT VOUCHERED
   ====================================================== */
 
   let voucherResp = booking.voucher?.raw || null;
 
-  if (!voucherResp) {
+  // STRICT BYPASS: If executionStatus is already voucher_generated, or the voucher raw response is already stored,
+  // do NOT call the live TBO API! We will compile the PDF directly using the cached data.
+  if (booking.executionStatus === "voucher_generated" || voucherResp) {
+    if (!voucherResp) {
+      // Fallback: If raw is empty but it was vouchered, reconstruct from BookResult
+      const rawResponse = booking.bookingResult?.providerResponse || {};
+      const bookResult = rawResponse.BookResult || rawResponse || {};
+      voucherResp = bookResult;
+    }
+  } else {
+    // This is the FIRST time downloading/generating the voucher!
     const rawResponse = booking.bookingResult?.providerResponse || {};
-    // const bookResult = rawResponse.BookResult || rawResponse;
-    const bookResult =
-      booking.bookingResult?.providerResponse?.BookResult || {};
-
+    const bookResult = rawResponse.BookResult || rawResponse || {};
     const bookingIdTBO = bookResult?.BookingId;
 
     if (!bookingIdTBO) {
       throw new ApiError(400, "TBO BookingId not found");
     }
 
-    voucherResp = await hotelService.generateVoucher({
+    // HIT TBO API ONCE ON THE FIRST REQUEST!
+    const liveVoucherResp = await hotelService.generateVoucher({
       BookingId: bookingIdTBO,
       EndUserIp: process.env.TBO_END_USER_IP,
     });
 
-    const result = voucherResp?.GenerateVoucherResult || voucherResp;
+    const result = liveVoucherResp?.GenerateVoucherResult || liveVoucherResp;
 
     if (!result?.VoucherStatus) {
       throw new ApiError(500, result?.Error?.ErrorMessage || "Voucher failed");
     }
 
-    // ✅ HANDLE ALREADY GENERATED CASE
-    if (result?.ResponseStatus !== 1) {
-      console.warn("⚠️ Voucher already generated, continuing...");
-    }
-    /* ================= SAVE TBO RESPONSE ================= */
-
+    // Save the raw response and confirmation details back to DB
     booking.voucher = {
       bookingRefNo: result.BookingRefNo || bookResult.BookingRefNo,
       confirmationNo: result.ConfirmationNo || bookResult.ConfirmationNo,
       invoiceNumber: result.InvoiceNumber || null,
       raw: result,
+      filePath: ""
     };
+    voucherResp = result;
   }
 
   /* =====================================================
-     ✅ STEP 4: GENERATE PDF (ONLY IF NOT EXISTS)
+     ✅ STEP 6: GENERATE PDF
   ====================================================== */
 
   const filePath = await pdfService.generateHotelVoucher(booking);
 
-  booking.voucher.filePath = filePath;
+  // Initialize voucher structure if not present
+  if (!booking.voucher) {
+    booking.voucher = {};
+  }
+  booking.voucher.filePath = ""; // Caching disabled: do not persist file path in database
   booking.executionStatus = "voucher_generated";
   booking.voucheredAt = new Date();
 
   await booking.save();
 
   /* =====================================================
-     ✅ STEP 5: DIRECT DOWNLOAD (BEST UX)
+     ✅ STEP 7: DIRECT DOWNLOAD & CLEANUP (BEST UX)
   ====================================================== */
 
-  return res.download(filePath);
+  return res.download(filePath, (err) => {
+    if (err) {
+      console.error("Voucher download completed with response check:", err.message);
+    }
+    // Delete temporary PDF from disk immediately after serving to avoid disk storage leaks
+    const fs = require("fs");
+    fs.unlink(filePath, (unlinkErr) => {
+      if (unlinkErr && unlinkErr.code !== 'ENOENT') {
+        console.error("Failed to delete temporary voucher PDF:", unlinkErr.message);
+      }
+    });
+  });
 });
 
 exports.getProjectHotelExpenses = asyncHandler(async (req, res) => {

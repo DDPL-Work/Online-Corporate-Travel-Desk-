@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hotel Booking Voucher — {{bookingReference}}</title>
+  <style>
+    {{{inlineCss}}}
+  </style>
+</head>
+<body>
+
+<div class="voucher-page">
+
+  <!-- ============================================================
+     TOP HEADER
+  ============================================================ -->
+  <header class="top-ticket-header">
+    <div class="top-ticket-header__meta">
+      <span class="top-ticket-header__date">Booked Date: {{bookedDate}}</span>
+      <div class="top-ticket-header__type-group">
+        <span class="top-ticket-header__type">Hotel Booking Voucher</span>
+        <span class="top-ticket-header__badge">CONFIRMED</span>
+      </div>
+    </div>
+    <div class="top-ticket-header__main">
+      <div class="partner-branding">
+        <img
+          src="{{traveamerLogo}}"
+          alt="Traveamer"
+          class="partner-logo-svg"
+        />
+        <div class="partner-contact-mini">
+          <span>📞 +91 8793353355</span>
+          <span>✉️ contact@traveamer.com</span>
+        </div>
+      </div>
+      <div class="airline-branding" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 3px; font-family: var(--font-sans);">
+        <div class="invoice-ref" style="font-size: 11px; color: #64748b; font-weight: 500; text-align: right;">CNF: <span style="font-weight: 700; color: var(--navy-dark); font-family: var(--font-mono);">{{confirmationNo}}</span></div>
+        <div class="invoice-ref" style="font-size: 11px; color: #64748b; font-weight: 500; text-align: right;">Booking ID: <span style="font-weight: 700; color: var(--navy-dark); font-family: var(--font-mono);">{{tboBookingId}}</span></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══ HOTEL HERO ═══ -->
+  <div class="hotel-hero" style="margin-bottom: 15px;">
+    <div class="hotel-identity">
+      <div class="hotel-name">{{hotelName}}</div>
+      <div class="hotel-address">{{hotelAddress}}</div>
+    </div>
+    <div class="hotel-meta" style="display: flex; align-items: center; justify-content: flex-end;">
+      {{#if hotelImage}}
+      <img src="{{hotelImage}}" alt="{{hotelName}}" class="hotel-header-main-img" />
+      {{/if}}
+    </div>
+  </div>
+
+  <!-- ═══ DATES STRIP ═══ -->
+  <div class="dates-strip">
+    <div class="date-block">
+      <div class="date-role">Check-In</div>
+      <div class="date-day">{{checkInDay}}</div>
+      <div class="date-full">{{checkInFull}}</div>
+      <div class="date-time">After {{checkInTime}}</div>
+    </div>
+
+    <div class="nights-divider">
+      <div class="nights-line">
+        <div class="nights-dot"></div>
+      </div>
+      <div class="nights-count">{{nights}}</div>
+      <div class="nights-label">Nights</div>
+    </div>
+
+    <div class="date-block right">
+      <div class="date-role">Check-Out</div>
+      <div class="date-day">{{checkOutDay}}</div>
+      <div class="date-full">{{checkOutFull}}</div>
+      <div class="date-time">Before {{checkOutTime}}</div>
+    </div>
+  </div>
+
+  <!-- ═══ BODY ═══ -->
+  <div class="voucher-body">
+
+    <!-- Amendment Notice -->
+    {{#if amendment}}
+    <div class="amendment-banner">
+      <div class="amendment-icon">⚠️</div>
+      <div class="amendment-text">
+        <div class="amendment-title">Amendment {{amendment.status}}</div>
+        <div class="amendment-body">A change request has been raised for this booking. Reason: <em>{{amendment.reason}}</em></div>
+        <div class="amendment-id">Change Request ID: {{amendment.id}} &nbsp;·&nbsp; Status: {{amendment.status}} &nbsp;·&nbsp; Last Checked: {{amendment.lastChecked}}</div>
+      </div>
+    </div>
+    {{/if}}
+
+    <!-- Unified Room Spec Details Card -->
+    <div class="unified-info-card" style="margin-bottom: 20px;">
+      <div class="info-card-header">
+        <svg class="info-card-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="2" width="14" height="12" rx="1.5" stroke="rgba(255,255,255,0.7)" stroke-width="1.4"/>
+          <line x1="1" y1="6" x2="15" y2="6" stroke="rgba(255,255,255,0.7)" stroke-width="1.4"/>
+          <line x1="5" y1="6" x2="5" y2="14" stroke="rgba(255,255,255,0.7)" stroke-width="1.4"/>
+        </svg>
+        <div class="info-card-title">Room Specifications</div>
+      </div>
+      <div class="info-card-body" style="padding: var(--space-5);">
+        
+        <!-- Room Details -->
+        <div class="unified-section">
+          {{#each parsedRooms}}
+          <div class="room-item-inline" style="margin-bottom: var(--space-4);">
+            <div class="room-type" style="font-size: 18px; font-weight: 600; color: var(--navy-dark);">Room {{index}}: {{name}}</div>
+            <div class="room-pills" style="margin-top: 6px; display: flex; gap: 8px;">
+              <span class="pill pill-blue">{{../roomsCount}} Room{{#if ../multiRoom}}s{{/if}} · {{../adultsCount}} Adult{{#if ../multiAdult}}s{{/if}}</span>
+              <span class="pill pill-gold">{{mealType}}</span>
+              <span class="pill pill-red">{{#if isRefundable}}Refundable{{else}}Non-Refundable{{/if}}</span>
+            </div>
+            {{#if hasInclusions}}
+            <div class="inclusions-inline" style="margin-top: 8px; font-size: 11px;">
+              <span style="color: var(--navy-dark); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 10px; margin-right: 6px;">Inclusions:</span>
+              <span style="color: #64748b;">{{#each inclusions}}{{this}}{{#unless @last}} &nbsp;·&nbsp; {{/unless}}{{/each}}</span>
+            </div>
+            {{/if}}
+
+            {{#if description}}
+            <div class="room-description-inline" style="margin-top: 10px; font-size: 11px; color: #475569; line-height: 1.5; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px;">
+              <div style="font-size: 10px; color: var(--navy-dark); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Room Specifications</div>
+              <div class="tbo-room-desc" style="color: #64748b;">
+                {{{description}}}
+              </div>
+            </div>
+            {{/if}}
+
+            {{#if hasAmenities}}
+            <div class="room-amenities-inline" style="margin-top: 10px;">
+              <div style="font-size: 10px; color: var(--navy-dark); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Room Amenities</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                {{#each amenities}}
+                <span style="font-size: 9px; background: rgba(201, 162, 64, 0.08); color: #b48a2b; border: 1px solid rgba(201, 162, 64, 0.2); padding: 2px 8px; border-radius: 4px; font-weight: 500;">{{this}}</span>
+                {{/each}}
+              </div>
+            </div>
+            {{/if}}
+          </div>
+          {{else}}
+          <div class="room-item-inline">
+            <div class="room-type" style="font-size: 18px; font-weight: 600; color: var(--navy-dark);">{{roomTypeName}}</div>
+            <div class="room-pills" style="margin-top: 6px; display: flex; gap: 8px;">
+              <span class="pill pill-blue">{{roomsCount}} Room{{#if multiRoom}}s{{/if}} · {{adultsCount}} Adult{{#if ../multiAdult}}s{{/if}}</span>
+              <span class="pill pill-gold">{{mealType}}</span>
+              <span class="pill pill-red">{{#if isRefundable}}Refundable{{else}}Non-Refundable{{/if}}</span>
+            </div>
+            {{#if inclusions.length}}
+            <div class="inclusions-inline" style="margin-top: 8px; font-size: 11px;">
+              <span style="color: var(--navy-dark); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 10px; margin-right: 6px;">Inclusions:</span>
+              <span style="color: #64748b;">{{#each inclusions}}{{this}}{{#unless @last}} &nbsp;·&nbsp; {{/unless}}{{/each}}</span>
+            </div>
+            {{/if}}
+          </div>
+          {{/each}}
+        </div>
+      </div>
+    </div>
+
+    <!-- Unified Passenger Specs Details Card -->
+    <div class="unified-info-card traveler-card" style="background: #EADCB9; border: 1.5px solid rgba(201, 162, 64, 0.45); border-radius: 8px; margin-bottom: 20px; overflow: hidden; page-break-inside: avoid;">
+      <div class="info-card-header" style="background: var(--navy-dark); padding: 10px 16px; display: flex; align-items: center; gap: 8px;">
+        <svg class="info-card-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="fill: var(--gold-soft); width: 14px; height: 14px;">
+          <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm2 1.75a2.75 2.75 0 0 0-5.5 0v2.5a.75.75 0 0 0 .75.75h4a.75.75 0 0 0 .75-.75v-2.5Z"/>
+        </svg>
+        <div class="info-card-title" style="color: var(--gold-soft); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">Passenger Details</div>
+      </div>
+      <div class="info-card-body" style="padding: 16px 20px;">
+        {{#each parsedTravellers}}
+        <div class="passenger-row-grid" style="display: flex; align-items: center; justify-content: space-between; gap: 15px; {{#unless @last}}border-bottom: 1px dashed rgba(201, 162, 64, 0.35); padding-bottom: 12px; margin-bottom: 12px;{{/unless}}">
+          
+          <!-- NAME -->
+          <div style="flex: 1.3; min-width: 0;">
+            <div style="font-size: 9px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+              <span>👤</span> NAME
+            </div>
+            <div style="font-size: 12px; font-weight: 700; color: var(--navy-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase;">
+              {{name}}
+            </div>
+          </div>
+
+          <!-- GENDER & AGE -->
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 9px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+              <span>🚻</span> GENDER / AGE
+            </div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--navy-dark); font-family: var(--font-sans); text-transform: uppercase;">
+              {{gender}} / {{age}}
+            </div>
+          </div>
+
+          <!-- EMAIL -->
+          <div style="flex: 1.3; min-width: 0;">
+            <div style="font-size: 9px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+              <span>📧</span> EMAIL
+            </div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--navy-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              {{email}}
+            </div>
+          </div>
+
+          <!-- PHONE -->
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 9px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+              <span>📱</span> PHONE
+            </div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--navy-dark); font-family: var(--font-sans);">
+              {{phone}}
+            </div>
+          </div>
+
+        </div>
+        {{/each}}
+      </div>
+    </div>
+
+    <!-- Pricing Section Exact Screenshot Match -->
+    <div class="pricing-screenshot-card" style="background: #ffffff; border: 1.5px dashed rgba(201, 162, 64, 0.35); border-radius: 8px; padding: 18px 24px; display: flex; align-items: center; justify-content: center; margin-top: 25px; box-shadow: var(--shadow-sm); margin-bottom: 25px;">
+      <div style="flex: 1; text-align: center;">
+        <div style="font-size: 10px; color: var(--navy-dark); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Total Amount</div>
+        <div style="font-size: 22px; font-weight: 700; color: #b48a2b; font-family: var(--font-sans);">{{currencySymbol}}{{totalAmount}}</div>
+      </div>
+      <div style="width: 1px; height: 35px; border-left: 1.5px dashed rgba(201, 162, 64, 0.3); margin: 0 20px;"></div>
+      <div style="flex: 1; text-align: center;">
+        <div style="font-size: 10px; color: var(--navy-dark); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Currency</div>
+        <div style="font-size: 20px; font-weight: 700; color: var(--navy-dark); font-family: var(--font-sans);">{{currency}}</div>
+      </div>
+    </div>
+
+    <!-- Important Information -->
+    <div class="info-section">
+      <div class="info-section-title">Important Information</div>
+      <div class="info-items">
+        {{#if importantInfo.length}}
+          {{#each importantInfo}}
+          <div class="info-item">
+            <div class="info-item-dot"></div>
+            <div class="info-item-text">{{this}}</div>
+          </div>
+          {{/each}}
+        {{else}}
+          <div class="info-item">
+            <div class="info-item-dot"></div>
+            <div class="info-item-text">Passport, Aadhaar and Driving License accepted as ID proof. Local IDs allowed.</div>
+          </div>
+          <div class="info-item">
+            <div class="info-item-dot"></div>
+            <div class="info-item-text">Primary guest must be at least 18 years of age at check-in.</div>
+          </div>
+          <div class="info-item">
+            <div class="info-item-dot"></div>
+            <div class="info-item-text">Government-issued photo ID and a credit/debit card may be required at check-in for incidentals.</div>
+          </div>
+          <div class="info-item">
+            <div class="info-item-dot"></div>
+            <div class="info-item-text">Special requests are subject to availability and may incur additional charges.</div>
+          </div>
+          <div class="info-item">
+            <div class="info-item-dot"></div>
+            <div class="info-item-text">Outside food and beverages are not permitted on the premises.</div>
+          </div>
+          <div class="info-item">
+            <div class="info-item-dot"></div>
+            <div class="info-item-text">Pets are not allowed at this property.</div>
+          </div>
+        {{/if}}
+      </div>
+    </div>
+  </div><!-- /voucher-body -->
+
+  <!-- ============================================================
+     FOOTER
+  ============================================================ -->
+  <footer class="doc-footer">
+    <div class="doc-footer__inner">
+      <div class="doc-footer__col">
+        <div class="footer-logos">
+          {{#if traveamerLogo}}
+          <img src="{{traveamerLogo}}" alt="Traveamer" class="footer-logo-img" />
+          {{/if}}
+        </div>
+        <div class="footer-contact-info">
+          Support: +91 8793353355 &nbsp;&nbsp; contact@traveamer.com
+        </div>
+      </div>
+      <div class="doc-footer__col doc-footer__col--center">
+        <p>
+          This is a Hotel Booking Voucher issued by Traveamer.com. Please carry a
+          valid government-issued photo ID matching the name on this voucher.
+          This document is computer-generated and does not require a
+          signature.
+        </p>
+      </div>
+      <div class="doc-footer__col doc-footer__col--right">
+        <span class="label">Generated</span><br />
+        <span class="mono">{{generatedAt}}</span>
+      </div>
+    </div>
+    <div class="doc-footer__legal">
+      Carriage and other services provided by the carrier are subject to
+      conditions of carriage, which are hereby incorporated by reference.
+      These conditions may be obtained from the issuing carrier. Traveamer.com
+      acts solely as a booking intermediary and is not the carrier.
+    </div>
+  </footer>
+
+</div><!-- /voucher-page -->
+
+</body>
+</html>

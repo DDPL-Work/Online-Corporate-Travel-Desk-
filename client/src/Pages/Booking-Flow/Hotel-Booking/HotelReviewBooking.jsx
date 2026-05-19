@@ -666,9 +666,16 @@ function SelectedRoomDetailsCard({
         {/* ── Top section: Image, Title, Badges ── */}
         <div>
           {images.length > 0 && <RoomImageGallery images={images} />}
-          <h4 className="text-base font-extrabold text-[#0A203E] leading-snug mb-3">
+          <h4 className="text-base font-extrabold text-[#0A203E] leading-snug mb-1">
             {roomNameDisplay}
           </h4>
+
+          {room?.BeddingGroup && (
+             <div className="flex items-start gap-1.5 text-[12px] text-slate-500 mb-3">
+               <MdKingBed className="text-slate-400 mt-0.5 shrink-0" size={14} />
+               <span className="leading-snug">{room.BeddingGroup}</span>
+             </div>
+          )}
 
           {/* Badges */}
           <div className="flex flex-wrap gap-2 mb-4">
