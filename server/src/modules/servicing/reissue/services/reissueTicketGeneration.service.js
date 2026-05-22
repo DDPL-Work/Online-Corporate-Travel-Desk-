@@ -4,6 +4,10 @@ const logger = require("../../../../utils/logger");
 const ApiError = require("../../../../utils/ApiError");
 const BookingRequest = require("../../../../models/BookingRequest");
 const pdfService = require("../../../../services/pdf.service");
+const {
+  buildActiveTicketSnapshotFromState,
+} = require("../utils/activeTicketSnapshot.helper");
+const { normalizeSsrSnapshot } = require("../utils/ssrSnapshot.util");
 
 class ReissueTicketGenerationService {
   constructor() {
@@ -129,14 +133,68 @@ class ReissueTicketGenerationService {
   buildSyntheticBooking({ originalBooking, request, selectedFlight, pricingSnapshot }) {
     const travellers = this.buildTravellers(originalBooking);
     const tboSegments = this.buildTboSegments(selectedFlight);
-    const newFare = Number(
-      pricingSnapshot?.newFare ??
-        selectedFlight?.newFare ??
-        selectedFlight?.fare ??
-        0,
-    );
+    const rawSegmentSnapshot = tboSegments.map((segment, index) => ({
+      origin: segment.Origin.Airport.AirportCode,
+      destination: segment.Destination.Airport.AirportCode,
+      departureTime: segment.Origin.DepTime,
+      arrivalTime: segment.Destination.ArrTime,
+      airlineCode: segment.Airline.AirlineCode,
+      airlineName: segment.Airline.AirlineName,
+      flightNumber: segment.Airline.FlightNumber,
+      journeyType: index > 0 ? "return" : "onward",
+      baggage: segment.Baggage,
+      cabinBaggage: segment.CabinBaggage,
+      duration: segment.Duration,
+    }));
+    const requestSelectedSsr =
+      request?.metadata?.selectedSSR ??
+      request?.activeTicketSnapshot?.ssrSnapshot ??
+      request?.activeTicketSnapshot?.ssr ??
+      {};
+    const normalizedSsrSnapshot = normalizeSsrSnapshot(requestSelectedSsr, rawSegmentSnapshot);
 
-    return {
+    let baseFare = Number(
+      pricingSnapshot?.newBaseFare ??
+      pricingSnapshot?.baseFare ??
+      selectedFlight?.baseFare ??
+      0
+    );
+    let tax = Number(
+      pricingSnapshot?.newTaxes ??
+      pricingSnapshot?.tax ??
+      selectedFlight?.tax ??
+      0
+    );
+    let newFare = Number(
+      pricingSnapshot?.newFare ??
+      selectedFlight?.newFare ??
+      selectedFlight?.fare ??
+      0
+    );
+    let seatSSR = 0;
+    let mealSSR = 0;
+    let baggageSSR = 0;
+
+    const ledger = request.financialLedger;
+    const history = request.pricingHistory || [];
+
+    if (ledger && history.length > 0) {
+      const lastEntry = history[history.length - 1];
+      baseFare = Number(lastEntry.newBaseFare ?? baseFare);
+      tax = Number(lastEntry.newTaxes ?? tax);
+      newFare = Number(lastEntry.newFare ?? newFare);
+      seatSSR = Number(lastEntry.newSeatSSR ?? 0);
+      mealSSR = Number(lastEntry.newMealSSR ?? 0);
+      baggageSSR = Number(lastEntry.newBaggageSSR ?? 0);
+    } else if (pricingSnapshot) {
+      seatSSR = Number(pricingSnapshot.seatSSR ?? pricingSnapshot.seatCharges ?? 0);
+      mealSSR = Number(pricingSnapshot.mealSSR ?? pricingSnapshot.mealCharges ?? 0);
+      baggageSSR = Number(pricingSnapshot.baggageSSR ?? pricingSnapshot.baggageCharges ?? 0);
+    }
+
+    const totalSSR = seatSSR + mealSSR + baggageSSR;
+
+    const syntheticBooking = {
       bookingReference:
         originalBooking?.bookingReference ||
         originalBooking?.orderId ||
@@ -144,20 +202,8 @@ class ReissueTicketGenerationService {
       createdAt: originalBooking?.createdAt || new Date(),
       travellers,
       flightRequest: {
-        segments: tboSegments.map((segment) => ({
-          origin: segment.Origin.Airport.AirportCode,
-          destination: segment.Destination.Airport.AirportCode,
-          departureTime: segment.Origin.DepTime,
-          arrivalTime: segment.Destination.ArrTime,
-          airlineCode: segment.Airline.AirlineCode,
-          flightNumber: segment.Airline.FlightNumber,
-          journeyType: "onward",
-        })),
-        ssrSnapshot: {
-          seats: [],
-          totalSeatAmount: 0,
-          totalMealAmount: 0,
-        },
+        segments: rawSegmentSnapshot,
+        ssrSnapshot: normalizedSsrSnapshot,
         fareQuote: {
           Results: [
             {
@@ -171,9 +217,12 @@ class ReissueTicketGenerationService {
         fareType: selectedFlight?.cabinClass || originalBooking?.bookingSnapshot?.fareType || "Regular Fare",
         cabinClass:
           selectedFlight?.cabinClass || originalBooking?.bookingSnapshot?.cabinClass || "Economy",
+        amount: newFare + totalSSR,
       },
       pricingSnapshot: {
-        totalAmount: newFare,
+        totalAmount: newFare + totalSSR,
+        baseAmount: baseFare,
+        taxes: tax,
       },
       bookingResult: {
         onwardPNR: request.originalPnr || request.pnr,
@@ -185,9 +234,13 @@ class ReissueTicketGenerationService {
                 TBOConfNo: request.originalPnr || request.pnr,
                 Segments: tboSegments,
                 Fare: {
-                  BaseFare: newFare,
-                  Tax: 0,
+                  BaseFare: baseFare,
+                  Tax: tax,
                   PublishedFare: newFare,
+                  OfferedFare: newFare,
+                  TotalSeatCharges: seatSSR,
+                  TotalMealCharges: mealSSR,
+                  TotalBaggageCharges: baggageSSR,
                 },
                 Passenger: [
                   {
@@ -207,6 +260,14 @@ class ReissueTicketGenerationService {
         reissueReferenceId: request.requestId,
       },
     };
+
+    syntheticBooking.activeTicketSnapshot = buildActiveTicketSnapshotFromState(syntheticBooking, {
+      pnrOverride: request.originalPnr || request.pnr || null,
+      ssrSnapshotOverride: normalizedSsrSnapshot,
+      segmentsOverride: rawSegmentSnapshot,
+    });
+
+    return syntheticBooking;
   }
 
   extractOriginalItinerary(originalBooking = {}) {

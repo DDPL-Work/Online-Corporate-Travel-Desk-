@@ -31,6 +31,12 @@ const reissueBookingLifecycleService = require("./reissueBookingLifecycle.servic
 const { validateCreateReissuePayload } = require("../validators/createReissue.validator");
 const { validateOpsStatusUpdate } = require("../validators/opsUpdateReissue.validator");
 const { canTransition } = require("../utils/reissueStatusMachine.util");
+const reissueFinancialLedgerService = require("../../../../services/reissue/reissueFinancialLedger.service");
+const {
+  buildActiveTicketSnapshot,
+  buildActiveTicketSnapshotFromState,
+} = require("../utils/activeTicketSnapshot.helper");
+const { normalizeSsrSnapshot } = require("../utils/ssrSnapshot.util");
 
 reissueNotificationService.registerSubscribers();
 
@@ -132,6 +138,28 @@ class ReissueWorkflowService {
       : actor.email || actor.role;
   }
 
+  normalizeSelectedSsr(payload = {}, booking = {}) {
+    if (!Object.prototype.hasOwnProperty.call(payload, "ssr")) {
+      return undefined;
+    }
+
+    return normalizeSsrSnapshot(payload?.ssr || {}, booking?.flightRequest?.segments || []);
+  }
+
+  resolveSelectedSsrForRequest(request = {}, booking = {}) {
+    if (request?.metadata && Object.prototype.hasOwnProperty.call(request.metadata, "selectedSSR")) {
+      return request.metadata.selectedSSR;
+    }
+
+    return (
+      request?.activeTicketSnapshot?.ssrSnapshot ||
+      request?.activeTicketSnapshot?.ssr ||
+      booking?.flightRequest?.ssrSnapshot ||
+      booking?.bookingSnapshot?.ssrSnapshot ||
+      {}
+    );
+  }
+
   async createRequest({ actor, payload }) {
     validateCreateReissuePayload(payload);
 
@@ -154,6 +182,7 @@ class ReissueWorkflowService {
 
     const corporate = await Corporate.findById(booking.corporateId);
     if (!corporate) throw new ApiError(404, "Corporate not found");
+    const normalizedSelectedSsr = this.normalizeSelectedSsr(payload, booking);
 
     const eligibility = reissueEligibilityService.evaluate({
       booking,
@@ -182,11 +211,15 @@ class ReissueWorkflowService {
       oldJourney: this.buildOldJourney(booking),
       newJourney: payload.newJourney,
       billingMode,
+      financialLedger: reissueFinancialLedgerService.initializeLedger(booking),
+      pricingHistory: [],
+      activeTicketSnapshot: buildActiveTicketSnapshot(booking),
       metadata: {
         employeeEmail: actor.email,
         employeeName: this.actorName(actor),
         orderId: booking.orderId || booking.bookingReference,
         remarks: payload.remarks || "",
+        ...(normalizedSelectedSsr !== undefined ? { selectedSSR: normalizedSelectedSsr } : {}),
         originalTraceId: this.extractOriginalTraceId(booking),
         originalResultIndex: this.extractOriginalResultIndex(booking),
         originalTicketData: this.extractOriginalTicketData(booking),
@@ -242,6 +275,11 @@ class ReissueWorkflowService {
     });
 
     if (!eligibility.eligible) {
+      logger.info("ONLINE_REISSUE_REJECTED", {
+        bookingId: booking._id?.toString(),
+        airlineCode: eligibility.support?.airlineCode || null,
+        reasons: eligibility.reasons,
+      });
       // ── QA sandbox path: ineligible by fare rules but sandbox testing is allowed ──
       // Allow the search to proceed so QA can verify the provider flow.
       // The provider will reject (expected) → workflow catches it → OFFLINE_REQUIRED.
@@ -337,6 +375,11 @@ class ReissueWorkflowService {
       };
 
       if (!providerEligibility.eligible) {
+        logger.info("ONLINE_REISSUE_REJECTED", {
+          bookingId: booking._id?.toString(),
+          airlineCode: providerEligibility.support?.airlineCode || null,
+          reasons: providerEligibility.reasons,
+        });
         const isOfflineRequired = providerEligibility.reasons.some(reason =>
           reason.includes("online reissue is not allowed") ||
           reason.includes("Mini fare rules indicate online reissue is not allowed")
@@ -373,6 +416,11 @@ class ReissueWorkflowService {
           });
         }
       } else {
+        logger.info("ONLINE_REISSUE_SUPPORTED", {
+          bookingId: booking._id?.toString(),
+          airlineCode: providerEligibility.support?.airlineCode || null,
+          traceId: normalized.traceId,
+        });
         reissueAuditService.transition(request, REISSUE_STATUSES.SEARCH_COMPLETED, {
           title: "Search completed",
           description: "Provider returned revised flight options for reissue",
@@ -449,6 +497,7 @@ class ReissueWorkflowService {
     }
 
     try {
+      request.isReissueLocked = true;
       const booking = await this.loadBookingOrThrow(request.bookingId);
       const { quoteResponse, normalized } = await reissueExecutionService.fareQuote({
         reissueRequest: request,
@@ -460,6 +509,7 @@ class ReissueWorkflowService {
         fareQuoteResponse: quoteResponse,
       };
       request.miniFareRules = normalized.miniFareRules;
+      request.supplierSupport.onlineReissueAllowed = normalized.onlineReissueAllowed;
       request.supplierSupport.onlineRefundAllowed = normalized.onlineRefundAllowed;
       request.metadata = {
         ...(request.metadata || {}),
@@ -469,15 +519,48 @@ class ReissueWorkflowService {
         itinerary: normalized.itinerary,
         supplierCharges: Number(normalized.supplierReissueCharges || 0),
       };
-      request.reissueCharges = Number(normalized.supplierReissueCharges || 0);
-      request.fareDifference = Math.max(
-        0,
-        Number(normalized.publishedFare || 0) -
-          Number(booking?.pricingSnapshot?.totalAmount || 0),
-      );
-      request.totalAdjustment = request.fareDifference + request.reissueCharges;
+      const reissuePenaltyResolver = require("./reissuePenaltyResolver.service");
+      const resolvedPenalty = await reissuePenaltyResolver.resolvePenalty({
+        booking,
+        reissueRequest: request,
+        normalizedQuote: normalized,
+      });
 
-      if (!request.supplierSupport.onlineRefundAllowed) {
+      request.reissueCharges = resolvedPenalty;
+
+      const calculation = reissueFinancialLedgerService.calculateCumulativeReissueAmount({
+        request,
+        newFareQuote: { fare: normalized.publishedFare },
+        selectedSSR: this.resolveSelectedSsrForRequest(request, booking),
+        supplierReissueCharge: request.reissueCharges,
+        booking,
+      });
+
+      request.fareDifference = Number(
+        (calculation.newFare - (calculation.previousFare || 0)).toFixed(2),
+      );
+      request.totalAdjustment = calculation.additionalCollection;
+
+      request.normalizedPricing = {
+        reissuePenalty: resolvedPenalty,
+        newFlightBase: normalized.publishedFare,
+        newSSRTotal: calculation.newSSR || 0,
+        reusablePreviousValue: calculation.reusableValue || 0,
+        netPayable: calculation.netPayable || 0,
+        refundDue: calculation.refundDue || 0,
+      };
+
+      logger.info("REISSUE_QUOTE_GENERATED", {
+        requestId: request.reissueId,
+        selectedResultIndex: normalized.selectedResultIndex,
+        newFare: calculation.newFare,
+        newSSR: calculation.newSSR,
+        airlinePenalty: resolvedPenalty,
+        netPayable: calculation.netPayable,
+        refundDue: calculation.refundDue,
+      });
+
+      if (!request.supplierSupport.onlineReissueAllowed) {
         reissueAuditService.transition(request, REISSUE_STATUSES.FAILED, {
           title: "Fare quote rejected",
           description: "Mini fare rules do not allow online reissue",
@@ -487,9 +570,10 @@ class ReissueWorkflowService {
           metadata: {
             ...request.metadata,
             status: REISSUE_STATUSES.FAILED,
-            onlineRefundAllowed: false,
+            onlineReissueAllowed: false,
           },
         });
+        request.isReissueLocked = false;
         await reissueRepository.save(request);
         await reissueBookingLifecycleService.unlockBookingReissue({
           bookingId: booking._id,
@@ -508,6 +592,7 @@ class ReissueWorkflowService {
           metadata: {
             ...request.metadata,
             status: REISSUE_STATUSES.QUOTE_RECEIVED,
+            onlineReissueAllowed: normalized.onlineReissueAllowed,
             onlineRefundAllowed: normalized.onlineRefundAllowed,
           },
         });
@@ -518,6 +603,7 @@ class ReissueWorkflowService {
           message: "Reissue quote refreshed",
           metadata: {
             status: request.status,
+            onlineReissueAllowed: normalized.onlineReissueAllowed,
             onlineRefundAllowed: normalized.onlineRefundAllowed,
           },
         });
@@ -541,6 +627,7 @@ class ReissueWorkflowService {
         },
       });
 
+      request.isReissueLocked = false;
       await reissueRepository.save(request);
       return request;
     } finally {
@@ -566,7 +653,9 @@ class ReissueWorkflowService {
     }
 
     try {
+      request.isReissueLocked = true;
       const booking = await this.loadBookingOrThrow(request.bookingId);
+      const selectedSsr = this.resolveSelectedSsrForRequest(request, booking);
       reissueAuditService.transition(request, REISSUE_STATUSES.PROCESSING, {
         title: "Processing online reissue",
         description: "Supplier ticket reissue execution started",
@@ -622,6 +711,46 @@ class ReissueWorkflowService {
           null,
       });
 
+      // Refresh activeTicketSnapshot from the newly-reissued booking, supplementing
+      // with request-level fields that the booking document may not carry yet.
+      request.activeTicketSnapshot = activeBooking
+        ? buildActiveTicketSnapshotFromState(activeBooking, {
+            pnrOverride: request.newPnr || request.originalPnr || null,
+            supplierBookingIdOverride: result.newBookingId || null,
+            ssrSnapshotOverride: selectedSsr,
+            ticketDataOverride: request.ticketData || null,
+            revisedTicketOverride: request.revisedTicket || null,
+            revisedInvoiceOverride: request.revisedInvoice || null,
+            sourceBookingIdOverride: activeBooking?._id || null,
+          })
+        : request.activeTicketSnapshot;
+
+      // Apply reissue cycle
+      const cycleCalc = reissueFinancialLedgerService.calculateCumulativeReissueAmount({
+        request,
+        newFareQuote: request.metadata?.itinerary || request.newJourney,
+        selectedSSR: selectedSsr,
+        supplierReissueCharge: request.reissueCharges,
+        booking,
+      });
+
+      request.normalizedPricing = {
+        reissuePenalty: request.reissueCharges || 0,
+        newFlightBase: cycleCalc.newFare || 0,
+        newSSRTotal: cycleCalc.newSSR || 0,
+        reusablePreviousValue: cycleCalc.reusableValue || 0,
+        netPayable: cycleCalc.netPayable || 0,
+        refundDue: cycleCalc.refundDue || 0,
+      };
+
+      reissueFinancialLedgerService.applyReissueCycle(request, cycleCalc);
+
+      logger.info("SSR_PERSISTED", {
+        requestId: request.reissueId,
+        totalSSRAmount: request.activeTicketSnapshot?.ssr?.totalSSRAmount || 0,
+        segmentCount: request.activeTicketSnapshot?.segments?.length || 0,
+      });
+
       await reissueBillingService.finalize({ reissueRequest: request });
 
       reissueAuditService.transition(request, REISSUE_STATUSES.COMPLETED, {
@@ -638,7 +767,13 @@ class ReissueWorkflowService {
         },
       });
 
+      request.isReissueLocked = false;
       await reissueRepository.save(request);
+      logger.info("REISSUE_COMPLETED", {
+        requestId: request.reissueId,
+        activeBookingId: activeBooking?._id?.toString?.() || null,
+        newPnr: request.newPnr,
+      });
       await reissueBookingLifecycleService.unlockBookingReissue({
         bookingId: booking._id,
         requestId: request._id,
@@ -660,6 +795,7 @@ class ReissueWorkflowService {
           status: REISSUE_STATUSES.FAILED,
         },
       });
+      request.isReissueLocked = false;
       await reissueRepository.save(request);
       await reissueBookingLifecycleService.unlockBookingReissue({
         bookingId: request.bookingId,

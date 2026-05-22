@@ -18,6 +18,7 @@ import {
   getPnr,
   getUserName,
   getUserEmail,
+  getCorporateName,
   getStatusTone,
   getRequestedDate,
   getStatus,
@@ -116,6 +117,7 @@ export default function LegacyReissueDetailModal({
     req?.corporate?.employeeName ||
     getUserName(req);
   const email = getUserEmail(req);
+  const corporateName = getCorporateName(req);
   const reason =
     req.reason ||
     req.remarks ||
@@ -131,6 +133,7 @@ export default function LegacyReissueDetailModal({
     journeyType: resolveJourneyType(req),
     airline: resolveAirline(req),
     flightNumber:
+      req?.displayInfo?.flightNumber ||
       resolvePrimarySegment(req)?.flightNumber ||
       req?.selectedFlight?.flightNumber ||
       req?.bookingSnapshot?.flightNumber ||
@@ -138,6 +141,7 @@ export default function LegacyReissueDetailModal({
       "N/A",
 
     route: (() => {
+      if (req?.displayInfo?.route) return req.displayInfo.route;
       const seg = resolvePrimarySegment(req);
       const lastSeg =
         (Array.isArray(req?.selectedSegments) && req.selectedSegments.length > 0
@@ -162,6 +166,7 @@ export default function LegacyReissueDetailModal({
     arrival: resolveArrival(req),
     duration: resolveDuration(req),
     stops:
+      req?.displayInfo?.stops ??
       resolvePrimarySegment(req)?.stops ??
       req?.preferredJourney?.stops ??
       req?.selectedFlight?.stops ??
@@ -176,6 +181,7 @@ export default function LegacyReissueDetailModal({
     totalEstimate: resolveTotalFare(req),
 
     currency:
+      req?.displayInfo?.currency ||
       req?.currency ||
       req?.reissuePricingSnapshot?.currency ||
       req?.preferredJourney?.currency ||
@@ -256,12 +262,17 @@ export default function LegacyReissueDetailModal({
               <div className="w-12 h-12 rounded-xl bg-[#0A4D68]/10 text-[#0A4D68] flex items-center justify-center font-black text-lg shrink-0">
                 {empName[0]?.toUpperCase() || <FiUser size={20} />}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-0.5">
                   Employee
                 </p>
                 <p className="font-bold text-slate-800 truncate">{empName}</p>
                 <p className="text-xs text-slate-500 truncate">{email}</p>
+                {corporateName && corporateName !== "N/A" && (
+                  <p className="text-[10px] font-extrabold text-[#088395] uppercase tracking-wider mt-1 truncate">
+                    {corporateName}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -487,6 +498,263 @@ export default function LegacyReissueDetailModal({
               </div>
             </div>
           </div>
+
+          {/* CUMULATIVE FINANCIAL LEDGER */}
+          {req.financialLedger && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+              <p className="text-[11px] font-black uppercase tracking-widest text-[#0A4D68] flex items-center gap-2">
+                <FiFileText size={14} /> Cumulative Financial Ledger
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Column 1: Original Cost Structure */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b pb-1.5">
+                    Original Booking Cost Structure
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <p className="text-slate-400 font-medium">Ticket Base Fare</p>
+                      <p className="font-bold text-slate-800 mt-0.5">
+                        {formatCurrency(req.financialLedger.originalBaseFare, bookingInfo.currency)}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <p className="text-slate-400 font-medium">Ticket Taxes</p>
+                      <p className="font-bold text-slate-800 mt-0.5">
+                        {formatCurrency(req.financialLedger.originalTaxes, bookingInfo.currency)}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <p className="text-slate-400 font-medium">Original Seats SSR</p>
+                      <p className="font-bold text-slate-800 mt-0.5">
+                        {formatCurrency(req.financialLedger.originalSeatSSR, bookingInfo.currency)}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <p className="text-slate-400 font-medium">Original Meals SSR</p>
+                      <p className="font-bold text-slate-800 mt-0.5">
+                        {formatCurrency(req.financialLedger.originalMealSSR, bookingInfo.currency)}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <p className="text-slate-400 font-medium">Original Baggage SSR</p>
+                      <p className="font-bold text-slate-800 mt-0.5">
+                        {formatCurrency(req.financialLedger.originalBaggageSSR, bookingInfo.currency)}
+                      </p>
+                    </div>
+                    <div className="bg-indigo-50 p-2.5 rounded-lg border border-indigo-100">
+                      <p className="text-indigo-600 font-black">Original Total Paid</p>
+                      <p className="font-black text-indigo-900 mt-0.5">
+                        {formatCurrency((req.financialLedger.originalTicketAmount || 0) + (req.financialLedger.originalSSR || 0), bookingInfo.currency)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2: Cumulative Modification Totals */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b pb-1.5">
+                    Cumulative Modification Totals
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <p className="text-slate-400 font-medium">Total Airline Penalties</p>
+                      <p className="font-bold text-slate-800 mt-0.5">
+                        {formatCurrency(req.financialLedger.cumulativeReissueCharges, bookingInfo.currency)}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <p className="text-slate-400 font-medium">Total New SSR Cost</p>
+                      <p className="font-bold text-slate-800 mt-0.5">
+                        {formatCurrency(req.financialLedger.cumulativeSSR, bookingInfo.currency)}
+                      </p>
+                    </div>
+                    <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-100">
+                      <p className="text-amber-600 font-bold">Total Additional Collections</p>
+                      <p className="font-bold text-amber-800 mt-0.5">
+                        {formatCurrency(req.financialLedger.cumulativeCollections, bookingInfo.currency)}
+                      </p>
+                    </div>
+                    <div className="bg-emerald-50 p-2.5 rounded-lg border border-emerald-100">
+                      <p className="text-emerald-600 font-bold">Total Refunds Issued</p>
+                      <p className="font-bold text-emerald-800 mt-0.5">
+                        {formatCurrency(req.financialLedger.cumulativeRefunds, bookingInfo.currency)}
+                      </p>
+                    </div>
+                    <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 col-span-2">
+                      <div className="flex justify-between items-center">
+                        <p className="text-blue-700 font-black">Net Paid To Date</p>
+                        <p className="font-black text-blue-900 text-sm">
+                          {formatCurrency(req.financialLedger.totalNetPaid, bookingInfo.currency)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* REISSUE CYCLE HISTORY */}
+          {Array.isArray(req.pricingHistory) && req.pricingHistory.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+              <p className="text-[11px] font-black uppercase tracking-widest text-[#0A4D68] flex items-center gap-2">
+                <FiClock size={14} /> Reissue Lifecycle & Pricing History
+              </p>
+              
+              <div className="space-y-4">
+                {req.pricingHistory.map((cycle, idx) => (
+                  <div key={idx} className="border border-slate-100 rounded-xl overflow-hidden shadow-sm bg-slate-50/50">
+                    <div className="bg-slate-100/70 px-4 py-3 flex justify-between items-center border-b border-slate-200/50">
+                      <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                        Reissue Cycle {cycle.cycle || idx + 1}
+                      </span>
+                      <span className="text-xs text-slate-400 font-semibold font-mono">
+                        {formatDateTime(cycle.createdAt)}
+                      </span>
+                    </div>
+
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Left: Flight Details snapshot */}
+                      <div className="space-y-2 text-xs">
+                        <p className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">
+                          Flight Costs Snapshot
+                        </p>
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Base Fare:</span>
+                            <span className="font-semibold text-slate-700">{formatCurrency(cycle.newBaseFare, bookingInfo.currency)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Taxes & Fees:</span>
+                            <span className="font-semibold text-slate-700">{formatCurrency(cycle.newTaxes, bookingInfo.currency)}</span>
+                          </div>
+                          <div className="flex justify-between border-t pt-1.5 mt-1.5 font-bold">
+                            <span className="text-slate-500">Flight Total:</span>
+                            <span className="text-slate-800">{formatCurrency(cycle.newFare, bookingInfo.currency)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Middle: SSR Reconciliation details */}
+                      <div className="space-y-2 text-xs">
+                        <p className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">
+                          SSR Delta Reconciliation
+                        </p>
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">New SSR Total:</span>
+                            <span className="font-semibold text-slate-700">{formatCurrency(cycle.newSSR, bookingInfo.currency)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Reusable SSR Value:</span>
+                            <span className="font-semibold text-emerald-600">-{formatCurrency(cycle.reusableSSRValue, bookingInfo.currency)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Refundable SSR Value:</span>
+                            <span className="font-semibold text-blue-600">{formatCurrency(cycle.refundSSRValue, bookingInfo.currency)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Additional SSR Charge:</span>
+                            <span className="font-semibold text-amber-600">+{formatCurrency(cycle.additionalSSRValue, bookingInfo.currency)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Net Settlement (airline-grade breakdown) */}
+                      <div className="space-y-2 text-xs bg-[#0A4D68]/5 p-3 rounded-lg border border-[#0A4D68]/10 col-span-1 md:col-span-1">
+                        <p className="font-bold text-[#0A4D68] uppercase tracking-wider text-[10px]">
+                          Net Settlement
+                        </p>
+
+                        {/* Section 1: Original Ticket Value */}
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 pt-1">
+                          Original Ticket Value
+                        </p>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Previously Paid:</span>
+                          <span className="font-semibold text-slate-700">
+                            {formatCurrency(cycle.previousTotalPaid ?? cycle.alreadyPaid, bookingInfo.currency)}
+                          </span>
+                        </div>
+
+                        {/* Section 2: New Itinerary Cost */}
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 pt-1">
+                          New Itinerary Cost
+                        </p>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">New Flight Fare:</span>
+                          <span className="font-semibold text-slate-700">
+                            {formatCurrency(cycle.newFare, bookingInfo.currency)}
+                          </span>
+                        </div>
+                        {Number(cycle.newSSR || 0) > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">New SSR Total:</span>
+                            <span className="font-semibold text-slate-700">
+                              {formatCurrency(cycle.newSSR, bookingInfo.currency)}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Section 3: Reissue Adjustments */}
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 pt-1">
+                          Reissue Adjustments
+                        </p>
+                        {(() => {
+                          const prevPaid = Number(cycle.previousTotalPaid ?? cycle.alreadyPaid ?? 0);
+                          const newFare  = Number(cycle.newFare ?? 0);
+                          const adj = cycle.flightAdjustment != null
+                            ? Number(cycle.flightAdjustment)
+                            : newFare - prevPaid;
+                          const isNeg = adj < 0;
+                          return (
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Flight Fare Adj:</span>
+                              <span className={`font-semibold ${isNeg ? "text-rose-600" : "text-emerald-700"}`}>
+                                {isNeg ? "−" : "+"}{formatCurrency(Math.abs(adj), bookingInfo.currency)}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Airline Reissue Penalty:</span>
+                          <span className="font-semibold text-slate-700">
+                            +{formatCurrency(cycle.reissueCharge ?? cycle.airlinePenalty, bookingInfo.currency)}
+                          </span>
+                        </div>
+
+                        {/* Section 4: Final Settlement */}
+                        <div className="border-t border-slate-300 pt-1.5 mt-1.5 space-y-0.5">
+                          {Number(cycle.additionalCollection || 0) > 0 && (
+                            <div className="flex justify-between font-bold">
+                              <span className="text-slate-600">Net Additional Collection:</span>
+                              <span className="text-amber-700">
+                                +{formatCurrency(cycle.additionalCollection, bookingInfo.currency)}
+                              </span>
+                            </div>
+                          )}
+                          {Number(cycle.refundAmount || 0) > 0 && (
+                            <div className="flex justify-between font-bold">
+                              <span className="text-slate-600">Refund Due:</span>
+                              <span className="text-emerald-700">
+                                −{formatCurrency(cycle.refundAmount, bookingInfo.currency)}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-between font-black text-sm text-[#0A4D68] pt-0.5 border-t border-slate-200">
+                            <span>Final Net Paid:</span>
+                            <span>{formatCurrency(cycle.totalPaidAfterCycle, bookingInfo.currency)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* TWO COLUMN: OPS ASSIGNMENT & SLA */}
           <div className="grid md:grid-cols-2 gap-4">

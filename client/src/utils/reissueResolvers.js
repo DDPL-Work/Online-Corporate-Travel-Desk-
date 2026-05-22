@@ -73,6 +73,7 @@ export const getRequestId = (req) => {
 
 export const getPnr = (req) => {
   if (!req) return "N/A";
+  if (req.displayInfo?.pnr) return safeString(req.displayInfo.pnr);
   return safeString(
     req.pnr ||
     req.originalPnr ||
@@ -85,6 +86,7 @@ export const getPnr = (req) => {
 
 export const getUserName = (req) => {
   if (!req) return "Not Available";
+  if (req.displayInfo?.userName) return req.displayInfo.userName;
   const name =
     req.requesterDetails?.name ||
     req.employee?.name ||
@@ -108,6 +110,7 @@ export const getUserName = (req) => {
 
 export const getUserEmail = (req) => {
   if (!req) return "N/A";
+  if (req.displayInfo?.userEmail) return safeString(req.displayInfo.userEmail);
   return safeString(
     req.user?.email ||
     req.employee?.email ||
@@ -116,12 +119,28 @@ export const getUserEmail = (req) => {
   );
 };
 
+export const getCorporateName = (req) => {
+  if (!req) return "N/A";
+  if (req.displayInfo?.corporateName) return req.displayInfo.corporateName;
+  return req.corporateName || req.corporateId?.corporateName || req.companyId?.corporateName || req.metadata?.corporateName || "N/A";
+};
+
 /**
  * Journey type — reads from preferredJourney.metadata.searchParams.journeyType
  * Returns human-readable string. NEVER reads bookingSnapshot.
  */
 export const getJourneyType = (req) => {
   if (!req) return "N/A";
+  if (req.displayInfo?.journeyType) {
+    const mapping = {
+      0: "Not Set",
+      1: "One Way",
+      2: "Round Trip",
+      3: "Multi City",
+    };
+    const val = req.displayInfo.journeyType;
+    return mapping[val] || safeString(val);
+  }
   const type =
     req?.preferredJourney?.metadata?.searchParams?.journeyType ??
     req?.metadata?.journeyType ??
@@ -138,17 +157,15 @@ export const getJourneyType = (req) => {
   return mapping[type] || safeString(type) || "Not Set";
 };
 
-export const resolvePrimarySegment = (req = {}) =>
-  req?.selectedSegments?.[0] ||
-  req?.segments?.[0] ||
-  req?.preferredJourney?.segments?.[0] ||
-  req?.bookingSnapshot?.segments?.[0] ||
-  req?.preferredJourney ||
-  req?.metadata?.selectedSegments?.[0] ||
-  // Online DTO (toReissueDto) stores journey under newJourney / oldJourney
-  req?.newJourney?.segments?.[0] ||
-  req?.oldJourney?.segments?.[0] ||
-  {};
+export const resolvePrimarySegment = (req = {}) => {
+  const segs = getSegments(req);
+  if (segs.length > 0) return segs[0];
+  // Fallback to preferredJourney if flat object
+  if (req?.preferredJourney && (req.preferredJourney.origin || req.preferredJourney.destination)) {
+    return req.preferredJourney;
+  }
+  return {};
+};
 
 const airlineCodeMap = {
   "6E": "Indigo",
@@ -161,6 +178,7 @@ const airlineCodeMap = {
 };
 
 export const resolveAirline = (req = {}) => {
+  if (req?.displayInfo?.airline) return req.displayInfo.airline;
   const segment = resolvePrimarySegment(req);
 
   return (
@@ -180,6 +198,7 @@ export const resolveAirline = (req = {}) => {
 };
 
 export const resolveDeparture = (req = {}) => {
+  if (req?.displayInfo?.departureTime) return req.displayInfo.departureTime;
   const segment = resolvePrimarySegment(req);
 
   return (
@@ -193,6 +212,7 @@ export const resolveDeparture = (req = {}) => {
 };
 
 export const resolveArrival = (req = {}) => {
+  if (req?.displayInfo?.arrivalTime) return req.displayInfo.arrivalTime;
   const segment = resolvePrimarySegment(req);
 
   return (
@@ -206,6 +226,7 @@ export const resolveArrival = (req = {}) => {
 };
 
 export const resolveDuration = (req = {}) => {
+  if (req?.displayInfo?.duration) return req.displayInfo.duration;
   const segment = resolvePrimarySegment(req);
 
   const raw =
@@ -229,46 +250,67 @@ export const resolveDuration = (req = {}) => {
   return `${hrs}h ${rem}m`;
 };
 
-export const resolveTotalFare = (req = {}) =>
-  req?.pricingSnapshot?.totalAmount ||
-  req?.pricingSnapshot?.totalFare ||
-  req?.selectedFlight?.totalFare ||
-  req?.selectedFlight?.totalEstimate ||
-  req?.fareQuote?.totalFare ||
-  req?.pricing?.grandTotal ||
-  req?.reissuePricingSnapshot?.totalAmount ||
-  req?.reissuePricingSnapshot?.totalEstimate ||
-  req?.totalEstimate ||
-  // Online DTO: totalAdjustment is the net billing amount
-  req?.totalAdjustment ||
-  0;
+export const resolveTotalFare = (req = {}) => {
+  if (req?.displayInfo?.totalEstimate !== undefined && req?.displayInfo?.totalEstimate !== null) {
+    return req.displayInfo.totalEstimate;
+  }
+  return (
+    req?.pricingSnapshot?.totalAmount ||
+    req?.pricingSnapshot?.totalFare ||
+    req?.selectedFlight?.totalFare ||
+    req?.selectedFlight?.totalEstimate ||
+    req?.fareQuote?.totalFare ||
+    req?.pricing?.grandTotal ||
+    req?.reissuePricingSnapshot?.totalAmount ||
+    req?.reissuePricingSnapshot?.totalEstimate ||
+    req?.totalEstimate ||
+    // Online DTO: totalAdjustment is the net billing amount
+    req?.totalAdjustment ||
+    0
+  );
+};
 
-export const resolveOldFare = (req = {}) =>
-  req?.oldFare ||
-  req?.reissuePricingSnapshot?.oldFare ||
-  req?.pricingSnapshot?.oldFare ||
-  req?.bookingId?.pricingSnapshot?.totalAmount ||
-  req?.bookingId?.pricingSnapshot?.totalFare ||
-  req?.booking?.pricingSnapshot?.totalAmount ||
-  req?.booking?.pricingSnapshot?.totalFare ||
-  req?.fareAudit?.oldFare ||
-  req?.bookingSnapshot?.oldFare ||
-  // Online DTO: oldJourney may hold the original fare
-  req?.oldJourney?.totalFare ||
-  0;
+export const resolveOldFare = (req = {}) => {
+  if (req?.displayInfo?.oldFare !== undefined && req?.displayInfo?.oldFare !== null) {
+    return req.displayInfo.oldFare;
+  }
+  return (
+    req?.oldFare ||
+    req?.reissuePricingSnapshot?.oldFare ||
+    req?.pricingSnapshot?.oldFare ||
+    req?.bookingId?.pricingSnapshot?.totalAmount ||
+    req?.bookingId?.pricingSnapshot?.totalFare ||
+    req?.booking?.pricingSnapshot?.totalAmount ||
+    req?.booking?.pricingSnapshot?.totalFare ||
+    req?.fareAudit?.oldFare ||
+    req?.bookingSnapshot?.oldFare ||
+    // Online DTO: oldJourney may hold the original fare
+    req?.oldJourney?.totalFare ||
+    0
+  );
+};
 
-export const resolveNewFare = (req = {}) =>
-  req?.newFare ||
-  req?.reissuePricingSnapshot?.newFare ||
-  req?.pricingSnapshot?.newFare ||
-  req?.selectedFlight?.newFare ||
-  req?.selectedFlight?.fare ||
-  req?.preferredJourney?.newFare ||
-  req?.preferredJourney?.fare ||
-  req?.pricingSnapshot?.totalAmount ||
-  resolveTotalFare(req);
+export const resolveNewFare = (req = {}) => {
+  if (req?.displayInfo?.newFare !== undefined && req?.displayInfo?.newFare !== null) {
+    return req.displayInfo.newFare;
+  }
+  return (
+    req?.newFare ||
+    req?.reissuePricingSnapshot?.newFare ||
+    req?.pricingSnapshot?.newFare ||
+    req?.selectedFlight?.newFare ||
+    req?.selectedFlight?.fare ||
+    req?.preferredJourney?.newFare ||
+    req?.preferredJourney?.fare ||
+    req?.pricingSnapshot?.totalAmount ||
+    resolveTotalFare(req)
+  );
+};
 
 export const resolveFareDifference = (req = {}) => {
+  if (req?.displayInfo?.fareDifference !== undefined && req?.displayInfo?.fareDifference !== null) {
+    return req.displayInfo.fareDifference;
+  }
   const explicit =
     req?.fareDifference ||
     req?.pricingSnapshot?.fareDifference ||
@@ -280,19 +322,32 @@ export const resolveFareDifference = (req = {}) => {
   return Math.max(resolveNewFare(req) - resolveOldFare(req), 0);
 };
 
-export const resolveReissueCharge = (req = {}) =>
-  req?.reissueCharge ||
-  req?.pricingSnapshot?.reissueCharge ||
-  req?.penaltyAmount ||
-  // Online DTO field name
-  req?.reissueCharges ||
-  0;
+export const resolveReissueCharge = (req = {}) => {
+  if (req?.displayInfo?.reissueCharge !== undefined && req?.displayInfo?.reissueCharge !== null) {
+    return req.displayInfo.reissueCharge;
+  }
+  return (
+    req?.normalizedPricing?.reissuePenalty ||
+    req?.reissueCharge ||
+    req?.pricingSnapshot?.reissueCharge ||
+    req?.penaltyAmount ||
+    // Online DTO field name
+    req?.reissueCharges ||
+    0
+  );
+};
 
-export const resolveRefund = (req = {}) =>
-  req?.refundAmount ||
-  req?.pricingSnapshot?.refundEstimate ||
-  req?.refundEstimate ||
-  0;
+export const resolveRefund = (req = {}) => {
+  if (req?.displayInfo?.refundEstimate !== undefined && req?.displayInfo?.refundEstimate !== null) {
+    return req.displayInfo.refundEstimate;
+  }
+  return (
+    req?.refundAmount ||
+    req?.pricingSnapshot?.refundEstimate ||
+    req?.refundEstimate ||
+    0
+  );
+};
 
 export const resolveBookingRef = (req = {}) =>
   req?.bookingReference ||
@@ -308,6 +363,7 @@ export const resolveBookingRef = (req = {}) =>
   "N/A";
 
 export const resolveCabinClass = (req = {}) => {
+  if (req?.displayInfo?.cabinClass) return req.displayInfo.cabinClass;
   const raw =
     resolvePrimarySegment(req)?.cabinClass ||
     req?.metadata?.searchParams?.cabinClass ||
@@ -319,6 +375,7 @@ export const resolveCabinClass = (req = {}) => {
 };
 
 export const resolveJourneyType = (req = {}) => {
+  if (req?.displayInfo?.journeyType) return req.displayInfo.journeyType;
   const raw = req?.metadata?.searchParams?.journeyType ?? req?.journeyType;
   const map = { 0: "Not Set", 1: "One Way", 2: "Round Trip", 3: "Multi City" };
   return map[raw] || raw || "One Way";
@@ -330,6 +387,7 @@ export const resolveJourneyType = (req = {}) => {
  */
 export const getAirline = (req) => {
   if (!req) return "N/A";
+  if (req.displayInfo?.airline) return req.displayInfo.airline;
   return (
     req?.selectedSegments?.[0]?.airlineName ||
     req?.segments?.[0]?.airlineName ||
@@ -350,6 +408,11 @@ export const getAirline = (req) => {
  */
 export const getTotalFare = (req) => {
   if (!req) return "N/A";
+  if (req.displayInfo?.totalEstimate !== undefined && req.displayInfo?.totalEstimate !== null) {
+    const fare = req.displayInfo.totalEstimate;
+    const currency = req.displayInfo.currency || "INR";
+    return `${currency} ${Number(fare).toLocaleString("en-IN")}`;
+  }
   const fare =
     req?.totalEstimate ??
     req?.preferredJourney?.totalEstimate ??
@@ -370,6 +433,7 @@ export const getTotalFare = (req) => {
 
 export const getCurrency = (req) => {
   if (!req) return "INR";
+  if (req.displayInfo?.currency) return req.displayInfo.currency;
   return safeString(req.currency || req.preferredJourney?.currency || "INR");
 };
 
@@ -379,6 +443,7 @@ export const getCurrency = (req) => {
  */
 export const getRoute = (req) => {
   if (!req) return "N/A";
+  if (req.displayInfo?.route) return req.displayInfo.route;
 
   // Offline reissue schema
   if (req?.preferredJourney?.origin && req?.preferredJourney?.destination) {
@@ -499,6 +564,9 @@ export const getRequestedDate = (req) => {
 
 export const getFareDifference = (req) => {
   if (!req) return 0;
+  if (req.displayInfo?.fareDifference !== undefined && req.displayInfo?.fareDifference !== null) {
+    return Number(req.displayInfo.fareDifference);
+  }
   return Number(
     req.fareDifference ??
     req.preferredJourney?.fareDifference ??
@@ -510,13 +578,53 @@ export const getFareDifference = (req) => {
 
 export const getSegments = (req) => {
   if (!req) return [];
-  return safeArray(
-    req.selectedSegments ||
-    req.preferredJourney?.segments ||
-    req.preferredFlight?.segments ||
-    req.selectedFlight?.segments ||
-    req.reissueHistory?.[0]?.newFlight
-  );
+
+  // 1. preferredJourney (preferred)
+  if (req.preferredJourney) {
+    if (Array.isArray(req.preferredJourney.segments)) {
+      return req.preferredJourney.segments;
+    }
+    if (req.preferredJourney.origin || req.preferredJourney.destination) {
+      return [req.preferredJourney];
+    }
+  }
+
+  // 2. selectedSegments or segments
+  if (Array.isArray(req.selectedSegments) && req.selectedSegments.length > 0) {
+    return req.selectedSegments;
+  }
+  if (Array.isArray(req.segments) && req.segments.length > 0) {
+    return req.segments;
+  }
+
+  // 3. Ticketed/reissued historical snapshot
+  if (Array.isArray(req.reissueHistory) && req.reissueHistory.length > 0) {
+    if (Array.isArray(req.reissueHistory[0].newFlight) && req.reissueHistory[0].newFlight.length > 0) {
+      return req.reissueHistory[0].newFlight;
+    }
+    if (Array.isArray(req.reissueHistory[0].oldFlight) && req.reissueHistory[0].oldFlight.length > 0) {
+      return req.reissueHistory[0].oldFlight;
+    }
+  }
+
+  // 4. Original booking request segments (lowest priority fallback)
+  if (req.bookingSnapshot && Array.isArray(req.bookingSnapshot.segments)) {
+    return req.bookingSnapshot.segments;
+  }
+  if (req.bookingId && req.bookingId.flightRequest && Array.isArray(req.bookingId.flightRequest.segments)) {
+    return req.bookingId.flightRequest.segments;
+  }
+  if (req.booking && req.booking.flightRequest && Array.isArray(req.booking.flightRequest.segments)) {
+    return req.booking.flightRequest.segments;
+  }
+  if (req.bookingId && req.bookingId.bookingSnapshot && Array.isArray(req.bookingId.bookingSnapshot.segments)) {
+    return req.bookingId.bookingSnapshot.segments;
+  }
+  if (req.booking && req.booking.bookingSnapshot && Array.isArray(req.booking.bookingSnapshot.segments)) {
+    return req.booking.bookingSnapshot.segments;
+  }
+
+  return [];
 };
 
 export const getStatusTone = (status) => {

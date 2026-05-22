@@ -402,22 +402,32 @@ class PDFService {
       const cssPath = path.join(__dirname, "./templates/ticket.css");
       const htmlTemplate = fs.readFileSync(templatePath, "utf8");
       const cssContent = fs.readFileSync(cssPath, "utf8");
+      const activeTicketSnapshot =
+        booking?.activeTicketSnapshot || booking?.reissueMeta?.activeTicketSnapshot || null;
 
       // Calculate SSR (Seats, Meals, Baggage) totals
-      const ssrSnapshot = booking.flightRequest?.ssrSnapshot || {};
-      const seatTotal = (ssrSnapshot.seats || []).reduce(
-        (acc, s) => acc + (s.price || 0),
-        0,
-      );
-      const mealTotal = (ssrSnapshot.meals || []).reduce(
-        (acc, m) => acc + (m.price || 0),
-        0,
-      );
-      const baggageTotal = (ssrSnapshot.baggage || []).reduce(
-        (acc, b) => acc + (b.price || 0),
-        0,
-      );
-      const ssrTotal = seatTotal + mealTotal + baggageTotal;
+      const ssrSnapshot =
+        activeTicketSnapshot?.ssr ||
+        activeTicketSnapshot?.ssrSnapshot ||
+        booking.flightRequest?.ssrSnapshot ||
+        {};
+      const seatTotal =
+        Number(
+          ssrSnapshot.totalSeatAmount ||
+            (ssrSnapshot.seats || []).reduce((acc, s) => acc + (s.price || s.amount || 0), 0),
+        ) || 0;
+      const mealTotal =
+        Number(
+          ssrSnapshot.totalMealAmount ||
+            (ssrSnapshot.meals || []).reduce((acc, m) => acc + (m.price || m.amount || 0), 0),
+        ) || 0;
+      const baggageTotal =
+        Number(
+          ssrSnapshot.totalBaggageAmount ||
+            (ssrSnapshot.baggage || []).reduce((acc, b) => acc + (b.price || b.amount || 0), 0),
+        ) || 0;
+      const ssrTotal =
+        Number(ssrSnapshot.totalSSRAmount || ssrSnapshot.totalAmount || seatTotal + mealTotal + baggageTotal) || 0;
 
       const template = handlebars.compile(htmlTemplate);
 
@@ -504,6 +514,10 @@ class PDFService {
             barcodeBase64: onwardBarcodeBase64 || returnBarcodeBase64,
             segmentServices: journeySegments.map((seg, segIdx) => {
               const addInfo = mergedAddInfo[segIdx] || {};
+              const snapshotSegment = activeTicketSnapshot?.segments?.[segIdx] || null;
+              const seatLabel = snapshotSegment?.ssr?.seat?.label || null;
+              const mealLabel = snapshotSegment?.ssr?.meal?.label || null;
+              const bagLabel = snapshotSegment?.ssr?.baggage?.label || null;
               const checkIn = (seg.Baggage || "15 KG")
                 .toUpperCase()
                 .includes("INCLUDED")
@@ -512,13 +526,11 @@ class PDFService {
 
               return {
                 route: `${seg.Origin?.Airport?.AirportCode || seg.Origin?.airportCode || "ORG"}-${seg.Destination?.Airport?.AirportCode || seg.Destination?.airportCode || "DEST"}`,
-                seat: addInfo.Seat || "Auto",
-                meal:
-                  addInfo.Meal && addInfo.Meal !== "0 Platter"
-                    ? addInfo.Meal
-                    : "N/A",
+                seat: seatLabel || "—",
+                meal: mealLabel || "—",
                 baggage: checkIn,
-                addOnBaggage: "N/A",
+                addOnBaggage: bagLabel || "—",
+                hasAddOn: Boolean(bagLabel),
               };
             }),
           };
@@ -580,6 +592,13 @@ class PDFService {
         format: "A4",
         printBackground: true,
         margin: { top: "10px", right: "10px", bottom: "10px", left: "10px" },
+      });
+
+      logger.info("PDF_GENERATED", {
+        bookingReference: booking?.bookingReference || null,
+        pnr,
+        isReissued: Boolean(booking?.reissueMeta?.isReissued || booking?.activeTicketSnapshot),
+        totalSSRAmount: ssrTotal,
       });
 
       await browser.close();

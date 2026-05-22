@@ -455,7 +455,7 @@ class TboReissueProvider {
       traceId: searchResponse?.Response?.TraceId || searchResponse?.TraceId,
       itinerariesCount: itineraries.length,
       firstResultIndex: firstResult?.ResultIndex,
-      onlineRefundAllowed: parsedMiniFareRules?.onlineReissueAllowed,
+      onlineReissueAllowed: parsedMiniFareRules?.onlineReissueAllowed,
     });
 
 
@@ -465,7 +465,8 @@ class TboReissueProvider {
       firstResultIndex: firstResult?.ResultIndex ?? null,
       miniFareRules,
       parsedMiniFareRules,
-      onlineRefundAllowed: parsedMiniFareRules?.onlineReissueAllowed ?? false,
+      onlineReissueAllowed: parsedMiniFareRules?.onlineReissueAllowed ?? false,
+      onlineRefundAllowed: parsedMiniFareRules?.onlineRefundAllowed ?? false,
     };
   }
 
@@ -749,7 +750,8 @@ class TboReissueProvider {
       supplierReissueCharges,
       quoteResult,
       miniFareRules: parsedMiniFareRules,
-      onlineRefundAllowed: parsedMiniFareRules.onlineReissueAllowed,
+      onlineReissueAllowed: parsedMiniFareRules.onlineReissueAllowed,
+      onlineRefundAllowed: parsedMiniFareRules.onlineRefundAllowed,
     };
   }
 }

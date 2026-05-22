@@ -101,6 +101,12 @@ export default function ReissueOpsDetailModal({
   const ticketUrl =
     activeRequest?.generatedTicketUrl || activeRequest?.revisedTicketUrl || null;
   const canDownloadTicket = ["TICKET_GENERATED", "COMPLETED"].includes(activeRequest?.status);
+  const corporateName =
+    activeRequest?.displayInfo?.corporateName ||
+    activeRequest?.corporateId?.corporateName ||
+    activeRequest?.companyId?.corporateName ||
+    activeRequest?.metadata?.corporateName ||
+    "N/A";
 
   useEffect(() => {
     dispatch(setCurrentReissueRequest(request));
@@ -254,9 +260,10 @@ export default function ReissueOpsDetailModal({
               )}
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               <Card label="Passenger" value={activeRequest?.metadata?.employeeName} />
               <Card label="Email" value={activeRequest?.metadata?.employeeEmail} />
+              <Card label="Corporate" value={corporateName} />
               <Card label="Booking ID" value={activeRequest?.bookingId} />
               <Card label="Original PNR" value={activeRequest?.originalPnr} />
             </div>
@@ -388,14 +395,18 @@ export default function ReissueOpsDetailModal({
                 <Card
                   label="Current Ticket Fare"
                   value={formatMoney(
-                    activeRequest?.oldFare ?? pricingSnapshot?.oldFare ?? selectedFlight?.oldFare,
+                    activeRequest?.displayInfo?.oldFare ??
+                      activeRequest?.oldFare ??
+                      pricingSnapshot?.oldFare ??
+                      selectedFlight?.oldFare,
                     pricingCurrency,
                   )}
                 />
                 <Card
                   label="New Fare"
                   value={formatMoney(
-                    activeRequest?.newFare ??
+                    activeRequest?.displayInfo?.newFare ??
+                      activeRequest?.newFare ??
                       pricingSnapshot?.newFare ??
                       selectedFlight?.newFare ??
                       selectedFlight?.fare,
@@ -405,16 +416,18 @@ export default function ReissueOpsDetailModal({
                 <Card
                   label="Fare Difference"
                   value={formatMoney(
-                    activeRequest?.fareDifference ??
+                    activeRequest?.displayInfo?.fareDifference ??
+                      activeRequest?.fareDifference ??
                       pricingSnapshot?.fareDifference ??
                       selectedFlight?.fareDifference,
                     pricingCurrency,
                   )}
                 />
                 <Card
-                  label="Airline Date Change Fee"
+                  label="Airline Reissue Penalty"
                   value={formatMoney(
-                    activeRequest?.reissueCharge ??
+                    activeRequest?.displayInfo?.reissueCharge ??
+                      activeRequest?.reissueCharge ??
                       activeRequest?.reissueCharges ??
                       pricingSnapshot?.reissueCharge ??
                       selectedFlight?.reissueCharge,
@@ -424,7 +437,8 @@ export default function ReissueOpsDetailModal({
                 <Card
                   label="Total Collection"
                   value={formatMoney(
-                    activeRequest?.totalEstimate ??
+                    activeRequest?.displayInfo?.totalEstimate ??
+                      activeRequest?.totalEstimate ??
                       activeRequest?.totalAdjustment ??
                       pricingSnapshot?.totalEstimate ??
                       selectedFlight?.totalEstimate,
@@ -434,6 +448,66 @@ export default function ReissueOpsDetailModal({
                 />
               </div>
             </div>
+
+            {activeRequest?.financialLedger && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5">
+                <p className="text-[11px] font-black uppercase tracking-widest text-amber-800">
+                  Cumulative Financial Ledger (Multi-Reissue Safe)
+                </p>
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <Card
+                    label="Original Ticket Fare"
+                    value={formatMoney(
+                      activeRequest.financialLedger.originalTicketAmount || 0,
+                      pricingCurrency,
+                    )}
+                  />
+                  <Card
+                    label="Original SSR Paid"
+                    value={formatMoney(
+                      activeRequest.financialLedger.originalSSR || 0,
+                      pricingCurrency,
+                    )}
+                  />
+                  <Card
+                    label="Previous Reissue Charges"
+                    value={formatMoney(
+                      activeRequest.financialLedger.cumulativeReissueCharges || 0,
+                      pricingCurrency,
+                    )}
+                  />
+                  <Card
+                    label="Previous SSR Cumulative"
+                    value={formatMoney(
+                      activeRequest.financialLedger.cumulativeSSR || 0,
+                      pricingCurrency,
+                    )}
+                  />
+                  <Card
+                    label="Previous Collections"
+                    value={formatMoney(
+                      activeRequest.financialLedger.cumulativeCollections || 0,
+                      pricingCurrency,
+                    )}
+                  />
+                  <Card
+                    label="Previous Refunds"
+                    value={formatMoney(
+                      activeRequest.financialLedger.cumulativeRefunds || 0,
+                      pricingCurrency,
+                    )}
+                  />
+                  <Card
+                    label="Total Net Paid To Date"
+                    value={formatMoney(
+                      activeRequest.financialLedger.totalNetPaid || 0,
+                      pricingCurrency,
+                    )}
+                    accent="text-emerald-700 font-bold"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="rounded-2xl border border-slate-200 p-5">
               <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">

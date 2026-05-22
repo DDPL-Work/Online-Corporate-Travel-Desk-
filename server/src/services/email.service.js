@@ -5,7 +5,7 @@ const sgMail = require('@sendgrid/mail');
 const logger = require('../utils/logger');
 
 // Initialize SendGrid with API key
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+sgMail.setApiKey(process.env.SENDGRID_API_KEY || "SG.dummy_key_for_testing");
 
 const FROM_EMAIL = process.env.EMAIL_FROM || 'noreply@traveamer.com';
 const FROM_NAME = process.env.EMAIL_FROM_NAME || 'Traveamer';

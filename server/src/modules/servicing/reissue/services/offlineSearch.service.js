@@ -9,6 +9,7 @@ const { toOfflineSearchDto } = require("../transformers/offlineSearch.dto");
 const { resolvePassengerCounts } = require("../../../../utils/bookingResolver.util");
 const { resolveReissueRoute } = require("../../../../utils/reissueRouteResolver.util");
 const { calculateOfflineReissueEstimate } = require("./reissuePricing.service");
+const reissueFinancialLedgerService = require("../../../../services/reissue/reissueFinancialLedger.service");
 
 const MAX_SEARCH_WINDOW_DAYS = 30;
 const CACHE_TTL_SECONDS = 1800;
@@ -269,10 +270,12 @@ const enrichResultPricing = async ({ booking, result, traceId }) => {
     }
   }
 
+  const ledger = await reissueFinancialLedgerService.getLedgerForBooking(booking);
   const estimate = calculateOfflineReissueEstimate({
     originalBooking: booking,
     selectedFlight: result,
     fareRuleResponse,
+    ledger,
   });
 
   return {
