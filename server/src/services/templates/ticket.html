@@ -247,6 +247,14 @@
                 <span class="pax-value muted-text">{{addOnBaggage}}</span>
                 {{/if}}
               </div>
+              <div class="pax-data-cell">
+                <span class="pax-label">🔔 Special Services</span>
+                {{#if (eq specialServices "N/A")}}
+                <span class="pax-value muted-text">{{specialServices}}</span>
+                {{else}}
+                <span class="pax-value highlight bold" style="color: var(--amber);">{{specialServices}}</span>
+                {{/if}}
+              </div>
             </div>
             {{/each}}
           </div>

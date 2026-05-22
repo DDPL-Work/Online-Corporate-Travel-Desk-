@@ -21,7 +21,7 @@ router.use(verifyToken);
 
 router.get(
   "/countries",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   hotelController.getCountryList,
 );
 
@@ -29,7 +29,7 @@ router.get("/country-list", hotelController.getCountriesFromDB);
 
 router.get(
   "/cities",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   hotelController.getCityList,
 );
 
@@ -39,7 +39,7 @@ HOTEL SEARCH
 
 router.post(
   "/search",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   searchLimiter,
   validate(bookingValidation.searchHotel),
   hotelController.searchHotels,
@@ -50,7 +50,7 @@ HOTEL DETAILS
 ====================================================== */
 router.post(
   "/details",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   hotelController.getStaticHotelDetails,
 );
 

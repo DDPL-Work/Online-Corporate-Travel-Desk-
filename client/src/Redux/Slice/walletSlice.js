@@ -59,9 +59,9 @@ export const fetchBookingTransactions = createAsyncThunk(
 
 export const initiateWalletRecharge = createAsyncThunk(
   "wallet/initiateRecharge",
-  async ({ amount }, { rejectWithValue }) => {
+  async ({ amount, returnUrl }, { rejectWithValue }) => {
     try {
-      const res = await api.post("/wallet/recharge", { amount });
+      const res = await api.post("/wallet/recharge", { amount, returnUrl });
       return res.data.data;
     } catch (err) {
       return rejectWithValue(

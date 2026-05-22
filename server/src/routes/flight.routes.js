@@ -23,7 +23,7 @@ router.use(verifyToken);
 // 1️⃣ Flight Search
 router.post(
   "/search",
-  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   searchLimiter,
   validate(bookingValidation.searchFlights),
   flightController.searchFlights
@@ -33,7 +33,7 @@ router.post(
 // 2️⃣ Fare Quote
 router.post(
   "/fare-quote",
-  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   validate(bookingValidation.fareQuote),
   flightController.getFareQuote
 );
@@ -42,7 +42,7 @@ router.post(
 // 3️⃣ Fare Rule
 router.post(
   "/fare-rule",
-  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   validate(bookingValidation.fareRule),
   flightController.getFareRule
 );
@@ -51,7 +51,7 @@ router.post(
 // 4 SSR
 router.post(
   "/ssr",
-  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   validate(bookingValidation.ssr),
   flightController.getSSR
 );
@@ -60,7 +60,7 @@ router.post(
 // 5️ Book Flight
 router.post(
   "/book",
-  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
 
   flightController.bookFlight
 );
@@ -69,7 +69,7 @@ router.post(
 //  Ticket Flight
 router.post(
   "/ticket",
-  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   validate(bookingValidation.ticketFlight),
   flightController.ticketFlight
 );
@@ -77,7 +77,7 @@ router.post(
 // ------------------------------------
 router.post(
   "/fare-upsell",
-  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   validate(bookingValidation.fareUpsell),
   flightController.getFareUpsell
 );
@@ -86,7 +86,7 @@ router.post(
 //  Retrieve Booking
 router.get(
   "/booking/:pnr",
-  authorizeRoles("manager", "travel-admin", "corporate-admin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   flightController.getBookingDetails
 );
 

@@ -26,6 +26,7 @@ export default function FinancialApprovalModal({ corporate, onClose }) {
     classification: "prepaid",
     billingCycle: "30days",
     customBillingDays: "",
+    dueDays: 15,
     creditLimit: 0,
     walletBalance: 0,
     domesticFlight: 0,
@@ -46,6 +47,10 @@ export default function FinancialApprovalModal({ corporate, onClose }) {
       toast.error("Credit limit is required for postpaid accounts");
       return;
     }
+    if (form.classification === "postpaid" && !form.dueDays) {
+      toast.error("Due days are required for postpaid accounts");
+      return;
+    }
 
     setForm(prev => ({ ...prev, isSubmitting: true }));
 
@@ -53,6 +58,7 @@ export default function FinancialApprovalModal({ corporate, onClose }) {
       classification: form.classification,
       billingCycle: form.classification === "postpaid" ? form.billingCycle : undefined,
       customBillingDays: form.billingCycle === "custom" ? Number(form.customBillingDays) : undefined,
+      dueDays: form.classification === "postpaid" ? Number(form.dueDays) : undefined,
       creditLimit: form.classification === "postpaid" ? Number(form.creditLimit) : 0,
       walletBalance: form.classification === "prepaid" ? Number(form.walletBalance) : 0,
       serviceCharges: {
@@ -195,7 +201,7 @@ export default function FinancialApprovalModal({ corporate, onClose }) {
                       <div className="relative group">
                         <FaCalendarAlt className="absolute left-4 top-1/2 -translate-y-1/2 text-[#0A4D68] transition-transform group-focus-within:scale-110" />
                         <select
-                          className="modal-input pl-12"
+                          className="modal-input !pl-12"
                           value={form.billingCycle}
                           onChange={(e) => setForm({ ...form, billingCycle: e.target.value })}
                         >
@@ -219,13 +225,27 @@ export default function FinancialApprovalModal({ corporate, onClose }) {
                       </div>
                     )}
 
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Due Days</label>
+                      <div className="relative group">
+                        <FaCalendarAlt className="absolute left-4 top-1/2 -translate-y-1/2 text-[#0A4D68] transition-transform group-focus-within:scale-110" />
+                        <input
+                          type="number"
+                          className="modal-input !pl-12"
+                          placeholder="e.g. 15"
+                          value={form.dueDays}
+                          onChange={(e) => setForm({ ...form, dueDays: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
                     <div className="md:col-span-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Assigned Credit Limit</label>
                       <div className="relative group">
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-[#0A4D68] text-lg transition-transform group-focus-within:scale-110">₹</div>
                         <input
                           type="number"
-                          className="modal-input pl-16 py-4 text-lg"
+                          className="modal-input !pl-16 py-4 text-lg"
                           placeholder="0.00"
                           value={form.creditLimit}
                           onChange={(e) => setForm({ ...form, creditLimit: e.target.value })}
@@ -240,7 +260,7 @@ export default function FinancialApprovalModal({ corporate, onClose }) {
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-[#0A4D68] text-lg transition-transform group-focus-within:scale-110">₹</div>
                       <input
                         type="number"
-                        className="modal-input pl-16 py-4 text-lg"
+                        className="modal-input !pl-16 py-4 text-lg"
                         placeholder="0.00"
                         value={form.walletBalance}
                         onChange={(e) => setForm({ ...form, walletBalance: e.target.value })}
@@ -401,7 +421,7 @@ function FeeInput({ label, value, onChange }) {
         <div className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-[#0A4D68] text-xs">₹</div>
         <input
           type="number"
-          className="modal-input pl-12 pr-3 py-2.5 text-xs"
+          className="modal-input !pl-12 !pr-3 py-2.5 text-xs"
           placeholder="0"
           value={value}
           onChange={(e) => onChange(e.target.value)}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   MdFlight,
@@ -125,11 +126,9 @@ function Navbar({ onAuthOpen }) {
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between py-4">
         <div className="flex items-center">
-          <img
-            src="/logo-primary.png" // change to your logo path
+          <img src="/logo-primary.png" // change to your logo path
             alt="Traveamer Logo"
-            className="h-14 w-auto object-contain"
-          />
+            className="h-14 w-auto object-contain" loading="eager" />
         </div>
         <ul className="hidden lg:flex items-center gap-8">
           {links.map((l) => (
@@ -192,7 +191,7 @@ function Hero() {
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden">
       <div className="absolute inset-0">
-        <img src={IMAGES.hero} alt="" className="w-full h-full object-cover" />
+        <img src={IMAGES.hero} alt="" className="w-full h-full object-cover" loading="eager" />
         <div className="absolute inset-0 bg-linear-to-br from-blue-950/93 via-blue-900/86 to-slate-900/90" />
         <div className="absolute inset-0 bg-linear-to-t from-slate-950/65 via-transparent to-transparent" />
       </div>
@@ -358,11 +357,9 @@ function Hero() {
                   key={i}
                   className="flex items-center gap-3 bg-white/5 border border-white/8 rounded-xl p-3"
                 >
-                  <img
-                    src={b.img}
+                  <img src={b.img}
                     alt=""
-                    className="w-10 h-10 rounded-xl object-cover shrink-0"
-                  />
+                    className="w-10 h-10 rounded-xl object-cover shrink-0" loading="lazy" decoding="async" />
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-bold truncate">
                       {b.route}
@@ -831,11 +828,9 @@ function Benefits() {
             </button>
           </div>
           <div className="relative">
-            <img
-              src={IMAGES.airport}
+            <img src={IMAGES.airport}
               alt=""
-              className="w-full rounded-3xl object-cover h-[420px] shadow-2xl shadow-slate-300"
-            />
+              className="w-full rounded-3xl object-cover h-[420px] shadow-2xl shadow-slate-300" loading="lazy" decoding="async" />
             <div className="absolute -bottom-6 -left-6 bg-white rounded-2xl p-5 shadow-2xl border border-slate-100 flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-green-50 border border-green-100 flex items-center justify-center shrink-0">
                 <MdTrendingDown className="text-green-500 text-2xl" />
@@ -873,11 +868,9 @@ function Benefits() {
         </div>
         <div className="grid lg:grid-cols-2 gap-20 items-center">
           <div className="relative order-2 lg:order-1">
-            <img
-              src={IMAGES.hotel2}
+            <img src={IMAGES.hotel2}
               alt=""
-              className="w-full rounded-3xl object-cover h-[420px] shadow-2xl shadow-slate-300"
-            />
+              className="w-full rounded-3xl object-cover h-[420px] shadow-2xl shadow-slate-300" loading="lazy" decoding="async" />
             <div className="absolute -bottom-6 -right-6 bg-white rounded-2xl p-5 shadow-2xl border border-slate-100">
               <div className="flex items-center gap-1 mb-2">
                 {[...Array(5)].map((_, i) => (
@@ -1008,7 +1001,7 @@ function ROICalculator() {
         }}
       />
       <div className="absolute top-0 right-0 w-[40%] h-full opacity-[0.04]">
-        <img src={IMAGES.globe} alt="" className="w-full h-full object-cover" />
+        <img src={IMAGES.globe} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
       </div>
       <div className="absolute top-1/4 left-0 w-72 h-72 rounded-full bg-cyan-500/10 blur-3xl" />
       <div className="absolute bottom-1/4 right-0 w-72 h-72 rounded-full bg-orange-500/10 blur-3xl" />
@@ -1315,11 +1308,9 @@ function CTASection() {
       style={{ background: "linear-gradient(135deg,#1e3a5f 0%,#0f172a 100%)" }}
     >
       <div className="absolute inset-0">
-        <img
-          src={IMAGES.office}
+        <img src={IMAGES.office}
           alt=""
-          className="w-full h-full object-cover opacity-[0.07]"
-        />
+          className="w-full h-full object-cover opacity-[0.07]" loading="lazy" decoding="async" />
         <div className="absolute inset-0 bg-linear-to-br from-blue-900/93 to-slate-950/97" />
       </div>
       <div className="absolute top-0 left-0 w-96 h-96 bg-cyan-500/8 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
@@ -1495,8 +1486,8 @@ export default function LandingPage() {
       <CTASection />
       <Footer />
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
-      {showInactiveModal && (
-        <div className="fixed inset-0 z-[99] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
+      {showInactiveModal && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-lg font-bold">
@@ -1526,7 +1517,8 @@ export default function LandingPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

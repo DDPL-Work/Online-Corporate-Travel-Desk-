@@ -13,6 +13,7 @@ import {
   FiX,
   FiArrowRight,
   FiDownload,
+  FiArrowDown,
 } from "react-icons/fi";
 import { MdBadge } from "react-icons/md";
 import Swal from "sweetalert2";
@@ -28,6 +29,9 @@ import { Pagination } from "./Shared/Pagination";
 import {
   getAllEmployeesAdmin,
   toggleEmployeeStatusAdmin,
+  demoteEmployeeAdmin,
+  promoteEmployeeAdmin,
+  promoteEmployeeToFinanceAdmin,
 } from "../../Redux/Actions/travelAdmin.thunks";
 import { ToastWithTimer } from "../../utils/ToastConfirm";
 import { C } from "../Shared/color";
@@ -97,7 +101,7 @@ export default function EmployeeManagement() {
       const name = `${e.name?.firstName || ""} ${e.name?.lastName || ""}`.toLowerCase();
       const dept = (e.department || "").toLowerCase();
       return (!q || name.includes(q) || e.email?.toLowerCase().includes(q) || dept.includes(q)) &&
-             (roleFilter === "All" || e.role?.toLowerCase() === roleFilter.toLowerCase()) &&
+             (roleFilter === "All" || e.role?.toLowerCase() === roleFilter.toLowerCase().replace(" ", "_")) &&
              (deptFilter === "All" || dept === deptFilter.toLowerCase()) &&
              (statusFilter === "All" || (statusFilter === "Active" ? e.isActive : !e.isActive));
     });
@@ -148,6 +152,111 @@ export default function EmployeeManagement() {
     } catch (err) {
       setLocalOverrides(prev => ({ ...prev, [id]: { ...prev[id], isActive: !isActivating } }));
       ToastWithTimer({ message: err || "Protocol Failure", type: "error" });
+    } finally {
+      setStatusLoading(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const handleDemote = async (employee) => {
+    const id = employee._id;
+    const name = `${employee.name?.firstName || ""} ${employee.name?.lastName || ""}`.trim();
+    const isFinance = employee.role === "finance_team";
+
+    const result = await Swal.fire({
+      title: isFinance ? "Reset Finance Team Role?" : "Demote Manager to Employee?",
+      text: isFinance 
+        ? `Are you sure you want to remove the Finance Team role from ${name}? This will immediately revoke their access to corporate wallets and ledgers.`
+        : `Are you sure you want to remove manager privileges from ${name}? This will immediately revoke their designated approval authority.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#D97706",
+      cancelButtonColor: "#94a3b8",
+      confirmButtonText: isFinance ? "Yes, Reset Role" : "Yes, Demote",
+      customClass: {
+        popup: 'rounded-2xl',
+        confirmButton: 'rounded-xl font-bold px-6 py-2.5',
+        cancelButton: 'rounded-xl font-bold px-6 py-2.5'
+      }
+    });
+
+    if (!result.isConfirmed) return;
+
+    setStatusLoading(prev => ({ ...prev, [id]: true }));
+    
+    try {
+      await dispatch(demoteEmployeeAdmin(id)).unwrap();
+      setLocalOverrides(prev => ({ ...prev, [id]: { ...prev[id], role: "employee" } }));
+      ToastWithTimer({ message: `Personnel ${name} role demoted to employee successfully`, type: "success" });
+    } catch (err) {
+      ToastWithTimer({ message: err || "Failed to modify role", type: "error" });
+    } finally {
+      setStatusLoading(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const handlePromote = async (employee) => {
+    const id = employee._id;
+    const name = `${employee.name?.firstName || ""} ${employee.name?.lastName || ""}`.trim();
+
+    const result = await Swal.fire({
+      title: "Promote to Manager?",
+      text: `Are you sure you want to promote ${name} to Manager? This will grant them team approval authority.`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#7C3AED",
+      cancelButtonColor: "#94a3b8",
+      confirmButtonText: "Yes, Promote",
+      customClass: {
+        popup: 'rounded-2xl',
+        confirmButton: 'rounded-xl font-bold px-6 py-2.5',
+        cancelButton: 'rounded-xl font-bold px-6 py-2.5'
+      }
+    });
+
+    if (!result.isConfirmed) return;
+
+    setStatusLoading(prev => ({ ...prev, [id]: true }));
+    
+    try {
+      await dispatch(promoteEmployeeAdmin(id)).unwrap();
+      setLocalOverrides(prev => ({ ...prev, [id]: { ...prev[id], role: "manager" } }));
+      ToastWithTimer({ message: `Personnel ${name} promoted to manager successfully`, type: "success" });
+    } catch (err) {
+      ToastWithTimer({ message: err || "Failed to promote employee", type: "error" });
+    } finally {
+      setStatusLoading(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const handlePromoteToFinance = async (employee) => {
+    const id = employee._id;
+    const name = `${employee.name?.firstName || ""} ${employee.name?.lastName || ""}`.trim();
+
+    const result = await Swal.fire({
+      title: "Assign to Finance Team?",
+      text: `Are you sure you want to assign the Finance Team role to ${name}? This will grant them access to corporate credit ledgers, wallet resources, and organizational profiles.`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#D97706",
+      cancelButtonColor: "#94a3b8",
+      confirmButtonText: "Yes, Assign Role",
+      customClass: {
+        popup: 'rounded-2xl',
+        confirmButton: 'rounded-xl font-bold px-6 py-2.5',
+        cancelButton: 'rounded-xl font-bold px-6 py-2.5'
+      }
+    });
+
+    if (!result.isConfirmed) return;
+
+    setStatusLoading(prev => ({ ...prev, [id]: true }));
+    
+    try {
+      await dispatch(promoteEmployeeToFinanceAdmin(id)).unwrap();
+      setLocalOverrides(prev => ({ ...prev, [id]: { ...prev[id], role: "finance_team" } }));
+      ToastWithTimer({ message: `Personnel ${name} assigned to Finance Team successfully`, type: "success" });
+    } catch (err) {
+      ToastWithTimer({ message: err || "Failed to assign Finance Team role", type: "error" });
     } finally {
       setStatusLoading(prev => ({ ...prev, [id]: false }));
     }
@@ -231,7 +340,7 @@ export default function EmployeeManagement() {
               <SearchBar value={search} onChange={(val) => { setSearch(val); setCurrentPage(1); }} placeholder="Search name, email, department..." />
             </LabeledField>
             <LabeledField label="Organizational Role" className="lg:col-span-2">
-              <CustomDropdown value={roleFilter} onChange={(val) => { setRoleFilter(val); setCurrentPage(1); }} options={["All", "Manager", "Employee"]} />
+              <CustomDropdown value={roleFilter} onChange={(val) => { setRoleFilter(val); setCurrentPage(1); }} options={["All", "Manager", "Employee", "Finance Team"]} />
             </LabeledField>
             <LabeledField label="Department" className="lg:col-span-2">
               <CustomDropdown value={deptFilter} onChange={(val) => { setDeptFilter(val); setCurrentPage(1); }} options={departments} />
@@ -283,15 +392,68 @@ export default function EmployeeManagement() {
                        <p className="text-[9px] font-black uppercase tracking-widest text-gold mt-1">{emp.department || "Not Assigned"}</p>
                     </td>
                     <td className="!px-6 !py-5 text-left">
-                       <div className="flex justify-start">
-                         <div className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm flex items-center gap-1.5" style={{ 
-                            background: isManager ? "#F5F3FF" : "#F1F5F9", 
-                            color: isManager ? "#7C3AED" : "#475569", 
-                            borderColor: isManager ? "#DDD6FE" : "#E2E8F0" 
-                          }}>
-                           {isManager ? <FiShield size={10} /> : <MdBadge size={10} />}
-                           {emp.role || "Employee"}
-                         </div>
+                       <div className="flex items-center gap-3">
+                         {emp.role?.toLowerCase() === "manager" ? (
+                           <div className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm flex items-center gap-1.5 bg-[#F5F3FF] text-[#7C3AED] border-[#DDD6FE]">
+                             <FiShield size={10} /> Manager
+                           </div>
+                         ) : emp.role?.toLowerCase() === "finance_team" ? (
+                           <div className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm flex items-center gap-1.5 bg-[#FEF3C7] text-[#D97706] border-[#FDE68A]">
+                             <FiShield size={10} /> Finance Team
+                           </div>
+                         ) : (
+                           <div className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm flex items-center gap-1.5 bg-[#F1F5F9] text-[#475569] border-[#E2E8F0]">
+                             <MdBadge size={10} /> {emp.role || "Employee"}
+                           </div>
+                         )}
+
+                         {emp.role?.toLowerCase() === "manager" && (
+                           <div className="flex items-center gap-2">
+                             <button 
+                               onClick={() => handleDemote(emp)}
+                               disabled={statusLoading[emp._id]}
+                               className="px-2 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border border-amber-200 bg-amber-50 text-amber-700 shadow-sm transition-all hover:scale-105 hover:bg-amber-100 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                             >
+                               <FiArrowDown size={10} /> Demote
+                             </button>
+                             <button 
+                               onClick={() => handlePromoteToFinance(emp)}
+                               disabled={statusLoading[emp._id]}
+                               className="px-2 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border border-yellow-200 bg-yellow-50 text-yellow-700 shadow-sm transition-all hover:scale-105 hover:bg-yellow-100 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                             >
+                               Assign Finance
+                             </button>
+                           </div>
+                         )}
+
+                         {emp.role?.toLowerCase() === "finance_team" && (
+                           <button 
+                             onClick={() => handleDemote(emp)}
+                             disabled={statusLoading[emp._id]}
+                             className="px-2 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border border-amber-200 bg-amber-50 text-amber-700 shadow-sm transition-all hover:scale-105 hover:bg-amber-100 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                           >
+                             <FiArrowDown size={10} /> Demote
+                           </button>
+                         )}
+
+                         {(!emp.role || emp.role?.toLowerCase() === "employee") && (
+                           <div className="flex items-center gap-2">
+                             <button 
+                               onClick={() => handlePromote(emp)}
+                               disabled={statusLoading[emp._id]}
+                               className="hidden px-2 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border border-violet-200 bg-violet-50 text-violet-700 shadow-sm transition-all hover:scale-105 hover:bg-violet-100 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                             >
+                               Promote Manager
+                             </button>
+                             <button 
+                               onClick={() => handlePromoteToFinance(emp)}
+                               disabled={statusLoading[emp._id]}
+                               className="px-2 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border border-yellow-200 bg-yellow-50 text-yellow-700 shadow-sm transition-all hover:scale-105 hover:bg-yellow-100 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                             >
+                               Assign Finance
+                             </button>
+                           </div>
+                         )}
                        </div>
                     </td>
                     <td className="!px-6 !py-5 text-left">

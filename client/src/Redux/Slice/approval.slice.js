@@ -5,6 +5,7 @@ import {
   fetchApprovalById,
   approveApproval,
   rejectApproval,
+  fetchSecondApproverRequests,
 } from "../Actions/approval.thunks";
 
 const initialState = {
@@ -39,6 +40,21 @@ const approvalSlice = createSlice({
         state.pagination = action.payload.pagination;
       })
       .addCase(fetchApprovals.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      /* ================= FETCH SECOND APPROVER ================= */
+      .addCase(fetchSecondApproverRequests.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchSecondApproverRequests.fulfilled, (state, action) => {
+        state.loading = false;
+        state.list = action.payload.approvals;
+        state.pagination = action.payload.pagination;
+      })
+      .addCase(fetchSecondApproverRequests.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })

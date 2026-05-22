@@ -11,6 +11,9 @@ import {
   reviewManagerRequest,
   getAllEmployeesAdmin,
   toggleEmployeeStatusAdmin,
+  demoteEmployeeAdmin,
+  promoteEmployeeAdmin,
+  promoteEmployeeToFinanceAdmin,
 } from "../Actions/travelAdmin.thunks";
 
 const initialState = {
@@ -212,6 +215,51 @@ const adminBookingSlice = createSlice({
       })
       .addCase(toggleEmployeeStatusAdmin.rejected, (state, action) => {
         // optional: you can add error handling if needed
+        state.errorEmployees = action.payload;
+      })
+      /**
+       * ============================================================
+       * 🔐 DEMOTE EMPLOYEE ADMIN
+       * ============================================================
+       */
+      .addCase(demoteEmployeeAdmin.fulfilled, (state, action) => {
+        const { userId, role } = action.payload;
+        const emp = state.allEmployees.find((u) => u._id === userId);
+        if (emp) {
+          emp.role = role;
+        }
+      })
+      .addCase(demoteEmployeeAdmin.rejected, (state, action) => {
+        state.errorEmployees = action.payload;
+      })
+      /**
+       * ============================================================
+       * 🔐 PROMOTE EMPLOYEE ADMIN
+       * ============================================================
+       */
+      .addCase(promoteEmployeeAdmin.fulfilled, (state, action) => {
+        const { userId, role } = action.payload;
+        const emp = state.allEmployees.find((u) => u._id === userId);
+        if (emp) {
+          emp.role = role;
+        }
+      })
+      .addCase(promoteEmployeeAdmin.rejected, (state, action) => {
+        state.errorEmployees = action.payload;
+      })
+      /**
+       * ============================================================
+       * 🔐 PROMOTE USER TO FINANCE TEAM ADMIN
+       * ============================================================
+       */
+      .addCase(promoteEmployeeToFinanceAdmin.fulfilled, (state, action) => {
+        const { userId, role } = action.payload;
+        const emp = state.allEmployees.find((u) => u._id === userId);
+        if (emp) {
+          emp.role = role;
+        }
+      })
+      .addCase(promoteEmployeeToFinanceAdmin.rejected, (state, action) => {
         state.errorEmployees = action.payload;
       });
   },

@@ -510,6 +510,22 @@ class PDFService {
                 ? "15 KG"
                 : seg.Baggage || "15 KG";
 
+              const segmentOrigin = seg.Origin?.Airport?.AirportCode || seg.Origin?.airportCode || "";
+              const segmentDest = seg.Destination?.Airport?.AirportCode || seg.Destination?.airportCode || "";
+
+              const onwardSvcs = (tboPaxOnward?.SpecialServices || [])
+                .filter((s) => (s.Origin || s.origin) === segmentOrigin && (s.Destination || s.destination) === segmentDest)
+                .map((s) => s.Text || s.text || s.Code || s.code);
+
+              const returnSvcs = (tboPaxReturn?.SpecialServices || [])
+                .filter((s) => (s.Origin || s.origin) === segmentOrigin && (s.Destination || s.destination) === segmentDest)
+                .map((s) => s.Text || s.text || s.Code || s.code);
+
+              const allSvcs = [...onwardSvcs, ...returnSvcs];
+              const specialServiceText = allSvcs.length > 0
+                ? allSvcs.join(", ")
+                : (addInfo.SpecialService && addInfo.SpecialService !== "N/A" && addInfo.SpecialService !== "None" ? addInfo.SpecialService : "N/A");
+
               return {
                 route: `${seg.Origin?.Airport?.AirportCode || seg.Origin?.airportCode || "ORG"}-${seg.Destination?.Airport?.AirportCode || seg.Destination?.airportCode || "DEST"}`,
                 seat: addInfo.Seat || "Auto",
@@ -519,6 +535,7 @@ class PDFService {
                     : "N/A",
                 baggage: checkIn,
                 addOnBaggage: "N/A",
+                specialServices: specialServiceText,
               };
             }),
           };

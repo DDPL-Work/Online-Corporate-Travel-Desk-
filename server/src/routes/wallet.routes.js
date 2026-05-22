@@ -12,7 +12,7 @@ const rateLimitMiddleware = require("../middleware/rateLimit.middleware");
 router.post("/webhooks/phonepe", walletController.handlePhonePeWebhook);
 
 router.use(verifyToken);
-router.use(authorizeRoles("travel-admin", "super-admin", "ops-member"));
+router.use(authorizeRoles("travel-admin", "super-admin", "ops-member","finance_team"));
 
 router.get("/balance", walletController.getWalletBalance);
 router.get("/transactions", walletController.getWalletTransactions);

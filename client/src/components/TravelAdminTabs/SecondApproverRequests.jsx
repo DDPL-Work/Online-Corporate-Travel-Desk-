@@ -13,9 +13,9 @@ import {
   FiActivity,
   FiX
 } from "react-icons/fi";
-import { FaHotel, FaPlane, FaRupeeSign } from "react-icons/fa";
+import { FaHotel, FaPlane, FaRupeeSign, FaExchangeAlt } from "react-icons/fa";
 import {
-  fetchApprovals,
+  fetchSecondApproverRequests,
   approveApproval,
   rejectApproval,
   transferApproval,
@@ -130,7 +130,7 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
     const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `pending-flights.xls`;
+    const a = document.createElement("a"); a.href = url; a.download = `transferred-flights.xls`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
@@ -180,7 +180,7 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
           </thead>
           <tbody>
             {filtered.length > 0 ? filtered.map((r, i) => {
-              const isDiscarded = r.isTravelPassed && r.status === "pending_approval";
+              const isDiscarded = r.isTravelPassed;
               return (
                 <tr key={r.id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray, opacity: isDiscarded ? 0.6 : 1 }}>
                   <td className="px-6! py-5!"><IdCell id={r.orderId} /></td>
@@ -224,7 +224,7 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <FiSearch size={32} />
                     </div>
-                    <p className="text-sm font-bold text-slate-400">No pending flight requests found.</p>
+                    <p className="text-sm font-bold text-slate-400">No transferred flight requests found.</p>
                   </div>
                 </td>
               </tr>
@@ -281,7 +281,7 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
     const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `pending-hotels.xls`;
+    const a = document.createElement("a"); a.href = url; a.download = `transferred-hotels.xls`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
@@ -331,7 +331,7 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
           </thead>
           <tbody>
             {filtered.length > 0 ? filtered.map((r, i) => {
-              const isDiscarded = r.isTravelPassed && r.status === "pending_approval";
+              const isDiscarded = r.isTravelPassed;
               return (
                 <tr key={r.id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray, opacity: isDiscarded ? 0.6 : 1 }}>
                   <td className="px-6! py-5!"><IdCell id={r.orderId} /></td>
@@ -376,7 +376,7 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <FiSearch size={32} />
                     </div>
-                    <p className="text-sm font-bold text-slate-400">No pending hotel requests found.</p>
+                    <p className="text-sm font-bold text-slate-400">No transferred hotel requests found.</p>
                   </div>
                 </td>
               </tr>
@@ -390,9 +390,9 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Main Component: PendingTravelRequests                          */
+/*  Main Component: SecondApproverRequests                          */
 /* ─────────────────────────────────────────────────────────────── */
-export default function PendingTravelRequests() {
+export default function SecondApproverRequests() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -410,7 +410,7 @@ export default function PendingTravelRequests() {
     setIsSyncing(true);
     try {
       await Promise.all([
-        dispatch(fetchApprovals({ status: "pending_approval" })),
+        dispatch(fetchSecondApproverRequests({})),
         dispatch(fetchCorporateAdmin()),
         dispatch(fetchEmployees()),
       ]);
@@ -420,7 +420,7 @@ export default function PendingTravelRequests() {
   };
 
   useEffect(() => {
-    dispatch(fetchApprovals({ status: "pending_approval" }));
+    dispatch(fetchSecondApproverRequests({}));
     dispatch(fetchCorporateAdmin());
     dispatch(fetchEmployees());
   }, [dispatch]);
@@ -466,7 +466,7 @@ export default function PendingTravelRequests() {
         orderId: b.orderId || "N/A", 
         bookingRef: b.bookingReference, 
         type: b.bookingType,
-        status: b.requestStatus || "pending_approval",
+        status: b.requestStatus || "pending_second_approval",
         employee: b.userId?.name ? `${b.userId.name.firstName} ${b.userId.name.lastName}`.trim() : "Employee",
         employeeId: b.userId?.email || "—", 
         bookedDate: b.createdAt ? new Date(b.createdAt) : new Date(), 
@@ -558,7 +558,7 @@ export default function PendingTravelRequests() {
     }
 
     const result = await Swal.fire({
-      title: `${isApprove ? "Approve" : "Reject"} Travel Request`,
+      title: `${isApprove ? "Approve" : "Reject"} Transferred Request`,
       input: isApprove ? null : "textarea",
       inputPlaceholder: isApprove ? "" : "Provide rejection reason...",
       icon: isApprove ? "question" : "warning",
@@ -571,6 +571,7 @@ export default function PendingTravelRequests() {
       dispatch(isApprove ? approveApproval({ id, type }) : rejectApproval({ id, comments: result.value, type }))
         .unwrap().then(() => { 
           Swal.fire("Success", `Request ${action}d`, "success"); 
+          handleRefresh();
         })
         .catch(err => Swal.fire("Error", err || "Update failed", "error"));
     }
@@ -615,12 +616,12 @@ export default function PendingTravelRequests() {
 
              <div className="flex items-center gap-5">
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
-                 <FiClock size={28} />
+                 <FaExchangeAlt size={28} />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Authorization Queue</h1>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Transferred Requests</h1>
                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Review and Authorize Corporate Travel Requirements and Deployment Authorization
+                   Review and Authorize Travel Requirements Transferred To You
                  </p>
                </div>
              </div>
@@ -667,7 +668,6 @@ export default function PendingTravelRequests() {
           onClose={() => setSelectedRequest(null)} 
           onApprove={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
           onReject={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
-          onTransfer={(secondApproverId, remark, type) => handleTransfer(selectedRequest.id, type, secondApproverId, remark)}
           isDiscarded={selectedRequest.isTravelPassed} 
         />
       )}
@@ -678,7 +678,6 @@ export default function PendingTravelRequests() {
           onClose={() => setSelectedRequest(null)} 
           onApprove={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
           onReject={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
-          onTransfer={(secondApproverId, remark, type) => handleTransfer(selectedRequest.id, type, secondApproverId, remark)}
           isDiscarded={selectedRequest.isTravelPassed} 
         />
       )}

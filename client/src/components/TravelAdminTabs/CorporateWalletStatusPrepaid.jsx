@@ -280,13 +280,19 @@ export default function CorporateWallet() {
   };
 
   useEffect(() => {
-    if (rechargeOrder?.gateway === "phonepe" && rechargeOrder.redirectUrl)
+    if (rechargeOrder?.gateway === "phonepe" && rechargeOrder.redirectUrl) {
       window.location.assign(rechargeOrder.redirectUrl);
+    }
   }, [rechargeOrder]);
 
   const handleRecharge = async () => {
     if (!rechargeAmount || rechargeAmount <= 0) return;
-    await dispatch(initiateWalletRecharge({ amount: Number(rechargeAmount) }));
+    await dispatch(
+      initiateWalletRecharge({
+        amount: Number(rechargeAmount),
+        returnUrl: window.location.href, // Tell PhonePe to redirect directly back here
+      })
+    );
     setShowRecharge(false);
     setRechargeAmount("");
   };

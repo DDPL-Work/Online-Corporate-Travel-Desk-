@@ -207,7 +207,7 @@ const MyReissueRequests = () => {
       corporateId = d.corporateId;
       role = d.role || d.userRole || "employee";
     }
-  } catch {}
+  } catch { }
 
   const buildParams = () => ({
     page: currentPage,
@@ -244,8 +244,8 @@ const MyReissueRequests = () => {
           typeof u.name === "string"
             ? u.name
             : [u.name?.firstName, u.name?.lastName].filter(Boolean).join(" ") ||
-              "Admin";
-      } catch {}
+            "Admin";
+      } catch { }
       await dispatch(
         updateReissueStatus({
           requestId,
@@ -395,7 +395,7 @@ const MyReissueRequests = () => {
       style={{ background: C.offWhite }}
     >
       {/* Navy Header Section */}
-      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+      <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
@@ -416,7 +416,7 @@ const MyReissueRequests = () => {
               </button>
             </div>
 
-            <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+            <div className="h-12 w-px bg-white/10 mx-2 hidden md:block" />
 
             <div className="flex items-center gap-5">
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
@@ -581,17 +581,17 @@ const MyReissueRequests = () => {
         >
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-                <Th className="!px-6 !py-5">Request ID</Th>
+              <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+                <Th className="px-6! py-5!">Request ID</Th>
                 {activeTab === "company" && (
-                  <Th className="!px-6 !py-5">Employee / Context</Th>
+                  <Th className="px-6! py-5!">Employee / Context</Th>
                 )}
-                <Th className="!px-6 !py-5">PNR / Ref</Th>
-                <Th className="!px-6 !py-5">Airline & Route</Th>
-                <Th className="!px-6 !py-5">Type & Reason</Th>
-                <Th className="!px-6 !py-5">Status</Th>
-                <Th className="!px-6 !py-5">Ticket</Th>
-                <Th className="!px-6 !py-5 !text-left">Action</Th>
+                <Th className="px-6! py-5!">PNR / Ref</Th>
+                <Th className="px-6! py-5!">Airline & Route</Th>
+                <Th className="px-6! py-5!">Type & Reason</Th>
+                <Th className="px-6! py-5!">Status</Th>
+                <Th className="px-6! py-5!">Ticket</Th>
+                <Th className="px-6! py-5! text-left!">Action</Th>
               </tr>
             </thead>
             <tbody>
@@ -599,7 +599,7 @@ const MyReissueRequests = () => {
                 <tr>
                   <td
                     colSpan={activeTab === "company" ? 8 : 7}
-                    className="!px-6 !py-20 text-center"
+                    className="px-6! py-20! text-center"
                   >
                     <div className="flex flex-col items-center gap-3 text-slate-400">
                       <FiRefreshCw size={28} className="animate-spin" />
@@ -629,7 +629,7 @@ const MyReissueRequests = () => {
                       }}
                     >
                       {/* Request ID */}
-                      <td className="!px-6 !py-5">
+                      <td className="px-6! py-5!">
                         <IdCell id={requestId} />
                         <p className="text-[10px] font-semibold text-slate-400 mt-1">
                           {requestedAt}
@@ -638,7 +638,7 @@ const MyReissueRequests = () => {
 
                       {/* Employee (Corporate View Only) */}
                       {activeTab === "company" && (
-                        <td className="!px-6 !py-5">
+                        <td className="px-6! py-5!">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-[#000D26]/10 text-[#000D26] flex items-center justify-center text-[11px] font-black shrink-0">
                               {userName?.[0]?.toUpperCase() || "?"}
@@ -656,7 +656,7 @@ const MyReissueRequests = () => {
                       )}
 
                       {/* PNR / Ref */}
-                      <td className="!px-6 !py-5">
+                      <td className="px-6! py-5!">
                         <p className="font-black text-sm text-slate-900 uppercase">
                           {pnr}
                         </p>
@@ -666,11 +666,10 @@ const MyReissueRequests = () => {
                       </td>
 
                       {/* Airline & Route */}
-                      <td className="!px-6 !py-5">
+                      <td className="px-6! py-5!">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden shrink-0">
-                            <img
-                              src={airlineLogo(getAirlineCode(req))}
+                            <img src={airlineLogo(getAirlineCode(req))}
                               alt={airline}
                               className="w-full h-full object-contain"
                               onError={(e) => {
@@ -692,7 +691,7 @@ const MyReissueRequests = () => {
                       </td>
 
                       {/* Type & Reason */}
-                      <td className="!px-6 !py-5">
+                      <td className="px-6! py-5!">
                         <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded text-[9px] font-black uppercase tracking-wider inline-block mb-1">
                           {req.reissueType || req.type || "REISSUE"}
                         </span>
@@ -705,21 +704,21 @@ const MyReissueRequests = () => {
                       </td>
 
                       {/* Status */}
-                      <td className="!px-6 !py-5">
+                      <td className="px-6! py-5!">
                         <ReissueStatusBadge req={req} />
                       </td>
 
                       {/* Ticket */}
-                      <td className="!px-6 !py-5">
+                      <td className="px-6! py-5!">
                         <TicketActions req={req} />
                       </td>
 
                       {/* Action */}
-                      <td className="!px-6 !py-5 !text-left">
+                      <td className="px-6! py-5! text-left!">
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => navigate(`/my-reissue/${req._id || req.id}`)}
-                            className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group cursor-pointer"
+                            className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group cursor-pointer"
                             title="View Details"
                           >
                             <FiEye
@@ -762,7 +761,7 @@ const MyReissueRequests = () => {
                 <tr>
                   <td
                     colSpan={activeTab === "company" ? 8 : 7}
-                    className="!px-6 !py-20 text-center"
+                    className="px-6! py-20! text-center"
                   >
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">

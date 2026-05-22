@@ -8,8 +8,128 @@ import { ToastWithTimer } from "../../../../utils/ToastConfirm";
 import { BaggageTable } from "./BaggageSelection";
 import { MealSelectionCards } from "./MealsSelection";
 import { normalizeSSRList } from "../CommonComponents";
-import { FaConciergeBell } from "react-icons/fa";
+import { FaConciergeBell, FaCrown, FaStar, FaChair, FaUtensils } from "react-icons/fa";
 import { fetchMySSRPolicy } from "../../../../Redux/Actions/ssrPolicy.thunks";
+
+function SpecialServiceSelectionCards({
+  services = [],
+  selectedServices = [],
+  onToggleService,
+  journeyType,
+  flightIndex,
+  travelersCount = 1,
+  onClearServices,
+}) {
+  if (!services || services.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+        <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-6">
+          <FaConciergeBell className="text-4xl text-amber-500 animate-bounce" />
+        </div>
+        <h3 className="text-xl font-bold text-gray-800 mb-2">No Special Services Available</h3>
+        <p className="text-gray-500 max-w-xs mx-auto">
+          The airline hasn't provided any special services or lounge options for this specific flight segment.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg sm:text-xl font-black text-[#0A203E] uppercase tracking-tight flex items-center gap-2">
+          <FaConciergeBell className="text-[#C9A84C]" /> Special Services & Lounges
+        </h2>
+        <button
+          onClick={() => onClearServices?.(journeyType, flightIndex)}
+          className="text-sm font-semibold text-gray-500 hover:text-red-600"
+        >
+          Clear All
+        </button>
+      </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {services.map((svc, idx) => {
+          const isSelected = selectedServices.some((s) => s.Code === svc.Code);
+
+          // Render icon based on name
+          const text = (svc.Text || svc.Description || "").toLowerCase();
+          let icon = <FaConciergeBell className={`text-2xl ${isSelected ? "text-green-600" : "text-[#C9A84C]"}`} />;
+          let iconBg = isSelected ? "bg-green-100" : "bg-slate-50";
+
+          if (text.includes("lounge") || text.includes("access")) {
+            icon = <FaCrown className={`text-2xl ${isSelected ? "text-green-600" : "text-amber-500"}`} />;
+            iconBg = isSelected ? "bg-green-100" : "bg-amber-50";
+          } else if (text.includes("priority") || text.includes("check")) {
+            icon = <FaStar className={`text-2xl ${isSelected ? "text-green-600" : "text-indigo-500"}`} />;
+            iconBg = isSelected ? "bg-green-100" : "bg-indigo-50";
+          } else if (text.includes("meal") || text.includes("food")) {
+            icon = <FaUtensils className={`text-2xl ${isSelected ? "text-green-600" : "text-emerald-500"}`} />;
+            iconBg = isSelected ? "bg-green-100" : "bg-emerald-50";
+          } else if (text.includes("seat") || text.includes("chair")) {
+            icon = <FaChair className={`text-2xl ${isSelected ? "text-green-600" : "text-blue-500"}`} />;
+            iconBg = isSelected ? "bg-green-100" : "bg-blue-50";
+          }
+
+          return (
+            <div
+              key={idx}
+              className={`group relative border rounded-2xl p-4 flex flex-col justify-between shadow-sm transition-all duration-200 hover:shadow-lg ${
+                isSelected
+                  ? "border-green-500 bg-green-50"
+                  : "border-gray-200 bg-white hover:border-[#C9A84C]"
+              }`}
+            >
+              {/* Top Section */}
+              <div className="flex gap-4 items-center">
+                {/* Icon */}
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 transition ${iconBg}`}>
+                  {icon}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-gray-800 text-sm sm:text-base truncate">
+                    {svc.Text || svc.Description || "Special Service"}
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5 truncate">
+                    {svc.Origin && svc.Destination ? `${svc.Origin} → ${svc.Destination}` : "Premium add-on"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Price + Button */}
+              <div className="mt-4 flex justify-between items-center">
+                <div className="text-lg font-bold text-[#0A203E]">
+                  ₹{svc.Price}
+                </div>
+                <button
+                  onClick={() => onToggleService(journeyType, flightIndex, svc, travelersCount)}
+                  className={`px-4 py-1.5 text-sm font-semibold rounded-full shadow-sm transition-all duration-200 ${
+                    isSelected
+                      ? "bg-red-500 text-white hover:bg-red-600"
+                      : "bg-[#0A203E] text-white hover:bg-[#0A203E]/90"
+                  }`}
+                >
+                  {isSelected ? "Remove" : "Add Service"}
+                </button>
+              </div>
+
+              {/* Selection Ribbon */}
+              {isSelected && (
+                <div className="absolute top-0 right-0 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">
+                  Selected
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function RTSeatSelectionModal({
   isOpen,
@@ -29,6 +149,8 @@ export default function RTSeatSelectionModal({
   onToggleMeal,
   selectedBaggage,
   onSelectBaggage,
+  selectedSpecialServices = {},
+  onToggleSpecialServices,
   routes,
   segments,
   ssrData, // ✅ explicitly mapped
@@ -65,6 +187,63 @@ export default function RTSeatSelectionModal({
   const [seatModalOpen, setSeatModalOpen] = useState(true);
   const [mealModalOpen, setMealModalOpen] = useState(false);
   const [baggageModalOpen, setBaggageModalOpen] = useState(false);
+  const [specialServicesModalOpen, setSpecialServicesModalOpen] = useState(false);
+
+  const [localSpecialServices, setLocalSpecialServices] = useState({});
+  const activeSelectedSpecialServices = selectedSpecialServices || localSpecialServices;
+
+  const handleToggleSpecialService = onToggleSpecialServices || ((j, si, svc, tc) => {
+    const key = `${j}|${si}`;
+    setLocalSpecialServices(prev => {
+      const list = prev[key] || [];
+      const exists = list.some(s => s.Code === svc.Code);
+      if (exists) {
+        return { ...prev, [key]: list.filter(s => s.Code !== svc.Code) };
+      }
+      if (list.length >= tc) {
+        ToastWithTimer({
+          type: "info",
+          message: `You can add services for only ${tc} traveler(s)`
+        });
+        return prev;
+      }
+      return { ...prev, [key]: [...list, svc] };
+    });
+  });
+
+  const handleClearSpecialServices = (j, si) => {
+    const key = `${j}|${si}`;
+    setLocalSpecialServices(prev => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
+  };
+
+  const normalizedSpecialServices = useMemo(() => {
+    const targetIndex = localSegmentIndex !== undefined ? localSegmentIndex : segmentIndex;
+    const rawServices = 
+      ssrData?.specialServices?.[targetIndex] ||
+      ssrData?.SpecialServices?.[0]?.SegmentSpecialService?.[targetIndex]?.SSRService ||
+      ssrData?.SpecialServices?.[targetIndex]?.SSRService ||
+      reduxSSR?.Response?.SpecialServices?.[0]?.SegmentSpecialService?.[targetIndex]?.SSRService ||
+      reduxSSR?.Response?.SpecialServices?.[targetIndex]?.SegmentSpecialService?.[0]?.SSRService ||
+      reduxSSR?.Response?.SpecialServices?.[targetIndex]?.SSRService ||
+      (Array.isArray(ssrData?.SpecialServices) ? ssrData.SpecialServices : []) ||
+      (Array.isArray(reduxSSR?.Response?.SpecialServices) ? reduxSSR.Response.SpecialServices : []) ||
+      [];
+
+    const flatServices = Array.isArray(rawServices[0]) ? rawServices.flat() : rawServices;
+    
+    return flatServices.filter(
+      (s) =>
+        s && typeof s === "object" && s.Code &&
+        (!s.AirlineCode ||
+          !s.FlightNumber ||
+          (s.AirlineCode === segment?.fD?.aI?.code &&
+            String(s.FlightNumber).trim() === String(segment?.fD?.fN).trim()))
+    );
+  }, [ssrData, reduxSSR, segmentIndex, localSegmentIndex, segment]);
 
   // SSR Normalization
   const segmentSSR = useMemo(() => {
@@ -193,9 +372,11 @@ export default function RTSeatSelectionModal({
     setSeatModalOpen(false);
     setMealModalOpen(false);
     setBaggageModalOpen(false);
+    setSpecialServicesModalOpen(false);
     if (type === "seat") setSeatModalOpen(true);
     if (type === "meal") setMealModalOpen(true);
     if (type === "baggage") setBaggageModalOpen(true);
+    if (type === "special") setSpecialServicesModalOpen(true);
   };
 
   // Meal/Baggage normalization
@@ -302,6 +483,12 @@ export default function RTSeatSelectionModal({
     // Baggage
     Object.values(selectedBaggage).forEach((bag) => {
       if (bag?.Price) total += Number(bag.Price) * travelers.length;
+    });
+    // Special Services
+    Object.values(activeSelectedSpecialServices).forEach((svcs) => {
+      svcs?.forEach((s) => {
+        if (s?.Price) total += Number(s.Price || 0);
+      });
     });
     return total;
   };
@@ -553,6 +740,12 @@ export default function RTSeatSelectionModal({
               icon: BsLuggage,
               allowed: policyAllowBaggage,
             },
+            {
+              key: "special",
+              label: "Special Services",
+              icon: FaConciergeBell,
+              allowed: true,
+            },
           ].map(({ key, label, icon: Icon, allowed }) => (
             <button
               key={key}
@@ -563,7 +756,8 @@ export default function RTSeatSelectionModal({
                   ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-70"
                   : (key === "seat" && seatModalOpen) ||
                       (key === "meal" && mealModalOpen) ||
-                      (key === "baggage" && baggageModalOpen)
+                      (key === "baggage" && baggageModalOpen) ||
+                      (key === "special" && specialServicesModalOpen)
                     ? "bg-[#0A203E] text-white shadow-md border-[#0A203E]"
                     : "bg-white text-[#0A203E] border border-slate-200 hover:bg-slate-100"
               }`}
@@ -889,6 +1083,20 @@ export default function RTSeatSelectionModal({
               />
             </div>
           )}
+
+          {specialServicesModalOpen && (
+            <div className="h-full p-4 overflow-auto bg-slate-50">
+              <SpecialServiceSelectionCards
+                services={normalizedSpecialServices}
+                selectedServices={activeSelectedSpecialServices[`${journeyType}|${segmentIndex}`] || []}
+                onToggleService={handleToggleSpecialService}
+                journeyType={journeyType}
+                flightIndex={segmentIndex}
+                travelersCount={travelers.length}
+                onClearServices={handleClearSpecialServices}
+              />
+            </div>
+          )}
         </div>
 
         {/* UNIVERSAL FOOTER */}
@@ -917,6 +1125,14 @@ export default function RTSeatSelectionModal({
                 </p>
                 <p className="text-xs font-bold text-gray-700 mt-0.5">
                   {selectedMeals[`${journeyType}|${segmentIndex}`]?.length || 0}
+                </p>
+              </div>
+              <div className="text-center ml-4">
+                <p className="text-[10px] text-gray-400 font-bold uppercase">
+                  Services
+                </p>
+                <p className="text-xs font-bold text-gray-700 mt-0.5">
+                  {activeSelectedSpecialServices[`${journeyType}|${segmentIndex}`]?.length || 0}
                 </p>
               </div>
             </div>

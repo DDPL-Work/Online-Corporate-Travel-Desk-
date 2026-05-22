@@ -300,11 +300,9 @@ function FlightOptionCard({
         {/* LEFT — Flight identity + schedule */}
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-4">
-            <img
-              src={airlineLogo(option.airlineCode)}
+            <img src={airlineLogo(option.airlineCode)}
               alt={option.airlineCode || "Airline"}
-              className="h-12 w-12 shrink-0 rounded-2xl border border-slate-200 bg-white object-contain p-2"
-            />
+              className="h-12 w-12 shrink-0 rounded-2xl border border-slate-200 bg-white object-contain p-2" loading="eager" />
             <div className="min-w-0 flex-1">
               {/* Airline + badges row */}
               <div className="flex flex-wrap items-center gap-2">

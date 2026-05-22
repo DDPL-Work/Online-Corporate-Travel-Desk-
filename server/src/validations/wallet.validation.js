@@ -6,6 +6,7 @@ module.exports = {
   initiateRecharge: Joi.object({
     amount: Joi.number().positive().precision(2).required(),
     gateway,
+    returnUrl: Joi.string().optional(),
   }),
 
   verifyPayment: Joi.object({

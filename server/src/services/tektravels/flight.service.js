@@ -271,10 +271,27 @@ function buildLccTicketSsrPayload({ ssr, liveSsrResponse, passengers }) {
     };
   });
 
+  const SpecialServices = (ssr?.specialServices || []).map((svc) => {
+    const expectedWayType = svc.journeyType === "return" ? 2 : (svc.journeyType === "onward" ? 1 : null);
+    return {
+      travelerIndex: svc.travelerIndex || 0,
+      WayType: expectedWayType || 1,
+      Code: svc.code || svc.Code,
+      Text: svc.text || svc.Text,
+      Origin: svc.Origin || svc.origin || "",
+      Destination: svc.Destination || svc.destination || "",
+      AirlineCode: svc.AirlineCode || svc.airlineCode || "",
+      FlightNumber: svc.FlightNumber || svc.flightNumber || "",
+      Amount: svc.price || svc.Price || 0,
+      Currency: "INR",
+    };
+  });
+
   return {
     MealDynamic,
     SeatDynamic,
     Baggage,
+    SpecialServices,
   };
 }
 
@@ -589,7 +606,7 @@ class FlightService {
   }
 
   /* ---------------- BOOK (NON-LCC) ---------------- */
-  async bookFlight({ traceId, resultIndex, result, passengers, ssr, gstDetails }) {
+  async bookFlight({ traceId, resultIndex, result, passengers, ssr, gstDetails, corporatePhone }) {
     if (!result) {
       throw new ApiError(400, "Selected flight result is required");
     }
@@ -653,11 +670,22 @@ class FlightService {
         Fare: getFareForPassenger(p),
       })),
       SSR:
-        ssr && (ssr.baggage?.length || ssr.meals?.length || ssr.seats?.length)
+        ssr && (ssr.baggage?.length || ssr.meals?.length || ssr.seats?.length || ssr.specialServices?.length)
           ? {
               Baggage: ssr.baggage || [],
               Meal: ssr.meals || [],
               Seat: ssr.seats || [],
+              SpecialServices: (ssr.specialServices || []).map(svc => ({
+                WayType: svc.journeyType === "return" ? 2 : 1,
+                Code: svc.code || svc.Code,
+                Text: svc.text || svc.Text,
+                Origin: svc.Origin || svc.origin || "",
+                Destination: svc.Destination || svc.destination || "",
+                AirlineCode: svc.AirlineCode || svc.airlineCode || "",
+                FlightNumber: svc.FlightNumber || svc.flightNumber || "",
+                Amount: svc.price || svc.Price || 0,
+                Currency: "INR"
+              })),
             }
           : null,
       ...(gstDetails?.gstin && {
@@ -665,6 +693,7 @@ class FlightService {
           GSTNumber: gstDetails.gstin || "",
           GSTCompanyName: gstDetails.legalName || "NA",
           GSTCompanyAddress: gstDetails.address || "NA",
+          GSTCompanyContactNumber: gstDetails.gstPhone || corporatePhone,
           GSTCompanyEmail: gstDetails.gstEmail || passengers[0]?.email || "info@domain.com"
         }
       }),
@@ -746,6 +775,7 @@ class FlightService {
     ssr,
     isLCC,
     gstDetails,
+    corporatePhone,
   }) {
     const env = this.getEnv();
 
@@ -796,17 +826,20 @@ class FlightService {
         MealDynamic: [],
         SeatDynamic: [],
         Baggage: [],
+        SpecialServices: [],
       };
 
       if (
         (ssr?.meals?.length || 0) > 0 ||
         (ssr?.seats?.length || 0) > 0 ||
-        (ssr?.baggage?.length || 0) > 0
+        (ssr?.baggage?.length || 0) > 0 ||
+        (ssr?.specialServices?.length || 0) > 0
       ) {
         logger.info("BUILDING SSR PAYLOAD FOR LCC", {
           mealCount: ssr?.meals?.length || 0,
           seatCount: ssr?.seats?.length || 0,
           baggageCount: ssr?.baggage?.length || 0,
+          specialCount: ssr?.specialServices?.length || 0,
         });
 
         const liveSsr = await this.getSSR(traceId, resultIndex);
@@ -855,16 +888,22 @@ class FlightService {
           Baggage: (lccSsrPayload.Baggage || [])
             .filter((b) => b.travelerIndex === pIndex)
             .map(({ travelerIndex, ...rest }) => rest),
+
+          SpecialServices: (lccSsrPayload.SpecialServices || [])
+            .filter((svc) => svc.travelerIndex === pIndex)
+            .map(({ travelerIndex, ...rest }) => rest),
         })),
         ...(gstDetails?.gstin && {
           GSTCompanyInformation: {
             GSTNumber: gstDetails.gstin || "",
             GSTCompanyName: gstDetails.legalName || "NA",
             GSTCompanyAddress: gstDetails.address || "NA",
-            GSTCompanyEmail: gstDetails.gstEmail || passengers[0]?.email || "info@domain.com"
+            GSTCompanyContactNumber: gstDetails.gstPhone || corporatePhone,
+            GSTCompanyEmail: gstDetails.gstEmail || passengers[0]?.email
           }
         }),
       };
+      logger.info("LCC TICKET PAYLOAD FOR TBO:", JSON.stringify(payload, null, 2));
     } else {
       /* ================= NON-LCC ================= */
       if (!bookingId || !pnr) {

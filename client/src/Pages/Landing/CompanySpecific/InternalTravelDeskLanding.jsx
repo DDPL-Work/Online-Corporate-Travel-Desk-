@@ -65,6 +65,11 @@ import { setSearchPayload } from "../../../Redux/Slice/hotelSlice";
 import { CountrySelector } from "../../../components/hotel-search/HotelSearchSubComponents";
 import HotelGuestSelection from "../../../components/hotel-search/HotelGuestSelection";
 import TravelersClassModal from "../../../components/FlightSearchComponents/TravelersClassModal";
+import Swal from "sweetalert2";
+import {
+  DEFAULT_HOTEL_PREBOOK_SESSION_MESSAGE,
+  consumeHotelPreBookSessionExpiredNotice,
+} from "../../Booking-Flow/Hotel-Booking/hotelPreBookSession";
 
 // ─── Brand Colors ──────────────────────────────────────────────────────────────
 const C = {
@@ -662,9 +667,9 @@ const HeroWithSearch = ({
     countries?.data?.CountryList || countries?.data || countries || [];
   const normalizedCountries = Array.isArray(countryArray)
     ? countryArray.map((c) => {
-        const code = c.Code || c.code;
-        return { code, name: c.Name || c.name, flag: getFlagEmoji(code) };
-      })
+      const code = c.Code || c.code;
+      return { code, name: c.Name || c.name, flag: getFlagEmoji(code) };
+    })
     : [];
 
   const handleCountryChange = (code) => {
@@ -779,9 +784,9 @@ const HeroWithSearch = ({
   const nightCount =
     checkIn && checkOut
       ? Math.max(
-          1,
-          Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000),
-        )
+        1,
+        Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000),
+      )
       : null;
   const selectedCountry = normalizedCountries.find((c) => c.code === country);
 
@@ -913,7 +918,7 @@ const HeroWithSearch = ({
           </p>
         </div>
 
-        <div className="flex justify-center mb-2 relative z-30">
+        <div className="flex justify-center  sm:hidden mb-2 relative z-30">
           <div className="flex p-1.5 rounded-2xl border border-white/20 shadow-2xl">
             {[
               { key: "flight", label: "Flights", Icon: FaPlane },
@@ -2134,6 +2139,8 @@ export default function InternalTravelDeskLanding() {
   const [searchParams] = useSearchParams();
   const { companySlug } = useParams();
   const { user, isAuthenticated } = useSelector((s) => s.auth);
+  const queryActiveTab = searchParams.get("activeTab") || searchParams.get("tab");
+  const hotelSessionExpiredParam = searchParams.get("hotelSessionExpired");
 
   const corporateId = searchParams.get("corporateId") || user?.corporateId;
   const { publicBranding, isLoading: pageLoading } = useSelector(
@@ -2141,8 +2148,9 @@ export default function InternalTravelDeskLanding() {
   );
   const [loading, setLoading] = useState(true);
   const [landingActiveTab, setLandingActiveTab] = useState(
-    location.state?.activeTab || "flight",
+    location.state?.activeTab || queryActiveTab || "flight",
   );
+  const hasShownHotelExpiredModalRef = useRef(false);
 
   // We map publicBranding to branding so the rest of the file continues to work unchanged
   const branding = publicBranding;
@@ -2153,10 +2161,61 @@ export default function InternalTravelDeskLanding() {
   };
 
   useEffect(() => {
-    if (location.state?.activeTab) {
-      setLandingActiveTab(location.state.activeTab);
+    const nextActiveTab = location.state?.activeTab || queryActiveTab;
+    if (nextActiveTab) {
+      setLandingActiveTab(nextActiveTab);
     }
-  }, [location.state?.activeTab]);
+  }, [location.state?.activeTab, queryActiveTab]);
+
+  useEffect(() => {
+    if (hasShownHotelExpiredModalRef.current) return;
+
+    const storedNotice = consumeHotelPreBookSessionExpiredNotice();
+    const shouldShowNotice =
+      location.state?.hotelSessionExpired ||
+      hotelSessionExpiredParam === "1" ||
+      Boolean(storedNotice);
+
+    if (!shouldShowNotice) return;
+
+    hasShownHotelExpiredModalRef.current = true;
+
+    Swal.fire({
+      icon: "warning",
+      title: "Hotel search expired",
+      text:
+        location.state?.hotelSessionExpiredMessage ||
+        storedNotice?.message ||
+        DEFAULT_HOTEL_PREBOOK_SESSION_MESSAGE,
+      confirmButtonText: "Search Again",
+      confirmButtonColor: GOLD,
+    });
+
+    const cleanedParams = new URLSearchParams(searchParams);
+    cleanedParams.delete("hotelSessionExpired");
+    cleanedParams.delete("activeTab");
+    cleanedParams.delete("tab");
+
+    navigate(
+      {
+        pathname: location.pathname,
+        search: cleanedParams.toString()
+          ? `?${cleanedParams.toString()}`
+          : "",
+      },
+      {
+        replace: true,
+        state: { activeTab: "hotel" },
+      },
+    );
+  }, [
+    hotelSessionExpiredParam,
+    location.pathname,
+    location.state?.hotelSessionExpired,
+    location.state?.hotelSessionExpiredMessage,
+    navigate,
+    searchParams,
+  ]);
 
   useEffect(() => {
     const fetchBranding = async () => {

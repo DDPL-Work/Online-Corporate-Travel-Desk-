@@ -1086,7 +1086,9 @@ class PaymentService {
     gateway,
     customerPhone,
     customerEmail,
+    returnUrl,
   }) {
+    logger.info("Initiating wallet recharge with dynamic returnUrl:", { returnUrl });
     const validAmount = this.validateRechargeAmount(amount);
     const normalizedGateway = normalizeGateway(
       gateway || paymentConfig.defaultGateway,
@@ -1105,6 +1107,7 @@ class PaymentService {
             bookingReference,
             customerPhone,
             customerEmail,
+            returnUrl,
           })
         : await gatewayClient.createOrder({
             amount: validAmount,

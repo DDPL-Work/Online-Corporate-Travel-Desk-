@@ -4,6 +4,22 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../API/axios";
 
+const normalizePreBookError = (responseData, fallbackMessage) => {
+  const data = responseData?.data || responseData;
+  const status = data?.Status || responseData?.data?.Status;
+
+  return {
+    message:
+      responseData?.message ||
+      responseData?.error ||
+      status?.Description ||
+      data?.Error?.ErrorMessage ||
+      fallbackMessage,
+    code: status?.Code,
+    data,
+  };
+};
+
 
 /* ================================
    PRE BOOK HOTEL
@@ -14,11 +30,16 @@ export const preBookHotel = createAsyncThunk(
     try {
       const res = await api.post("/hotel-booking/prebook", payload);
       if (res.data.success === false) {
-        return rejectWithValue(res.data.message || "PreBook failed");
+        return rejectWithValue(normalizePreBookError(res.data, "PreBook failed"));
       }
       return res.data.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.error || err.response?.data?.message || err.message);
+      return rejectWithValue(
+        normalizePreBookError(
+          err.response?.data,
+          err.response?.data?.error || err.response?.data?.message || err.message,
+        ),
+      );
     }
   }
 );

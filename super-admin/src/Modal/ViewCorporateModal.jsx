@@ -80,6 +80,9 @@ export default function ViewCorporateModal({ corporate, onClose }) {
                   : "N/A"
               }
             />
+            {corporate.classification === "postpaid" && (
+              <Item label="Due Days" value={corporate.dueDays ?? "N/A"} />
+            )}
           </Section>
 
           <Section title="Travel Policy">

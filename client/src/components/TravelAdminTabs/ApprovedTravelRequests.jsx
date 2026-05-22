@@ -54,11 +54,10 @@ const RouteCell = ({ routes, airline }) => {
   return (
     <div className="flex items-center gap-3">
       <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
-        <img 
-          src={logoUrl} 
+        <img src={logoUrl} 
           alt={airlineName} 
           className="w-full h-full object-contain"
-          onError={(e) => { 
+          loading="eager" onError={(e) => { 
             e.target.onerror = null;
             e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
           }} 
@@ -152,47 +151,47 @@ function FlightApprovalsSection({ requests, refreshing, employeeOptions }) {
       <ResponsiveDataTable title="Flight Fulfillment Queue" subtitle={`${filtered.length} missions awaiting ticketing`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
-              <Th className="!px-6 !py-5">Route</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5 text-center">Status</Th>
-              <Th className="!px-6 !py-5">Approved Date & Time</Th>
-              <Th className="!px-6 !py-5">Amount</Th>
-              <Th className="!px-6 !py-5 text-center">Action</Th>
+            <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="px-6! py-5!">Order ID</Th>
+              <Th className="px-6! py-5!">Personnel</Th>
+              <Th className="px-6! py-5!">Route</Th>
+              <Th className="px-6! py-5!">Email Identifier</Th>
+              <Th className="px-6! py-5! text-center">Status</Th>
+              <Th className="px-6! py-5!">Approved Date & Time</Th>
+              <Th className="px-6! py-5!">Amount</Th>
+              <Th className="px-6! py-5! text-center">Action</Th>
             </tr>
           </thead>
           <tbody>
             {filtered.length > 0 ? filtered.map((r, i) => (
               <tr key={r.id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
-                <td className="!px-6 !py-5"><IdCell id={r.orderId} /></td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!"><IdCell id={r.orderId} /></td>
+                <td className="px-6! py-5!">
                    <p className="text-xs font-black" style={{ color: C.navy }}>{r.employee}</p>
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                   <RouteCell routes={r.routes} airline={r.airline} />
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{r.employeeId}</span>
                 </td>
-                <td className="!px-6 !py-5 text-center">
+                <td className="px-6! py-5! text-center">
                    <ExecStatusBadge status={r.executionStatus} />
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <p className="text-[11px] font-black text-slate-700">{r.bookedDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{r.bookedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                 </td>
-                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{r.estimatedCost.toLocaleString()}</td>
-                <td className="!px-6 !py-5 text-center">
-                  <button onClick={() => setSelected(r.originalData)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group">
+                <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{r.estimatedCost.toLocaleString()}</td>
+                <td className="px-6! py-5! text-center">
+                  <button onClick={() => setSelected(r.originalData)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group">
                     <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
                   </button>
                 </td>
               </tr>
             )) : (
               <tr>
-                <td colSpan={8} className="!px-6 !py-20 text-center">
+                <td colSpan={8} className="px-6! py-20! text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <FiSearch size={32} />
@@ -286,39 +285,39 @@ function HotelApprovalsSection({ requests, refreshing, employeeOptions }) {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order Reference</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
-              <Th className="!px-6 !py-5">Asset Detail</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5 text-center">Status</Th>
-              <Th className="!px-6 !py-5">Approved Date & Time</Th>
-              <Th className="!px-6 !py-5">Amount</Th>
-              <Th className="!px-6 !py-5 text-center">Action</Th>
+              <Th className="px-6! py-5!">Order Reference</Th>
+              <Th className="px-6! py-5!">Personnel</Th>
+              <Th className="px-6! py-5!">Asset Detail</Th>
+              <Th className="px-6! py-5!">Email Identifier</Th>
+              <Th className="px-6! py-5! text-center">Status</Th>
+              <Th className="px-6! py-5!">Approved Date & Time</Th>
+              <Th className="px-6! py-5!">Amount</Th>
+              <Th className="px-6! py-5! text-center">Action</Th>
             </tr>
           </thead>
           <tbody>
             {filtered.length > 0 ? filtered.map((r, i) => (
               <tr key={r.id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
-                <td className="!px-6 !py-5"><IdCell id={r.orderId} /></td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!"><IdCell id={r.orderId} /></td>
+                <td className="px-6! py-5!">
                    <p className="text-xs font-black" style={{ color: C.navy }}>{r.employee}</p>
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <p className="text-xs font-black" style={{ color: C.navy }}>{r.hotelName}</p>
                    <p className="text-[10px] font-bold text-gold uppercase">{r.city}</p>
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{r.employeeId}</span>
                 </td>
-                <td className="!px-6 !py-5 text-center">
+                <td className="px-6! py-5! text-center">
                    <ExecStatusBadge status={r.executionStatus} />
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <p className="text-[11px] font-black text-slate-700">{r.bookedDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{r.bookedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                 </td>
-                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{r.estimatedCost.toLocaleString()}</td>
-                <td className="!px-6 !py-5 text-center">
+                <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{r.estimatedCost.toLocaleString()}</td>
+                <td className="px-6! py-5! text-center">
                   <button onClick={() => setSelected(r.originalData)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group">
                     <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
                   </button>

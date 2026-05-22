@@ -185,15 +185,15 @@ export default function CompanyLandingPage() {
               <div className="w-full flex justify-center items-center gap-3.5">
                 {/* Google */}
                 <button className="bg-white inline-flex justify-center items-center w-16 h-16 rounded-xl outline outline-1 outline-black/10 hover:bg-gray-50 transition-colors shadow-sm p-4">
-                  <img src="/Google.svg" alt="Google" className="w-full h-full object-contain" />
+                  <img src="/Google.svg" alt="Google" className="w-full h-full object-contain" loading="lazy" decoding="async" />
                 </button>
                 {/* Microsoft */}
                 <button className="bg-white inline-flex justify-center items-center w-16 h-16 rounded-xl outline outline-1 outline-black/10 hover:bg-gray-50 transition-colors shadow-sm p-4">
-                  <img src="/MicroSoft.svg" alt="Microsoft" className="w-full h-full object-contain" />
+                  <img src="/MicroSoft.svg" alt="Microsoft" className="w-full h-full object-contain" loading="lazy" decoding="async" />
                 </button>
                 {/* Zoho */}
                 <button className="bg-white inline-flex justify-center items-center w-16 h-16 rounded-xl outline outline-1 outline-black/10 hover:bg-gray-50 transition-colors shadow-sm p-4">
-                  <img src="/Zoho.svg" alt="Zoho" className="w-full h-full object-contain" />
+                  <img src="/Zoho.svg" alt="Zoho" className="w-full h-full object-contain" loading="lazy" decoding="async" />
                 </button>
               </div>
 
@@ -427,7 +427,7 @@ export default function CompanyLandingPage() {
                 return (
                   <div key={name} className="flex justify-start items-center bg-white h-[88px] px-10 hover:bg-gray-50 transition-colors gap-4 cursor-pointer">
                     <div className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0 bg-white">
-                      <img src={logoUrl} alt={name} className="w-full h-full object-contain mix-blend-multiply" />
+                      <img src={logoUrl} alt={name} className="w-full h-full object-contain mix-blend-multiply" loading="eager" />
                     </div>
                     <span className="text-[#1E293B] text-[15px] font-bold font-['DM_Sans']">{name}</span>
                   </div>

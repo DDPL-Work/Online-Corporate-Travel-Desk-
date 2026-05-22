@@ -60,3 +60,19 @@ export const fetchCycleTransactions = createAsyncThunk(
     }
   },
 );
+
+export const updateCycleReceipt = createAsyncThunk(
+  "postpaid/updateCycleReceipt",
+  async ({ corporateId, cycleIndex, receivedAmount }, { rejectWithValue }) => {
+    try {
+      const res = await api.post("postpaid/cycles/receipt", {
+        corporateId,
+        cycleIndex,
+        receivedAmount,
+      });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || "Failed to update receipt");
+    }
+  }
+);
