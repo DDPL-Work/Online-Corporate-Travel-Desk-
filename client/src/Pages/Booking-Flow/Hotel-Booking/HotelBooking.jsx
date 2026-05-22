@@ -402,11 +402,9 @@ const HotelBookNow = () => {
           <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end pb-8">
             {/* Hotel image */}
             <div className="relative shrink-0">
-              <img
-                src={hotel.image}
+              <img src={hotel.image}
                 alt={hotel.name}
-                className="w-28 h-28 sm:w-32 sm:h-32 object-cover rounded-2xl border-2 border-white/20 shadow-2xl transition-all duration-700 ease-in-out"
-              />
+                className="w-28 h-28 sm:w-32 sm:h-32 object-cover rounded-2xl border-2 border-white/20 shadow-2xl transition-all duration-700 ease-in-out" loading="lazy" decoding="async" />
               <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-emerald-500 border-2 border-[#0A203E] flex items-center justify-center shadow-lg">
                 <MdVerifiedUser size={14} className="text-white" />
               </div>

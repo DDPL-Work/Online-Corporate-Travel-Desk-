@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
@@ -20,6 +20,8 @@ import {
   FiShield,
   FiChevronDown,
   FiChevronUp,
+  FiChevronLeft,
+  FiChevronRight,
   FiStar,
   FiXCircle,
   FiAlertTriangle,
@@ -523,7 +525,12 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
   const seats = ssrSnapshot?.seats || [];
   const meals = ssrSnapshot?.meals || [];
   const baggage = ssrSnapshot?.baggage || [];
-  const hasSSR = seats.length > 0 || meals.length > 0 || baggage.length > 0;
+  const specialServices = ssrSnapshot?.specialServices || [];
+  const hasSSR =
+    seats.length > 0 ||
+    meals.length > 0 ||
+    baggage.length > 0 ||
+    specialServices.length > 0;
 
   if (!hasSSR) return null;
 
@@ -539,15 +546,15 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
   const segRoute = (segIdx) => {
     const seg = segments[segIdx];
     if (!seg) return null;
-    return `${seg.origin?.airportCode} → ${seg.destination?.airportCode}`;
+    return `${seg.origin?.airportCode || seg.Origin?.Airport?.AirportCode} → ${seg.destination?.airportCode || seg.Destination?.Airport?.AirportCode}`;
   };
 
-  // Group all SSR items by travelerIndex, then by segmentIndex
-  // Shape: { [travelerIndex]: { seats: [], meals: [], baggage: [] } }
+  // Group all SSR items by travelerIndex
+  // Shape: { [travelerIndex]: { seats: [], meals: [], baggage: [], specialServices: [] } }
   const byTraveler = {};
 
   travellers.forEach((_, idx) => {
-    byTraveler[idx] = { seats: [], meals: [], baggage: [] };
+    byTraveler[idx] = { seats: [], meals: [], baggage: [], specialServices: [] };
   });
 
   seats.forEach((s) => {
@@ -560,11 +567,18 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
     if (byTraveler[b.travelerIndex])
       byTraveler[b.travelerIndex].baggage.push(b);
   });
+  specialServices.forEach((s) => {
+    if (byTraveler[s.travelerIndex])
+      byTraveler[s.travelerIndex].specialServices.push(s);
+  });
 
   // Only include travelers that actually have at least one SSR
   const activeTravelers = Object.entries(byTraveler).filter(
     ([, data]) =>
-      data.seats.length > 0 || data.meals.length > 0 || data.baggage.length > 0,
+      data.seats.length > 0 ||
+      data.meals.length > 0 ||
+      data.baggage.length > 0 ||
+      data.specialServices.length > 0,
   );
 
   if (!activeTravelers.length) return null;
@@ -575,7 +589,7 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
       <div className="flex items-center gap-2 mb-5">
         <FiStar size={13} className="text-[#A07840]" />
         <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
-          Seat, Meal &amp; Baggage Add-ons
+          Seat, Meal, Baggage &amp; Special Services
         </span>
       </div>
 
@@ -597,6 +611,7 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
             ...data.seats.map((s) => s.price || 0),
             ...data.meals.map((m) => m.price || 0),
             ...data.baggage.map((b) => b.price || 0),
+            ...data.specialServices.map((s) => s.price || s.Price || 0),
           ].reduce((a, b) => a + b, 0);
 
           return (
@@ -605,13 +620,13 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
               className="bg-white rounded-xl border border-[#E8E0D0] p-4"
             >
               {/* Passenger header */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 min-w-0">
                   <div className="w-7 h-7 rounded-full bg-[#F5F0E8] border border-[#E0D8C8] flex items-center justify-center shrink-0">
                     <FiUser size={12} className="text-[#A07840]" />
                   </div>
-                  <div>
-                    <p className="text-[13px] font-bold text-gray-900 leading-none">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-bold text-gray-900 leading-none truncate">
                       {travelerName(idx)}
                     </p>
                     <p className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">
@@ -619,8 +634,8 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
                     </p>
                   </div>
                 </div>
-                {passengerTotal > 0 && (
-                  <span className="text-[12px] font-bold text-gray-900">
+                {passengerTotal > 0 && !isEmployee && (
+                  <span className="text-[12px] font-bold text-gray-900 shrink-0">
                     ₹{passengerTotal}
                   </span>
                 )}
@@ -631,25 +646,25 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
                 {data.seats.map((s, i) => (
                   <div
                     key={`seat-${i}`}
-                    className="flex items-center justify-between"
+                    className="flex items-start justify-between gap-3 py-1"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840]">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840] shrink-0 mt-0.5">
                         S
                       </span>
-                      <div>
-                        <p className="text-[12px] font-semibold text-gray-800">
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-semibold text-gray-800 break-words">
                           Seat {s.seatNo}
                         </p>
                         {segRoute(s.segmentIndex) && (
-                          <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide break-all">
                             {segRoute(s.segmentIndex)}
                           </p>
                         )}
                       </div>
                     </div>
-                    <span className="text-[12px] font-semibold text-gray-700">
-                      {s.price > 0 ? `₹${s.price}` : "Free"}
+                    <span className="text-[12px] font-semibold text-gray-700 shrink-0 text-right">
+                      {s.price > 0 ? (!isEmployee ? `₹${s.price}` : "Selected") : "Free"}
                     </span>
                   </div>
                 ))}
@@ -658,29 +673,29 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
                 {data.meals.map((m, i) => (
                   <div
                     key={`meal-${i}`}
-                    className="flex items-center justify-between"
+                    className="flex items-start justify-between gap-3 py-1"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840]">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840] shrink-0 mt-0.5">
                         M
                       </span>
-                      <div>
-                        <p className="text-[12px] font-semibold text-gray-800">
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-semibold text-gray-800 break-words">
                           {m.code}
                           {m.description && typeof m.description === "string"
                             ? ` · ${m.description}`
                             : ""}
                         </p>
                         {segRoute(m.segmentIndex) && (
-                          <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide break-all">
                             {segRoute(m.segmentIndex)}
                           </p>
                         )}
                       </div>
                     </div>
-                    <span className="text-[12px] font-semibold text-gray-700">
+                    <span className="text-[12px] font-semibold text-gray-700 shrink-0 text-right">
                       {m.price > 0 ? (
-                        `₹${m.price}`
+                        !isEmployee ? `₹${m.price}` : "Selected"
                       ) : (
                         <span className="text-[11px] text-gray-400 italic font-normal">
                           Complimentary
@@ -694,25 +709,52 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
                 {data.baggage.map((b, i) => (
                   <div
                     key={`bag-${i}`}
-                    className="flex items-center justify-between"
+                    className="flex items-start justify-between gap-3 py-1"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840]">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840] shrink-0 mt-0.5">
                         B
                       </span>
-                      <div>
-                        <p className="text-[12px] font-semibold text-gray-800">
-                          {b.weight || b.description || "Extra Baggage"}
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-semibold text-gray-800 break-words">
+                          Baggage · {b.weight || b.description || "Extra"}
                         </p>
                         {segRoute(b.segmentIndex) && (
-                          <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide break-all">
                             {segRoute(b.segmentIndex)}
                           </p>
                         )}
                       </div>
                     </div>
-                    <span className="text-[12px] font-semibold text-gray-700">
-                      {b.price > 0 ? `₹${b.price}` : "Free"}
+                    <span className="text-[12px] font-semibold text-gray-700 shrink-0 text-right">
+                      {b.price > 0 ? (!isEmployee ? `₹${b.price}` : "Selected") : "Free"}
+                    </span>
+                  </div>
+                ))}
+
+                {/* Special Services */}
+                {data.specialServices.map((s, i) => (
+                  <div
+                    key={`special-${i}`}
+                    className="flex items-start justify-between gap-3 py-1"
+                  >
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840] shrink-0 mt-0.5">
+                        SS
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-semibold text-gray-800 break-words">
+                          {s.text || s.Text || s.code || s.Code || "Special Service"}
+                        </p>
+                        {segRoute(s.segmentIndex) && (
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide break-all">
+                            {segRoute(s.segmentIndex)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[12px] font-semibold text-gray-700 shrink-0 text-right">
+                      {(s.price > 0 || s.Price > 0) ? (!isEmployee ? `₹${s.price || s.Price}` : "Selected") : "Free"}
                     </span>
                   </div>
                 ))}
@@ -728,9 +770,10 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
           ...seats.map((s) => s.price || 0),
           ...meals.map((m) => m.price || 0),
           ...baggage.map((b) => b.price || 0),
+          ...specialServices.map((s) => s.price || s.Price || 0),
         ].reduce((a, b) => a + b, 0);
 
-        return grandTotal > 0 ? (
+        return grandTotal > 0 && !isEmployee ? (
           <div className="mt-4 flex justify-between items-center pt-4 border-t border-[#E0D8C8]">
             <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
               Total Add-on Charges
@@ -1618,6 +1661,17 @@ export default function TeamBookingDetails() {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
+  const passengerTableRef = useRef(null);
+
+  const scrollTable = (direction) => {
+    if (passengerTableRef.current) {
+      const scrollAmount = 250;
+      passengerTableRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
   const { teamBookingDetail: booking, loadingTeamBookingDetail: loading } =
     useSelector((s) => s.manager);
   const userRole = useSelector((s) => s.auth?.user?.role);
@@ -1738,7 +1792,7 @@ export default function TeamBookingDetails() {
     <div className="min-h-screen bg-gray-50">
       {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
+        <div className="w-full mx-auto px-5 h-14 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
@@ -1756,7 +1810,7 @@ export default function TeamBookingDetails() {
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-5 py-8 pb-24 space-y-6">
+      <main className="w-full mx-auto px-5 py-8 pb-24 space-y-6">
         {/* ── Header: "The trip is confirmed" ── */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -1804,18 +1858,39 @@ export default function TeamBookingDetails() {
         {/* ── Passenger Section ── */}
         <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-5">
           {/* Header */}
-          <div className="flex items-center justify-between mb-5">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
-              Passengers · {travellers.length}
-            </p>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
-              Listed once for the entire trip
-            </p>
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
+                Passengers · {travellers.length}
+              </p>
+              <p className="text-[10px] text-gray-500 uppercase tracking-wide mt-0.5">
+                Listed once for the entire trip
+              </p>
+            </div>
+            {/* Scroll Controls */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => scrollTable("left")}
+                className="w-7 h-7 rounded-full bg-white border border-[#E0D8C8] flex items-center justify-center text-[#A07840] hover:bg-[#F5F0E8] transition active:scale-95 shadow-sm"
+                title="Scroll Left"
+              >
+                <FiChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollTable("right")}
+                className="w-7 h-7 rounded-full bg-white border border-[#E0D8C8] flex items-center justify-center text-[#A07840] hover:bg-[#F5F0E8] transition active:scale-95 shadow-sm"
+                title="Scroll Right"
+              >
+                <FiChevronRight size={16} />
+              </button>
+            </div>
           </div>
 
           {/* Travelers Table */}
           <div className="bg-white rounded-xl border border-[#E8E0D0] overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
+            <div ref={passengerTableRef} className="overflow-x-auto scroll-smooth">
               <table className="w-full text-left border-collapse min-w-[900px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-[#E8E0D0] text-[10px] font-bold uppercase tracking-widest text-[#8B7355]">

@@ -61,7 +61,7 @@ export const MicrosoftIcon = ({ size = 22 }) => (
 );
 
 export const ZohoIcon = ({ size = 22 }) => (
-  <img src="/Zoho.svg" alt="Zoho" className="w-full h-full object-contain" />
+  <img src="/Zoho.svg" alt="Zoho" className="w-full h-full object-contain" loading="lazy" decoding="async" />
 );
 
 // ── Images ────────────────────────────────────────────────────────────────────
@@ -411,12 +411,10 @@ export const LeftPanel = ({ step }) => {
   return (
     <div className="hidden md:block relative w-[340px] shrink-0 overflow-hidden rounded-l-3xl">
       {/* Bg image */}
-      <img
-        src={img}
+      <img src={img}
         alt=""
         key={img}
-        className="absolute inset-0 w-full h-full object-cover transition-all duration-700"
-      />
+        className="absolute inset-0 w-full h-full object-cover transition-all duration-700" loading="lazy" decoding="async" />
       {/* Gradient overlays */}
       <div className="absolute inset-0 bg-linear-to-br from-[#000D26]/95 via-[#000D26]/85 to-slate-900/90" />
       <div className="absolute inset-0 bg-linear-to-t from-[#000D26]/90 via-transparent to-transparent" />
@@ -425,11 +423,9 @@ export const LeftPanel = ({ step }) => {
       <div className="relative z-10 h-full flex flex-col justify-between p-8">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <img
-            src="/logo-traveamer.svg"
+          <img src="/logo-traveamer.svg"
             alt="Traveamer Logo"
-            className="w-20 h-auto object-contain"
-          />
+            className="w-20 h-auto object-contain" loading="eager" />
         </div>
 
         {/* Middle content */}

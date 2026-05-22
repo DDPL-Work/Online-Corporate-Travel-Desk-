@@ -131,11 +131,23 @@ const corporateSchema = new mongoose.Schema(
       max: 365,
     },
 
+    dueDays: {
+      type: Number,
+      min: 0,
+      max: 365,
+    },
+
     walletBalance: {
       type: Number,
       default: 0,
       min: 0,
     },
+
+    cycleReceipts: [{
+      cycleIndex: { type: Number, required: true },
+      receivedAmount: { type: Number, default: 0 },
+      updatedAt: { type: Date, default: Date.now }
+    }],
 
     // ───── SERVICE CHARGES ─────
     serviceCharges: {

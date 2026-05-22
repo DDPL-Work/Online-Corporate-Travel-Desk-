@@ -130,6 +130,7 @@ export default function CreditUtilizationPostpaid() {
   } = useSelector((s) => s.postpaid || {});
 
   const { allEmployees: companyUsers = [] } = useSelector((s) => s.adminBooking || {});
+  const { corporate } = useSelector((s) => s.corporateAdmin || {});
 
   const daysRemaining = useMemo(() => {
     if (!balance?.currentCycleEnd) return null;
@@ -154,8 +155,9 @@ export default function CreditUtilizationPostpaid() {
     const stmtDate = balance.currentCycleEnd
       ? new Date(new Date(balance.currentCycleEnd).getTime() + 86400000)
       : null;
+    const dueDays = corporate?.dueDays ?? 15;
     const dueDate = stmtDate
-      ? new Date(stmtDate.getTime() + 8 * 86400000)
+      ? new Date(stmtDate.getTime() + dueDays * 86400000)
       : null;
     const delayDays =
       dueDate && new Date() > dueDate
@@ -174,7 +176,7 @@ export default function CreditUtilizationPostpaid() {
       statementAmount: balance.usedCredit || 0,
       isCurrent: true,
     };
-  }, [balance]);
+  }, [balance, corporate]);
 
   const displayStats = useMemo(() => {
     if (drillCycle) {
@@ -676,7 +678,8 @@ export default function CreditUtilizationPostpaid() {
                       <Th className="!px-6 !py-5">Billing Horizon</Th>
                       <Th className="!px-6 !py-5">Due Protocol</Th>
                       <Th className="!px-6 !py-5">Compliance Status</Th>
-                      <Th className="!px-6 !py-5 text-right">Deployment Value</Th>
+                      <Th className="!px-6 !py-5 text-right">Paid Amount</Th>
+                      <Th className="!px-6 !py-5 text-right">Remaining</Th>
                     </>
                   )}
                 </tr>
@@ -753,11 +756,10 @@ export default function CreditUtilizationPostpaid() {
                           return (
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden shrink-0">
-                                <img 
-                                  src={logoUrl} 
+                                <img src={logoUrl} 
                                   alt={airlineName} 
                                   className="w-full h-full object-contain"
-                                  onError={(e) => { 
+                                  loading="eager" onError={(e) => { 
                                     e.target.onerror = null;
                                     e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
                                   }} 
@@ -964,8 +966,13 @@ function StatementRow({ row, onClick, idx = 0 }) {
         </span>
       </td>
       <td className="px-6 py-5 text-right">
-        <p className="text-sm font-black text-navy">
-          ₹{fmtAmt(row.statementAmount)}
+        <p className="text-sm font-black text-[#088395]">
+          ₹{fmtAmt(row.receivedAmount || 0)}
+        </p>
+      </td>
+      <td className="px-6 py-5 text-right">
+        <p className={`text-sm font-black ${row.statementAmount - (row.receivedAmount || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+          ₹{fmtAmt(Math.max(0, row.statementAmount - (row.receivedAmount || 0)))}
         </p>
         <button className="text-[9px] font-black text-gold uppercase tracking-tighter mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 justify-end ml-auto">
           View Protocol <FiChevronRight />

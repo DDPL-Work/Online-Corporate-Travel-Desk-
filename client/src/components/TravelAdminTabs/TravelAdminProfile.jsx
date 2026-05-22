@@ -25,8 +25,8 @@ import { C } from "../Shared/color";
 
 const CORPORATE_FIELDS = [
   { key: "corporateName", label: "Corporate Designation", icon: FiUser, type: "text", editable: true },
-  { key: "classification", label: "Classification", icon: FiBriefcase, type: "text", editable: true },
-  { key: "billingCycle", label: "Billing Protocol", icon: FiCalendar, type: "text", editable: true },
+  { key: "classification", label: "Classification", icon: FiBriefcase, type: "text", editable: false },
+  { key: "billingCycle", label: "Billing Protocol", icon: FiCalendar, type: "text", editable: false },
 ];
 
 const ADDRESS_FIELDS = [
@@ -43,9 +43,9 @@ const CONTACT_FIELDS = [
 ];
 
 const SSO_FIELDS = [
-  { key: "ssoConfig.type", label: "Protocol Provider", icon: FiShield, type: "text", editable: true },
-  { key: "ssoConfig.domain", label: "Authorized Domain", icon: FiShield, type: "text", editable: true },
-  { key: "ssoConfig.verified", label: "Validation Status", icon: FiShield, type: "checkbox", editable: true },
+  { key: "ssoConfig.type", label: "Protocol Provider", icon: FiShield, type: "text", editable: false },
+  { key: "ssoConfig.domain", label: "Authorized Domain", icon: FiShield, type: "text", editable: false },
+  { key: "ssoConfig.verified", label: "Validation Status", icon: FiShield, type: "checkbox", editable: false },
 ];
 
 function getInitials(name = "") {
@@ -171,6 +171,9 @@ export default function TravelAdminProfile() {
                   <InfoRow icon={FaRupeeSign} value={`₹${walletBalance.toLocaleString()}`} label="Liquid Assets" />
                   <InfoRow icon={FiCreditCard} value={`₹${creditLimit.toLocaleString()}`} label="Credit Authorization" />
                   <InfoRow icon={FiActivity} value={`₹${usedCredit.toLocaleString()}`} label="Deployed Credit" />
+                  {formData.classification === "postpaid" && (
+                    <InfoRow icon={FiCalendar} value={`${formData.dueDays || 0} Days`} label="Payment Due Days" />
+                  )}
                   <InfoRow icon={FiUser} value={formData.primaryContact?.name || "—"} label="Primary Contact" />
                   <InfoRow icon={FiMail} value={formData.primaryContact?.email || "—"} label="Contact Email" />
                   <InfoRow icon={FiPhone} value={formData.primaryContact?.mobile || "—"} label="Contact Mobile" />
@@ -338,9 +341,12 @@ function Field({ field, value, editing, onChange }) {
       </label>
       {editing ? (
         field.type === "checkbox" ? (
-          <div className="flex items-center gap-3 px-5 py-3 border rounded-[1.25rem]" style={{ backgroundColor: C.gold + "11", borderColor: C.gold + "44" }}>
-            <input type="checkbox" checked={value === true || value === "true" || value === "Allowed"} onChange={(e) => onChange(e.target.checked)} className="w-5 h-5 rounded accent-gold" />
-            <span className="text-xs font-black uppercase tracking-widest" style={{ color: C.navy }}>{value ? "Authorized" : "Restricted"}</span>
+          <div className="flex items-center gap-3 px-5 py-3 border rounded-[1.25rem]" style={{ 
+            backgroundColor: field.editable ? C.gold + "11" : "#f8fafc", 
+            borderColor: field.editable ? C.gold + "44" : "#e2e8f0" 
+          }}>
+            <input type="checkbox" disabled={!field.editable} checked={value === true || value === "true" || value === "Allowed"} onChange={(e) => onChange(e.target.checked)} className={`w-5 h-5 rounded accent-gold ${!field.editable ? "cursor-not-allowed opacity-50" : ""}`} />
+            <span className={`text-xs font-black uppercase tracking-widest ${!field.editable ? "text-slate-400" : ""}`} style={{ color: field.editable ? C.navy : undefined }}>{value ? "Authorized" : "Restricted"}</span>
           </div>
         ) : (
           <input

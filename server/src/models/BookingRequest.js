@@ -40,7 +40,7 @@ const bookingRequestSchema = new mongoose.Schema(
 
     requestStatus: {
       type: String,
-      enum: ["draft", "pending_approval", "approved", "rejected", "expired"],
+      enum: ["draft", "pending_approval", "pending_second_approval", "approved", "rejected", "expired"],
       default: "draft",
       index: true,
     },
@@ -60,6 +60,15 @@ const bookingRequestSchema = new mongoose.Schema(
     rejectedAt: Date,
 
     approverComments: String,
+
+    secondApprover: {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      email: String,
+      name: String,
+      role: String,
+      transferRemark: String,
+      transferredAt: Date,
+    },
 
     /* ================= PROJECT / APPROVER METADATA ================= */
     projectCodeId: String,
@@ -403,7 +412,8 @@ bookingRequestSchema.pre("save", function () {
 /* 2️⃣ Enforce status transitions */
 const ALLOWED_STATUS_TRANSITIONS = {
   draft: ["pending_approval", "approved"],
-  pending_approval: ["approved", "rejected"],
+  pending_approval: ["approved", "rejected", "pending_second_approval"],
+  pending_second_approval: ["approved", "rejected"],
   approved: [],
   rejected: [],
   expired: [],

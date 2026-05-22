@@ -10,10 +10,10 @@ export const FlightSegment = ({ data, label, fare, selected, noOfSeatAvailable }
       {/* Left: Airline Info */}
       <div className="flex items-center gap-3 w-[160px] shrink-0">
         <div className="w-10 h-10 rounded shadow-sm bg-white border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden p-1">
-          <img
-            src={data.logo}
+          <img src={data.logo}
             className="w-full h-full object-contain"
             alt={data.airline}
+            loading="eager"
             onError={(e) => {
               e.target.src = "https://via.placeholder.com/32";
             }}

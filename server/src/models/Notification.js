@@ -15,7 +15,7 @@ const notificationSchema = new mongoose.Schema(
     },
     recipientRole: {
       type: String,
-      enum: ["travel-admin", "manager", "employee", "super-admin", "ops-member"],
+      enum: ["travel-admin", "manager", "employee","finance_team", "super-admin", "ops-member"],
       index: true,
     },
     corporateId: {

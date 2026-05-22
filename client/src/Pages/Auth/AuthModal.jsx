@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { MdClose, MdArrowForward, MdArrowBack } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams } from "react-router-dom";
@@ -89,6 +90,15 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
   useEffect(() => {
     setStep(initialStep || 0);
   }, [initialStep]);
+
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
 
   const TOTAL = STEPS.length; // 9
   const isLast = step === TOTAL - 1;
@@ -443,9 +453,11 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     }
   };
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 cursor-pointer"
+      className="fixed inset-0 z-[99999] flex min-h-dvh items-center justify-center overflow-y-auto p-4 md:p-6 cursor-pointer"
       style={{ background: "rgba(0,13,38,0.6)", backdropFilter: "blur(8px)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -567,6 +579,7 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

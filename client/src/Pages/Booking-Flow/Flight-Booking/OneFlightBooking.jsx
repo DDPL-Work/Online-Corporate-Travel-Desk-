@@ -102,6 +102,7 @@ export default function OneFlightBooking() {
   const [selectedMeals, setSelectedMeals] = useState({});
 
   const [selectedBaggage, setSelectedBaggage] = useState({});
+  const [selectedSpecialServices, setSelectedSpecialServices] = useState({});
 
   const [expandedSections, setExpandedSections] = useState({
     flightDetails: true,
@@ -286,29 +287,24 @@ export default function OneFlightBooking() {
 
   useEffect(() => {
     const quoteResponse = fareQuote?.Response;
-    if (quoteResponse?.ResponseStatus === 2) {
-      const errorMsg = quoteResponse?.Error?.ErrorMessage || "";
-      if (
-        errorMsg.toLowerCase().includes("traceid") ||
-        errorMsg.toLowerCase().includes("expired") ||
-        errorMsg.toLowerCase().includes("invalid")
-      ) {
-        Swal.fire({
-          title: "Session Expired",
-          text: "Your search session has expired. Please search again.",
-          icon: "warning",
-          confirmButtonColor: "#0A4D68",
-        }).then(() => {
-          window.close();
-          setTimeout(() => {
-            if (window.history.length > 1) {
-              navigate(-1);
-            } else {
-              navigate("/travel");
-            }
-          }, 300);
-        });
-      }
+    if (quoteResponse?.ResponseStatus === 2 || quoteResponse?.Error?.ErrorCode > 0) {
+      const errorMsg = quoteResponse?.Error?.ErrorMessage || "Pricing failed from the supplier end. Please search again.";
+      
+      Swal.fire({
+        title: "Session Expired",
+        text: errorMsg,
+        icon: "warning",
+        confirmButtonColor: "#0A4D68",
+      }).then(() => {
+        window.close();
+        setTimeout(() => {
+          if (window.history.length > 1) {
+            navigate(-1);
+          } else {
+            navigate("/travel");
+          }
+        }, 300);
+      });
     }
   }, [fareQuote, navigate]);
 
@@ -509,6 +505,26 @@ export default function OneFlightBooking() {
     }));
   };
 
+  const toggleSpecialServiceSelection = (
+    journeyType,
+    segmentIndex,
+    svc,
+    travelersCount,
+  ) => {
+    const key = `${journeyType}|${segmentIndex}`;
+
+    setSelectedSpecialServices((prev) => {
+      const list = prev[key] || [];
+      const exists = list.find((s) => s.Code === svc.Code);
+
+      if (exists) {
+        return { ...prev, [key]: list.filter((s) => s.Code !== svc.Code) };
+      }
+
+      return { ...prev, [key]: [...list, svc] };
+    });
+  };
+
   const updateTraveler = (id, field, value) => {
     setTravelers((prev) =>
       prev.map((t) => (t.id === id ? { ...t, [field]: value } : t)),
@@ -561,6 +577,10 @@ export default function OneFlightBooking() {
 
     Object.values(selectedBaggage).forEach((bag) => {
       if (bag?.Price) total += Number(bag.Price) * travelers.length;
+    });
+
+    Object.values(selectedSpecialServices).forEach((services) => {
+      services?.forEach((s) => (total += Number(s.Price || 0)));
     });
 
     return total;
@@ -664,6 +684,30 @@ export default function OneFlightBooking() {
     return baggage;
   };
 
+  const buildSpecialServicesSSR = () => {
+    const services = [];
+
+    Object.entries(selectedSpecialServices).forEach(([key, serviceList]) => {
+      if (!Array.isArray(serviceList)) return;
+      const [journeyType, segmentIndex] = key.split("|");
+
+      serviceList.forEach((svc, index) => {
+        services.push({
+          ...svc,
+          journeyType,
+          segmentIndex: Number(segmentIndex),
+          travelerIndex: 0,
+          travelerId: travelers[0]?.id,
+          code: svc.Code,
+          text: svc.Text || svc.Description || "",
+          price: svc.Price,
+        });
+      });
+    });
+
+    return services;
+  };
+
   const buildBookingRequestPayload = () => {
     const segments = parsedFlightData?.segments || [];
     const firstSegment = segments[0];
@@ -742,6 +786,7 @@ export default function OneFlightBooking() {
           seats: buildSeatSSR(),
           meals: buildMealSSR(),
           baggage: buildBaggageSSR(),
+          specialServices: buildSpecialServicesSSR(),
         },
 
         fareExpiry,
@@ -1241,6 +1286,7 @@ export default function OneFlightBooking() {
               selectedSeats={selectedSeats}
               selectedMeals={selectedMeals}
               selectedBaggage={selectedBaggage}
+              selectedSpecialServices={selectedSpecialServices}
               travelers={travelers}
               segments={fullSegments}
             />
@@ -1306,6 +1352,7 @@ export default function OneFlightBooking() {
                 selectedSeats={selectedSeats}
                 selectedMeals={selectedMeals}
                 selectedBaggage={selectedBaggage}
+                selectedSpecialServices={selectedSpecialServices}
                 approver={approver}
                 approverLoading={approverLoading}
                 approverError={approverError}
@@ -1337,6 +1384,8 @@ export default function OneFlightBooking() {
           selectedBaggage={selectedBaggage}
           onToggleMeal={toggleMealSelection}
           onSelectBaggage={handleSelectBaggage}
+          selectedSpecialServices={selectedSpecialServices}
+          onToggleSpecialServices={toggleSpecialServiceSelection}
           ssrError={isSSRError}
           ssrErrorMessage={ssrErrorMessage}
         />

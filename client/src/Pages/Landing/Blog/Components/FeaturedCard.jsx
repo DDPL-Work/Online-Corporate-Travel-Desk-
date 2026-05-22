@@ -28,11 +28,9 @@ export default function FeaturedCard({ post }) {
         className="relative overflow-hidden flex-shrink-0"
         style={{ width: "100%", maxWidth: "320px", height: "280px" }}
       >
-        <img
-          src={post.featured_image || "https://images.unsplash.com/photo-1436491865332-7a61a109c0f3?w=800&q=80"}
+        <img src={post.featured_image || "https://images.unsplash.com/photo-1436491865332-7a61a109c0f3?w=800&q=80"}
           alt={post.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="eager" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
 
         <span

@@ -266,45 +266,72 @@ const SectionCard = ({ section, defaultOpen = true }) => {
 /* ─────────────────────────────────────────
    Check-In / Check-Out Card
 ───────────────────────────────────────── */
-const CheckTimesCard = ({ checkIn, checkOut }) => (
-  <div className="bg-[#0A203E] rounded-xl p-4 flex items-center gap-0">
-    <div className="flex-1 flex flex-col items-center gap-1 py-2">
-      <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center mb-1">
-        <MdLogin className="text-white text-xl" />
-      </div>
-      <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">
-        Check-In
-      </span>
-      <span className="text-white font-black text-lg leading-none">
-        {" "}
-        {checkIn || "—"}
-      </span>
-      <span className="text-[10px] text-white/40">Earliest arrival</span>
-    </div>
+const CheckTimesCard = ({ checkIn, checkOut, checkInDate, checkOutDate }) => {
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString("en-US", {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    } catch (e) {
+      return dateStr;
+    }
+  };
 
-    {/* Divider */}
-    <div className="flex flex-col items-center gap-1 px-4">
-      <div className="w-px h-12 bg-white/10" />
-      <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center">
-        <MdAccessTime className="text-white/50 text-xs" />
+  return (
+    <div className="bg-[#0A203E] rounded-xl p-4 flex items-center gap-0">
+      <div className="flex-1 flex flex-col items-center gap-1 py-2">
+        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center mb-1">
+          <MdLogin className="text-white text-xl" />
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">
+          Check-In
+        </span>
+        {checkInDate && (
+          <span className="text-[#C9A84C] font-black text-xs mt-1">
+            {formatDate(checkInDate)}
+          </span>
+        )}
+        <span className="text-white font-black text-lg leading-none mt-0.5">
+          {checkIn || "—"}
+        </span>
+        <span className="text-[10px] text-white/40 mt-1">Earliest arrival</span>
       </div>
-      <div className="w-px h-12 bg-white/10" />
-    </div>
 
-    <div className="flex-1 flex flex-col items-center gap-1 py-2">
-      <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center mb-1">
-        <MdLogout className="text-white text-xl" />
+      {/* Divider */}
+      <div className="flex flex-col items-center gap-1 px-4">
+        <div className="w-px h-16 bg-white/10" />
+        <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center">
+          <MdAccessTime className="text-white/50 text-xs" />
+        </div>
+        <div className="w-px h-16 bg-white/10" />
       </div>
-      <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">
-        Check-Out
-      </span>
-      <span className="text-white font-black text-lg leading-none">
-        {checkOut || "—"}
-      </span>
-      <span className="text-[10px] text-white/40">Latest departure</span>
+
+      <div className="flex-1 flex flex-col items-center gap-1 py-2">
+        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center mb-1">
+          <MdLogout className="text-white text-xl" />
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">
+          Check-Out
+        </span>
+        {checkOutDate && (
+          <span className="text-[#C9A84C] font-black text-xs mt-1">
+            {formatDate(checkOutDate)}
+          </span>
+        )}
+        <span className="text-white font-black text-lg leading-none mt-0.5">
+          {checkOut || "—"}
+        </span>
+        <span className="text-[10px] text-white/40 mt-1">Latest departure</span>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const ContactCard = ({ contact }) => {
   if (!contact?.phone && !contact?.email && !contact?.website) return null;
@@ -412,7 +439,7 @@ const MapSection = ({ mapString }) => {
 /* ─────────────────────────────────────────
    Main HotelInfo
 ───────────────────────────────────────── */
-const HotelInfo = ({ description = "", checkIn, checkOut, contact = {}, map }) => {
+const HotelInfo = ({ description = "", checkIn, checkOut, checkInDate, checkOutDate, contact = {}, map }) => {
 // >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
   const [showAll, setShowAll] = useState(false);
 
@@ -442,7 +469,12 @@ const HotelInfo = ({ description = "", checkIn, checkOut, contact = {}, map }) =
         <div>
           {/* ── Check times ── */}
           {(checkIn || checkOut) && (
-            <CheckTimesCard checkIn={checkIn} checkOut={checkOut} />
+            <CheckTimesCard
+              checkIn={checkIn}
+              checkOut={checkOut}
+              checkInDate={checkInDate}
+              checkOutDate={checkOutDate}
+            />
           )}
         </div>
 

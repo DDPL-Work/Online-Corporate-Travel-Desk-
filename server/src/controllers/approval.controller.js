@@ -24,9 +24,11 @@ exports.getAllApprovals = asyncHandler(async (req, res) => {
 
   const skip = (Number(page) - 1) * Number(limit);
 
+  const statuses = status === "pending_approval" ? ["pending_approval", "pending_second_approval"] : [status];
+
   const query = {
     corporateId: req.user.corporateId,
-    requestStatus: status, // pending_approval | approved | rejected
+    requestStatus: { $in: statuses },
   };
 
   // const requests = await BookingRequest.find(query)
@@ -77,20 +79,17 @@ exports.getAllApprovals = asyncHandler(async (req, res) => {
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
   );
 
-  // 🔹 Apply pagination AFTER merge
-  const paginated = allRequests.slice(skip, skip + Number(limit));
-
   const total = allRequests.length;
 
   res.status(200).json(
     new ApiResponse(
       200,
       {
-        approvals: paginated,
+        approvals: allRequests,
         pagination: {
           total,
-          page: Number(page),
-          pages: Math.ceil(total / limit),
+          page: 1,
+          pages: 1,
         },
       },
       "Booking requests fetched successfully",
@@ -133,29 +132,122 @@ exports.getApproval = asyncHandler(async (req, res) => {
     );
 });
 
+// @desc    Check if user is a pending second approver for any requests
+// @route   GET /api/v1/approvals/second-approver/check
+// @access  Private
+exports.checkSecondApproverPending = asyncHandler(async (req, res) => {
+  const query = {
+    corporateId: req.user.corporateId,
+    requestStatus: "pending_second_approval",
+    "secondApprover.userId": req.user._id,
+  };
+
+  const flightCount = await BookingRequest.countDocuments(query);
+  const hotelCount = await HotelBookingRequest.countDocuments(query);
+
+  const hasPending = (flightCount + hotelCount) > 0;
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      { hasPending, count: flightCount + hotelCount },
+      "Checked pending transferred requests successfully"
+    )
+  );
+});
+
+// @desc    Get all requests pending for second approver
+// @route   GET /api/v1/approvals/second-approver/requests
+// @access  Private
+exports.getSecondApproverRequests = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const query = {
+    corporateId: req.user.corporateId,
+    requestStatus: "pending_second_approval",
+    "secondApprover.userId": req.user._id,
+  };
+
+  const flightRequests = await BookingRequest.find(query)
+    .populate("userId", "name email")
+    .populate("approvedBy", "name email")
+    .populate("rejectedBy", "name email")
+    .populate("approverId", "name email role");
+
+  const hotelRequests = await HotelBookingRequest.find(query)
+    .populate("userId", "name email")
+    .populate("approvedBy", "name email")
+    .populate("rejectedBy", "name email")
+    .populate("approverId", "name email role");
+
+  const taggedFlights = flightRequests.map((r) => {
+    const obj = r.toObject();
+    return {
+      ...obj,
+      orderId: obj.orderId || "N/A",
+      bookingType: "flight",
+    };
+  });
+
+  const taggedHotels = hotelRequests.map((r) => {
+    const obj = r.toObject();
+    return {
+      ...obj,
+      orderId: obj.orderId || "N/A",
+      bookingType: "hotel",
+    };
+  });
+
+  const allRequests = [...taggedFlights, ...taggedHotels].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  );
+
+  const total = allRequests.length;
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        approvals: allRequests,
+        pagination: {
+          total,
+          page: 1,
+          pages: 1,
+        },
+      },
+      "Transferred requests fetched successfully",
+    ),
+  );
+});
+
 // @desc    Approve booking request
 // @route   POST /api/v1/approvals/:id/approve
 // @access  Private (Travel Admin)
 exports.approveRequest = asyncHandler(async (req, res) => {
   const { comments = "" } = req.body;
 
-  if (!["travel-admin", "manager"].includes(req.user.role)) {
-    throw new ApiError(403, "Only admin/manager can approve requests");
+  const bookingRequest = await BookingRequest.findOne({
+    _id: req.params.id,
+    corporateId: req.user.corporateId,
+    requestStatus: { $in: ["pending_approval", "pending_second_approval"] },
+  });
+
+  if (!bookingRequest) {
+    throw new ApiError(404, "Booking request not found or already processed");
+  }
+
+  const isSecondApprover =
+    bookingRequest.requestStatus === "pending_second_approval" &&
+    bookingRequest.secondApprover?.userId?.toString() === req.user._id.toString();
+
+  if (!["travel-admin", "manager"].includes(req.user.role) && !isSecondApprover) {
+    throw new ApiError(403, "You are not authorized to approve this request");
   }
 
   // 🔹 NEW: Block pending managers
   if (req.user.role === "manager" && req.user.managerRequestStatus !== "approved") {
     throw new ApiError(403, "Your manager account is pending travel-admin verification. You cannot approve bookings yet.");
-  }
-
-  const bookingRequest = await BookingRequest.findOne({
-    _id: req.params.id,
-    corporateId: req.user.corporateId,
-    requestStatus: "pending_approval",
-  });
-
-  if (!bookingRequest) {
-    throw new ApiError(404, "Booking request not found or already processed");
   }
 
   /* ================= BALANCE / CREDIT VALIDATION ================= */
@@ -291,23 +383,27 @@ exports.rejectRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Rejection comments are required");
   }
 
-  if (!["travel-admin", "manager"].includes(req.user.role)) {
-    throw new ApiError(403, "Only admin/manager can approve requests");
+  const bookingRequest = await BookingRequest.findOne({
+    _id: req.params.id,
+    corporateId: req.user.corporateId,
+    requestStatus: { $in: ["pending_approval", "pending_second_approval"] },
+  });
+
+  if (!bookingRequest) {
+    throw new ApiError(404, "Booking request not found or already processed");
+  }
+
+  const isSecondApprover =
+    bookingRequest.requestStatus === "pending_second_approval" &&
+    bookingRequest.secondApprover?.userId?.toString() === req.user._id.toString();
+
+  if (!["travel-admin", "manager"].includes(req.user.role) && !isSecondApprover) {
+    throw new ApiError(403, "You are not authorized to reject this request");
   }
 
   // 🔹 NEW: Block pending managers
   if (req.user.role === "manager" && req.user.managerRequestStatus !== "approved") {
     throw new ApiError(403, "Your manager account is pending travel-admin verification. You cannot reject bookings yet.");
-  }
-
-  const bookingRequest = await BookingRequest.findOne({
-    _id: req.params.id,
-    corporateId: req.user.corporateId,
-    requestStatus: "pending_approval",
-  });
-
-  if (!bookingRequest) {
-    throw new ApiError(404, "Booking request not found or already processed");
   }
 
   bookingRequest.$locals.previousStatus = bookingRequest.requestStatus;
@@ -347,6 +443,53 @@ exports.rejectRequest = asyncHandler(async (req, res) => {
         "Booking request rejected successfully",
       ),
     );
+});
+
+// @desc    Transfer booking request
+// @route   POST /api/v1/approvals/:id/transfer
+// @access  Private (Travel Admin/Manager)
+exports.transferRequest = asyncHandler(async (req, res) => {
+  const { secondApproverId, remark } = req.body;
+
+  if (!["travel-admin", "manager"].includes(req.user.role)) {
+    throw new ApiError(403, "Only admin/manager can transfer requests");
+  }
+
+  const bookingRequest = await BookingRequest.findOne({
+    _id: req.params.id,
+    corporateId: req.user.corporateId,
+    requestStatus: "pending_approval",
+  });
+
+  if (!bookingRequest) {
+    throw new ApiError(404, "Booking request not found or already processed");
+  }
+
+  const newApprover = await User.findById(secondApproverId);
+  if (!newApprover) {
+    throw new ApiError(404, "Second approver not found");
+  }
+
+  bookingRequest.$locals.previousStatus = bookingRequest.requestStatus;
+  bookingRequest.requestStatus = "pending_second_approval";
+  bookingRequest.secondApprover = {
+    userId: newApprover._id,
+    email: newApprover.email,
+    name: `${newApprover.name?.firstName || ""} ${newApprover.name?.lastName || ""}`.trim(),
+    role: newApprover.role,
+    transferRemark: remark,
+    transferredAt: new Date(),
+  };
+
+  await bookingRequest.save();
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      bookingRequest,
+      "Booking request transferred successfully"
+    )
+  );
 });
 
 // ======================================
@@ -396,23 +539,27 @@ exports.getHotelApproval = asyncHandler(async (req, res) => {
 exports.approveHotelRequest = asyncHandler(async (req, res) => {
   const { comments = "" } = req.body;
 
-  if (!["travel-admin", "manager"].includes(req.user.role)) {
-    throw new ApiError(403, "Only admin/manager can approve requests");
+  const bookingRequest = await HotelBookingRequest.findOne({
+    _id: req.params.id,
+    corporateId: req.user.corporateId,
+    requestStatus: { $in: ["pending_approval", "pending_second_approval"] },
+  });
+
+  if (!bookingRequest) {
+    throw new ApiError(404, "Hotel request not found or already processed");
+  }
+
+  const isSecondApprover =
+    bookingRequest.requestStatus === "pending_second_approval" &&
+    bookingRequest.secondApprover?.userId?.toString() === req.user._id.toString();
+
+  if (!["travel-admin", "manager"].includes(req.user.role) && !isSecondApprover) {
+    throw new ApiError(403, "You are not authorized to approve this request");
   }
 
   // 🔹 NEW: Block pending managers
   if (req.user.role === "manager" && req.user.managerRequestStatus !== "approved") {
     throw new ApiError(403, "Your manager account is pending travel-admin verification. You cannot approve hotel bookings yet.");
-  }
-
-  const bookingRequest = await HotelBookingRequest.findOne({
-    _id: req.params.id,
-    corporateId: req.user.corporateId,
-    requestStatus: "pending_approval",
-  });
-
-  if (!bookingRequest) {
-    throw new ApiError(404, "Hotel request not found or already processed");
   }
 
   /* ================= BALANCE / CREDIT VALIDATION ================= */
@@ -479,23 +626,27 @@ exports.rejectHotelRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Rejection comments are required");
   }
 
-  if (!["travel-admin", "manager"].includes(req.user.role)) {
-    throw new ApiError(403, "Only admin/manager can approve requests");
+  const bookingRequest = await HotelBookingRequest.findOne({
+    _id: req.params.id,
+    corporateId: req.user.corporateId,
+    requestStatus: { $in: ["pending_approval", "pending_second_approval"] },
+  });
+
+  if (!bookingRequest) {
+    throw new ApiError(404, "Hotel request not found or already processed");
+  }
+
+  const isSecondApprover =
+    bookingRequest.requestStatus === "pending_second_approval" &&
+    bookingRequest.secondApprover?.userId?.toString() === req.user._id.toString();
+
+  if (!["travel-admin", "manager"].includes(req.user.role) && !isSecondApprover) {
+    throw new ApiError(403, "You are not authorized to reject this request");
   }
 
   // 🔹 NEW: Block pending managers
   if (req.user.role === "manager" && req.user.managerRequestStatus !== "approved") {
     throw new ApiError(403, "Your manager account is pending travel-admin verification. You cannot reject hotel bookings yet.");
-  }
-
-  const bookingRequest = await HotelBookingRequest.findOne({
-    _id: req.params.id,
-    corporateId: req.user.corporateId,
-    requestStatus: "pending_approval",
-  });
-
-  if (!bookingRequest) {
-    throw new ApiError(404, "Hotel request not found or already processed");
   }
 
   bookingRequest.requestStatus = "rejected";
@@ -533,4 +684,50 @@ exports.rejectHotelRequest = asyncHandler(async (req, res) => {
         "Hotel booking request rejected successfully",
       ),
     );
+});
+
+// @desc    Transfer HOTEL booking request
+// @route   POST /api/v1/approvals/hotel/:id/transfer
+// @access  Private (Travel Admin/Manager)
+exports.transferHotelRequest = asyncHandler(async (req, res) => {
+  const { secondApproverId, remark } = req.body;
+
+  if (!["travel-admin", "manager"].includes(req.user.role)) {
+    throw new ApiError(403, "Only admin/manager can transfer requests");
+  }
+
+  const bookingRequest = await HotelBookingRequest.findOne({
+    _id: req.params.id,
+    corporateId: req.user.corporateId,
+    requestStatus: "pending_approval",
+  });
+
+  if (!bookingRequest) {
+    throw new ApiError(404, "Hotel request not found or already processed");
+  }
+
+  const newApprover = await User.findById(secondApproverId);
+  if (!newApprover) {
+    throw new ApiError(404, "Second approver not found");
+  }
+
+  bookingRequest.requestStatus = "pending_second_approval";
+  bookingRequest.secondApprover = {
+    userId: newApprover._id,
+    email: newApprover.email,
+    name: `${newApprover.name?.firstName || ""} ${newApprover.name?.lastName || ""}`.trim(),
+    role: newApprover.role,
+    transferRemark: remark,
+    transferredAt: new Date(),
+  };
+
+  await bookingRequest.save();
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      bookingRequest,
+      "Hotel booking request transferred successfully"
+    )
+  );
 });

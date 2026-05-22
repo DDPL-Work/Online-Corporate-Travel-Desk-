@@ -119,11 +119,9 @@ export default function MultiCityFlightCard({
                 className="flex justify-between w-full items-center px-4 py-1.5 bg-slate-50/50 hover:bg-slate-100 rounded-t-xl transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <img
-                    src={airlineLogo(airlineCode)}
+                  <img src={airlineLogo(airlineCode)}
                     alt={airline}
-                    className="w-8 h-8 border border-gray-200 rounded-md object-contain"
-                  />
+                    className="w-8 h-8 border border-gray-200 rounded-md object-contain" loading="eager" />
                   <div className="flex  flex-col text-left">
                     <div className="font-medium text-gray-800">
                       {from} → {to}

@@ -8,7 +8,7 @@ const router = express.Router();
 router.post(
   "/search-options",
   verifyToken,
-  authorizeRoles("employee", "manager", "travel-admin"),
+  authorizeRoles("employee", "manager", "travel-admin", "finance_team"),
   searchLimiter,
   controller.searchOptions,
 );

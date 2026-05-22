@@ -278,11 +278,15 @@ exports.getPreviousCycles = async (req, res, next) => {
         .reduce((s, d) => s + (d.amount || 0), 0);
       const statementAmount = debit - credit;
 
-      // Statement date = day after cycle ends; due date = +8 days
+      // Statement date = day after cycle ends; due date = +dueDays
       const statementDate = new Date(c.end.getTime() + 1 * 24 * 60 * 60 * 1000);
-      const dueDate = new Date(statementDate.getTime() + 8 * 24 * 60 * 60 * 1000);
+      const dueDays = corporate.dueDays !== undefined && corporate.dueDays !== null ? corporate.dueDays : 15;
+      const dueDate = new Date(statementDate.getTime() + dueDays * 24 * 60 * 60 * 1000);
       const now = new Date();
       const delayDays = now > dueDate ? Math.floor((now - dueDate) / (24 * 60 * 60 * 1000)) : 0;
+
+      const receiptRecord = corporate.cycleReceipts?.find(r => r.cycleIndex === c.index);
+      const receivedAmount = receiptRecord ? receiptRecord.receivedAmount : 0;
 
       return {
         rowNum: previousCycles.length - idx, // descending row num like the screenshot
@@ -295,6 +299,7 @@ exports.getPreviousCycles = async (req, res, next) => {
         dueDate,
         delayDays,
         statementAmount,
+        receivedAmount,
       };
     }).reverse(); // newest first
 
@@ -430,6 +435,49 @@ exports.createCreditUsage = async (req, res, next) => {
       success: true,
       message: "Credit usage recorded",
       transaction,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateCycleReceipt = async (req, res, next) => {
+  try {
+    const { corporateId, cycleIndex, receivedAmount } = req.body;
+    
+    if (!corporateId || cycleIndex === undefined || receivedAmount === undefined) {
+      return next(new ApiError(400, "Corporate ID, cycle index and received amount are required"));
+    }
+
+    const isAdmin = ["super-admin", "ops-member"].includes(req.user.role);
+    if (!isAdmin) {
+      return next(new ApiError(403, "Not authorized to update cycle receipts"));
+    }
+
+    const corporate = await Corporate.findById(corporateId);
+    if (!corporate) return next(new ApiError(404, "Corporate not found"));
+
+    if (!corporate.cycleReceipts) {
+      corporate.cycleReceipts = [];
+    }
+
+    const existing = corporate.cycleReceipts.find(c => c.cycleIndex === Number(cycleIndex));
+    if (existing) {
+      existing.receivedAmount = Number(receivedAmount);
+      existing.updatedAt = new Date();
+    } else {
+      corporate.cycleReceipts.push({
+        cycleIndex: Number(cycleIndex),
+        receivedAmount: Number(receivedAmount)
+      });
+    }
+
+    await corporate.save();
+
+    res.json({
+      success: true,
+      message: "Receipt updated successfully",
+      cycleReceipts: corporate.cycleReceipts,
     });
   } catch (err) {
     next(err);

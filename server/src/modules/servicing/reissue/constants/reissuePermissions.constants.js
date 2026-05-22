@@ -18,6 +18,7 @@ const ROLES = Object.freeze({
   TRAVEL_ADMIN: "travel-admin",
   MANAGER: "manager",
   EMPLOYEE: "employee",
+  FINANCE_TEAM: "finance_team",
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -71,6 +72,7 @@ const OFFLINE_REISSUE_EMPLOYEE_ROLES = Object.freeze([
   ROLES.EMPLOYEE,
   ROLES.MANAGER,
   ROLES.TRAVEL_ADMIN,
+  ROLES.FINANCE_TEAM,
 ]);
 
 const OFFLINE_REISSUE_ALL_ROLES = Object.freeze([
@@ -97,6 +99,7 @@ const ONLINE_REISSUE_EMPLOYEE_ROLES = Object.freeze([
   ROLES.EMPLOYEE,
   ROLES.MANAGER,
   ROLES.TRAVEL_ADMIN,
+  ROLES.FINANCE_TEAM,
 ]);
 
 // ════════════════════════════════════════════════════════════════
@@ -190,6 +193,14 @@ const PERMISSION_MATRIX = Object.freeze({
 
   [ROLES.EMPLOYEE]: [
     // Limited to own requests
+    PERMISSIONS.EMPLOYEE_CREATE_REQUEST,
+    PERMISSIONS.EMPLOYEE_VIEW_OWN,
+    PERMISSIONS.EMPLOYEE_DOWNLOAD_OWN_TICKET,
+    PERMISSIONS.EMPLOYEE_VIEW_STATUS_TIMELINE,
+  ],
+
+  [ROLES.FINANCE_TEAM]: [
+    // Can create and manage own reissue requests
     PERMISSIONS.EMPLOYEE_CREATE_REQUEST,
     PERMISSIONS.EMPLOYEE_VIEW_OWN,
     PERMISSIONS.EMPLOYEE_DOWNLOAD_OWN_TICKET,

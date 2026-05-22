@@ -199,7 +199,7 @@ function FlightSection({ onSelect }) {
                 <td className="!px-6 !py-5">
                    <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
-                         <img src={airlineLogo(b.airlineCode)} alt={b.airlineName} className="w-full h-full object-contain" onError={(e) => { e.target.onerror = null; e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; }} />
+                         <img src={airlineLogo(b.airlineCode)} alt={b.airlineName} className="w-full h-full object-contain" loading="eager" onError={(e) => { e.target.onerror = null; e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; }} />
                       </div>
                       <div>
                          <p className="text-xs font-black uppercase tracking-tight" style={{ color: C.navy }}>{b.destination}</p>

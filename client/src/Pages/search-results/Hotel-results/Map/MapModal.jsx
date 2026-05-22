@@ -184,12 +184,10 @@ const HotelListCard = ({ hotel, isActive, onEnter, onLeave, onClick }) => (
     <div className="flex gap-0 p-0">
       {/* Image */}
       <div className="relative w-36 h-28 shrink-0">
-        <img
-          src={hotel.images?.[0]}
+        <img src={hotel.images?.[0]}
           alt={hotel.name}
           className="w-full h-full object-cover"
-          style={{ borderRadius: "12px 0 0 12px" }}
-        />
+          style={{ borderRadius: "12px 0 0 12px" }} loading="lazy" decoding="async" />
         {hotel.refundable && (
           <span className="absolute bottom-1.5 left-1.5 bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
             FREE CANCEL
@@ -585,11 +583,9 @@ const MapModal = ({
                 if (!h) return null;
                 return (
                   <div className="absolute bottom-16 left-4 z-1000 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 flex items-center gap-3 max-w-xs">
-                    <img
-                      src={h.images?.[0]}
+                    <img src={h.images?.[0]}
                       alt={h.name}
-                      className="w-16 h-12 rounded-lg object-cover"
-                    />
+                      className="w-16 h-12 rounded-lg object-cover" loading="lazy" decoding="async" />
                     <div className="min-w-0">
                       <p className="text-sm font-black text-[#0a2540] truncate">
                         {h.name}

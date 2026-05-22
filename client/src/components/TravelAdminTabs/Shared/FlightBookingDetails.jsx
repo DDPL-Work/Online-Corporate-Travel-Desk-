@@ -523,7 +523,12 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
   const seats = ssrSnapshot?.seats || [];
   const meals = ssrSnapshot?.meals || [];
   const baggage = ssrSnapshot?.baggage || [];
-  const hasSSR = seats.length > 0 || meals.length > 0 || baggage.length > 0;
+  const specialServices = ssrSnapshot?.specialServices || [];
+  const hasSSR =
+    seats.length > 0 ||
+    meals.length > 0 ||
+    baggage.length > 0 ||
+    specialServices.length > 0;
 
   if (!hasSSR) return null;
 
@@ -539,15 +544,15 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
   const segRoute = (segIdx) => {
     const seg = segments[segIdx];
     if (!seg) return null;
-    return `${seg.origin?.airportCode} → ${seg.destination?.airportCode}`;
+    return `${seg.origin?.airportCode || seg.Origin?.Airport?.AirportCode} → ${seg.destination?.airportCode || seg.Destination?.Airport?.AirportCode}`;
   };
 
-  // Group all SSR items by travelerIndex, then by segmentIndex
-  // Shape: { [travelerIndex]: { seats: [], meals: [], baggage: [] } }
+  // Group all SSR items by travelerIndex
+  // Shape: { [travelerIndex]: { seats: [], meals: [], baggage: [], specialServices: [] } }
   const byTraveler = {};
 
   travellers.forEach((_, idx) => {
-    byTraveler[idx] = { seats: [], meals: [], baggage: [] };
+    byTraveler[idx] = { seats: [], meals: [], baggage: [], specialServices: [] };
   });
 
   seats.forEach((s) => {
@@ -560,11 +565,18 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
     if (byTraveler[b.travelerIndex])
       byTraveler[b.travelerIndex].baggage.push(b);
   });
+  specialServices.forEach((s) => {
+    if (byTraveler[s.travelerIndex])
+      byTraveler[s.travelerIndex].specialServices.push(s);
+  });
 
   // Only include travelers that actually have at least one SSR
   const activeTravelers = Object.entries(byTraveler).filter(
     ([, data]) =>
-      data.seats.length > 0 || data.meals.length > 0 || data.baggage.length > 0,
+      data.seats.length > 0 ||
+      data.meals.length > 0 ||
+      data.baggage.length > 0 ||
+      data.specialServices.length > 0,
   );
 
   if (!activeTravelers.length) return null;
@@ -575,7 +587,7 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
       <div className="flex items-center gap-2 mb-5">
         <FiStar size={13} className="text-[#A07840]" />
         <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
-          Seat, Meal &amp; Baggage Add-ons
+          Seat, Meal, Baggage &amp; Special Services
         </span>
       </div>
 
@@ -597,6 +609,7 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
             ...data.seats.map((s) => s.price || 0),
             ...data.meals.map((m) => m.price || 0),
             ...data.baggage.map((b) => b.price || 0),
+            ...data.specialServices.map((s) => s.price || s.Price || 0),
           ].reduce((a, b) => a + b, 0);
 
           return (
@@ -716,6 +729,33 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
                     </span>
                   </div>
                 ))}
+
+                {/* Special Services */}
+                {data.specialServices.map((s, i) => (
+                  <div
+                    key={`special-${i}`}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840]">
+                        SS
+                      </span>
+                      <div>
+                        <p className="text-[12px] font-semibold text-gray-800">
+                          {s.text || s.Text || s.code || s.Code || "Special Service"}
+                        </p>
+                        {segRoute(s.segmentIndex) && (
+                          <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+                            {segRoute(s.segmentIndex)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[12px] font-semibold text-gray-700">
+                      {s.price > 0 ? `₹${s.price}` : s.Price > 0 ? `₹${s.Price}` : "Free"}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           );
@@ -728,6 +768,7 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
           ...seats.map((s) => s.price || 0),
           ...meals.map((m) => m.price || 0),
           ...baggage.map((b) => b.price || 0),
+          ...specialServices.map((s) => s.price || s.Price || 0),
         ].reduce((a, b) => a + b, 0);
 
         return grandTotal > 0 ? (

@@ -340,11 +340,9 @@ export default function BlogDetails() {
             <div className="w-full lg:w-[45%] relative">
               {/* Image Frame with offset border */}
               <div className="relative z-10 rounded-[3rem] overflow-hidden aspect-[4/5] shadow-2xl">
-                <img 
-                  src={post.featured_image || "https://images.unsplash.com/photo-1436491865332-7a61a109c0f3?w=800&q=80"} 
+                <img src={post.featured_image || "https://images.unsplash.com/photo-1436491865332-7a61a109c0f3?w=800&q=80"} 
                   alt={post.featured_image_alt || post.image_alt_text || post.title} 
-                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
-                />
+                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" loading="eager" />
                 {/* Subtle overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#000D26]/40 to-transparent" />
               </div>

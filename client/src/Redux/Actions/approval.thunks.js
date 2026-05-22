@@ -28,6 +28,27 @@ export const fetchApprovals = createAsyncThunk(
 
 /**
  * ================================
+ * FETCH SECOND APPROVER REQUESTS
+ * ================================
+ */
+export const fetchSecondApproverRequests = createAsyncThunk(
+  "approvals/fetchSecondApprover",
+  async ({ page = 1, limit = 10 }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/approvals/second-approver/requests", {
+        params: { page, limit },
+      });
+      return data.data; // { approvals, pagination }
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.error || "Failed to fetch transferred requests",
+      );
+    }
+  },
+);
+
+/**
+ * ================================
  * FETCH SINGLE (Pending or History)
  * ================================
  */
@@ -95,6 +116,30 @@ export const rejectApproval = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(
         err.response?.data?.error || "Rejection failed"
+      );
+    }
+  }
+);
+
+/**
+ * ================================
+ * TRANSFER REQUEST
+ * ================================
+ */
+export const transferApproval = createAsyncThunk(
+  "approvals/transfer",
+  async ({ id, secondApproverId, remark, type = "flight" }, { rejectWithValue }) => {
+    try {
+      const url =
+        type === "hotel"
+          ? `/approvals/hotel/${id}/transfer`
+          : `/approvals/${id}/transfer`;
+
+      const { data } = await api.post(url, { secondApproverId, remark });
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.error || "Transfer failed"
       );
     }
   }

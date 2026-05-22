@@ -1,6 +1,7 @@
 //HotelImageGallery.jsx
 
 import React, { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   MdPhotoLibrary,
   MdClose,
@@ -11,6 +12,7 @@ import {
 } from "react-icons/md";
 import { FaExpand, FaCompress } from "react-icons/fa";
 import { BsArrowsFullscreen } from "react-icons/bs";
+import LazyImage from "../../../../components/common/LazyImage";
 
 /* ─────────────────────────────────────────
    Full-screen Lightbox
@@ -28,9 +30,9 @@ const Lightbox = ({ images, startIndex, onClose }) => {
     if (e.key === "Escape") onClose();
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex flex-col"
+      className="fixed inset-0 z-[99999] flex flex-col"
       style={{
         background: "rgba(5,10,20,0.97)",
         backdropFilter: "blur(20px)",
@@ -95,16 +97,14 @@ const Lightbox = ({ images, startIndex, onClose }) => {
         </button>
 
         <div className="relative max-h-full max-w-full flex items-center justify-center">
-          <img
-            key={current}
+          <img key={current}
             src={images[current]}
             alt={`Photo ${current + 1}`}
             className="rounded-lg sm:rounded-xl md:rounded-2xl shadow-2xl object-contain"
             style={{
               maxHeight: "calc(100vh - 140px)",
               maxWidth: "100%",
-            }}
-          />
+            }} loading="lazy" decoding="async" />
         </div>
 
         {/* Right Arrow */}
@@ -134,47 +134,31 @@ const Lightbox = ({ images, startIndex, onClose }) => {
               opacity: i === current ? 1 : 0.45,
             }}
           >
-            <img src={img} alt="" className="w-full h-full object-cover" />
+            <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
           </button>
         ))}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
 /* ─────────────────────────────────────────
    Tile Component
 ───────────────────────────────────────── */
-const Tile = ({ src, alt, onClick, children, style, className = "" }) => {
-  const [loaded, setLoaded] = useState(false);
-
+const Tile = ({ src, alt, onClick, children, style, className = "", lazy = true }) => {
   return (
     <div
       className={`relative overflow-hidden cursor-pointer group ${className}`}
       style={{ borderRadius: 12, ...style }}
       onClick={onClick}
     >
-      {/* Skeleton shimmer */}
-      {!loaded && (
-        <div
-          className="absolute inset-0 bg-slate-200"
-          style={{
-            background:
-              "linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%)",
-            backgroundSize: "200% 100%",
-            animation: "shimmer 1.5s infinite",
-          }}
-        />
-      )}
-      <img
+      <LazyImage
         src={src}
         alt={alt}
-        onLoad={() => setLoaded(true)}
-        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.06]"
-        style={{
-          opacity: loaded ? 1 : 0,
-          transition: "opacity 0.4s, transform 0.7s",
-        }}
+        lazy={lazy}
+        className="absolute inset-0 w-full h-full"
+        imgClassName="transition-transform duration-700 group-hover:scale-[1.06] w-full h-full object-cover"
       />
       {/* Hover overlay gradient */}
       <div
@@ -326,6 +310,7 @@ const HotelImageGallery = ({ images = [] }) => {
               alt="Main"
               onClick={() => open(0)}
               style={{ borderRadius: 0, width: "100%", height: "100%" }}
+              lazy={false}
             >
               {/* Hero overlay label - Hidden on mobile */}
               <div
@@ -501,7 +486,7 @@ const HotelImageGallery = ({ images = [] }) => {
                   (e.currentTarget.style.borderColor = "transparent")
                 }
               >
-                <img src={img} alt="" className="w-full h-full object-cover" />
+                <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition" />
                 <div className="absolute bottom-0.5 right-1 text-[8px] text-white/0 group-hover:text-white/80 font-bold transition">
                   {i + 1}

@@ -257,12 +257,16 @@ const calculateSnapshotTotals = (snapshot = {}) => {
   const totalBaggageAmount = toMoney(
     (snapshot?.baggage || []).reduce((sum, item) => sum + Number(item?.price || 0), 0),
   );
+  const totalSpecialAmount = toMoney(
+    (snapshot?.specialServices || []).reduce((sum, item) => sum + Number(item?.price || 0), 0),
+  );
 
   return {
     totalSeatAmount,
     totalMealAmount,
     totalBaggageAmount,
-    totalAmount: toMoney(totalSeatAmount + totalMealAmount + totalBaggageAmount),
+    totalSpecialAmount,
+    totalAmount: toMoney(totalSeatAmount + totalMealAmount + totalBaggageAmount + totalSpecialAmount),
   };
 };
 
@@ -455,6 +459,7 @@ const mapSsrSnapshot = ({
     seats: seatResult.mapped,
     meals: mealResult.mapped,
     baggage: baggageResult.mapped,
+    specialServices: oldSnapshot?.specialServices || [],
   };
 
   const totals = calculateSnapshotTotals(mappedSnapshot);

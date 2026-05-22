@@ -42,8 +42,8 @@ class PhonePeGateway {
     return this.client;
   }
 
-  buildRedirectUrl(merchantOrderId) {
-    const redirectUrl = new URL(phonepeConfig.redirectUrl);
+  buildRedirectUrl(merchantOrderId, customReturnUrl) {
+    const redirectUrl = new URL(customReturnUrl || phonepeConfig.redirectUrl);
     redirectUrl.searchParams.set("merchantOrderId", merchantOrderId);
     redirectUrl.searchParams.set("gateway", PAYMENT_GATEWAYS.PHONEPE);
     return redirectUrl.toString();
@@ -67,6 +67,7 @@ class PhonePeGateway {
     userId,
     bookingReference,
     customerPhone,
+    returnUrl,
   }) {
     const client = this.getClient();
 
@@ -81,7 +82,7 @@ class PhonePeGateway {
           gateway: PAYMENT_GATEWAYS.PHONEPE,
         }),
       )
-      .redirectUrl(this.buildRedirectUrl(merchantOrderId))
+      .redirectUrl(this.buildRedirectUrl(merchantOrderId, returnUrl))
       .expireAfter(15 * 60);
 
     if (customerPhone) {

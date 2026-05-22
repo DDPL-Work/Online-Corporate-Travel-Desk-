@@ -148,6 +148,7 @@ exports.initiateRecharge = asyncHandler(async (req, res) => {
     customerPhone:
       req.user.mobile || req.user.phone || req.user.phoneWithCode || null,
     customerEmail: req.user.email || null,
+    returnUrl: req.body.returnUrl,
   });
 
   logger.info("Wallet recharge initiated", {

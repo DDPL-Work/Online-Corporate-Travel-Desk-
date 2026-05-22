@@ -200,6 +200,7 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
     classification,
     billingCycle,
     customBillingDays,
+    dueDays,
     creditLimit,
     walletBalance,
     serviceCharges,
@@ -226,6 +227,7 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
     corporate.billingCycle = billingCycle;
     corporate.customBillingDays =
       billingCycle === "custom" ? Number(customBillingDays || 0) : null;
+    corporate.dueDays = Number(dueDays || 0);
 
     corporate.nextBillingDate = calculateNextBillingDate(
       billingCycle,
@@ -238,6 +240,7 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
     corporate.creditLimit = 0;
     corporate.billingCycle = null;
     corporate.customBillingDays = null;
+    corporate.dueDays = null;
     corporate.nextBillingDate = null;
   }
 
@@ -312,6 +315,13 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
     corporate.primaryContact,
     "travel-admin",
   );
+
+  if (corporate.billingDepartment && corporate.billingDepartment.email) {
+    await createOrUpdateUserWithRole(
+      corporate.billingDepartment,
+      "finance_team",
+    );
+  }
 
   // const secondaryAdmin = await createOrUpdateUserWithRole(
   //   corporate.secondaryContact,

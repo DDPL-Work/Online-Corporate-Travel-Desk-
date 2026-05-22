@@ -8,10 +8,11 @@ import AuthModal from "../Pages/Auth/AuthModal";
 import { LuWorkflow, LuPlane } from "react-icons/lu";
 import NotificationBell from "../components/common/NotificationBell";
 
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { logoutUser } from "../Redux/Slice/authSlice";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { FaBars, FaHotel, FaPlane } from "react-icons/fa";
 import { C } from "../components/Shared/color";
 import { toggleSidebar } from "../Redux/Slice/layoutSlice";
@@ -31,11 +32,11 @@ const platformLinks = [
     href: "/platform/hotel-booking-info",
   },
   {
-  icon: <LuWorkflow size={18} className="text-[#C9A84C]" />,
-  label: "Approval & Workflow",
-  desc: "Manage booking approvals and track request workflows",
-  href: "/platform/approval-and-workflow",
-}
+    icon: <LuWorkflow size={18} className="text-[#C9A84C]" />,
+    label: "Approval & Workflow",
+    desc: "Manage booking approvals and track request workflows",
+    href: "/platform/approval-and-workflow",
+  }
 ];
 
 const whoItsForLinks = [
@@ -71,9 +72,8 @@ function NavDropdown({ label, items, isOpen, onToggle, dropdownRef }) {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={onToggle}
-        className={`flex items-center gap-1 text-sm font-medium font-['Plus_Jakarta_Sans'] transition-colors ${
-          isOpen ? "text-[#C9A84C]" : "text-[#000D26] hover:text-[#C9A84C]"
-        }`}
+        className={`flex items-center gap-1 text-sm font-medium font-['Plus_Jakarta_Sans'] transition-colors ${isOpen ? "text-[#C9A84C]" : "text-[#000D26] hover:text-[#C9A84C]"
+          }`}
       >
         {label}
         <FiChevronDown
@@ -85,7 +85,7 @@ function NavDropdown({ label, items, isOpen, onToggle, dropdownRef }) {
       {isOpen && (
         <div className="absolute top-[calc(100%+12px)] left-1/2 -translate-x-1/2 w-[280px] bg-white rounded-2xl shadow-[0px_8px_32px_rgba(0,0,0,0.12)] border border-gray-100 overflow-hidden z-50">
           {/* Arrow pointer */}
-          <div className="absolute -top-[6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-l border-t border-gray-100 rotate-45" />
+          <div className="absolute -top-1.5left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-l border-t border-gray-100 rotate-45" />
 
           <div className="p-2">
             {items.map(({ icon, label, desc, href }) => (
@@ -94,7 +94,7 @@ function NavDropdown({ label, items, isOpen, onToggle, dropdownRef }) {
                 href={href}
                 className="flex items-start gap-3 px-3 py-3 rounded-xl hover:bg-[#C9A84C]/8 group transition-colors"
               >
-                <div className="w-8 h-8 min-w-[32px] bg-[#C9A84C]/10 rounded-lg flex items-center justify-center mt-0.5 group-hover:bg-[#C9A84C]/15 transition-colors">
+                <div className="w-8 h-8 min-w- bg-[#C9A84C]/10 rounded-lg flex items-center justify-center mt-0.5 group-hover:bg-[#C9A84C]/15 transition-colors">
                   {icon}
                 </div>
                 <div className="flex flex-col gap-0.5">
@@ -120,6 +120,14 @@ export default function LandingHeader() {
   const navigate = useNavigate();
   const { slug } = useParams();
   const dispatch = useDispatch();
+  const location = useLocation();
+  const activeTab = useMemo(() => {
+    if (location.state?.activeTab) return location.state.activeTab;
+    const path = location.pathname.toLowerCase();
+    if (path.includes("hotel")) return "hotel";
+    if (path.includes("flight")) return "flight";
+    return "flight";
+  }, [location]);
   const storedSlug = localStorage.getItem("companySlug");
   const activeSlug = slug || storedSlug;
   const { user, isAuthenticated } = useSelector((s) => s.auth);
@@ -211,20 +219,21 @@ export default function LandingHeader() {
         setShowAuth(false);
         sessionStorage.removeItem("auth_inactive_msg");
       }
-    } catch (_) {}
+    } catch (_) { }
   }, []);
 
   const toggle = (menu) => setOpenMenu((prev) => (prev === menu ? null : menu));
 
   return (
     <header className="w-full px-6 py-4 flex justify-between items-center z-50 sticky top-0 shadow-sm transition-all" style={{ background: "#FFFFFF" }}>
-      
+
       <div className="flex items-center gap-4">
         {/* Logo */}
         <div
           className="flex items-center cursor-pointer"
-          onClick={() => {
-            if (isAuthenticated) {
+          onClick={(e) => {
+            e.preventDefault();
+            if (isAuthenticated || sessionStorage.getItem("token")) {
               navigate("/travel");
             } else {
               navigate("/platform/flight-booking-info");
@@ -232,13 +241,11 @@ export default function LandingHeader() {
           }}
         >
           {branding?.branding?.logo?.url ? (
-            <img
-              src={branding.branding.logo.url}
+            <img src={branding.branding.logo.url}
               alt={branding.corporateName || "Logo"}
-              className="h-8 object-contain"
-            />
+              className="h-8 object-contain" loading="eager" />
           ) : (
-            <img src="/logo-traveamer.svg" alt="Traveamer" className="h-7" />
+            <img src="/logo-traveamer.svg" alt="Traveamer" className="h-7" loading="eager" />
           )}
         </div>
       </div>
@@ -246,7 +253,7 @@ export default function LandingHeader() {
       {/* Desktop Nav */}
       {!isAuthenticated && (
         <nav className="hidden md:flex items-center gap-8">
-           <a
+          <a
             href="/traveamer"
             className="text-sm font-semibold font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors px-3 py-1.5 rounded-full border border-[#C9A84C]/40 hover:border-[#C9A84C] hover:bg-[#C9A84C]/8"
           >
@@ -274,7 +281,7 @@ export default function LandingHeader() {
             onToggle={() => toggle("whoFor")}
             dropdownRef={whoForRef}
           />
-         
+
           <a
             href="/about-us"
             className="text-sm font-medium font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors"
@@ -297,23 +304,37 @@ export default function LandingHeader() {
       )}
 
       {isAuthenticated && (
-        <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-4">
-          <button
-            onClick={() => navigate("/travel", { state: { activeTab: "flight" } })}
-            className="group flex items-center justify-center gap-2 w-28 py-1.5 text-sm font-semibold rounded-full transition-all duration-500 ease-in-out text-[#000D26] bg-[#C9A84C] border border-[#000D26] group-hover:gap-0"
-            title="Search Flight"
-          >
-            <FaPlane size={16} className="transition-transform duration-500 ease-in-out group-hover:scale-110" />
-            <span className="transition-all duration-500 ease-in-out max-w-[100px] group-hover:max-w-0 group-hover:opacity-0 overflow-hidden whitespace-nowrap font-bold">Flight</span>
-          </button>
-          <button
-            onClick={() => navigate("/travel", { state: { activeTab: "hotel" } })}
-            className="group flex items-center justify-center gap-2 w-28 py-1.5 text-sm font-semibold rounded-full transition-all duration-500 ease-in-out text-[#000D26] bg-[#C9A84C] border border-[#000D26] group-hover:gap-0"
-            title="Search Hotel"
-          >
-            <FaHotel size={16} className="transition-transform duration-500 ease-in-out group-hover:scale-110" />
-            <span className="transition-all duration-500 ease-in-out max-w-[100px] group-hover:max-w-0 group-hover:opacity-0 overflow-hidden whitespace-nowrap font-bold">Hotel</span>
-          </button>
+        <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center">
+          <div className="flex items-center bg-white rounded-full space-x-4 p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.10)] border border-gray-100">
+            <button
+              onClick={() => navigate("/travel", { state: { activeTab: "flight" } })}
+              className={`flex items-center justify-center gap-2 px-5 py-[7px] text-sm font-semibold rounded-full transition-all duration-300 ease-in-out outline-none select-none cursor-pointer ${activeTab === "flight"
+                ? "bg-[#002080] text-white shadow-sm shadow-[#002080]/15"
+                : "text-slate-500 hover:text-slate-800 bg-transparent"
+                }`}
+              title="Search Flight"
+            >
+              <FaPlane
+                size={14}
+                className="transition-transform duration-300"
+              />
+              <span>Flight</span>
+            </button>
+            <button
+              onClick={() => navigate("/travel", { state: { activeTab: "hotel" } })}
+              className={`flex items-center justify-center gap-2 px-5 py-[7px] text-sm font-semibold rounded-full transition-all duration-300 ease-in-out outline-none select-none cursor-pointer ${activeTab === "hotel"
+                ? "bg-[#002080] text-white shadow-sm shadow-[#002080]/15"
+                : "text-slate-500 hover:text-slate-800 bg-transparent"
+                }`}
+              title="Search Hotel"
+            >
+              <FaHotel
+                size={14}
+                className="transition-transform duration-300"
+              />
+              <span>Hotel</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -431,7 +452,7 @@ export default function LandingHeader() {
       {/* Mobile Menu */}
       {mobileOpen && (
         <div className="absolute top-full left-0 w-full bg-[#F5F5F5] shadow-lg md:hidden flex flex-col gap-1 p-4 z-50">
-           <a
+          <a
             href="/traveamer"
             className="text-sm font-semibold font-['Plus_Jakarta_Sans'] text-[#000D26] hover:text-[#C9A84C] transition-colors px-3 py-1.5 rounded-full border border-[#C9A84C]/40 hover:border-[#C9A84C] hover:bg-[#C9A84C]/8"
           >
@@ -442,14 +463,14 @@ export default function LandingHeader() {
           {!isAuthenticated && (
             <>
               {activeSlug && (
-            <a
-              href={`/${activeSlug}`}
-              className="flex items-center w-full px-3 py-2.5 text-[#C9A84C] text-sm font-bold font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
-            >
-              Home
-            </a>
-          )}
-          {/* Platform accordion */}
+                <a
+                  href={`/${activeSlug}`}
+                  className="flex items-center w-full px-3 py-2.5 text-[#C9A84C] text-sm font-bold font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
+                >
+                  Home
+                </a>
+              )}
+              {/* Platform accordion */}
               <button
                 onClick={() => setMobilePlatformOpen(!mobilePlatformOpen)}
                 className="flex items-center justify-between w-full px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
@@ -499,7 +520,7 @@ export default function LandingHeader() {
                 </div>
               )}
 
-             
+
               <a
                 href="/about-us"
                 className="px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
@@ -536,24 +557,26 @@ export default function LandingHeader() {
                 </div>
                 <NotificationBell />
               </div>
-              <button
-                onClick={() => {
-                  navigate("/travel", { state: { activeTab: "flight" } });
-                  setMobileOpen(false);
-                }}
-                className="flex items-center gap-2 px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
-              >
-                <MdOutlineFlight size={16} /> Search Flight
-              </button>
-              <button
-                onClick={() => {
-                  navigate("/travel", { state: { activeTab: "hotel" } });
-                  setMobileOpen(false);
-                }}
-                className="flex items-center gap-2 px-3 py-2.5 text-[#000D26] text-sm font-medium font-['Plus_Jakarta_Sans'] rounded-xl hover:bg-black/5 transition-colors"
-              >
-                <MdOutlineHotel size={16} /> Search Hotel
-              </button>
+              <div className="flex items-center bg-white rounded-full space-x-4 p-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.10)] border border-gray-100">
+                <button
+                  onClick={() => {
+                    navigate("/travel", { state: { activeTab: "flight" } });
+                    setMobileOpen(false);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-[#000D26] text-xs font-bold font-['Plus_Jakarta_Sans'] rounded-full hover:bg-slate-100 transition-colors"
+                >
+                  <MdOutlineFlight size={16} /> Flight
+                </button>
+                <button
+                  onClick={() => {
+                    navigate("/travel", { state: { activeTab: "hotel" } });
+                    setMobileOpen(false);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-[#000D26] text-xs font-bold font-['Plus_Jakarta_Sans'] rounded-full hover:bg-slate-100 transition-colors"
+                >
+                  <MdOutlineHotel size={16} /> Hotel
+                </button>
+              </div>
               <button
                 onClick={() => {
                   navigate(dashboardRoute);
@@ -604,8 +627,8 @@ export default function LandingHeader() {
       {showAuth && <AuthModal initialStep={authStep} onClose={() => setShowAuth(false)} />}
 
       {/* Inactive account modal */}
-      {showInactiveModal && (
-        <div className="fixed inset-0 z-[99] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
+      {showInactiveModal && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-lg font-bold">
@@ -635,7 +658,8 @@ export default function LandingHeader() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </header>
   );

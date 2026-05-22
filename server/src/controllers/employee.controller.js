@@ -29,19 +29,31 @@ exports.getProfile = async (req, res, next) => {
       .select("-__v")
       .lean();
 
+    const corporate = user.corporateId;
+    let corporatePhone = "";
+    if (corporate) {
+      const userEmailLower = (user.email || "").toLowerCase();
+      if (corporate.primaryContact && (corporate.primaryContact.email || "").toLowerCase() === userEmailLower) {
+        corporatePhone = corporate.primaryContact.mobile;
+      } else if (corporate.billingDepartment && (corporate.billingDepartment.email || "").toLowerCase() === userEmailLower) {
+        corporatePhone = corporate.billingDepartment.mobile;
+      }
+    }
+
     // Unified Profile Object (Employee + User merge)
     const employee = {
       // Identity from User
       _id: user._id,
       name: employeeDoc?.name || `${user.name?.firstName || ""} ${user.name?.lastName || ""}`.trim() || user.username,
       email: user.email,
-      phone: employeeDoc?.mobile || user.phone || "",
+      phone: employeeDoc?.mobile || user.phone || corporatePhone || "",
       profilePicture: user.profilePicture,
       role: user.role,
       corporateId: user.corporateId?._id || user.corporateId,
       corporate: user.corporateId,
 
       // Professional from Employee
+      employeeId: employeeDoc?.employeeCode || (["travel-admin", "corporate-admin"].includes(user.role) ? "ADMIN" : "PENDING"),
       employeeCode: employeeDoc?.employeeCode || (["travel-admin", "corporate-admin"].includes(user.role) ? "ADMIN" : "PENDING"),
       department: employeeDoc?.department || (["travel-admin", "corporate-admin"].includes(user.role) ? "Administration" : "Not Assigned"),
       designation: employeeDoc?.designation || user.role,
@@ -275,6 +287,17 @@ exports.updateProfile = async (req, res, next) => {
       };
     }
 
+    const corporate = await Corporate.findById(emp.corporateId || user.corporateId);
+    let corporatePhone = "";
+    if (corporate) {
+      const userEmailLower = (user.email || "").toLowerCase();
+      if (corporate.primaryContact && (corporate.primaryContact.email || "").toLowerCase() === userEmailLower) {
+        corporatePhone = corporate.primaryContact.mobile;
+      } else if (corporate.billingDepartment && (corporate.billingDepartment.email || "").toLowerCase() === userEmailLower) {
+        corporatePhone = corporate.billingDepartment.mobile;
+      }
+    }
+
     res.json({
       success: true,
       message: latestReq
@@ -283,7 +306,8 @@ exports.updateProfile = async (req, res, next) => {
       employee: {
         name: emp.name,
         email: user?.email,
-        phone: emp.mobile,
+        phone: emp.mobile || corporatePhone || "",
+        employeeId: emp.employeeCode,
         employeeCode: emp.employeeCode,
         department: emp.department,
         designation: emp.designation,

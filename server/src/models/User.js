@@ -26,7 +26,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, select: false },
     role: {
       type: String,
-      enum: ["super-admin", "manager", "travel-admin", "employee"],
+      enum: ["super-admin", "manager", "travel-admin", "employee", "finance_team"],
       default: "employee",
     },
     isTempManager: { type: Boolean, default: false },
