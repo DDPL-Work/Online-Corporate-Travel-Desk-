@@ -442,11 +442,9 @@ const ContactModal = ({ onClose }) => {
 
           <div className="relative flex flex-col gap-6">
             {/* Logo */}
-            <img
-              src="/logo-traveamer.svg"
+            <img src="/logo-traveamer.svg"
               alt="Traveamer"
-              className="h-7 w-auto object-contain self-start"
-            />
+              className="h-7 w-auto object-contain self-start" loading="eager" />
 
             <div className="flex flex-col gap-3">
               <Badge label="Get in Touch" dark />

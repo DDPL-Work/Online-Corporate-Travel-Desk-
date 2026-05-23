@@ -224,11 +224,9 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
         {/* Image */}
         <div className="relative min-h-[320px] overflow-hidden bg-[#E8E0D0]">
           {images.length > 0 ? (
-            <img
-              src={images[activeIndex]}
+            <img src={images[activeIndex]}
               alt={hotelName}
-              className="w-full h-full object-cover block absolute inset-0 transition-opacity duration-700"
-            />
+              className="w-full h-full object-cover block absolute inset-0 transition-opacity duration-700" loading="lazy" decoding="async" />
           ) : (
             <div className="w-full h-full min-h-[320px] flex items-center justify-center bg-[#E8E0D0]">
               <MdHotel size={48} className="text-[#EAE4D9]" />

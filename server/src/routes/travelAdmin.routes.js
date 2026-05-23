@@ -48,6 +48,9 @@ router.post('/all/managers', adminBookingCtrl.getManagerRequests);
 router.get("/all-employees",  adminBookingCtrl.getAllEmployees); // list all employees
 router.get("/:id", adminBookingCtrl.getEmployee); // single employee
 router.put("/:id", adminBookingCtrl.updateEmployee); // update employee
+router.put("/promote/:userId", adminBookingCtrl.promoteToManager); // promote employee to manager
+router.put("/promote-finance/:userId", adminBookingCtrl.promoteToFinanceTeam); // promote user to finance team
+router.put("/demote/:userId", adminBookingCtrl.demoteToEmployee); // demote manager
 router.patch("/:id/toggle-status", adminBookingCtrl.toggleEmployeeStatus); // toggle status
 router.delete("/:id", adminBookingCtrl.removeEmployee); // delete employee
 

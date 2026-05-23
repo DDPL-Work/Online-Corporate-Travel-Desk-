@@ -317,11 +317,10 @@ export const FlightTimeline = ({
                       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow duration-300 min-w-[220px]">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <img
-                              src={getAirlineLogo(segment.fD?.aI?.code)}
+                            <img src={getAirlineLogo(segment.fD?.aI?.code)}
                               alt="airline"
                               className="w-8 h-8 rounded"
-                              onError={(e) =>
+                              loading="eager" onError={(e) =>
                                 (e.target.src =
                                   "https://via.placeholder.com/40")
                               }
@@ -730,11 +729,10 @@ export const FareRulesAccordion = ({ parsedRules = [], title = "" }) => {
       {title && <h3 className="font-bold text-lg text-gray-800 mb-2">{title}</h3>}
       {/* Airline Header Banner */}
       <div className={`flex items-center gap-3 px-4 py-3 rounded-xl bg-[#0A203E] text-white shadow`}>
-        <img
-          src={airlineLogo(airlineCode)}
+        <img src={airlineLogo(airlineCode)}
           alt={name}
           className="w-9 h-9 rounded-full bg-white p-0.5 object-contain"
-          onError={(e) => { e.target.style.display = "none"; }}
+          loading="eager" onError={(e) => { e.target.style.display = "none"; }}
         />
         <div>
           <p className="font-semibold text-sm">{name}</p>
@@ -758,6 +756,7 @@ export const PriceSummary = ({
   selectedSeats = {},
   selectedMeals = {},
   selectedBaggage = {},
+  selectedSpecialServices = {},
   travelers = [],
   approver,
   approverLoading,
@@ -815,8 +814,23 @@ export const PriceSummary = ({
     return sum;
   }, [selectedBaggage, travelers.length]);
 
+  const totalSpecialServicesPrice = useMemo(() => {
+    let sum = 0;
+
+    Object.values(selectedSpecialServices || {}).forEach((svcs) => {
+      if (!Array.isArray(svcs)) return;
+      svcs.forEach((svc) => {
+        if (svc?.Price) {
+          sum += Number(svc.Price || 0);
+        }
+      });
+    });
+
+    return sum;
+  }, [selectedSpecialServices]);
+
   const subtotal =
-    baseFare + taxFare + totalSeatPrice + totalMealPrice + totalBaggagePrice;
+    baseFare + taxFare + totalSeatPrice + totalMealPrice + totalBaggagePrice + totalSpecialServicesPrice;
 
   const totalAmount = Math.max(0, subtotal - discountAmount);
 
@@ -873,6 +887,16 @@ export const PriceSummary = ({
             <span className="text-sm text-gray-600">Meals</span>
             <span className="font-semibold">
               ₹{totalMealPrice.toLocaleString()}
+            </span>
+          </div>
+        )}
+
+        {/* Special Services Charges */}
+        {totalSpecialServicesPrice > 0 && (
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Special Services</span>
+            <span className="font-semibold">
+              ₹{totalSpecialServicesPrice.toLocaleString()}
             </span>
           </div>
         )}
@@ -1914,13 +1938,15 @@ export const SelectedSSRSummary = ({
   selectedSeats = {},
   selectedMeals = {},
   selectedBaggage = {},
+  selectedSpecialServices = {},
   segments = [],
 }) => {
   const hasSeats = Object.values(selectedSeats).some((v) => v?.list?.length > 0);
   const hasMeals = Object.values(selectedMeals).some((v) => v?.length > 0);
   const hasBaggage = Object.values(selectedBaggage).some((v) => v !== null);
+  const hasSpecial = Object.values(selectedSpecialServices).some((v) => v?.length > 0);
 
-  if (!hasSeats && !hasMeals && !hasBaggage) return null;
+  if (!hasSeats && !hasMeals && !hasBaggage && !hasSpecial) return null;
 
   const renderPriceTag = (price) => {
     const p = Number(price || 0);
@@ -1955,7 +1981,8 @@ export const SelectedSSRSummary = ({
               <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Route</th>
               <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Seats</th>
               <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Meals</th>
-              <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Extra Baggage</th>
+              <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Extra Baggage</th>
+              <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Special Services</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -1972,10 +1999,12 @@ export const SelectedSSRSummary = ({
               const seatEntries = Object.entries(selectedSeats).filter(([k]) => k === matchKey);
               const mealEntries = Object.entries(selectedMeals).filter(([k]) => k === matchKey);
               const baggageEntries = Object.entries(selectedBaggage).filter(([k]) => k === matchKey);
+              const specialEntries = Object.entries(selectedSpecialServices).filter(([k]) => k === matchKey);
 
               const hasAnySSR = seatEntries.some(([, v]) => v?.list?.length > 0) ||
-                                mealEntries.some(([, v]) => v?.length > 0) ||
-                                baggageEntries.some(([, v]) => v !== null);
+                                 mealEntries.some(([, v]) => v?.length > 0) ||
+                                 baggageEntries.some(([, v]) => v !== null) ||
+                                 specialEntries.some(([, v]) => v?.length > 0);
 
               if (!hasAnySSR) return null;
 
@@ -2047,12 +2076,12 @@ export const SelectedSSRSummary = ({
                   </td>
 
                   {/* Baggage */}
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex flex-col items-end gap-1.5">
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col items-start gap-1.5">
                       {baggageEntries.map(([k, bag]) => bag && (
                         <div key={`${k}-bag`} className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-lg border border-slate-200 shadow-xs">
                           <MdLuggage size={12} className="text-blue-500" />
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-start">
                             <span className="text-xs font-bold text-slate-700">
                               {bag.Text || `${bag.Weight} KG Extra`}
                             </span>
@@ -2067,6 +2096,24 @@ export const SelectedSSRSummary = ({
                         </div>
                       ))}
                       {baggageEntries.every(([, v]) => !v) && <span className="text-[10px] font-bold text-slate-300 italic uppercase">None Selected</span>}
+                    </div>
+                  </td>
+
+                  {/* Special Services */}
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex flex-col items-end gap-1.5">
+                      {specialEntries.map(([k, svcs]) => svcs?.map((svc, sIdx2) => (
+                        <div key={`${k}-svc-${sIdx2}`} className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-lg border border-slate-200 shadow-xs">
+                          <FaConciergeBell size={12} className="text-indigo-500" />
+                          <div className="flex flex-col items-end">
+                            <span className="text-xs font-bold text-slate-700">
+                              {svc.Text || svc.Description || "Special Service"}
+                            </span>
+                          </div>
+                          {renderPriceTag(svc.Price)}
+                        </div>
+                      )))}
+                      {specialEntries.every(([, v]) => !v?.length) && <span className="text-[10px] font-bold text-slate-300 italic uppercase">None Selected</span>}
                     </div>
                   </td>
                 </tr>

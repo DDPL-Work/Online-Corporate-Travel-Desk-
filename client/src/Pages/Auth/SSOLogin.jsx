@@ -26,11 +26,9 @@ const SSOLogin = () => {
       <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 rounded-3xl overflow-hidden shadow-2xl bg-white">
         {/* IMAGE / BRAND PANEL */}
         <div className="relative hidden md:flex items-center justify-center">
-          <img
-            src={travelBg}
+          <img src={travelBg}
             alt="Corporate Travel"
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+            className="absolute inset-0 w-full h-full object-cover" loading="lazy" decoding="async" />
           <div className="absolute inset-0 bg-black/50"></div>
 
           <div className="relative z-10 text-white px-12">

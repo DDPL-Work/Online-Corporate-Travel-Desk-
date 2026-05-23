@@ -184,3 +184,60 @@ export const toggleEmployeeStatusAdmin = createAsyncThunk(
     }
   }
 );
+
+/**
+ * ============================================================
+ * 🔐 DEMOTE MANAGER → EMPLOYEE (ADMIN)
+ * ============================================================
+ */
+export const demoteEmployeeAdmin = createAsyncThunk(
+  "adminBooking/demoteEmployeeAdmin",
+  async (userId, { rejectWithValue }) => {
+    try {
+      await api.put(`/travel-admin/demote/${userId}`);
+      return { userId, role: "employee" };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to demote manager"
+      );
+    }
+  }
+);
+
+/**
+ * ============================================================
+ * 🔐 PROMOTE EMPLOYEE → MANAGER (ADMIN)
+ * ============================================================
+ */
+export const promoteEmployeeAdmin = createAsyncThunk(
+  "adminBooking/promoteEmployeeAdmin",
+  async (userId, { rejectWithValue }) => {
+    try {
+      const res = await api.put(`/travel-admin/promote/${userId}`);
+      return { userId, role: res.data.data.role };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to promote employee"
+      );
+    }
+  }
+);
+
+/**
+ * ============================================================
+ * 🔐 PROMOTE USER → FINANCE TEAM (ADMIN)
+ * ============================================================
+ */
+export const promoteEmployeeToFinanceAdmin = createAsyncThunk(
+  "adminBooking/promoteEmployeeToFinanceAdmin",
+  async (userId, { rejectWithValue }) => {
+    try {
+      const res = await api.put(`/travel-admin/promote-finance/${userId}`);
+      return { userId, role: res.data.data.role };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to promote to Finance Team"
+      );
+    }
+  }
+);

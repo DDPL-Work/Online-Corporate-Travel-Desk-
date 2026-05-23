@@ -44,7 +44,7 @@ export const ALL_POSTS = [
       <h2>The Foundation of Travel Management</h2>
       <p>In the fast-paced world of business, travel is often a necessity. However, without a clear policy, costs can spiral out of control. A corporate travel policy isn't just about rules; it's about setting expectations and providing a framework for employees to travel safely and efficiently. Developing a policy that is both restrictive enough to save money and flexible enough to satisfy employees is an ongoing challenge for many travel managers.</p>
       
-      <img src="https://images.unsplash.com/photo-1454165833767-027ffea9e41b?w=800&q=80" alt="Corporate office team planning travel" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1454165833767-027ffea9e41b?w=800&q=80" alt="Corporate office team planning travel" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>1. Defining the Scope and Objectives</h3>
       <p>Before you write a single word, identify who the policy applies to. Is it just full-time employees, or do contractors and consultants fall under the same rules? Clarity here prevents confusion later. You must also define your core objectives: Is the primary goal cost reduction, employee safety, or administrative efficiency? Most organizations aim for a balance of all three.</p>
@@ -59,7 +59,7 @@ export const ALL_POSTS = [
       <h3>3. Booking Channels and the Role of Technology</h3>
       <p>Centralising bookings through a single platform like Traveamer helps in tracking spend and ensures that travellers are using negotiated corporate rates. By mandating a specific booking channel, you can capture 100% of your travel data, which is essential for future negotiations with airlines and hotel chains. Technology also allows for pre-trip approvals, which can stop unauthorized spending before it happens.</p>
 
-      <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80" alt="Data analytics on a tablet" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80" alt="Data analytics on a tablet" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>4. Air Travel: Class of Service and Preferred Carriers</h3>
       <p>Define exactly when an employee is eligible for premium economy or business class. Many companies use a "flight duration" rule—for example, business class is only allowed for flights longer than 6 or 8 hours. Additionally, list your preferred carriers. Concentrating your spend with a few airlines allows you to negotiate corporate discounts that aren't available to the general public.</p>
@@ -99,7 +99,7 @@ export const ALL_POSTS = [
       <h2>The Death of the Paper Receipt</h2>
       <p>We've all seen them — shoe boxes full of crumpled receipts, some so faded they're barely legible. Not only is this a nightmare for the employee who has to spend their Sunday evening filling out spreadsheets, but it's an even bigger headache for the finance team who has to manually verify each line item. Manual expense management is one of the most inefficient processes in the modern office, yet many companies still cling to it.</p>
       
-      <img src="https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=800&q=80" alt="Person organizing receipts" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=800&q=80" alt="Person organizing receipts" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>1. Elimination of Data Entry Errors</h3>
       <p>When employees manually type in amounts, dates, and vendor names, mistakes are inevitable. A simple decimal point error can lead to significant overpayments or messy audits. Automation uses Optical Character Recognition (OCR) to read receipts and extract data with near-perfect accuracy, populating the expense report automatically and removing the human error element entirely.</p>
@@ -107,7 +107,7 @@ export const ALL_POSTS = [
       <h3>2. Real-Time Policy Compliance</h3>
       <p>In a manual system, a finance manager only realizes an employee has overspent after the money is already gone. Automated systems can flag "out-of-policy" expenses the moment a receipt is uploaded. If a traveler tries to book a 5-star hotel when the policy allows only 4-star, the system can either block the submission or route it for special approval immediately, ensuring 100% compliance without manual checking.</p>
 
-      <img src="https://images.unsplash.com/photo-1586282391129-59a998bd1160?w=800&q=80" alt="Automated workflow diagram" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1586282391129-59a998bd1160?w=800&q=80" alt="Automated workflow diagram" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>3. Dramatic Reduction in Processing Time</h3>
       <p>Studies show that processing a single manual expense report can take up to 20 minutes of a finance professional's time. For a company with 500 travelers, that's hundreds of hours every month. Automation reduces this to seconds. The system handles the routing, the math, and the basic verification, allowing the finance team to focus on high-level strategy and auditing only the flagged "high-risk" reports.</p>
@@ -144,7 +144,7 @@ export const ALL_POSTS = [
       <h2>Comfort vs. Cost: The Executive Balance</h2>
       <p>Leadership travel is about more than just getting from point A to point B. It's about ensuring your executives arrive ready to perform. Business class provides the space and quiet needed to work or rest during long-haul flights, but the cost can be 3x to 5x higher than economy. As a travel manager, you must justify this spend through the lens of productivity and ROI.</p>
 
-      <img src="https://images.unsplash.com/photo-1540339832862-474550c609c5?w=800&q=80" alt="Business class flight interior" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1540339832862-474550c609c5?w=800&q=80" alt="Business class flight interior" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>1. Defining the "Productivity Factor"</h3>
       <p>If an executive flies economy on a 12-hour flight and arrives at 8:00 AM for a billion-dollar negotiation, they are likely to be jet-lagged and underperforming. The "cost" of a failed meeting far outweighs the "saving" on the airfare. Business class allows for a flatbed sleep, meaning the executive can go straight from the airport to the boardroom, effectively gaining a full day of productivity.</p>
@@ -184,7 +184,7 @@ export const ALL_POSTS = [
       <h2>Beyond the Booking: The Manager's Responsibility</h2>
       <p>Duty of Care is a legal and ethical obligation that organizations have to ensure the safety and well-being of their employees while they are traveling for business. In 2026, this responsibility has evolved far beyond basic insurance. It now encompasses mental health, digital security, infectious disease mitigation, and real-time crisis management. Failure to meet these standards can result in significant legal liability and, more importantly, a breakdown in employee trust.</p>
       
-      <img src="https://images.unsplash.com/photo-1521791136064-7986c2920216?w=800&q=80" alt="Handshake representing duty of care" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1521791136064-7986c2920216?w=800&q=80" alt="Handshake representing duty of care" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>1. The Legal Framework: Understanding Your Liabilities</h3>
       <p>In many jurisdictions, Duty of Care is not just a HR policy; it is codified in labor laws. Employers must demonstrate that they have taken "reasonably practicable" steps to ensure safety. This includes providing adequate training, conducting risk assessments of destinations, and having a robust emergency response plan in place. If an employee is injured in a high-risk area where the company provided no warning, the organization can be held legally responsible for negligence.</p>
@@ -192,7 +192,7 @@ export const ALL_POSTS = [
       <h3>2. Pre-Trip: Education and Risk Assessment</h3>
       <p>A proactive Duty of Care strategy begins before the employee even packs their bags. Managers should provide travelers with destination-specific intelligence: political stability, local laws, health risks, and cultural norms. For high-risk destinations, a formal "Trip Approval" should only be granted after a specific risk mitigation plan is filed.</p>
 
-      <img src="https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=800&q=80" alt="Meeting for risk assessment" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=800&q=80" alt="Meeting for risk assessment" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>3. Real-Time Tracking: The Ethics of Location Monitoring</h3>
       <p>Knowing where your employees are during a global crisis is essential. Modern travel platforms like Traveamer provide "Active Traveler Monitoring" which maps travelers in real-time. While this is a safety tool, it must be balanced with privacy. Employees should be clearly informed that location tracking is only active during the trip's duration and is used exclusively for emergency response purposes.</p>
@@ -228,7 +228,7 @@ export const ALL_POSTS = [
       <h2>The Art of the Hotel RFP</h2>
       <p>Hotel spending is typically the second-largest travel expense for most corporations. Negotiating preferred rates can lead to significant savings, but it requires data and a strategic approach.</p>
       
-      <img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80" alt="Luxury hotel lobby" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80" alt="Luxury hotel lobby" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>1. Leverage Your Data</h3>
       <p>Before entering negotiations, know your numbers. Which hotels are your employees already staying at? What is the total number of room nights you booked last year? Data is your strongest bargaining chip. By showing a hotel chain that you can "shift share" from a competitor to them, you gain immense leverage in rate discussions.</p>
@@ -255,7 +255,7 @@ export const ALL_POSTS = [
       <h2>Security in the Age of SaaS</h2>
       <p>As corporate travel moves entirely into the cloud, managing user access becomes critical. Single Sign-On (SSO) isn't just about saving employees from remembering another password; it's about centralized security control and operational efficiency.</p>
       
-      <img src="https://images.unsplash.com/photo-1563986768609-322da13575f3?w=800&q=80" alt="Cyber security concept" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1563986768609-322da13575f3?w=800&q=80" alt="Cyber security concept" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>1. Centralized Offboarding</h3>
       <p>When an employee leaves the company, their access to the travel portal must be revoked immediately to prevent unauthorized bookings. With SSO, disabling their primary corporate account automatically secures all connected platforms, including travel.</p>
@@ -279,7 +279,7 @@ export const ALL_POSTS = [
       <h2>Maximizing Input Tax Credit (ITC) in Indian Travel</h2>
       <p>In the Indian corporate landscape, Goods and Services Tax (GST) is a significant factor in travel cost management. For many large enterprises, GST on travel can represent 5% to 18% of the total spend. If your company is not correctly claiming Input Tax Credit (ITC), you are effectively overpaying for every trip. However, compliance is notoriously complex due to the varying rules for IGST, CGST, and SGST.</p>
       
-      <img src="https://images.unsplash.com/photo-1554224155-1696413575b8?w=800&q=80" alt="Financial documents and calculator" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1554224155-1696413575b8?w=800&q=80" alt="Financial documents and calculator" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>1. The "Place of Supply" Problem</h3>
       <p>One of the biggest hurdles in GST compliance is the "Place of Supply" rule. For hotel accommodation, the place of supply is the location of the hotel. This means if your office is in Maharashtra but your employee stays in Karnataka, you are charged Karnataka SGST. You can typically only claim credit for SGST if you have a registered office in that specific state. For flights, the rule is different: the place of supply is the location of the registered person (your office), allowing for IGST or CGST/SGST claims based on your GSTIN.</p>
@@ -322,7 +322,7 @@ export const ALL_POSTS = [
       <h2>The 21-Day Rule in Domestic Aviation</h2>
       <p>Data across millions of domestic flights in India shows a clear pattern: booking more than 21 days in advance yields the lowest fares. After the 14-day mark, prices begin to climb exponentially. For popular routes like Delhi-Mumbai or Bangalore-Hyderabad, the difference between a 21-day booking and a 3-day booking can be as high as 300%.</p>
       
-      <img src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800&q=80" alt="Airplane in flight" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800&q=80" alt="Airplane in flight" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>1. Why Airlines Price the Way They Do</h3>
       <p>Airlines use sophisticated Revenue Management Systems (RMS) that predict demand. As the flight date approaches, the "cheap" fare buckets (like 'O' or 'V' class) are closed, leaving only the "flexible" but expensive buckets open for last-minute business travelers.</p>
@@ -346,7 +346,7 @@ export const ALL_POSTS = [
       <h2>Strategic Payment Solutions in Corporate Travel</h2>
       <p>How a company pays for its travel is just as critical as how much it spends. The choice between a centralized corporate wallet and individual corporate credit cards can significantly impact cash flow, security, and administrative overhead. In this guide, we break down the pros and cons of each model to help you decide which fits your enterprise best.</p>
       
-      <img src="https://images.unsplash.com/photo-1556742044-3c52d6e88c62?w=800&q=80" alt="Corporate credit card" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1556742044-3c52d6e88c62?w=800&q=80" alt="Corporate credit card" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>1. The Corporate Wallet: Centralized Control</h3>
       <p>A corporate wallet is a prepaid account managed by the company. Funds are added to the wallet, and all bookings made via the travel platform are deducted from this balance. This model is increasingly popular for companies looking for absolute cost control and simplified accounting.</p>
@@ -387,7 +387,7 @@ export const ALL_POSTS = [
       <h2>The Critical Role of Real-Time Information</h2>
       <p>In the world of corporate travel, uncertainty is the only constant. From sudden flight cancellations and weather disruptions to geopolitical shifts, travel managers must be able to react instantly to protect their employees. Real-time travel alerts have moved from being a "nice-to-have" feature to a core component of duty of care and operational efficiency.</p>
       
-      <img src="https://images.unsplash.com/photo-1488085061387-422e29b40080?w=800&q=80" alt="Digital travel information screen" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1488085061387-422e29b40080?w=800&q=80" alt="Digital travel information screen" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>1. Proactive vs. Reactive Management</h3>
       <p>Reactive management happens when an employee calls from an airport at midnight because their flight was cancelled. Proactive management happens when the travel platform identifies the cancellation three hours in advance and automatically suggests an alternative flight before the employee even leaves for the airport.</p>
@@ -419,7 +419,7 @@ export const ALL_POSTS = [
       <h2>Optimizing the Corporate Approval Cycle</h2>
       <p>The speed of business often exceeds the speed of traditional corporate bureaucracy. For a sales team chasing a deal, a 24-hour delay in travel approval can mean a 50% increase in airfare or, worse, a lost opportunity. Modern travel management is about building "frictionless" approval workflows that balance oversight with agility.</p>
       
-      <img src="https://images.unsplash.com/photo-1454165833767-027ffea9e41b?w=800&q=80" alt="Team collaborating in office" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1454165833767-027ffea9e41b?w=800&q=80" alt="Team collaborating in office" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>1. The Cost of Slow Approvals</h3>
       <p>Every hour a flight booking sits in a manager's inbox is an hour where the price can fluctuate. Data shows that "last-minute" price spikes are often exacerbated by slow internal approval cycles. Automating this process can save a company thousands of dollars in avoidable fare increases.</p>
@@ -451,7 +451,7 @@ export const ALL_POSTS = [
       <h2>Precision Accounting for Client-Billable Travel</h2>
       <p>For consulting firms, law practices, and service-based agencies, travel is often a direct project expense that is billed back to the client. When travel data is disconnected from project codes, the risk of "unbilled leakage" is high. Project-linked travel ensures that every rupee spent on behalf of a client is captured, justified, and billed accurately.</p>
       
-      <img src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80" alt="Lawyer reviewing documents" class="w-full rounded-2xl my-10 shadow-lg" />
+      <img src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80" alt="Lawyer reviewing documents" class="w-full rounded-2xl my-10 shadow-lg" loading="eager" />
 
       <h3>1. Automating the Attribution</h3>
       <p>The best way to ensure project accuracy is to mandate it at the time of booking. By requiring a "Project Code" or "Cost Center" before a flight can be reserved, you ensure that the data is captured at the source. This eliminates the need for employees to remember which trip was for which client weeks later during the expense filing phase.</p>

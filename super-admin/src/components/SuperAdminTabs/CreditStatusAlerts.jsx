@@ -13,9 +13,14 @@ import {
   FiCalendar,
   FiClock,
   FiArrowLeft,
+  FiArrowRight,
+  FiChevronLeft,
+  FiChevronRight,
   FiUser,
   FiRotateCcw,
   FiFilter,
+  FiEdit2,
+  FiX,
 } from "react-icons/fi";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import { 
@@ -27,6 +32,7 @@ import {
   fetchPostpaidTransactions,
   fetchPreviousCycles,
   fetchCycleTransactions,
+  updateCycleReceipt,
 } from "../../Redux/Actions/postpaidThunks";
 import { clearCycleTransactions } from "../../Redux/Slice/postpaidSlice";
 import { toast } from "sonner";
@@ -41,7 +47,7 @@ const fmtAmt = (n) =>
 
 const STMT_COLS = [
   "Row", "Statement ID", "Statement Period",
-  "Statement Date", "Due Date", "Delay Days", "Amount (₹)",
+  "Statement Date", "Due Date", "Delay Days", "Amount (₹)", "Received (₹)", "Action",
 ];
 
 const TX_COLS = [
@@ -66,6 +72,13 @@ const ITEMS_PER_PAGE = 10;
 export default function CreditStatusAlerts() {
   const dispatch = useDispatch();
   const tableScrollRef = useRef(null);
+  const cycleTableScrollRef = useRef(null);
+  
+  const scrollCycleTable = (dir) => {
+    if (cycleTableScrollRef.current) {
+      cycleTableScrollRef.current.scrollBy({ left: dir === "left" ? -300 : 300, behavior: "smooth" });
+    }
+  };
   
   // Filters & Pagination
   const [searchTerm, setSearchTerm] = useState("");
@@ -91,6 +104,9 @@ export default function CreditStatusAlerts() {
   const [activeTab, setActiveTab] = useState("current");
   const [drillCycle, setDrillCycle] = useState(null);
   const [drillPage, setDrillPage] = useState(1);
+
+  // Edit Modal State
+  const [editModal, setEditModal] = useState({ isOpen: false, row: null, receivedAmount: "" });
 
   const {
     balance, loadingBalance: loadingPostpaidBalance,
@@ -174,11 +190,14 @@ export default function CreditStatusAlerts() {
   /* ── Derived Postpaid values ──────────────────────────────── */
   const currentCycleRow = useMemo(() => {
     if (!balance || !drillDownId) return null;
+    const targetCorp = corporates.find(c => c._id === drillDownId) || {};
+    const dueDays = targetCorp.dueDays !== undefined && targetCorp.dueDays !== null ? Number(targetCorp.dueDays) : 15;
+
     const stmtDate = balance.currentCycleEnd
       ? new Date(new Date(balance.currentCycleEnd).getTime() + 86400000)
       : null;
     const dueDate = stmtDate
-      ? new Date(stmtDate.getTime() + 8 * 86400000)
+      ? new Date(stmtDate.getTime() + dueDays * 86400000)
       : null;
     const delayDays = dueDate && new Date() > dueDate
       ? Math.floor((Date.now() - dueDate.getTime()) / 86400000)
@@ -196,7 +215,31 @@ export default function CreditStatusAlerts() {
       statementAmount: balance.usedCredit || 0,
       isCurrent: true,
     };
-  }, [balance, drillDownId]);
+  }, [balance, drillDownId, corporates]);
+
+  const enhancedPreviousCycles = useMemo(() => {
+    if (!previousCycles || !drillDownId) return [];
+    const targetCorp = corporates.find(c => c._id === drillDownId) || {};
+    const dueDays = targetCorp.dueDays !== undefined && targetCorp.dueDays !== null ? Number(targetCorp.dueDays) : 15;
+
+    return previousCycles.map(cycle => {
+      const stmtDate = cycle.periodEnd
+        ? new Date(new Date(cycle.periodEnd).getTime() + 86400000)
+        : null;
+      const dueDate = stmtDate
+        ? new Date(stmtDate.getTime() + dueDays * 86400000)
+        : null;
+      const delayDays = dueDate && new Date() > dueDate
+        ? Math.floor((Date.now() - dueDate.getTime()) / 86400000)
+        : 0;
+      
+      return {
+        ...cycle,
+        dueDate: dueDate || cycle.dueDate,
+        delayDays,
+      };
+    });
+  }, [previousCycles, drillDownId, corporates]);
 
   const handleTabSwitch = (tab) => {
     setActiveTab(tab);
@@ -355,6 +398,86 @@ export default function CreditStatusAlerts() {
           </div>
         </div>
 
+      {/* EDIT PREVIOUS CYCLE MODAL */}
+      {editModal.isOpen && editModal.row && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 m-4 animate-in zoom-in-95 duration-200 border border-slate-100">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Edit Received Amount</h3>
+              <button 
+                onClick={() => setEditModal({ isOpen: false, row: null, receivedAmount: "" })}
+                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Statement ID</label>
+                <div className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-600 cursor-not-allowed mt-1">
+                  {editModal.row.statementId}
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Total Amount</label>
+                <div className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black text-slate-900 cursor-not-allowed mt-1">
+                  ₹{fmtAmt(editModal.row.statementAmount)}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 text-[#0A4D68]">Received Amount</label>
+                <input 
+                  type="number"
+                  placeholder="Enter amount received"
+                  value={editModal.receivedAmount}
+                  onChange={(e) => setEditModal({ ...editModal, receivedAmount: e.target.value })}
+                  className="w-full px-4 py-3 bg-white border border-slate-200 focus:border-[#0A4D68] rounded-xl text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-[#0A4D68]/10 transition-all mt-1"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Remaining Amount</label>
+                <div className={`w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black mt-1 ${editModal.row.statementAmount - Number(editModal.receivedAmount || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                  ₹{fmtAmt(Math.max(0, editModal.row.statementAmount - Number(editModal.receivedAmount || 0)))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <button 
+                onClick={() => setEditModal({ isOpen: false, row: null, receivedAmount: "" })}
+                className="flex-1 px-4 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={async () => {
+                  try {
+                    await dispatch(updateCycleReceipt({
+                      corporateId: drillDownId,
+                      cycleIndex: editModal.row.cycleIndex,
+                      receivedAmount: editModal.receivedAmount
+                    })).unwrap();
+                    toast.success("Amount updated successfully");
+                    setEditModal({ isOpen: false, row: null, receivedAmount: "" });
+                    // Refresh data
+                    dispatch(fetchPreviousCycles({ corporateId: drillDownId }));
+                  } catch (err) {
+                    toast.error("Failed to update receipt");
+                  }
+                }}
+                className="flex-1 px-4 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest text-white bg-[#0A4D68] hover:bg-[#063346] shadow-lg shadow-[#0A4D68]/20 transition-all"
+              >
+                Save Updates
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
         {/* ── DRILL-DOWN CYCLE DETAIL VIEW ── */}
         {drillCycle && (
           <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
@@ -447,9 +570,25 @@ export default function CreditStatusAlerts() {
               <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest">
                 {activeTab === "current" ? "Current Billing Cycle" : "Statement History"}
               </h3>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => scrollCycleTable('left')}
+                  className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-[#0A4D68] hover:border-[#0A4D68]/30 transition-colors shadow-sm"
+                  title="Scroll Left"
+                >
+                  <FiChevronLeft size={14} />
+                </button>
+                <button 
+                  onClick={() => scrollCycleTable('right')}
+                  className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-[#0A4D68] hover:border-[#0A4D68]/30 transition-colors shadow-sm"
+                  title="Scroll Right"
+                >
+                  <FiChevronRight size={14} />
+                </button>
+              </div>
             </div>
             
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" ref={cycleTableScrollRef}>
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-900 border-b border-slate-800">
@@ -465,26 +604,35 @@ export default function CreditStatusAlerts() {
                     ) : !currentCycleRow ? (
                       <tr><td colSpan={STMT_COLS.length} className="py-20 text-center text-slate-400 font-black uppercase text-[10px] tracking-widest">No active cycle data</td></tr>
                     ) : (
-                      <StatementRow row={currentCycleRow} onClick={() => openDrillDownCycle(currentCycleRow)} />
+                      <StatementRow 
+                        row={currentCycleRow} 
+                        onClick={() => openDrillDownCycle(currentCycleRow)} 
+                        onEdit={() => {}} 
+                      />
                     )
                   ) : (
                     loadingCycles ? (
                       <tr><td colSpan={STMT_COLS.length} className="py-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A4D68] mx-auto"></div></td></tr>
-                    ) : previousCycles.length === 0 ? (
+                    ) : enhancedPreviousCycles.length === 0 ? (
                       <tr><td colSpan={STMT_COLS.length} className="py-20 text-center text-slate-400 font-black uppercase text-[10px] tracking-widest">No statement history available</td></tr>
                     ) : (
-                      previousCycles.map((c) => (
-                        <StatementRow key={c.cycleIndex} row={c} onClick={() => openDrillDownCycle(c)} />
+                      enhancedPreviousCycles.map((c) => (
+                        <StatementRow 
+                          key={c.cycleIndex} 
+                          row={c} 
+                          onClick={() => openDrillDownCycle(c)}
+                          onEdit={(row) => setEditModal({ isOpen: true, row, receivedAmount: row.receivedAmount || "" })}
+                        />
                       ))
                     )
                   )}
                 </tbody>
-                {activeTab === "previous" && previousCycles.length > 0 && (
+                {activeTab === "previous" && enhancedPreviousCycles.length > 0 && (
                   <tfoot className="bg-slate-50">
                     <tr>
-                      <td colSpan={STMT_COLS.length - 1} className="px-8 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Historical Volume</td>
-                      <td className="px-8 py-4 font-black text-slate-900 text-sm">
-                        ₹{fmtAmt(previousCycles.reduce((sum, c) => sum + (c.statementAmount || 0), 0))}
+                      <td colSpan={STMT_COLS.length - 2} className="px-8 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Historical Volume</td>
+                      <td className="px-8 py-4 font-black text-slate-900 text-sm" colSpan="2">
+                        ₹{fmtAmt(enhancedPreviousCycles.reduce((sum, c) => sum + (c.statementAmount || 0), 0))}
                       </td>
                     </tr>
                   </tfoot>
@@ -778,7 +926,7 @@ export default function CreditStatusAlerts() {
 }
 
 /* ── SHARED STATEMENT ROW ── */
-function StatementRow({ row, onClick }) {
+function StatementRow({ row, onClick, onEdit }) {
   return (
     <tr
       onClick={onClick}
@@ -803,6 +951,20 @@ function StatementRow({ row, onClick }) {
         </span>
       </td>
       <td className="px-8 py-4 font-black text-slate-900 text-[13px]">₹{fmtAmt(row.statementAmount)}</td>
+      <td className="px-8 py-4 font-black text-[#0A4D68] text-[13px]">
+        {row.isCurrent ? "—" : `₹${fmtAmt(row.receivedAmount || 0)}`}
+      </td>
+      <td className="px-8 py-4 text-center">
+        {!row.isCurrent && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(row); }}
+            className="p-2 text-slate-400 hover:text-[#0A4D68] bg-slate-100 hover:bg-[#0A4D68]/10 rounded-xl transition-all shadow-sm active:scale-95"
+            title="Edit Received Amount"
+          >
+            <FiEdit2 size={14} />
+          </button>
+        )}
+      </td>
     </tr>
   );
 }

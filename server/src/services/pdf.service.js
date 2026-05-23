@@ -9,9 +9,7 @@ const bwipjs = require("bwip-js");
 const handlebars = require("handlebars");
 const axios = require("axios");
 
-const {
-  generateHotelVoucherPdfKit,
-} = require("./templates/hotel_voucher_pdfkit");
+
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -425,21 +423,18 @@ class PDFService {
 
       // ── Prepare Consolidated Passenger Data (Global for the journey) ──
       const consolidatedTravellers = await Promise.all(
-// <<<<<<< HEAD
-//         booking.travellers.map(async (traveller, tIdx) => {
-//           const tboPaxOnward =
-//             onwardData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
-//           const tboPaxReturn =
-//             returnData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
-// =======
         (Array.isArray(booking.travellers) ? booking.travellers : []).map(async (traveller, tIdx) => {
-          const tboPaxOnward = onwardData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
-          const tboPaxReturn = returnData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
-          
-          const onwardTicket = tboPaxOnward?.Ticket ? {
-            id: tboPaxOnward.Ticket.TicketId || "—",
-            no: tboPaxOnward.Ticket.TicketNumber || "—"
-          } : null;
+          const tboPaxOnward =
+            onwardData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
+          const tboPaxReturn =
+            returnData.response?.FlightItinerary?.Passenger?.[tIdx] || {};
+
+          const onwardTicket = tboPaxOnward?.Ticket
+            ? {
+                id: tboPaxOnward.Ticket.TicketId || "—",
+                no: tboPaxOnward.Ticket.TicketNumber || "—",
+              }
+            : null;
 
           const returnTicket = tboPaxReturn?.Ticket
             ? {
@@ -515,6 +510,22 @@ class PDFService {
                 ? "15 KG"
                 : seg.Baggage || "15 KG";
 
+              const segmentOrigin = seg.Origin?.Airport?.AirportCode || seg.Origin?.airportCode || "";
+              const segmentDest = seg.Destination?.Airport?.AirportCode || seg.Destination?.airportCode || "";
+
+              const onwardSvcs = (tboPaxOnward?.SpecialServices || [])
+                .filter((s) => (s.Origin || s.origin) === segmentOrigin && (s.Destination || s.destination) === segmentDest)
+                .map((s) => s.Text || s.text || s.Code || s.code);
+
+              const returnSvcs = (tboPaxReturn?.SpecialServices || [])
+                .filter((s) => (s.Origin || s.origin) === segmentOrigin && (s.Destination || s.destination) === segmentDest)
+                .map((s) => s.Text || s.text || s.Code || s.code);
+
+              const allSvcs = [...onwardSvcs, ...returnSvcs];
+              const specialServiceText = allSvcs.length > 0
+                ? allSvcs.join(", ")
+                : (addInfo.SpecialService && addInfo.SpecialService !== "N/A" && addInfo.SpecialService !== "None" ? addInfo.SpecialService : "N/A");
+
               return {
                 route: `${seg.Origin?.Airport?.AirportCode || seg.Origin?.airportCode || "ORG"}-${seg.Destination?.Airport?.AirportCode || seg.Destination?.airportCode || "DEST"}`,
                 seat: addInfo.Seat || "Auto",
@@ -524,6 +535,7 @@ class PDFService {
                     : "N/A",
                 baggage: checkIn,
                 addOnBaggage: "N/A",
+                specialServices: specialServiceText,
               };
             }),
           };
@@ -716,18 +728,361 @@ class PDFService {
   }
 
   async generateHotelVoucher(booking) {
+    let browser;
     try {
-      const filename = `hotel-${booking.bookingReference}-${randomUUID()}.pdf`;
+      const filename = `hotel-${booking.bookingReference || "hotel"}-${randomUUID()}.pdf`;
       const filepath = path.join(this.voucherDir, filename);
 
-      await generateHotelVoucherPdfKit({
-        booking,
-        outputPath: filepath,
+      const hotel = booking.hotelRequest?.selectedHotel || {};
+      const room = booking.hotelRequest?.selectedRoom || {};
+      const result = booking.bookingResult?.providerResponse?.BookResult || {};
+      const guest = booking.travellers?.[0] || {};
+
+      // ── Hotel Image Extraction ──
+      const extractImageUrl = (img) => {
+        if (!img) return null;
+        if (typeof img === "string") return img;
+        if (typeof img === "object") {
+          return img.Url || img.url || img.Image || img.image || null;
+        }
+        return null;
+      };
+
+      let hotelImages = booking.hotelRequest?.selectedHotel?.images ||
+                        booking.hotelRequest?.rawHotelData?.Images ||
+                        booking.hotelRequest?.rawHotelData?.images ||
+                        [];
+      if (hotelImages.length === 0 && booking.bookingSnapshot?.hotelImage) {
+        hotelImages = [booking.bookingSnapshot.hotelImage];
+      }
+
+      let hotelImage = null;
+      for (const img of hotelImages) {
+        let url = extractImageUrl(img);
+        if (url && typeof url === "string") {
+          let cleaned = url.trim();
+          if (cleaned.startsWith("//")) {
+            cleaned = "https:" + cleaned;
+          }
+          if (cleaned.startsWith("http")) {
+            hotelImage = cleaned;
+            break;
+          }
+        }
+      }
+
+      // Self-contained luxury gold & navy corporate hotel SVG vector illustration
+      // 100% offline-ready and guaranteed to load instantly under all environments
+      if (!hotelImage) {
+        hotelImage = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCI+CiAgPHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMwNDExMmYiIHJ4PSI2Ii8+CiAgPHJlY3QgeD0iMzUiIHk9IjI1IiB3aWR0aD0iMzAiIGhlaWdodD0iNjAiIGZpbGw9IiMxMDIyMzgiIHN0cm9rZT0iI2M5YTg0YyIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8cmVjdCB4PSI0MiIgeT0iMzIiIHdpZHRoPSI2IiBoZWlnaHQ9IjYiIGZpbGw9IiNjOWE4NGMiIG9wYWNpdHk9IjAuOCIvPgogIDxyZWN0IHg9IjUyIiB5PSIzMiIgd2lkdGg9IjYiIGhlaWdodD0iNiIgZmlsbD0iI2M5YTg0YyIgb3BhY2l0eT0iMC44Ii8+CiAgPHJlY3Qgd2lkdGg9IjYiIGhlaWdodD0iNiIgZmlsbD0iI2M5YTg0YyIgb3BhY2l0eT0iMC44IiB4PSI0MiIgeT0iNDIiLz4KICA8cmVjdCB3aWR0aD0iYiIgaGVpZ2h0PSI2IiBmaWxsPSIjYzlhODRjIiBvcGFjaXR5PSIwLjgiIHg9IjUyIiB5PSI0MiIvPgogIDxyZWN0IHdpZHRoPSI2IiBoZWlnaHQ9IjYiIGZpbGw9IiNjOWE4NGMiIG9wYWNpdHk9IjAuOCIgeD0iNDIiIHk9IjUyIi8+CiAgPHJlY3Qgd2lkdGg9IjYiIGhlaWdodD0iNiIgZmlsbD0iI2M5YTg0YyIgb3BhY2l0eT0iMC44IiB4PSI1MiIgeT0iNTIiLz4KICA8cmVjdCB3aWR0aD0iNiIgaGVpZ2h0PSI2IiBmaWxsPSIjYzlhODRjIiBvcGFjaXR5PSIwLjgiIHg9IjQyIiB5PSI2MiIvPgogIDxyZWN0IHdpZHRoPSI2IiBoZWlnaHQ9IjYiIGZpbGw9IiNjOWE4NGMiIG9wYWNpdHk9IjAuOCIgeD0iNTIiIHk9IjYyIi8+CiAgPHJlY3QgeD0iNDciIHk9Ijc0IiB3aWR0aD0iNiIgaGVpZ2h0PSIxMSIgZmlsbD0iI2M5YTg0YyIvPgogIDxwYXRoIGQ9Ik01MCAxMiBMNTMgMTcgTDU5IDE3IEw1NCAyMCBMNTYgMjUgTDUwIDIyIEw0NCAyNSBMNDYgMjAgTDQxIDE3IEw0NyAxNyBaIiBmaWxsPSIjYzlhODRjIi8+Cjwvc3ZnPg==";
+      }
+
+      // Preload image to base64 to ensure Puppeteer renders it 100% of the time, avoiding Cloudflare/WAF blocks
+      let resolvedHotelImage = hotelImage;
+      if (hotelImage && !hotelImage.startsWith("data:")) {
+        try {
+          const axios = require("axios");
+          const response = await axios.get(hotelImage, {
+            responseType: "arraybuffer",
+            timeout: 5000,
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Referer": "https://www.tboholidays.com/"
+            }
+          });
+          const contentType = response.headers["content-type"] || "image/jpeg";
+          const base64Data = Buffer.from(response.data, "binary").toString("base64");
+          resolvedHotelImage = `data:${contentType};base64,${base64Data}`;
+        } catch (err) {
+          logger.warn(`Failed to preload hotel image from ${hotelImage}, using offline SVG fallback. Error: ${err.message}`);
+          resolvedHotelImage = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCI+CiAgPHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMwNDExMmYiIHJ4PSI2Ii8+CiAgPHJlY3QgeD0iMzUiIHk9IjI1IiB3aWR0aD0iMzAiIGhlaWdodD0iNjAiIGZpbGw9IiMxMDIyMzgiIHN0cm9rZT0iI2M5YTg0YyIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8cmVjdCB4PSI0MiIgeT0iMzIiIHdpZHRoPSI2IiBoZWlnaHQ9IjYiIGZpbGw9IiNjOWE4NGMiIG9wYWNpdHk9IjAuOCIvPgogIDxyZWN0IHg9IjUyIiB5PSIzMiIgd2lkdGg9IjYiIGhlaWdodD0iNiIgZmlsbD0iI2M5YTg0YyIgb3BhY2l0eT0iMC44Ii8+CiAgPHJlY3Qgd2lkdGg9IjYiIGhlaWdodD0iNiIgZmlsbD0iI2M5YTg0YyIgb3BhY2l0eT0iMC44IiB4PSI0MiIgeT0iNDIiLz4KICA8cmVjdCBgd2lkdGg9IjYiIGhlaWdodD0iNiIgZmlsbD0iI2M5YTg0YyIgb3BhY2l0eT0iMC44IiB4PSI1MiIgeT0iNDIiLz4KICA8cmVjdCB3aWR0aD0iNiIgaGVpZ2h0PSI2IiBmaWxsPSIjYzlhODRjIiBvcGFjaXR5PSIwLjgiIHg9IjQyIiB5PSI1MiIvPgogIDxyZWN0IHdpZHRoPSI2IiBoZWlnaHQ9IjYiIGZpbGw9IiNjOWE4NGMiIG9wYWNpdHk9IjAuOCIgeD0iNTIiIHk9IjUzIi8+CiAgPHJlY3Qgd2lkdGg9IjYiIGhlaWdodD0iNiIgZmlsbD0iI2M5YTg0YyIgb3BhY2l0eT0iMC44IiB4PSI0MiIgeT0iNjIiLz4KICA8cmVjdCB3aWR0aD0iNiIgaGVpZ2h0PSI2IiBmaWxsPSIjYzlhODRjIiBvcGFjaXR5PSIwLjgiIHg9IjUyIiB5PSI2MiIvPgogIDxyZWN0IHg9IjQ3IiB5PSI3NCIgd2lkdGg9IjYiIGhlaWdodD0xMSIgZmlsbD0iI2M5YTg0YyIvPgogIDxwYXRoIGQ9Ik01MCAxMiBMNTMgMTcgTDU5IDE3IEw1NCAyMCBMNTYgMjUgTDUwIDIyIEw0NCAyNSBMNDYgMjAgTDQxIDE3IEw0NyAxNyBaIiBmaWxsPSIjYzlhODRjIi8+Cjwvc3ZnPg==";
+        }
+      }
+
+      // ── Date Formatting Helpers ──
+      const safeParseDate = (dateVal) => {
+        if (!dateVal) return new Date();
+        if (dateVal instanceof Date) return dateVal;
+        if (typeof dateVal === "object" && dateVal.$date) {
+          return new Date(dateVal.$date);
+        }
+        const parsed = new Date(dateVal);
+        return isNaN(parsed.getTime()) ? new Date() : parsed;
+      };
+
+      const formatDateDay = (dateStr) => {
+        if (!dateStr) return "—";
+        const d = safeParseDate(dateStr);
+        return d.toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+        });
+      };
+
+      const formatDateFull = (dateStr) => {
+        if (!dateStr) return "—";
+        const d = safeParseDate(dateStr);
+        return d.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        });
+      };
+
+      const rawVoucheredDate = booking.voucheredAt || 
+                               booking.voucheredDate || 
+                               booking.approvedAt || 
+                               booking.payment?.paidAt || 
+                               booking.createdAt || 
+                               new Date();
+      const voucheredDate = safeParseDate(rawVoucheredDate).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
       });
 
+      const bookedDate = safeParseDate(booking.createdAt).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+      });
+
+      const checkInDate = safeParseDate(booking.hotelRequest?.checkInDate);
+      const checkOutDate = safeParseDate(booking.hotelRequest?.checkOutDate);
+
+      // ── Nights Calculation ──
+      const checkIn = checkInDate;
+      const checkOut = checkOutDate;
+      const diffTime = Math.abs(checkOut - checkIn);
+      const nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+
+      // ── Amendment Handling ──
+      const amendment = booking.changeRequest || booking.amendmentRequest ? {
+        status: booking.changeRequest?.status || booking.amendmentRequest?.status || "Requested",
+        reason: booking.changeRequest?.reason || booking.amendmentRequest?.reason || "Change of travel plans.",
+        id: booking.changeRequest?.id || booking.amendmentRequest?.id || "—",
+        lastChecked: booking.changeRequest?.updatedAt 
+          ? new Date(booking.changeRequest.updatedAt).toLocaleDateString("en-GB") 
+          : new Date().toLocaleDateString("en-GB")
+      } : null;
+
+      // ── Primary Guest ──
+      const primaryGuest = {
+        name: `${guest.title || "Mr."} ${guest.firstName || ""} ${guest.lastName || ""}`.trim().toUpperCase(),
+        panCard: guest.panCard || guest.pan || null,
+        nationality: guest.nationality || "India (IN)",
+        dateOfBirth: guest.dateOfBirth 
+          ? new Date(guest.dateOfBirth).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) 
+          : null,
+        email: guest.email || "—",
+        phone: guest.phoneWithCode || guest.phone || "—"
+      };
+
+      // ── All Travellers ──
+      const parsedTravellers = (booking.travellers || []).map((t, idx) => {
+        return {
+          index: idx + 1,
+          name: `${t.title || "Mr."} ${t.firstName || ""} ${t.lastName || ""}`.trim().toUpperCase(),
+          gender: t.gender || "—",
+          age: t.age || "—",
+          paxType: t.paxType || "Adult",
+          panCard: t.panCard || t.pan || "—",
+          nationality: t.nationality || "IN",
+          email: t.email || "—",
+          phone: t.phoneWithCode || t.phone || "—"
+        };
+      });
+
+      // ── Room Details ──
+      const rawRoomsList = Array.isArray(room.rawRoomData) 
+        ? room.rawRoomData 
+        : (room.rawRoomData ? [room.rawRoomData] : []);
+      const parsedRooms = rawRoomsList.map((rawRoom, idx) => {
+        const nameVal = Array.isArray(rawRoom.Name) 
+          ? rawRoom.Name[0] 
+          : (rawRoom.Name || rawRoom.name || "Room " + (idx + 1));
+        const meal = rawRoom.MealType || rawRoom.mealType || "Room Only";
+        const inclusionStr = rawRoom.Inclusion || rawRoom.inclusion || "";
+        const inclusionsList = inclusionStr.split(",").map(i => i.trim()).filter(Boolean);
+        
+        return {
+          index: idx + 1,
+          name: nameVal,
+          mealType: meal.replace(/_/g, " "),
+          inclusions: inclusionsList,
+          hasInclusions: inclusionsList.length > 0,
+          isRefundable: rawRoom.IsRefundable ?? rawRoom.isRefundable ?? false,
+          description: rawRoom.Description || rawRoom.description || "",
+          amenities: Array.isArray(rawRoom.Amenities) ? rawRoom.Amenities.slice(0, 15) : (Array.isArray(rawRoom.amenities) ? rawRoom.amenities.slice(0, 15) : []),
+          hasAmenities: (Array.isArray(rawRoom.Amenities) && rawRoom.Amenities.length > 0) || (Array.isArray(rawRoom.amenities) && rawRoom.amenities.length > 0)
+        };
+      });
+
+      const roomTypeName = parsedRooms.length > 0 ? parsedRooms[0].name : (room.roomTypeName || room.RoomTypeName || "Standard Room");
+      const roomsCount = booking.hotelRequest?.rooms?.length || booking.hotelRequest?.noOfRooms || 1;
+      const multiRoom = roomsCount > 1;
+      const adultsCount = booking.hotelRequest?.rooms?.reduce((acc, r) => acc + (Number(r.adults) || 1), 0) || booking.travellers?.length || 1;
+      const multiAdult = adultsCount > 1;
+      const mealType = parsedRooms.length > 0 ? parsedRooms[0].mealType : (room.mealType?.replace(/_/g, " ") || room.MealType?.replace(/_/g, " ") || "Room Only");
+      const isRefundable = parsedRooms.length > 0 ? parsedRooms[0].isRefundable : (room.isRefundable ?? room.IsRefundable ?? false);
+
+      const inclusions = parsedRooms.length > 0 ? parsedRooms[0].inclusions : ((room.rawRoomData?.Inclusion || room.Inclusion || "")
+        .split(",")
+        .map((i) => i.trim())
+        .filter(Boolean));
+
+      // ── Voucher API Response Info ──
+      const rawVoucher = booking.voucher?.raw || booking.bookingResult?.providerResponse?.BookResult || {};
+      const voucherApiResponse = {
+        apiName: "TBO GenerateVoucher API",
+        status: rawVoucher.VoucherStatus ? "SUCCESS" : "CONFIRMED",
+        bookingId: rawVoucher.BookingId || booking.bookingResult?.providerResponse?.BookResult?.BookingId || "—",
+        invoiceNumber: rawVoucher.InvoiceNumber || booking.bookingResult?.providerResponse?.BookResult?.InvoiceNumber || "—",
+        traceId: rawVoucher.TraceId || booking.bookingResult?.providerResponse?.BookResult?.TraceId || "—",
+        responseStatus: rawVoucher.ResponseStatus === 1 ? "1 (Success)" : (rawVoucher.ResponseStatus || "—"),
+        errorCode: rawVoucher.Error?.ErrorCode ?? 0,
+        errorMessage: rawVoucher.Error?.ErrorMessage || "No Errors"
+      };
+
+      const tboBookingId = voucherApiResponse.bookingId || "—";
+
+      // ── Pricing Details ──
+      const currency = booking.pricingSnapshot?.currency || room.rawRoomData?.Currency || "INR";
+      let currencySymbol = currency;
+      try {
+        const symbol = (0).toLocaleString("en-US", {
+          style: "currency",
+          currency: currency,
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0
+        }).replace(/\d/g, "").trim();
+        currencySymbol = symbol ? `${symbol} ` : `${currency} `;
+      } catch (e) {
+        currencySymbol = `${currency} `;
+      }
+      
+      const totalAmountVal = booking.pricingSnapshot?.totalAmount || booking.pricingSnapshot?.totalFare || room.rawRoomData?.TotalFare || 0;
+      const taxesVal = booking.pricingSnapshot?.taxes || booking.pricingSnapshot?.totalTax || room.rawRoomData?.TotalTax || 0;
+      const baseFareVal = booking.pricingSnapshot?.baseAmount || booking.pricingSnapshot?.baseFare || (totalAmountVal - taxesVal) || 0;
+
+      const baseFare = Number(baseFareVal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const taxes = Number(taxesVal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const totalAmount = Number(totalAmountVal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      
+      const perNightRate = Number(Math.round(totalAmountVal / nights)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const perNightBase = Number(Math.round(baseFareVal / nights)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      const paymentMethod = booking.paymentSnapshot?.paymentMethod || booking.paymentMethod || "Wallet";
+      const paymentStatus = booking.paymentSnapshot?.status || booking.paymentStatus || "Completed";
+
+      // ── Cancellation Policy ──
+      const cancelPolicies = (room.cancelPolicies || room.CancelPolicies || []).map((policy) => {
+        return {
+          FromDate: policy.FromDate || "—",
+          CancellationCharge: policy.CancellationCharge ? Number(policy.CancellationCharge).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00",
+          isFree: Number(policy.CancellationCharge) === 0
+        };
+      });
+
+      // ── GST Details ──
+      const gstInfo = booking.gstDetails || booking.hotelRequest?.gstDetails || null;
+      const gst = gstInfo && gstInfo.gstin ? {
+        gstin: gstInfo.gstin || "—",
+        legalName: gstInfo.legalName || "—",
+        address: gstInfo.address || gstInfo.registeredAddress || "—"
+      } : null;
+
+      // ── Load Templates ──
+      const templatePath = path.join(__dirname, "./templates/hotel.voucher.html");
+      const cssPath = path.join(__dirname, "./templates/hotel.css");
+      const htmlTemplate = fs.readFileSync(templatePath, "utf8");
+      const cssContent = fs.readFileSync(cssPath, "utf8");
+
+      const publicDir = path.join(__dirname, "../../public");
+      const traveamerLogo = `data:image/svg+xml;base64,${fs.readFileSync(path.join(publicDir, "logo-traveamer.svg")).toString("base64")}`;
+      const iataLogo = `data:image/svg+xml;base64,${fs.readFileSync(path.join(publicDir, "iata-logo.svg")).toString("base64")}`;
+
+      const template = handlebars.compile(htmlTemplate);
+
+      const finalHtml = template({
+        bookingReference: booking.bookingReference || result.BookingRefNo || "—",
+        hotelCity: hotel.cityName || hotel.city || "—",
+        hotelName: hotel.hotelName || hotel.name || "—",
+        hotelAddress: hotel.address || "—",
+        projectName: booking.project?.name || booking.project?.projectName || booking.projectName || null,
+        invoiceNo: booking.bookingResult?.invoiceNumber || booking.invoiceNumber || booking.bookingResult?.invoiceNo || "—",
+        confirmationNo: result.ConfirmationNo || booking.bookingResult?.providerResponse?.BookResult?.ConfirmationNo || "—",
+        checkInDay: formatDateDay(checkInDate),
+        checkInFull: formatDateFull(checkInDate),
+        checkInTime: hotel.checkInTime || "02:00 PM",
+        checkOutDay: formatDateDay(checkOutDate),
+        checkOutFull: formatDateFull(checkOutDate),
+        checkOutTime: hotel.checkOutTime || "12:00 PM",
+        nights,
+        amendment,
+        primaryGuest,
+        roomTypeName,
+        roomsCount,
+        multiRoom,
+        adultsCount,
+        multiAdult,
+        mealType,
+        isRefundable,
+        inclusions,
+        currency,
+        currencySymbol,
+        baseFare,
+        taxes,
+        totalAmount,
+        perNightRate,
+        perNightBase,
+        paymentMethod,
+        paymentStatus,
+        cancelPolicies,
+        gst,
+        hotelImage: resolvedHotelImage,
+        importantInfo: [],
+        bookedOn: safeParseDate(booking.createdAt).toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false
+        }) + " UTC",
+        traveamerLogo,
+        iataLogo,
+        generatedAt: new Date().toLocaleString("en-IN"),
+        voucheredDate,
+        bookedDate,
+        parsedRooms,
+        voucherApiResponse,
+        tboBookingId,
+        parsedTravellers,
+        inlineCss: cssContent
+      });
+
+      // ── Generate PDF via Puppeteer ──
+      browser = await this._launchBrowser();
+      const page = await browser.newPage();
+
+      await page.setContent(finalHtml, { waitUntil: "networkidle0" });
+
+      const pdfBuffer = await page.pdf({
+        format: "A4",
+        printBackground: true,
+        margin: { top: "10px", right: "10px", bottom: "10px", left: "10px" },
+      });
+
+      await browser.close();
+      browser = null;
+
+      await fs.promises.writeFile(filepath, pdfBuffer);
       return filepath;
     } catch (error) {
-      logger.error("Hotel voucher PDF generation failed", error);
+      if (browser) await browser.close();
+      logger.error("Hotel voucher Puppeteer PDF generation failed", error);
       throw error;
     }
   }

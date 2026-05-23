@@ -16,6 +16,7 @@ import { FaHotel, FaPlane, FaRupeeSign } from "react-icons/fa";
 import {
   approveApproval,
   rejectApproval,
+  transferApproval,
 } from "../../Redux/Actions/approval.thunks";
 import {
   getPendingHotelRequests,
@@ -52,11 +53,10 @@ const RouteCell = ({ routes, airline }) => {
   return (
     <div className="flex items-center gap-3">
       <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
-        <img 
-          src={logoUrl} 
+        <img src={logoUrl} 
           alt={airlineName} 
           className="w-full h-full object-contain"
-          onError={(e) => { 
+          loading="eager" onError={(e) => { 
             e.target.onerror = null;
             e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
           }} 
@@ -136,6 +136,7 @@ function FlightSection({ data, loading, onRefresh, handleAction, isVerified, onS
 
     return { 
       ...b, 
+      bookingType: "flight",
       travellerName: traveller, 
       employeeId: b.requesterDetails?.email || b.userId?.email || "—", 
       status: b.requestStatus || "pending_approval", 
@@ -282,6 +283,7 @@ function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSe
 
     return { 
       ...b, 
+      bookingType: "hotel",
       guestName: guest, 
       employeeId: b.requesterDetails?.email || b.userId?.email || "—", 
       status: b.requestStatus || "pending_approval", 
@@ -489,6 +491,22 @@ export default function PendingTravelRequestsForManager() {
     }
   };
 
+  const handleTransfer = async (secondApproverId, remark, type) => {
+    const bookingId = selectedRequest?._id;
+    if (!bookingId) return;
+    const bookingType = type || selectedRequest?.bookingType || "hotel";
+    try {
+      await dispatch(
+        transferApproval({ id: bookingId, secondApproverId, remark, type: bookingType })
+      ).unwrap();
+      Swal.fire("Transferred", "Approval has been transferred successfully.", "success");
+      setSelectedRequest(null);
+      dispatch(activeTab === "flight" ? getPendingFlightRequests() : getPendingHotelRequests());
+    } catch (err) {
+      Swal.fire("Error", err || "Transfer failed", "error");
+    }
+  };
+
   return (
     <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
       <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-10 pb-24 px-6 md:px-10">
@@ -553,6 +571,7 @@ export default function PendingTravelRequestsForManager() {
             onClose={() => setSelectedRequest(null)} 
             onApprove={(id, type, action) => handleAction(id, type, action, selectedRequest)} 
             onReject={(id, type, action) => handleAction(id, type, action, selectedRequest)} 
+            onTransfer={handleTransfer}
             isVerified={isVerified} 
             isDiscarded={selectedRequest.isTravelPassed} 
           />
@@ -562,6 +581,7 @@ export default function PendingTravelRequestsForManager() {
             onClose={() => setSelectedRequest(null)} 
             onApprove={(id, type, action) => handleAction(id, type, action, selectedRequest)} 
             onReject={(id, type, action) => handleAction(id, type, action, selectedRequest)} 
+            onTransfer={handleTransfer}
             isVerified={isVerified} 
             isDiscarded={selectedRequest.isTravelPassed} 
           />

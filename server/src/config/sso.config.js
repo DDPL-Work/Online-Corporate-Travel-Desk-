@@ -201,6 +201,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
             if (corporate.primaryContact?.email?.toLowerCase() === email) {
               role = "travel-admin";
+            } else if (corporate.billingDepartment?.email?.toLowerCase() === email) {
+              role = "finance_team";
             }
           }
 
@@ -228,15 +230,17 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           user = await User.findById(user._id);
 
           // 🔥 Ensure role stays correct even if user existed before
-          let expectedRole = "employee";
+          let expectedRole = null;
           if (corporate.primaryContact?.email?.toLowerCase() === email) {
             expectedRole = "travel-admin";
+          } else if (corporate.billingDepartment?.email?.toLowerCase() === email) {
+            expectedRole = "finance_team";
           }
 
-          // if (user.role) {
-          //   user.role = expectedRole;
-          //   await user.save();
-          // }
+          if (expectedRole && user.role !== expectedRole) {
+            user.role = expectedRole;
+            await user.save();
+          }
 
           // ✅ BLOCK USER LEVEL
           if (!user.isActive) {
@@ -347,6 +351,8 @@ if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET) {
 
             if (corporate.primaryContact?.email?.toLowerCase() === email) {
               role = "travel-admin";
+            } else if (corporate.billingDepartment?.email?.toLowerCase() === email) {
+              role = "finance_team";
             }
             // else if (
             //   corporate.secondaryContact?.email?.toLowerCase() === email
@@ -378,19 +384,21 @@ if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET) {
           user = await User.findById(user._id);
 
           // 🔥 Ensure role stays correct
-          let expectedRole = "employee";
+          let expectedRole = null;
           if (corporate.primaryContact?.email?.toLowerCase() === email) {
-            expectedRole = "corporate-super-admin";
+            expectedRole = "travel-admin";
+          } else if (corporate.billingDepartment?.email?.toLowerCase() === email) {
+            expectedRole = "finance_team";
           } else if (
             corporate.secondaryContact?.email?.toLowerCase() === email
           ) {
             expectedRole = "travel-admin";
           }
 
-          // if (user.role !== expectedRole) {
-          //   user.role = expectedRole;
-          //   await user.save();
-          // }
+          if (expectedRole && user.role !== expectedRole) {
+            user.role = expectedRole;
+            await user.save();
+          }
 
           if (!user.isActive) {
             return done(null, false, {
@@ -495,6 +503,8 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
 
             if (corporate.primaryContact?.email?.toLowerCase() === email) {
               role = "travel-admin";
+            } else if (corporate.billingDepartment?.email?.toLowerCase() === email) {
+              role = "finance_team";
             }
             // else if (
             //   corporate.secondaryContact?.email?.toLowerCase() === email
@@ -523,19 +533,21 @@ if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET) {
           user = await User.findById(user._id);
 
           // 🔥 Ensure role stays correct
-          let expectedRole = "employee";
+          let expectedRole = null;
           if (corporate.primaryContact?.email?.toLowerCase() === email) {
             expectedRole = "travel-admin";
+          } else if (corporate.billingDepartment?.email?.toLowerCase() === email) {
+            expectedRole = "finance_team";
           } else if (
             corporate.secondaryContact?.email?.toLowerCase() === email
           ) {
             expectedRole = "travel-admin";
           }
 
-          // if (user.role !== expectedRole) {
-          //   user.role = expectedRole;
-          //   await user.save();
-          // }
+          if (expectedRole && user.role !== expectedRole) {
+            user.role = expectedRole;
+            await user.save();
+          }
 
           if (!user.isActive) {
             return done(null, false, {

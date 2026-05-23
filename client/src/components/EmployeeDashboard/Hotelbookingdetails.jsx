@@ -228,11 +228,9 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
         {/* Image */}
         <div className="relative min-h-[320px] overflow-hidden bg-[#E8E0D0]">
           {images.length > 0 ? (
-            <img
-              src={images[activeIndex]}
+            <img src={images[activeIndex]}
               alt={hotelName}
-              className="w-full h-full object-cover block absolute inset-0 transition-opacity duration-700"
-            />
+              className="w-full h-full object-cover block absolute inset-0 transition-opacity duration-700" loading="lazy" decoding="async" />
           ) : (
             <div className="w-full h-full min-h-[320px] flex items-center justify-center bg-[#E8E0D0]">
               <MdHotel size={48} className="text-[#EAE4D9]" />
@@ -1683,7 +1681,7 @@ export default function HotelBookingDetails() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const { selectedBookingDetails: booking, loading } = useSelector(
+  const { selectedBookingDetails: booking, loading, voucherLoading } = useSelector(
     (s) => s.hotelBookings,
   );
   const user = useSelector((state) => state.auth?.user);
@@ -1777,10 +1775,20 @@ export default function HotelBookingDetails() {
           {paymentSuccessful && !isCancelled && (
             <button
               onClick={() => dispatch(generateHotelVoucher(booking.bookingId))}
-              className="inline-flex items-center gap-[6px] px-4 py-[7px] bg-[#B5862A] text-white border-none cursor-pointer font-['DM_Sans'] text-[11px] font-semibold tracking-[0.05em] uppercase transition-colors hover:bg-[#D4A843]"
+              disabled={voucherLoading}
+              className="inline-flex items-center gap-[6px] px-4 py-[7px] bg-[#B5862A] text-white border-none cursor-pointer font-['DM_Sans'] text-[11px] font-semibold tracking-[0.05em] uppercase transition-colors hover:bg-[#D4A843] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <FiDownload size={12} />
-              Download Voucher
+              {voucherLoading ? (
+                <>
+                  <FiRefreshCw size={12} className="animate-spin" />
+                  Downloading…
+                </>
+              ) : (
+                <>
+                  <FiDownload size={12} />
+                  Download Voucher
+                </>
+              )}
             </button>
           )}
         </div>

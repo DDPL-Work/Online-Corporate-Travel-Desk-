@@ -1,6 +1,7 @@
 // SelectedTripSummary.jsx (Enhanced – MakeMyTrip Style)
 import { MdOutlineFlight } from "react-icons/md";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import Swal from "sweetalert2";
 import {
   airlineLogo,
@@ -52,7 +53,7 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
   const returnFare = Math.ceil(ret?.Fare?.PublishedFare) || 0;
   const totalFare = onwardFare + returnFare;
 
-  return (
+  return createPortal(
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50">
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between gap-10">
@@ -61,11 +62,9 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
             {/* ONWARD */}
             {onwardData && (
               <div className="flex items-center gap-4">
-                <img
-                  src={airlineLogo(onwardData.airlineCode)}
+                <img src={airlineLogo(onwardData.airlineCode)}
                   alt={onwardData.airline}
-                  className="w-9 h-9 object-contain"
-                />
+                  className="w-9 h-9 object-contain" loading="eager" />
                 <div>
                   <div className="flex items-center gap-2 text-sm font-bold text-slate-800 uppercase tracking-wider">
                     <span>{onwardData.fromCode}</span>
@@ -94,11 +93,9 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
             {/* RETURN */}
             {returnData ? (
               <div className="flex items-center gap-4">
-                <img
-                  src={airlineLogo(returnData.airlineCode)}
+                <img src={airlineLogo(returnData.airlineCode)}
                   alt={returnData.airline}
-                  className="w-9 h-9 object-contain"
-                />
+                  className="w-9 h-9 object-contain" loading="eager" />
 
                 <div>
                   <div className="flex items-center gap-2 text-sm font-bold text-slate-800 uppercase tracking-wider">
@@ -272,6 +269,7 @@ export default function SelectedTripSummary({ onward, ret, onContinue }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

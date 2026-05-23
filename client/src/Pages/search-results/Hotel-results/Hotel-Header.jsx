@@ -63,14 +63,14 @@ const DateField = ({
             {label}
           </span>
           {f ? (
-            <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-2xl font-black text-gray-800 leading-none">
+            <div className="flex flex-wrap items-baseline gap-1 mt-1">
+              <span className="text-lg sm:text-xl lg:text-2xl font-black text-gray-800 leading-none">
                 {f.day}
               </span>
-              <span className="text-sm font-bold text-gray-600">
+              <span className="text-xs lg:text-sm font-bold text-gray-600">
                 {f.month} '{f.year}
               </span>
-              <span className="text-xs text-gray-400">{f.weekday}</span>
+              <span className="text-[10px] lg:text-xs text-gray-400 hidden sm:inline-block">{f.weekday}</span>
             </div>
           ) : (
             <span className="text-sm font-bold text-gray-400 mt-1">
@@ -302,8 +302,8 @@ const Header = () => {
         </div>
 
         {/* Search Bar */}
-        <div className="flex flex-col md:flex-row items-stretch bg-white rounded-2xl overflow-visible shadow-2xl py-3">
-          <div className="flex-1 min-w-0 px-2 py-0.5 border-b md:border-b-0 md:border-r border-gray-100 bg-amber-50/30">
+        <div className="flex flex-col lg:flex-row items-stretch bg-white rounded-2xl overflow-visible shadow-2xl py-3 gap-y-2 lg:gap-y-0">
+          <div className="flex-1 min-w-0 px-2 lg:px-3 py-1 lg:py-0.5 border-b lg:border-b-0 lg:border-r border-gray-100 bg-amber-50/30">
             <CountrySelector
               label="Country"
               variant="minimal"
@@ -317,7 +317,7 @@ const Header = () => {
               }}
             />
           </div>
-          <div className="flex-[1.5] min-w-0 px-2 py-0.5 border-b md:border-b-0 md:border-r border-gray-100 bg-amber-50/30">
+          <div className="flex-[1.5] min-w-0 px-2 lg:px-3 py-1 lg:py-0.5 border-b lg:border-b-0 lg:border-r border-gray-100 bg-amber-50/30">
             <SearchableSelect
               label="City / Area"
               variant="minimal"
@@ -338,7 +338,7 @@ const Header = () => {
               placeholder="Where are you going?"
             />
           </div>
-          <div className="flex-1 min-w-0 px-2 py-0.5 border-b md:border-b-0 md:border-r border-gray-100">
+          <div className="flex-1 min-w-0 px-2 lg:px-3 py-1 lg:py-0.5 border-b lg:border-b-0 lg:border-r border-gray-100">
             <DateField
               label="Check-In"
               value={form.checkIn}
@@ -356,7 +356,7 @@ const Header = () => {
             />
           </div>
           {nights > 0 && (
-            <div className="hidden md:flex items-center justify-center px-1 shrink-0">
+            <div className="hidden lg:flex items-center justify-center px-1 shrink-0">
               <span
                 className="text-xs font-black px-2 py-1 rounded-full whitespace-nowrap border"
                 style={{
@@ -370,7 +370,7 @@ const Header = () => {
             </div>
           )}
           <Divider />
-          <div className="flex-1 min-w-0 px-2 py-0.5 border-b md:border-b-0 md:border-r border-gray-100">
+          <div className="flex-1 min-w-0 px-2 lg:px-3 py-1 lg:py-0.5 border-b lg:border-b-0 lg:border-r border-gray-100">
             <DateField
               label="Check-Out"
               value={form.checkOut}
@@ -383,7 +383,7 @@ const Header = () => {
           </div>
           <Divider />
           <div
-            className="flex-[1.3] min-w-0 relative px-2 py-0.5 border-b md:border-b-0 border-gray-100"
+            className="flex-[1.3] min-w-0 relative px-2 lg:px-3 py-1 lg:py-0.5 border-b lg:border-b-0 border-gray-100"
             ref={guestRef}
           >
             <button
@@ -440,7 +440,7 @@ const Header = () => {
               </div>
             )}
           </div>
-          <div className="px-3 flex items-center shrink-0">
+          <div className="px-3 lg:px-4 flex items-center shrink-0 pt-2 lg:pt-0">
             <button
               type="button"
               onClick={handleSearch}

@@ -15,7 +15,7 @@ import {
   FiUserCheck, 
   FiPhone 
 } from "react-icons/fi";
-import logo from "../../public/logo-traveamer.svg";
+const logo = "/logo-traveamer.svg";
 import { useFlightSearch } from "../context/FlightSearchContext";
 
 export default function LandingFooter({ onTabChange }) {
@@ -111,13 +111,11 @@ export default function LandingFooter({ onTabChange }) {
           {/* Brand */}
           <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
             {branding?.branding?.logo?.url ? (
-              <img
-                src={branding.branding.logo.url}
+              <img src={branding.branding.logo.url}
                 alt="Logo"
-                className="h-12 object-contain"
-              />
+                className="h-12 object-contain" loading="eager" />
             ) : (
-              <img src={logo} alt="Traveamer" className="h-10" />
+              <img src={logo} alt="Traveamer" className="h-10" loading="eager" />
             )}
             <div className="space-y-1">
               <h4
@@ -178,13 +176,11 @@ export default function LandingFooter({ onTabChange }) {
           <div className="lg:col-span-1">
             <div className="mb-5">
               {branding?.branding?.logo?.url ? (
-                <img
-                  src={branding.branding.logo.url}
+                <img src={branding.branding.logo.url}
                   alt="Logo"
-                  className="h-10 object-contain"
-                />
+                  className="h-10 object-contain" loading="eager" />
               ) : (
-                <img src={logo} alt="Traveamer" className="h-8" />
+                <img src={logo} alt="Traveamer" className="h-8" loading="eager" />
               )}
             </div>
 
@@ -194,11 +190,9 @@ export default function LandingFooter({ onTabChange }) {
             />
 
             <div className="mb-5">
-              <img
-                className="h-14"
+              <img className="h-14"
                 src="/iata-logo.svg"
-                alt="iata-logo"
-              />
+                alt="iata-logo" loading="eager" />
               <p
                 className="text-[10px] font-semibold mt-2 opacity-60"
                 style={{

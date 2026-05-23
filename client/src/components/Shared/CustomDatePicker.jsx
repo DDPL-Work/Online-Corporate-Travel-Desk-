@@ -27,7 +27,11 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
   }, []);
 
   const handleMonthChange = (offset) => {
-    setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1));
+    if (viewMode === "years") {
+      setViewDate(new Date(viewDate.getFullYear() + offset, viewDate.getMonth(), 1));
+    } else {
+      setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1));
+    }
   };
 
   const handleDateClick = (dateStr) => {
@@ -149,11 +153,12 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
 
   const renderYears = () => {
     const currentYear = viewDate.getFullYear();
-    const startYear = currentYear - 10;
-    const years = Array.from({ length: 21 }, (_, i) => startYear + i);
+    const startYear = 1900;
+    const endYear = new Date().getFullYear() + 30;
+    const years = Array.from({ length: endYear - startYear + 1 }, (_, i) => endYear - i); // Reversed to show latest first!
 
     return (
-      <div className="grid grid-cols-3 gap-2 py-2 max-h-[220px] overflow-y-auto no-scrollbar">
+      <div className="grid grid-cols-3 gap-2 py-2 max-h-[220px] overflow-y-auto custom-year-scrollbar scroll-smooth">
         {years.map((y) => (
           <div
             key={y}
@@ -161,6 +166,12 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
               setViewDate(new Date(y, viewDate.getMonth(), 1));
               setViewMode("days");
             }}
+            ref={currentYear === y ? (el) => {
+              if (el && !el.dataset.scrolled) {
+                el.dataset.scrolled = "true";
+                setTimeout(() => el.scrollIntoView({ block: "center" }), 50);
+              }
+            } : null}
             className={`py-4 flex items-center justify-center rounded-2xl cursor-pointer text-[11px] font-black uppercase tracking-widest transition-all
               ${currentYear === y ? "text-[#003399]" : "text-slate-600 hover:bg-slate-50"}
             `}
@@ -228,6 +239,10 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
       <style dangerouslySetInnerHTML={{ __html: `
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .custom-year-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-year-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-year-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+        .custom-year-scrollbar::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
       `}} />
     </div>
   );

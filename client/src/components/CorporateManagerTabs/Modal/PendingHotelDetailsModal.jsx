@@ -1,4 +1,7 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
+import api from "../../../API/axios";
+import { FiSearch } from "react-icons/fi";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import {
   FiX,
@@ -31,6 +34,8 @@ import {
   formatDateWithYear,
 } from "../../../utils/formatter";
 import { InfoBadge, SectionLabel } from "../Shared/CommonComponents";
+import { FareRulesAccordion } from "../../../Pages/Booking-Flow/Flight-Booking/CommonComponents";
+import { processFareRulesData } from "../../../utils/fareRulesParser";
 
 // ─────────────────────────────────────────────
 // SHARED HELPERS
@@ -138,13 +143,12 @@ const TimelineItem = ({ title, time, status, description, active }) => (
   <div className="flex gap-4 relative">
     <div className="flex flex-col items-center">
       <div
-        className={`w-3.5 h-3.5 rounded-full border-2 z-10 ${
-          status === "completed"
+        className={`w-3.5 h-3.5 rounded-full border-2 z-10 ${status === "completed"
             ? "bg-emerald-500 border-emerald-100"
             : active
               ? "bg-amber-400 border-amber-100 animate-pulse"
               : "bg-slate-200 border-slate-100"
-        }`}
+          }`}
       />
     </div>
     <div className="-mt-1 pb-6">
@@ -166,6 +170,164 @@ const TimelineItem = ({ title, time, status, description, active }) => (
 );
 
 // ─────────────────────────────────────────────
+// TRANSFER APPROVER MODAL
+// ─────────────────────────────────────────────
+
+const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType }) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [remark, setRemark] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedApprover, setSelectedApprover] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!searchTerm) {
+      setSearchResults([]);
+      return;
+    }
+    const delayDebounceFn = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const { data } = await api.get("/travel-admin/all-employees");
+        const users = data.employees || [];
+        const filtered = users.filter(
+          (u) =>
+            u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            u.name?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            u.name?.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setSearchResults(filtered);
+        setDropdownOpen(true);
+      } catch (err) {
+        console.error("Failed to fetch employees", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
+
+  if (!isOpen) return null;
+
+  const handleSelect = (user) => {
+    setSelectedApprover(user);
+    setSearchTerm(user.email);
+    setDropdownOpen(false);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setSelectedApprover(null);
+  };
+
+  const handleSubmit = () => {
+    if (selectedApprover) {
+      if (onTransfer) {
+        onTransfer(selectedApprover._id, remark, bookingType);
+      } else {
+        console.log("Transfer requested:", { approver: selectedApprover, remark, bookingType });
+      }
+      onClose();
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-[#1A1C20]/60 backdrop-blur-md">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+        <div className="bg-gradient-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center">
+          <h2 className="text-lg font-black tracking-tight uppercase">Transfer Approver</h2>
+          <button
+            onClick={onClose}
+            className="hover:bg-white/10 p-2 rounded-full transition-colors text-slate-400"
+          >
+            <FiX size={22} />
+          </button>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="space-y-2 relative" ref={wrapperRef}>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Select Approver Email
+            </label>
+            <div className="relative">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                placeholder="Search by name or email..."
+                className="w-full pl-10 pr-4 py-3 bg-[#FAF8F4] border border-[#EAE4D9] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B5862A]/50 transition-all font-medium text-slate-700"
+              />
+            </div>
+            {dropdownOpen && searchResults.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-[#EAE4D9] rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                {searchResults.map((user) => (
+                  <div
+                    key={user._id}
+                    onClick={() => handleSelect(user)}
+                    className="px-4 py-3 hover:bg-[#FAF8F4] cursor-pointer border-b border-[#EAE4D9] last:border-b-0"
+                  >
+                    <p className="text-sm font-black text-[#1A1714]">
+                      {user.name?.firstName} {user.name?.lastName}
+                    </p>
+                    <p className="text-xs font-medium text-slate-500">{user.email}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {dropdownOpen && searchTerm && searchResults.length === 0 && !isSearching && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-[#EAE4D9] rounded-xl shadow-lg px-4 py-3">
+                <p className="text-sm font-medium text-slate-500">No users found.</p>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Remark
+            </label>
+            <textarea
+              value={remark}
+              onChange={(e) => setRemark(e.target.value)}
+              placeholder="Add a remark for the transfer..."
+              rows={3}
+              className="w-full px-4 py-3 bg-[#FAF8F4] border border-[#EAE4D9] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B5862A]/50 transition-all font-medium text-slate-700 resize-none"
+            />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-[#EAE4D9] bg-slate-50 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 border border-[#EAE4D9] text-slate-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!selectedApprover}
+            className={`px-5 py-2 bg-[#B5862A] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!selectedApprover ? "opacity-50 cursor-not-allowed shadow-none" : "hover:bg-[#966b1e] shadow-amber-100"}`}
+          >
+            Transfer
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// ─────────────────────────────────────────────
 // HOTEL MODAL
 // ─────────────────────────────────────────────
 
@@ -174,11 +336,13 @@ export const PendingHotelDetailsModal = ({
   onClose,
   onApprove,
   onReject,
+  onTransfer,
   isVerified = true,
   isDiscarded = false,
 }) => {
   const [activeTab, setActiveTab] = useState("details");
   const tabsRef = useRef(null);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
   const scrollTabs = (direction) => {
     if (tabsRef.current) {
@@ -255,11 +419,19 @@ export const PendingHotelDetailsModal = ({
     return { totalAmount: total || 0, baseFare: base || 0, tax: tx || 0 };
   })();
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl my-4 overflow-hidden flex flex-col h-[92vh]">
         {/* Header */}
-        <div className="bg-slate-900 px-6 py-4 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
+        <div className="bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-[#C9A84C]/20 rounded-lg text-[#C9A84C]">
               <FaHotel size={20} />
@@ -342,6 +514,16 @@ export const PendingHotelDetailsModal = ({
               </div>
             ) : (
               <>
+                {onTransfer && (
+                  <button
+                    onClick={() => setIsTransferModalOpen(true)}
+                    disabled={!isVerified}
+                    className={`px-5 py-2 border border-amber-200 text-amber-700 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-slate-200" : "hover:bg-amber-50"}`}
+                    title={!isVerified ? "Account pending verification" : ""}
+                  >
+                    Transfer Approver
+                  </button>
+                )}
                 <button
                   onClick={() => onReject(booking._id, "hotel", "reject")}
                   disabled={!isVerified}
@@ -392,11 +574,10 @@ export const PendingHotelDetailsModal = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 py-4 text-[11px] font-black uppercase tracking-widest transition-all relative shrink-0 ${
-                  activeTab === tab.id
+                className={`flex items-center gap-2 py-4 text-[11px] font-black uppercase tracking-widest transition-all relative shrink-0 ${activeTab === tab.id
                     ? "text-indigo-600"
                     : "text-slate-400 hover:text-slate-600"
-                }`}
+                  }`}
               >
                 <span
                   className={
@@ -432,14 +613,12 @@ export const PendingHotelDetailsModal = ({
                   {/* Hotel Snapshot */}
                   <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm flex flex-col md:flex-row">
                     <div className="w-full md:w-64 h-48 md:h-auto relative shrink-0">
-                      <img
-                        src={
-                          bookSnap.hotelImage ||
-                          "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500"
-                        }
+                      <img src={
+                        bookSnap.hotelImage ||
+                        "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500"
+                      }
                         alt={bookSnap.hotelName}
-                        className="w-full h-full object-cover"
-                      />
+                        className="w-full h-full object-cover" loading="eager" />
                       <div className="absolute top-4 left-4">
                         <span className="bg-slate-900/80 backdrop-blur-sm text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-white/20 shadow-xl">
                           Confirmed Rate
@@ -464,7 +643,7 @@ export const PendingHotelDetailsModal = ({
                               size={12}
                               fill={
                                 i <
-                                (hotelRequest?.selectedHotel?.starRating || 4)
+                                  (hotelRequest?.selectedHotel?.starRating || 4)
                                   ? "currentColor"
                                   : "none"
                               }
@@ -654,7 +833,7 @@ export const PendingHotelDetailsModal = ({
                 {/* Right Column */}
                 <div className="w-full lg:w-96 space-y-6">
                   {/* Pricing Snapshot */}
-                  <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+                  <div className="bg-linear-to-r from-[#003399] to-[#000d26] text-white rounded-3xl p-6 shadow-2xl relative overflow-hidden">
                     <SectionLabel icon={<FiDollarSign />} title="Fare Summary" />
                     <div className="mt-6">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
@@ -740,6 +919,41 @@ export const PendingHotelDetailsModal = ({
                       </div>
                     </div>
                   </div>
+
+                  {booking.secondApprover && booking.secondApprover.email && (
+                    <div className="bg-white border border-amber-200 rounded-3xl p-8 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-5">
+                        <FiAlertCircle size={64} />
+                      </div>
+                      <SectionLabel icon={<FiUser />} title="Transferred Approver Details" />
+                      <div className="mt-8 flex items-center gap-6">
+                        <div className="w-20 h-20 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-500 font-black text-2xl italic shadow-inner">
+                          {(booking.secondApprover.name || booking.secondApprover.email)[0].toUpperCase()}
+                        </div>
+                        <div className="relative z-10">
+                          <p className="text-xl font-black text-[#1A1714] uppercase tracking-tighter italic">
+                            {booking.secondApprover.name || booking.secondApprover.email.split('@')[0]}
+                          </p>
+                          <p className="text-xs font-bold text-slate-400 mt-1">
+                            {booking.secondApprover.email}
+                          </p>
+                          <div className="mt-2 flex gap-2">
+                            <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-amber-200">
+                              Second Approver
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-8 pt-8 border-t border-slate-50 relative z-10">
+                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-4">
+                          Transfer Remark
+                        </p>
+                        <div className="bg-amber-50 p-6 rounded-4xl border border-amber-100 italic text-sm font-black text-amber-900 leading-relaxed shadow-inner">
+                          "{booking.secondApprover.transferRemark || booking.secondApprover.remark || "No remark provided"}"
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
                     <SectionLabel icon={<FiUser />} title="Requested By" />
@@ -926,7 +1140,14 @@ export const PendingHotelDetailsModal = ({
           </div>
         </div>
       </div>
-    </div>
+      <TransferApproverModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        onTransfer={onTransfer}
+        bookingType="hotel"
+      />
+    </div>,
+    document.body
   );
 };
 
@@ -939,19 +1160,29 @@ export const PendingFlightDetailsModal = ({
   onClose,
   onApprove,
   onReject,
+  onTransfer,
   isVerified = true,
   isDiscarded = false,
 }) => {
   const [activeTab, setActiveTab] = useState("details");
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
   if (!booking) return null;
 
   const flightRequest = booking.flightRequest || {};
   const segments = flightRequest.segments || [];
   const fareSnapshot = flightRequest.fareSnapshot || {};
-  const fareQuoteResult = flightRequest.fareQuote?.Results?.[0] || {};
+  const fareQuoteResult = flightRequest.fareQuote?.Response?.Results?.[0] || flightRequest.fareQuote?.Results?.[0] || {};
   const fareBreakdown = fareQuoteResult.FareBreakdown || [];
+  const bookingItinerary = booking.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary || {};
+
   const miniFareRules = (() => {
+    // Priority 0: From bookingResult if it's an approved/ticketed booking
+    const fromBooking = bookingItinerary.MiniFareRules;
+    if (fromBooking && fromBooking.length > 0) {
+      // Ensure it's always array-of-arrays so the render loop works
+      return Array.isArray(fromBooking[0]) ? fromBooking : [fromBooking];
+    }
     // Priority 1: live fareQuote result (nested array-of-arrays)
     const fromQuote = fareQuoteResult.MiniFareRules;
     if (fromQuote && fromQuote.length > 0) return fromQuote;
@@ -963,7 +1194,7 @@ export const PendingFlightDetailsModal = ({
     }
     return [];
   })();
-  const fareRules = fareQuoteResult.FareRules || [];
+  const fareRules = bookingItinerary.FareRules || fareQuoteResult.FareRules || [];
   const travelers = booking.travellers || [];
   const bookSnap = booking.bookingSnapshot || {};
   const approver = resolveApproverDetails(booking);
@@ -981,7 +1212,7 @@ export const PendingFlightDetailsModal = ({
   const paxTypeLabel = { 1: "Adult", 2: "Child", 3: "Infant" };
   const cabinDisplay =
     bookSnap.cabinClass || cabinLabel[segments[0]?.cabinClass] || "Economy";
-  
+
   // 💰 PRICE FALLBACKS
   const baseFare = fareSnapshot.baseFare ?? fareQuoteResult.Fare?.BaseFare ?? 0;
   const totalTax = fareSnapshot.tax ?? fareQuoteResult.Fare?.Tax ?? 0;
@@ -996,11 +1227,25 @@ export const PendingFlightDetailsModal = ({
   // Flatten detailed segments from fareQuote for easy lookup
   const allDetailedSegments = (fareQuoteResult.Segments || []).flat();
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const parsedFareRules = React.useMemo(() => {
+    let rules = flightRequest.fareRules?.data?.Response?.FareRules || flightRequest.fareRules?.Response?.FareRules || fareRules || [];
+    let quote = fareQuoteResult?.Results || fareQuoteResult || [];
+    return processFareRulesData(rules, quote);
+  }, [flightRequest.fareRules, fareRules, fareQuoteResult]);
+
+  if (!isMounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl my-4 overflow-hidden flex flex-col h-[92vh]">
         {/* Header */}
-        <div className="bg-slate-900 px-6 py-4 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
+        <div className="bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-[#C9A84C]/20 rounded-lg text-[#C9A84C]">
               <FaPlane size={20} />
@@ -1083,6 +1328,16 @@ export const PendingFlightDetailsModal = ({
               </div>
             ) : (
               <>
+                {onTransfer && (
+                  <button
+                    onClick={() => setIsTransferModalOpen(true)}
+                    disabled={!isVerified}
+                    className={`px-5 py-2 border border-amber-200 text-amber-700 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-slate-200" : "hover:bg-amber-50"}`}
+                    title={!isVerified ? "Account pending verification" : ""}
+                  >
+                    Transfer Approver
+                  </button>
+                )}
                 <button
                   onClick={() => onReject(booking._id, "flight", "reject")}
                   disabled={!isVerified}
@@ -1117,11 +1372,10 @@ export const PendingFlightDetailsModal = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 py-4 text-[11px] font-black uppercase tracking-widest transition-all relative shrink-0 ${
-                activeTab === tab.id
+              className={`flex items-center gap-2 py-4 text-[11px] font-black uppercase tracking-widest transition-all relative shrink-0 ${activeTab === tab.id
                   ? "text-indigo-600"
                   : "text-slate-400 hover:text-slate-600"
-              }`}
+                }`}
             >
               <span className={activeTab === tab.id ? "text-indigo-600" : "text-slate-300"}>
                 {tab.icon}
@@ -1150,7 +1404,7 @@ export const PendingFlightDetailsModal = ({
                           (ds) =>
                             ds.Airline?.FlightNumber === seg.flightNumber &&
                             ds.Origin?.Airport?.AirportCode ===
-                              seg.origin?.airportCode,
+                            seg.origin?.airportCode,
                         ) || {};
 
                       const origin = seg.origin || {};
@@ -1315,7 +1569,7 @@ export const PendingFlightDetailsModal = ({
                           {/* Layover Indicator */}
                           {idx < segments.length - 1 &&
                             (seg.journeyType || "onward") ===
-                              (segments[idx + 1].journeyType || "onward") && (
+                            (segments[idx + 1].journeyType || "onward") && (
                               <div className="flex items-center gap-4 py-2 px-6">
                                 <div className="flex-1 border-t border-dashed border-slate-200" />
                                 <div className="flex items-center gap-2 bg-amber-50 text-amber-700 px-4 py-1.5 rounded-full border border-amber-100 shadow-sm">
@@ -1344,230 +1598,230 @@ export const PendingFlightDetailsModal = ({
                     (ssrSnap.meals?.length || 0) +
                     (ssrSnap.baggage?.length || 0) >
                     0 && (
-                    <div className="space-y-4">
-                      <SectionLabel
-                        icon={<FiTag />}
-                        title="Extra Add-ons (SSR Details)"
-                      />
-                      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">
-                                <th className="pb-4 text-left">Route</th>
-                                <th className="pb-4 text-left">Seat Selection</th>
-                                <th className="pb-4 text-left">Meal Selection</th>
-                                <th className="pb-4 text-left">Extra Baggage</th>
-                                <th className="pb-4 text-right">
-                                  Total Add-on Cost
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                              {Array.from(
-                                new Set([
-                                  ...(ssrSnap.seats || []).map(
-                                    (s) => s.segmentIndex,
-                                  ),
-                                  ...(ssrSnap.meals || []).map(
-                                    (m) => m.segmentIndex,
-                                  ),
-                                  ...(ssrSnap.baggage || []).map(
-                                    (b) => b.segmentIndex,
-                                  ),
-                                ]),
-                              )
-                                .sort((a, b) => a - b)
-                                .map((segIdx) => {
-                                  const seg = segments[segIdx] || {};
-                                  const segSeats = (ssrSnap.seats || []).filter(
-                                    (s) => s.segmentIndex === segIdx,
-                                  );
-                                  const segMeals = (ssrSnap.meals || []).filter(
-                                    (m) => m.segmentIndex === segIdx,
-                                  );
-                                  const segBaggage = (ssrSnap.baggage || []).filter(
-                                    (b) => b.segmentIndex === segIdx,
-                                  );
+                      <div className="space-y-4">
+                        <SectionLabel
+                          icon={<FiTag />}
+                          title="Extra Add-ons (SSR Details)"
+                        />
+                        <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">
+                                  <th className="pb-4 text-left">Route</th>
+                                  <th className="pb-4 text-left">Seat Selection</th>
+                                  <th className="pb-4 text-left">Meal Selection</th>
+                                  <th className="pb-4 text-left">Extra Baggage</th>
+                                  <th className="pb-4 text-right">
+                                    Total Add-on Cost
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-50">
+                                {Array.from(
+                                  new Set([
+                                    ...(ssrSnap.seats || []).map(
+                                      (s) => s.segmentIndex,
+                                    ),
+                                    ...(ssrSnap.meals || []).map(
+                                      (m) => m.segmentIndex,
+                                    ),
+                                    ...(ssrSnap.baggage || []).map(
+                                      (b) => b.segmentIndex,
+                                    ),
+                                  ]),
+                                )
+                                  .sort((a, b) => a - b)
+                                  .map((segIdx) => {
+                                    const seg = segments[segIdx] || {};
+                                    const segSeats = (ssrSnap.seats || []).filter(
+                                      (s) => s.segmentIndex === segIdx,
+                                    );
+                                    const segMeals = (ssrSnap.meals || []).filter(
+                                      (m) => m.segmentIndex === segIdx,
+                                    );
+                                    const segBaggage = (ssrSnap.baggage || []).filter(
+                                      (b) => b.segmentIndex === segIdx,
+                                    );
 
-                                  const segTotal = [
-                                    ...segSeats,
-                                    ...segMeals,
-                                    ...segBaggage,
-                                  ].reduce(
-                                    (acc, curr) => acc + (curr.price || 0),
-                                    0,
-                                  );
-
-                                  return (
-                                    <tr
-                                      key={segIdx}
-                                      className="text-xs font-black text-slate-700 hover:bg-slate-50/50 transition-colors"
-                                    >
-                                      <td className="py-5 pr-4">
-                                        <div className="flex flex-col">
-                                          <span className="text-sm font-black text-slate-900 tracking-tighter italic">
-                                            {seg.origin?.airportCode || "???"} →{" "}
-                                            {seg.destination?.airportCode || "???"}
-                                          </span>
-                                        </div>
-                                      </td>
-                                      <td className="py-5 pr-4">
-                                        {segSeats.length > 0 ? (
-                                          <div className="space-y-1">
-                                            {segSeats.map((s, idx) => (
-                                              <div
-                                                key={idx}
-                                                className="flex items-center gap-2"
-                                              >
-                                                <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-black uppercase">
-                                                  SEAT {s.seatNo}
-                                                </span>
-                                                <span className="text-[9px] text-slate-400">
-                                                  ₹{s.price || 0}
-                                                </span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <span className="text-slate-300 italic">
-                                            —
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="py-5 pr-4">
-                                        {segMeals.length > 0 ? (
-                                          <div className="space-y-2">
-                                            {segMeals.map((m, idx) => (
-                                              <div
-                                                key={idx}
-                                                className="flex flex-col gap-0.5"
-                                              >
-                                                <span className="text-[10px] font-black text-slate-800 leading-tight uppercase">
-                                                  {m.airlineDescription || m.code}
-                                                </span>
-                                                <div className="flex items-center gap-1.5">
-                                                  <span className="text-[8px] font-black text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase">
-                                                    {getMealDesc(m.description)}
-                                                  </span>
-                                                  <span className="text-[9px] text-slate-400">
-                                                    ₹{m.price || 0}
-                                                  </span>
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <span className="text-slate-300 italic">
-                                            —
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="py-5 pr-4">
-                                        {segBaggage.length > 0 ? (
-                                          <div className="space-y-1">
-                                            {segBaggage.map((b, idx) => (
-                                              <div
-                                                key={idx}
-                                                className="flex flex-col gap-0.5"
-                                              >
-                                                <span className="text-[10px] font-black text-slate-800 uppercase italic leading-tight">
-                                                  {b.weight} KG Extra
-                                                </span>
-                                                <div className="flex items-center gap-1.5">
-                                                  <span className="text-[8px] font-black text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded uppercase">
-                                                    {getBaggageDesc(b.description)}
-                                                  </span>
-                                                  <span className="text-[9px] text-slate-400">
-                                                    ₹{b.price || 0}
-                                                  </span>
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <span className="text-slate-300 italic">
-                                            —
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="py-5 text-right font-mono text-sm text-slate-900">
-                                        ₹{segTotal.toLocaleString()}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                            </tbody>
-                            <tfoot>
-                              <tr className="border-t border-slate-100 bg-slate-50/30">
-                                <td
-                                  colSpan={4}
-                                  className="py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest italic"
-                                >
-                                  Combined SSR Total
-                                </td>
-                                <td className="py-4 text-right text-base font-black text-indigo-700 tracking-tighter">
-                                  ₹
-                                  {[
-                                    ...(ssrSnap.seats || []),
-                                    ...(ssrSnap.meals || []),
-                                    ...(ssrSnap.baggage || []),
-                                  ]
-                                    .reduce(
+                                    const segTotal = [
+                                      ...segSeats,
+                                      ...segMeals,
+                                      ...segBaggage,
+                                    ].reduce(
                                       (acc, curr) => acc + (curr.price || 0),
                                       0,
-                                    )
-                                    .toLocaleString()}
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
+                                    );
 
-                        {/* SSR Legend Note */}
-                        <div className="mt-8 pt-6 border-t border-slate-50">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                            SSR Status Legend
-                          </p>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
-                              <p className="text-[9px] font-black text-indigo-600 uppercase mb-1">
-                                Seats
-                              </p>
-                              <p className="text-[10px] text-slate-500 leading-relaxed font-bold">
-                                1: Included (Fare) <br />
-                                2: Purchase (Extra)
-                              </p>
-                            </div>
-                            <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
-                              <p className="text-[9px] font-black text-amber-600 uppercase mb-1">
-                                Meals
-                              </p>
-                              <p className="text-[10px] text-slate-500 leading-relaxed font-bold">
-                                1: Included · 2: Direct <br />
-                                3: Imported
-                              </p>
-                            </div>
-                            <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
-                              <p className="text-[9px] font-black text-purple-600 uppercase mb-1">
-                                Baggage
-                              </p>
-                              <p className="text-[10px] text-slate-500 leading-relaxed font-bold">
-                                1: Included · 2: Direct <br />
-                                5: ImportedUpgrade
-                              </p>
+                                    return (
+                                      <tr
+                                        key={segIdx}
+                                        className="text-xs font-black text-slate-700 hover:bg-slate-50/50 transition-colors"
+                                      >
+                                        <td className="py-5 pr-4">
+                                          <div className="flex flex-col">
+                                            <span className="text-sm font-black text-slate-900 tracking-tighter italic">
+                                              {seg.origin?.airportCode || "???"} →{" "}
+                                              {seg.destination?.airportCode || "???"}
+                                            </span>
+                                          </div>
+                                        </td>
+                                        <td className="py-5 pr-4">
+                                          {segSeats.length > 0 ? (
+                                            <div className="space-y-1">
+                                              {segSeats.map((s, idx) => (
+                                                <div
+                                                  key={idx}
+                                                  className="flex items-center gap-2"
+                                                >
+                                                  <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-black uppercase">
+                                                    SEAT {s.seatNo}
+                                                  </span>
+                                                  <span className="text-[9px] text-slate-400">
+                                                    ₹{s.price || 0}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-slate-300 italic">
+                                              —
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="py-5 pr-4">
+                                          {segMeals.length > 0 ? (
+                                            <div className="space-y-2">
+                                              {segMeals.map((m, idx) => (
+                                                <div
+                                                  key={idx}
+                                                  className="flex flex-col gap-0.5"
+                                                >
+                                                  <span className="text-[10px] font-black text-slate-800 leading-tight uppercase">
+                                                    {m.airlineDescription || m.code}
+                                                  </span>
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="text-[8px] font-black text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase">
+                                                      {getMealDesc(m.description)}
+                                                    </span>
+                                                    <span className="text-[9px] text-slate-400">
+                                                      ₹{m.price || 0}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-slate-300 italic">
+                                              —
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="py-5 pr-4">
+                                          {segBaggage.length > 0 ? (
+                                            <div className="space-y-1">
+                                              {segBaggage.map((b, idx) => (
+                                                <div
+                                                  key={idx}
+                                                  className="flex flex-col gap-0.5"
+                                                >
+                                                  <span className="text-[10px] font-black text-slate-800 uppercase italic leading-tight">
+                                                    {b.weight} KG Extra
+                                                  </span>
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="text-[8px] font-black text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded uppercase">
+                                                      {getBaggageDesc(b.description)}
+                                                    </span>
+                                                    <span className="text-[9px] text-slate-400">
+                                                      ₹{b.price || 0}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-slate-300 italic">
+                                              —
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="py-5 text-right font-mono text-sm text-slate-900">
+                                          ₹{segTotal.toLocaleString()}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t border-slate-100 bg-slate-50/30">
+                                  <td
+                                    colSpan={4}
+                                    className="py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest italic"
+                                  >
+                                    Combined SSR Total
+                                  </td>
+                                  <td className="py-4 text-right text-base font-black text-indigo-700 tracking-tighter">
+                                    ₹
+                                    {[
+                                      ...(ssrSnap.seats || []),
+                                      ...(ssrSnap.meals || []),
+                                      ...(ssrSnap.baggage || []),
+                                    ]
+                                      .reduce(
+                                        (acc, curr) => acc + (curr.price || 0),
+                                        0,
+                                      )
+                                      .toLocaleString()}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+
+                          {/* SSR Legend Note */}
+                          <div className="mt-8 pt-6 border-t border-slate-50">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                              SSR Status Legend
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+                                <p className="text-[9px] font-black text-indigo-600 uppercase mb-1">
+                                  Seats
+                                </p>
+                                <p className="text-[10px] text-slate-500 leading-relaxed font-bold">
+                                  1: Included (Fare) <br />
+                                  2: Purchase (Extra)
+                                </p>
+                              </div>
+                              <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+                                <p className="text-[9px] font-black text-amber-600 uppercase mb-1">
+                                  Meals
+                                </p>
+                                <p className="text-[10px] text-slate-500 leading-relaxed font-bold">
+                                  1: Included · 2: Direct <br />
+                                  3: Imported
+                                </p>
+                              </div>
+                              <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+                                <p className="text-[9px] font-black text-purple-600 uppercase mb-1">
+                                  Baggage
+                                </p>
+                                <p className="text-[10px] text-slate-500 leading-relaxed font-bold">
+                                  1: Included · 2: Direct <br />
+                                  5: ImportedUpgrade
+                                </p>
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                 </div>
 
                 {/* Right Column */}
                 <div className="w-full lg:w-96 space-y-6">
                   {/* Fare Breakdown */}
-                  <div className="bg-slate-900 text-white rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
+                  <div className="bg-linear-to-r from-[#003399] to-[#000d26] text-white rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
                     <SectionLabel
                       icon={<FiDollarSign />}
                       title="Fare Snapshot"
@@ -1682,6 +1936,41 @@ export const PendingFlightDetailsModal = ({
                     </div>
                   </div>
 
+                  {booking.secondApprover && booking.secondApprover.email && (
+                    <div className="bg-white border border-amber-200 rounded-3xl p-8 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-5">
+                        <FiAlertCircle size={64} />
+                      </div>
+                      <SectionLabel icon={<FiUser />} title="Transferred Approver Details" />
+                      <div className="mt-8 flex items-center gap-6">
+                        <div className="w-20 h-20 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-500 font-black text-2xl italic shadow-inner">
+                          {booking.secondApprover.email[0].toUpperCase()}
+                        </div>
+                        <div className="relative z-10">
+                          <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
+                            {booking.secondApprover.name || booking.secondApprover.email.split('@')[0]}
+                          </p>
+                          <p className="text-xs font-bold text-slate-400 mt-1">
+                            {booking.secondApprover.email}
+                          </p>
+                          <div className="mt-2 flex gap-2">
+                            <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-amber-200">
+                              Second Approver
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-8 pt-8 border-t border-slate-50 relative z-10">
+                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-4">
+                          Transfer Remark
+                        </p>
+                        <div className="bg-amber-50 p-6 rounded-4xl border border-amber-100 italic text-sm font-black text-amber-900 leading-relaxed shadow-inner">
+                          "{booking.secondApprover.transferRemark || booking.secondApprover.remark || "No remark provided"}"
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
                     <SectionLabel icon={<FiUser />} title="Requested By" />
                     <div className="mt-8 flex items-center gap-6">
@@ -1725,71 +2014,15 @@ export const PendingFlightDetailsModal = ({
             {activeTab === "charges" && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-6">
-                  {/* Cancellation & Fare Rules */}
-                  {(miniFareRules.length > 0 || fareRules.length > 0) && (
-                    <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
-                      <SectionLabel
-                        icon={<FiAlertCircle />}
-                        title="Cancellation & Date Change Rules"
-                      />
-                      <div className="mt-8 grid grid-cols-1 gap-6">
-                        {miniFareRules.map((group, gIdx) => (
-                          <div
-                            key={gIdx}
-                            className="bg-slate-50/50 border border-slate-100 rounded-3xl p-6 space-y-6"
-                          >
-                            <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-                              <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100">
-                                <FiMapPin size={14} />
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sector Route</p>
-                                <p className="text-sm font-black text-slate-900 uppercase italic">{group[0]?.JourneyPoints || "All Sectors"}</p>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {group.map((rule, rIdx) => (
-                                <div
-                                  key={rIdx}
-                                  className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between hover:border-indigo-200 transition-all"
-                                >
-                                  <div className="flex justify-between items-start mb-4">
-                                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${rule.Type === "Cancellation" ? "bg-red-50 text-red-600 border border-red-100" : "bg-blue-50 text-blue-600 border border-blue-100"}`}>
-                                      {rule.Type}
-                                    </span>
-                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{rule.Unit}</span>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase">
-                                      {rule.From ? `From ${rule.From} ` : ""} {rule.To ? `to ${rule.To} ` : "onwards "}
-                                    </p>
-                                    <p className={`text-xl font-black tracking-tighter ${rule.Details === "100%" || rule.Details?.toLowerCase().includes("non") ? "text-red-600" : rule.Details?.toLowerCase() === "nil" ? "text-emerald-600" : "text-indigo-700"}`}>
-                                      {rule.Details}
-                                    </p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-
-                        {fareRules.map((rule, idx) => rule.FareRuleDetail && (
-                          <div key={idx} className="bg-slate-50 border border-slate-100 rounded-2xl p-6">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 italic">Detailed Rule: {rule.Origin} to {rule.Destination}</p>
-                            <div className="text-[11px] text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">{rule.FareRuleDetail}</div>
-                          </div>
-                        ))}
-                      </div>
+                  <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+                    <SectionLabel
+                      icon={<FiAlertCircle />}
+                      title="Cancellation & Date Change Rules"
+                    />
+                    <div className="mt-8">
+                      <FareRulesAccordion parsedRules={parsedFareRules} />
                     </div>
-                  )}
-
-                  {!miniFareRules.length && !fareRules.some(r => r.FareRuleDetail) && (
-                    <div className="py-20 text-center bg-white rounded-[2.5rem] border border-dashed border-slate-200 shadow-sm">
-                      <FiAlertCircle className="mx-auto text-amber-400 mb-4 animate-bounce" size={48} />
-                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Policy Data Not Available</h3>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Fare rules were not captured for this request</p>
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
             )}
@@ -1889,7 +2122,14 @@ export const PendingFlightDetailsModal = ({
           </div>
         </div>
       </div>
-    </div>
+      <TransferApproverModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        onTransfer={onTransfer}
+        bookingType="flight"
+      />
+    </div>,
+    document.body
   );
 };
 

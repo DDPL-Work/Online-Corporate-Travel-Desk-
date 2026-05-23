@@ -42,7 +42,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
 
     requestStatus: {
       type: String,
-      enum: ["draft", "pending_approval", "approved", "rejected", "expired"],
+      enum: ["draft", "pending_approval", "pending_second_approval", "approved", "rejected", "expired"],
       default: "draft",
       index: true,
     },
@@ -54,6 +54,15 @@ const hotelBookingRequestSchema = new mongoose.Schema(
     rejectedAt: Date,
 
     approverComments: String,
+
+    secondApprover: {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      email: String,
+      name: String,
+      role: String,
+      transferRemark: String,
+      transferredAt: Date,
+    },
 
     purposeOfTravel: {
       type: String,
@@ -193,6 +202,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       providerTraceId: String,
       providerSearchResponse: mongoose.Schema.Types.Mixed,
       providerRoomInfoResponse: mongoose.Schema.Types.Mixed,
+      preBookResponse: mongoose.Schema.Types.Mixed,
     },
 
     /* ================= PRICING ================= */
@@ -201,6 +211,10 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       totalAmount: Number,
       currency: { type: String, default: "INR" },
       capturedAt: Date,
+      commissionEarned: Number,
+      plbEarned: Number,
+      incentiveEarned: Number,
+      taxTdsDetails: mongoose.Schema.Types.Mixed,
     },
 
     /* ================= EXECUTION ================= */
@@ -224,6 +238,14 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       confirmationNumber: String,
       providerBookingId: String,
       providerResponse: mongoose.Schema.Types.Mixed,
+    },
+
+    voucher: {
+      bookingRefNo: String,
+      confirmationNo: String,
+      invoiceNumber: String,
+      filePath: String,
+      raw: mongoose.Schema.Types.Mixed,
     },
 
     /* ================= PAYMENT ================= */

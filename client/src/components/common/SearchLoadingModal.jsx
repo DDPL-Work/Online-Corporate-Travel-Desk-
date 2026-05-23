@@ -1,8 +1,9 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { FaPlane, FaHotel } from "react-icons/fa";
 
 const SearchLoadingModal = ({ type = "flight", origin, destination, date }) => {
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center backdrop-blur-sm">
       <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4 flex flex-col items-center text-center animate-in fade-in zoom-in duration-300">
         {/* Animated Icon Container */}
@@ -69,7 +70,8 @@ const SearchLoadingModal = ({ type = "flight", origin, destination, date }) => {
       `,
         }}
       />
-    </div>
+    </div>,
+    document.body
   );
 };
 

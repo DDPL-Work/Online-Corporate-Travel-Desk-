@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import {
   Navigate,
@@ -15,6 +15,14 @@ export default function Layout() {
   const dispatch = useDispatch();
   const location = useLocation();
   const { role } = useSelector((state) => state.auth);
+  const mainRef = useRef(null);
+
+  // Scroll main container to top when user navigates
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [location]);
 
   // 🚪 Pages that do NOT need sidebar/header
   const authPages = ["/login", "/register", "/forgot-password"];
@@ -65,11 +73,12 @@ export default function Layout() {
           </header>
 
           {/* ===== SCROLLABLE CONTENT ===== */}
-          <main className="flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden px-4 md:px-6 py-6">
-            <div className="w-full min-w-0 mx-auto">
+          <main ref={mainRef} className="flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden px-4 md:px-6 py-6">
+            <div key={location.pathname} className="w-full min-w-0 mx-auto animate-pageTransition">
               <Outlet />
             </div>
           </main>
+
         </div>
       </div>
     </>

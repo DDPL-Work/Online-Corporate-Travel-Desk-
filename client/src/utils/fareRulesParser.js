@@ -232,13 +232,35 @@ export const processFareRulesData = (rawRulesArray, quoteResult) => {
       notes: [],
     };
 
-    // ── MiniFareRules (dynamic penalty data) ──────────────────────────────
-    const miniRulesSource = rule.MiniFareRules || rule.MiniFarRules;
+    const miniRulesSource = rule.MiniFareRules || rule.MiniFarRules || quoteResult?.MiniFareRules;
     if (miniRulesSource) {
-      const rules = miniRulesSource.Rules || [];
-      const globalCurrency = miniRulesSource.Currency || "INR";
+      // Sometimes quoteResult.MiniFareRules is an array of arrays, sometimes it has a .Rules property
+      let rules = [];
+      let globalCurrency = "INR";
+      
+      if (miniRulesSource.Rules) {
+         rules = miniRulesSource.Rules;
+         globalCurrency = miniRulesSource.Currency || "INR";
+      } else if (Array.isArray(miniRulesSource)) {
+         rules = Array.isArray(miniRulesSource[0]) ? miniRulesSource[0] : miniRulesSource;
+      }
 
       const mapRule = (c) => {
+        // Support both old array format (Type, From, To, Details, Unit) and new format (PaxPenalties)
+        if (c.Details !== undefined) {
+           const timeParts = [];
+           if (c.From) timeParts.push(`From ${c.From}`);
+           if (c.To) timeParts.push(`To ${c.To}`);
+           if (c.Unit) timeParts.push(c.Unit);
+           if (!c.To && c.From) timeParts.push("onwards");
+           if (!c.From && !c.To) timeParts.push("Any time");
+           
+           return {
+             timeRange: timeParts.join(" "),
+             fee: normalizeCurrencyText(c.Details),
+           };
+        }
+        
         const p = c.PaxPenalties?.[0] || {};
         const curr = p.Currency || globalCurrency;
         const fee = p.AirlineFee || 0;
@@ -268,11 +290,19 @@ export const processFareRulesData = (rawRulesArray, quoteResult) => {
 
     // ── FareInclusions ────────────────────────────────────────────────────
     const fareInclusions = parseFareInclusions(rule, quoteResult);
+    
+    // Sync baggage and meal info if HTML parse missed it
+    if (!parsed.baggage?.checkIn && fareInclusions.checkinBaggage) {
+       parsed.baggage.checkIn = fareInclusions.checkinBaggage;
+    }
+    if (!parsed.baggage?.cabin && fareInclusions.cabinBaggage) {
+       parsed.baggage.cabin = fareInclusions.cabinBaggage;
+    }
 
     return {
-      airline: rule.Airline,
-      origin: rule.Origin,
-      destination: rule.Destination,
+      airline: rule.Airline || quoteResult?.AirlineCode,
+      origin: rule.Origin || quoteResult?.Segments?.[0]?.[0]?.Origin?.Airport?.AirportCode,
+      destination: rule.Destination || quoteResult?.Segments?.[0]?.[quoteResult.Segments[0].length - 1]?.Destination?.Airport?.AirportCode,
       fareBasisCode: parsed?.fareHeader?.fareBasisCode || rule.FareBasisCode || null,
       fareType: rule.FareType || parsed?.fareHeader?.fareType || null,
       ...parsed,

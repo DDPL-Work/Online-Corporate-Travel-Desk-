@@ -516,7 +516,7 @@ export default function BookApprovedFlight() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-10 font-sans">
-      <LandingHeader />
+      {/* <LandingHeader /> */}
 
       {/* 🔙 BACK BUTTON */}
       <div className="max-w-7xl mx-auto mt-4 px-4">
@@ -818,11 +818,9 @@ const FlightSegmentCard = ({ seg }) => (
     {/* AIRLINE */}
     <div className="flex items-center justify-between border-b border-slate-50 pb-3">
       <div className="flex items-center gap-4">
-        <img
-          src={airlineLogo(seg.airlineCode)}
+        <img src={airlineLogo(seg.airlineCode)}
           alt={seg.airlineName}
-          className="w-10 h-10 object-contain"
-        />
+          className="w-10 h-10 object-contain" loading="eager" />
         <div>
           <p className="font-black text-[#0A203E] text-xs uppercase tracking-tight">
             {seg.airlineName}

@@ -88,6 +88,7 @@ export default function MyProfile() {
       const lastName  = nameParts.slice(1).join(" ") || "";
       setLocalProfile({
         ...myProfile,
+        employeeId: myProfile.employeeId || myProfile.employeeCode || "",
         firstName,
         lastName,
         managerId: myProfile.manager?._id || myProfile.managerId,

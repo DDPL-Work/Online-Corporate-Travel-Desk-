@@ -158,7 +158,7 @@ export default function BrandingSettings() {
               <div className="px-6 pb-8 -mt-12 flex flex-col items-center text-center">
                 <div className="w-24 h-24 rounded-[2rem] bg-white border-8 border-white shadow-xl flex items-center justify-center text-2xl font-black overflow-hidden relative">
                   {logoPreview ? (
-                    <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-2" />
+                    <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-2" loading="eager" />
                   ) : (
                     <FiImage size={32} className="text-slate-300" />
                   )}

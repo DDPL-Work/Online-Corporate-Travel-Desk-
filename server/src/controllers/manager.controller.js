@@ -279,7 +279,7 @@ exports.getPendingHotelRequestsForApprover = async (req, res) => {
       approverId,
       corporateId,
       bookingType: "hotel",
-      requestStatus: "pending_approval", // ✅ key condition
+      requestStatus: ["pending_approval", "pending_second_approval"], // ✅ key condition
     })
       .sort({ createdAt: -1 })
       .lean();
@@ -488,7 +488,7 @@ exports.getPendingFlightRequestsForApprover = async (req, res) => {
 
     const requests = await BookingRequest.find({
       bookingType: "flight",
-      requestStatus: "pending_approval",
+      requestStatus: ["pending_approval","pending_second_approval"],
       corporateId,
       approverId: { $in: [approverId, req.user._id] },
     })

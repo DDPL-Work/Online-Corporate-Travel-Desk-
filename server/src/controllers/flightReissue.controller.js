@@ -141,6 +141,38 @@ exports.getReissueRequests = async (req, res) => {
 };
 
 /* ======================================================
+   2️⃣.5️⃣ GET SINGLE REISSUE REQUEST BY ID
+====================================================== */
+exports.getReissueRequestById = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    let request = null;
+
+    // 1. Try fetching from OfflineReissueRequest collection first
+    try {
+      const OfflineReissueRequest = require("../modules/servicing/reissue/schemas/OfflineReissueRequest.schema");
+      request = await OfflineReissueRequest.findById(requestId).populate("bookingId");
+    } catch (err) {
+      console.warn("OfflineReissueRequest lookup error/not loaded:", err.message);
+    }
+
+    // 2. Fall back to FlightReissueRequest if not found
+    if (!request) {
+      request = await FlightReissueRequest.findById(requestId).populate("bookingId");
+    }
+
+    if (!request) {
+      return res.status(404).json({ success: false, message: "Request not found" });
+    }
+
+    return res.json({ success: true, data: request });
+  } catch (error) {
+    console.error("Get Reissue Request By Id Error:", error.message);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/* ======================================================
    3️⃣ UPDATE REISSUE STATUS (Approve/Reject - Corp Admin)
 ====================================================== */
 exports.updateReissueStatus = async (req, res) => {

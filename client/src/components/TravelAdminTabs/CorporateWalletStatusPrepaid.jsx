@@ -280,13 +280,19 @@ export default function CorporateWallet() {
   };
 
   useEffect(() => {
-    if (rechargeOrder?.gateway === "phonepe" && rechargeOrder.redirectUrl)
+    if (rechargeOrder?.gateway === "phonepe" && rechargeOrder.redirectUrl) {
       window.location.assign(rechargeOrder.redirectUrl);
+    }
   }, [rechargeOrder]);
 
   const handleRecharge = async () => {
     if (!rechargeAmount || rechargeAmount <= 0) return;
-    await dispatch(initiateWalletRecharge({ amount: Number(rechargeAmount) }));
+    await dispatch(
+      initiateWalletRecharge({
+        amount: Number(rechargeAmount),
+        returnUrl: window.location.href, // Tell PhonePe to redirect directly back here
+      })
+    );
     setShowRecharge(false);
     setRechargeAmount("");
   };
@@ -516,7 +522,7 @@ export default function CorporateWallet() {
                   <Th className="!px-6 !py-5">Deployment Date</Th>
                   <Th className="!px-6 !py-5">Mission Protocol</Th>
                   <Th className="!px-6 !py-5">Asset Reference</Th>
-                  <Th className="!px-6 !py-5">Category</Th>
+                  {/* <Th className="!px-6 !py-5">Category</Th> */}
                   <Th className="!px-6 !py-5">Matrix Type</Th>
                   <Th className="!px-6 !py-5">Capital Flow</Th>
                   <Th className="!px-6 !py-5">Status</Th>
@@ -579,7 +585,7 @@ export default function CorporateWallet() {
                           {gatewayInfo}
                         </p>
                       </td>
-                      <td className="px-6 py-5">
+                      {/* <td className="px-6 py-5">
                         <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-[10px] font-black uppercase text-navy border border-slate-200/60 shadow-sm block w-fit mb-1">
                           {tx.bookingModel === "HotelBookingRequest"
                             ? "Hotel"
@@ -590,7 +596,7 @@ export default function CorporateWallet() {
                             {tx.bookingId.orderId}
                           </p>
                         )}
-                      </td>
+                      </td> */}
                       <td className="px-6 py-5">
                         <span
                           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm"

@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import {
   FiHome,
@@ -140,10 +141,18 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
 
   const leadTraveller = raw.travellers?.find((t) => t.isLeadPassenger);
 
-  return (
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) return null;
+
+  return createPortal(
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto"
+      className="fixed inset-0 z-[99999] flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -450,12 +459,11 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                             </p>
                             <div className="flex gap-2 overflow-x-auto pb-1">
                               {roomImages.slice(0, 5).map((url, i) => (
-                                <img
-                                  key={i}
+                                <img key={i}
                                   src={url}
                                   alt={`Room ${idx + 1} image ${i + 1}`}
                                   className="h-20 w-28 object-cover rounded-lg border border-slate-200 shrink-0"
-                                  onError={(e) => {
+                                  loading="lazy" decoding="async" onError={(e) => {
                                     e.target.style.display = "none";
                                   }}
                                 />
@@ -943,7 +951,7 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
           </button>
         </div>
       </div>
-    // </div>
+    , document.body
   );
 };
 
@@ -1033,10 +1041,18 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
     { adult: 0, child: 0, infant: 0 },
   );
 
-  return (
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) return null;
+
+  return createPortal(
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto"
+      className="fixed inset-0 z-[99999] flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -2370,6 +2386,7 @@ export const FlightBookingModal = ({ booking: raw, traceTimers, onClose }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

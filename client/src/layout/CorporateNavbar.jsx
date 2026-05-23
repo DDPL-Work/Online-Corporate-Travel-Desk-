@@ -61,11 +61,9 @@ export const CorporateNavbar = () => {
             }}
           >
             {publicBranding?.branding?.logo?.url ? (
-              <img
-                src={publicBranding.branding.logo.url}
+              <img src={publicBranding.branding.logo.url}
                 alt="Logo"
-                className="h-8 object-contain"
-              />
+                className="h-8 object-contain" loading="eager" />
             ) : (
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"

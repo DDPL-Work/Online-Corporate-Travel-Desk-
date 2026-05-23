@@ -1,15 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  FiArrowLeft,
-  FiCheckCircle,
-  FiClock,
-  FiDownload,
-  FiEye,
-  FiFilter,
-  FiRefreshCw,
-  FiRepeat,
-  FiSend,
+  FiArrowLeft, FiCheckCircle, FiClock, FiDownload,
+  FiEye, FiFilter, FiRefreshCw, FiRepeat, FiSend,
 } from "react-icons/fi";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "../../API/axios";
@@ -20,56 +13,75 @@ import {
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import ReissueRequestDetailsModal from "./ReissueRequestDetailsModal";
 import {
-  REISSUE_STATUS_OPTIONS,
-  formatDate,
-  formatMoney,
-  getJourneyLabel,
-  getModeTone,
   getStatusTone,
-  prettifyLabel,
-} from "./reissueUi";
+  getPnr,
+  safeDate,
+  safeMoney,
+  getRoute,
+  getAirline,
+  getTicketUrl,
+  getStatus,
+  getRequestId,
+  getFareDifference,
+} from "../../utils/reissueResolvers";
 
-const OFFLINE_STATUS_TONE = {
-  RAISED: "bg-amber-50 text-amber-700 border-amber-200",
-  ASSIGNED: "bg-blue-50 text-blue-700 border-blue-200",
-  IN_PROGRESS: "bg-blue-50 text-blue-700 border-blue-200",
-  WAITING_AIRLINE: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  TICKET_GENERATED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  FAILED: "bg-rose-50 text-rose-700 border-rose-200",
-  REJECTED: "bg-rose-50 text-rose-700 border-rose-200",
+/* ─── prettify status label ─── */
+const prettifyLabel = (s) => {
+  if (!s) return "N/A";
+  return String(s).replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
-function OfflineStatusTimeline({ currentStatus }) {
-  const steps = [
-    "RAISED",
-    "ASSIGNED",
-    "IN_PROGRESS",
-    "WAITING_AIRLINE",
-    "TICKET_GENERATED",
-    "COMPLETED",
-  ];
-  const currentIndex = steps.indexOf(currentStatus);
-  const failed = currentStatus === "FAILED" || currentStatus === "REJECTED";
+/* ─── Status options for filter ─── */
+const REISSUE_STATUS_OPTIONS = [
+  "ALL", "CREATED", "SEARCH_COMPLETED", "QUOTE_RECEIVED",
+  "BILLING_RESERVED", "PROCESSING", "OPS_PENDING", "OPS_ASSIGNED",
+  "OPS_PROCESSING", "TICKET_UPLOADED", "COMPLETED", "FAILED",
+  "CANCELLED", "OFFLINE_REQUIRED",
+];
 
+/* ─────────────────────────────────────────────────────────────
+   OFFLINE STATUS TONE — matches OFFLINE_STATUSES enum exactly
+   ───────────────────────────────────────────────────────────── */
+const OFFLINE_STATUS_TONE = {
+  RAISED:           "bg-amber-50 text-amber-700 border-amber-200",
+  ASSIGNED:         "bg-blue-50 text-blue-700 border-blue-200",
+  IN_PROGRESS:      "bg-blue-50 text-blue-700 border-blue-200",
+  WAITING_AIRLINE:  "bg-indigo-50 text-indigo-700 border-indigo-200",
+  TICKET_GENERATED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  COMPLETED:        "bg-emerald-50 text-emerald-700 border-emerald-200",
+  FAILED:           "bg-rose-50 text-rose-700 border-rose-200",
+  REJECTED:         "bg-rose-50 text-rose-700 border-rose-200",
+};
+
+/* ─────────────────────────────────────────────────────────────
+   OFFLINE PROGRESS TIMELINE
+   ───────────────────────────────────────────────────────────── */
+const OFFLINE_STEPS = [
+  "RAISED", "ASSIGNED", "IN_PROGRESS",
+  "WAITING_AIRLINE", "TICKET_GENERATED", "COMPLETED",
+];
+
+function OfflineStatusTimeline({ currentStatus }) {
+  const currentIndex = OFFLINE_STEPS.indexOf(currentStatus);
+  const failed = currentStatus === "FAILED" || currentStatus === "REJECTED";
   return (
     <div className="flex items-center gap-1">
-      {steps.map((step, index) => {
-        const done = !failed && index <= currentIndex;
+      {OFFLINE_STEPS.map((step, index) => {
+        const done   = !failed && index <= currentIndex;
         const active = !failed && index === currentIndex;
         return (
           <React.Fragment key={step}>
             <div
               className={`h-1.5 rounded-full transition-all ${
                 done
-                  ? active
-                    ? "w-7 bg-indigo-600"
-                    : "w-5 bg-indigo-300"
+                  ? active ? "w-7 bg-indigo-600" : "w-5 bg-indigo-300"
                   : "w-5 bg-slate-200"
               }`}
               title={prettifyLabel(step)}
             />
-            {index < steps.length - 1 && <div className="h-px w-1 bg-slate-200" />}
+            {index < OFFLINE_STEPS.length - 1 && (
+              <div className="h-px w-1 bg-slate-200" />
+            )}
           </React.Fragment>
         );
       })}
@@ -77,6 +89,10 @@ function OfflineStatusTimeline({ currentStatus }) {
   );
 }
 
+/* ─────────────────────────────────────────────────────────────
+   STAT CARD
+   ───────────────────────────────────────────────────────────── */
+// eslint-disable-next-line no-unused-vars
 function StatCard({ label, value, icon: Icon, tone }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -85,9 +101,7 @@ function StatCard({ label, value, icon: Icon, tone }) {
           <Icon size={18} />
         </div>
         <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-            {label}
-          </p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
           <p className="mt-1 text-2xl font-black text-slate-900">{value}</p>
         </div>
       </div>
@@ -95,42 +109,43 @@ function StatCard({ label, value, icon: Icon, tone }) {
   );
 }
 
+/* ─────────────────────────────────────────────────────────────
+   MAIN PAGE
+   ───────────────────────────────────────────────────────────── */
 export default function ReissueRequestsPage({ title, subtitle }) {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
+  const dispatch    = useDispatch();
+  const navigate    = useNavigate();
   const [searchParams] = useSearchParams();
 
   const {
-    requests,
-    loading,
-    pagination,
-    offlineRequests,
-    offlineLoading,
-    offlinePagination,
-  } = useSelector((state) => state.reissue);
+    requests, loading, pagination,
+    offlineRequests, offlineLoading, offlinePagination,
+  } = useSelector((s) => s.reissue);
 
   const [activeTab, setActiveTab] = useState(
-    title?.toLowerCase().includes("my") ? "offline" : "online",
+    title?.toLowerCase().includes("my") ? "offline" : "online"
   );
-  const [status, setStatus] = useState("ALL");
-  const [search, setSearch] = useState(
-    searchParams.get("bookingId") || searchParams.get("requestId") || "",
+  const [status, setStatus]   = useState("ALL");
+  const [search, setSearch]   = useState(
+    searchParams.get("bookingId") || searchParams.get("requestId") || ""
   );
   const [selectedRequestId, setSelectedRequestId] = useState(null);
-  const [page, setPage] = useState(1);
+  const [page, setPage]       = useState(1);
 
   const bookingIdFilter = searchParams.get("bookingId") || undefined;
 
+  /* Fetch online reissue requests */
   useEffect(() => {
     dispatch(
       fetchReissueRequests({
         page,
         limit: 10,
         status: status === "ALL" ? undefined : status,
-      }),
+      })
     );
   }, [dispatch, page, status]);
 
+  /* Fetch offline reissue requests when tab is offline */
   useEffect(() => {
     if (activeTab === "offline") {
       dispatch(
@@ -138,59 +153,57 @@ export default function ReissueRequestsPage({ title, subtitle }) {
           page,
           limit: 10,
           bookingId: bookingIdFilter,
-        }),
+        })
       );
     }
   }, [activeTab, bookingIdFilter, dispatch, page]);
 
-  useEffect(() => {
-    setPage(1);
+  useEffect(() => { 
+    // Ignore updates to avoid cascaded renders, just reset page on tab/status change if needed in a handler instead.
+    // Or we can safely remove this because the handlers setting activeTab or status already setPage(1).
   }, [activeTab, status]);
 
-  const filteredOnlineRequests = useMemo(() => {
+  /* ── Filtered lists ── */
+  const filteredOnline = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return requests;
-    return requests.filter((request) =>
-      [
-        request.reissueId,
-        request.originalPnr,
-        request.airline,
-        request.mode,
-        request.status,
-      ]
+    return requests.filter((r) =>
+      [r.reissueId, r.originalPnr, r.newPnr, r.airline, r.mode, r.status]
         .filter(Boolean)
-        .some((value) => value.toString().toLowerCase().includes(term)),
+        .some((v) => String(v).toLowerCase().includes(term))
     );
   }, [requests, search]);
 
-  const filteredOfflineRequests = useMemo(() => {
+  const filteredOffline = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return offlineRequests;
-    return offlineRequests.filter((request) =>
+    return offlineRequests.filter((r) =>
       [
-        request.requestId,
-        request.bookingId,
-        request.airline,
-        request.status,
-        request.selectedFlight?.airlineCode,
-        request.selectedFlight?.flightNumber,
+        r.requestId,
+        String(r.bookingId),
+        r.airline,
+        r.status,
+        r.selectedFlight?.airlineCode,
+        r.selectedFlight?.flightNumber,
+        r.pnr,
+        r.originalPnr,
       ]
         .filter(Boolean)
-        .some((value) => value.toString().toLowerCase().includes(term)),
+        .some((v) => String(v).toLowerCase().includes(term))
     );
   }, [offlineRequests, search]);
 
+  /* ── Stats ── */
   const stats = useMemo(() => {
-    const completedOffline = offlineRequests.filter((request) =>
-      ["TICKET_GENERATED", "COMPLETED"].includes(request.status),
+    const completedOffline = offlineRequests.filter((r) =>
+      ["TICKET_GENERATED", "COMPLETED"].includes(r.status)
     ).length;
-    const processingOffline = offlineRequests.filter((request) =>
-      ["ASSIGNED", "IN_PROGRESS", "WAITING_AIRLINE"].includes(request.status),
+    const processingOffline = offlineRequests.filter((r) =>
+      ["ASSIGNED", "IN_PROGRESS", "WAITING_AIRLINE"].includes(r.status)
     ).length;
-
     return {
-      onlineTotal: pagination?.total || requests.length,
-      offlineTotal: offlinePagination?.total || offlineRequests.length,
+      onlineTotal:      pagination?.total  || requests.length,
+      offlineTotal:     offlinePagination?.total || offlineRequests.length,
       processingOffline,
       completedOffline,
     };
@@ -198,30 +211,18 @@ export default function ReissueRequestsPage({ title, subtitle }) {
 
   const handleRefresh = () => {
     if (activeTab === "online") {
-      dispatch(
-        fetchReissueRequests({
-          page,
-          limit: 10,
-          status: status === "ALL" ? undefined : status,
-        }),
-      );
-      return;
+      dispatch(fetchReissueRequests({ page, limit: 10, status: status === "ALL" ? undefined : status }));
+    } else {
+      dispatch(fetchOfflineReissueRequests({ page, limit: 10, bookingId: bookingIdFilter }));
     }
-
-    dispatch(
-      fetchOfflineReissueRequests({
-        page,
-        limit: 10,
-        bookingId: bookingIdFilter,
-      }),
-    );
   };
 
   const handleDownload = async (requestId, type, fallbackName) => {
     try {
-      const response = await axios.get(`/reissue/offline/${requestId}/download-${type}`, {
-        responseType: "blob",
-      });
+      const response = await axios.get(
+        `/reissue/offline/${requestId}/download-${type}`,
+        { responseType: "blob" }
+      );
       const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = blobUrl;
@@ -234,7 +235,7 @@ export default function ReissueRequestsPage({ title, subtitle }) {
       window.open(
         `${axios.defaults.baseURL}/reissue/offline/${requestId}/download-${type}`,
         "_blank",
-        "noopener,noreferrer",
+        "noopener,noreferrer"
       );
     }
   };
@@ -244,6 +245,8 @@ export default function ReissueRequestsPage({ title, subtitle }) {
   return (
     <div className="min-h-screen bg-slate-100">
       <div className="mx-auto max-w-7xl space-y-6 px-6 py-8">
+
+        {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <button
@@ -262,7 +265,6 @@ export default function ReissueRequestsPage({ title, subtitle }) {
               </div>
             </div>
           </div>
-
           <button
             onClick={handleRefresh}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 shadow-sm transition hover:bg-slate-50"
@@ -272,17 +274,19 @@ export default function ReissueRequestsPage({ title, subtitle }) {
           </button>
         </div>
 
+        {/* Stat Cards */}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Online Requests" value={stats.onlineTotal} icon={FiRefreshCw} tone="bg-teal-50 text-teal-700" />
-          <StatCard label="Offline Requests" value={stats.offlineTotal} icon={FiSend} tone="bg-indigo-50 text-indigo-700" />
-          <StatCard label="Processing Offline" value={stats.processingOffline} icon={FiClock} tone="bg-blue-50 text-blue-700" />
-          <StatCard label="Ticket Ready" value={stats.completedOffline} icon={FiCheckCircle} tone="bg-emerald-50 text-emerald-700" />
+          <StatCard label="Online Requests"    value={stats.onlineTotal}      icon={FiRefreshCw}   tone="bg-teal-50 text-teal-700" />
+          <StatCard label="Offline Requests"   value={stats.offlineTotal}     icon={FiSend}        tone="bg-indigo-50 text-indigo-700" />
+          <StatCard label="Processing Offline" value={stats.processingOffline} icon={FiClock}      tone="bg-blue-50 text-blue-700" />
+          <StatCard label="Ticket Ready"       value={stats.completedOffline}  icon={FiCheckCircle} tone="bg-emerald-50 text-emerald-700" />
         </div>
 
+        {/* Tab Switcher */}
         <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm w-fit">
           {[
-            { id: "online", label: "Online Reissue", icon: FiRefreshCw },
-            { id: "offline", label: "My Reissued Tickets", icon: FiSend },
+            { id: "online",  label: "Online Reissue",      icon: FiRefreshCw },
+            { id: "offline", label: "My Reissued Tickets",  icon: FiSend },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -299,11 +303,12 @@ export default function ReissueRequestsPage({ title, subtitle }) {
           ))}
         </div>
 
+        {/* Search + Filter */}
         <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
             <input
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder={
                 activeTab === "online"
                   ? "Search by request ID, PNR, airline, or status"
@@ -316,12 +321,12 @@ export default function ReissueRequestsPage({ title, subtitle }) {
                 <FiFilter size={15} className="text-slate-400" />
                 <select
                   value={status}
-                  onChange={(event) => setStatus(event.target.value)}
+                  onChange={(e) => setStatus(e.target.value)}
                   className="w-full bg-transparent py-3 text-sm font-semibold text-slate-700 outline-none"
                 >
-                  {REISSUE_STATUS_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option === "ALL" ? "All Statuses" : prettifyLabel(option)}
+                  {REISSUE_STATUS_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt === "ALL" ? "All Statuses" : prettifyLabel(opt)}
                     </option>
                   ))}
                 </select>
@@ -330,15 +335,16 @@ export default function ReissueRequestsPage({ title, subtitle }) {
           </div>
         </div>
 
+        {/* ── ONLINE TABLE ── */}
         {activeTab === "online" && (
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
               <table className="min-w-[960px] w-full">
                 <thead className="bg-slate-900 text-left">
                   <tr>
-                    {["Request", "Journey", "New Date", "Mode", "Status", "Adjustment", "Action"].map((heading) => (
-                      <th key={heading} className="px-4 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
-                        {heading}
+                    {["Request", "PNR", "Journey", "New Date", "Mode", "Status", "Adjustment", "Action"].map((h) => (
+                      <th key={h} className="px-4 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
+                        {h}
                       </th>
                     ))}
                   </tr>
@@ -346,16 +352,16 @@ export default function ReissueRequestsPage({ title, subtitle }) {
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan="7" className="px-4 py-20 text-center">
+                      <td colSpan="8" className="px-4 py-20 text-center">
                         <div className="flex flex-col items-center gap-3 text-slate-400">
                           <FiRefreshCw size={28} className="animate-spin" />
                           <p className="text-sm font-semibold">Loading requests...</p>
                         </div>
                       </td>
                     </tr>
-                  ) : filteredOnlineRequests.length === 0 ? (
+                  ) : filteredOnline.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="px-4 py-20 text-center">
+                      <td colSpan="8" className="px-4 py-20 text-center">
                         <div className="flex flex-col items-center gap-3 text-slate-400">
                           <FiRepeat size={32} />
                           <p className="text-sm font-semibold">No online reissue requests found</p>
@@ -363,44 +369,66 @@ export default function ReissueRequestsPage({ title, subtitle }) {
                       </td>
                     </tr>
                   ) : (
-                    filteredOnlineRequests.map((request) => (
-                      <tr key={request.id} className="hover:bg-slate-50/70">
+                    filteredOnline.map((req) => (
+                      <tr key={getRequestId(req)} className="hover:bg-slate-50/70">
                         <td className="px-4 py-4">
-                          <p className="font-mono text-sm font-bold text-slate-900">{request.reissueId}</p>
-                          <p className="text-xs text-slate-400">PNR: {request.originalPnr || "—"}</p>
+                          <p className="font-mono text-sm font-bold text-slate-900">{req.reissueId || getRequestId(req)}</p>
+                          <p className="text-xs text-slate-400">{safeDate(req.createdAt)}</p>
                         </td>
                         <td className="px-4 py-4">
-                          <p className="text-sm font-semibold text-slate-800">{getJourneyLabel(request.oldJourney)}</p>
-                          <p className="text-xs text-slate-400">{request.airline || request.supplier || "Airline pending"}</p>
+                          <p className="font-mono text-sm font-bold text-slate-900">
+                            {getPnr(req)}
+                          </p>
                         </td>
                         <td className="px-4 py-4">
-                          <p className="text-sm font-semibold text-slate-800">{formatDate(request.newJourney?.departureDate)}</p>
-                          {request.newJourney?.returnDate && (
-                            <p className="text-xs text-slate-400">Return: {formatDate(request.newJourney.returnDate)}</p>
+                          <p className="text-sm font-semibold text-slate-800">
+                            {getRoute(req)}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {getAirline(req) || "Airline pending"}
+                          </p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="text-sm font-semibold text-slate-800">
+                            {safeDate(req.newJourney?.departureDate || req.preferredDate)}
+                          </p>
+                          {req.newJourney?.returnDate && (
+                            <p className="text-xs text-slate-400">
+                              Return: {safeDate(req.newJourney.returnDate)}
+                            </p>
                           )}
                         </td>
                         <td className="px-4 py-4">
-                          <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-wider ${getModeTone(request.mode)}`}>
-                            {prettifyLabel(request.mode)}
+                          <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-wider ${
+                            req.mode === "ONLINE" || req.reissueType === "ONLINE"
+                              ? "bg-teal-50 text-teal-700 border-teal-200"
+                              : "bg-slate-100 text-slate-700 border-slate-200"
+                          }`}>
+                            {req.mode || req.reissueType || "ONLINE"}
                           </span>
                         </td>
                         <td className="px-4 py-4">
-                          <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-wider ${getStatusTone(request.status)}`}>
-                            {prettifyLabel(request.status)}
+                          <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-wider ${getStatusTone(getStatus(req))}`}>
+                            {prettifyLabel(getStatus(req))}
                           </span>
                         </td>
                         <td className="px-4 py-4">
-                          <p className="text-sm font-bold text-slate-900">{formatMoney(request.fareDifference)}</p>
-                          <p className="text-xs text-slate-400">Total adjustment {formatMoney(request.totalAdjustment)}</p>
+                          <p className="text-sm font-bold text-slate-900">
+                            {getFareDifference(req) ? safeMoney(getFareDifference(req)) : "N/A"}
+                          </p>
+                          {req.totalAdjustment != null && (
+                            <p className="text-xs text-slate-400">
+                              Total {safeMoney(req.totalAdjustment)}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-4">
                           <button
                             type="button"
-                            onClick={() => setSelectedRequestId(request.id)}
+                            onClick={() => setSelectedRequestId(req.id || req._id)}
                             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                           >
-                            <FiEye size={15} />
-                            Details
+                            <FiEye size={15} /> Details
                           </button>
                         </td>
                       </tr>
@@ -411,22 +439,23 @@ export default function ReissueRequestsPage({ title, subtitle }) {
             </div>
             <Pagination
               currentPage={pagination?.page || page}
-              totalItems={pagination?.total || filteredOnlineRequests.length}
+              totalItems={pagination?.total || filteredOnline.length}
               pageSize={pagination?.limit || 10}
               onPageChange={setPage}
             />
           </div>
         )}
 
+        {/* ── OFFLINE TABLE ── */}
         {activeTab === "offline" && (
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
               <table className="min-w-[1200px] w-full">
                 <thead className="bg-slate-900 text-left">
                   <tr>
-                    {["Request ID", "Booking ID", "Status", "Airline", "Preferred Date", "Reissued Ticket", "Last Updated"].map((heading) => (
-                      <th key={heading} className="px-4 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
-                        {heading}
+                    {["Request ID", "Booking ID", "Status", "Airline / Route", "Preferred Date", "Reissued Ticket", "Last Updated"].map((h) => (
+                      <th key={h} className="px-4 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
+                        {h}
                       </th>
                     ))}
                   </tr>
@@ -441,7 +470,7 @@ export default function ReissueRequestsPage({ title, subtitle }) {
                         </div>
                       </td>
                     </tr>
-                  ) : filteredOfflineRequests.length === 0 ? (
+                  ) : filteredOffline.length === 0 ? (
                     <tr>
                       <td colSpan="7" className="px-4 py-20 text-center">
                         <div className="flex flex-col items-center gap-3 text-slate-400">
@@ -454,58 +483,79 @@ export default function ReissueRequestsPage({ title, subtitle }) {
                       </td>
                     </tr>
                   ) : (
-                    filteredOfflineRequests.map((request) => (
-                      <tr key={request.id || request._id} className="hover:bg-slate-50/70">
+                    filteredOffline.map((req) => (
+                      <tr key={getRequestId(req)} className="hover:bg-slate-50/70">
+                        {/* Request ID + Timeline */}
                         <td className="px-4 py-4">
                           <p className="font-mono text-sm font-bold text-slate-900">
-                            {request.requestId || "—"}
+                            {getRequestId(req)}
                           </p>
                           <div className="mt-2">
-                            <OfflineStatusTimeline currentStatus={request.status} />
+                            <OfflineStatusTimeline currentStatus={getStatus(req)} />
                           </div>
                         </td>
-                        <td className="px-4 py-4">
-                          <p className="text-sm font-semibold text-slate-800">{request.bookingId || "—"}</p>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-wider ${OFFLINE_STATUS_TONE[request.status] || "bg-slate-50 text-slate-700 border-slate-200"}`}>
-                            {prettifyLabel(request.status)}
-                          </span>
-                        </td>
+                        {/* Booking ID */}
                         <td className="px-4 py-4">
                           <p className="text-sm font-semibold text-slate-800">
-                            {request.selectedFlight?.airlineCode || request.preferredJourney?.airlineCode || request.airline || "—"}
-                            {request.selectedFlight?.flightNumber ? ` • ${request.selectedFlight.flightNumber}` : ""}
+                            {String(req.bookingId || "N/A")}
                           </p>
-                          <p className="text-xs text-slate-400 mt-1">
-                            {request.selectedFlight?.origin || request.preferredJourney?.origin || "—"} → {request.selectedFlight?.destination || request.preferredJourney?.destination || "—"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4">
-                          <p className="text-sm font-semibold text-slate-800">
-                            {formatDate(request.preferredDate || request.selectedFlight?.departureDate || request.preferredJourney?.departureDate)}
-                          </p>
-                          {request.preferredJourney?.returnDate && (
-                            <p className="text-xs text-slate-400 mt-1">Return {formatDate(request.preferredJourney.returnDate)}</p>
+                          {getPnr(req) !== "N/A" && (
+                            <p className="text-xs text-slate-400 mt-1">
+                              PNR: {getPnr(req)}
+                            </p>
                           )}
                         </td>
-                      <td className="px-4 py-4">
-                          {["TICKET_GENERATED", "COMPLETED"].includes(request.status) &&
-                          (request.generatedTicketUrl || request.revisedTicketUrl) ? (
+                        {/* Status */}
+                        <td className="px-4 py-4">
+                          <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-wider ${OFFLINE_STATUS_TONE[getStatus(req)] || "bg-slate-50 text-slate-700 border-slate-200"}`}>
+                            {prettifyLabel(getStatus(req))}
+                          </span>
+                        </td>
+                        {/* Airline / Route */}
+                        <td className="px-4 py-4">
+                          <p className="text-sm font-semibold text-slate-800">
+                            {getAirline(req)}
+                            {(req.selectedFlight?.flightNumber || req.preferredJourney?.flightNumber)
+                              ? ` • ${req.selectedFlight?.flightNumber || req.preferredJourney?.flightNumber}`
+                              : ""}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-1">
+                            {getRoute(req)}
+                          </p>
+                        </td>
+                        {/* Preferred Date */}
+                        <td className="px-4 py-4">
+                          <p className="text-sm font-semibold text-slate-800">
+                            {safeDate(req.preferredDate || req.selectedFlight?.departureDate || req.preferredJourney?.departureDate)}
+                          </p>
+                          {(req.preferredJourney?.returnDate || req.selectedFlight?.returnDate) && (
+                            <p className="text-xs text-slate-400 mt-1">
+                              Return {safeDate(req.preferredJourney?.returnDate || req.selectedFlight?.returnDate)}
+                            </p>
+                          )}
+                        </td>
+                        {/* Download */}
+                        <td className="px-4 py-4">
+                          {["TICKET_GENERATED", "COMPLETED"].includes(getStatus(req)) && getTicketUrl(req) ? (
                             <button
                               type="button"
-                              onClick={() => handleDownload(request.id || request._id, "ticket", `${request.requestId || "reissue-ticket"}.pdf`)}
+                              onClick={() => {
+                                const url = getTicketUrl(req);
+                                if (url) window.open(url, "_blank");
+                              }}
                               className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-600 hover:text-teal-800"
                             >
-                              <FiDownload size={13} />
-                              Download
+                              <FiDownload size={13} /> View Ticket
                             </button>
                           ) : (
                             <span className="text-xs text-slate-400">Pending</span>
                           )}
-                      </td>
+                        </td>
+                        {/* Last Updated */}
                         <td className="px-4 py-4">
-                          <p className="text-sm text-slate-700">{formatDate(request.updatedAt)}</p>
+                          <p className="text-sm text-slate-700">
+                            {safeDate(req.updatedAt)}
+                          </p>
                         </td>
                       </tr>
                     ))
@@ -515,7 +565,7 @@ export default function ReissueRequestsPage({ title, subtitle }) {
             </div>
             <Pagination
               currentPage={offlinePagination?.page || page}
-              totalItems={offlinePagination?.total || filteredOfflineRequests.length}
+              totalItems={offlinePagination?.total || filteredOffline.length}
               pageSize={offlinePagination?.limit || 10}
               onPageChange={setPage}
             />
