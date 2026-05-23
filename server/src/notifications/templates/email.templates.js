@@ -44,6 +44,25 @@ const alert = (msg) =>
 // ─────────────────────────────────────────────────────────────
 const templates = {
 
+  // ── CORPORATE_REGISTERED ────────────────────────────────
+  // Sent to super admin + ops members with manage_corporates permission
+  [EVENTS.CORPORATE_REGISTERED]: (d) => ({
+    subject: `🏢 New Corporate Registration — ${d.corporateName} (Pending Review)`,
+    html: base(`
+      <h2 style="color:#000D26;">New Corporate Registration</h2>
+      <p>Dear Admin,</p>
+      <p>A new corporate account has been registered and is <strong>pending your review</strong>.</p>
+      ${card([
+        ['Corporate Name', d.corporateName || 'N/A'],
+        ['Classification', d.classification?.toUpperCase() || 'N/A'],
+        ['Primary Contact', d.primaryContactEmail || 'N/A'],
+        ['Registered At', new Date().toLocaleString()],
+      ])}
+      ${btn(`${process.env.SUPER_ADMIN_URL || process.env.FRONTEND_URL}/corporates`, 'Review Corporate', '#C9A84C')}
+      ${alert('Please review and approve or reject this registration at your earliest convenience.')}
+    `),
+  }),
+
   // ── CORPORATE_APPROVED ──────────────────────────────────
   [EVENTS.CORPORATE_APPROVED]: (d) => ({
     subject: `🎉 Welcome to Traveamer — Your Corporate Portal is Live!`,
@@ -233,6 +252,22 @@ const templates = {
         ['Amount', d.amount ? `₹${Number(d.amount).toLocaleString()}` : 'N/A'],
       ])}
       ${btn(`${process.env.FRONTEND_URL}/manager/pending-requests?type=${d.bookingType}`, 'Approve Now')}
+    `),
+  }),
+
+  // ── BOOKING_TRANSFERRED ─────────────────────────────────
+  [EVENTS.BOOKING_TRANSFERRED]: (d) => ({
+    subject: `🔔 Action Required: Approve Transferred Booking ${d.orderId}`,
+    html: base(`
+      <h2 style="color:#0A4D68;">Booking Transferred for Approval</h2>
+      <p>Dear ${d.secondApproverName || 'Approver'},</p>
+      <p><strong>${d.transferredByName}</strong> has transferred <strong>${d.employeeName}</strong>'s booking to you for final approval.</p>
+      ${card([
+        ['Order ID', d.orderId],
+        ['Type', d.bookingType?.toUpperCase() || 'N/A'],
+        ['Amount', d.amount ? `₹${Number(d.amount).toLocaleString()}` : 'N/A'],
+      ])}
+      ${btn(`${process.env.FRONTEND_URL}/manager/pending-requests?type=${d.bookingType}`, 'Review Booking')}
     `),
   }),
 

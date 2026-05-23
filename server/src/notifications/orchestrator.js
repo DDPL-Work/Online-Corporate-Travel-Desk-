@@ -24,6 +24,7 @@ const CHANNEL_MAP = {
   [EVENTS.CREDIT_LIMIT_LOW]:                { email: true,  inapp: true  },
   [EVENTS.CREDIT_LIMIT_EXCEEDED]:           { email: true,  inapp: true  },
   [EVENTS.BOOKING_APPROVAL_REQUIRED]:       { email: true,  inapp: true  },
+  [EVENTS.BOOKING_TRANSFERRED]:             { email: true,  inapp: true  },
   [EVENTS.BOOKING_APPROVED]:                { email: true,  inapp: true  },
   [EVENTS.BOOKING_REJECTED]:                { email: true,  inapp: true  },
   [EVENTS.BOOKING_CONFIRMED]:               { email: true,  inapp: true  },
@@ -35,7 +36,7 @@ const CHANNEL_MAP = {
   // HIGH — email + in-app
   [EVENTS.BOOKING_REQUEST_CREATED]:         { email: true,  inapp: true  },
   [EVENTS.BOOKING_CANCELLED]:               { email: true,  inapp: true  },
-  [EVENTS.BOOKING_REISSUED]:                { email: false, inapp: true  },
+  [EVENTS.BOOKING_REISSUED]:                { email: true,  inapp: true  },
   [EVENTS.REISSUE_CREATED]:                 { email: true,  inapp: true  },
   [EVENTS.REISSUE_ELIGIBILITY_CHECKED]:     { email: true,  inapp: true  },
   [EVENTS.REISSUE_SEARCH_COMPLETED]:        { email: false, inapp: true  },
@@ -54,8 +55,8 @@ const CHANNEL_MAP = {
   [EVENTS.CORPORATE_APPROVED]:              { email: true,  inapp: true  },
   [EVENTS.CORPORATE_APPROVED_BY_OPS]:       { email: true,  inapp: true  },
   [EVENTS.CORPORATE_UPDATED_BY_OPS]:        { email: true,  inapp: true  },
-  [EVENTS.CORPORATE_REGISTERED]:            { email: false, inapp: true  },
-  [EVENTS.UPCOMING_TRIP_REMINDER]:          { email: false, inapp: true  },
+  [EVENTS.CORPORATE_REGISTERED]:            { email: true,  inapp: true  },
+  [EVENTS.UPCOMING_TRIP_REMINDER]:          { email: true,  inapp: true  },
 
   // MEDIUM — in-app only
   [EVENTS.WALLET_RECHARGED]:                { email: true,  inapp: true  },
@@ -103,7 +104,7 @@ const resolveRecipients = async (event, data) => {
 
   switch (event) {
 
-    // ── TO EMPLOYEE & OTHERS (CC) ───────────────────────────
+    // ── TO EMPLOYEE & OTHERS (CC) — corporate-internal only, no super admin ──
     case EVENTS.BOOKING_APPROVED:
     case EVENTS.BOOKING_REJECTED:
     case EVENTS.BOOKING_CONFIRMED:
@@ -134,7 +135,7 @@ const resolveRecipients = async (event, data) => {
           corporateId: data.corporateId,
         });
       }
-      // 3. Travel Admin (Resolve to actual User IDs)
+      // 3. Travel Admin — booking mails are corporate-internal only
       const admins = await User.find({ corporateId: data.corporateId, role: 'travel-admin' }).select('_id email');
       admins.forEach(admin => {
         recipients.push({
@@ -143,16 +144,7 @@ const resolveRecipients = async (event, data) => {
           corporateId: data.corporateId,
         });
       });
-
-      // 4. Super Admin (Resolve to actual User IDs)
-      const superAdmins = await SuperAdmin.find({}).select('_id email');
-      superAdmins.forEach(sa => {
-        recipients.push({
-          userId: sa._id,
-          email: sa.email,
-          corporateId: data.corporateId || 'system',
-        });
-      });
+      // NOTE: Super admin intentionally excluded — booking mails stay corporate-to-corporate
       break;
     }
 
@@ -194,6 +186,17 @@ const resolveRecipients = async (event, data) => {
         recipients.push({
           userId: data.managerId,
           email: data.managerEmail,
+          corporateId: data.corporateId,
+        });
+      }
+      break;
+
+    // ── TO SECOND APPROVER ──────────────────────────────────
+    case EVENTS.BOOKING_TRANSFERRED:
+      if (data.secondApproverId) {
+        recipients.push({
+          userId: data.secondApproverId,
+          email: data.secondApproverEmail,
           corporateId: data.corporateId,
         });
       }
@@ -311,18 +314,35 @@ const resolveRecipients = async (event, data) => {
       break;
     }
 
-    // ── TO CORPORATE PRIMARY CONTACT & SUPER ADMIN ──────────
+    // ── TO CORPORATE PRIMARY CONTACT, SUPER ADMIN & OPS (manage_corporates) ──
     case EVENTS.CORPORATE_APPROVED: {
+      // 1. Primary Contact of the corporate
       recipients.push({
         email: data.primaryContactEmail,
         corporateId: data.corporateId,
       });
-      const superAdmins = await SuperAdmin.find({}).select('_id email');
-      superAdmins.forEach(sa => {
+      // 2. All Super Admins
+      const superAdminsCA = await SuperAdmin.find({}).select('_id email');
+      superAdminsCA.forEach(sa => {
         recipients.push({
           userId: sa._id,
           email: sa.email,
           corporateId: data.corporateId || 'system',
+          role: 'super-admin',
+        });
+      });
+      // 3. OPS members permitted by super admin to handle corporates
+      const corpOpsCA = await OpsMember.find({
+        isDeleted: false,
+        status: 'Active',
+        permissions: 'manage_corporates',
+      }).select('_id email');
+      corpOpsCA.forEach(ops => {
+        recipients.push({
+          userId: ops._id,
+          email: ops.email,
+          corporateId: 'system',
+          role: 'ops-member',
         });
       });
       break;
@@ -331,8 +351,8 @@ const resolveRecipients = async (event, data) => {
     case EVENTS.CORPORATE_APPROVED_BY_OPS:
     case EVENTS.CORPORATE_UPDATED_BY_OPS: {
       // 1. Notify all Super Admins
-      const superAdmins = await SuperAdmin.find({}).select('_id email');
-      superAdmins.forEach(sa => {
+      const superAdminsCO = await SuperAdmin.find({}).select('_id email');
+      superAdminsCO.forEach(sa => {
         recipients.push({
           userId: sa._id,
           email: sa.email,
@@ -341,7 +361,22 @@ const resolveRecipients = async (event, data) => {
         });
       });
 
-      // 2. Notify Corporate Admins for this specific corporate
+      // 2. OPS members permitted by super admin to handle corporates
+      const corpOpsCO = await OpsMember.find({
+        isDeleted: false,
+        status: 'Active',
+        permissions: 'manage_corporates',
+      }).select('_id email');
+      corpOpsCO.forEach(ops => {
+        recipients.push({
+          userId: ops._id,
+          email: ops.email,
+          corporateId: 'system',
+          role: 'ops-member',
+        });
+      });
+
+      // 3. Notify Corporate Travel Admins for this specific corporate
       if (data.corporateId) {
         const corpAdmins = await User.find({
           corporateId: data.corporateId,
@@ -371,15 +406,44 @@ const resolveRecipients = async (event, data) => {
       });
       break;
 
-    // ── TO SUPER ADMIN (via role on super-admin collection) ─
-    case EVENTS.OPS_LOGIN_ALERT:
-    case EVENTS.CORPORATE_REGISTERED: {
-      const superAdmins = await SuperAdmin.find({}).select('_id email');
-      superAdmins.forEach(sa => {
+    // ── TO SUPER ADMIN (login alert) ────────────────────────
+    case EVENTS.OPS_LOGIN_ALERT: {
+      const superAdminsSA = await SuperAdmin.find({}).select('_id email');
+      superAdminsSA.forEach(sa => {
         recipients.push({
           userId: sa._id,
           email: sa.email,
           corporateId: data.corporateId || 'system',
+          role: 'super-admin',
+        });
+      });
+      break;
+    }
+
+    // ── TO SUPER ADMIN + OPS (manage_corporates) on new corporate ──
+    case EVENTS.CORPORATE_REGISTERED: {
+      // 1. All Super Admins
+      const superAdminsCR = await SuperAdmin.find({}).select('_id email');
+      superAdminsCR.forEach(sa => {
+        recipients.push({
+          userId: sa._id,
+          email: sa.email,
+          corporateId: data.corporateId || 'system',
+          role: 'super-admin',
+        });
+      });
+      // 2. OPS members permitted by super admin to handle corporates
+      const corpOpsCR = await OpsMember.find({
+        isDeleted: false,
+        status: 'Active',
+        permissions: 'manage_corporates',
+      }).select('_id email');
+      corpOpsCR.forEach(ops => {
+        recipients.push({
+          userId: ops._id,
+          email: ops.email,
+          corporateId: 'system',
+          role: 'ops-member',
         });
       });
       break;

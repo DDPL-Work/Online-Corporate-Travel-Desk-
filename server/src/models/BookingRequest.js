@@ -285,6 +285,12 @@ const bookingRequestSchema = new mongoose.Schema(
         enum: ["wallet", "gateway", "postpaid"],
       },
       transactionId: String,
+      paymentId: {
+        type: String,
+        index: true,
+        sparse: true,
+        comment: "Platform Payment ID — format: TVR-[F|H]-[PRE|POST]-[000AAA]",
+      },
       paidAt: Date,
       status: {
         type: String,
@@ -471,5 +477,6 @@ bookingRequestSchema.index({ corporateId: 1, createdAt: -1 });
 bookingRequestSchema.index({ approvedBy: 1 });
 bookingRequestSchema.index({ rejectedBy: 1 });
 bookingRequestSchema.index({ executionStatus: 1 });
+bookingRequestSchema.index({ "payment.paymentId": 1 }, { sparse: true, unique: true });
 
 module.exports = mongoose.model("BookingRequest", bookingRequestSchema);

@@ -1,6 +1,7 @@
 // client/src/Pages/Legal/UserAgreement.jsx
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import LandingHeader from "../../layout/LandingHeader";
 
@@ -114,8 +115,8 @@ function BulletList({ items }) {
 
 /* ── Success Modal ── */
 function SuccessModal({ onClose }) {
-  return (
-    <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4"
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4"
       onClick={onClose}>
       <div
         className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 flex flex-col items-center gap-5 animate-[modalIn_0.3s_ease]"
@@ -160,7 +161,8 @@ function SuccessModal({ onClose }) {
           to   { opacity: 1; transform: scale(1) translateY(0); }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -542,7 +544,8 @@ User.</Para>
       </div>
 
       {/* ── Fixed Bottom Acceptance Bar ── */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pointer-events-none">
+      {!showModal && createPortal(
+        <div className="fixed bottom-0 left-0 right-0 z-[9999] px-4 pb-4 pointer-events-none">
         <div className="max-w-[1340px] mx-auto pointer-events-auto">
           <div className={`rounded-[24px] border px-4 lg:px-6 py-4 lg:py-4 flex flex-col sm:flex-row items-center gap-4 shadow-[0px_20px_40px_-20px_rgba(10,37,64,0.5)] transition-all duration-500 ${
             allDone
@@ -593,7 +596,9 @@ User.</Para>
             </div>
           </div>
         </div>
-      </div>
+        </div>,
+        document.body
+      )}
 
       {/* ── Success Modal ── */}
       {showModal && <SuccessModal onClose={handleModalClose} />}

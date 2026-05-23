@@ -531,6 +531,7 @@ exports.getMyGstDetails = async (req, res, next) => {
         gstin: gst.gstin || "",
         legalName: gst.legalName || "",
         gstEmail: gst.gstEmail || "",
+        contactNumber: gst.contactNumber || corporate.primaryContact?.mobile || "",
         address:
           gst.address ||
           [

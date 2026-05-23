@@ -188,9 +188,10 @@ export const cancelBooking = createAsyncThunk(
 
 export const downloadTicketPdf = createAsyncThunk(
   "bookings/downloadTicketPdf",
-  async (bookingId, { rejectWithValue }) => {
+  async ({ bookingId, journeyType }, { rejectWithValue }) => {
     try {
       const response = await api.get(`/bookings/${bookingId}/ticket-pdf`, {
+        params: { journeyType },
         responseType: "blob",
       });
 
@@ -201,12 +202,49 @@ export const downloadTicketPdf = createAsyncThunk(
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = `ticket_${bookingId}.pdf`;
+      a.download = `ticket_${bookingId}${journeyType ? `_${journeyType}` : ''}.pdf`;
       a.click();
 
       window.URL.revokeObjectURL(url);
     } catch (err) {
       return rejectWithValue("Failed to download ticket");
+    }
+  },
+);
+
+export const manualTicketNonLcc = createAsyncThunk(
+  "bookings/manualTicketNonLcc",
+  async (bookingId, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`/bookings/${bookingId}/manual-ticket`);
+      return data?.data || data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Manual ticketing failed",
+      );
+    }
+  },
+);
+
+export const generateHotelVoucher = createAsyncThunk(
+  "hotelBookings/generateVoucher",
+  async (bookingId, { rejectWithValue }) => {
+    try {
+      const response = await api.post(`/hotel-booking/${bookingId}/voucher`, {}, {
+        responseType: "blob",
+      });
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `hotel_voucher_${bookingId}.pdf`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+      return true;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to download voucher",
+      );
     }
   },
 );

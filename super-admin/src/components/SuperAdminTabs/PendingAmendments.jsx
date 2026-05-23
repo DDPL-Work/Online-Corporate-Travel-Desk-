@@ -11,6 +11,8 @@ import {
 import { FaPlane, FaHotel } from "react-icons/fa";
 import { pendingAmendmentsData } from "../../data/dummyData";
 import TableActionBar from "../Shared/TableActionBar";
+import useCsvExporter from "../../services/export/useCsvExporter";
+import { pendingAmendmentsExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const colors = {
   primary: "#0A4D68",
@@ -25,6 +27,7 @@ const colors = {
 
 export default function PendingAmendments() {
   const tableScrollRef = useRef(null);
+  const { exportCsv, exportingKey } = useCsvExporter();
   // Tab state
   const [activeTab, setActiveTab] = useState("Flight");
 
@@ -41,6 +44,7 @@ export default function PendingAmendments() {
   const corporates = ["All", ...new Set(allData.map((a) => a.company))];
   const types = ["All", "Flight", "Hotel"];
   const statuses = ["All", "Pending", "Approved", "Rejected"];
+  const isExporting = exportingKey === "pending_amendments";
 
   // Filter data based on selected tab and all filters
   const filteredData = allData.filter((item) => {
@@ -106,6 +110,17 @@ export default function PendingAmendments() {
   function viewDetails(item) {
     alert(`View details for ${item.bookingId || item.id}`);
   }
+
+  const handleExport = () => {
+    exportCsv({
+      key: "pending_amendments",
+      data: filteredData,
+      columns: pendingAmendmentsExportTemplate,
+      filenamePrefix: `${activeTab.toLowerCase()}_amendments_export`,
+      emptyMessage: "No amendments available to export",
+      successMessage: `${activeTab} amendments exported`,
+    });
+  };
 
   return (
     <div
@@ -281,7 +296,9 @@ export default function PendingAmendments() {
             <TableActionBar
               scrollRef={tableScrollRef}
               exportLabel="Export"
-              onExport={() => {}}
+              onExport={handleExport}
+              exportDisabled={isExporting}
+              exportLoading={isExporting}
               exportClassName="bg-[#0F766E] hover:bg-[#115E59] shadow-[#0F766E]/20"
               arrowClassName="border-emerald-100 bg-emerald-50 text-[#0F766E] hover:bg-emerald-100 hover:border-emerald-200 hover:text-[#115E59] disabled:hover:bg-emerald-50"
             />

@@ -24,6 +24,8 @@ import AllReissueRequests from "../components/SuperAdminTabs/AllReissueRequests"
 import PendingCorporates from "../components/SuperAdminTabs/PendingCorporates";
 import OpsTeamManagement from "../components/SuperAdminTabs/OpsTeamManagement";
 import ProfileSettings from "../Pages/Auth/ProfileSettings";
+import BookedFlightDetailsPage from "../components/Shared/BookedFlightDetailsPage";
+import BookedHotelDetailsPage from "../components/Shared/BookedHotelDetailsPage";
 
 import BlogListPage from '../components/Blog/AllBlogs'
 import BlogEditPage from '../components/Blog/BlogEditPage'
@@ -65,6 +67,8 @@ export const appRouter = createBrowserRouter([
 
           { path: "/onboarded-corporates", element: <Navigate to="/all-corporates" replace /> },
           { path: "/bookings-summary", element: <BookingsSummary /> },
+          { path: "/bookings/flight/:id", element: <BookedFlightDetailsPage /> },
+          { path: "/bookings/hotel/:id", element: <BookedHotelDetailsPage /> },
           { path: "/cancellation-summary", element: <CancellationDashboard /> },
           { path: "/cancellation-query", element: <Navigate to="/cancellation-queries" replace /> },
           { path: "/all-reissue-requests", element: <AllReissueRequests /> },

@@ -81,6 +81,12 @@ const templates = {
     link: `/manager/pending-requests?type=${d.bookingType}`,
   }),
 
+  [EVENTS.BOOKING_TRANSFERRED]: (d) => ({
+    title: '🔔 Selected as Second Approver',
+    message: `${d.transferredByName} has transferred ${d.employeeName}'s ${d.bookingType} booking (${d.orderId}) to you for approval.`,
+    link: `/manager/pending-requests?type=${d.bookingType}`,
+  }),
+
   [EVENTS.BOOKING_APPROVED]: (d) => ({
     title: '✅ Booking Approved',
     message: `Your ${d.bookingType} booking (${d.orderId}) has been approved by ${d.approverName}.`,

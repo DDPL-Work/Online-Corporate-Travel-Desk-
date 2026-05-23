@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { AiOutlineClose } from "react-icons/ai";
 import { MdEventSeat, MdRestaurant } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
@@ -697,9 +698,9 @@ export default function RTSeatSelectionModal({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6"
+      className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-6"
       onClick={onClose}
     >
       <div
@@ -1147,6 +1148,7 @@ export default function RTSeatSelectionModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

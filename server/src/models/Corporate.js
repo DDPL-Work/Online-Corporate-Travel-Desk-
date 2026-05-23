@@ -79,6 +79,7 @@ const corporateSchema = new mongoose.Schema(
       legalName: String,
       address: String,
       gstEmail: String,
+      contactNumber: String,
       verified: { type: Boolean, default: false },
       verifiedAt: Date,
     },
@@ -146,6 +147,7 @@ const corporateSchema = new mongoose.Schema(
     cycleReceipts: [{
       cycleIndex: { type: Number, required: true },
       receivedAmount: { type: Number, default: 0 },
+      receivedAt: Date,
       updatedAt: { type: Date, default: Date.now }
     }],
 

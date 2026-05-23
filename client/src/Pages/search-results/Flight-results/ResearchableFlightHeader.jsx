@@ -206,7 +206,7 @@ const buildPayload = (draft, original) => {
 };
 
 /* ─── Airport Autocomplete ───────────────────────────────────────────────────── */
-function AirportAutocomplete({ value, onChange, placeholder }) {
+function AirportAutocomplete({ value, onChange, placeholder, icon, onOpen }) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState([]);
   const [open, setOpen] = useState(false);
@@ -237,6 +237,7 @@ function AirportAutocomplete({ value, onChange, placeholder }) {
   }, []);
 
   const handleChange = (e) => {
+    if (onOpen) onOpen();
     const v = e.target.value;
     setQ(v);
     if (v.length > 1) {
@@ -272,7 +273,10 @@ function AirportAutocomplete({ value, onChange, placeholder }) {
           type="text"
           value={q}
           onChange={handleChange}
-          onFocus={() => q.length > 1 && setOpen(true)}
+          onFocus={() => {
+            if (onOpen) onOpen();
+            if (q.length > 1) setOpen(true);
+          }}
           placeholder={placeholder}
           autoComplete="off"
           className="w-full border-none outline-none bg-transparent text-[14px] font-extrabold text-gray-900 font-inter placeholder:text-gray-400 placeholder:font-semibold"
@@ -509,6 +513,7 @@ export default function ResearchableFlightHeader({
           value={draft.origin}
           onChange={(a) => setDraft((d) => ({ ...d, origin: a.code }))}
           placeholder="City or airport"
+          onOpen={() => setOpenDropdown(null)}
         />
       </div>
 
@@ -535,6 +540,7 @@ export default function ResearchableFlightHeader({
           value={draft.destination}
           onChange={(a) => setDraft((d) => ({ ...d, destination: a.code }))}
           placeholder="City or airport"
+          onOpen={() => setOpenDropdown(null)}
         />
       </div>
 
@@ -680,6 +686,7 @@ export default function ResearchableFlightHeader({
                   }}
                   placeholder="City"
                   icon={<MdFlightTakeoff />}
+                  onOpen={() => setOpenDropdown(null)}
                 />
               </div>
 
@@ -699,6 +706,7 @@ export default function ResearchableFlightHeader({
                   }}
                   placeholder="City"
                   icon={<MdFlightLand />}
+                  onOpen={() => setOpenDropdown(null)}
                 />
               </div>
 

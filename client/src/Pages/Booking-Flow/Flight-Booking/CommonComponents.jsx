@@ -1182,7 +1182,7 @@ export const TravelerForm = ({
               Fetched from Profile
             </span>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">
                 GSTIN
@@ -1219,7 +1219,19 @@ export const TravelerForm = ({
                 className="w-full px-4 py-3 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
               />
             </div>
-            <div className="lg:col-span-3">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                GST Contact Number
+              </label>
+              <input
+                type="text"
+                value={gstDetails.contactNumber || ""}
+                readOnly
+                placeholder="GST Contact Number"
+                className="w-full px-4 py-3 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
+              />
+            </div>
+            <div className="lg:col-span-4">
               <label className="block text-sm font-bold text-gray-700 mb-2">
                 Billing Address
               </label>

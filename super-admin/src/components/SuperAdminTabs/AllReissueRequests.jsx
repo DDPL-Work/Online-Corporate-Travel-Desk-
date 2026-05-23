@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { jwtDecode } from "jwt-decode";
 import {
@@ -11,8 +11,9 @@ import {
   FiRepeat,
   FiSend,
 } from "react-icons/fi";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import Pagination from "../Shared/Pagination";
+import TableActionBar from "../Shared/TableActionBar";
 import ReissueOpsDetailModal from "../reissue/ReissueOpsDetailModal";
 import { fetchReissueRequests } from "../../Redux/Actions/reissueThunks";
 import { listOpsMembers } from "../../API/opsAPI";
@@ -24,6 +25,8 @@ import {
   getStatusTone,
   getJourneyLabel,
 } from "../reissue/reissueUi";
+import useCsvExporter from "../../services/export/useCsvExporter";
+import { reissueRequestsExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 function readToken() {
   const token = sessionStorage.getItem("token");
@@ -55,6 +58,8 @@ function SummaryCard({ label, value, icon: Icon, tone }) {
 
 export default function AllReissueRequests() {
   const dispatch = useDispatch();
+  const tableScrollRef = useRef(null);
+  const { exportCsv, exportingKey } = useCsvExporter();
   const token = readToken();
   const currentRole = token.role || token.userRole || "super-admin";
   const currentUserId = token.id || token._id || null;
@@ -72,6 +77,7 @@ export default function AllReissueRequests() {
   const [page, setPage] = useState(1);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [opsMembers, setOpsMembers] = useState([]);
+  const isExporting = exportingKey === "reissue_requests";
 
   useEffect(() => {
     dispatch(
@@ -148,6 +154,22 @@ export default function AllReissueRequests() {
 
     return { total, processing, overdue, completed };
   }, [pagination, requests]);
+
+  const handleExport = () => {
+    if (loading) return;
+
+    exportCsv({
+      key: "reissue_requests",
+      data: filteredRequests.map((request) => ({
+        ...request,
+        exportJourneyLabel: getJourneyLabel(request.selectedFlight || request.preferredJourney),
+      })),
+      columns: reissueRequestsExportTemplate,
+      filenamePrefix: "reissue_requests_export",
+      emptyMessage: "No reissue requests available to export",
+      successMessage: "Reissue requests exported",
+    });
+  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-6">
@@ -282,7 +304,18 @@ export default function AllReissueRequests() {
         </div>
 
         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
+          <div className="flex justify-end border-b border-slate-100 bg-slate-50/60 px-4 py-3">
+            <TableActionBar
+              scrollRef={tableScrollRef}
+              exportLabel="Export"
+              onExport={handleExport}
+              exportDisabled={loading || isExporting}
+              exportLoading={isExporting}
+              exportClassName="bg-[#0A4D68] hover:bg-[#083d52] shadow-[#0A4D68]/20"
+              arrowClassName="border-cyan-100 bg-cyan-50 text-[#0A4D68] hover:bg-cyan-100 hover:border-cyan-200 hover:text-[#083d52] disabled:hover:bg-cyan-50"
+            />
+          </div>
+          <div ref={tableScrollRef} className="overflow-x-auto">
             <table className="min-w-[1280px] w-full">
               <thead className="bg-slate-900 text-left">
                 <tr>

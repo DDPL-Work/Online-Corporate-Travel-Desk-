@@ -14,6 +14,8 @@ import { fetchWalletRechargeLogs } from "../../Redux/Slice/walletRechargeLogsSli
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import Pagination from "../Shared/Pagination";
 import TableActionBar from "../Shared/TableActionBar";
+import useCsvExporter from "../../services/export/useCsvExporter";
+import { walletRechargeLogsExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const colors = {
   primary: "#0A4D68",
@@ -29,6 +31,7 @@ const colors = {
 export default function WalletRechargeLogs() {
   const dispatch = useDispatch();
   const tableScrollRef = useRef(null);
+  const { exportCsv, exportingKey } = useCsvExporter();
 
   // Filter states
   const [startDate, setStartDate] = useState("");
@@ -133,12 +136,26 @@ export default function WalletRechargeLogs() {
 
   const methods = ["All", "Razorpay"]; // only one method from API
   const statuses = ["All", "Success", "Failed", "Pending"];
+  const isExporting = exportingKey === "wallet_recharge_logs";
 
   // Summary stats (based on final displayed logs)
   const totalRecharge = finalLogs.reduce((sum, l) => sum + l.amount, 0);
   const success = finalLogs.filter((l) => l.status === "Success").length;
   const failed = finalLogs.filter((l) => l.status === "Failed").length;
   const pending = finalLogs.filter((l) => l.status === "Pending").length;
+
+  const handleExport = () => {
+    if (loading) return;
+
+    exportCsv({
+      key: "wallet_recharge_logs",
+      data: finalLogs,
+      columns: walletRechargeLogsExportTemplate,
+      filenamePrefix: "wallet_recharge_logs_export",
+      emptyMessage: "No wallet recharge logs available to export",
+      successMessage: "Wallet recharge logs exported",
+    });
+  };
 
   return (
     <div
@@ -290,7 +307,9 @@ export default function WalletRechargeLogs() {
             <TableActionBar
               scrollRef={tableScrollRef}
               exportLabel="Export"
-              onExport={() => {}}
+              onExport={handleExport}
+              exportDisabled={loading || isExporting}
+              exportLoading={isExporting}
               exportClassName="bg-[#0A4D68] hover:bg-[#088395] shadow-[#0A4D68]/20"
               arrowClassName="border-cyan-100 bg-cyan-50 text-[#0A4D68] hover:bg-cyan-100 hover:border-cyan-200 hover:text-[#08384d] disabled:hover:bg-cyan-50"
             />

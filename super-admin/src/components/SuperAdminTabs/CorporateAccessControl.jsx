@@ -23,6 +23,8 @@ import ViewCorporateModal from "../../Modal/ViewCorporateModal";
 import { ToastConfirm } from "../../utils/ToastConfirm";
 import FinancialApprovalModal from "../../Modal/FinancialApprovalModal";
 import TableActionBar from "../Shared/TableActionBar";
+import useCsvExporter from "../../services/export/useCsvExporter";
+import { corporateAccessExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const colors = {
   primary: "#0A4D68",
@@ -32,20 +34,13 @@ const colors = {
   dark: "#1E293B",
 };
 
-const formatExportCurrency = (value) =>
-  `INR ${Number(value || 0).toLocaleString("en-IN")}`;
-
-const escapeHtml = (value) =>
-  String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+const canManageApprovedCorporate = (corporate) =>
+  Boolean(corporate?.status && corporate.status !== "pending");
 
 export default function CorporateAccessControl() {
   const tableScrollRef = useRef(null);
   const dispatch = useDispatch();
+  const { exportCsv, exportingKey } = useCsvExporter();
 
   const {
     corporates = [],
@@ -62,6 +57,7 @@ export default function CorporateAccessControl() {
   const [corporateFilter, setCorporateFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const isExporting = exportingKey === "corporate_access";
 
   /* ---------------- FETCH ---------------- */
   useEffect(() => {
@@ -146,86 +142,14 @@ export default function CorporateAccessControl() {
   const handleExport = () => {
     if (loading) return;
 
-    if (filtered.length === 0) {
-      toast.info("No corporates available to export");
-      return;
-    }
-
-    const headers = [
-      "Corporate Name",
-      "Primary Contact",
-      "Primary Email",
-      "Classification",
-      "Wallet Balance",
-      "Current Credit",
-      "Credit Limit",
-      "SSO Domain",
-      "Status",
-    ];
-
-    const rows = filtered.map((corporate) => [
-      corporate.corporateName || "N/A",
-      corporate.primaryContact?.name || "N/A",
-      corporate.primaryContact?.email || "N/A",
-      corporate.classification || "N/A",
-      formatExportCurrency(corporate.walletBalance),
-      formatExportCurrency(corporate.currentCredit),
-      formatExportCurrency(corporate.creditLimit),
-      corporate.ssoConfig?.domain || "N/A",
-      corporate.status || "inactive",
-    ]);
-
-    const tableRows = rows
-      .map(
-        (row) =>
-          `<tr>${row
-            .map(
-              (cell) =>
-                `<td style="border:1px solid #dbe4f0;padding:10px;vertical-align:top;">${escapeHtml(cell)}</td>`,
-            )
-            .join("")}</tr>`,
-      )
-      .join("");
-
-    const html = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-  </head>
-  <body>
-    <table>
-      <thead>
-        <tr>
-          ${headers
-            .map(
-              (header) =>
-                `<th style="border:1px solid #cbd5e1;padding:10px;background:#0A4D68;color:#ffffff;font-weight:700;text-align:left;">${escapeHtml(header)}</th>`,
-            )
-            .join("")}
-        </tr>
-      </thead>
-      <tbody>
-        ${tableRows}
-      </tbody>
-    </table>
-  </body>
-</html>`;
-
-    const stamp = new Date().toISOString().slice(0, 10);
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
+    exportCsv({
+      key: "corporate_access",
+      data: filtered,
+      columns: corporateAccessExportTemplate,
+      filenamePrefix: "corporate_access_export",
+      emptyMessage: "No corporates available to export",
+      successMessage: "Corporate list exported",
     });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = `corporate-access-control-${stamp}.xls`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    toast.success("Corporate list exported");
   };
 
   /* ---------------- UI ---------------- */
@@ -327,6 +251,8 @@ export default function CorporateAccessControl() {
               scrollRef={tableScrollRef}
               exportLabel="Export"
               onExport={handleExport}
+              exportDisabled={loading || isExporting}
+              exportLoading={isExporting}
               exportClassName="bg-[#0A4D68] hover:bg-[#088395] shadow-[#0A4D68]/20"
               arrowClassName="border-teal-100 bg-teal-50 text-[#0A4D68] hover:bg-teal-100 hover:border-teal-200 hover:text-[#08384d] disabled:hover:bg-teal-50"
             />
@@ -365,7 +291,10 @@ export default function CorporateAccessControl() {
                   </tr>
                 )}
                 {!loading &&
-                  filtered.map((c) => (
+                  filtered.map((c) => {
+                    const canManage = canManageApprovedCorporate(c);
+
+                    return (
                     <tr key={c._id} className="hover:bg-slate-50 transition-all">
                       <td className="px-6 py-3 align-middle">
                         <div className="flex flex-col">
@@ -409,16 +338,18 @@ export default function CorporateAccessControl() {
                             color="text-slate-600"
                             hoverBg="bg-slate-100"
                           />
-                          <ActionButton
-                            icon={<FiEdit2 size={16} />}
-                            onClick={() => {
-                              setSelectedRow(c);
-                              setOpenEdit(true);
-                            }}
-                            tooltip="Edit"
-                            color="text-blue-600"
-                            hoverBg="bg-blue-50"
-                          />
+                          {canManage && (
+                            <ActionButton
+                              icon={<FiEdit2 size={16} />}
+                              onClick={() => {
+                                setSelectedRow(c);
+                                setOpenEdit(true);
+                              }}
+                              tooltip="Edit"
+                              color="text-blue-600"
+                              hoverBg="bg-blue-50"
+                            />
+                          )}
                           {c.status === "pending" && (
                             <ActionButton
                               icon={<FiCheckCircle size={16} />}
@@ -428,23 +359,26 @@ export default function CorporateAccessControl() {
                               hoverBg="bg-green-50"
                             />
                           )}
-                          <ActionButton
-                            icon={
-                              c.status === "active" ? (
-                                <FiToggleRight size={20} />
-                              ) : (
-                                <FiToggleLeft size={20} />
-                              )
-                            }
-                            onClick={() => handleToggleStatus(c._id)}
-                            tooltip="Toggle Status"
-                            color={c.status === "active" ? "text-green-600" : "text-red-600"}
-                            hoverBg="bg-slate-100"
-                          />
+                          {canManage && (
+                            <ActionButton
+                              icon={
+                                c.status === "active" ? (
+                                  <FiToggleRight size={20} />
+                                ) : (
+                                  <FiToggleLeft size={20} />
+                                )
+                              }
+                              onClick={() => handleToggleStatus(c._id)}
+                              tooltip="Change the status"
+                              color={c.status === "active" ? "text-green-600" : "text-red-600"}
+                              hoverBg="bg-slate-100"
+                            />
+                          )}
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 {!loading && filtered.length === 0 && (
                   <tr>
                     <td colSpan="6" className="py-8 text-center text-slate-500">
