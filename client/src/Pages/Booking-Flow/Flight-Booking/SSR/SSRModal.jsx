@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { AiOutlineClose } from "react-icons/ai";
 import { FaConciergeBell } from "react-icons/fa";
 import { MdEventSeat, MdRestaurant } from "react-icons/md";
@@ -132,9 +133,9 @@ export default function SSRModal({
 
   /* ── SSR unavailable error state ── */
   if (ssrError) {
-    return (
+    return createPortal(
       <div
-        className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
+        className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center"
         onClick={onClose}
       >
         <div
@@ -150,13 +151,14 @@ export default function SSRModal({
             Close
           </button>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6"
+      className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-6"
       onClick={onClose}
     >
       <div
@@ -313,6 +315,7 @@ export default function SSRModal({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

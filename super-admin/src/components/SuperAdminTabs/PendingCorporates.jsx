@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  FiEdit2,
   FiCheckCircle,
-  FiToggleLeft,
   FiEye,
   FiSearch,
   FiUsers,
@@ -11,16 +9,15 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "sonner";
 
-import EditCorporateModal from "../../Modal/EditCorporateModal";
 import {
   fetchCorporates,
-  updateCorporate,
   fetchCorporateById,
 } from "../../Redux/Slice/corporateListSlice";
 import ViewCorporateModal from "../../Modal/ViewCorporateModal";
-import { ToastConfirm } from "../../utils/ToastConfirm";
 import FinancialApprovalModal from "../../Modal/FinancialApprovalModal";
 import TableActionBar from "../Shared/TableActionBar";
+import useCsvExporter from "../../services/export/useCsvExporter";
+import { pendingCorporatesExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const colors = {
   primary: "#0A4D68",
@@ -30,20 +27,10 @@ const colors = {
   dark: "#1E293B",
 };
 
-const formatExportCurrency = (value) =>
-  `INR ${Number(value || 0).toLocaleString("en-IN")}`;
-
-const escapeHtml = (value) =>
-  String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-
 export default function PendingCorporates() {
   const tableScrollRef = useRef(null);
   const dispatch = useDispatch();
+  const { exportCsv, exportingKey } = useCsvExporter();
 
   const { corporates = [], loading } = useSelector(
     (state) => state.corporateList,
@@ -51,11 +38,11 @@ export default function PendingCorporates() {
 
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [viewCorporate, setViewCorporate] = useState(null);
-  const [openEdit, setOpenEdit] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [openFinancialApprove, setOpenFinancialApprove] = useState(false);
   const [corporateFilter, setCorporateFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const isExporting = exportingKey === "pending_corporates";
 
   useEffect(() => {
     dispatch(fetchCorporates())
@@ -120,112 +107,17 @@ export default function PendingCorporates() {
     setOpenFinancialApprove(true);
   };
 
-  const handleReject = (corporate) => {
-    ToastConfirm({
-      message: `Reject onboarding request for ${corporate.corporateName}?`,
-      confirmText: "Reject",
-      onConfirm: async () => {
-        try {
-          await dispatch(
-            updateCorporate({
-              id: corporate._id,
-              payload: {
-                status: "inactive",
-                isActive: false,
-              },
-            }),
-          ).unwrap();
-          toast.info("Corporate request rejected");
-        } catch (err) {
-          toast.error(err);
-        }
-      },
-    });
-  };
-
   const handleExport = () => {
     if (loading) return;
 
-    if (filtered.length === 0) {
-      toast.info("No pending corporates available to download");
-      return;
-    }
-
-    const headers = [
-      "Corporate Name",
-      "Primary Contact",
-      "Primary Email",
-      "Classification",
-      "Wallet Balance",
-      "Current Credit",
-      "Credit Limit",
-      "SSO Domain",
-      "Status",
-    ];
-
-    const rows = filtered.map((corporate) => [
-      corporate.corporateName || "N/A",
-      corporate.primaryContact?.name || "N/A",
-      corporate.primaryContact?.email || "N/A",
-      corporate.classification || "N/A",
-      formatExportCurrency(corporate.walletBalance),
-      formatExportCurrency(corporate.currentCredit),
-      formatExportCurrency(corporate.creditLimit),
-      corporate.ssoConfig?.domain || "N/A",
-      corporate.status || "pending",
-    ]);
-
-    const tableRows = rows
-      .map(
-        (row) =>
-          `<tr>${row
-            .map(
-              (cell) =>
-                `<td style="border:1px solid #dbe4f0;padding:10px;vertical-align:top;">${escapeHtml(cell)}</td>`,
-            )
-            .join("")}</tr>`,
-      )
-      .join("");
-
-    const html = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-  </head>
-  <body>
-    <table>
-      <thead>
-        <tr>
-          ${headers
-            .map(
-              (header) =>
-                `<th style="border:1px solid #cbd5e1;padding:10px;background:#0A4D68;color:#ffffff;font-weight:700;text-align:left;">${escapeHtml(header)}</th>`,
-            )
-            .join("")}
-        </tr>
-      </thead>
-      <tbody>
-        ${tableRows}
-      </tbody>
-    </table>
-  </body>
-</html>`;
-
-    const stamp = new Date().toISOString().slice(0, 10);
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
+    exportCsv({
+      key: "pending_corporates",
+      data: filtered,
+      columns: pendingCorporatesExportTemplate,
+      filenamePrefix: "pending_corporates_export",
+      emptyMessage: "No pending corporates available to export",
+      successMessage: "Pending corporates exported",
     });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = `pending-corporates-${stamp}.xls`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    toast.success("Pending corporate list downloaded");
   };
 
   return (
@@ -305,6 +197,8 @@ export default function PendingCorporates() {
               scrollRef={tableScrollRef}
               exportLabel="Export"
               onExport={handleExport}
+              exportDisabled={loading || isExporting}
+              exportLoading={isExporting}
               exportClassName="bg-[#7C3AED] hover:bg-[#6D28D9] shadow-[#7C3AED]/20"
               arrowClassName="border-violet-100 bg-violet-50 text-[#7C3AED] hover:bg-violet-100 hover:border-violet-200 hover:text-[#5B21B6] disabled:hover:bg-violet-50"
             />
@@ -415,28 +309,11 @@ export default function PendingCorporates() {
                             hoverBg="bg-slate-100"
                           />
                           <ActionButton
-                            icon={<FiEdit2 size={16} />}
-                            onClick={() => {
-                              setSelectedRow(corporate);
-                              setOpenEdit(true);
-                            }}
-                            tooltip="Edit Corporate"
-                            color="text-blue-600"
-                            hoverBg="bg-blue-50"
-                          />
-                          <ActionButton
                             icon={<FiCheckCircle size={16} />}
                             onClick={() => handleApprove(corporate)}
                             tooltip="Approve Corporate"
                             color="text-green-600"
                             hoverBg="bg-green-50"
-                          />
-                          <ActionButton
-                            icon={<FiToggleLeft size={20} />}
-                            onClick={() => handleReject(corporate)}
-                            tooltip="Reject Corporate"
-                            color="text-red-600"
-                            hoverBg="bg-slate-100"
                           />
                         </div>
                       </td>
@@ -471,13 +348,6 @@ export default function PendingCorporates() {
             setIsViewOpen(false);
             setViewCorporate(null);
           }}
-        />
-      )}
-
-      {openEdit && selectedRow && (
-        <EditCorporateModal
-          corporate={selectedRow}
-          onClose={() => setOpenEdit(false)}
         />
       )}
 

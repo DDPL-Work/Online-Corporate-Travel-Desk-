@@ -18,6 +18,8 @@ import EditApiConfigModal from "../../Modal/EditApiConfigModal";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchTboBalance } from "../../Redux/Slice/tboBalanceSlice";
 import TableActionBar from "../Shared/TableActionBar";
+import useCsvExporter from "../../services/export/useCsvExporter";
+import { apiConfigurationsExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const colors = {
   primary: "#0A4D68",
@@ -31,6 +33,7 @@ const colors = {
 
 export default function ApiConfigurations() {
   const tableScrollRef = useRef(null);
+  const { exportCsv, exportingKey } = useCsvExporter();
   const [records, setRecords] = useState(apiConfigurationsData);
   const [openAdd, setOpenAdd] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
@@ -53,6 +56,7 @@ export default function ApiConfigurations() {
 
   const types = ["All", "Flight", "Hotel", "Finance"];
   const statuses = ["All", "Active", "Inactive"];
+  const isExporting = exportingKey === "api_configurations";
 
   // Filtered list
   const filtered = records.filter((r) => {
@@ -92,6 +96,17 @@ export default function ApiConfigurations() {
       )
     );
   }
+
+  const handleExport = () => {
+    exportCsv({
+      key: "api_configurations",
+      data: filtered,
+      columns: apiConfigurationsExportTemplate,
+      filenamePrefix: "api_configurations_export",
+      emptyMessage: "No API configurations available to export",
+      successMessage: "API configurations exported",
+    });
+  };
 
   React.useEffect(() => {
     dispatch(fetchTboBalance());
@@ -244,7 +259,9 @@ export default function ApiConfigurations() {
             <TableActionBar
               scrollRef={tableScrollRef}
               exportLabel="Export"
-              onExport={() => {}}
+              onExport={handleExport}
+              exportDisabled={isExporting}
+              exportLoading={isExporting}
               exportClassName="bg-[#0A4D68] hover:bg-[#088395] shadow-[#0A4D68]/20"
               arrowClassName="border-sky-100 bg-sky-50 text-[#0A4D68] hover:bg-sky-100 hover:border-sky-200 hover:text-[#08384d] disabled:hover:bg-sky-50"
             />

@@ -14,8 +14,6 @@ import {
   FiClock,
   FiArrowLeft,
   FiArrowRight,
-  FiChevronLeft,
-  FiChevronRight,
   FiUser,
   FiRotateCcw,
   FiFilter,
@@ -38,6 +36,12 @@ import { clearCycleTransactions } from "../../Redux/Slice/postpaidSlice";
 import { toast } from "sonner";
 import Pagination from "../Shared/Pagination";
 import TableActionBar from "../Shared/TableActionBar";
+import useCsvExporter from "../../services/export/useCsvExporter";
+import {
+  creditAlertsExportTemplate,
+  creditStatementsExportTemplate,
+  creditTransactionsExportTemplate,
+} from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const fmt = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }) : "—";
@@ -47,14 +51,25 @@ const fmtAmt = (n) =>
 
 const STMT_COLS = [
   "Row", "Statement ID", "Statement Period",
-  "Statement Date", "Due Date", "Delay Days", "Amount (₹)", "Received (₹)", "Action",
+  "Statement Date", "Due Date", "Payment Received", "Delay Days", "Amount (₹)", "Received (₹)", "Action",
 ];
 
 const TX_COLS = [
-  "Transaction ID", "Doc Type",
+  "Transaction ID", "Payment ID", "Doc Type",
   "Invoice Date", "Product Type", "Booking Date", "Booking Ref",
   "Txn Type", "Amount (₹)", "Status",
 ];
+
+const calculateDelayDays = ({ dueDate, statementAmount, receivedAmount, paymentReceivedAt }) => {
+  if (!dueDate) return 0;
+  if (Number(statementAmount || 0) <= 0) return 0;
+  const normalizedDueDate = new Date(dueDate);
+  const paidInFull = Number(receivedAmount || 0) >= Number(statementAmount || 0);
+  const stopAt = paidInFull && paymentReceivedAt ? new Date(paymentReceivedAt) : new Date();
+  return stopAt > normalizedDueDate
+    ? Math.floor((stopAt.getTime() - normalizedDueDate.getTime()) / 86400000)
+    : 0;
+};
 
 const DRILL_PAGE_SIZE = 10;
 
@@ -73,12 +88,8 @@ export default function CreditStatusAlerts() {
   const dispatch = useDispatch();
   const tableScrollRef = useRef(null);
   const cycleTableScrollRef = useRef(null);
-  
-  const scrollCycleTable = (dir) => {
-    if (cycleTableScrollRef.current) {
-      cycleTableScrollRef.current.scrollBy({ left: dir === "left" ? -300 : 300, behavior: "smooth" });
-    }
-  };
+  const creditTransactionsScrollRef = useRef(null);
+  const { exportCsv, exportingKey } = useCsvExporter();
   
   // Filters & Pagination
   const [searchTerm, setSearchTerm] = useState("");
@@ -229,13 +240,18 @@ export default function CreditStatusAlerts() {
       const dueDate = stmtDate
         ? new Date(stmtDate.getTime() + dueDays * 86400000)
         : null;
-      const delayDays = dueDate && new Date() > dueDate
-        ? Math.floor((Date.now() - dueDate.getTime()) / 86400000)
-        : 0;
+      const paymentReceivedAt = cycle.paymentReceivedAt || cycle.receivedAt || null;
+      const delayDays = calculateDelayDays({
+        dueDate,
+        statementAmount: cycle.statementAmount,
+        receivedAmount: cycle.receivedAmount,
+        paymentReceivedAt,
+      });
       
       return {
         ...cycle,
         dueDate: dueDate || cycle.dueDate,
+        paymentReceivedAt,
         delayDays,
       };
     });
@@ -330,6 +346,18 @@ export default function CreditStatusAlerts() {
   }, [processedData, startDate, endDate]);
 
   const inr = (v) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v || 0);
+  const isAlertsExporting = exportingKey === "credit_alerts";
+
+  const handleAlertsExport = () => {
+    exportCsv({
+      key: "credit_alerts",
+      data: filtered,
+      columns: creditAlertsExportTemplate,
+      filenamePrefix: "credit_alerts_export",
+      emptyMessage: "No credit alerts available to export",
+      successMessage: "Credit alerts exported",
+    });
+  };
 
   if (loading) {
     return (
@@ -343,6 +371,35 @@ export default function CreditStatusAlerts() {
   // --- CYCLE-BASED DRILL DOWN VIEW ---
   if (drillDownId) {
     const target = corporates.find(c => c._id === drillDownId) || {};
+    const statementRows = activeTab === "current"
+      ? currentCycleRow ? [currentCycleRow] : []
+      : enhancedPreviousCycles;
+    const isStatementsExporting = exportingKey === "credit_statements";
+    const isTransactionsExporting = exportingKey === "credit_transactions";
+
+    const handleStatementsExport = () => {
+      exportCsv({
+        key: "credit_statements",
+        data: statementRows,
+        columns: creditStatementsExportTemplate,
+        filenamePrefix: "credit_statements_export",
+        emptyMessage: "No statement rows available to export",
+        successMessage: "Credit statements exported",
+      });
+    };
+
+    const handleTransactionsExport = () => {
+      if (drillLoading) return;
+
+      exportCsv({
+        key: "credit_transactions",
+        data: paginatedDrillTx,
+        columns: creditTransactionsExportTemplate,
+        filenamePrefix: "credit_transactions_export",
+        emptyMessage: "No credit transactions available to export",
+        successMessage: "Credit transactions exported",
+      });
+    };
 
     return (
       <div className="min-h-screen p-4 lg:p-6 bg-[#F8FAFC] space-y-6 animate-in slide-in-from-bottom-4 duration-500">
@@ -444,6 +501,13 @@ export default function CreditStatusAlerts() {
                   ₹{fmtAmt(Math.max(0, editModal.row.statementAmount - Number(editModal.receivedAmount || 0)))}
                 </div>
               </div>
+
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Payment Received</label>
+                <div className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-600 cursor-not-allowed mt-1">
+                  {fmt(editModal.row.paymentReceivedAt)}
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3 mt-8">
@@ -500,12 +564,23 @@ export default function CreditStatusAlerts() {
             </div>
 
             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-               <div className="px-8 py-5 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+               <div className="px-8 py-5 border-b border-slate-50 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
                   <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest">Transactions — {drillStmtId}</h3>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{drillTx.length} records</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{drillTx.length} records</span>
+                    <TableActionBar
+                      scrollRef={creditTransactionsScrollRef}
+                      exportLabel="Export"
+                      onExport={handleTransactionsExport}
+                      exportDisabled={drillLoading || isTransactionsExporting}
+                      exportLoading={isTransactionsExporting}
+                      exportClassName="bg-[#0A4D68] hover:bg-[#083d52] shadow-[#0A4D68]/20"
+                      arrowClassName="border-cyan-100 bg-cyan-50 text-[#0A4D68] hover:bg-cyan-100 hover:border-cyan-200 hover:text-[#083d52] disabled:hover:bg-cyan-50"
+                    />
+                  </div>
                </div>
                
-               <div className="overflow-x-auto min-h-[400px]">
+               <div ref={creditTransactionsScrollRef} className="overflow-x-auto min-h-[400px]">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-900 border-b border-slate-800">
@@ -524,6 +599,15 @@ export default function CreditStatusAlerts() {
                           <td className="px-6 py-3 font-mono text-slate-400 text-[10px]">{t._id}</td>
 
 
+                          <td className="px-6 py-3">
+                            {t.paymentId ? (
+                              <span className="font-mono text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-md whitespace-nowrap">
+                                {t.paymentId}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
                           <td className="px-6 py-3">{t.type === "booking" ? "Sales Invoice" : t.type || "—"}</td>
                           <td className="px-6 py-3">{fmt(t.bookingDate || t.createdAt)}</td>
                           <td className="px-6 py-3">
@@ -566,26 +650,19 @@ export default function CreditStatusAlerts() {
         {/* ── CYCLE LIST VIEW ── */}
         {!drillCycle && (
           <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-            <div className="px-8 py-5 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+            <div className="px-8 py-5 border-b border-slate-50 bg-slate-50/50 flex flex-wrap justify-between items-center gap-3">
               <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest">
                 {activeTab === "current" ? "Current Billing Cycle" : "Statement History"}
               </h3>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => scrollCycleTable('left')}
-                  className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-[#0A4D68] hover:border-[#0A4D68]/30 transition-colors shadow-sm"
-                  title="Scroll Left"
-                >
-                  <FiChevronLeft size={14} />
-                </button>
-                <button 
-                  onClick={() => scrollCycleTable('right')}
-                  className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-[#0A4D68] hover:border-[#0A4D68]/30 transition-colors shadow-sm"
-                  title="Scroll Right"
-                >
-                  <FiChevronRight size={14} />
-                </button>
-              </div>
+              <TableActionBar
+                scrollRef={cycleTableScrollRef}
+                exportLabel="Export"
+                onExport={handleStatementsExport}
+                exportDisabled={loadingPostpaidBalance || loadingCycles || isStatementsExporting}
+                exportLoading={isStatementsExporting}
+                exportClassName="bg-slate-900 hover:bg-black shadow-black/10"
+                arrowClassName="border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 disabled:hover:bg-slate-50"
+              />
             </div>
             
             <div className="overflow-x-auto" ref={cycleTableScrollRef}>
@@ -809,7 +886,9 @@ export default function CreditStatusAlerts() {
       <TableActionBar
         scrollRef={tableScrollRef}
         exportLabel="Export Alerts"
-        onExport={() => toast.info("Preparing alert report...")}
+        onExport={handleAlertsExport}
+        exportDisabled={isAlertsExporting}
+        exportLoading={isAlertsExporting}
         exportClassName="bg-[#B45309] hover:bg-[#92400E] shadow-[#B45309]/20"
         arrowClassName="border-amber-100 bg-amber-50 text-[#B45309] hover:bg-amber-100 hover:border-amber-200 hover:text-[#92400E] disabled:hover:bg-amber-50"
       />
@@ -943,6 +1022,9 @@ function StatementRow({ row, onClick, onEdit }) {
       </td>
       <td className="px-8 py-4 whitespace-nowrap text-slate-500">{fmt(row.statementDate)}</td>
       <td className="px-8 py-4 whitespace-nowrap text-slate-500">{fmt(row.dueDate)}</td>
+      <td className="px-8 py-4 whitespace-nowrap text-slate-500">
+        {row.isCurrent ? "—" : fmt(row.paymentReceivedAt)}
+      </td>
       <td className="px-8 py-4 text-center">
         <span
           className={`px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-xs ${row.delayDays > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}

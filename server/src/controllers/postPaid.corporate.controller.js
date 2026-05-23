@@ -33,6 +33,26 @@ function trackId(corporateId, cycleIndex) {
   return `TRK${shortCorp}${String(cycleIndex).padStart(4, "0")}`;
 }
 
+const BOOKING_LEDGER_SELECT =
+  "bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType payment";
+
+function attachPaymentId(transaction, details) {
+  if (!details) return transaction;
+  transaction.paymentId = details.payment?.paymentId || transaction.paymentId || null;
+  transaction.paymentMethod = details.payment?.method || transaction.paymentMethod || null;
+  return transaction;
+}
+
+function calculateDelayDays({ dueDate, statementAmount, receivedAmount, receivedAt }) {
+  if (!dueDate) return 0;
+  if (Number(statementAmount || 0) <= 0) return 0;
+  const paidInFull = Number(receivedAmount || 0) >= Number(statementAmount || 0);
+  const stopAt = paidInFull && receivedAt ? new Date(receivedAt) : new Date();
+  return stopAt > dueDate
+    ? Math.floor((stopAt.getTime() - dueDate.getTime()) / (24 * 60 * 60 * 1000))
+    : 0;
+}
+
 // =======================================
 // GET POSTPAID BALANCE (SUMMARY ONLY)
 // =======================================
@@ -167,28 +187,30 @@ exports.getPostpaidTransactions = async (req, res, next) => {
           
           // 2. Try primary model based on hint
           let Model = isHotel ? HotelBookingRequest : BookingRequest;
-          let details = await Model.findById(bId).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+          let details = await Model.findById(bId).select(BOOKING_LEDGER_SELECT);
 
           // 3. If not found, try the other model (robust fallback)
           if (!details) {
             Model = isHotel ? BookingRequest : HotelBookingRequest;
-            details = await Model.findById(bId).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+            details = await Model.findById(bId).select(BOOKING_LEDGER_SELECT);
           }
 
           if (details) {
             t.bookingId = details;
+            attachPaymentId(t, details);
           } else {
             // 4. Try searching by bookingReference as a final safety net
             if (tx.bookingReference) {
-              details = await Model.findOne({ bookingReference: tx.bookingReference }).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+              details = await Model.findOne({ bookingReference: tx.bookingReference }).select(BOOKING_LEDGER_SELECT);
               if (!details) {
                 Model = isHotel ? BookingRequest : HotelBookingRequest;
-                details = await Model.findOne({ bookingReference: tx.bookingReference }).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+                details = await Model.findOne({ bookingReference: tx.bookingReference }).select(BOOKING_LEDGER_SELECT);
               }
             }
             
             if (details) {
               t.bookingId = details;
+              attachPaymentId(t, details);
             } else {
               // Last resort: try generic Booking model
               const Booking = require("../models/Booking");
@@ -282,11 +304,18 @@ exports.getPreviousCycles = async (req, res, next) => {
       const statementDate = new Date(c.end.getTime() + 1 * 24 * 60 * 60 * 1000);
       const dueDays = corporate.dueDays !== undefined && corporate.dueDays !== null ? corporate.dueDays : 15;
       const dueDate = new Date(statementDate.getTime() + dueDays * 24 * 60 * 60 * 1000);
-      const now = new Date();
-      const delayDays = now > dueDate ? Math.floor((now - dueDate) / (24 * 60 * 60 * 1000)) : 0;
 
       const receiptRecord = corporate.cycleReceipts?.find(r => r.cycleIndex === c.index);
       const receivedAmount = receiptRecord ? receiptRecord.receivedAmount : 0;
+      const paymentReceivedAt = Number(receivedAmount || 0) > 0
+        ? receiptRecord?.receivedAt || receiptRecord?.updatedAt || null
+        : null;
+      const delayDays = calculateDelayDays({
+        dueDate,
+        statementAmount,
+        receivedAmount,
+        receivedAt: paymentReceivedAt,
+      });
 
       return {
         rowNum: previousCycles.length - idx, // descending row num like the screenshot
@@ -300,6 +329,7 @@ exports.getPreviousCycles = async (req, res, next) => {
         delayDays,
         statementAmount,
         receivedAmount,
+        paymentReceivedAt,
       };
     }).reverse(); // newest first
 
@@ -364,27 +394,29 @@ exports.getCycleTransactions = async (req, res, next) => {
             t.description?.toLowerCase().includes("hotel");
           
           let Model = isHotel ? HotelBookingRequest : BookingRequest;
-          let details = await Model.findById(bId).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+          let details = await Model.findById(bId).select(BOOKING_LEDGER_SELECT);
 
           if (!details) {
             Model = isHotel ? BookingRequest : HotelBookingRequest;
-            details = await Model.findById(bId).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+            details = await Model.findById(bId).select(BOOKING_LEDGER_SELECT);
           }
 
           if (details) {
             t.bookingId = details;
+            attachPaymentId(t, details);
           } else {
             // 4. Try searching by bookingReference as a final safety net
             if (tx.bookingReference) {
-              details = await Model.findOne({ bookingReference: tx.bookingReference }).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+              details = await Model.findOne({ bookingReference: tx.bookingReference }).select(BOOKING_LEDGER_SELECT);
               if (!details) {
                 Model = isHotel ? BookingRequest : HotelBookingRequest;
-                details = await Model.findOne({ bookingReference: tx.bookingReference }).select("bookingResult orderId bookingReference flightDetails hotelDetails travellers bookingSnapshot bookingType");
+                details = await Model.findOne({ bookingReference: tx.bookingReference }).select(BOOKING_LEDGER_SELECT);
               }
             }
             
             if (details) {
               t.bookingId = details;
+              attachPaymentId(t, details);
             } else {
               const Booking = require("../models/Booking");
               t.bookingId = await Booking.findById(bId).select("flightDetails hotelDetails tboBookingId bookingReference bookingType");
@@ -462,13 +494,22 @@ exports.updateCycleReceipt = async (req, res, next) => {
     }
 
     const existing = corporate.cycleReceipts.find(c => c.cycleIndex === Number(cycleIndex));
+    const normalizedReceivedAmount = Number(receivedAmount);
+    if (Number.isNaN(normalizedReceivedAmount) || normalizedReceivedAmount < 0) {
+      return next(new ApiError(400, "Received amount must be a valid non-negative number"));
+    }
+
+    const paymentReceivedAt = normalizedReceivedAmount > 0 ? new Date() : null;
+
     if (existing) {
-      existing.receivedAmount = Number(receivedAmount);
+      existing.receivedAmount = normalizedReceivedAmount;
+      existing.receivedAt = paymentReceivedAt;
       existing.updatedAt = new Date();
     } else {
       corporate.cycleReceipts.push({
         cycleIndex: Number(cycleIndex),
-        receivedAmount: Number(receivedAmount)
+        receivedAmount: normalizedReceivedAmount,
+        receivedAt: paymentReceivedAt,
       });
     }
 

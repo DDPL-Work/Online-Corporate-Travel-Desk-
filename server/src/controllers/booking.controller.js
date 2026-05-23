@@ -2314,8 +2314,15 @@ exports.downloadTicketPdf = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Booking not found");
   }
 
+  const isAdminOrOps = ["super-admin", "travel-admin", "ops-member"].includes(
+    req.user.role
+  );
+
   // 🔐 ownership check
-  if (context.requestedBooking.userId.toString() !== req.user._id.toString()) {
+  if (
+    !isAdminOrOps &&
+    context.requestedBooking.userId.toString() !== req.user._id.toString()
+  ) {
     throw new ApiError(403, "Not authorized");
   }
 

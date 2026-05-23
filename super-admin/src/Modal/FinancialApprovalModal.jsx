@@ -26,7 +26,7 @@ export default function FinancialApprovalModal({ corporate, onClose }) {
     classification: "prepaid",
     billingCycle: "30days",
     customBillingDays: "",
-    dueDays: 15,
+    dueDays: 7,
     creditLimit: 0,
     walletBalance: 0,
     domesticFlight: 0,

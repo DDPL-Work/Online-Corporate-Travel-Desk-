@@ -25,6 +25,11 @@ import {
   FlightBookingModal,
   HotelBookingModal,
 } from "../Shared/BookingRequestDetailsModal";
+import useCsvExporter from "../../services/export/useCsvExporter";
+import {
+  flightCancellationQueriesExportTemplate,
+  hotelCancellationQueriesExportTemplate,
+} from "../../templates/exportTemplates/superAdminExportTemplates";
 
 // ─────────────────────────────────────────────
 // CONSTANTS
@@ -600,6 +605,7 @@ function QueryDetailModal({ query, onClose, onStatusChange }) {
 function CancellationQueryTab() {
   const tableScrollRef = useRef(null);
   const dispatch = useDispatch();
+  const { exportCsv, exportingKey } = useCsvExporter();
   const {
     cancellationQueries,
     loadingCancellationQueries,
@@ -613,6 +619,7 @@ function CancellationQueryTab() {
   const [requestedDate, setRequestedDate] = useState("");
   const [page, setPage] = useState(1);
   const [selectedQuery, setSelectedQuery] = useState(null);
+  const isExporting = exportingKey === "flight_cancellation_queries";
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -711,6 +718,19 @@ function CancellationQueryTab() {
     });
     return counts;
   }, [queries]);
+
+  const handleExport = () => {
+    if (loadingCancellationQueries) return;
+
+    exportCsv({
+      key: "flight_cancellation_queries",
+      data: paginatedQueries,
+      columns: flightCancellationQueriesExportTemplate,
+      filenamePrefix: "flight_cancellation_queries_export",
+      emptyMessage: "No flight cancellation queries available to export",
+      successMessage: "Flight cancellation queries exported",
+    });
+  };
 
   const fmt = (d) =>
     d
@@ -835,7 +855,9 @@ function CancellationQueryTab() {
           <TableActionBar
             scrollRef={tableScrollRef}
             exportLabel="Export Queries"
-            onExport={() => {}}
+            onExport={handleExport}
+            exportDisabled={loadingCancellationQueries || isExporting}
+            exportLoading={isExporting}
             exportClassName="bg-rose-700 hover:bg-rose-800 shadow-rose-700/20"
             arrowClassName="border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:border-rose-200 hover:text-rose-800 disabled:hover:bg-rose-50"
           />
@@ -988,6 +1010,7 @@ function QueryRow({ query, fmt, onView }) {
 
 function HotelCancellationQueryTab() {
   const tableScrollRef = useRef(null);
+  const { exportCsv, exportingKey } = useCsvExporter();
   const [search, setSearch]               = useState("");
   const [statusFilter, setStatusFilter]   = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
@@ -996,6 +1019,7 @@ function HotelCancellationQueryTab() {
   const [requestedDate, setRequestedDate] = useState("");
   const [page, setPage]                   = useState(1);
   const [selectedQuery, setSelectedQuery] = useState(null);
+  const isExporting = exportingKey === "hotel_cancellation_queries";
 
   useEffect(() => {
     const resetId = window.requestAnimationFrame(() => {
@@ -1037,6 +1061,17 @@ function HotelCancellationQueryTab() {
     DUMMY_HOTEL_QUERIES.forEach((q) => { if (counts[q.status] !== undefined) counts[q.status]++; });
     return counts;
   }, []);
+
+  const handleExport = () => {
+    exportCsv({
+      key: "hotel_cancellation_queries",
+      data: paginatedQueries,
+      columns: hotelCancellationQueriesExportTemplate,
+      filenamePrefix: "hotel_cancellation_queries_export",
+      emptyMessage: "No hotel cancellation queries available to export",
+      successMessage: "Hotel cancellation queries exported",
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -1098,7 +1133,9 @@ function HotelCancellationQueryTab() {
           <TableActionBar
             scrollRef={tableScrollRef}
             exportLabel="Export Queries"
-            onExport={() => {}}
+            onExport={handleExport}
+            exportDisabled={isExporting}
+            exportLoading={isExporting}
             exportClassName="bg-teal-700 hover:bg-teal-800 shadow-teal-700/20"
             arrowClassName="border-teal-100 bg-teal-50 text-teal-700 hover:bg-teal-100 hover:border-teal-200 hover:text-teal-800 disabled:hover:bg-teal-50"
           />

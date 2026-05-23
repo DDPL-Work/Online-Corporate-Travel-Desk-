@@ -16,6 +16,7 @@ const EVENTS = require("../events/eventConstants");
 const crypto = require("crypto");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
+const hotelService = require("../services/tektravels/hotel.service");
 
 
 // -----------------------------------------------------
@@ -80,6 +81,12 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
     gstDetails.gstEmail ||
     billingDepartment?.email ||
     primaryContact?.email ||
+    "";
+
+  gstDetails.contactNumber =
+    gstDetails.contactNumber ||
+    billingDepartment?.mobile ||
+    primaryContact?.mobile ||
     "";
 
   // --------------------------------------------------
@@ -505,6 +512,377 @@ exports.toggleCorporateStatus = asyncHandler(async (req, res) => {
  * 🛫 GET ALL FLIGHT BOOKINGS (SUPER ADMIN)
  * ============================================================
  */
+const safeCorporateName = (corporate) => {
+  if (!corporate) return "N/A";
+  if (typeof corporate === "object") {
+    return corporate.corporateName || corporate.companyName || corporate.name || "N/A";
+  }
+  return corporate;
+};
+
+const buildCancellationRequestId = (booking) => {
+  const latestHistory =
+    Array.isArray(booking?.amendmentHistory) && booking.amendmentHistory.length
+      ? booking.amendmentHistory[booking.amendmentHistory.length - 1]
+      : {};
+
+  return (
+    booking?.ChangeRequestId ||
+    booking?.changeRequestId ||
+    booking?.cancellationRequestId ||
+    booking?.cancelRequestId ||
+    booking?.amendment?.ChangeRequestId ||
+    booking?.amendment?.changeRequestId ||
+    latestHistory?.ChangeRequestId ||
+    latestHistory?.changeRequestId ||
+    booking?.amendment?.response?.[0]?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
+    latestHistory?.response?.[0]?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
+    booking?.amendment?.providerResponse?.HotelChangeRequestResult?.ChangeRequestId ||
+    latestHistory?.providerResponse?.HotelChangeRequestResult?.ChangeRequestId ||
+    null
+  );
+};
+
+const mapFlightBookingDto = (booking = {}) => {
+  const segments = Array.isArray(booking.flightRequest?.segments)
+    ? booking.flightRequest.segments
+    : [];
+  const firstSegment = segments[0] || {};
+
+  return {
+    ...booking,
+    orderId: booking.orderId || booking.bookingReference,
+    paymentId: booking.payment?.paymentId || null,
+    paymentMethod: booking.payment?.method || null,
+    bookedDate: booking.createdAt,
+    corporateName: safeCorporateName(booking.corporateId || booking.corporate),
+    cancellationRequestId: buildCancellationRequestId(booking),
+    changeRequestId: buildCancellationRequestId(booking),
+    travellerDetails: (booking.travellers || []).map((traveller) => ({
+      name: [traveller.firstName, traveller.lastName].filter(Boolean).join(" ").trim(),
+      email: traveller.email || null,
+    })),
+    airlineDetails: {
+      name: booking.bookingSnapshot?.airline || firstSegment.airlineName || firstSegment.airlineCode || null,
+      code: firstSegment.airlineCode || null,
+      logo: booking.bookingSnapshot?.airlineLogo || firstSegment.airlineLogo || null,
+    },
+    route: Array.isArray(booking.bookingSnapshot?.sectors)
+      ? booking.bookingSnapshot.sectors
+      : segments.map((segment) => ({
+          origin: segment?.origin?.airportCode,
+          destination: segment?.destination?.airportCode,
+        })),
+    travelDate:
+      booking.bookingSnapshot?.travelDate ||
+      firstSegment.departureDateTime ||
+      booking.travelDate ||
+      null,
+  };
+};
+
+const resolveFlightRefundStatus = (booking = {}) => {
+  const dbStatus = booking.cancellation?.refundStatus || booking.refundStatus;
+  if (dbStatus && dbStatus.toLowerCase() !== "pending") return dbStatus;
+
+  const amendment = booking.amendment || {};
+  const lastHistory =
+    Array.isArray(booking.amendmentHistory) && booking.amendmentHistory.length
+      ? booking.amendmentHistory[booking.amendmentHistory.length - 1]
+      : {};
+  const ticketCrInfo =
+    amendment.response?.[0]?.response?.Response?.TicketCRInfo?.[0] ||
+    lastHistory.response?.[0]?.response?.Response?.TicketCRInfo?.[0];
+
+  if (ticketCrInfo?.ChangeRequestStatus === 4 || ticketCrInfo?.RefundedAmount > 0) {
+    return "Processed";
+  }
+
+  return dbStatus || null;
+};
+
+const mapFlightBookingTableDto = (booking = {}) => {
+  const segments = Array.isArray(booking.flightRequest?.segments)
+    ? booking.flightRequest.segments
+    : [];
+  const firstSegment = segments[0] || {};
+  const traveler = (booking.travellers || [])[0] || {};
+  const travelerName =
+    [traveler.firstName, traveler.lastName].filter(Boolean).join(" ").trim() ||
+    traveler.email ||
+    "N/A";
+
+  return {
+    _id: booking._id,
+    orderId: booking.orderId || booking.bookingReference,
+    bookingReference: booking.bookingReference,
+    payment: booking.payment || null,
+    paymentId: booking.payment?.paymentId || null,
+    paymentMethod: booking.payment?.method || null,
+    bookedDate: booking.createdAt,
+    createdAt: booking.createdAt,
+    approvedAt: booking.approvedAt,
+    ticketedAt: booking.ticketedAt,
+    pnr: booking.bookingResult?.pnr || booking.pnr || null,
+    corporateId: booking.corporateId,
+    corporateName: safeCorporateName(booking.corporateId || booking.corporate),
+    employeeName: booking.employeeName || travelerName,
+    userId: booking.userId,
+    employeeCode: booking.employeeCode,
+    employeeId: booking.employeeId,
+    travellers: traveler
+      ? [
+          {
+            firstName: traveler.firstName,
+            lastName: traveler.lastName,
+            email: traveler.email,
+          },
+        ]
+      : [],
+    bookingSnapshot: {
+      sectors: booking.bookingSnapshot?.sectors,
+      city: booking.bookingSnapshot?.city,
+      travelDate: booking.bookingSnapshot?.travelDate,
+      amount: booking.bookingSnapshot?.amount,
+      airline: booking.bookingSnapshot?.airline,
+      orderId: booking.bookingSnapshot?.orderId,
+    },
+    flightRequest: {
+      segments: segments.map((segment) => ({
+        journeyType: segment.journeyType,
+        airlineName: segment.airlineName,
+        airlineCode: segment.airlineCode,
+        origin: {
+          airportCode: segment.origin?.airportCode,
+        },
+        destination: {
+          airportCode: segment.destination?.airportCode,
+        },
+        departureDateTime: segment.departureDateTime,
+      })),
+    },
+    pricingSnapshot: {
+      totalAmount: booking.pricingSnapshot?.totalAmount,
+      currency: booking.pricingSnapshot?.currency,
+    },
+    totalFare: booking.totalFare,
+    executionStatus: booking.executionStatus,
+    requestStatus: booking.requestStatus,
+    status: booking.status,
+    refundStatus: resolveFlightRefundStatus(booking),
+    cancellationRequestId: buildCancellationRequestId(booking),
+    changeRequestId: buildCancellationRequestId(booking),
+    airlineDetails: {
+      name:
+        booking.bookingSnapshot?.airline ||
+        firstSegment.airlineName ||
+        firstSegment.airlineCode ||
+        null,
+      code: firstSegment.airlineCode || null,
+      logo: booking.bookingSnapshot?.airlineLogo || firstSegment.airlineLogo || null,
+    },
+    route: Array.isArray(booking.bookingSnapshot?.sectors)
+      ? booking.bookingSnapshot.sectors
+      : segments.map((segment) => ({
+          origin: segment?.origin?.airportCode,
+          destination: segment?.destination?.airportCode,
+        })),
+    travelDate:
+      booking.bookingSnapshot?.travelDate ||
+      firstSegment.departureDateTime ||
+      booking.travelDate ||
+      null,
+  };
+};
+
+const mapHotelBookingDto = (booking = {}) => {
+  const selectedHotel = booking.hotelRequest?.selectedHotel || {};
+
+  return {
+    ...booking,
+    orderId: booking.orderId || booking.bookingReference,
+    paymentId: booking.payment?.paymentId || null,
+    paymentMethod: booking.payment?.method || null,
+    bookedDate: booking.createdAt,
+    corporateName: safeCorporateName(booking.corporateId || booking.corporate),
+    cancellationRequestId: buildCancellationRequestId(booking),
+    changeRequestId: buildCancellationRequestId(booking),
+    guestDetails: (booking.travellers || []).map((guest) => ({
+      name: [guest.firstName, guest.lastName].filter(Boolean).join(" ").trim(),
+      email: guest.email || null,
+    })),
+    hotelDetails: {
+      name: booking.bookingSnapshot?.hotelName || selectedHotel.hotelName || booking.hotelName || null,
+      city: booking.bookingSnapshot?.city || selectedHotel.city || booking.hotelRequest?.cityName || null,
+      image:
+        booking.bookingSnapshot?.hotelImage ||
+        selectedHotel.image ||
+        selectedHotel.images?.[0] ||
+        null,
+    },
+    stayDate: {
+      checkIn:
+        booking.bookingSnapshot?.checkInDate ||
+        booking.hotelRequest?.checkInDate ||
+        booking.checkInDate ||
+        null,
+      checkOut:
+        booking.bookingSnapshot?.checkOutDate ||
+        booking.hotelRequest?.checkOutDate ||
+        booking.checkOutDate ||
+        null,
+    },
+  };
+};
+
+const resolveHotelRefundStatus = (booking = {}) => {
+  const dbStatus = booking.cancellation?.refundStatus || booking.refundStatus;
+  if (dbStatus && dbStatus.toLowerCase() !== "pending") return dbStatus;
+
+  const amendment = booking.amendment || {};
+  const lastHistory =
+    Array.isArray(booking.amendmentHistory) && booking.amendmentHistory.length
+      ? booking.amendmentHistory[booking.amendmentHistory.length - 1]
+      : {};
+  const result =
+    amendment.providerResponse?.HotelChangeRequestResult ||
+    lastHistory.providerResponse?.HotelChangeRequestResult ||
+    {};
+
+  if (result.ChangeRequestStatus === 3 || result.RefundedAmount > 0) {
+    return "Processed";
+  }
+
+  return dbStatus || null;
+};
+
+const mapHotelBookingTableDto = (booking = {}) => {
+  const selectedHotel = booking.hotelRequest?.selectedHotel || {};
+  const selectedRoom = booking.hotelRequest?.selectedRoom || {};
+  const traveler = (booking.travellers || booking.guests || [])[0] || {};
+  const guestName =
+    booking.employeeName ||
+    booking.guestName ||
+    booking.travelerName ||
+    [traveler.firstName, traveler.lastName].filter(Boolean).join(" ").trim() ||
+    traveler.email ||
+    "N/A";
+
+  return {
+    _id: booking._id,
+    bookingId: booking.bookingId,
+    orderId: booking.orderId || booking.bookingReference,
+    bookingReference: booking.bookingReference,
+    payment: booking.payment || null,
+    paymentId: booking.payment?.paymentId || null,
+    paymentMethod: booking.payment?.method || null,
+    bookedDate: booking.createdAt,
+    createdAt: booking.createdAt,
+    approvedAt: booking.approvedAt,
+    voucheredAt: booking.voucheredAt,
+    corporateId: booking.corporateId,
+    corporateName: safeCorporateName(booking.corporateId || booking.corporate),
+    employeeName: guestName,
+    guestName,
+    travelerName: guestName,
+    userId: booking.userId,
+    employeeCode: booking.employeeCode,
+    employeeId: booking.employeeId,
+    travellers: traveler
+      ? [
+          {
+            firstName: traveler.firstName,
+            lastName: traveler.lastName,
+            email: traveler.email,
+          },
+        ]
+      : [],
+    guests: [],
+    bookingSnapshot: {
+      amount: booking.bookingSnapshot?.amount,
+      hotelName: booking.bookingSnapshot?.hotelName,
+      city: booking.bookingSnapshot?.city,
+      checkInDate: booking.bookingSnapshot?.checkInDate,
+      checkOutDate: booking.bookingSnapshot?.checkOutDate,
+      orderId: booking.bookingSnapshot?.orderId,
+    },
+    hotelRequest: {
+      checkInDate: booking.hotelRequest?.checkInDate,
+      checkOutDate: booking.hotelRequest?.checkOutDate,
+      cityName: booking.hotelRequest?.cityName,
+      selectedHotel: {
+        hotelName: selectedHotel.hotelName,
+        city: selectedHotel.city,
+      },
+      selectedRoom: {
+        Price: {
+          totalFare: selectedRoom.Price?.totalFare,
+        },
+        rawRoomData: {
+          Name: selectedRoom.rawRoomData?.Name,
+        },
+      },
+    },
+    pricingSnapshot: {
+      totalAmount: booking.pricingSnapshot?.totalAmount,
+      currency: booking.pricingSnapshot?.currency,
+    },
+    selectedRoom: {
+      Price: {
+        totalFare: booking.selectedRoom?.Price?.totalFare,
+      },
+    },
+    totalFare: booking.totalFare,
+    amount: booking.amount,
+    roomType: booking.roomType,
+    room: booking.room,
+    hotelName: booking.hotelName,
+    property: booking.property,
+    destination: booking.destination,
+    checkIn: booking.checkIn,
+    checkInDate: booking.checkInDate,
+    checkOut: booking.checkOut,
+    checkOutDate: booking.checkOutDate,
+    endDate: booking.endDate,
+    executionStatus: booking.executionStatus,
+    requestStatus: booking.requestStatus,
+    status: booking.status,
+    refundStatus: resolveHotelRefundStatus(booking),
+    cancellationRequestId: buildCancellationRequestId(booking),
+    changeRequestId: buildCancellationRequestId(booking),
+    guestDetails: [
+      {
+        name: guestName,
+        email: traveler.email || null,
+      },
+    ],
+    hotelDetails: {
+      name:
+        booking.bookingSnapshot?.hotelName ||
+        selectedHotel.hotelName ||
+        booking.hotelName ||
+        null,
+      city:
+        booking.bookingSnapshot?.city ||
+        selectedHotel.city ||
+        booking.hotelRequest?.cityName ||
+        null,
+    },
+    stayDate: {
+      checkIn:
+        booking.bookingSnapshot?.checkInDate ||
+        booking.hotelRequest?.checkInDate ||
+        booking.checkInDate ||
+        null,
+      checkOut:
+        booking.bookingSnapshot?.checkOutDate ||
+        booking.hotelRequest?.checkOutDate ||
+        booking.checkOutDate ||
+        null,
+    },
+  };
+};
+
 exports.getAllFlightBookings = async (req, res) => {
   try {
     const {
@@ -515,6 +893,7 @@ exports.getAllFlightBookings = async (req, res) => {
       corporateId,
       fromDate,
       toDate,
+      view,
     } = req.query;
 
     const blockedStatuses = ["failed", "not_started"];
@@ -541,9 +920,61 @@ exports.getAllFlightBookings = async (req, res) => {
     }
 
     const skip = (page - 1) * limit;
+    const tableOnly = view === "table";
+    const mapper = tableOnly ? mapFlightBookingTableDto : mapFlightBookingDto;
+    const tableProjection = {
+      _id: 1,
+      orderId: 1,
+      bookingReference: 1,
+      payment: 1,
+      createdAt: 1,
+      approvedAt: 1,
+      ticketedAt: 1,
+      bookedDate: 1,
+      pnr: 1,
+      corporateId: 1,
+      userId: 1,
+      employeeName: 1,
+      employeeCode: 1,
+      employeeId: 1,
+      "travellers.firstName": 1,
+      "travellers.lastName": 1,
+      "travellers.email": 1,
+      "bookingResult.pnr": 1,
+      "bookingSnapshot.sectors": 1,
+      "bookingSnapshot.city": 1,
+      "bookingSnapshot.travelDate": 1,
+      "bookingSnapshot.amount": 1,
+      "bookingSnapshot.airline": 1,
+      "bookingSnapshot.airlineLogo": 1,
+      "bookingSnapshot.orderId": 1,
+      "flightRequest.segments.journeyType": 1,
+      "flightRequest.segments.airlineName": 1,
+      "flightRequest.segments.airlineCode": 1,
+      "flightRequest.segments.origin.airportCode": 1,
+      "flightRequest.segments.destination.airportCode": 1,
+      "flightRequest.segments.departureDateTime": 1,
+      "pricingSnapshot.totalAmount": 1,
+      "pricingSnapshot.currency": 1,
+      totalFare: 1,
+      executionStatus: 1,
+      requestStatus: 1,
+      status: 1,
+      "cancellation.refundStatus": 1,
+      refundStatus: 1,
+      "amendment.response.response.Response.TicketCRInfo.ChangeRequestId": 1,
+      "amendment.response.response.Response.TicketCRInfo.ChangeRequestStatus": 1,
+      "amendment.response.response.Response.TicketCRInfo.RefundedAmount": 1,
+      "amendmentHistory.response.response.Response.TicketCRInfo.ChangeRequestId": 1,
+      "amendmentHistory.response.response.Response.TicketCRInfo.ChangeRequestStatus": 1,
+      "amendmentHistory.response.response.Response.TicketCRInfo.RefundedAmount": 1,
+      changeRequestId: 1,
+      cancellationRequestId: 1,
+    };
 
     const [data, total] = await Promise.all([
       BookingRequest.find(query)
+        .select(tableOnly ? tableProjection : undefined)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
@@ -556,7 +987,7 @@ exports.getAllFlightBookings = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Flight bookings fetched successfully",
-      data,
+      data: data.map(mapper),
       pagination: {
         total,
         page: Number(page),
@@ -573,6 +1004,33 @@ exports.getAllFlightBookings = async (req, res) => {
   }
 };
 
+exports.getFlightBookingById = async (req, res) => {
+  try {
+    const booking = await BookingRequest.findById(req.params.id)
+      .populate({ path: "corporateId", select: "corporateName" })
+      .lean();
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Flight booking not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Flight booking fetched successfully",
+      data: mapFlightBookingDto(booking),
+    });
+  } catch (error) {
+    console.error("SuperAdmin Flight Detail Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch flight booking",
+    });
+  }
+};
+
 /**
  * ============================================================
  * 🏨 GET ALL HOTEL BOOKINGS (SUPER ADMIN)
@@ -581,13 +1039,14 @@ exports.getAllFlightBookings = async (req, res) => {
 exports.getAllHotelBookings = async (req, res) => {
   try {
     const {
-      // page = 1,
-      // limit = 500,
+      page = 1,
+      limit = 500,
       search,
       status,
       corporateId,
       fromDate,
       toDate,
+      view,
     } = req.query;
 
     const blockedStatuses = ["failed", "not_started"];
@@ -611,13 +1070,80 @@ exports.getAllHotelBookings = async (req, res) => {
       if (toDate) query.createdAt.$lte = new Date(toDate);
     }
 
-    // const skip = (page - 1) * limit;
+    const skip = (page - 1) * limit;
+    const tableOnly = view === "table";
+    const mapper = tableOnly ? mapHotelBookingTableDto : mapHotelBookingDto;
+    const tableProjection = {
+      _id: 1,
+      bookingId: 1,
+      orderId: 1,
+      bookingReference: 1,
+      payment: 1,
+      createdAt: 1,
+      approvedAt: 1,
+      voucheredAt: 1,
+      corporateId: 1,
+      userId: 1,
+      employeeName: 1,
+      guestName: 1,
+      travelerName: 1,
+      employeeCode: 1,
+      employeeId: 1,
+      "travellers.firstName": 1,
+      "travellers.lastName": 1,
+      "travellers.email": 1,
+      "guests.firstName": 1,
+      "guests.lastName": 1,
+      "guests.email": 1,
+      "bookingSnapshot.amount": 1,
+      "bookingSnapshot.hotelName": 1,
+      "bookingSnapshot.city": 1,
+      "bookingSnapshot.checkInDate": 1,
+      "bookingSnapshot.checkOutDate": 1,
+      "bookingSnapshot.orderId": 1,
+      "hotelRequest.checkInDate": 1,
+      "hotelRequest.checkOutDate": 1,
+      "hotelRequest.cityName": 1,
+      "hotelRequest.selectedHotel.hotelName": 1,
+      "hotelRequest.selectedHotel.city": 1,
+      "hotelRequest.selectedRoom.Price.totalFare": 1,
+      "hotelRequest.selectedRoom.rawRoomData.Name": 1,
+      "pricingSnapshot.totalAmount": 1,
+      "pricingSnapshot.currency": 1,
+      "selectedRoom.Price.totalFare": 1,
+      totalFare: 1,
+      amount: 1,
+      roomType: 1,
+      room: 1,
+      hotelName: 1,
+      property: 1,
+      destination: 1,
+      checkIn: 1,
+      checkInDate: 1,
+      checkOut: 1,
+      checkOutDate: 1,
+      endDate: 1,
+      executionStatus: 1,
+      requestStatus: 1,
+      status: 1,
+      "cancellation.refundStatus": 1,
+      refundStatus: 1,
+      "amendment.providerResponse.HotelChangeRequestResult.ChangeRequestId": 1,
+      "amendment.providerResponse.HotelChangeRequestResult.ChangeRequestStatus": 1,
+      "amendment.providerResponse.HotelChangeRequestResult.RefundedAmount": 1,
+      "amendmentHistory.providerResponse.HotelChangeRequestResult.ChangeRequestId": 1,
+      "amendmentHistory.providerResponse.HotelChangeRequestResult.ChangeRequestStatus": 1,
+      "amendmentHistory.providerResponse.HotelChangeRequestResult.RefundedAmount": 1,
+      changeRequestId: 1,
+      cancellationRequestId: 1,
+    };
 
     const [data, total] = await Promise.all([
       HotelBookingRequest.find(query)
+        .select(tableOnly ? tableProjection : undefined)
         .sort({ createdAt: -1 })
-        // .skip(skip)
-        // .limit(Number(limit))
+        .skip(skip)
+        .limit(Number(limit))
         .populate({ path: "corporateId", select: "corporateName" })
         .lean(),
 
@@ -627,12 +1153,12 @@ exports.getAllHotelBookings = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Hotel bookings fetched successfully",
-      data,
+      data: data.map(mapper),
       pagination: {
         total,
-        // page: Number(page),
-        // limit: Number(limit),
-        // totalPages: Math.ceil(total / limit),
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
@@ -640,6 +1166,54 @@ exports.getAllHotelBookings = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch hotel bookings",
+    });
+  }
+};
+
+exports.getHotelBookingById = async (req, res) => {
+  try {
+    const booking = await HotelBookingRequest.findById(req.params.id)
+      .populate({ path: "corporateId", select: "corporateName" })
+      .lean();
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Hotel booking not found",
+      });
+    }
+
+    let liveBookingData = null;
+    try {
+      const bookResult = booking.bookingResult?.providerResponse?.BookResult;
+      if (bookResult && bookResult.BookingId) {
+        liveBookingData = await hotelService.getBookingDetails({
+          bookingId: bookResult.BookingId,
+        });
+      } else if (bookResult && bookResult.ConfirmationNo) {
+        liveBookingData = await hotelService.getBookingDetails({
+          confirmationNo: bookResult.ConfirmationNo,
+          firstName: booking.travellers?.[0]?.firstName || "",
+          lastName: booking.travellers?.[0]?.lastName || "",
+        });
+      }
+    } catch (apiError) {
+      console.error("Failed to fetch live booking details from provider:", apiError.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Hotel booking fetched successfully",
+      data: {
+        ...mapHotelBookingDto(booking),
+        liveBookingData
+      },
+    });
+  } catch (error) {
+    console.error("SuperAdmin Hotel Detail Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch hotel booking",
     });
   }
 };
@@ -690,7 +1264,7 @@ exports.getCancelledOrRequestedFlights = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Cancelled/Requested flight bookings fetched",
-      data,
+      data: data.map(mapFlightBookingDto),
       pagination: {
         total,
         // page: Number(page),
@@ -764,7 +1338,7 @@ exports.getCancelledOrRequestedHotels = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Cancelled/Requested hotel bookings fetched",
-      data,
+      data: data.map(mapHotelBookingDto),
       pagination: {
         total,
         // page: Number(page),

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FiChevronLeft, FiChevronRight, FiDownload } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiDownload, FiLoader } from "react-icons/fi";
 
 const defaultExportClassName =
-  "inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all cursor-pointer hover:scale-[1.02] active:scale-95";
+  "inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100";
 
 const defaultArrowClassName =
   "w-10 h-10 shrink-0 rounded-xl border shadow-sm flex items-center justify-center transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
@@ -125,6 +125,8 @@ export default function TableActionBar({
   scrollRef,
   exportLabel = "Export",
   onExport,
+  exportDisabled = false,
+  exportLoading = false,
   exportClassName = "",
   arrowClassName = "",
   containerClassName = "",
@@ -220,10 +222,11 @@ export default function TableActionBar({
       <button
         type="button"
         onClick={onExport}
+        disabled={exportDisabled || exportLoading}
         className={`${defaultExportClassName} ${exportClassName}`}
       >
-        <FiDownload size={16} />
-        <span>{exportLabel}</span>
+        {exportLoading ? <FiLoader size={16} className="animate-spin" /> : <FiDownload size={16} />}
+        <span>{exportLoading ? "Exporting..." : exportLabel}</span>
       </button>
 
       {children}

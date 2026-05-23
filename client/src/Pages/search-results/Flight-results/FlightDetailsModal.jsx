@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-
+import { createPortal } from "react-dom";
 import { useDispatch } from "react-redux";
 import { IoClose } from "react-icons/io5";
 import { AiOutlineInfoCircle } from "react-icons/ai";
@@ -532,8 +532,8 @@ export function FlightDetailsModal({
     }).filter(Boolean);
   }
 
-  return (
-    <div className="fixed inset-0 bg-[#0A203E]/75 backdrop-blur-sm flex items-center justify-center z-[100] sm:p-4">
+  return createPortal(
+    <div className="fixed inset-0 bg-[#0A203E]/75 backdrop-blur-sm flex items-center justify-center z-[9999] sm:p-4">
       <div className="bg-white sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto max-h-[100dvh] sm:max-h-[90vh] lg:max-w-5xl flex flex-col overflow-hidden border border-slate-200">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-[#0A203E] shrink-0">
@@ -1061,6 +1061,7 @@ export function FlightDetailsModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

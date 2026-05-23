@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { IoClose } from "react-icons/io5";
 import { AiOutlineInfoCircle } from "react-icons/ai";
 import { FareRulesAccordion, FareOptions } from "./CommonComponents";
@@ -144,8 +145,8 @@ export const FareDetailsModal = ({
         View Fare Rules
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 bg-[#0A203E]/60 backdrop-blur-md flex items-center justify-center z-[100] animate-fadeIn sm:p-4">
+      {isOpen && createPortal(
+        <div className="fixed inset-0 bg-[#0A203E]/60 backdrop-blur-md flex items-center justify-center z-[9999] animate-fadeIn sm:p-4">
           <div className="bg-white sm:rounded-[2rem] shadow-2xl w-full h-full sm:h-auto max-h-[100dvh] sm:max-h-[90vh] lg:max-w-5xl flex flex-col overflow-hidden border border-white/20">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-5 sm:px-8 sm:py-6 border-b border-slate-100 bg-white shrink-0">
@@ -297,7 +298,8 @@ export const FareDetailsModal = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

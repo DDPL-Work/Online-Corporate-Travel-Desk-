@@ -125,19 +125,32 @@ exports.getCompanyWiseRevenue = asyncHandler(async (req, res) => {
   processGroups(flightGroups, "flight");
   processGroups(hotelGroups, "hotel");
 
-  const results = Object.values(companyMap);
+  // Determine which corporates to fetch
+  const corporateIds = Object.keys(companyMap);
+  const corpQuery = { $or: [{ _id: { $in: corporateIds } }] };
 
-  // Populate names
-  const corporateIds = results.map((r) => r.corporateId);
-  const corporates = await Corporate.find({ _id: { $in: corporateIds } }, "corporateName classification");
-  
+  // If viewing 'All' corporates, include all active ones to show zero-revenue accounts
+  if (!filter.corporateId) {
+    corpQuery.$or.push({ status: "active" });
+  }
+
+  const corporates = await Corporate.find(corpQuery, "corporateName classification");
+
   const corpInfoMap = {};
   corporates.forEach(c => {
-    corpInfoMap[c._id.toString()] = { 
-      name: c.corporateName, 
-      classification: c.classification || "prepaid" 
+    const cid = c._id.toString();
+    corpInfoMap[cid] = {
+      name: c.corporateName,
+      classification: c.classification || "prepaid"
     };
+
+    // Include zero-revenue corporates
+    if (!companyMap[cid]) {
+      companyMap[cid] = { corporateId: cid, revenue: 0, bookings: 0, flightRev: 0, hotelRev: 0 };
+    }
   });
+
+  const results = Object.values(companyMap);
 
   const totalGlobalRevenue = results.reduce((sum, r) => sum + r.revenue, 0);
 
@@ -397,7 +410,6 @@ exports.getDailyRevenue = asyncHandler(async (req, res) => {
  */
 exports.getCorporateDetailedBookings = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { fromDate, toDate } = req.query;
 
   const filter = {
     corporateId: new mongoose.Types.ObjectId(id),
@@ -405,19 +417,13 @@ exports.getCorporateDetailedBookings = asyncHandler(async (req, res) => {
     executionStatus: { $nin: ["failed", "not_started"] }
   };
 
-  if (fromDate || toDate) {
-    filter.createdAt = {};
-    if (fromDate) filter.createdAt.$gte = new Date(fromDate);
-    if (toDate) filter.createdAt.$lte = new Date(toDate);
-  }
-
   const [flights, hotels] = await Promise.all([
     BookingRequest.find(filter)
-      .select("createdAt bookingReference pricingSnapshot travellers userId bookingType executionStatus")
+      .select("createdAt bookingReference orderId pricingSnapshot travellers userId bookingType executionStatus payment")
       .sort({ createdAt: -1 })
       .lean(),
     HotelBookingRequest.find(filter)
-      .select("createdAt bookingReference pricingSnapshot travellers userId bookingType executionStatus")
+      .select("createdAt bookingReference orderId pricingSnapshot travellers userId bookingType executionStatus payment")
       .sort({ createdAt: -1 })
       .lean()
   ]);
@@ -428,19 +434,27 @@ exports.getCorporateDetailedBookings = asyncHandler(async (req, res) => {
       id: f._id,
       date: f.createdAt,
       reference: f.bookingReference,
+      orderId: f.orderId || f.bookingReference,
       type: "Flight",
       amount: f.pricingSnapshot?.totalAmount || 0,
       employee: `${f.travellers?.[0]?.firstName || "—"} ${f.travellers?.[0]?.lastName || ""}`,
-      status: f.executionStatus
+      email: f.travellers?.[0]?.email || "—",
+      status: f.executionStatus,
+      paymentId: f.payment?.paymentId || null,
+      paymentMethod: f.payment?.method || null,
     })),
     ...hotels.map(h => ({
       id: h._id,
       date: h.createdAt,
       reference: h.bookingReference,
+      orderId: h.orderId || h.bookingReference,
       type: "Hotel",
       amount: h.pricingSnapshot?.totalAmount || 0,
       employee: `${h.travellers?.[0]?.firstName || "—"} ${h.travellers?.[0]?.lastName || ""}`,
-      status: h.executionStatus
+      email: h.travellers?.[0]?.email || "—",
+      status: h.executionStatus,
+      paymentId: h.payment?.paymentId || null,
+      paymentMethod: h.payment?.method || null,
     }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
 

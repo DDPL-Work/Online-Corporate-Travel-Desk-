@@ -84,3 +84,31 @@ export const fetchReissueAnalytics = createAsyncThunk(
     }
   },
 );
+
+export const checkReissueEligibility = createAsyncThunk(
+  "reissue/checkEligibility",
+  async (bookingId, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`/reissue/eligibility/${bookingId}`);
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        getErrorMessage(error, "Failed to check reissue eligibility"),
+      );
+    }
+  },
+);
+
+export const fetchOfflineReissueRequestByBooking = createAsyncThunk(
+  "reissue/fetchByBooking",
+  async (bookingId, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`/reissue/offline/by-booking/${bookingId}`);
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        getErrorMessage(error, "Failed to fetch reissue request"),
+      );
+    }
+  },
+);

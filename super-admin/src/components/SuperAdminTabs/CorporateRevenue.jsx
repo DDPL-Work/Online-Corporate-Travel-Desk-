@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   FiFilter,
   FiDownload,
@@ -21,6 +22,7 @@ import {
   FiLayers,
   FiEye,
   FiChevronRight,
+  FiChevronLeft,
 } from "react-icons/fi";
 import { FaRupeeSign, FaChartLine, FaBuilding, FaPlane } from "react-icons/fa";
 import {
@@ -68,6 +70,7 @@ const ITEMS_PER_PAGE = 10;
 
 export default function CorporateRevenue() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const leaderboardScrollRef = useRef(null);
 
   // 🟢 1. STATE HOOKS
@@ -99,6 +102,17 @@ export default function CorporateRevenue() {
   const [ddStatus, setDdStatus] = useState("All");
 
   const [viewMode, setViewMode] = useState("monthly");
+
+  const tableScrollRef = useRef(null);
+  const handleScroll = (direction) => {
+    if (tableScrollRef.current) {
+      const scrollAmount = 300;
+      tableScrollRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth"
+      });
+    }
+  };
 
   // 🟢 2. MEMO HOOKS
   const computedDates = useMemo(() => {
@@ -228,14 +242,9 @@ export default function CorporateRevenue() {
     if (drillDownId) {
       const fetchDetails = async () => {
         setDrillDownLoading(true);
+
         try {
-          const res = await dispatch(
-            fetchCorporateDetailedBookings({
-              id: drillDownId,
-              fromDate: computedDates.from,
-              toDate: computedDates.to,
-            }),
-          ).unwrap();
+          const res = await dispatch(fetchCorporateDetailedBookings({ id: drillDownId })).unwrap();
           setDrillDownData(res.data);
           setDrillDownPage(1);
         } catch (err) {
@@ -246,7 +255,7 @@ export default function CorporateRevenue() {
       };
       fetchDetails();
     }
-  }, [drillDownId, computedDates, dispatch]);
+  }, [drillDownId, dispatch]);
 
   // 🟠 4. RENDER LOGIC
   const inr = (val) => `₹${Number(val || 0).toLocaleString("en-IN")}`;
@@ -295,7 +304,7 @@ export default function CorporateRevenue() {
                 {corpName}
               </h2>
               <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.15em] mt-2 translate-y-1">
-                {computedDates.from} to {computedDates.to}
+                All approved bookings
               </p>
             </div>
           </div>
@@ -375,17 +384,25 @@ export default function CorporateRevenue() {
                 Granular view of corporate activity
               </p>
             </div>
-            <Pagination
-              currentPage={drillDownPage}
-              totalPages={Math.ceil(
-                filteredDrillDownData.length / ITEMS_PER_PAGE,
-              )}
-              onPageChange={setDrillDownPage}
-              showFirstLast={false}
-            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleScroll("left")}
+                className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors focus:outline-none"
+                aria-label="Scroll left"
+              >
+                <FiChevronLeft size={16} />
+              </button>
+              <button
+                onClick={() => handleScroll("right")}
+                className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors focus:outline-none"
+                aria-label="Scroll right"
+              >
+                <FiChevronRight size={16} />
+              </button>
+            </div>
           </div>
 
-          <div className="overflow-x-auto min-h-[400px]">
+          <div ref={tableScrollRef} className="overflow-x-auto min-h-[400px]">
             {drillDownLoading ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A4D68] mb-4"></div>
@@ -394,21 +411,23 @@ export default function CorporateRevenue() {
                 </p>
               </div>
             ) : (
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse" style={{ minWidth: "900px" }}>
                 <thead>
-                  <tr className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
-                    <th className="px-8 py-3.5">Date</th>
-                    <th className="px-8 py-3.5">Reference</th>
-                    <th className="px-8 py-3.5">Employee</th>
-                    <th className="px-8 py-3.5">Category</th>
-                    <th className="px-8 py-3.5">Status</th>
-                    <th className="px-8 py-3.5 text-right">Amount</th>
+                  <tr className="bg-slate-50/80 text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none border-b border-slate-100">
+                    <th className="px-6 py-3.5 whitespace-nowrap">Order ID</th>
+                    <th className="px-6 py-3.5 whitespace-nowrap">Payment ID</th>
+                    <th className="px-6 py-3.5 whitespace-nowrap">Traveller & Email</th>
+                    <th className="px-6 py-3.5 whitespace-nowrap">Payment Date</th>
+                    <th className="px-6 py-3.5 whitespace-nowrap">Category</th>
+                    <th className="px-6 py-3.5 whitespace-nowrap">Status</th>
+                    <th className="px-6 py-3.5 text-right whitespace-nowrap">Amount</th>
+                    <th className="px-6 py-3.5 text-center whitespace-nowrap">View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {paginatedDrillDown.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="py-24 text-center">
+                      <td colSpan="8" className="py-24 text-center">
                         <div className="flex flex-col items-center">
                           <FiActivity
                             size={32}
@@ -426,47 +445,82 @@ export default function CorporateRevenue() {
                         key={i}
                         className="hover:bg-slate-50/50 transition-all border-l-4 border-transparent hover:border-[#0A4D68]"
                       >
-                        <td className="px-8 py-3 text-[12.5px] text-slate-500 font-bold uppercase tracking-tighter">
-                          {new Date(b.date).toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </td>
-                        <td className="px-8 py-3">
-                          <span className="font-mono text-[13px] font-black text-slate-800 uppercase tracking-tight">
-                            {b.reference}
+                        {/* Order ID */}
+                        <td className="px-6 py-3.5">
+                          <span className="font-mono text-[12px] font-black text-slate-800 uppercase tracking-tight whitespace-nowrap">
+                            {b.orderId || b.reference || "—"}
                           </span>
                         </td>
-                        <td className="px-8 py-3">
+
+                        {/* Payment ID */}
+                        <td className="px-6 py-3.5">
+                          {b.paymentId ? (
+                            <span className="font-mono text-[11px] font-black bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 rounded-md whitespace-nowrap">
+                              {b.paymentId}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-300 font-medium">—</span>
+                          )}
+                        </td>
+
+                        {/* Traveller & Email */}
+                        <td className="px-6 py-3.5">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100">
+                            <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100 shrink-0">
                               <FiUser size={14} />
                             </div>
-                            <span className="font-black text-[13px] text-slate-700">
-                              {b.employee}
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-black text-[12.5px] text-slate-700 whitespace-nowrap">
+                                {b.employee}
+                              </span>
+                              <span className="text-[10.5px] text-slate-400 font-medium truncate max-w-[180px]">
+                                {b.email || "—"}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Payment Date */}
+                        <td className="px-6 py-3.5 whitespace-nowrap">
+                          <div className="flex flex-col">
+                            <span className="text-[12.5px] text-slate-700 font-bold">
+                              {new Date(b.date).toLocaleDateString("en-IN", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {new Date(b.date).toLocaleTimeString("en-IN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
                             </span>
                           </div>
                         </td>
-                        <td className="px-8 py-3">
+
+                        {/* Category */}
+                        <td className="px-6 py-3.5">
                           <span
-                            className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${
+                            className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border whitespace-nowrap ${
                               b.type === "Flight"
                                 ? "bg-blue-50 text-blue-700 border-blue-100"
                                 : "bg-purple-50 text-purple-700 border-purple-100"
                             }`}
                           >
-                            {b.type}
+                            {b.type === "Flight" ? "✈ Flight" : "🏨 Hotel"}
                           </span>
                         </td>
-                        <td className="px-8 py-3">
+
+                        {/* Status */}
+                        <td className="px-6 py-3.5">
                           <div
-                            className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${
                               b.status?.toLowerCase().includes("success")
-                                ? "text-emerald-600"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
                                 : b.status?.toLowerCase().includes("cancel")
-                                  ? "text-rose-600"
-                                  : "text-amber-600"
+                                  ? "bg-rose-50 text-rose-700 border border-rose-100"
+                                  : "bg-amber-50 text-amber-700 border border-amber-100"
                             }`}
                           >
                             <div
@@ -475,14 +529,35 @@ export default function CorporateRevenue() {
                                   ? "bg-emerald-600"
                                   : b.status?.toLowerCase().includes("cancel")
                                     ? "bg-rose-600"
-                                    : "bg-amber-600"
+                                    : "bg-amber-500"
                               }`}
                             />
-                            {b.status?.replace(/_/g, " ")}
+                            {b.status?.replace(/_/g, " ") || "—"}
                           </div>
                         </td>
-                        <td className="px-8 py-3 text-right font-black text-[14px] text-slate-900 tracking-tight">
-                          {inr(b.amount)}
+
+                        {/* Amount */}
+                        <td className="px-6 py-3.5 text-right whitespace-nowrap">
+                          <span className="font-black text-[14px] text-slate-900 tracking-tight">
+                            {inr(b.amount)}
+                          </span>
+                        </td>
+
+                        {/* View */}
+                        <td className="px-6 py-3.5 text-center">
+                          <button
+                            onClick={() =>
+                              navigate(
+                                b.type === "Flight"
+                                  ? `/bookings/flight/${b.id}`
+                                  : `/bookings/hotel/${b.id}`
+                              )
+                            }
+                            className="w-8 h-8 rounded-xl bg-[#0A4D68]/8 hover:bg-[#0A4D68]/15 flex items-center justify-center text-[#0A4D68] transition-colors mx-auto"
+                            title="View booking details"
+                          >
+                            <FiEye size={15} />
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -490,6 +565,16 @@ export default function CorporateRevenue() {
                 </tbody>
               </table>
             )}
+          </div>
+          <div className="px-6 py-4 border-t border-slate-50 flex items-center justify-end">
+            <Pagination
+              currentPage={drillDownPage}
+              totalPages={Math.ceil(
+                filteredDrillDownData.length / ITEMS_PER_PAGE,
+              )}
+              onPageChange={setDrillDownPage}
+              showFirstLast={false}
+            />
           </div>
         </div>
       </div>

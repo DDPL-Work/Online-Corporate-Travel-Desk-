@@ -92,7 +92,7 @@ router.get(
 
 router.post(
   "/:id/voucher",
-  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
+  authorizeRoles("super-admin", "ops-member", "manager", "travel-admin", "finance_team", "employee"),
   hotelBookingController.generateHotelVoucher,
 );
 

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
+import AuthModal from "../../Auth/AuthModal";
 import { FaChevronDown, FaArrowRight } from "react-icons/fa";
 import { IoCheckmark } from "react-icons/io5";
 import { BsChat, BsCreditCard, BsTable, BsArrowRepeat } from "react-icons/bs";
@@ -33,7 +35,7 @@ const Badge = ({ label, gold = false, dark = false }) => (
 );
 
 // ─── Hero Section ──────────────────────────────────────────────────────────────
-const HeroSection = () => (
+const HeroSection = ({ onStartSetup }) => (
   <section className="w-full bg-gradient-to-b from-[#003399] to-[#000D26] overflow-hidden py-12 lg:py-20 px-4">
     <div className="max-w-[1280px] mx-auto px-2 lg:px-6 flex flex-col lg:flex-row items-center lg:items-start gap-12 lg:gap-8">
       {/* Left: Copy */}
@@ -60,7 +62,10 @@ const HeroSection = () => (
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-5 pt-3">
-          <button className="relative flex items-center justify-center gap-2 px-7 py-4 bg-[#C9A240] rounded-full font-['DM_Sans'] text-black text-sm font-semibold leading-5 shadow-[0_30px_80px_-30px_rgba(5,29,140,0.35)] hover:brightness-105 transition-all w-full sm:w-auto">
+          <button 
+            onClick={onStartSetup}
+            className="relative flex items-center justify-center gap-2 px-7 py-4 bg-[#C9A240] rounded-full font-['DM_Sans'] text-black text-sm font-semibold leading-5 shadow-[0_30px_80px_-30px_rgba(5,29,140,0.35)] hover:brightness-105 transition-all w-full sm:w-auto"
+          >
             Start structuring today <FaArrowRight size={13} />
           </button>
           <div className="flex flex-col gap-1 items-center sm:items-start">
@@ -413,9 +418,9 @@ const ContactModal = ({ onClose }) => {
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-6"
       style={{ backgroundColor: "rgba(3,14,48,0.78)", backdropFilter: "blur(8px)" }}
       onClick={onClose}
     >
@@ -645,12 +650,13 @@ const ContactModal = ({ onClose }) => {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
 // ─── Final CTA Section ─────────────────────────────────────────────────────────
-const FinalCTASection = ({ onContactOpen }) => (
+const FinalCTASection = ({ onContactOpen, onStartSetup }) => (
   <section className="max-w-[896px] mx-auto px-6 py-16 flex flex-col items-center gap-6 text-center">
     <Badge label="The Final Structure" gold />
 
@@ -676,7 +682,10 @@ const FinalCTASection = ({ onContactOpen }) => (
     </p>
 
     <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
-      <button className="relative flex items-center gap-2 px-7 py-4 bg-gradient-to-br from-[#051D8C] to-[#030E30] rounded-full text-white text-sm font-semibold font-['DM_Sans'] leading-5 shadow-[0_30px_80px_-30px_rgba(5,29,140,0.35)] hover:brightness-110 transition-all">
+      <button 
+        onClick={onStartSetup}
+        className="relative flex items-center gap-2 px-7 py-4 bg-gradient-to-br from-[#051D8C] to-[#030E30] rounded-full text-white text-sm font-semibold font-['DM_Sans'] leading-5 shadow-[0_30px_80px_-30px_rgba(5,29,140,0.35)] hover:brightness-110 transition-all"
+      >
         Start your setup <FaArrowRight size={13} />
       </button>
       <button
@@ -692,19 +701,27 @@ const FinalCTASection = ({ onContactOpen }) => (
 // ─── Page Root ─────────────────────────────────────────────────────────────────
 const Traveamer = () => {
   const [contactOpen, setContactOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   return (
     <div className="w-full bg-white overflow-x-hidden">
       <LandingHeader />
-      <HeroSection />
+      <HeroSection onStartSetup={() => setAuthModalOpen(true)} />
       <ConflictSection />
       <ThreeStepsSection />
       <AdaptabilitySection />
-      <FinalCTASection onContactOpen={() => setContactOpen(true)} />
+      <FinalCTASection 
+        onContactOpen={() => setContactOpen(true)} 
+        onStartSetup={() => setAuthModalOpen(true)}
+      />
       <LandingFooter />
 
       {contactOpen && (
         <ContactModal onClose={() => setContactOpen(false)} />
+      )}
+      
+      {authModalOpen && (
+        <AuthModal onClose={() => setAuthModalOpen(false)} initialStep={1} />
       )}
     </div>
   );

@@ -120,6 +120,7 @@ export default function OneFlightBooking() {
     legalName: "",
     address: "",
     gstEmail: "",
+    contactNumber: "",
   });
   const [projectApproverData, setProjectApproverData] = useState({
     project: null,
@@ -255,6 +256,7 @@ export default function OneFlightBooking() {
             legalName: data.data.legalName || "",
             address: data.data.address || "",
             gstEmail: data.data.gstEmail || "",
+            contactNumber: data.data.contactNumber || "",
           }));
         }
       } catch (err) {

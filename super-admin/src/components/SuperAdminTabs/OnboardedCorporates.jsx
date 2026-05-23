@@ -1,22 +1,41 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FiPlusCircle } from "react-icons/fi";
 import { useDispatch, useSelector } from "react-redux";
 import AddCorporateModal from "../../Modal/AddCorporateModal";
 // NOTE: assumes you already have a list API slice
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
+import TableActionBar from "../Shared/TableActionBar";
+import useCsvExporter from "../../services/export/useCsvExporter";
+import { onboardedCorporatesExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 export default function OnboardedCorporates() {
   const dispatch = useDispatch();
+  const tableScrollRef = useRef(null);
+  const { exportCsv, exportingKey } = useCsvExporter();
 
   const { corporates = [], loading } = useSelector(
     (state) => state.corporateList
   );
 
   const [openAddModal, setOpenAddModal] = useState(false);
+  const isExporting = exportingKey === "onboarded_corporates";
 
   useEffect(() => {
     dispatch(fetchCorporates());
   }, [dispatch]);
+
+  const handleExport = () => {
+    if (loading) return;
+
+    exportCsv({
+      key: "onboarded_corporates",
+      data: corporates,
+      columns: onboardedCorporatesExportTemplate,
+      filenamePrefix: "onboarded_corporates_export",
+      emptyMessage: "No corporates available to export",
+      successMessage: "Corporates exported",
+    });
+  };
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
@@ -38,6 +57,21 @@ export default function OnboardedCorporates() {
 
         {/* TABLE */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
+            <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
+              Corporate List
+            </h2>
+            <TableActionBar
+              scrollRef={tableScrollRef}
+              exportLabel="Export"
+              onExport={handleExport}
+              exportDisabled={loading || isExporting}
+              exportLoading={isExporting}
+              exportClassName="bg-[#0A4D68] hover:bg-[#088395] shadow-[#0A4D68]/20"
+              arrowClassName="border-cyan-100 bg-cyan-50 text-[#0A4D68] hover:bg-cyan-100 hover:border-cyan-200 hover:text-[#083d52] disabled:hover:bg-cyan-50"
+            />
+          </div>
+          <div ref={tableScrollRef} className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-[#0A4D68] text-white">
               <tr>
@@ -110,6 +144,7 @@ export default function OnboardedCorporates() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* MODAL */}

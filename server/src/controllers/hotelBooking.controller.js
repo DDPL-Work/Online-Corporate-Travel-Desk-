@@ -1754,7 +1754,8 @@ exports.generateHotelVoucher = asyncHandler(async (req, res) => {
 
   if (!booking) throw new ApiError(404, "Booking not found");
 
-  if (booking.userId.toString() !== req.user._id.toString()) {
+  const isAdmin = ["super-admin", "ops-member", "manager", "travel-admin", "finance_team"].includes(req.user.role);
+  if (booking.userId.toString() !== req.user._id.toString() && !isAdmin) {
     throw new ApiError(403, "Not authorized");
   }
 

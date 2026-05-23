@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import LandingHeader from "../../layout/LandingHeader";
 
@@ -150,9 +151,9 @@ function NavItem({ num, label, active, reviewed, onClick, itemRef }) {
 }
 
 function SuccessModal({ onClose }) {
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4"
+      className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4"
       onClick={onClose}
     >
       <div
@@ -204,7 +205,8 @@ function SuccessModal({ onClose }) {
           to   { opacity: 1; transform: scale(1) translateY(0); }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1115,54 +1117,57 @@ export default function PrivacyPolicy() {
       </div>
 
       {/* Acceptance Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pointer-events-none">
-        <div className="max-w-[1340px] mx-auto pointer-events-auto">
-          <div className={`rounded-[24px] border px-4 lg:px-6 py-4 lg:py-4 flex flex-col sm:flex-row items-center gap-4 shadow-[0px_20px_40px_-20px_rgba(10,37,64,0.5)] transition-all duration-500 ${
-            allDone
-              ? "bg-[#0A2540] border-white/10"
-              : "bg-[#0A2540]/95 border-white/10 backdrop-blur-md"
-          }`}>
-            <div className="flex items-center gap-4 w-full">
-              <CircularProgress pct={pct} allDone={allDone} />
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-sm lg:text-[15px] font-bold font-['DM_Sans'] leading-tight lg:leading-snug">
-                  {allDone ? "You've reviewed the entire privacy policy" : `Reading privacy policy… ${reviewedCount} of ${TOTAL}`}
-                </p>
-                <p className="text-white/60 text-[11px] lg:text-xs mt-0.5">
-                  {allDone
-                    ? "Tap 'Accept & Continue' to confirm agreement."
-                    : "Scroll to the end to enable the button."}
-                </p>
+      {!showModal && createPortal(
+        <div className="fixed bottom-0 left-0 right-0 z-[9999] px-4 pb-4 pointer-events-none">
+          <div className="max-w-[1340px] mx-auto pointer-events-auto">
+            <div className={`rounded-[24px] border px-4 lg:px-6 py-4 lg:py-4 flex flex-col sm:flex-row items-center gap-4 shadow-[0px_20px_40px_-20px_rgba(10,37,64,0.5)] transition-all duration-500 ${
+              allDone
+                ? "bg-[#0A2540] border-white/10"
+                : "bg-[#0A2540]/95 border-white/10 backdrop-blur-md"
+            }`}>
+              <div className="flex items-center gap-4 w-full">
+                <CircularProgress pct={pct} allDone={allDone} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm lg:text-[15px] font-bold font-['DM_Sans'] leading-tight lg:leading-snug">
+                    {allDone ? "You've reviewed the entire privacy policy" : `Reading privacy policy… ${reviewedCount} of ${TOTAL}`}
+                  </p>
+                  <p className="text-white/60 text-[11px] lg:text-xs mt-0.5">
+                    {allDone
+                      ? "Tap 'Accept & Continue' to confirm agreement."
+                      : "Scroll to the end to enable the button."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end border-t border-white/10 pt-3 sm:border-t-0 sm:pt-0">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="px-4 py-2 lg:py-2.5 text-xs lg:text-sm font-medium text-white/60 hover:text-white transition-colors rounded-xl"
+                >
+                  Decline
+                </button>
+                <button
+                  onClick={handleAccept}
+                  disabled={!allDone}
+                  className={`flex-1 sm:flex-none px-6 py-2.5 lg:py-2.5 text-xs lg:text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2 ${
+                    allDone
+                      ? "bg-[#DCB149] text-[#0A2540] hover:bg-[#c9a432] active:scale-[0.98] cursor-pointer"
+                      : "bg-white/10 text-white/30 cursor-not-allowed"
+                  }`}
+                >
+                  {allDone ? "Accept & Continue" : `${TOTAL - reviewedCount} left`}
+                  {allDone && (
+                    <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
+                      <path d="M1 6H13M8 1L13 6L8 11" stroke="#0A2540" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </button>
               </div>
             </div>
-
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end border-t border-white/10 pt-3 sm:border-t-0 sm:pt-0">
-              <button
-                onClick={() => navigate(-1)}
-                className="px-4 py-2 lg:py-2.5 text-xs lg:text-sm font-medium text-white/60 hover:text-white transition-colors rounded-xl"
-              >
-                Decline
-              </button>
-              <button
-                onClick={handleAccept}
-                disabled={!allDone}
-                className={`flex-1 sm:flex-none px-6 py-2.5 lg:py-2.5 text-xs lg:text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2 ${
-                  allDone
-                    ? "bg-[#DCB149] text-[#0A2540] hover:bg-[#c9a432] active:scale-[0.98] cursor-pointer"
-                    : "bg-white/10 text-white/30 cursor-not-allowed"
-                }`}
-              >
-                {allDone ? "Accept & Continue" : `${TOTAL - reviewedCount} left`}
-                {allDone && (
-                  <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
-                    <path d="M1 6H13M8 1L13 6L8 11" stroke="#0A2540" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
-              </button>
-            </div>
           </div>
-        </div>
-      </div>
+        </div>,
+        document.body
+      )}
 
       {showModal && <SuccessModal onClose={handleModalClose} />}
 

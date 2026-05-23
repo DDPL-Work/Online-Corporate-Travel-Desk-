@@ -483,6 +483,25 @@ exports.transferRequest = asyncHandler(async (req, res) => {
 
   await bookingRequest.save();
 
+  // ── Notify Second Approver: booking transferred ─────────────
+  const _flightRequester = await User.findById(bookingRequest.userId).select('name email').lean();
+  const _transferredByName = req.user.name?.firstName
+    ? `${req.user.name.firstName} ${req.user.name.lastName || ''}`.trim()
+    : req.user.name || 'Admin';
+
+  notify(EVENTS.BOOKING_TRANSFERRED, {
+    secondApproverId: newApprover._id,
+    secondApproverEmail: newApprover.email,
+    secondApproverName: newApprover.name?.firstName || 'Approver',
+    employeeName: _flightRequester?.name?.firstName || 'Employee',
+    transferredByName: _transferredByName,
+    corporateId: bookingRequest.corporateId,
+    orderId: bookingRequest.orderId || bookingRequest.bookingReference,
+    bookingType: 'flight',
+    amount: bookingRequest.pricingSnapshot?.totalAmount || 0,
+    relatedId: bookingRequest._id,
+  });
+
   res.status(200).json(
     new ApiResponse(
       200,
@@ -722,6 +741,25 @@ exports.transferHotelRequest = asyncHandler(async (req, res) => {
   };
 
   await bookingRequest.save();
+
+  // ── Notify Second Approver: booking transferred ─────────────
+  const _hotelRequester = await User.findById(bookingRequest.userId).select('name email').lean();
+  const _transferredByName = req.user.name?.firstName
+    ? `${req.user.name.firstName} ${req.user.name.lastName || ''}`.trim()
+    : req.user.name || 'Admin';
+
+  notify(EVENTS.BOOKING_TRANSFERRED, {
+    secondApproverId: newApprover._id,
+    secondApproverEmail: newApprover.email,
+    secondApproverName: newApprover.name?.firstName || 'Approver',
+    employeeName: _hotelRequester?.name?.firstName || 'Employee',
+    transferredByName: _transferredByName,
+    corporateId: bookingRequest.corporateId,
+    orderId: bookingRequest.orderId || bookingRequest.bookingReference,
+    bookingType: 'hotel',
+    amount: bookingRequest.pricingSnapshot?.totalAmount || bookingRequest.bookingSnapshot?.amount || 0,
+    relatedId: bookingRequest._id,
+  });
 
   res.status(200).json(
     new ApiResponse(
