@@ -173,7 +173,7 @@ function FlightSegmentDetail({ segment }) {
             </span>
           )}
           <span className="px-3 py-1 bg-[#C9A84C] text-[#0A203E] text-[10px] font-black uppercase tracking-widest rounded-full">
-            {durationH}h {durationM}m
+            {durationH}h {durationM}
           </span>
         </div>
       </div>
@@ -979,7 +979,7 @@ export function FlightDetailsModal({
                                 <div className="flex items-center gap-2 mb-4">
                                   <div className="w-1.5 h-4 bg-[#C9A84C] rounded-full" />
                                   <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">
-                                    Date Change Fee
+                                    Airline Reissue Penalty
                                   </h4>
                                 </div>
                                 <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">

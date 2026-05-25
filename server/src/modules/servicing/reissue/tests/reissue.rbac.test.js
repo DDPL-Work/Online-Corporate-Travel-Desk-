@@ -6,6 +6,64 @@
  */
 
 const request = require("supertest");
+const app = require("../../../../app");
+
+jest.mock("../../../../middleware/auth.middleware.js", () => {
+  return {
+    verifyToken: (req, res, next) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+      const token = authHeader.split(" ")[1];
+      if (!token.startsWith("mock_token_")) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+      const role = token.replace("mock_token_", "");
+      req.user = {
+        _id: "user_123",
+        id: "user_123",
+        role: role,
+        roles: [role],
+        email: `user@${role}.com`,
+        name: { firstName: "Test", lastName: role },
+        isActive: true,
+      };
+      if (role === "ops-member") {
+        req.opsMember = {
+          _id: "user_123",
+          permissions: ["PROCESS_REISSUE"],
+          status: "Active",
+        };
+      }
+      next();
+    },
+    authorizeRoles: (...allowedRoles) => {
+      const normalize = (r) => r?.toString().replace(/[-_ ]/g, "").toLowerCase();
+      const wanted = allowedRoles.map(normalize);
+      return (req, res, next) => {
+        const role = normalize(req.user?.role);
+        if (!role || !wanted.includes(role)) {
+          return res.status(403).json({
+            success: false,
+            message: "You are not authorized to perform this action",
+          });
+        }
+        next();
+      };
+    },
+    verifySuperAdmin: (req, res, next) => {
+      if (!req.user || req.user.role !== "super-admin") {
+        return res.status(403).json({
+          success: false,
+          message: "Super Admin access only",
+        });
+      }
+      next();
+    },
+  };
+});
+
 const {
   OFFLINE_REISSUE_ADMIN_ROLES,
   OFFLINE_REISSUE_OPS_ROLES,

@@ -6,6 +6,9 @@ const {
   resolvePnr,
   resolveSupplierBookingId,
 } = require("../../../../utils/bookingResolver.util");
+const {
+  normalizeSsrSnapshot,
+} = require("../utils/ssrSnapshot.util");
 
 const toDate = (value) => {
   if (!value) return null;
@@ -23,6 +26,9 @@ const deepClone = (value) => {
   if (value == null) return value;
   return JSON.parse(JSON.stringify(value));
 };
+
+const hasOwn = (object, key) =>
+  Boolean(object) && Object.prototype.hasOwnProperty.call(object, key);
 
 const normalizeCabinClass = (value) => {
   if (!value) return "Economy";
@@ -185,7 +191,7 @@ class ReissueBookingLifecycleService {
     }));
   }
 
-  buildBookingSnapshot(sourceBooking, selectedJourney, activePnr) {
+  buildBookingSnapshot(sourceBooking, selectedJourney, activePnr, totalAmountOverride = null) {
     const segments = this.buildFlightRequestSegments(selectedJourney);
     const first = segments[0] || {};
     const last = segments[segments.length - 1] || {};
@@ -215,17 +221,22 @@ class ReissueBookingLifecycleService {
         selectedJourney?.cabinClass || sourceBooking?.bookingSnapshot?.cabinClass,
       ),
       amount: roundCurrency(
-        selectedJourney?.newFare ||
-          selectedJourney?.fare ||
-          sourceBooking?.pricingSnapshot?.totalAmount ||
-          sourceBooking?.bookingSnapshot?.amount ||
+        totalAmountOverride ??
+          selectedJourney?.newFare ??
+          selectedJourney?.fare ??
+          sourceBooking?.pricingSnapshot?.totalAmount ??
+          sourceBooking?.bookingSnapshot?.amount ??
           0,
       ),
       pnr: activePnr,
     };
   }
 
-  buildProviderResponse(sourceBooking, selectedJourney, { supplierBookingId, activePnr, mode }) {
+  buildProviderResponse(
+    sourceBooking,
+    selectedJourney,
+    { supplierBookingId, activePnr, mode, fareTotals = {}, ssrSnapshot = {} },
+  ) {
     const providerResponse = deepClone(sourceBooking?.bookingResult?.providerResponse || {});
     const segments = this.buildFlightRequestSegments(selectedJourney);
 
@@ -276,8 +287,22 @@ class ReissueBookingLifecycleService {
       root.FlightItinerary.Fare = {
         ...(root.FlightItinerary.Fare || {}),
         PublishedFare: roundCurrency(
-          selectedJourney?.newFare || selectedJourney?.fare || root?.FlightItinerary?.Fare?.PublishedFare || 0,
+          fareTotals.currentTicketValue ??
+            selectedJourney?.newFare ??
+            selectedJourney?.fare ??
+            root?.FlightItinerary?.Fare?.PublishedFare ??
+            0,
         ),
+        OfferedFare: roundCurrency(
+          fareTotals.currentTicketValue ??
+            selectedJourney?.newFare ??
+            selectedJourney?.fare ??
+            root?.FlightItinerary?.Fare?.OfferedFare ??
+            0,
+        ),
+        TotalSeatCharges: roundCurrency(ssrSnapshot?.totalSeatAmount || 0),
+        TotalMealCharges: roundCurrency(ssrSnapshot?.totalMealAmount || 0),
+        TotalBaggageCharges: roundCurrency(ssrSnapshot?.totalBaggageAmount || 0),
       };
     }
 
@@ -318,15 +343,51 @@ class ReissueBookingLifecycleService {
       request?.newBookingId ||
       resolveSupplierBookingId(sourceBooking) ||
       null;
+    const lastPricingEntry =
+      Array.isArray(request?.pricingHistory) && request.pricingHistory.length
+        ? request.pricingHistory[request.pricingHistory.length - 1]
+        : null;
     const orderId = await generateSequentialOrderId("flight");
     const bookingReference = generateBookingReference();
+    const selectedSsrSnapshot = hasOwn(request?.metadata, "selectedSSR")
+      ? deepClone(request?.metadata?.selectedSSR || {})
+      : deepClone(source?.flightRequest?.ssrSnapshot || {});
+    const normalizedSsrSnapshot = normalizeSsrSnapshot(
+      selectedSsrSnapshot,
+      this.buildFlightRequestSegments(selectedJourney),
+    );
+    const fareTotals = {
+      currentTicketValue: roundCurrency(
+        request?.financialLedger?.currentTicketValue ??
+          lastPricingEntry?.newFare ??
+          selectedJourney?.newFare ??
+          selectedJourney?.fare ??
+          source?.pricingSnapshot?.totalAmount ??
+          0,
+      ),
+      currentSSRValue: roundCurrency(
+        request?.financialLedger?.currentSSRValue ??
+          normalizedSsrSnapshot.totalSSRAmount ??
+          0,
+      ),
+    };
+    fareTotals.currentTotalValue = roundCurrency(
+      fareTotals.currentTicketValue + fareTotals.currentSSRValue,
+    );
 
     const newFlightSegments = this.buildFlightRequestSegments(selectedJourney);
-    const newBookingSnapshot = this.buildBookingSnapshot(sourceBooking, selectedJourney, activePnr);
+    const newBookingSnapshot = this.buildBookingSnapshot(
+      sourceBooking,
+      selectedJourney,
+      activePnr,
+      fareTotals.currentTotalValue,
+    );
     const newProviderResponse = this.buildProviderResponse(sourceBooking, selectedJourney, {
       supplierBookingId: providerBookingId,
       activePnr,
       mode,
+      fareTotals,
+      ssrSnapshot: normalizedSsrSnapshot,
     });
 
     const clonedPayload = {
@@ -351,15 +412,17 @@ class ReissueBookingLifecycleService {
       flightRequest: {
         ...(deepClone(source?.flightRequest) || {}),
         segments: newFlightSegments,
+        ssrSnapshot: normalizedSsrSnapshot,
+        fareSnapshot: {
+          ...(deepClone(source?.flightRequest?.fareSnapshot) || {}),
+          offeredFare: fareTotals.currentTicketValue,
+          publishedFare: fareTotals.currentTicketValue,
+          totalAmount: fareTotals.currentTotalValue,
+        },
       },
       pricingSnapshot: {
         ...(deepClone(source?.pricingSnapshot) || {}),
-        totalAmount: roundCurrency(
-          selectedJourney?.newFare ||
-            selectedJourney?.fare ||
-            source?.pricingSnapshot?.totalAmount ||
-            0,
-        ),
+        totalAmount: fareTotals.currentTotalValue,
       },
       bookingResult: {
         ...(deepClone(source?.bookingResult) || {}),
@@ -426,6 +489,8 @@ class ReissueBookingLifecycleService {
           ticketUrl: revisedTicketUrl || null,
           metadata: {
             revisedTicketPath: revisedTicketPath || null,
+            currentTicketValue: fareTotals.currentTicketValue,
+            currentSSRValue: fareTotals.currentSSRValue,
           },
         },
       ],
@@ -459,6 +524,8 @@ class ReissueBookingLifecycleService {
       ticketUrl: revisedTicketUrl || null,
       metadata: {
         latestReissueBookingId: created._id,
+        currentTicketValue: fareTotals.currentTicketValue,
+        currentSSRValue: fareTotals.currentSSRValue,
       },
     });
     sourceBooking.servicing = sourceBooking.servicing || {};
