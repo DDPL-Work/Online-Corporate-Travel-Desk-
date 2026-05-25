@@ -37,6 +37,20 @@ const auditLogSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const creationSourceSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ["USER_SUBMITTED", "AUTO_GENERATED"],
+      default: "USER_SUBMITTED",
+    },
+    trigger: { type: String, default: null },
+    createdBy: { type: String, default: null },
+    workflow: { type: String, default: null },
+  },
+  { _id: false },
+);
+
 const offlineReissueRequestSchema = new mongoose.Schema(
   {
     requestId: {
@@ -111,6 +125,15 @@ const offlineReissueRequestSchema = new mongoose.Schema(
       default: [],
     },
     remarks: String,
+    creationSource: {
+      type: creationSourceSchema,
+      default: () => ({
+        type: "USER_SUBMITTED",
+        trigger: null,
+        createdBy: null,
+        workflow: null,
+      }),
+    },
     status: {
       type: String,
       enum: Object.values(OFFLINE_STATUSES),
@@ -223,6 +246,18 @@ const offlineReissueRequestSchema = new mongoose.Schema(
         default: null,
       },
     },
+    bookingLineage: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    lastTicketedSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    ssrFinancials: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     financialLedger: {
       originalTicketAmount: { type: Number, default: 0 },
       originalSSR: { type: Number, default: 0 },
@@ -244,6 +279,8 @@ const offlineReissueRequestSchema = new mongoose.Schema(
       currentTicketValue: { type: Number, default: 0 },
       currentSSRValue: { type: Number, default: 0 },
       currentTotalValue: { type: Number, default: 0 },
+      lastTicketedSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+      ssrFinancials: { type: mongoose.Schema.Types.Mixed, default: null },
     },
     pricingHistory: [
       {

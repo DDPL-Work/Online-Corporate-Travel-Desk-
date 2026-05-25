@@ -197,6 +197,28 @@ const bookingRequestSchema = new mongoose.Schema(
       ticketNumbers: [String],
       providerBookingId: String,
     },
+    ticketData: mongoose.Schema.Types.Mixed,
+    originalBookingSnapshot: {
+      bookingId: String,
+      pnr: String,
+      supplierBookingReference: String,
+      providerBookingReference: String,
+      providerReferences: mongoose.Schema.Types.Mixed,
+      corporateFareContext: mongoose.Schema.Types.Mixed,
+      traceId: String,
+      resultIndex: mongoose.Schema.Types.Mixed,
+      ticketId: [String],
+      ticketData: mongoose.Schema.Types.Mixed,
+      journeyType: Number,
+      segments: mongoose.Schema.Types.Mixed,
+      onwardSegments: mongoose.Schema.Types.Mixed,
+      returnSegments: mongoose.Schema.Types.Mixed,
+      passengers: mongoose.Schema.Types.Mixed,
+      metadata: mongoose.Schema.Types.Mixed,
+      capturedAt: Date,
+    },
+    bookingLineage: mongoose.Schema.Types.Mixed,
+    lastTicketedSnapshot: mongoose.Schema.Types.Mixed,
 
     isReissued: {
       type: Boolean,
@@ -310,6 +332,9 @@ const bookingRequestSchema = new mongoose.Schema(
       amount: Number,
       purposeOfTravel: String,
       city: String,
+      pnr: String,
+      ticketData: mongoose.Schema.Types.Mixed,
+      providerReferences: mongoose.Schema.Types.Mixed,
     },
 
     /* ================= DOCUMENTS ================= */

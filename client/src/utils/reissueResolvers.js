@@ -437,11 +437,162 @@ export const getCurrency = (req) => {
   return safeString(req.currency || req.preferredJourney?.currency || "INR");
 };
 
+const extractAirportCode = (value) => {
+  if (!value) return null;
+
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    return normalized || null;
+  }
+
+  if (typeof value !== "object") return null;
+
+  return (
+    value?.airportCode ||
+    value?.AirportCode ||
+    value?.code ||
+    value?.iata ||
+    value?.airport ||
+    value?.Airport?.AirportCode ||
+    value?.Airport?.Code ||
+    value?.Airport?.airportCode ||
+    null
+  );
+};
+
+const normalizeRouteTokens = (value) => {
+  if (!value) return [];
+
+  if (typeof value === "string") {
+    return value
+      .split(/\s*(?:->|→|-|\/|,)\s*/g)
+      .map((token) => token.trim())
+      .filter(Boolean);
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => normalizeRouteTokens(item));
+  }
+
+  if (typeof value !== "object") return [];
+
+  const directOrigin = extractAirportCode(
+    value?.origin ||
+      value?.from ||
+      value?.Origin ||
+      value?.originCode ||
+      value?.OriginAirportCode ||
+      value?.source,
+  );
+  const directDestination = extractAirportCode(
+    value?.destination ||
+      value?.to ||
+      value?.Destination ||
+      value?.destinationCode ||
+      value?.DestinationAirportCode ||
+      value?.target,
+  );
+
+  if (directOrigin || directDestination) {
+    return [directOrigin, directDestination].filter(Boolean);
+  }
+
+  if (Array.isArray(value?.sectors) && value.sectors.length) {
+    return value.sectors.flatMap((sector) =>
+      normalizeRouteTokens(
+        typeof sector === "string"
+          ? sector
+          : {
+              origin: sector?.origin || sector?.from,
+              destination: sector?.destination || sector?.to,
+            },
+      ),
+    );
+  }
+
+  return normalizeRouteTokens(
+    value?.segments ||
+      value?.journeys ||
+      value?.flights ||
+      value?.newFlight ||
+      value?.oldFlight ||
+      [],
+  );
+};
+
+const collapseRouteTokens = (tokens = []) =>
+  tokens.reduce((accumulator, token) => {
+    const normalized = String(token || "").trim();
+    if (!normalized) return accumulator;
+    if (accumulator[accumulator.length - 1] === normalized) return accumulator;
+    accumulator.push(normalized);
+    return accumulator;
+  }, []);
+
+export const resolveDisplayRoute = (req = {}) => {
+  if (!req) return "N/A";
+  if (req.displayInfo?.route && typeof req.displayInfo.route === "string") {
+    return req.displayInfo.route.replace(/\s*->\s*/g, " → ");
+  }
+
+  const candidates = [
+    req?.metadata?.selectedRoute,
+    req?.preferredJourney,
+    req?.selectedFlight,
+    req?.preferredFlight,
+    req?.selectedSegments,
+    req?.segments,
+    req?.newJourney,
+    req?.newJourney?.segments,
+    req?.oldJourney,
+    req?.oldJourney?.segments,
+    req?.oldJourney?.sectors,
+    req?.reissueHistory?.[0]?.newFlight,
+    req?.reissueHistory?.[0]?.oldFlight,
+    req?.activeTicketSnapshot?.segments,
+  ];
+
+  for (const candidate of candidates) {
+    const tokens = collapseRouteTokens(normalizeRouteTokens(candidate));
+    if (tokens.length >= 2) {
+      return tokens.join(" → ");
+    }
+  }
+
+  return "N/A";
+};
+
+export const resolveWorkflowType = (req = {}) => {
+  const explicitWorkflow = String(req?.creationSource?.workflow || "").toUpperCase();
+  if (explicitWorkflow === "ONLINE_REISSUE") return "ONLINE_REISSUE";
+  if (explicitWorkflow === "OFFLINE_REISSUE") return "OFFLINE_REISSUE";
+  if (explicitWorkflow === "MANUAL_REISSUE") return "MANUAL_REISSUE";
+
+  const discriminator = String(req?._type || req?.mode || "").toUpperCase();
+  if (discriminator === "ONLINE") return "ONLINE_REISSUE";
+  if (discriminator === "OFFLINE") return "OFFLINE_REISSUE";
+
+  const rawType = String(req?.reissueType || req?.type || "").toUpperCase();
+  if (rawType.includes("ONLINE")) return "ONLINE_REISSUE";
+  if (rawType.includes("OFFLINE")) return "OFFLINE_REISSUE";
+  if (rawType.includes("MANUAL")) return "MANUAL_REISSUE";
+
+  return "MANUAL_REISSUE";
+};
+
+export const isVisibleLedgerRequest = (req = {}) => {
+  if (!req) return false;
+  if (req?.creationSource?.type === "AUTO_GENERATED") return false;
+  if (String(req?.status || "").toUpperCase() === "OFFLINE_REQUIRED") return false;
+  return true;
+};
+
 /**
  * Route — reads from preferredJourney, selectedFlight, selectedSegments, oldJourney.
  * NEVER reads bookingSnapshot.
  */
 export const getRoute = (req) => {
+  return resolveDisplayRoute(req);
   if (!req) return "N/A";
   if (req.displayInfo?.route) return req.displayInfo.route;
 
@@ -625,6 +776,136 @@ export const getSegments = (req) => {
   }
 
   return [];
+};
+
+export const resolveFinancialLedger = (req = {}) =>
+  req?.financialLedger ||
+  req?.pricingSnapshot?.financialLedger ||
+  req?.reissuePricingSnapshot?.financialLedger ||
+  req?.metadata?.financialLedger ||
+  req?.bookingSnapshot?.financialLedger ||
+  null;
+
+const pickMoney = (...values) => {
+  for (const value of values) {
+    const num = Number(value);
+    if (Number.isFinite(num)) return num;
+  }
+  return 0;
+};
+
+export const resolveFinancialBreakdown = (req = {}) => {
+  const ledger = resolveFinancialLedger(req) || {};
+  const ssrFinancials = req?.ssrFinancials || ledger?.ssrFinancials || {};
+  const normalizedPricing = req?.normalizedPricing || {};
+  const lastCycle = Array.isArray(req?.pricingHistory) && req.pricingHistory.length
+    ? req.pricingHistory[req.pricingHistory.length - 1]
+    : {};
+
+  const previouslyPaid = pickMoney(
+    lastCycle?.previousTotalPaid,
+    ledger?.lastTicketedSnapshot?.fare?.totalFare,
+    ledger?.currentTicketValue,
+    ledger?.originalTicketAmount,
+  );
+  const newFlight = pickMoney(
+    normalizedPricing?.newFlightBase,
+    lastCycle?.newFare,
+    req?.lastTicketedSnapshot?.fare?.totalFare,
+    req?.newFare,
+    req?.displayInfo?.newFare,
+  );
+  const newSSR = pickMoney(
+    normalizedPricing?.newSSRTotal,
+    lastCycle?.newSSR,
+    ssrFinancials?.newSSR,
+    ledger?.currentSSRValue,
+  );
+  const ssrRefund = pickMoney(
+    ssrFinancials?.refundableSSR,
+    lastCycle?.refundSSRValue,
+  );
+  const reissuePenalty = pickMoney(
+    normalizedPricing?.reissuePenalty,
+    lastCycle?.airlinePenalty,
+    req?.reissueCharges,
+    req?.reissueCharge,
+  );
+  const netCollection = pickMoney(
+    req?.totalAdjustment,
+    lastCycle?.additionalCollection,
+    normalizedPricing?.netPayable > 0 ? normalizedPricing.netPayable : null,
+  );
+  const netRefund = pickMoney(
+    normalizedPricing?.refundDue,
+    lastCycle?.refundAmount,
+  );
+  const currency =
+    req?.displayInfo?.currency ||
+    req?.currency ||
+    req?.reissuePricingSnapshot?.currency ||
+    req?.pricingSnapshot?.currency ||
+    "INR";
+
+  return {
+    ledger,
+    previouslyPaid,
+    newFlight,
+    newSSR,
+    ssrRefund,
+    reissuePenalty,
+    netCollection,
+    netRefund,
+    currency,
+    ssrFinancials,
+  };
+};
+
+const STATUS_PRIORITY = {
+  ASSIGNED: 120,
+  IN_PROGRESS: 115,
+  WAITING_AIRLINE: 110,
+  PROCESSING: 105,
+  BILLING_RESERVED: 100,
+  QUOTE_RECEIVED: 95,
+  SEARCH_COMPLETED: 90,
+  CREATED: 85,
+  OFFLINE_REQUIRED: 80,
+  TICKET_GENERATED: 70,
+  COMPLETED: 60,
+  FAILED: 20,
+  REJECTED: 15,
+  CANCELLED: 10,
+};
+
+export const dedupeLatestActionableRequests = (items = []) => {
+  const sorted = [...safeArray(items)]
+    .filter((item) => isVisibleLedgerRequest(item))
+    .sort((left, right) => {
+    const generationDiff =
+      Number(right?.bookingLineage?.reissueGeneration || 0) -
+      Number(left?.bookingLineage?.reissueGeneration || 0);
+    if (generationDiff !== 0) return generationDiff;
+
+    const statusDiff =
+      (STATUS_PRIORITY[right?.status] || 0) - (STATUS_PRIORITY[left?.status] || 0);
+    if (statusDiff !== 0) return statusDiff;
+      return new Date(right?.updatedAt || right?.createdAt || 0) - new Date(left?.updatedAt || left?.createdAt || 0);
+    });
+
+  const seen = new Set();
+  return sorted.filter((item) => {
+    const key =
+      item?.bookingLineage?.originalBookingId ||
+      item?.bookingLineage?.originalMongoBookingId ||
+      item?.originalPnr ||
+      item?.displayInfo?.pnr ||
+      item?.bookingId ||
+      item?.id;
+    if (!key || seen.has(String(key))) return false;
+    seen.add(String(key));
+    return true;
+  });
 };
 
 export const getStatusTone = (status) => {

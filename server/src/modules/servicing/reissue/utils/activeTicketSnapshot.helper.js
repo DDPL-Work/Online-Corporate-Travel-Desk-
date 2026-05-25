@@ -78,6 +78,23 @@ function buildActiveTicketSnapshotFromState(
     booking?.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Ticket ||
     booking?.bookingResult?.providerResponse?.raw?.Response?.Response?.FlightItinerary?.Ticket ||
     null;
+  const providerReferences =
+    booking?.bookingSnapshot?.providerReferences ||
+    booking?.providerReferences ||
+    booking?.originalBookingSnapshot?.providerReferences ||
+    {
+      supplierBookingReference: supplierBookingId || null,
+      providerBookingReference: supplierBookingId || null,
+      pnr: pnr || null,
+      traceId:
+        booking?.originalBookingSnapshot?.traceId ||
+        booking?.metadata?.traceId ||
+        null,
+      resultIndex:
+        booking?.originalBookingSnapshot?.resultIndex ??
+        booking?.flightRequest?.resultIndex ??
+        null,
+    };
 
   let revisedTicket = revisedTicketOverride === undefined ? null : revisedTicketOverride;
   if (revisedTicketOverride === undefined) {
@@ -106,9 +123,23 @@ function buildActiveTicketSnapshotFromState(
     supplierBookingId: supplierBookingId || null,
     segments: normalizedSegments || [],
     fareSnapshot,
+    fare: {
+      totalFare:
+        fareSnapshot?.offeredFare ||
+        fareSnapshot?.publishedFare ||
+        booking?.pricingSnapshot?.totalAmount ||
+        null,
+      baseFare: fareSnapshot?.baseFare || null,
+      taxes:
+        fareSnapshot?.taxes ||
+        (fareSnapshot?.offeredFare != null && fareSnapshot?.baseFare != null
+          ? Number(fareSnapshot.offeredFare) - Number(fareSnapshot.baseFare)
+          : null),
+    },
     ssrSnapshot: ssr,
     ssr,
     ticketData,
+    providerReferences,
     revisedTicket,
     revisedInvoice,
     capturedAt: new Date(),

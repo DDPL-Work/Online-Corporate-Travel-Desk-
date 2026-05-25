@@ -5,7 +5,6 @@ import {
   FiEye, FiFilter, FiRefreshCw, FiRepeat, FiSend,
 } from "react-icons/fi";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import axios from "../../API/axios";
 import {
   fetchOfflineReissueRequests,
   fetchReissueRequests,
@@ -23,6 +22,8 @@ import {
   getStatus,
   getRequestId,
   getFareDifference,
+  dedupeLatestActionableRequests,
+  resolveWorkflowType,
 } from "../../utils/reissueResolvers";
 
 /* ─── prettify status label ─── */
@@ -36,7 +37,7 @@ const REISSUE_STATUS_OPTIONS = [
   "ALL", "CREATED", "SEARCH_COMPLETED", "QUOTE_RECEIVED",
   "BILLING_RESERVED", "PROCESSING", "OPS_PENDING", "OPS_ASSIGNED",
   "OPS_PROCESSING", "TICKET_UPLOADED", "COMPLETED", "FAILED",
-  "CANCELLED", "OFFLINE_REQUIRED",
+  "CANCELLED",
 ];
 
 /* ─────────────────────────────────────────────────────────────
@@ -165,9 +166,10 @@ export default function ReissueRequestsPage({ title, subtitle }) {
 
   /* ── Filtered lists ── */
   const filteredOnline = useMemo(() => {
+    const dedupedRequests = dedupeLatestActionableRequests(requests);
     const term = search.trim().toLowerCase();
-    if (!term) return requests;
-    return requests.filter((r) =>
+    if (!term) return dedupedRequests;
+    return dedupedRequests.filter((r) =>
       [r.reissueId, r.originalPnr, r.newPnr, r.airline, r.mode, r.status]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(term))
@@ -214,29 +216,6 @@ export default function ReissueRequestsPage({ title, subtitle }) {
       dispatch(fetchReissueRequests({ page, limit: 10, status: status === "ALL" ? undefined : status }));
     } else {
       dispatch(fetchOfflineReissueRequests({ page, limit: 10, bookingId: bookingIdFilter }));
-    }
-  };
-
-  const handleDownload = async (requestId, type, fallbackName) => {
-    try {
-      const response = await axios.get(
-        `/reissue/offline/${requestId}/download-${type}`,
-        { responseType: "blob" }
-      );
-      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fallbackName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
-    } catch {
-      window.open(
-        `${axios.defaults.baseURL}/reissue/offline/${requestId}/download-${type}`,
-        "_blank",
-        "noopener,noreferrer"
-      );
     }
   };
 
@@ -400,11 +379,11 @@ export default function ReissueRequestsPage({ title, subtitle }) {
                         </td>
                         <td className="px-4 py-4">
                           <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-wider ${
-                            req.mode === "ONLINE" || req.reissueType === "ONLINE"
+                            resolveWorkflowType(req) === "ONLINE_REISSUE"
                               ? "bg-teal-50 text-teal-700 border-teal-200"
                               : "bg-slate-100 text-slate-700 border-slate-200"
                           }`}>
-                            {req.mode || req.reissueType || "ONLINE"}
+                            {resolveWorkflowType(req)}
                           </span>
                         </td>
                         <td className="px-4 py-4">

@@ -73,17 +73,28 @@ const formatDate = (value) => {
   });
 };
 
-const formatDateTime = (value) => {
-  if (!value) return PLACEHOLDER;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return PLACEHOLDER;
-  return date.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const normalizeDateInput = (value) => {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 8);
+  if (!digits) return "";
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
+const parseDisplayDate = (value) => {
+  const match = String(value || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return "";
+
+  const [, day, month, year] = match;
+  const isoDate = `${year}-${month}-${day}`;
+  const date = new Date(`${isoDate}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) return "";
+  if (date.getFullYear() !== Number(year)) return "";
+  if (date.getMonth() + 1 !== Number(month)) return "";
+  if (date.getDate() !== Number(day)) return "";
+
+  return isoDate;
 };
 
 const formatMoney = (value, currency = "INR") => {
@@ -148,16 +159,95 @@ const getDurationFromSegments = (segments) =>
     return Number.isFinite(value) ? total + value : total;
   }, 0);
 
+const normalizeJourneyGroup = (segments = [], journeyType = "onward") => {
+  const normalizedSegments = toArray(segments);
+  const first = normalizedSegments[0] || {};
+  const last = normalizedSegments[normalizedSegments.length - 1] || first;
+  const durationMinutes = getDurationFromSegments(normalizedSegments);
+
+  return {
+    journeyType,
+    label: journeyType === "return" ? "Return" : "Onward",
+    origin: getSegmentAirport(first, "Origin") || PLACEHOLDER,
+    destination: getSegmentAirport(last, "Destination") || PLACEHOLDER,
+    departureTime: getSegmentTime(first, "Origin"),
+    arrivalTime: getSegmentTime(last, "Destination"),
+    departureDate: getSegmentTime(first, "Origin"),
+    durationMinutes,
+    duration: formatDuration(durationMinutes),
+    stops: Math.max(normalizedSegments.length - 1, 0),
+    airlineCode: first?.Airline?.AirlineCode || first?.AirlineCode || "",
+    airlineName: first?.Airline?.AirlineName || first?.AirlineName || "Airline",
+    flightNumber: first?.Airline?.FlightNumber || first?.FlightNumber || "",
+    baggage:
+      first?.Baggage ||
+      first?.CabinBaggage ||
+      PLACEHOLDER,
+    segments: normalizedSegments.map((segment) => ({
+      origin: getSegmentAirport(segment, "Origin"),
+      destination: getSegmentAirport(segment, "Destination"),
+      departureTime: getSegmentTime(segment, "Origin"),
+      arrivalTime: getSegmentTime(segment, "Destination"),
+      airlineCode: segment?.Airline?.AirlineCode || "",
+      airlineName: segment?.Airline?.AirlineName || "Airline",
+      flightNumber: segment?.Airline?.FlightNumber || segment?.FlightNumber || "",
+      duration: segment?.Duration ? formatDuration(segment.Duration) : null,
+      baggage: segment?.Baggage || segment?.CabinBaggage || null,
+      journeyType,
+    })),
+  };
+};
+
+const buildJourneyGroups = (rawSegments) => {
+  const groups = Array.isArray(rawSegments) ? rawSegments : [];
+  const hasNestedGroups = groups.some(Array.isArray);
+
+  if (hasNestedGroups) {
+    return groups
+      .map((group, index) =>
+        normalizeJourneyGroup(group, index === 1 ? "return" : "onward"),
+      )
+      .filter((group) => group.segments.length);
+  }
+
+  const fallbackGroup = normalizeJourneyGroup(groups, "onward");
+  return fallbackGroup.segments.length ? [fallbackGroup] : [];
+};
+
+const flattenJourneyGroups = (journeyGroups = []) =>
+  journeyGroups.flatMap((group) => toArray(group?.segments));
+
+const getOptionFlightLabel = (option) =>
+  toArray(option?.journeyGroups).length > 1
+    ? `${option?.airlineName || option?.airlineCode || "Airline"} Roundtrip`
+    : `${option?.airlineName || option?.airlineCode || "Airline"} ${option?.airlineCode || ""} ${option?.flightNumber || ""}`.trim();
+
+const getOptionRouteLabel = (option) =>
+  toArray(option?.journeyGroups)
+    .map((group) => `${group?.origin || PLACEHOLDER} -> ${group?.destination || PLACEHOLDER}`)
+    .join(" | ") || `${option?.origin || PLACEHOLDER} -> ${option?.destination || PLACEHOLDER}`;
+
+const getOptionScheduleLabel = (option) =>
+  toArray(option?.journeyGroups)
+    .map((group) => {
+      const dateLabel = formatDate(group?.departureDate);
+      const timeLabel = `${formatFlightTime(group?.departureTime)} -> ${formatFlightTime(group?.arrivalTime)}`;
+      return dateLabel !== PLACEHOLDER ? `${group?.label}: ${dateLabel} | ${timeLabel}` : `${group?.label}: ${timeLabel}`;
+    })
+    .join(" | ") || `${formatFlightTime(option?.departureTime)} -> ${formatFlightTime(option?.arrivalTime)}`;
+
 const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
   return toArray(rawResults).map((result, index) => {
-    // TBO Results structure: Results = [[seg1, seg2, ...]] (one-way) or [[onward...], [return...]]
-    // Segments field: Segments = [[seg1, seg2]] — first element is the segments array for the journey
-    const rawSegs = result?.Segments;
-    const segments = toArray(
-      Array.isArray(rawSegs?.[0]) ? rawSegs[0] : (rawSegs || [])
+    const journeyGroups = buildJourneyGroups(result?.Segments);
+    const segments = flattenJourneyGroups(journeyGroups);
+    const firstGroup = journeyGroups[0] || {};
+    const lastGroup = journeyGroups[journeyGroups.length - 1] || firstGroup;
+    const first = firstGroup.segments?.[0] || {};
+    const last = lastGroup.segments?.[lastGroup.segments.length - 1] || first;
+    const totalStops = journeyGroups.reduce(
+      (count, group) => count + Math.max(toArray(group?.segments).length - 1, 0),
+      0,
     );
-    const first = segments[0] || {};
-    const last = segments[segments.length - 1] || first;
     const newFare = Number(
       result?.Fare?.PublishedFare ??
         result?.Fare?.OfferedFare ??
@@ -177,17 +267,22 @@ const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
       id: `${result?.ResultIndex ?? index}`,
       resultIndex: result?.ResultIndex ?? index,
       raw: result,
-      airlineCode: first?.Airline?.AirlineCode || first?.AirlineCode || "",
-      airlineName: first?.Airline?.AirlineName || first?.AirlineName || "Airline",
-      flightNumber: first?.Airline?.FlightNumber || first?.FlightNumber || "",
-      origin: getSegmentAirport(first, "Origin") || PLACEHOLDER,
-      destination: getSegmentAirport(last, "Destination") || PLACEHOLDER,
-      departureDate: getSegmentTime(first, "Origin"),
-      departureTime: getSegmentTime(first, "Origin"),
-      arrivalTime: getSegmentTime(last, "Destination"),
-      durationMinutes: getDurationFromSegments(segments),
-      duration: formatDuration(getDurationFromSegments(segments)),
-      stops: Math.max(segments.length - 1, 0),
+      airlineCode: firstGroup?.airlineCode || "",
+      airlineName: firstGroup?.airlineName || "Airline",
+      flightNumber: firstGroup?.flightNumber || "",
+      origin: firstGroup?.origin || PLACEHOLDER,
+      destination: lastGroup?.destination || PLACEHOLDER,
+      departureDate: firstGroup?.departureDate || getSegmentTime(first, "Origin"),
+      departureTime: firstGroup?.departureTime || getSegmentTime(first, "Origin"),
+      arrivalTime: lastGroup?.arrivalTime || getSegmentTime(last, "Destination"),
+      durationMinutes: journeyGroups.reduce(
+        (total, group) => total + Number(group?.durationMinutes || 0),
+        0,
+      ),
+      duration: formatDuration(
+        journeyGroups.reduce((total, group) => total + Number(group?.durationMinutes || 0), 0),
+      ),
+      stops: totalStops,
       noOfSeatAvailable: noOfSeats,
       lowSeatWarning: noOfSeats !== null && Number(noOfSeats) <= 3,
       cabin: getCabinLabel(
@@ -196,6 +291,7 @@ const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
           result?.ResultFareType,
       ),
       baggage:
+        firstGroup?.baggage ||
         first?.Baggage ||
         first?.CabinBaggage ||
         result?.Fare?.BaggageAllowance ||
@@ -208,17 +304,8 @@ const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
       currency: result?.Fare?.Currency || "INR",
       isNdc: !!(result?.SupplierFareClass || result?.FareClassification?.Type),
       fareBadge: result?.SupplierFareClass || result?.ResultFareType || null,
-      segments: segments.map((segment) => ({
-        origin: getSegmentAirport(segment, "Origin"),
-        destination: getSegmentAirport(segment, "Destination"),
-        departureTime: getSegmentTime(segment, "Origin"),
-        arrivalTime: getSegmentTime(segment, "Destination"),
-        airlineCode: segment?.Airline?.AirlineCode || "",
-        airlineName: segment?.Airline?.AirlineName || "Airline",
-        flightNumber: segment?.Airline?.FlightNumber || segment?.FlightNumber || "",
-        duration: segment?.Duration ? formatDuration(segment.Duration) : null,
-        baggage: segment?.Baggage || segment?.CabinBaggage || null,
-      })),
+      journeyGroups,
+      segments,
     };
   });
 };
@@ -312,6 +399,7 @@ function FlightOptionCard({
   onSelect,
   mode,
 }) {
+  const journeyGroups = toArray(option.journeyGroups);
   const hasTimings = option.departureTime && option.arrivalTime;
   const depTime = hasTimings ? formatFlightTime(option.departureTime) : PLACEHOLDER;
   const arrTime = hasTimings ? formatFlightTime(option.arrivalTime) : PLACEHOLDER;
@@ -338,7 +426,7 @@ function FlightOptionCard({
               {/* Airline + badges row */}
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-base font-black text-slate-900">
-                  {option.airlineName || option.airlineCode || "Airline"}
+                  {getOptionFlightLabel(option)}
                 </p>
                 {option.isNdc && (
                   <span className="rounded-full bg-gradient-to-r from-violet-600 to-purple-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white">
@@ -385,6 +473,31 @@ function FlightOptionCard({
                 </div>
                 {travelDate && travelDate !== PLACEHOLDER && (
                   <p className="mt-2 text-center text-xs font-medium text-slate-400">{travelDate}</p>
+                )}
+                {journeyGroups.length > 1 && (
+                  <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+                    {journeyGroups.map((group) => (
+                      <div
+                        key={`${group.label}-${group.origin}-${group.destination}-${group.departureTime || ""}`}
+                        className="rounded-2xl bg-white px-3 py-2"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                            {group.label}
+                          </p>
+                          <p className="text-xs font-semibold text-slate-500">
+                            {group.duration || PLACEHOLDER}
+                          </p>
+                        </div>
+                        <p className="mt-1 text-sm font-bold text-slate-800">
+                          {group.origin || PLACEHOLDER}{" -> "}{group.destination || PLACEHOLDER}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {formatDate(group.departureDate)} | {formatFlightTime(group.departureTime)}{" -> "}{formatFlightTime(group.arrivalTime)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
 
@@ -485,7 +598,7 @@ function FlightOptionCard({
             <div className="space-y-2">
               {option.segments.map((segment, index) => {
                 const prevSeg = index > 0 ? option.segments[index - 1] : null;
-                const layoverMins = prevSeg
+                const layoverMins = prevSeg && prevSeg.journeyType === segment.journeyType
                   ? calcLayoverMinutes(prevSeg.arrivalTime, segment.departureTime)
                   : null;
                 return (
@@ -557,7 +670,6 @@ export default function ReissueModal({ booking, onClose }) {
     createLoading,
     quoteLoading,
     confirmLoading,
-    requestDetail,
     offlineCreateLoading,
     offlineSearchResults,
     offlineSearchPagination,
@@ -567,6 +679,8 @@ export default function ReissueModal({ booking, onClose }) {
 
   const [departureDate, setDepartureDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
+  const [departureDateInput, setDepartureDateInput] = useState("");
+  const [returnDateInput, setReturnDateInput] = useState("");
   const [remarks, setRemarks] = useState("");
   const [currentStep, setCurrentStep] = useState(STEP.FORM);
   const [selectedOption, setSelectedOption] = useState(null);
@@ -587,13 +701,13 @@ export default function ReissueModal({ booking, onClose }) {
     (segment) => (segment?.journeyType || "").toString().toLowerCase() === "return",
   );
   const oldFare = Number(booking?.pricingSnapshot?.totalAmount || 0);
-  const isOnlineEligible = eligibility?.support?.onlineReissueAllowed === true;
-  // CORRECT FLOW:
-  // showOfflineFlow is driven EXCLUSIVELY by offlineFallback (set after the actual
-  // API search attempt confirms online is unavailable). The eligibility badge informs
-  // the user but does NOT prematurely switch the UI to offline mode.
-  // This ensures: user clicks Search → API called → THEN mode is determined.
-  const showOfflineFlow = Boolean(offlineFallback);
+  const isOnlineEligible =
+    eligibility?.eligible === true && eligibility?.mode === "ONLINE";
+  const showOfflineFlow =
+    eligibility?.mode === "OFFLINE" || Boolean(offlineFallback);
+  const eligibilityReasons = toArray(
+    offlineFallback?.reasons || eligibility?.reasons,
+  );
 
   useEffect(() => {
     if (booking?._id) {
@@ -650,8 +764,12 @@ export default function ReissueModal({ booking, onClose }) {
     };
   }, [quoteSnapshot]);
 
-  const canSearch =
-    Boolean(departureDate) && (!isRoundTrip || Boolean(returnDate));
+  const todayIso = new Date().toISOString().split("T")[0];
+  const isDepartureDateValid = Boolean(departureDate) && departureDate >= todayIso;
+  const isReturnDateValid =
+    !isRoundTrip ||
+    (Boolean(returnDate) && returnDate >= (departureDate || todayIso));
+  const canSearch = isDepartureDateValid && isReturnDateValid;
   const onlineStepIndex =
     currentStep === STEP.FORM
       ? 1
@@ -694,6 +812,7 @@ export default function ReissueModal({ booking, onClose }) {
           message:
             response?.message ||
             "Online reissue is unavailable for this booking. Please continue with offline servicing.",
+          reasons: response?.reasons || [],
         });
         setCurrentStep(STEP.FORM);
         return;
@@ -753,8 +872,33 @@ export default function ReissueModal({ booking, onClose }) {
         );
       });
     } catch (error) {
+      setOfflineSearchId(null);
+      setSelectedOption(null);
+      setSearchPage(page);
+      setCurrentStep(STEP.SEARCH_RESULTS);
       toast.error(error || OFFLINE_SEARCH_FALLBACK_MESSAGE);
     }
+  };
+
+  const handleDepartureDateChange = (event) => {
+    const formattedValue = normalizeDateInput(event.target.value);
+    const parsedValue = parseDisplayDate(formattedValue);
+
+    setDepartureDateInput(formattedValue);
+    setDepartureDate(parsedValue);
+
+    if (returnDate && parsedValue && returnDate < parsedValue) {
+      setReturnDate("");
+      setReturnDateInput("");
+    }
+  };
+
+  const handleReturnDateChange = (event) => {
+    const formattedValue = normalizeDateInput(event.target.value);
+    const parsedValue = parseDisplayDate(formattedValue);
+
+    setReturnDateInput(formattedValue);
+    setReturnDate(parsedValue);
   };
 
   const handlePreviewQuote = async () => {
@@ -884,14 +1028,13 @@ export default function ReissueModal({ booking, onClose }) {
           Selected Flight
         </p>
         <p className="mt-3 text-lg font-black text-slate-900">
-          {selectedOption.airlineName || selectedOption.airlineCode || "Airline"}{" "}
-          {selectedOption.airlineCode || ""} {selectedOption.flightNumber || ""}
+          {getOptionFlightLabel(selectedOption)}
         </p>
         <p className="mt-2 text-sm font-semibold text-slate-700">
-          {selectedOption.origin || PLACEHOLDER} {"->"} {selectedOption.destination || PLACEHOLDER}
+          {getOptionRouteLabel(selectedOption)}
         </p>
         <p className="mt-1 text-sm text-slate-600">
-          {formatFlightTime(selectedOption.departureTime)} {"->"} {formatFlightTime(selectedOption.arrivalTime)}
+          {getOptionScheduleLabel(selectedOption)}
         </p>
         {(() => {
           const previouslyPaid = Number(summary?.alreadyPaid ?? summary?.previouslyPaid ?? summary?.oldFare ?? selectedOption.oldFare ?? 0);
@@ -1032,14 +1175,13 @@ export default function ReissueModal({ booking, onClose }) {
               Selected Flight
             </p>
             <p className="mt-2 text-sm font-bold text-slate-900">
-              {selectedOption?.airlineName || selectedOption?.airlineCode || "Airline"}{" "}
-              {selectedOption?.flightNumber || ""}
+              {getOptionFlightLabel(selectedOption)}
             </p>
             <p className="mt-1 text-sm text-slate-600">
-              {selectedOption?.origin || PLACEHOLDER} {"->"} {selectedOption?.destination || PLACEHOLDER}
+              {getOptionRouteLabel(selectedOption)}
             </p>
             <p className="mt-1 text-sm text-slate-600">
-              {formatDate(selectedOption?.departureDate)} {"|"} {formatFlightTime(selectedOption?.departureTime)}
+              {getOptionScheduleLabel(selectedOption)}
             </p>
           </div>
           <div className="rounded-2xl bg-white p-4 shadow-sm">
@@ -1083,16 +1225,14 @@ export default function ReissueModal({ booking, onClose }) {
   );
 
   const modalTitle = showOfflineFlow ? "Offline Reissue Request" : "Reissue Flight";
-  // Header message logic:
-  // - If offline fallback is active: show the reason from the API
-  // - If online eligible: show online confirmation
-  // - If not online eligible but no fallback yet: inform user that online check will run on Search
   const headerMessage = showOfflineFlow
     ? offlineFallback?.message ||
+      eligibility?.message ||
+      eligibilityReasons[0] ||
       "Online reissue is unavailable for this booking. Choose a preferred date, review replacement flights, and submit the request for operations processing."
     : isOnlineEligible
       ? "This booking supports online reissue. Search, select, quote, and confirm in one flow."
-      : "We will attempt an online reissue search. If unavailable, you will be guided through offline servicing.";
+      : "This booking requires offline servicing.";
 
   const showBackButton =
     !showOfflineFlow &&
@@ -1177,11 +1317,23 @@ export default function ReissueModal({ booking, onClose }) {
                         <p className="text-sm font-bold text-slate-900">
                           {showOfflineFlow
                             ? "Offline servicing required"
-                            : isOnlineEligible
+                          : isOnlineEligible
                               ? "Online reissue available"
-                              : "Online reissue will be attempted"}
+                              : "Offline servicing required"}
                         </p>
                         <p className="mt-1 text-sm text-slate-600">{headerMessage}</p>
+                        {showOfflineFlow && eligibilityReasons.length > 0 && (
+                          <div className="mt-3 space-y-1">
+                            {eligibilityReasons.slice(0, 3).map((reason) => (
+                              <p
+                                key={reason}
+                                className="text-xs font-medium text-slate-600"
+                              >
+                                {reason}
+                              </p>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1199,12 +1351,19 @@ export default function ReissueModal({ booking, onClose }) {
                                 {showOfflineFlow ? "Preferred Travel Date" : "New Departure Date"}
                               </label>
                               <input
-                                type="date"
-                                value={departureDate}
-                                min={new Date().toISOString().split("T")[0]}
-                                onChange={(event) => setDepartureDate(event.target.value)}
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={10}
+                                placeholder="dd/mm/yyyy"
+                                value={departureDateInput}
+                                onChange={handleDepartureDateChange}
                                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A4D68] focus:ring-1 focus:ring-[#0A4D68]"
                               />
+                              {departureDateInput.length === 10 && !isDepartureDateValid && (
+                                <p className="mt-2 text-xs text-rose-600">
+                                  Enter a valid future date in dd/mm/yyyy format.
+                                </p>
+                              )}
                             </div>
 
                             {isRoundTrip && (
@@ -1213,12 +1372,19 @@ export default function ReissueModal({ booking, onClose }) {
                                   {showOfflineFlow ? "Preferred Return Date" : "New Return Date"}
                                 </label>
                                 <input
-                                  type="date"
-                                  value={returnDate}
-                                  min={departureDate || new Date().toISOString().split("T")[0]}
-                                  onChange={(event) => setReturnDate(event.target.value)}
+                                  type="text"
+                                  inputMode="numeric"
+                                  maxLength={10}
+                                  placeholder="dd/mm/yyyy"
+                                  value={returnDateInput}
+                                  onChange={handleReturnDateChange}
                                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A4D68] focus:ring-1 focus:ring-[#0A4D68]"
                                 />
+                                {returnDateInput.length === 10 && !isReturnDateValid && (
+                                  <p className="mt-2 text-xs text-rose-600">
+                                    Enter a valid return date in dd/mm/yyyy format.
+                                  </p>
+                                )}
                               </div>
                             )}
                           </div>

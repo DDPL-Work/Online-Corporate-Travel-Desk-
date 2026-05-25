@@ -37,6 +37,9 @@ import {
   resolveReissueCharge,
   resolveBookingRef,
   resolvePrimarySegment,
+  resolveFinancialBreakdown,
+  resolveDisplayRoute,
+  resolveWorkflowType,
 } from "../../../utils/reissueResolvers";
 
 /* ─────────────────────────────────────────────────────────────────
@@ -49,15 +52,6 @@ const formatCurrency = (val, currency = "INR") => {
     currency: currency || "INR",
     maximumFractionDigits: 0,
   }).format(Number(val) || 0);
-};
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return "N/A";
-  return new Date(dateStr).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 };
 
 const formatDateTime = (dateStr) => {
@@ -97,7 +91,6 @@ export default function LegacyReissueDetailModal({
   request: requestData,
   onClose,
   onStatusUpdate,
-  userRole,
 }) {
   if (!requestData) return null;
 
@@ -124,7 +117,7 @@ export default function LegacyReissueDetailModal({
     req.resolutionNote ||
     req.metadata?.reason ||
     "No reason provided";
-  const type = req.reissueType || req.type || "REISSUE";
+  const type = resolveWorkflowType(req);
   const date = getRequestedDate(req);
   const status = getStatus(req);
   const tone = getStatusTone(status);
@@ -187,6 +180,8 @@ export default function LegacyReissueDetailModal({
       req?.preferredJourney?.currency ||
       "INR",
   };
+  bookingInfo.route = resolveDisplayRoute(req);
+  const financialBreakdown = resolveFinancialBreakdown(req);
 
   // Safe Arrays
   const passengers = Array.isArray(req.passengers) ? req.passengers : [];
@@ -441,58 +436,62 @@ export default function LegacyReissueDetailModal({
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                 <p className="text-[10px] uppercase font-bold text-slate-400">
-                  Old Fare
+                  Previously Paid
                 </p>
                 <p className="text-sm font-black text-slate-700 mt-1">
-                  {formatCurrency(bookingInfo.oldFare, bookingInfo.currency)}
+                  {formatCurrency(financialBreakdown.previouslyPaid, financialBreakdown.currency)}
                 </p>
               </div>
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                 <p className="text-[10px] uppercase font-bold text-slate-400">
-                  New Fare
+                  New Flight
                 </p>
                 <p className="text-sm font-black text-slate-700 mt-1">
-                  {formatCurrency(bookingInfo.fare, bookingInfo.currency)}
+                  {formatCurrency(financialBreakdown.newFlight, financialBreakdown.currency)}
                 </p>
               </div>
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                 <p className="text-[10px] uppercase font-bold text-slate-400">
-                  Fare Diff
+                  New SSR
                 </p>
                 <p className="text-sm font-black text-slate-700 mt-1">
+                  {formatCurrency(financialBreakdown.newSSR, financialBreakdown.currency)}
+                </p>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">
+                  SSR Refund
+                </p>
+                <p className="text-sm font-black text-slate-700 mt-1">
+                  {formatCurrency(financialBreakdown.ssrRefund, financialBreakdown.currency)}
+                </p>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                <p className="text-[10px] uppercase font-bold text-slate-400">
+                  Reissue Penalty
+                </p>
+                <p className="text-sm font-black text-slate-700 mt-1">
+                  {formatCurrency(financialBreakdown.reissuePenalty, financialBreakdown.currency)}
+                </p>
+              </div>
+              <div className={`rounded-xl p-3 border ${
+                financialBreakdown.netRefund > 0
+                  ? "bg-emerald-50 border-emerald-200"
+                  : "bg-rose-50 border-rose-200"
+              }`}>
+                <p className={`text-[10px] uppercase font-bold ${
+                  financialBreakdown.netRefund > 0 ? "text-emerald-700" : "text-rose-700"
+                }`}>
+                  {financialBreakdown.netRefund > 0 ? "Net Refund" : "Net Collection"}
+                </p>
+                <p className={`text-sm font-black mt-1 ${
+                  financialBreakdown.netRefund > 0 ? "text-emerald-800" : "text-rose-800"
+                }`}>
                   {formatCurrency(
-                    bookingInfo.fareDifference,
-                    bookingInfo.currency,
-                  )}
-                </p>
-              </div>
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                <p className="text-[10px] uppercase font-bold text-slate-400">
-                  Reissue Charge
-                </p>
-                <p className="text-sm font-black text-slate-700 mt-1">
-                  {formatCurrency(
-                    bookingInfo.reissueCharge,
-                    bookingInfo.currency,
-                  )}
-                </p>
-              </div>
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                <p className="text-[10px] uppercase font-bold text-slate-400">
-                  Refund
-                </p>
-                <p className="text-sm font-black text-slate-700 mt-1">
-                  {formatCurrency(bookingInfo.refund, bookingInfo.currency)}
-                </p>
-              </div>
-              <div className="bg-[#0A4D68]/5 rounded-xl p-3 border border-[#0A4D68]/20">
-                <p className="text-[10px] uppercase font-bold text-[#0A4D68]">
-                  Total Estimate
-                </p>
-                <p className="text-sm font-black text-[#0A4D68] mt-1">
-                  {formatCurrency(
-                    bookingInfo.totalEstimate,
-                    bookingInfo.currency,
+                    financialBreakdown.netRefund > 0
+                      ? financialBreakdown.netRefund
+                      : financialBreakdown.netCollection,
+                    financialBreakdown.currency,
                   )}
                 </p>
               </div>

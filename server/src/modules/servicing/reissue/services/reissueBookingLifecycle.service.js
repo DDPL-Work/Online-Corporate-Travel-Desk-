@@ -9,6 +9,13 @@ const {
 const {
   normalizeSsrSnapshot,
 } = require("../utils/ssrSnapshot.util");
+const {
+  buildOriginalBookingSnapshot,
+} = require("../utils/onlineReissueContext.util");
+const {
+  buildInitialBookingLineage,
+  buildNextBookingLineage,
+} = require("../utils/reissueLineage.util");
 
 const toDate = (value) => {
   if (!value) return null;
@@ -229,6 +236,14 @@ class ReissueBookingLifecycleService {
           0,
       ),
       pnr: activePnr,
+      ticketData:
+        sourceBooking?.ticketData ||
+        sourceBooking?.originalBookingSnapshot?.ticketData ||
+        null,
+      providerReferences:
+        sourceBooking?.bookingSnapshot?.providerReferences ||
+        sourceBooking?.originalBookingSnapshot?.providerReferences ||
+        null,
     };
   }
 
@@ -337,7 +352,11 @@ class ReissueBookingLifecycleService {
       typeof sourceBooking.toObject === "function"
         ? sourceBooking.toObject({ depopulate: true })
         : deepClone(sourceBooking);
-    const activePnr = request?.originalPnr || resolvePnr(sourceBooking) || null;
+    const activePnr =
+      request?.newPnr ||
+      request?.originalPnr ||
+      resolvePnr(sourceBooking) ||
+      null;
     const providerBookingId =
       supplierBookingId ||
       request?.newBookingId ||
@@ -374,6 +393,69 @@ class ReissueBookingLifecycleService {
     fareTotals.currentTotalValue = roundCurrency(
       fareTotals.currentTicketValue + fareTotals.currentSSRValue,
     );
+    const inheritedLineage = buildInitialBookingLineage(sourceBooking);
+    const providerReferences = {
+      bookingId: providerBookingId,
+      supplierBookingReference: providerBookingId,
+      providerBookingReference: providerBookingId,
+      pnr: activePnr,
+      traceId:
+        request?.metadata?.searchTraceId ||
+        request?.onlineReissueContext?.traceId ||
+        source?.originalBookingSnapshot?.traceId ||
+        null,
+      resultIndex:
+        request?.metadata?.selectedResultIndex ??
+        request?.onlineReissueContext?.resultIndex ??
+        null,
+      supplierLocator:
+        source?.bookingSnapshot?.providerReferences?.supplierLocator ||
+        source?.originalBookingSnapshot?.providerReferences?.supplierLocator ||
+        null,
+      providerLocator:
+        source?.bookingSnapshot?.providerReferences?.providerLocator ||
+        source?.originalBookingSnapshot?.providerReferences?.providerLocator ||
+        null,
+      reservationId:
+        source?.bookingSnapshot?.providerReferences?.reservationId ||
+        source?.originalBookingSnapshot?.providerReferences?.reservationId ||
+        null,
+      ticketIds:
+        request?.onlineReissueContext?.ticketIds ||
+        source?.originalBookingSnapshot?.providerReferences?.ticketIds ||
+        source?.originalBookingSnapshot?.ticketId ||
+        [],
+      ticketNumbers:
+        source?.originalBookingSnapshot?.providerReferences?.ticketNumbers ||
+        source?.bookingSnapshot?.providerReferences?.ticketNumbers ||
+        [],
+      source:
+        source?.bookingSnapshot?.providerReferences?.source ||
+        source?.originalBookingSnapshot?.providerReferences?.source ||
+        source?.flightRequest?.source ||
+        null,
+      gdsPcc:
+        source?.bookingSnapshot?.providerReferences?.gdsPcc ||
+        source?.originalBookingSnapshot?.providerReferences?.gdsPcc ||
+        source?.metadata?.PCC ||
+        null,
+      validatingAirline:
+        source?.bookingSnapshot?.providerReferences?.validatingAirline ||
+        source?.originalBookingSnapshot?.providerReferences?.validatingAirline ||
+        selectedJourney?.airlineCode ||
+        null,
+      supplierName:
+        source?.bookingSnapshot?.providerReferences?.supplierName ||
+        source?.originalBookingSnapshot?.providerReferences?.supplierName ||
+        source?.metadata?.supplierName ||
+        "TBO",
+      providerName:
+        source?.bookingSnapshot?.providerReferences?.providerName ||
+        source?.originalBookingSnapshot?.providerReferences?.providerName ||
+        source?.metadata?.providerName ||
+        "TBO",
+      createdAt: new Date(),
+    };
 
     const newFlightSegments = this.buildFlightRequestSegments(selectedJourney);
     const newBookingSnapshot = this.buildBookingSnapshot(
@@ -382,6 +464,12 @@ class ReissueBookingLifecycleService {
       activePnr,
       fareTotals.currentTotalValue,
     );
+    newBookingSnapshot.providerReferences = providerReferences;
+    newBookingSnapshot.ticketData =
+      request?.ticketData ||
+      source?.ticketData ||
+      source?.originalBookingSnapshot?.ticketData ||
+      null;
     const newProviderResponse = this.buildProviderResponse(sourceBooking, selectedJourney, {
       supplierBookingId: providerBookingId,
       activePnr,
@@ -433,6 +521,30 @@ class ReissueBookingLifecycleService {
         providerResponse: newProviderResponse,
         reissueSupplierResponse: supplierResponse || null,
       },
+      ticketData:
+        request?.ticketData ||
+        source?.ticketData ||
+        source?.originalBookingSnapshot?.ticketData ||
+        null,
+      bookingLineage: inheritedLineage,
+      lastTicketedSnapshot: {
+        fare: {
+          totalFare: fareTotals.currentTicketValue,
+        },
+        ssr: normalizedSsrSnapshot,
+        segments: newFlightSegments,
+        baggage: normalizedSsrSnapshot.baggage,
+        meals: normalizedSsrSnapshot.meals,
+        seats: normalizedSsrSnapshot.seats,
+        bookingId: providerBookingId,
+        providerReferences,
+        ticketData:
+          request?.ticketData ||
+          source?.ticketData ||
+          source?.originalBookingSnapshot?.ticketData ||
+          null,
+        capturedAt: new Date(),
+      },
       documents: {
         ...(deepClone(source?.documents) || {}),
         ticketUrl: revisedTicketUrl || source?.documents?.ticketUrl || null,
@@ -442,11 +554,11 @@ class ReissueBookingLifecycleService {
         ...(deepClone(source?.servicing) || {}),
         reissue: {
           ...(deepClone(source?.servicing?.reissue) || {}),
-          status: "REISSUED",
+          status: "ACTIVE",
           currentRequestId: mode === "ONLINE" ? request?._id || null : source?.servicing?.reissue?.currentRequestId || null,
           offlineRequestId: mode === "OFFLINE" ? request?._id || null : source?.servicing?.reissue?.offlineRequestId || null,
-          originalBookingId: resolveSupplierBookingId(sourceBooking),
-          originalPnr: activePnr,
+          originalBookingId: inheritedLineage.originalBookingId || resolveSupplierBookingId(sourceBooking),
+          originalPnr: inheritedLineage.originalPnr || activePnr,
           reissuedBookingId: providerBookingId,
           activeBookingId: providerBookingId,
           activePnr,
@@ -500,10 +612,45 @@ class ReissueBookingLifecycleService {
       __v: undefined,
     };
 
+    clonedPayload.originalBookingSnapshot = buildOriginalBookingSnapshot(clonedPayload, {
+      bookingId: bookingReference,
+      providerBookingReference: providerBookingId,
+      supplierBookingReference: providerBookingId,
+      pnr: activePnr,
+      traceId:
+        request?.metadata?.searchTraceId ||
+        request?.onlineReissueContext?.traceId ||
+        source?.originalBookingSnapshot?.traceId ||
+        null,
+      resultIndex:
+        request?.metadata?.selectedResultIndex ??
+        request?.onlineReissueContext?.resultIndex ??
+        null,
+    });
+
     const [created] = await BookingRequest.create([clonedPayload], { session });
+    created.bookingLineage = buildNextBookingLineage({
+      sourceBooking,
+      newMongoBookingId: created._id,
+      newProviderBookingId: providerBookingId,
+      newPnr: activePnr,
+    });
+    created.lastTicketedSnapshot = {
+      ...(created.lastTicketedSnapshot || {}),
+      bookingId: providerBookingId,
+      providerReferences,
+    };
+    await created.save({ session });
 
     sourceBooking.isReissued = true;
     sourceBooking.latestReissueBookingId = created._id;
+    sourceBooking.bookingLineage = buildNextBookingLineage({
+      sourceBooking,
+      newMongoBookingId: created._id,
+      newProviderBookingId: providerBookingId,
+      newPnr: activePnr,
+    });
+    sourceBooking.lastTicketedSnapshot = created.lastTicketedSnapshot;
     sourceBooking.reissueHistory = Array.isArray(sourceBooking.reissueHistory)
       ? sourceBooking.reissueHistory
       : [];
@@ -532,9 +679,15 @@ class ReissueBookingLifecycleService {
     sourceBooking.servicing.reissue = sourceBooking.servicing.reissue || {};
     sourceBooking.servicing.reissue.status = "REISSUED";
     sourceBooking.servicing.reissue.originalBookingId =
-      resolveSupplierBookingId(sourceBooking) || sourceBooking.servicing.reissue.originalBookingId || null;
+      sourceBooking.bookingLineage?.originalBookingId ||
+      resolveSupplierBookingId(sourceBooking) ||
+      sourceBooking.servicing.reissue.originalBookingId ||
+      null;
     sourceBooking.servicing.reissue.originalPnr =
-      activePnr || sourceBooking.servicing.reissue.originalPnr || null;
+      sourceBooking.bookingLineage?.originalPnr ||
+      activePnr ||
+      sourceBooking.servicing.reissue.originalPnr ||
+      null;
     sourceBooking.servicing.reissue.reissuedBookingId = providerBookingId;
     sourceBooking.servicing.reissue.activeBookingId = providerBookingId;
     sourceBooking.servicing.reissue.activePnr = activePnr;
@@ -549,6 +702,17 @@ class ReissueBookingLifecycleService {
       lockedAt: null,
       lockedBy: null,
     };
+    sourceBooking.originalBookingSnapshot =
+      sourceBooking.originalBookingSnapshot ||
+      buildOriginalBookingSnapshot(sourceBooking);
+    sourceBooking.ticketData =
+      request?.ticketData ||
+      sourceBooking.ticketData ||
+      sourceBooking.originalBookingSnapshot?.ticketData ||
+      null;
+    sourceBooking.bookingSnapshot = sourceBooking.bookingSnapshot || {};
+    sourceBooking.bookingSnapshot.providerReferences = providerReferences;
+    sourceBooking.bookingSnapshot.ticketData = sourceBooking.ticketData;
 
     await sourceBooking.save({ session });
     return created;

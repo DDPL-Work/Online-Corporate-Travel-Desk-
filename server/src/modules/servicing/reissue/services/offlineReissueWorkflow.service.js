@@ -667,6 +667,12 @@ class OfflineReissueWorkflowService {
           selectedFlight: selectedFlightSnapshot,
           selectedSegments: selectedFlightSnapshot.segments || [],
           remarks: payload.remarks || "",
+          creationSource: {
+            type: "USER_SUBMITTED",
+            trigger: "USER_ACTION",
+            createdBy: actor?._id?.toString?.() || actor?.id?.toString?.() || null,
+            workflow: "OFFLINE_REISSUE",
+          },
           status: OFFLINE_STATUSES.RAISED,
           billingMode,
           financialLedger: reissueFinancialLedgerService.initializeLedger(booking),

@@ -8,6 +8,9 @@ const {
   resolveSupplierBookingId,
   resolvePnr,
 } = require("../../../../utils/bookingResolver.util");
+const {
+  resolveBookingContext,
+} = require("../../../../utils/activeBookingResolver.util");
 const reissueRepository = require("../repositories/reissue.repository");
 const { generateReissueId } = require("../utils/reissueId.util");
 const {
@@ -21,7 +24,6 @@ const {
 } = require("../constants/reissue.constants");
 const reissueAuditService = require("./reissueAudit.service");
 const reissueEligibilityService = require("./reissueEligibility.service");
-const { isOnlineReissueAllowed } = require("./reissueEligibility.service");
 const reissueBillingService = require("./reissueBilling.service");
 const reissueExecutionService = require("./reissueExecution.service");
 const reissueLockService = require("./reissueLock.service");
@@ -37,6 +39,15 @@ const {
   buildActiveTicketSnapshotFromState,
 } = require("../utils/activeTicketSnapshot.helper");
 const { normalizeSsrSnapshot } = require("../utils/ssrSnapshot.util");
+const {
+  buildOnlineReissueContext,
+  validateOnlineReissueContext,
+} = require("../utils/onlineReissueContext.util");
+const {
+  buildInitialBookingLineage,
+} = require("../utils/reissueLineage.util");
+const { validateNdcReissue } = require("../validators/ndcReissue.validator");
+const providerReferenceService = require("../../../../services/reissue/providerReference.service");
 
 reissueNotificationService.registerSubscribers();
 
@@ -47,8 +58,20 @@ class ReissueWorkflowService {
     return booking;
   }
 
+  async loadBookingContextOrThrow(bookingId) {
+    const context = await resolveBookingContext(bookingId);
+    if (!context?.requestedBooking || !context?.activeBooking) {
+      throw new ApiError(404, "Booking not found");
+    }
+    return context;
+  }
+
   extractOriginalBookingId(booking) {
-    return resolveSupplierBookingId(booking);
+    return (
+      booking?.originalBookingSnapshot?.providerBookingReference ||
+      booking?.onlineReissueContext?.providerBookingReference ||
+      resolveSupplierBookingId(booking)
+    );
   }
 
   extractOriginalPnr(booking) {
@@ -57,6 +80,7 @@ class ReissueWorkflowService {
 
   extractOriginalTraceId(booking) {
     return (
+      booking?.originalBookingSnapshot?.traceId ||
       booking?.flightRequest?.traceId ||
       booking?.bookingResult?.traceId ||
       booking?.bookingResult?.providerResponse?.Response?.Response?.TraceId ||
@@ -66,9 +90,10 @@ class ReissueWorkflowService {
 
   extractOriginalResultIndex(booking) {
     return (
-      booking?.flightRequest?.resultIndex ||
-      booking?.bookingResult?.resultIndex ||
-      booking?.bookingResult?.providerResponse?.Response?.Response?.ResultIndex ||
+      booking?.originalBookingSnapshot?.resultIndex ??
+      booking?.flightRequest?.resultIndex ??
+      booking?.bookingResult?.resultIndex ??
+      booking?.bookingResult?.providerResponse?.Response?.Response?.ResultIndex ??
       null
     );
   }
@@ -76,6 +101,7 @@ class ReissueWorkflowService {
   extractOriginalTicketData(booking) {
     return (
       booking?.ticketData ||
+      booking?.originalBookingSnapshot?.ticketData ||
       booking?.bookingResult?.ticketData ||
       booking?.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Ticket ||
       booking?.bookingResult?.providerResponse?.raw?.Response?.Response?.FlightItinerary?.Ticket ||
@@ -160,10 +186,96 @@ class ReissueWorkflowService {
     );
   }
 
+  buildCreationSource(actor, workflow) {
+    return {
+      type: "USER_SUBMITTED",
+      trigger: "USER_ACTION",
+      createdBy: actor?._id?.toString?.() || actor?.id?.toString?.() || null,
+      workflow,
+    };
+  }
+
+  buildTransientOfflineResponse({
+    booking,
+    supplier,
+    supplierSupport = {},
+    reasons = [],
+    code = "OFFLINE_REQUIRED",
+    message = null,
+    metadata = null,
+  }) {
+    return {
+      transient: true,
+      success: false,
+      eligible: false,
+      mode: REISSUE_MODES.OFFLINE,
+      status: REISSUE_STATUSES.OFFLINE_REQUIRED,
+      code,
+      message: message || reasons[0] || "This booking requires offline reissue.",
+      reasons,
+      shouldCreateOfflineRequest: false,
+      supplier,
+      supplierSupport,
+      support: supplierSupport,
+      bookingId: booking?._id || null,
+      originalPnr: resolvePnr(booking) || null,
+      reissueId: null,
+      reissueRequestId: null,
+      metadata: metadata || {},
+    };
+  }
+
+  shouldForceOfflineFromReasons(reasons = []) {
+    return reasons.some((reason) =>
+      /offline servicing|fare rules|provider references|partially travelled|check-in|past departure|legacy booking/i.test(
+        String(reason || ""),
+      ),
+    );
+  }
+
+  isOfflineFallbackError(error) {
+    const offlineCodes = new Set([
+      "TBO_SANDBOX_REISSUE_UNSUPPORTED",
+      "REISSUE_NOT_AVAILABLE",
+      "REISSUE_AIRPORT_CODE_MISSING",
+    ]);
+
+    if (offlineCodes.has(error?.code)) return true;
+    if (error?.mode === "OFFLINE" || error?.fallbackAvailable === true) return true;
+
+    const message = String(error?.message || "").toLowerCase();
+    return /online reissue.*not allowed|no (?:flights|options)|reissue.*not available|valid reissue flight options|did not return valid reissue flight options|supplier.*not available|please\s+provide\s+pnr/i.test(
+      message,
+    );
+  }
+
+  applyLedgerVisibilityFilter(query = {}, { excludeOfflineRequired = true } = {}) {
+    const nextQuery = { ...query };
+    const creationVisibility = [
+      { "creationSource.type": "USER_SUBMITTED" },
+      { creationSource: { $exists: false } },
+      { "creationSource.type": { $exists: false } },
+    ];
+
+    if (Array.isArray(nextQuery.$and)) {
+      nextQuery.$and = [...nextQuery.$and, { $or: creationVisibility }];
+    } else {
+      nextQuery.$or = creationVisibility;
+    }
+
+    if (excludeOfflineRequired && !nextQuery.status) {
+      nextQuery.status = { $ne: REISSUE_STATUSES.OFFLINE_REQUIRED };
+    }
+
+    return nextQuery;
+  }
+
   async createRequest({ actor, payload }) {
     validateCreateReissuePayload(payload);
 
-    const booking = await this.loadBookingOrThrow(payload.bookingId);
+    const bookingContext = await this.loadBookingContextOrThrow(payload.bookingId);
+    const booking = bookingContext.activeBooking;
+    await providerReferenceService.backfillProviderReferences(booking, { save: true });
     this.ensureServicableBooking(booking);
     reissueBookingLifecycleService.assertBookingCanBeReissued(booking);
     reissueBookingLifecycleService.assertBookingNotLocked(booking);
@@ -171,6 +283,30 @@ class ReissueWorkflowService {
       userId: booking.userId,
       corporateId: booking.corporateId,
     });
+
+    const onlineReissueContext = buildOnlineReissueContext(booking, {
+      requestedBookingId: bookingContext.requestedBooking?._id?.toString?.() || null,
+    });
+    const contextValidation = validateOnlineReissueContext(onlineReissueContext);
+
+    if (!contextValidation.isValid) {
+      logger.warn("SUPPLIER_REFERENCE_MISSING", {
+        bookingId: booking?._id?.toString(),
+        requestedBookingId: bookingContext.requestedBooking?._id?.toString?.() || null,
+        missingFields: contextValidation.missingFields,
+        context: onlineReissueContext,
+        originalBookingSnapshot: booking?.originalBookingSnapshot || null,
+      });
+    }
+
+    if (onlineReissueContext.journeyType === 2 || onlineReissueContext.returnSegments?.length) {
+      logger.info("RETURN_REISSUE_CONTEXT_CREATED", {
+        bookingId: booking?._id?.toString(),
+        requestedBookingId: bookingContext.requestedBooking?._id?.toString?.() || null,
+        onwardSegments: onlineReissueContext.onwardSegments?.length || 0,
+        returnSegments: onlineReissueContext.returnSegments?.length || 0,
+      });
+    }
 
     const existing = await reissueRepository.findOne({
       bookingId: booking._id,
@@ -183,21 +319,56 @@ class ReissueWorkflowService {
     const corporate = await Corporate.findById(booking.corporateId);
     if (!corporate) throw new ApiError(404, "Corporate not found");
     const normalizedSelectedSsr = this.normalizeSelectedSsr(payload, booking);
+    const bookingLineage = buildInitialBookingLineage(booking);
+    const lastTicketedSnapshot = reissueFinancialLedgerService.buildLastTicketedSnapshot({
+      booking,
+    });
 
-    const eligibility = reissueEligibilityService.evaluate({
+    const eligibility = await reissueEligibilityService.evaluate({
       booking,
       newJourney: payload.newJourney,
     });
+    if (eligibility?.support?.ndc) {
+      validateNdcReissue({
+        travellers: booking?.travellers || [],
+        newJourney: payload.newJourney || {},
+      });
+    }
     const billingMode =
       corporate.classification === "postpaid"
         ? BILLING_MODES.POSTPAID
         : BILLING_MODES.PREPAID;
 
-    const request = await reissueRepository.create({
-      reissueId: await generateReissueId(),
+    const correlationId = payload.correlationId || crypto.randomUUID();
+    const reissueId = await generateReissueId();
+    const baseMetadata = {
+      employeeEmail: actor.email,
+      employeeName: this.actorName(actor),
+      orderId: booking.orderId || booking.bookingReference,
+      remarks: payload.remarks || "",
+      requestedBookingId: bookingContext.requestedBooking?._id?.toString?.() || null,
+      activeBookingId: booking?._id?.toString?.() || null,
+      isReissueRedirect: bookingContext.isReissueRedirect === true,
+      ...(normalizedSelectedSsr !== undefined ? { selectedSSR: normalizedSelectedSsr } : {}),
+      originalTraceId: onlineReissueContext.traceId || this.extractOriginalTraceId(booking),
+      originalResultIndex:
+        onlineReissueContext.resultIndex ?? this.extractOriginalResultIndex(booking),
+      originalTicketData:
+        onlineReissueContext.ticketData || this.extractOriginalTicketData(booking),
+      providerReferences:
+        onlineReissueContext.providerReferences ||
+        booking?.bookingSnapshot?.providerReferences ||
+        null,
+      corporateFareContext:
+        onlineReissueContext.corporateFareContext ||
+        booking?.originalBookingSnapshot?.corporateFareContext ||
+        null,
+    };
+    const baseRequestPayload = {
+      reissueId,
       bookingId: booking._id,
-      originalBookingId: this.extractOriginalBookingId(booking),
-      originalPnr: this.extractOriginalPnr(booking),
+      originalBookingId: onlineReissueContext.providerBookingReference,
+      originalPnr: onlineReissueContext.originalPnr,
       userId: booking.userId,
       corporateId: booking.corporateId,
       companyId: booking.corporateId,
@@ -207,119 +378,64 @@ class ReissueWorkflowService {
       mode: REISSUE_MODES.ONLINE,
       status: REISSUE_STATUSES.CREATED,
       reissueType: REISSUE_TYPES.FULL_REISSUE,
-      supplierSupport: eligibility.support,
+      creationSource: this.buildCreationSource(actor, "ONLINE_REISSUE"),
+      supplierSupport: eligibility.supplierSupport,
       oldJourney: this.buildOldJourney(booking),
       newJourney: payload.newJourney,
       billingMode,
       financialLedger: reissueFinancialLedgerService.initializeLedger(booking),
       pricingHistory: [],
       activeTicketSnapshot: buildActiveTicketSnapshot(booking),
-      metadata: {
-        employeeEmail: actor.email,
-        employeeName: this.actorName(actor),
-        orderId: booking.orderId || booking.bookingReference,
-        remarks: payload.remarks || "",
-        ...(normalizedSelectedSsr !== undefined ? { selectedSSR: normalizedSelectedSsr } : {}),
-        originalTraceId: this.extractOriginalTraceId(booking),
-        originalResultIndex: this.extractOriginalResultIndex(booking),
-        originalTicketData: this.extractOriginalTicketData(booking),
-      },
-      correlationId: payload.correlationId || crypto.randomUUID(),
-      timeline: [
-        {
-          status: REISSUE_STATUSES.CREATED,
-          title: "Reissue request created",
-          description: "Unified servicing engine request created",
-          actorId: actor._id || actor.id,
-          actorRole: actor.role,
-          at: new Date(),
-          metadata: {},
-        },
-      ],
-      auditLogs: [
-        {
-          action: DOMAIN_EVENTS.REISSUE_CREATED,
-          actorId: actor._id || actor.id,
-          actorRole: actor.role,
-          message: "Reissue request created",
-          at: new Date(),
-          metadata: {},
-        },
-      ],
-    });
-
-    await reissueBookingLifecycleService.lockBookingForReissue({
-      booking,
-      actor,
-      requestId: request._id,
-      requestRef: request.reissueId,
-      correlationId: request.correlationId,
-      mode: REISSUE_MODES.ONLINE,
-      reason: "Online reissue workflow created",
-    });
-
-    reissueAuditService.transition(request, REISSUE_STATUSES.ELIGIBILITY_CHECKED, {
-      title: "Eligibility checked",
-      description: eligibility.eligible
-        ? "Online reissue pre-checks passed"
-        : "Online reissue pre-checks failed",
-      actorId: actor._id || actor.id,
-      actorRole: actor.role,
-      eventName: DOMAIN_EVENTS.REISSUE_ELIGIBILITY_CHECKED,
-      metadata: {
-        ...request.metadata,
-        mode: REISSUE_MODES.ONLINE,
-        status: REISSUE_STATUSES.ELIGIBILITY_CHECKED,
-        reasons: eligibility.reasons,
-      },
-    });
+      bookingLineage,
+      lastTicketedSnapshot,
+      onlineReissueContext,
+      metadata: baseMetadata,
+      correlationId,
+    };
 
     if (!eligibility.eligible) {
       logger.info("ONLINE_REISSUE_REJECTED", {
         bookingId: booking._id?.toString(),
-        airlineCode: eligibility.support?.airlineCode || null,
+        airlineCode: eligibility.supplierSupport?.airlineCode || null,
         reasons: eligibility.reasons,
       });
       // ── QA sandbox path: ineligible by fare rules but sandbox testing is allowed ──
       // Allow the search to proceed so QA can verify the provider flow.
       // The provider will reject (expected) → workflow catches it → OFFLINE_REQUIRED.
-      if (eligibility.support.sandboxTestingAllowed) {
+      if (eligibility.supplierSupport.sandboxTestingAllowed) {
         logger.warn("SANDBOX TESTING PATH: real eligibility=false but sandboxTestingAllowed, proceeding to provider search", {
           bookingId: booking._id?.toString(),
-          airlineCode: eligibility.support.airlineCode,
+          airlineCode: eligibility.supplierSupport.airlineCode,
           reasons: eligibility.reasons,
         });
         // Do NOT return early — fall through to search
       } else {
-        reissueAuditService.transition(request, REISSUE_STATUSES.FAILED, {
-          title: "Eligibility failed",
-          description: eligibility.reasons.join("; "),
-          actorId: actor._id || actor.id,
-          actorRole: actor.role,
-          eventName: DOMAIN_EVENTS.REISSUE_FAILED,
-          metadata: {
-            ...request.metadata,
-            mode: REISSUE_MODES.ONLINE,
-            status: REISSUE_STATUSES.FAILED,
-            reasons: eligibility.reasons,
-            errorCode: "ONLINE_REISSUE_NOT_SUPPORTED",
-          },
+        logger.warn("ONLINE REISSUE BLOCKED - eligibility check failed, no sandbox override", {
+          bookingId: booking._id?.toString(),
+          reasons: eligibility.reasons,
         });
-        await reissueRepository.save(request);
-        await reissueBookingLifecycleService.unlockBookingReissue({
-          bookingId: booking._id,
-          requestId: request._id,
+        return this.buildTransientOfflineResponse({
+          booking,
+          supplier: eligibility.supplier,
+          supplierSupport: eligibility.supplierSupport,
+          reasons: eligibility.reasons,
+          code: "ONLINE_REISSUE_NOT_SUPPORTED",
+          message:
+            eligibility.message ||
+            "This booking does not support online reissue. Please raise offline request.",
+          metadata: {
+            errorCode: "OFFLINE_REQUIRED",
+          },
         });
 
         logger.warn("ONLINE REISSUE BLOCKED — eligibility check failed, no sandbox override", {
           bookingId: booking._id?.toString(),
           reasons: eligibility.reasons,
         });
-        return request;
       }
     }
 
-    const lock = await reissueLockService.acquire(request.reissueId, 45000);
+    const lock = await reissueLockService.acquire(`search:${booking._id}`, 45000);
     if (!lock.acquired) {
       throw new ApiError(409, "This reissue search is already being processed");
     }
@@ -347,134 +463,182 @@ class ReissueWorkflowService {
     try {
       const { searchResponse, normalized } = await reissueExecutionService.searchFlights({
         booking,
-        reissueRequest: request,
+        reissueRequest: {
+          ...baseRequestPayload,
+        },
       });
 
-      request.supplierResponse = {
-        ...(request.supplierResponse || {}),
-        searchResponse,
-      };
-      request.metadata = {
-        ...(request.metadata || {}),
-        supplierTraceId: normalized.traceId,
-        searchTraceId: normalized.traceId,
-        selectedResultIndex: normalized.firstResultIndex,
-        itinerary: normalized.itineraries[0] || null,
-        itineraryCount: normalized.itineraries.length,
-      };
-      request.miniFareRules = normalized.parsedMiniFareRules;
-
-      const providerEligibility = reissueEligibilityService.evaluate({
+      const providerEligibility = await reissueEligibilityService.evaluate({
         booking,
         newJourney: payload.newJourney,
         miniFareRules: normalized.parsedMiniFareRules,
       });
-      request.supplierSupport = {
-        ...(request.supplierSupport || {}),
-        ...providerEligibility.support,
-      };
 
       if (!providerEligibility.eligible) {
         logger.info("ONLINE_REISSUE_REJECTED", {
           bookingId: booking._id?.toString(),
-          airlineCode: providerEligibility.support?.airlineCode || null,
+          airlineCode: providerEligibility.supplierSupport?.airlineCode || null,
           reasons: providerEligibility.reasons,
         });
-        const isOfflineRequired = providerEligibility.reasons.some(reason =>
-          reason.includes("online reissue is not allowed") ||
-          reason.includes("Mini fare rules indicate online reissue is not allowed")
-        );
-
-        if (isOfflineRequired) {
-          request.mode = REISSUE_MODES.OFFLINE;
-          reissueAuditService.transition(request, REISSUE_STATUSES.OFFLINE_REQUIRED, {
-            title: "Offline reissue required",
-            description: "Supplier fare rules require offline processing",
-            actorId: actor._id || actor.id,
-            actorRole: actor.role,
-            eventName: DOMAIN_EVENTS.REISSUE_FAILED,
-            metadata: {
-              ...request.metadata,
-              mode: REISSUE_MODES.OFFLINE,
-              status: REISSUE_STATUSES.OFFLINE_REQUIRED,
-              reasons: providerEligibility.reasons,
-            },
-          });
-        } else {
-          reissueAuditService.transition(request, REISSUE_STATUSES.FAILED, {
-            title: "Supplier eligibility failed",
-            description: providerEligibility.reasons.join("; "),
-            actorId: actor._id || actor.id,
-            actorRole: actor.role,
-            eventName: DOMAIN_EVENTS.REISSUE_FAILED,
-            metadata: {
-              ...request.metadata,
-              mode: REISSUE_MODES.ONLINE,
-              status: REISSUE_STATUSES.FAILED,
-              reasons: providerEligibility.reasons,
-            },
-          });
-        }
+        return this.buildTransientOfflineResponse({
+          booking,
+          supplier: providerEligibility.supplier,
+          supplierSupport: {
+            ...(eligibility.supplierSupport || {}),
+            ...(providerEligibility.supplierSupport || {}),
+          },
+          reasons: providerEligibility.reasons,
+          code: this.shouldForceOfflineFromReasons(providerEligibility.reasons)
+            ? "OFFLINE_REQUIRED"
+            : "ONLINE_REISSUE_NOT_SUPPORTED",
+          message:
+            providerEligibility.message ||
+            "Online reissue is currently unavailable for this booking/airline.",
+          metadata: {
+            errorCode: "OFFLINE_REQUIRED",
+            searchTraceId: normalized.traceId,
+          },
+        });
       } else {
         logger.info("ONLINE_REISSUE_SUPPORTED", {
           bookingId: booking._id?.toString(),
-          airlineCode: providerEligibility.support?.airlineCode || null,
+          airlineCode: providerEligibility.supplierSupport?.airlineCode || null,
           traceId: normalized.traceId,
         });
-        reissueAuditService.transition(request, REISSUE_STATUSES.SEARCH_COMPLETED, {
-          title: "Search completed",
-          description: "Provider returned revised flight options for reissue",
-          actorId: actor._id || actor.id,
-          actorRole: actor.role,
-          eventName: DOMAIN_EVENTS.REISSUE_SEARCH_COMPLETED,
+        const now = new Date();
+        const request = reissueRepository.build({
+          ...baseRequestPayload,
+          status: REISSUE_STATUSES.SEARCH_COMPLETED,
+          supplierSupport: {
+            ...(eligibility.supplierSupport || {}),
+            ...(providerEligibility.supplierSupport || {}),
+          },
+          supplierResponse: {
+            searchResponse,
+          },
+          miniFareRules: normalized.parsedMiniFareRules,
           metadata: {
-            ...request.metadata,
-            mode: REISSUE_MODES.ONLINE,
-            status: REISSUE_STATUSES.SEARCH_COMPLETED,
+            ...baseMetadata,
+            supplierTraceId: normalized.traceId,
+            searchTraceId: normalized.traceId,
+            selectedResultIndex: normalized.firstResultIndex,
+            itinerary: normalized.itineraries[0] || null,
             itineraryCount: normalized.itineraries.length,
           },
+          timeline: [
+            {
+              status: REISSUE_STATUSES.CREATED,
+              title: "Reissue request created",
+              description: "Unified servicing engine request created",
+              actorId: actor._id || actor.id,
+              actorRole: actor.role,
+              at: now,
+              metadata: {},
+            },
+            {
+              status: REISSUE_STATUSES.ELIGIBILITY_CHECKED,
+              title: "Eligibility checked",
+              description: "Online reissue pre-checks passed",
+              actorId: actor._id || actor.id,
+              actorRole: actor.role,
+              at: now,
+              metadata: {
+                ...baseMetadata,
+                mode: REISSUE_MODES.ONLINE,
+                status: REISSUE_STATUSES.ELIGIBILITY_CHECKED,
+                reasons: eligibility.reasons,
+              },
+            },
+            {
+              status: REISSUE_STATUSES.SEARCH_COMPLETED,
+              title: "Search completed",
+              description: "Provider returned revised flight options for reissue",
+              actorId: actor._id || actor.id,
+              actorRole: actor.role,
+              at: now,
+              metadata: {
+                ...baseMetadata,
+                mode: REISSUE_MODES.ONLINE,
+                status: REISSUE_STATUSES.SEARCH_COMPLETED,
+                itineraryCount: normalized.itineraries.length,
+                searchTraceId: normalized.traceId,
+              },
+            },
+          ],
+          auditLogs: [
+            {
+              action: DOMAIN_EVENTS.REISSUE_CREATED,
+              actorId: actor._id || actor.id,
+              actorRole: actor.role,
+              message: "Reissue request created",
+              at: now,
+              metadata: {},
+            },
+            {
+              action: DOMAIN_EVENTS.REISSUE_ELIGIBILITY_CHECKED,
+              actorId: actor._id || actor.id,
+              actorRole: actor.role,
+              message: "Online reissue pre-checks passed",
+              at: now,
+              metadata: {
+                ...baseMetadata,
+                mode: REISSUE_MODES.ONLINE,
+                status: REISSUE_STATUSES.ELIGIBILITY_CHECKED,
+                reasons: eligibility.reasons,
+              },
+            },
+            {
+              action: DOMAIN_EVENTS.REISSUE_SEARCH_COMPLETED,
+              actorId: actor._id || actor.id,
+              actorRole: actor.role,
+              message: "Provider returned revised flight options for reissue",
+              at: now,
+              metadata: {
+                ...baseMetadata,
+                mode: REISSUE_MODES.ONLINE,
+                status: REISSUE_STATUSES.SEARCH_COMPLETED,
+                itineraryCount: normalized.itineraries.length,
+                searchTraceId: normalized.traceId,
+              },
+            },
+          ],
         });
-      }
 
-      await reissueRepository.save(request);
-      if (
-        [REISSUE_STATUSES.OFFLINE_REQUIRED, REISSUE_STATUSES.FAILED].includes(request.status)
-      ) {
-        await reissueBookingLifecycleService.unlockBookingReissue({
-          bookingId: booking._id,
+        await reissueBookingLifecycleService.lockBookingForReissue({
+          booking,
+          actor,
           requestId: request._id,
+          requestRef: request.reissueId,
+          correlationId: request.correlationId,
+          mode: REISSUE_MODES.ONLINE,
+          reason: "Online reissue workflow created",
         });
-      }
-      return request;
-    } catch (error) {
-      const offlineFallback = isOfflineFallbackError(error);
-      if (offlineFallback) {
-        request.mode = REISSUE_MODES.OFFLINE;
-      }
 
-      reissueAuditService.transition(request, offlineFallback ? REISSUE_STATUSES.OFFLINE_REQUIRED : REISSUE_STATUSES.FAILED, {
-        title: offlineFallback ? "Offline reissue required" : "Reissue search failed",
-        description: offlineFallback
-          ? "Supplier cannot process online reissue for the requested journey. Routing to offline servicing."
-          : error.message,
-        actorId: actor._id || actor.id,
-        actorRole: actor.role,
-        eventName: DOMAIN_EVENTS.REISSUE_FAILED,
-        metadata: {
-          ...request.metadata,
-          mode: offlineFallback ? REISSUE_MODES.OFFLINE : REISSUE_MODES.ONLINE,
-          status: offlineFallback ? REISSUE_STATUSES.OFFLINE_REQUIRED : REISSUE_STATUSES.FAILED,
-          reasons: [error.message],
-          errorCode: error?.code || "REISSUE_NOT_AVAILABLE",
-        },
-      });
-      await reissueRepository.save(request);
-      await reissueBookingLifecycleService.unlockBookingReissue({
-        bookingId: booking._id,
-        requestId: request._id,
-      });
-      if (offlineFallback) {
+        try {
+          await reissueRepository.save(request);
+        } catch (saveError) {
+          await reissueBookingLifecycleService.unlockBookingReissue({
+            bookingId: booking._id,
+            requestId: request._id,
+          });
+          throw saveError;
+        }
+
         return request;
+      }
+    } catch (error) {
+      if (this.isOfflineFallbackError(error)) {
+        return this.buildTransientOfflineResponse({
+          booking,
+          supplier: eligibility.supplier,
+          supplierSupport: eligibility.supplierSupport,
+          reasons: [error.message],
+          code: error?.code || "OFFLINE_REQUIRED",
+          message: "Online reissue is currently unavailable for this booking/airline.",
+          metadata: {
+            errorCode: error?.code || "REISSUE_NOT_AVAILABLE",
+          },
+        });
       }
       throw error;
     } finally {
@@ -561,15 +725,17 @@ class ReissueWorkflowService {
       });
 
       if (!request.supplierSupport.onlineReissueAllowed) {
-        reissueAuditService.transition(request, REISSUE_STATUSES.FAILED, {
-          title: "Fare quote rejected",
-          description: "Mini fare rules do not allow online reissue",
+        request.mode = REISSUE_MODES.OFFLINE;
+        reissueAuditService.transition(request, REISSUE_STATUSES.OFFLINE_REQUIRED, {
+          title: "Offline reissue required",
+          description: "Supplier fare rules do not allow online reissue",
           actorId: actor._id || actor.id,
           actorRole: actor.role,
           eventName: DOMAIN_EVENTS.REISSUE_FAILED,
           metadata: {
             ...request.metadata,
-            status: REISSUE_STATUSES.FAILED,
+            mode: REISSUE_MODES.OFFLINE,
+            status: REISSUE_STATUSES.OFFLINE_REQUIRED,
             onlineReissueAllowed: false,
           },
         });
@@ -656,6 +822,19 @@ class ReissueWorkflowService {
       request.isReissueLocked = true;
       const booking = await this.loadBookingOrThrow(request.bookingId);
       const selectedSsr = this.resolveSelectedSsrForRequest(request, booking);
+      const previousTicketedSnapshot =
+        request.lastTicketedSnapshot ||
+        request.financialLedger?.lastTicketedSnapshot ||
+        request.activeTicketSnapshot ||
+        reissueFinancialLedgerService.buildLastTicketedSnapshot({ request, booking });
+
+      if (request?.supplierSupport?.ndc) {
+        validateNdcReissue({
+          travellers: booking?.travellers || [],
+          newJourney: request.newJourney || {},
+        });
+      }
+
       reissueAuditService.transition(request, REISSUE_STATUSES.PROCESSING, {
         title: "Processing online reissue",
         description: "Supplier ticket reissue execution started",
@@ -680,13 +859,23 @@ class ReissueWorkflowService {
         ticketReissueResponse: result.supplierResponse,
       };
       request.newBookingId = result.newBookingId;
-      request.newPnr = request.originalPnr || result.newPnr;
+      request.newPnr = result.newPnr || request.originalPnr;
       request.ticketData = ticketData || request.ticketData || null;
       request.revisedTicket = result.revisedTicket || request.revisedTicket || null;
       request.revisedInvoice = result.revisedInvoice || request.revisedInvoice || null;
+      request.onlineReissueContext = {
+        ...(request.onlineReissueContext || {}),
+        providerBookingReference: result.newBookingId || request.originalBookingId || null,
+        supplierBookingReference:
+          result.newBookingId ||
+          request?.onlineReissueContext?.supplierBookingReference ||
+          request.originalBookingId ||
+          null,
+        originalPnr: result.newPnr || request.originalPnr || null,
+      };
       request.metadata = {
         ...(request.metadata || {}),
-        newPnr: request.originalPnr || result.newPnr,
+        newPnr: result.newPnr || request.originalPnr,
         newBookingId: result.newBookingId,
         changeDetails: remarks || "Online reissue completed",
       };
@@ -732,6 +921,8 @@ class ReissueWorkflowService {
         selectedSSR: selectedSsr,
         supplierReissueCharge: request.reissueCharges,
         booking,
+        previousTicketedSnapshot,
+        currentTicketedSnapshot: request.activeTicketSnapshot,
       });
 
       request.normalizedPricing = {
@@ -744,6 +935,7 @@ class ReissueWorkflowService {
       };
 
       reissueFinancialLedgerService.applyReissueCycle(request, cycleCalc);
+      request.lastTicketedSnapshot = request.financialLedger?.lastTicketedSnapshot || request.lastTicketedSnapshot;
 
       logger.info("SSR_PERSISTED", {
         requestId: request.reissueId,
@@ -762,7 +954,7 @@ class ReissueWorkflowService {
         metadata: {
           ...request.metadata,
           status: REISSUE_STATUSES.COMPLETED,
-          newPnr: request.originalPnr || result.newPnr,
+          newPnr: result.newPnr || request.originalPnr,
           activeBookingId: activeBooking?._id?.toString?.() || null,
         },
       });
@@ -808,7 +1000,7 @@ class ReissueWorkflowService {
   }
 
   async getMyRequests({ actor, query }) {
-    const mongoQuery = { userId: actor.id };
+    const mongoQuery = this.applyLedgerVisibilityFilter({ userId: actor.id });
     if (query?.status) mongoQuery.status = query.status;
     return reissueRepository.list(mongoQuery, {
       page: Number(query?.page || 1),
@@ -824,7 +1016,7 @@ class ReissueWorkflowService {
   }
 
   async listAdmin({ query }) {
-    const mongoQuery = {};
+    const mongoQuery = this.applyLedgerVisibilityFilter({});
     if (query?.status) mongoQuery.status = query.status;
     if (query?.corporateId) mongoQuery.corporateId = query.corporateId;
     return reissueRepository.list(mongoQuery, {
@@ -834,7 +1026,7 @@ class ReissueWorkflowService {
   }
 
   async listOps({ query }) {
-    const mongoQuery = {};
+    const mongoQuery = this.applyLedgerVisibilityFilter({});
     if (query?.status) mongoQuery.status = query.status;
     if (query?.corporateId) mongoQuery.corporateId = query.corporateId;
     if (query?.assignedOpsUserId) mongoQuery.assignedOpsUserId = query.assignedOpsUserId;
@@ -1040,7 +1232,9 @@ class ReissueWorkflowService {
    * Returns eligibility status without creating any request or calling any API.
    */
   async checkEligibility({ actor, bookingId }) {
-    const booking = await this.loadBookingOrThrow(bookingId);
+    const bookingContext = await this.loadBookingContextOrThrow(bookingId);
+    const booking = bookingContext.activeBooking;
+    await providerReferenceService.backfillProviderReferences(booking, { save: true });
     this.ensureAccess(actor, {
       userId: booking.userId,
       corporateId: booking.corporateId,
@@ -1049,19 +1243,25 @@ class ReissueWorkflowService {
     if (booking.executionStatus !== "ticketed") {
       return {
         eligible: false,
-        mode: null,
+        mode: REISSUE_MODES.OFFLINE,
         code: "BOOKING_NOT_TICKETED",
         message: "Only ticketed bookings can be reissued",
         support: {},
+        supplierSupport: {},
+        reasons: ["Only ticketed bookings can be reissued."],
+        shouldCreateOfflineRequest: false,
       };
     }
     if (booking.bookingType !== "flight") {
       return {
         eligible: false,
-        mode: null,
+        mode: REISSUE_MODES.OFFLINE,
         code: "NOT_FLIGHT_BOOKING",
         message: "Reissue is only supported for flight bookings",
         support: {},
+        supplierSupport: {},
+        reasons: ["Reissue is only supported for flight bookings."],
+        shouldCreateOfflineRequest: false,
       };
     }
 
@@ -1071,14 +1271,17 @@ class ReissueWorkflowService {
     } catch (error) {
       return {
         eligible: false,
-        mode: null,
+        mode: REISSUE_MODES.OFFLINE,
         code: error.message.includes("locked") ? "REISSUE_LOCKED" : "ONLINE_REISSUE_NOT_SUPPORTED",
         message: error.message,
         support: {},
+        supplierSupport: {},
+        reasons: [error.message],
+        shouldCreateOfflineRequest: false,
       };
     }
 
-    const eligibility = reissueEligibilityService.evaluate({ booking });
+    const eligibility = await reissueEligibilityService.evaluate({ booking });
 
     // eligible / code = REAL airline capability (no sandbox leakage)
     // sandboxTestingAllowed = QA-only override capability
@@ -1088,13 +1291,15 @@ class ReissueWorkflowService {
       code: eligibility.eligible ? "ONLINE_REISSUE_ALLOWED" : "ONLINE_REISSUE_NOT_SUPPORTED",
       message: eligibility.eligible
         ? "This booking supports online reissue"
-        : "This booking does not support online reissue. Please raise offline request.",
-      support: eligibility.support,
+        : eligibility.message || "This booking does not support online reissue. Please raise offline request.",
+      support: eligibility.supplierSupport,
+      supplierSupport: eligibility.supplierSupport,
       reasons: eligibility.reasons,
       supplier: eligibility.supplier,
+      shouldCreateOfflineRequest: false,
       // QA-only fields — frontend uses these to show sandbox QA badge, NEVER the primary badge
-      sandboxTestingAllowed: eligibility.support.sandboxTestingAllowed || false,
-      sandboxOverrideApplied: eligibility.support.sandboxOverrideApplied || false,
+      sandboxTestingAllowed: eligibility.supplierSupport.sandboxTestingAllowed || false,
+      sandboxOverrideApplied: eligibility.supplierSupport.sandboxOverrideApplied || false,
     };
   }
 }

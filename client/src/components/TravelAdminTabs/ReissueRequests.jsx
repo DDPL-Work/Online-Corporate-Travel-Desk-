@@ -32,6 +32,8 @@ import {
   getSegments,
   getStatusTone,
   extractRequestArray,
+  isVisibleLedgerRequest,
+  resolveWorkflowType,
 } from "../../utils/reissueResolvers";
 import { IdCell, Th } from "./Shared/CommonComponents";
 
@@ -219,7 +221,7 @@ export default function ReissueRequests() {
 
   /* Client-side search filter */
   const filtered = useMemo(() => {
-    let result = requests;
+    let result = requests.filter((r) => isVisibleLedgerRequest(r));
     if (statusFilter !== "All") {
       // Allow mapping multiple valid statuses for APPROVED queue filtering if necessary
       if (statusFilter === "APPROVED") {
@@ -275,7 +277,7 @@ export default function ReissueRequests() {
         r.bookingReference || r.bookingRef || "N/A",
         getUserName(r),
         getRoute(r),
-        r.reissueType || r.type || "REISSUE",
+        resolveWorkflowType(r),
         r.reason || r.remarks || "N/A",
         getRequestedDate(r),
         getStatus(r),
@@ -505,7 +507,7 @@ export default function ReissueRequests() {
                         </td>
                         <td className="px-4 py-4">
                           <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-black uppercase tracking-wider">
-                            {r.reissueType || r.type || "REISSUE"}
+                            {resolveWorkflowType(r)}
                           </span>
                           <p
                             className="text-[11px] text-slate-500 mt-1.5 italic line-clamp-1 max-w-[200px]"

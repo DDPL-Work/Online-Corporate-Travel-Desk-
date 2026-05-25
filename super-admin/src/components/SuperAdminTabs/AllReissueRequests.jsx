@@ -25,6 +25,53 @@ import {
   getJourneyLabel,
 } from "../reissue/reissueUi";
 
+const REQUEST_STATUS_PRIORITY = {
+  ASSIGNED: 120,
+  IN_PROGRESS: 115,
+  WAITING_AIRLINE: 110,
+  PROCESSING: 105,
+  BILLING_RESERVED: 100,
+  QUOTE_RECEIVED: 95,
+  SEARCH_COMPLETED: 90,
+  CREATED: 85,
+  OFFLINE_REQUIRED: 80,
+  TICKET_GENERATED: 70,
+  COMPLETED: 60,
+  FAILED: 20,
+  REJECTED: 15,
+  CANCELLED: 10,
+};
+
+const dedupeLatestActionableRequests = (items = []) => {
+  const sorted = [...items].sort((left, right) => {
+    const generationDiff =
+      Number(right?.bookingLineage?.reissueGeneration || 0) -
+      Number(left?.bookingLineage?.reissueGeneration || 0);
+    if (generationDiff !== 0) return generationDiff;
+
+    const statusDiff =
+      (REQUEST_STATUS_PRIORITY[right?.status] || 0) -
+      (REQUEST_STATUS_PRIORITY[left?.status] || 0);
+    if (statusDiff !== 0) return statusDiff;
+
+    return new Date(right?.updatedAt || right?.createdAt || 0) - new Date(left?.updatedAt || left?.createdAt || 0);
+  });
+
+  const seen = new Set();
+  return sorted.filter((item) => {
+    const key =
+      item?.bookingLineage?.originalBookingId ||
+      item?.bookingLineage?.originalMongoBookingId ||
+      item?.originalPnr ||
+      item?.displayInfo?.pnr ||
+      item?.bookingId ||
+      item?.id;
+    if (!key || seen.has(String(key))) return false;
+    seen.add(String(key));
+    return true;
+  });
+};
+
 function readToken() {
   const token = sessionStorage.getItem("token");
   if (!token) return {};
@@ -119,9 +166,10 @@ export default function AllReissueRequests() {
   }, [error]);
 
   const filteredRequests = useMemo(() => {
+    const dedupedRequests = dedupeLatestActionableRequests(requests);
     const term = search.trim().toLowerCase();
-    if (!term) return requests;
-    return requests.filter((request) =>
+    if (!term) return dedupedRequests;
+    return dedupedRequests.filter((request) =>
       [
         request.requestId,
         request.bookingId,

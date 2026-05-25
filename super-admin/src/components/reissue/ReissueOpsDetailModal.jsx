@@ -41,6 +41,64 @@ const formatMoney = (value, currency = "INR") => {
   }).format(amount);
 };
 
+const pickMoney = (...values) => {
+  for (const value of values) {
+    const amount = Number(value);
+    if (Number.isFinite(amount)) return amount;
+  }
+  return 0;
+};
+
+const resolveFinancialBreakdown = (request = {}) => {
+  const ledger = request?.financialLedger || {};
+  const ssrFinancials = request?.ssrFinancials || ledger?.ssrFinancials || {};
+  const normalizedPricing = request?.normalizedPricing || {};
+  const lastCycle = Array.isArray(request?.pricingHistory) && request.pricingHistory.length
+    ? request.pricingHistory[request.pricingHistory.length - 1]
+    : {};
+
+  return {
+    previouslyPaid: pickMoney(
+      lastCycle?.previousTotalPaid,
+      ledger?.lastTicketedSnapshot?.fare?.totalFare,
+      ledger?.currentTicketValue,
+      ledger?.originalTicketAmount,
+    ),
+    newFlight: pickMoney(
+      normalizedPricing?.newFlightBase,
+      lastCycle?.newFare,
+      request?.lastTicketedSnapshot?.fare?.totalFare,
+      request?.newFare,
+      request?.displayInfo?.newFare,
+    ),
+    newSSR: pickMoney(
+      normalizedPricing?.newSSRTotal,
+      lastCycle?.newSSR,
+      ssrFinancials?.newSSR,
+      ledger?.currentSSRValue,
+    ),
+    ssrRefund: pickMoney(ssrFinancials?.refundableSSR, lastCycle?.refundSSRValue),
+    reissuePenalty: pickMoney(
+      normalizedPricing?.reissuePenalty,
+      lastCycle?.airlinePenalty,
+      request?.reissueCharges,
+      request?.reissueCharge,
+    ),
+    netCollection: pickMoney(
+      request?.totalAdjustment,
+      lastCycle?.additionalCollection,
+      normalizedPricing?.netPayable > 0 ? normalizedPricing.netPayable : null,
+    ),
+    netRefund: pickMoney(normalizedPricing?.refundDue, lastCycle?.refundAmount),
+    currency:
+      request?.displayInfo?.currency ||
+      request?.currency ||
+      request?.reissuePricingSnapshot?.currency ||
+      request?.pricingSnapshot?.currency ||
+      "INR",
+  };
+};
+
 function Card({ label, value, accent }) {
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
@@ -100,6 +158,7 @@ export default function ReissueOpsDetailModal({
   );
   const ticketUrl =
     activeRequest?.generatedTicketUrl || activeRequest?.revisedTicketUrl || null;
+  const financialBreakdown = resolveFinancialBreakdown(activeRequest || {});
   const canDownloadTicket = ["TICKET_GENERATED", "COMPLETED"].includes(activeRequest?.status);
   const corporateName =
     activeRequest?.displayInfo?.corporateName ||
@@ -393,58 +452,38 @@ export default function ReissueOpsDetailModal({
               </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <Card
-                  label="Current Ticket Fare"
-                  value={formatMoney(
-                    activeRequest?.displayInfo?.oldFare ??
-                      activeRequest?.oldFare ??
-                      pricingSnapshot?.oldFare ??
-                      selectedFlight?.oldFare,
-                    pricingCurrency,
-                  )}
+                  label="Previously Paid"
+                  value={formatMoney(financialBreakdown.previouslyPaid, financialBreakdown.currency)}
                 />
                 <Card
-                  label="New Fare"
-                  value={formatMoney(
-                    activeRequest?.displayInfo?.newFare ??
-                      activeRequest?.newFare ??
-                      pricingSnapshot?.newFare ??
-                      selectedFlight?.newFare ??
-                      selectedFlight?.fare,
-                    pricingCurrency,
-                  )}
+                  label="New Flight"
+                  value={formatMoney(financialBreakdown.newFlight, financialBreakdown.currency)}
                 />
                 <Card
-                  label="Fare Difference"
-                  value={formatMoney(
-                    activeRequest?.displayInfo?.fareDifference ??
-                      activeRequest?.fareDifference ??
-                      pricingSnapshot?.fareDifference ??
-                      selectedFlight?.fareDifference,
-                    pricingCurrency,
-                  )}
+                  label="New SSR"
+                  value={formatMoney(financialBreakdown.newSSR, financialBreakdown.currency)}
                 />
                 <Card
-                  label="Airline Reissue Penalty"
-                  value={formatMoney(
-                    activeRequest?.displayInfo?.reissueCharge ??
-                      activeRequest?.reissueCharge ??
-                      activeRequest?.reissueCharges ??
-                      pricingSnapshot?.reissueCharge ??
-                      selectedFlight?.reissueCharge,
-                    pricingCurrency,
-                  )}
+                  label="SSR Refund"
+                  value={formatMoney(financialBreakdown.ssrRefund, financialBreakdown.currency)}
                 />
                 <Card
-                  label="Total Collection"
+                  label={
+                    financialBreakdown.netRefund > 0 ? "Net Refund" : "Net Collection"
+                  }
                   value={formatMoney(
-                    activeRequest?.displayInfo?.totalEstimate ??
-                      activeRequest?.totalEstimate ??
-                      activeRequest?.totalAdjustment ??
-                      pricingSnapshot?.totalEstimate ??
-                      selectedFlight?.totalEstimate,
-                    pricingCurrency,
+                    financialBreakdown.netRefund > 0
+                      ? financialBreakdown.netRefund
+                      : financialBreakdown.netCollection,
+                    financialBreakdown.currency,
                   )}
-                  accent="text-slate-900"
+                  accent={financialBreakdown.netRefund > 0 ? "text-emerald-700" : "text-rose-700"}
+                />
+              </div>
+              <div className="mt-3">
+                <Card
+                  label="Reissue Penalty"
+                  value={formatMoney(financialBreakdown.reissuePenalty, financialBreakdown.currency)}
                 />
               </div>
             </div>

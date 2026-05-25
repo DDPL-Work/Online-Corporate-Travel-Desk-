@@ -47,6 +47,8 @@ const toArray = (value) => {
  */
 const resolveSupplierBookingId = (booking = {}) => {
   const candidates = [
+    booking?.originalBookingSnapshot?.providerBookingReference,
+    booking?.originalBookingSnapshot?.supplierBookingReference,
     // ── Direct schema field set by booking execution (most reliable) ──
     booking?.bookingResult?.providerBookingId,
 
@@ -96,6 +98,8 @@ const resolveSupplierBookingId = (booking = {}) => {
     booking?.airlineBookingId,
     booking?.flight?.bookingId,
     booking?.segments?.[0]?.BookingId,
+    booking?.metadata?.providerBookingReference,
+    booking?.metadata?.supplierBookingReference,
   ];
 
   for (const value of candidates) {
@@ -112,6 +116,7 @@ const resolveSupplierBookingId = (booking = {}) => {
  */
 const resolvePnr = (booking = {}) => {
   const candidates = [
+    booking?.originalBookingSnapshot?.pnr,
     // ── Direct schema field — set by booking execution, most reliable ──
     booking?.bookingResult?.pnr,
     booking?.bookingResult?.onwardPNR,
@@ -167,6 +172,7 @@ const resolvePnr = (booking = {}) => {
     booking?.tboResponse?.Response?.Response?.PNR,
     booking?.trace?.PNR,
     booking?.segments?.[0]?.AirlinePNR,
+    booking?.metadata?.pnr,
   ];
 
   for (const value of candidates) {
@@ -211,6 +217,7 @@ const resolveAirlineCode = (booking = {}) => {
  */
 const resolveTraceId = (booking = {}) => {
   const candidates = [
+    booking?.originalBookingSnapshot?.traceId,
     // ── TBO raw response — correct single-nesting path first ──
     booking?.bookingResult?.providerResponse?.raw?.Response?.TraceId,
     booking?.bookingResult?.providerResponse?.raw?.Response?.Response?.TraceId,
@@ -232,6 +239,8 @@ const resolveTraceId = (booking = {}) => {
     booking?.tboResponse?.Response?.TraceId,
     booking?.tboResponse?.Response?.Response?.TraceId,
     booking?.traceId,
+    booking?.traceData?.traceId,
+    booking?.metadata?.traceId,
   ];
 
   for (const value of candidates) {
@@ -248,6 +257,7 @@ const resolveTraceId = (booking = {}) => {
  */
 const resolveSegments = (booking = {}) => {
   const candidates = [
+    booking?.originalBookingSnapshot?.segments,
     booking?.flightRequest?.segments,
     booking?.segments,
     booking?.bookingResult?.segments,
@@ -272,6 +282,7 @@ const resolveSegments = (booking = {}) => {
  */
 const resolveTicketNumber = (booking = {}) => {
   const candidates = [
+    booking?.originalBookingSnapshot?.passengers?.[0]?.ticketNumber,
     booking?.ticket?.ticketNumber,
     booking?.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Passenger?.Ticket?.TicketNumber,
     booking?.bookingResult?.providerResponse?.raw?.Response?.Response?.FlightItinerary?.Passenger?.Ticket?.TicketNumber,
@@ -297,12 +308,14 @@ const resolveTicketNumber = (booking = {}) => {
  */
 const resolveSupplierReference = (booking = {}) => {
   const candidates = [
+    booking?.originalBookingSnapshot?.supplierBookingReference,
     booking?.providerData?.supplierReference,
     booking?.bookingResponse?.supplierReference,
     booking?.bookingSnapshot?.supplierReference,
     booking?.supplierReference,
     booking?.bookingResult?.providerResponse?.Response?.Response?.SupplierReference,
     booking?.bookingResult?.providerResponse?.raw?.Response?.Response?.SupplierReference,
+    booking?.metadata?.supplierBookingReference,
   ];
 
   for (const value of candidates) {

@@ -1,6 +1,10 @@
 const ReissueRequest = require("../schemas/ReissueRequest.schema");
 
 class ReissueRepository {
+  build(payload = {}) {
+    return new ReissueRequest(payload);
+  }
+
   async create(payload, options = {}) {
     const [doc] = await ReissueRequest.create([payload], options);
     return doc;

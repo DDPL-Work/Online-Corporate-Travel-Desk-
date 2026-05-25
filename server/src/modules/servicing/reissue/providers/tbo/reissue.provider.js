@@ -3,9 +3,14 @@ const config = require("../../../../../config/tbo.config");
 const logger = require("../../../../../utils/logger");
 const ApiError = require("../../../../../utils/ApiError");
 const { parseMiniFareRules } = require("../../utils/miniFareRuleParser");
+const providerReferenceService = require("../../../../../services/reissue/providerReference.service");
 const {
   resolveBookingData,
 } = require("../../../../../utils/bookingResolver.util");
+const {
+  buildOnlineReissueContext,
+  validateOnlineReissueContext,
+} = require("../../utils/onlineReissueContext.util");
 
 const toArray = (value) => (Array.isArray(value) ? value.filter(Boolean) : []);
 
@@ -436,6 +441,149 @@ class TboReissueProvider {
     return { adults: fallbackAdults, children: fallbackChildren, infants: fallbackInfants };
   }
 
+  resolveReissuePassengerCountsFromContext(booking = {}, onlineReissueContext = {}) {
+    const passengers = toArray(onlineReissueContext?.passengers);
+    const mapType = (value) => String(value || "").trim().toUpperCase();
+
+    const adults = passengers.filter((p) => ["ADULT", "ADT", "1"].includes(mapType(p?.paxType))).length;
+    const children = passengers.filter((p) => ["CHILD", "CHD", "2"].includes(mapType(p?.paxType))).length;
+    const infants = passengers.filter((p) => ["INFANT", "INF", "3"].includes(mapType(p?.paxType))).length;
+
+    if (adults + children + infants > 0) {
+      return { adults: Math.max(adults, 1), children, infants };
+    }
+
+    return this.resolveReissuePassengerCounts(booking);
+  }
+
+  buildTboReissueSearchPayloadFromContext({
+    booking,
+    reissueRequest,
+    onlineReissueContext,
+    providerPnr,
+    providerBookingId,
+    newJourney,
+    preferredAirlines = [],
+  }) {
+    const toIsoDateTime = (dateInput, originalDateTime) => {
+      const datePart = String(dateInput || originalDateTime || "").split("T")[0].trim();
+      if (!datePart) return "";
+      let timePart = "00:00:00";
+      const sourceTime = String(originalDateTime || "").trim();
+      if (sourceTime.includes("T")) timePart = sourceTime.split("T")[1].slice(0, 8);
+      else if (sourceTime.includes(" ")) timePart = sourceTime.split(" ")[1].slice(0, 8);
+      return `${datePart}T${timePart}`;
+    };
+
+    const createSearchSegment = (segments = [], dateInput) => {
+      const first = segments[0] || {};
+      const last = segments[segments.length - 1] || first;
+      const origin = extractAirportCode(first?.origin || first?.Origin || null);
+      const destination = extractAirportCode(last?.destination || last?.Destination || null);
+      if (!origin || !destination) return null;
+
+      return {
+        Origin: origin,
+        Destination: destination,
+        PreferredDepartureTime: toIsoDateTime(
+          dateInput || first?.departureTime,
+          first?.departureTime,
+        ),
+        PreferredArrivalTime: toIsoDateTime(
+          dateInput || last?.arrivalTime || first?.departureTime,
+          last?.arrivalTime || first?.departureTime,
+        ),
+        FlightCabinClass: Number(first?.cabinClass) || 1,
+      };
+    };
+
+    const onwardSegments = toArray(onlineReissueContext?.onwardSegments);
+    const returnSegments = toArray(onlineReissueContext?.returnSegments);
+    const journeyType = Number(
+      onlineReissueContext?.journeyType || (returnSegments.length ? 2 : onwardSegments.length > 1 ? 3 : 1),
+    );
+
+    let parsedSegments = [];
+    if (journeyType === 2) {
+      const onward = createSearchSegment(onwardSegments, newJourney?.departureDate);
+      const returning = createSearchSegment(returnSegments, newJourney?.returnDate);
+      parsedSegments = [onward, returning].filter(Boolean);
+    } else if (journeyType === 3) {
+      parsedSegments = onwardSegments
+        .map((segment, index) =>
+          createSearchSegment(
+            [segment],
+            newJourney?.segments?.[index]?.departureDate || segment?.departureTime,
+          ),
+        )
+        .filter(Boolean);
+    } else {
+      parsedSegments = [createSearchSegment(onwardSegments, newJourney?.departureDate)].filter(Boolean);
+    }
+
+    if (!parsedSegments.length) {
+      const fallbackSegments = this.buildSegments(booking, newJourney, journeyType === 3 ? 1 : journeyType);
+      parsedSegments = toArray(fallbackSegments).filter(
+        (segment) => segment?.Origin && segment?.Destination,
+      );
+    }
+
+    if (!parsedSegments.length) {
+      const error = new ApiError(400, "Failed to resolve airport codes for reissue search");
+      error.code = "REISSUE_AIRPORT_CODE_MISSING";
+      throw error;
+    }
+
+    const resolvedAirlineCode =
+      onwardSegments[0]?.airlineCode ||
+      returnSegments[0]?.airlineCode ||
+      null;
+    const finalAirlineCodes = (resolvedAirlineCode
+      ? [resolvedAirlineCode]
+      : preferredAirlines
+    ).filter(Boolean);
+
+    const passengerCounts = this.resolveReissuePassengerCountsFromContext(
+      booking,
+      onlineReissueContext,
+    );
+
+    const corporateFareContext =
+      reissueRequest?.metadata?.corporateFareContext ||
+      onlineReissueContext?.corporateFareContext ||
+      {};
+
+    return {
+      AdultCount: passengerCounts.adults,
+      ChildCount: passengerCounts.children,
+      InfantCount: passengerCounts.infants,
+      DirectFlight: false,
+      OneStopFlight: false,
+      JourneyType: journeyType,
+      PreferredAirlines: finalAirlineCodes,
+      Segments: parsedSegments,
+      Sources: null,
+      SearchType: 1,
+      Pnr: String(providerPnr).trim(),
+      BookingId: Number(providerBookingId) || String(providerBookingId).trim(),
+      SupplierBookingReference:
+        onlineReissueContext?.supplierBookingReference || String(providerBookingId).trim(),
+      ProviderBookingReference: String(providerBookingId).trim(),
+      TraceId: onlineReissueContext?.traceId || null,
+      ...(corporateFareContext?.pcc ? { PCC: corporateFareContext.pcc } : {}),
+      ...(corporateFareContext?.corporateCode
+        ? { CorporateCode: corporateFareContext.corporateCode }
+        : {}),
+      ...(Array.isArray(corporateFareContext?.corporateCodes) &&
+      corporateFareContext.corporateCodes.length
+        ? { CorporateCodes: corporateFareContext.corporateCodes }
+        : {}),
+      ...(corporateFareContext?.airlineMappings
+        ? { AirlineCorporateMappings: corporateFareContext.airlineMappings }
+        : {}),
+    };
+  }
+
   extractResults(searchResponse) {
     const results = searchResponse?.Response?.Results || searchResponse?.Results || [];
     return toArray(results).flat().filter(Boolean);
@@ -449,7 +597,10 @@ class TboReissueProvider {
       firstResult?.Fare?.MiniFareRules ||
       firstResult?.FareRules ||
       null;
-    const parsedMiniFareRules = parseMiniFareRules(miniFareRules);
+    const parsedMiniFareRules = parseMiniFareRules(miniFareRules, {
+      strictEligibility: true,
+      acceptRefundAsReissue: true,
+    });
 
     logger.info("TBO REISSUE SEARCH NORMALIZED", {
       traceId: searchResponse?.Response?.TraceId || searchResponse?.TraceId,
@@ -473,20 +624,88 @@ class TboReissueProvider {
   async searchReissueFlights({ booking, reissueRequest }) {
     // ── Step 1: Resolve all provider identifiers from booking document ──
     const resolved = resolveBookingData(booking);
+    const onlineReissueContext =
+      reissueRequest?.onlineReissueContext || buildOnlineReissueContext(booking);
+    const resolvedReferences = await providerReferenceService.resolveProviderReferences({
+      request: reissueRequest,
+      booking,
+      originalBooking: booking,
+      throwOnMissing: true,
+      saveBackfilledBooking: true,
+    });
+    const contextValidation = validateOnlineReissueContext({
+      ...onlineReissueContext,
+      providerBookingReference:
+        onlineReissueContext?.providerBookingReference ||
+        resolvedReferences.providerBookingReference,
+      supplierBookingReference:
+        onlineReissueContext?.supplierBookingReference ||
+        resolvedReferences.supplierBookingReference,
+      originalPnr: onlineReissueContext?.originalPnr || resolvedReferences.pnr,
+      traceId: onlineReissueContext?.traceId || resolvedReferences.traceId,
+    });
 
 
     // Prefer reissueRequest stored values (set at request creation) over re-resolution
-    const supplierPnr = reissueRequest.originalPnr || resolved.pnr;
-    const supplierBookingId = reissueRequest.originalBookingId || resolved.bookingId;
+    const activeLineage = reissueRequest?.bookingLineage || {};
+    const supplierPnr =
+      activeLineage?.activePnr ||
+      resolvedReferences?.pnr ||
+      onlineReissueContext?.providerReferences?.pnr ||
+      onlineReissueContext?.originalPnr ||
+      reissueRequest.originalPnr ||
+      resolved.pnr;
+    const supplierBookingId =
+      activeLineage?.activeBookingId ||
+      resolvedReferences?.providerBookingReference ||
+      onlineReissueContext?.providerReferences?.providerBookingReference ||
+      onlineReissueContext?.providerBookingReference ||
+      reissueRequest.originalBookingId ||
+      resolved.bookingId;
     const supplierTraceId =
+      resolvedReferences?.traceId ||
+      onlineReissueContext?.traceId ||
       reissueRequest?.metadata?.originalTraceId ||
       resolved.traceId ||
       null;
     const supplierResultIndex =
-      reissueRequest?.metadata?.originalResultIndex ||
-      booking?.flightRequest?.resultIndex ||
+      onlineReissueContext?.resultIndex ??
+      reissueRequest?.metadata?.originalResultIndex ??
+      booking?.flightRequest?.resultIndex ??
       null;
-    const supplierAirline = resolved.airlineCode || reissueRequest.airline || null;
+    const supplierAirline =
+      onlineReissueContext?.onwardSegments?.[0]?.airlineCode ||
+      resolved.airlineCode ||
+      reissueRequest.airline ||
+      null;
+
+    logger.info("ONLINE_REISSUE_SEARCH_STARTED", {
+      bookingMongoId: booking._id?.toString(),
+      reissueRequestId: reissueRequest?._id?.toString?.() || null,
+      journeyType: onlineReissueContext?.journeyType || null,
+      onwardSegments: onlineReissueContext?.onwardSegments?.length || 0,
+      returnSegments: onlineReissueContext?.returnSegments?.length || 0,
+      resolvedPnr: supplierPnr,
+      resolvedBookingId: supplierBookingId,
+      resolvedTraceId: supplierTraceId,
+      missingContextFields: contextValidation.missingFields,
+    });
+
+    if (!contextValidation.isValid) {
+      logger.error("SUPPLIER_REFERENCE_MISSING", {
+        bookingMongoId: booking._id?.toString(),
+        reissueRequestId: reissueRequest?._id?.toString?.() || null,
+        missingFields: contextValidation.missingFields,
+        onlineReissueContext,
+      });
+      const error = new ApiError(
+        422,
+        `Online reissue context is incomplete. Missing: ${contextValidation.missingFields.join(", ")}`,
+      );
+      error.code = "ONLINE_REISSUE_CONTEXT_INCOMPLETE";
+      error.details = { missingFields: contextValidation.missingFields };
+      throw error;
+    }
 
     // ── Step 2: Full diagnostic dump — required for debugging PNR resolution failures ──
     logger.info("RESOLVED REISSUE IDENTIFIERS", {
@@ -508,19 +727,21 @@ class TboReissueProvider {
 
     // ── Step 3: Strict validation with specific error codes ──
     if (!supplierPnr) {
-      throw new ApiError(
-        400,
+      const error = new ApiError(
+        422,
         "Resolved provider PNR missing — cannot call TBO reissue search without PNR",
-        "REISSUE_PNR_MISSING",
       );
+      error.code = "REISSUE_PNR_MISSING";
+      throw error;
     }
 
     if (!supplierBookingId) {
-      throw new ApiError(
-        400,
+      const error = new ApiError(
+        422,
         "Resolved provider BookingId missing — cannot call TBO reissue search without BookingId",
-        "REISSUE_BOOKING_ID_MISSING",
       );
+      error.code = "REISSUE_BOOKING_ID_MISSING";
+      throw error;
     }
 
     logger.info("TBO REISSUE SEARCH IDENTIFIERS CONFIRMED", {
@@ -536,8 +757,10 @@ class TboReissueProvider {
 
     const preferredAirlines = [supplierAirline].filter(Boolean);
 
-    const payload = this.buildTboReissueSearchPayload({
+    const payload = this.buildTboReissueSearchPayloadFromContext({
       booking,
+      reissueRequest,
+      onlineReissueContext,
       providerPnr: supplierPnr,
       providerBookingId: supplierBookingId,
       newJourney: reissueRequest.newJourney,
@@ -551,7 +774,18 @@ class TboReissueProvider {
       resolvedBookingId: supplierBookingId,
     });
 
-    const response = await this.execute("flightSearch", payload);
+    let response;
+    try {
+      response = await this.execute("flightSearch", payload);
+    } catch (error) {
+      logger.error("ONLINE_REISSUE_SEARCH_FAILED", {
+        bookingMongoId: booking?._id?.toString(),
+        reissueRequestId: reissueRequest?._id?.toString?.() || null,
+        message: error.message,
+        code: error.code || null,
+      });
+      throw error;
+    }
 
     logger.info("TBO REISSUE SEARCH RESPONSE", {
       response,
@@ -626,24 +860,58 @@ class TboReissueProvider {
     });
   }
 
-  extractTicketIds(booking = {}) {
-    const passengers =
-      booking?.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Passenger ||
-      [];
+  extractTicketIds(booking = {}, reissueRequest = {}) {
+    const contextTicketIds = toArray(
+      reissueRequest?.onlineReissueContext?.ticketIds ||
+      booking?.originalBookingSnapshot?.ticketId ||
+      [],
+    ).filter(Boolean);
 
-    return passengers
-      .map((passenger) => passenger?.Ticket?.TicketId)
-      .filter(Boolean);
+    if (contextTicketIds.length) {
+      return Array.from(new Set(contextTicketIds.map((item) => String(item))));
+    }
+
+    const passengerGroups = [
+      booking?.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Passenger,
+      booking?.bookingResult?.providerResponse?.raw?.Response?.Response?.FlightItinerary?.Passenger,
+      booking?.bookingResult?.providerResponse?.ticketResponse?.Response?.Response?.FlightItinerary?.Passenger,
+      booking?.bookingResult?.onwardResponse?.raw?.Response?.Response?.FlightItinerary?.Passenger,
+      booking?.bookingResult?.returnResponse?.raw?.Response?.Response?.FlightItinerary?.Passenger,
+    ];
+
+    return Array.from(
+      new Set(
+        passengerGroups
+          .flatMap((group) => toArray(group))
+          .map((passenger) => passenger?.Ticket?.TicketId || passenger?.TicketId)
+          .filter(Boolean)
+          .map((item) => String(item)),
+      ),
+    );
   }
 
-  buildTicketData(ticketData = {}, booking = {}) {
+  buildTicketData(ticketData = {}, booking = {}, reissueRequest = {}) {
+    const fallbackTicketData =
+      booking?.ticketData ||
+      booking?.lastTicketedSnapshot?.ticketData ||
+      booking?.originalBookingSnapshot?.ticketData ||
+      reissueRequest?.lastTicketedSnapshot?.ticketData ||
+      reissueRequest?.onlineReissueContext?.ticketData ||
+      reissueRequest?.metadata?.originalTicketData ||
+      null;
     const data = {
-      TourCode: ticketData?.TourCode || booking?.ticketData?.TourCode || "",
+      TourCode: ticketData?.TourCode || fallbackTicketData?.TourCode || "",
       Endorsement:
-        ticketData?.Endorsement || booking?.ticketData?.Endorsement || "Corporate full reissue",
+        ticketData?.Endorsement ||
+        fallbackTicketData?.Endorsement ||
+        "Corporate full reissue",
       CorporateCode:
-        ticketData?.CorporateCode || booking?.ticketData?.CorporateCode || booking?.corporateCode || "",
-      AgentDealCode: ticketData?.AgentDealCode || booking?.ticketData?.AgentDealCode || "",
+        ticketData?.CorporateCode ||
+        fallbackTicketData?.CorporateCode ||
+        booking?.corporateCode ||
+        "",
+      AgentDealCode:
+        ticketData?.AgentDealCode || fallbackTicketData?.AgentDealCode || "",
     };
 
     const missing = Object.entries(data)
@@ -654,7 +922,7 @@ class TboReissueProvider {
       logger.warn("TBO ticket reissue payload missing optional ticket metadata", {
         bookingId: booking?._id,
         missingFields: missing,
-        ticketDataSource: ticketData?.TourCode ? "request" : "booking",
+        ticketDataSource: ticketData?.TourCode ? "request" : "booking_snapshot",
       });
     }
 
@@ -662,7 +930,7 @@ class TboReissueProvider {
   }
 
   async ticketReissue({ booking, reissueRequest, remarks, ticketData }) {
-    const ticketIds = this.extractTicketIds(booking);
+    const ticketIds = this.extractTicketIds(booking, reissueRequest);
     if (!ticketIds.length) {
       throw new ApiError(400, "Unable to locate ticket IDs for ticket reissue");
     }
@@ -675,19 +943,81 @@ class TboReissueProvider {
       throw new ApiError(400, "TicketReissue endpoint not available for this environment");
     }
 
+    const onlineReissueContext =
+      reissueRequest?.onlineReissueContext || buildOnlineReissueContext(booking);
+    const resolvedReferences = await providerReferenceService.resolveProviderReferences({
+      request: reissueRequest,
+      booking,
+      originalBooking: booking,
+      throwOnMissing: true,
+      saveBackfilledBooking: true,
+    });
+    const contextValidation = validateOnlineReissueContext({
+      ...onlineReissueContext,
+      providerBookingReference:
+        onlineReissueContext?.providerBookingReference ||
+        resolvedReferences.providerBookingReference,
+      supplierBookingReference:
+        onlineReissueContext?.supplierBookingReference ||
+        resolvedReferences.supplierBookingReference,
+      originalPnr: onlineReissueContext?.originalPnr || resolvedReferences.pnr,
+      traceId: onlineReissueContext?.traceId || resolvedReferences.traceId,
+    });
+    if (!contextValidation.isValid) {
+      logger.error("SUPPLIER_REFERENCE_MISSING", {
+        bookingMongoId: booking?._id?.toString(),
+        reissueRequestId: reissueRequest?._id?.toString?.() || null,
+        missingFields: contextValidation.missingFields,
+        stage: "ticketReissue",
+      });
+      const error = new ApiError(
+        422,
+        `Online reissue context is incomplete. Missing: ${contextValidation.missingFields.join(", ")}`,
+      );
+      error.code = "ONLINE_REISSUE_CONTEXT_INCOMPLETE";
+      error.details = { missingFields: contextValidation.missingFields };
+      throw error;
+    }
+
     const basePayload = {
-      BookingId: reissueRequest.originalBookingId,
-      Pnr: reissueRequest.originalPnr,
-      TraceId: reissueRequest.metadata?.searchTraceId || null,
+      BookingId:
+        reissueRequest?.bookingLineage?.activeBookingId ||
+        resolvedReferences?.providerBookingReference ||
+        onlineReissueContext?.providerReferences?.providerBookingReference ||
+        onlineReissueContext?.providerBookingReference ||
+        reissueRequest.originalBookingId,
+      Pnr:
+        reissueRequest?.bookingLineage?.activePnr ||
+        resolvedReferences?.pnr ||
+        onlineReissueContext?.providerReferences?.pnr ||
+        onlineReissueContext?.originalPnr ||
+        reissueRequest.originalPnr,
+      TraceId:
+        reissueRequest.metadata?.searchTraceId ||
+        resolvedReferences?.traceId ||
+        onlineReissueContext?.traceId ||
+        null,
       ResultIndex: reissueRequest.metadata?.selectedResultIndex ?? null,
+      SupplierBookingReference:
+        reissueRequest?.bookingLineage?.activeBookingId ||
+        resolvedReferences?.supplierBookingReference ||
+        onlineReissueContext?.providerReferences?.supplierBookingReference ||
+        onlineReissueContext?.supplierBookingReference ||
+        reissueRequest.originalBookingId,
+      ProviderBookingReference:
+        reissueRequest?.bookingLineage?.activeBookingId ||
+        resolvedReferences?.providerBookingReference ||
+        onlineReissueContext?.providerReferences?.providerBookingReference ||
+        onlineReissueContext?.providerBookingReference ||
+        reissueRequest.originalBookingId,
       TicketIds: ticketIds,
       TicketId: ticketIds.join(","),
       Remarks: remarks || "Enterprise online reissue execution",
-      TicketData: this.buildTicketData(ticketData, booking),
+      TicketData: this.buildTicketData(ticketData, booking, reissueRequest),
       CorrelationId: reissueRequest.correlationId,
     };
 
-    logger.info("TBO TICKET REISSUE PAYLOAD", basePayload);
+    logger.info("TBO_TICKETREISSUE_PAYLOAD_GENERATED", basePayload);
 
     const response = await this.execute("flightTicketReissue", basePayload);
 
@@ -731,7 +1061,10 @@ class TboReissueProvider {
       quoteResult?.FareRules ||
       searchResult?.MiniFareRules ||
       null;
-    const parsedMiniFareRules = parseMiniFareRules(rawMiniFareRules);
+    const parsedMiniFareRules = parseMiniFareRules(rawMiniFareRules, {
+      strictEligibility: true,
+      acceptRefundAsReissue: true,
+    });
     const supplierReissueCharges =
       quoteResult?.Fare?.SupplierReissueCharges ||
       quoteResult?.SupplierReissueCharges ||

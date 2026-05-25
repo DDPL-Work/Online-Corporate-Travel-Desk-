@@ -138,6 +138,7 @@ function toOfflineReissueDto(doc) {
     airline: item.airline,
     preferredDate: item.preferredDate,
     remarks: item.remarks,
+    creationSource: item.creationSource || null,
     status: item.status,
     assignedOpsMember: item.assignedOpsMember,
     assignedTo: item.assignedOpsMember,
@@ -168,6 +169,10 @@ function toOfflineReissueDto(doc) {
       item.reissuePricingSnapshot?.totalEstimate ??
       item.preferredJourney?.totalEstimate ??
       item.totalAdjustment,
+    bookingLineage: item.bookingLineage || null,
+    lastTicketedSnapshot:
+      item.lastTicketedSnapshot || item.financialLedger?.lastTicketedSnapshot || null,
+    ssrFinancials: item.ssrFinancials || item.financialLedger?.ssrFinancials || null,
     oldFare:
       item.reissuePricingSnapshot?.oldFare ??
       item.preferredJourney?.oldFare ??

@@ -71,6 +71,20 @@ const notificationLogSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const creationSourceSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ["USER_SUBMITTED", "AUTO_GENERATED"],
+      default: "USER_SUBMITTED",
+    },
+    trigger: { type: String, default: null },
+    createdBy: { type: String, default: null },
+    workflow: { type: String, default: null },
+  },
+  { _id: false },
+);
+
 const reissueRequestSchema = new mongoose.Schema(
   {
     reissueId: {
@@ -136,6 +150,15 @@ const reissueRequestSchema = new mongoose.Schema(
       enum: Object.values(REISSUE_TYPES),
       default: REISSUE_TYPES.FULL_REISSUE,
     },
+    creationSource: {
+      type: creationSourceSchema,
+      default: () => ({
+        type: "USER_SUBMITTED",
+        trigger: null,
+        createdBy: null,
+        workflow: null,
+      }),
+    },
     supplierSupport: {
       onlineReissue: { type: Boolean, default: false },
       ndc: { type: Boolean, default: false },
@@ -188,6 +211,18 @@ const reissueRequestSchema = new mongoose.Schema(
         default: null,
       },
     },
+    bookingLineage: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    lastTicketedSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    ssrFinancials: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     financialLedger: {
       originalTicketAmount: { type: Number, default: 0 },
       originalSSR: { type: Number, default: 0 },
@@ -209,6 +244,8 @@ const reissueRequestSchema = new mongoose.Schema(
       currentTicketValue: { type: Number, default: 0 },
       currentSSRValue: { type: Number, default: 0 },
       currentTotalValue: { type: Number, default: 0 },
+      lastTicketedSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+      ssrFinancials: { type: mongoose.Schema.Types.Mixed, default: null },
     },
     pricingHistory: [
       {
@@ -275,6 +312,7 @@ const reissueRequestSchema = new mongoose.Schema(
     ticketData: mongoose.Schema.Types.Mixed,
     miniFareRules: mongoose.Schema.Types.Mixed,
     supplierResponse: mongoose.Schema.Types.Mixed,
+    onlineReissueContext: mongoose.Schema.Types.Mixed,
     metadata: mongoose.Schema.Types.Mixed,
     correlationId: {
       type: String,

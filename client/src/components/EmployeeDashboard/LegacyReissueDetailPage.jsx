@@ -53,6 +53,8 @@ import {
   resolveReissueCharge,
   resolveBookingRef,
   resolvePrimarySegment,
+  resolveDisplayRoute,
+  resolveWorkflowType,
 } from "../../utils/reissueResolvers";
 import { airlineLogo } from "../../utils/formatter";
 
@@ -244,7 +246,7 @@ export default function LegacyReissueDetailPage() {
     req.resolutionNote ||
     req.metadata?.reason ||
     "No reason provided";
-  const type = req.reissueType || req.type || "REISSUE";
+  const type = resolveWorkflowType(req);
   const date = getRequestedDate(req);
   const status = getStatus(req);
 
@@ -302,6 +304,7 @@ export default function LegacyReissueDetailPage() {
       req?.preferredJourney?.currency ||
       "INR",
   };
+  bookingInfo.route = resolveDisplayRoute(req);
 
   const passengers = (() => {
     const bookingObj = req.bookingId || req.booking;

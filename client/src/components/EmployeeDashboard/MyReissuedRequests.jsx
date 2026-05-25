@@ -37,6 +37,8 @@ import {
   getRequestedDate,
   getStatusTone,
   resolvePrimarySegment,
+  isVisibleLedgerRequest,
+  resolveWorkflowType,
 } from "../../utils/reissueResolvers";
 import { airlineLogo } from "../../utils/formatter";
 import {
@@ -277,12 +279,13 @@ const MyReissueRequests = () => {
       baseRequests = [...(onlineRequests || []), ...(offlineRequests || [])];
     }
 
-    // Sort
-    let sorted = baseRequests.sort((a, b) => {
+    let sorted = baseRequests
+      .filter((request) => isVisibleLedgerRequest(request))
+      .sort((a, b) => {
       const d1 = new Date(a.createdAt || a.date);
       const d2 = new Date(b.createdAt || b.date);
       return d2 - d1;
-    });
+      });
 
     // Client-side search filter
     if (searchQuery.trim()) {
@@ -365,7 +368,7 @@ const MyReissueRequests = () => {
       r.bookingReference || r.bookingRef || "N/A",
       getUserName(r),
       getRoute(r),
-      r.reissueType || r.type || "REISSUE",
+      resolveWorkflowType(r),
       r.reason || r.remarks || "N/A",
       getRequestedDate(r),
       getStatus(r),
@@ -694,7 +697,7 @@ const MyReissueRequests = () => {
                       {/* Type & Reason */}
                       <td className="!px-6 !py-5">
                         <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded text-[9px] font-black uppercase tracking-wider inline-block mb-1">
-                          {req.reissueType || req.type || "REISSUE"}
+                          {resolveWorkflowType(req)}
                         </span>
                         <p
                           className="text-[11px] text-slate-600 italic line-clamp-1 max-w-[200px]"

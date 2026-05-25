@@ -4,6 +4,13 @@ const {
   resolvePnr,
   resolveSupplierBookingId,
 } = require("../../utils/bookingResolver.util");
+const {
+  buildOriginalBookingSnapshot,
+} = require("../../modules/servicing/reissue/utils/onlineReissueContext.util");
+const {
+  buildInitialBookingLineage,
+} = require("../../modules/servicing/reissue/utils/reissueLineage.util");
+const reissueFinancialLedgerService = require("../reissue/reissueFinancialLedger.service");
 const paymentService = require("../payment.service");
 const tboService = require("../tektravels/flight.service");
 
@@ -158,12 +165,30 @@ const persistBookedState = async ({
   }
 
   booking.bookingResult = bookingResult;
+  const originalBookingSnapshot = buildOriginalBookingSnapshot(booking);
+  booking.originalBookingSnapshot = originalBookingSnapshot;
+  booking.ticketData = originalBookingSnapshot?.ticketData || booking.ticketData || null;
+  booking.bookingLineage = buildInitialBookingLineage(booking);
+  booking.lastTicketedSnapshot = reissueFinancialLedgerService.buildLastTicketedSnapshot({
+    booking,
+  });
   booking.executionStatus = executionStatus;
   await booking.save();
 
   if (["booked", "ticketed"].includes(executionStatus)) {
     await paymentService.processBookingPayment({ booking, corporate });
   }
+};
+
+const refreshOriginalBookingSnapshot = (booking) => {
+  const originalBookingSnapshot = buildOriginalBookingSnapshot(booking);
+  booking.originalBookingSnapshot = originalBookingSnapshot;
+  booking.ticketData = originalBookingSnapshot?.ticketData || booking.ticketData || null;
+  booking.bookingLineage = buildInitialBookingLineage(booking);
+  booking.lastTicketedSnapshot = reissueFinancialLedgerService.buildLastTicketedSnapshot({
+    booking,
+  });
+  return originalBookingSnapshot;
 };
 
 const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
@@ -334,6 +359,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
 
     booking.executionStatus = "ticketed";
     booking.bookingResult.providerResponse.ticketResponse = ticketResponse;
+    refreshOriginalBookingSnapshot(booking);
     await booking.save();
 
     return {
@@ -418,6 +444,10 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
 
     const onwardPNR = extractPnr(onwardResponse);
     const returnPNR = extractPnr(returnResponse);
+    const onwardSupplierBookingId =
+      onwardResponse?.raw?.Response?.Response?.BookingId || null;
+    const returnSupplierBookingId =
+      returnResponse?.raw?.Response?.Response?.BookingId || null;
 
     if (!onwardPNR || !returnPNR) {
       throw new ApiError(500, "Booking failed");
@@ -429,17 +459,14 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       returnPNR,
       onwardResponse,
       returnResponse,
+      providerBookingId: onwardSupplierBookingId || returnSupplierBookingId || null,
     };
 
     booking.executionStatus = "booked";
+    refreshOriginalBookingSnapshot(booking);
     await booking.save();
 
     await paymentService.processBookingPayment({ booking, corporate });
-
-    const onwardSupplierBookingId =
-      onwardResponse?.raw?.Response?.Response?.BookingId;
-    const returnSupplierBookingId =
-      returnResponse?.raw?.Response?.Response?.BookingId;
 
     const onwardTicketResponse = await tboService.ticketFlight({
       traceId: booking.flightRequest.traceId,
@@ -476,6 +503,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       return: returnTicketResponse,
     };
     booking.executionStatus = "ticketed";
+    refreshOriginalBookingSnapshot(booking);
     await booking.save();
 
     return {
@@ -616,6 +644,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     providerResponse: bookingResponse,
   };
   booking.executionStatus = "booked";
+  refreshOriginalBookingSnapshot(booking);
   await booking.save();
 
   await paymentService.processBookingPayment({ booking, corporate });
@@ -646,6 +675,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
 
   booking.bookingResult.providerResponse.ticketResponse = ticketResponse;
   booking.executionStatus = "ticketed";
+  refreshOriginalBookingSnapshot(booking);
   await booking.save();
 
   return {
