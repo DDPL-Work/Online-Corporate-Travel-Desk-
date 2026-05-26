@@ -218,6 +218,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
     },
     providerBookingId: hotelRequest.bookingCode || null,
     preBookResponse: hotelRequest.preBookResponse || null,
+    ...(hotelRequest.IsCorporate && { IsCorporate: true }),
   };
 
   const bookingSnapshot = {
@@ -439,6 +440,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
         ClientReferenceId: bookingRequest.bookingReference,
         TraceId: hotelRequest.traceId || hotelRequest.TraceId,
         HotelRoomsDetails,
+        ...(hotelRequest.IsCorporate && { IsCorporate: true }),
         ...(gstDetails?.gstin && {
           GSTCompanyInformation: {
             GSTNumber: gstDetails.gstin,
@@ -651,7 +653,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
     cityName: hotelRequest.city || hotelRequest.rawHotelData?.CityName,
     countryName: hotelRequest.country || hotelRequest.rawHotelData?.CountryName,
-    guestNationality: hotelRequest.guestNationality || "IN",
+    guestNationality: hotelRequest.guestNationality,
 
     roomGuests,
     paxRooms,
@@ -1264,7 +1266,7 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
         booking.hotelRequest?.TraceId,
 
       HotelRoomsDetails,
-
+      ...(booking.hotelRequest?.IsCorporate && { IsCorporate: true }),
       ...(booking.gstDetails?.gstin && {
         GSTCompanyInformation: {
           GSTNumber: booking.gstDetails.gstin || "",
