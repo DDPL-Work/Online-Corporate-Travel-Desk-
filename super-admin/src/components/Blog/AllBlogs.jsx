@@ -22,14 +22,18 @@ import {
   FaFolder,
   FaGlobe,
   FaFileAlt,
+  FaDownload,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { BlogViewModal } from "./components";
+import useCsvExporter from "../../services/export/useCsvExporter";
+import { blogArticlesExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const BlogListPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { exportCsv, exportingKey } = useCsvExporter();
   const { items: blogs, loading, error } = useSelector((state) => state.blogs);
 
   // Modal states
@@ -82,6 +86,7 @@ const BlogListPage = () => {
     indexOfLastBlog
   );
   const totalPages = Math.ceil(filteredAndSortedBlogs.length / blogsPerPage);
+  const isExporting = exportingKey === "blog_articles";
 
   const handleDelete = async (id, e) => {
     e.stopPropagation();
@@ -122,6 +127,19 @@ const BlogListPage = () => {
     } catch (err) {
       Swal.fire("Error!", err || "Failed to refresh blogs", "error");
     }
+  };
+
+  const handleExport = () => {
+    if (loading) return;
+
+    exportCsv({
+      key: "blog_articles",
+      data: currentBlogs,
+      columns: blogArticlesExportTemplate,
+      filenamePrefix: "blog_articles_export",
+      emptyMessage: "No blog articles available to export",
+      successMessage: "Blog articles exported",
+    });
   };
 
   const getStatusBadge = (status) => {
@@ -259,6 +277,9 @@ const BlogListPage = () => {
             </div>
           </div>
           <div className="flex flex-wrap gap-3">
+            <button onClick={handleExport} disabled={loading || isExporting} className="flex items-center justify-center space-x-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-all shadow-md text-xs font-bold uppercase disabled:opacity-50">
+              <FaDownload className="w-3 h-3" /><span>{isExporting ? "Exporting..." : "Export"}</span>
+            </button>
             <button onClick={handleRefresh} disabled={loading} className="flex items-center justify-center space-x-2 px-4 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 transition-all shadow-md text-xs font-bold uppercase disabled:opacity-50">
               <FaSyncAlt className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} /><span>Refresh</span>
             </button>

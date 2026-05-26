@@ -112,6 +112,7 @@ export default function MultiCityFlightBooking() {
     legalName: "",
     address: "",
     gstEmail: "",
+    contactNumber: "",
   });
   // ===== Traveler State =====
   const initialTraveler = (id, type = "ADULT") => ({
@@ -197,6 +198,7 @@ export default function MultiCityFlightBooking() {
             legalName: data.data.legalName || "",
             address: data.data.address || "",
             gstEmail: data.data.gstEmail || "",
+            contactNumber: data.data.contactNumber || "",
           }));
         }
       } catch (err) {

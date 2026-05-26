@@ -20,6 +20,8 @@ import {
   OPS_DEPARTMENT_OPTIONS,
   OPS_DESIGNATION_OPTIONS,
 } from "../../constants/opsMember";
+import useCsvExporter from "../../services/export/useCsvExporter";
+import { opsTeamExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const colors = {
   light: "#F8FAFC",
@@ -28,12 +30,10 @@ const colors = {
 export default function OpsTeamManagement() {
   const tableScrollRef = useRef(null);
   const { role } = useSelector((state) => state.auth);
-
-  if (role !== "super-admin") {
-    return <Navigate to="/unauthorized" replace />;
-  }
+  const isSuperAdmin = role === "super-admin";
 
   const [members, setMembers] = useState([]);
+  const { exportCsv, exportingKey } = useCsvExporter();
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
@@ -41,8 +41,11 @@ export default function OpsTeamManagement() {
   const [designationFilter, setDesignationFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const isExporting = exportingKey === "ops_team";
 
   const fetchMembers = async () => {
+    if (!isSuperAdmin) return;
+
     setLoading(true);
     try {
       const res = await listOpsMembers({
@@ -60,9 +63,11 @@ export default function OpsTeamManagement() {
   };
 
   useEffect(() => {
+    if (!isSuperAdmin) return undefined;
+
     const timer = setTimeout(fetchMembers, 300);
     return () => clearTimeout(timer);
-  }, [search, designationFilter, departmentFilter, statusFilter]);
+  }, [isSuperAdmin, search, designationFilter, departmentFilter, statusFilter]);
 
   const handleToggleStatus = (member) => {
     const newStatus = member.status === "Active" ? "Inactive" : "Active";
@@ -94,6 +99,31 @@ export default function OpsTeamManagement() {
       },
     });
   };
+
+  const handleExport = () => {
+    if (loading) return;
+
+    exportCsv({
+      key: "ops_team",
+      data: members.map((member) => {
+        const normalizedMember = normalizeOpsMemberRecord(member);
+        return {
+          ...member,
+          exportDesignation: normalizedMember.designation,
+          exportDepartment: normalizedMember.department,
+          exportServicingScope: normalizedMember.servicingScope,
+        };
+      }),
+      columns: opsTeamExportTemplate,
+      filenamePrefix: "ops_team_export",
+      emptyMessage: "No OPS members available to export",
+      successMessage: "OPS team exported",
+    });
+  };
+
+  if (!isSuperAdmin) {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
   return (
     <div className="min-h-screen p-6 font-sans" style={{ backgroundColor: colors.light }}>
@@ -198,7 +228,9 @@ export default function OpsTeamManagement() {
         <TableActionBar
           scrollRef={tableScrollRef}
           exportLabel="Export Team"
-          onExport={() => {}}
+          onExport={handleExport}
+          exportDisabled={loading || isExporting}
+          exportLoading={isExporting}
           exportClassName="bg-[#7C2D12] shadow-[#7C2D12]/20 hover:bg-[#9A3412]"
           arrowClassName="border-orange-100 bg-orange-50 text-[#9A3412] hover:border-orange-200 hover:bg-orange-100 hover:text-[#7C2D12] disabled:hover:bg-orange-50"
         />

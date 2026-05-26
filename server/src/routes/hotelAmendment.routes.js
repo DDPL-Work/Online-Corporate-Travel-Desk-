@@ -49,7 +49,7 @@ router.post(
  */
 router.post(
   "/status",
-  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
+  // authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   getAmendmentStatus,
 );
 

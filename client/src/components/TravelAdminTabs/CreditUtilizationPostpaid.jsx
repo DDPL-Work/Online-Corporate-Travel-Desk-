@@ -52,6 +52,17 @@ const fmtAmt = (n) =>
     maximumFractionDigits: 2,
   });
 
+const calculateDelayDays = ({ dueDate, statementAmount, receivedAmount, paymentReceivedAt }) => {
+  if (!dueDate) return 0;
+  if (Number(statementAmount || 0) <= 0) return 0;
+  const normalizedDueDate = new Date(dueDate);
+  const paidInFull = Number(receivedAmount || 0) >= Number(statementAmount || 0);
+  const stopAt = paidInFull && paymentReceivedAt ? new Date(paymentReceivedAt) : new Date();
+  return stopAt > normalizedDueDate
+    ? Math.floor((stopAt.getTime() - normalizedDueDate.getTime()) / 86400000)
+    : 0;
+};
+
 const DRILL_PAGE_SIZE = 10;
 
 const StatusBadge = ({ status }) => {
@@ -249,12 +260,13 @@ export default function CreditUtilizationPostpaid() {
   const handleExport = () => {
     const list = activeTab === "current" ? [currentCycleRow] : previousCycles;
     if (!list.length) return;
-    const headers = ["Statement ID", "Billing Cycle", "Usage", "Due Date"];
+    const headers = ["Statement ID", "Billing Cycle", "Usage", "Due Date", "Payment Received"];
     const rows = list.map((c) => [
       c.statementId,
       `${fmt(c.periodStart)} - ${fmt(c.periodEnd)}`,
       `₹${c.statementAmount.toLocaleString()}`,
       fmt(c.dueDate),
+      c.isCurrent ? "N/A" : fmt(c.paymentReceivedAt),
     ]);
     const tableHtml = rows
       .map(
@@ -677,6 +689,7 @@ export default function CreditUtilizationPostpaid() {
                       <Th className="!px-6 !py-5">Statement Registry</Th>
                       <Th className="!px-6 !py-5">Billing Horizon</Th>
                       <Th className="!px-6 !py-5">Due Protocol</Th>
+                      <Th className="!px-6 !py-5">Payment Received</Th>
                       <Th className="!px-6 !py-5">Compliance Status</Th>
                       <Th className="!px-6 !py-5 text-right">Paid Amount</Th>
                       <Th className="!px-6 !py-5 text-right">Remaining</Th>
@@ -688,7 +701,7 @@ export default function CreditUtilizationPostpaid() {
                 {drillCycle ? (
                   drillLoading ? (
                     <tr>
-                      <td colSpan={8} className="py-24 text-center">
+                      <td colSpan={9} className="py-24 text-center">
                         <div className="animate-spin mb-4 flex justify-center">
                           <FiRefreshCw size={32} className="text-gold" />
                         </div>
@@ -871,7 +884,7 @@ export default function CreditUtilizationPostpaid() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={8} className="py-20 text-center">
+                      <td colSpan={9} className="py-20 text-center">
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                           No transactions found in this matrix
                         </p>
@@ -917,6 +930,13 @@ export default function CreditUtilizationPostpaid() {
 }
 
 function StatementRow({ row, onClick, idx = 0 }) {
+  const delayDays = calculateDelayDays({
+    dueDate: row.dueDate,
+    statementAmount: row.statementAmount,
+    receivedAmount: row.receivedAmount,
+    paymentReceivedAt: row.paymentReceivedAt,
+  });
+
   return (
     <tr
       onClick={onClick}
@@ -954,15 +974,20 @@ function StatementRow({ row, onClick, idx = 0 }) {
         </p>
       </td>
       <td className="px-6 py-5">
+        <p className="text-[10px] font-bold text-slate-400 uppercase">
+          {row.isCurrent ? "—" : fmt(row.paymentReceivedAt)}
+        </p>
+      </td>
+      <td className="px-6 py-5">
         <span
           className="px-3 py-1 rounded-full font-black text-[9px] uppercase tracking-widest border shadow-sm"
           style={{
-            backgroundColor: row.delayDays > 0 ? "#FEF2F2" : "#ECFDF5",
-            color: row.delayDays > 0 ? "#EF4444" : "#10B981",
-            borderColor: row.delayDays > 0 ? "#FECACA" : "#A7F3D0",
+            backgroundColor: delayDays > 0 ? "#FEF2F2" : "#ECFDF5",
+            color: delayDays > 0 ? "#EF4444" : "#10B981",
+            borderColor: delayDays > 0 ? "#FECACA" : "#A7F3D0",
           }}
         >
-          {row.delayDays > 0 ? `${row.delayDays} Days Overdue` : "Strategic Standby"}
+          {delayDays > 0 ? `${delayDays} Days Overdue` : "Strategic Standby"}
         </span>
       </td>
       <td className="px-6 py-5 text-right">

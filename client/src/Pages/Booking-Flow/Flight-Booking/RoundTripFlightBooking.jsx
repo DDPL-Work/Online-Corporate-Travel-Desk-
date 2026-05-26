@@ -141,6 +141,7 @@ export default function RoundTripFlightBooking() {
     legalName: "",
     address: "",
     gstEmail: "",
+    contactNumber: "",
   });
   const { actionLoading } = useSelector((state) => state.bookings);
   const fareQuote = useSelector((state) => state.flightsRT.fareQuoteRT);
@@ -255,6 +256,7 @@ export default function RoundTripFlightBooking() {
             legalName: data.data.legalName || "",
             address: data.data.address || "",
             gstEmail: data.data.gstEmail || "",
+            contactNumber: data.data.contactNumber || "",
           }));
         }
       } catch (err) {

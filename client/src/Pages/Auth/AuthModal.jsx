@@ -60,6 +60,8 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     gstAddress: "",
     gstEmail: "",
     gstEmailSource: "manual", // linked source: manual, primary, billing
+    gstContactNumber: "",
+    gstContactSource: "manual", // linked source: manual, primary, billing
     corporateType: "pvt-ltd",
   });
 
@@ -318,6 +320,9 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     // GST Email preference: Accounts (Billing) > Travel-admin (Primary)
     const finalGstEmail = form.gstEmail || form.billingEmail || form.primaryEmail || "";
     fd.append("gstDetails[gstEmail]", finalGstEmail);
+
+    const finalGstContactNumber = form.gstContactNumber || form.billingMobile || form.primaryMobile || "";
+    fd.append("gstDetails[contactNumber]", finalGstContactNumber);
 
     // BILLING
     // fd.append("billingCycle", form.billingCycle);

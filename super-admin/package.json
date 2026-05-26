@@ -13,7 +13,7 @@
     "@reduxjs/toolkit": "^2.11.0",
     "@tailwindcss/vite": "^4.1.17",
     "@tiptap/extension-bubble-menu": "^3.23.4",
-    "@tiptap/extension-character-count": "^3.23.1",
+    "@tiptap/extension-character-count": "^3.23.4",
     "@tiptap/extension-code-block-lowlight": "^3.23.1",
     "@tiptap/extension-color": "^3.23.1",
     "@tiptap/extension-font-family": "^3.23.1",
