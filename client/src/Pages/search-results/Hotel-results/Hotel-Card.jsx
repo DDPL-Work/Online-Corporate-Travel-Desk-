@@ -194,15 +194,15 @@ const HotelCard = ({ hotel }) => {
             Starts From
           </div>
           <div className="w-full text-center">
-            <div className="text-xl font-black" style={{ color: AZURE }}>
+            {/* <div className="text-xl font-black" style={{ color: AZURE }}>
               ₹{hotel.perNight?.toLocaleString()}{" "}
               <span className="text-sm font-normal">/ room / night</span>
-            </div>
+            </div> */}
 
-            <div className="bg-white border border-slate-200 rounded-lg p-2 mt-3">
-              <div className="text-[10px] text-slate-400 uppercase">
+            <div className="bg-white border border-slate-200 rounded-lg p-2">
+              {/* <div className="text-[10px] text-slate-400 uppercase">
                 Total Amount
-              </div>
+              </div> */}
               <div className="text-lg font-black" style={{ color: ORANGE }}>
                 ₹{hotel.price?.toLocaleString()}
               </div>
