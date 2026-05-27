@@ -45,6 +45,7 @@ router.post('/all/managers', adminBookingCtrl.getManagerRequests);
 
 
 
+router.get("/expenses/employees", adminBookingCtrl.getEmployeeExpenses); // get aggregated expenses per employee
 router.get("/all-employees",  adminBookingCtrl.getAllEmployees); // list all employees
 router.get("/:id", adminBookingCtrl.getEmployee); // single employee
 router.put("/:id", adminBookingCtrl.updateEmployee); // update employee

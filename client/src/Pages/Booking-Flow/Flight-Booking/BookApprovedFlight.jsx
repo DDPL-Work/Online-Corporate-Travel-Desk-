@@ -482,6 +482,13 @@ export default function BookApprovedFlight() {
         bg: "bg-yellow-50",
         canBook: false,
       };
+    if (booking.requestStatus === "manager_approved" || booking.requestStatus === "pending_second_approval")
+      return {
+        text: "Waiting for travel-admin approval",
+        color: "text-amber-600",
+        bg: "bg-amber-50",
+        canBook: false,
+      };
     if (booking.requestStatus === "rejected")
       return {
         text: "Rejected by admin",

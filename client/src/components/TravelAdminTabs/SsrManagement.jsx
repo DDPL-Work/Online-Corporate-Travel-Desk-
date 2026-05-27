@@ -373,7 +373,23 @@ function PolicyList({
     <ResponsiveDataTable 
       title={title} 
       subtitle={subtitle} 
-      onExport={onExport}
+      exportConfig={{
+        data: policies,
+        filename: `ssr_policies_${new Date().toISOString().split('T')[0]}.csv`,
+        columns: [
+          { header: "Employee Email", key: "employeeEmail" },
+          { header: "Seat Allowed", accessor: (p) => p.allowSeat ? "Yes" : "No" },
+          { header: "Seat Min", accessor: (p) => p.seatPriceRange?.min },
+          { header: "Seat Max", accessor: (p) => p.seatPriceRange?.max },
+          { header: "Meal Allowed", accessor: (p) => p.allowMeal ? "Yes" : "No" },
+          { header: "Meal Min", accessor: (p) => p.mealPriceRange?.min },
+          { header: "Meal Max", accessor: (p) => p.mealPriceRange?.max },
+          { header: "Baggage Allowed", accessor: (p) => p.allowBaggage ? "Yes" : "No" },
+          { header: "Baggage Min", accessor: (p) => p.baggagePriceRange?.min },
+          { header: "Baggage Max", accessor: (p) => p.baggagePriceRange?.max },
+          { header: "Approval Required", accessor: (p) => p.approvalRequired ? "Manual" : "Auto" }
+        ]
+      }}
       wrapperClass="!border-none !shadow-none"
       toolbarRight={onRefresh && <button onClick={onRefresh} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all" style={{ background: C.white, borderColor: C.border, color: C.navy, border: "1px solid" }}><FiRefreshCw size={14} /> Sync Policies</button>}
     >
@@ -653,7 +669,7 @@ export default function SsrManagement() {
               title="Active Governance Ledger"
               subtitle={`${filteredPolicies.length} custom policies in effect`}
               onRefresh={() => dispatch(fetchAllSSRPolicies())}
-              onExport={() => {}}
+
             />
           </div>
         )}

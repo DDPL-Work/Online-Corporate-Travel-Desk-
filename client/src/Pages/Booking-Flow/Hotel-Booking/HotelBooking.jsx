@@ -269,6 +269,16 @@ const HotelBookNow = () => {
       sub: "Waiting for Approval",
       className: "text-[#C9A84C] bg-amber-400/10 border-amber-400/20",
     },
+    pending_second_approval: {
+      label: "Pending",
+      sub: "Waiting for Travel Admin Approval",
+      className: "text-[#C9A84C] bg-amber-400/10 border-amber-400/20",
+    },
+    manager_approved: {
+      label: "Pending",
+      sub: "Waiting for Travel Admin Approval",
+      className: "text-[#C9A84C] bg-amber-400/10 border-amber-400/20",
+    },
     approved: {
       label: "Approved",
       sub: "Ready to Book",
@@ -291,6 +301,8 @@ const HotelBookNow = () => {
           color: "emerald",
         };
       case "pending_approval":
+      case "pending_second_approval":
+      case "manager_approved":
         return {
           icon: <FiAlertCircle size={18} />,
           color: "amber",

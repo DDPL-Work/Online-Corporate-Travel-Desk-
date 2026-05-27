@@ -63,7 +63,7 @@ router.post(
 // ✅ Transfer booking request (ADMIN ONLY)
 router.post(
   '/:id/transfer',
-  authorizeRoles('travel-admin','manager'),
+  authorizeRoles('travel-admin'),
   approvalController.transferRequest
 );
 

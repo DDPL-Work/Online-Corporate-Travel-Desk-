@@ -195,7 +195,26 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading, onCountCha
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Approval Ledger" subtitle={`${filtered.length} requests pending execution`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Approval Ledger" 
+        subtitle={`${filtered.length} requests pending execution`} 
+        exportConfig={{
+          data: filtered,
+          filename: `approved_flights_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "travellerName" },
+            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
+            { header: "Email", key: "employeeId" },
+            { header: "Approved On", accessor: (r) => r.approvedAt ? new Date(r.approvedAt).toLocaleDateString("en-IN") : "—" },
+            { header: "Travel Date", accessor: (r) => r.travelDate ? new Date(r.travelDate).toLocaleDateString("en-IN") : "—" },
+            { header: "Status", key: "executionStatus" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
@@ -232,7 +251,13 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading, onCountCha
                    <p className="text-xs font-black" style={{ color: C.navy }}>{a.travelDate ? new Date(a.travelDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
                    <p className="text-[9px] font-bold text-slate-400 uppercase">{a.travelDate ? new Date(a.travelDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : ""}</p>
                 </td>
-                <td className="px-6! py-5!"><ExecStatusBadge status={isDiscarded(a.travelDate) ? "discarded" : a.executionStatus} /></td>
+                <td className="px-6! py-5!">
+                  {a.requestStatus === "manager_approved" ? (
+                    <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-1 rounded border border-amber-200 uppercase tracking-tight">Awaiting Travel Admin Approval</span>
+                  ) : (
+                    <ExecStatusBadge status={isDiscarded(a.travelDate) ? "discarded" : a.executionStatus} />
+                  )}
+                </td>
                 <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{a.amount.toLocaleString()}</td>
                 <td className="px-6! py-5! text-center!">
                     <button onClick={() => setSelected(a)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
@@ -338,7 +363,26 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Approval Ledger" subtitle={`${filtered.length} requests pending execution`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Approval Ledger" 
+        subtitle={`${filtered.length} requests pending execution`} 
+        exportConfig={{
+          data: filtered,
+          filename: `approved_hotels_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order Reference", key: "orderId" },
+            { header: "Personnel", key: "guestName" },
+            { header: "Email", key: "employeeId" },
+            { header: "Approved On", accessor: (r) => r.approvedAt ? new Date(r.approvedAt).toLocaleDateString("en-IN") : "—" },
+            { header: "Check-in", accessor: (r) => r.checkIn ? new Date(r.checkIn).toLocaleDateString("en-IN") : "—" },
+            { header: "Asset Detail", key: "hotelName" },
+            { header: "Status", key: "executionStatus" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
@@ -375,7 +419,13 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
                    <p className="text-xs font-black" style={{ color: C.navy }}>{a.hotelName}</p>
                    <p className="text-[10px] font-bold text-gold uppercase">{a.city}</p>
                 </td>
-                <td className="px-6! py-5!"><ExecStatusBadge status={isDiscarded(a.checkIn) ? "discarded" : a.executionStatus} /></td>
+                <td className="px-6! py-5!">
+                  {a.requestStatus === "manager_approved" ? (
+                    <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-1 rounded border border-amber-200 uppercase tracking-tight">Awaiting Travel Admin Approval</span>
+                  ) : (
+                    <ExecStatusBadge status={isDiscarded(a.checkIn) ? "discarded" : a.executionStatus} />
+                  )}
+                </td>
                 <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{a.amount.toLocaleString()}</td>
                 <td className="px-6! py-5! text-center!">
                     <button onClick={() => setSelected(a)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">

@@ -243,13 +243,12 @@ export default function HotelGuestSelection({
                    <div className="w-1 h-1 rounded-full bg-amber-500" />
                    <h4 className="text-[9px] font-black text-slate-700 uppercase tracking-widest">Nationality</h4>
                 </div>
-                <span className="text-[7px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full uppercase">Fixed</span>
               </div>
-              <div className="bg-white p-0.5 rounded-lg border border-slate-200 pointer-events-none shadow-sm">
+              <div className="bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm">
                  <CountrySelector 
                     value={guestNationality || 'IN'} 
-                    onChange={() => {}} 
-                    countries={normalizedCountries} 
+                    onChange={setGuestNationality} 
+                    countries={normalizedCountries}
                  />
               </div>
            </div>

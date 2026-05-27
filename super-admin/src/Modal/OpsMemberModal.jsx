@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { toast } from "sonner";
-import { FiEye, FiEyeOff } from "react-icons/fi";
+import { FiCheck, FiEye, FiEyeOff, FiLock, FiShield, FiUser, FiX } from "react-icons/fi";
 import { createOpsMember, updateOpsMember } from "../API/opsAPI";
 import {
   buildOpsMemberPayload,
@@ -33,32 +33,33 @@ const createDefaultForm = () => ({
   password: "",
 });
 
+const createFormFromMember = (member) => {
+  if (!member) return createDefaultForm();
+
+  const normalized = normalizeOpsMemberRecord(member);
+  return {
+    name: member.name || "",
+    email: member.email || "",
+    phone: member.phone || "",
+    role: normalized.role,
+    department: normalized.department,
+    designation: normalized.designation,
+    servicingScope: normalized.servicingScope,
+    permissions: member.permissions || [],
+    password: "",
+  };
+};
+
+const inputClass =
+  "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition-all placeholder:text-slate-300 hover:bg-white focus:border-[#003399] focus:bg-white focus:ring-4 focus:ring-[#003399]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400";
+
 export default function OpsMemberModal({ member, onClose, onSuccess }) {
   const isEdit = Boolean(member);
 
-  const [form, setForm] = useState(createDefaultForm);
+  const [form, setForm] = useState(() => createFormFromMember(member));
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => {
-    if (!member) {
-      setForm(createDefaultForm());
-      return;
-    }
-
-    const normalized = normalizeOpsMemberRecord(member);
-    setForm({
-      name: member.name || "",
-      email: member.email || "",
-      phone: member.phone || "",
-      role: normalized.role,
-      department: normalized.department,
-      designation: normalized.designation,
-      servicingScope: normalized.servicingScope,
-      permissions: member.permissions || [],
-      password: "",
-    });
-  }, [member]);
+  const [activeTab, setActiveTab] = useState("profile");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -114,22 +115,63 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-6">
-      <div className="my-auto w-full max-w-2xl rounded-xl bg-white shadow-2xl animate-fade-in">
-        <div className="flex items-center justify-between rounded-t-xl border-b border-gray-100 bg-[#0A4D68] px-6 py-4 text-white">
-          <h2 className="text-lg font-bold uppercase tracking-tight">
-            {isEdit ? "Edit OPS Member" : "Add OPS Member"}
-          </h2>
-          <button onClick={onClose} className="transition-transform hover:rotate-90">
-            x
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-950/55 p-4 backdrop-blur-sm md:p-8">
+      <div className="flex h-[82vh] min-h-135 w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl animate-fade-in">
+        <div className="shrink-0 flex items-center justify-between bg-linear-to-br from-[#003399] to-[#000D26] px-6 py-6 text-white md:px-8">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 bg-white/10 shadow-xl">
+              <FiShield size={26} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight">
+                {isEdit ? "Edit OPS Member" : "Add OPS Member"}
+              </h2>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/60">
+                Manage access, department, and service permissions
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white transition-all hover:rotate-90 hover:bg-white/20"
+            aria-label="Close modal"
+          >
+            <FiX size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
+          <div className="sticky top-0 z-10 mb-5 grid grid-cols-2 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-1.5 shadow-sm">
+            <TabButton
+              active={activeTab === "profile"}
+              icon={<FiUser size={15} />}
+              label="Profile & Access"
+              onClick={() => setActiveTab("profile")}
+            />
+            <TabButton
+              active={activeTab === "permissions"}
+              icon={<FiLock size={15} />}
+              label={`Permissions (${form.permissions.length})`}
+              onClick={() => setActiveTab("permissions")}
+            />
+          </div>
+
+          {activeTab === "profile" && (
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5">
+            <div className="mb-5">
+              <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">
+                Member Profile
+              </h3>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                Required contact and operational identity
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             <Field label="Full Name *">
               <input
-                className="modal-input"
+                className={inputClass}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="John Doe"
@@ -138,7 +180,7 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
 
             <Field label="Email Address *">
               <input
-                className="modal-input"
+                className={inputClass}
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -149,7 +191,7 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
 
             <Field label="Phone Number *">
               <input
-                className="modal-input"
+                className={inputClass}
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 placeholder="+91 9876543210"
@@ -158,7 +200,7 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
 
             <Field label="Access Role *">
               <select
-                className="modal-input"
+                className={inputClass}
                 value={form.role}
                 onChange={(e) => setForm({ ...form, role: e.target.value })}
               >
@@ -172,7 +214,7 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
 
             <Field label="Department *">
               <select
-                className="modal-input"
+                className={inputClass}
                 value={form.department}
                 onChange={(e) => setForm({ ...form, department: e.target.value })}
               >
@@ -186,7 +228,7 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
 
             <Field label="Designation *">
               <select
-                className="modal-input"
+                className={inputClass}
                 value={form.designation}
                 onChange={(e) => setForm({ ...form, designation: e.target.value })}
               >
@@ -200,7 +242,7 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
 
             <Field label="Servicing Scope">
               <select
-                className="modal-input"
+                className={inputClass}
                 value={form.servicingScope}
                 onChange={(e) => setForm({ ...form, servicingScope: e.target.value })}
               >
@@ -215,7 +257,7 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
             <Field label={isEdit ? "Reset Password (Leave blank to keep current)" : "Password"}>
               <div className="relative">
                 <input
-                  className="modal-input w-full pr-10"
+                  className={`${inputClass} pr-11`}
                   type={showPassword ? "text" : "password"}
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
@@ -224,29 +266,42 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-[#0A4D68]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 transition-colors hover:bg-[#003399]/10 hover:text-[#003399]"
                 >
                   {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
                 </button>
               </div>
-              <p className="mt-1 text-[11px] text-slate-400">
+              <p className="mt-1 text-[11px] font-medium text-slate-400">
                 Service scope preserves the legacy Flights/Hotels/Both routing used by OPS assignment flows.
               </p>
             </Field>
+            </div>
           </div>
+          )}
 
-          <div className="mt-6">
-            <label className="mb-3 block text-xs font-black uppercase tracking-widest text-slate-400">
-              Permissions
-            </label>
-            <div className="grid grid-cols-2 gap-2">
+          {activeTab === "permissions" && (
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <label className="block text-sm font-black uppercase tracking-tight text-slate-800">
+                  Permissions
+                </label>
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  Select operational capabilities for this member
+                </p>
+              </div>
+              <span className="rounded-full bg-[#003399]/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#003399]">
+                {form.permissions.length} selected
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {PERMISSIONS_LIST.map((perm) => (
                 <label
                   key={perm}
-                  className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 transition-all ${
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-4 transition-all ${
                     form.permissions.includes(perm)
-                      ? "border-teal-200 bg-teal-50 text-teal-700"
-                      : "border-gray-100 bg-gray-50 text-gray-500 opacity-60 hover:opacity-100"
+                      ? "border-[#003399]/25 bg-[#003399]/5 text-[#003399] shadow-sm"
+                      : "border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200 hover:bg-white"
                   }`}
                 >
                   <input
@@ -255,27 +310,47 @@ export default function OpsMemberModal({ member, onClose, onSuccess }) {
                     checked={form.permissions.includes(perm)}
                     onChange={() => togglePermission(perm)}
                   />
-                  <span className="text-sm font-medium">{perm}</span>
+                  <span className="text-sm font-black">{perm}</span>
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border text-xs transition-all ${
+                      form.permissions.includes(perm)
+                        ? "border-[#003399] bg-[#003399] text-white"
+                        : "border-slate-200 bg-white text-transparent"
+                    }`}
+                  >
+                    <FiCheck size={14} />
+                  </span>
                 </label>
               ))}
             </div>
           </div>
+          )}
+          </div>
 
-          <div className="mt-8 flex justify-end gap-3 border-t pt-6">
+          <div className="shrink-0 flex flex-col-reverse justify-between gap-3 border-t border-slate-100 bg-white px-5 py-5 sm:flex-row sm:items-center md:px-6">
+            <button
+              type="button"
+              onClick={() => setActiveTab(activeTab === "profile" ? "permissions" : "profile")}
+              className="rounded-xl bg-slate-100 px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-slate-200"
+            >
+              {activeTab === "profile" ? "Next: Permissions" : "Back to Profile"}
+            </button>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-200 px-6 py-2 text-xs font-bold uppercase text-gray-500 hover:bg-gray-50"
+              className="rounded-xl border border-slate-200 px-6 py-3 text-xs font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-slate-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="rounded-lg bg-[#0A4D68] px-8 py-2 text-xs font-bold uppercase text-white shadow-lg disabled:opacity-50 hover:shadow-teal-500/20"
+              className="rounded-xl bg-[#003399] px-8 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-[#003399]/20 transition-all hover:bg-[#002266] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Saving..." : isEdit ? "Update Member" : "Create Member"}
             </button>
+            </div>
           </div>
         </form>
       </div>
@@ -290,4 +365,19 @@ const Field = ({ label, children }) => (
     </label>
     {children}
   </div>
+);
+
+const TabButton = ({ active, icon, label, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-black uppercase tracking-widest transition-all ${
+      active
+        ? "bg-white text-[#003399] shadow-sm"
+        : "text-slate-400 hover:bg-white/60 hover:text-slate-600"
+    }`}
+  >
+    {icon}
+    <span className="truncate">{label}</span>
+  </button>
 );

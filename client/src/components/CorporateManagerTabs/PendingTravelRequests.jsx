@@ -187,7 +187,26 @@ function FlightSection({ data, loading, onRefresh, handleAction, isVerified, onS
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Approval Queue" subtitle={`${filtered.length} pending decisions`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Approval Queue" 
+        subtitle={`${filtered.length} pending decisions`} 
+        exportConfig={{
+          data: filtered,
+          filename: `pending_flights_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "travellerName" },
+            { header: "Requested On", accessor: (r) => new Date(r.bookedDate).toLocaleDateString("en-IN") },
+            { header: "Travel Date", accessor: (r) => r.travelDate ? new Date(r.travelDate).toLocaleDateString("en-IN") : "—" },
+            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
+            { header: "Email", key: "employeeId" },
+            { header: "Status", key: "status" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -225,13 +244,17 @@ function FlightSection({ data, loading, onRefresh, handleAction, isVerified, onS
                    <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{b.employeeId}</span>
                 </td>
                 <td className="!px-6 !py-5">
-                   {b.isTravelPassed && b.status === "pending_approval" ? <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded border border-slate-200">EXPIRED</span> : <StatusBadge status={b.status} />}
+                   {b.isTravelPassed && b.status === "pending_approval" ? <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded border border-slate-200">EXPIRED</span> : b.status === "manager_approved" ? <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-1 rounded border border-amber-200 uppercase tracking-tight">WAITING FOR TRAVEL ADMIN APPROVAL</span> : <StatusBadge status={b.status} />}
                 </td>
                 <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
                 <td className="!px-6 !py-5 !text-center">
+                   {b.status !== "manager_approved" ? (
                     <button onClick={() => onSelect(b)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
                       <FiList size={16} className="text-[#E7C695] group-hover:scale-110 transition-transform" />
                     </button>
+                   ) : (
+                     <span className="text-[10px] font-bold text-slate-400 block mt-2">Action Locked</span>
+                   )}
                 </td>
               </tr>
             )) : (
@@ -334,7 +357,26 @@ function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSe
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Approval Queue" subtitle={`${filtered.length} pending decisions`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Approval Queue" 
+        subtitle={`${filtered.length} pending decisions`} 
+        exportConfig={{
+          data: filtered,
+          filename: `pending_hotels_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order Reference", key: "orderId" },
+            { header: "Personnel", key: "guestName" },
+            { header: "Requested On", accessor: (r) => new Date(r.bookedDate).toLocaleDateString("en-IN") },
+            { header: "Check-in", accessor: (r) => r.checkIn ? new Date(r.checkIn).toLocaleDateString("en-IN") : "—" },
+            { header: "Email", key: "employeeId" },
+            { header: "Asset Detail", key: "hotelName" },
+            { header: "Status", key: "status" },
+            { header: "Estimate", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -373,13 +415,17 @@ function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSe
                    <p className="text-[10px] font-bold text-gold uppercase">{b.city}</p>
                 </td>
                 <td className="!px-6 !py-5">
-                   {b.isTravelPassed && b.status === "pending_approval" ? <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded border border-slate-200">EXPIRED</span> : <StatusBadge status={b.status} />}
+                   {b.isTravelPassed && b.status === "pending_approval" ? <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded border border-slate-200">EXPIRED</span> : b.status === "manager_approved" ? <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-1 rounded border border-amber-200 uppercase tracking-tight">WAITING FOR TRAVEL ADMIN APPROVAL</span> : <StatusBadge status={b.status} />}
                 </td>
                 <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
                 <td className="!px-6 !py-5 !text-center">
+                   {b.status !== "manager_approved" ? (
                     <button onClick={() => onSelect(b)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
                       <FiList size={16} className="text-[#E7C695] group-hover:scale-110 transition-transform" />
                     </button>
+                   ) : (
+                     <span className="text-[10px] font-bold text-slate-400 block mt-2">Action Locked</span>
+                   )}
                 </td>
               </tr>
             )) : (
@@ -437,7 +483,7 @@ export default function PendingTravelRequestsForManager() {
   const { user } = useSelector((state) => state.auth);
   const isVerified = user?.managerRequestStatus === "approved";
 
-  const handleAction = async (id, type, action, request) => {
+  const handleAction = async (id, type, action, request, comments = "") => {
     const isApprove = action === "approve";
     if (isApprove) {
       const estimatedCost = (() => {
@@ -473,22 +519,13 @@ export default function PendingTravelRequestsForManager() {
       }
     }
 
-    const result = await Swal.fire({
-      title: `${isApprove ? "Approve" : "Reject"} Request`,
-      input: isApprove ? null : "textarea",
-      icon: isApprove ? "question" : "warning",
-      showCancelButton: true,
-      confirmButtonColor: isApprove ? "#16a34a" : "#dc2626",
-    });
-
-    if (result.isConfirmed) {
-      dispatch(isApprove ? approveApproval({ id, comments: "", type }) : rejectApproval({ id, comments: result.value || "", type }))
-        .unwrap()
-        .then(() => {
-          Swal.fire("Success", `Request ${action}d successfully`, "success");
-        })
-        .catch((err) => Swal.fire("Error", err || "Update failed", "error"));
-    }
+    dispatch(isApprove ? approveApproval({ id, comments, type }) : rejectApproval({ id, comments, type }))
+      .unwrap()
+      .then(() => {
+        Swal.fire("Success", `Request ${action}d successfully`, "success");
+        setSelectedRequest(null);
+      })
+      .catch((err) => Swal.fire("Error", err || "Update failed", "error"));
   };
 
   const handleTransfer = async (secondApproverId, remark, type) => {

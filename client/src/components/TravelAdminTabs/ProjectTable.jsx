@@ -484,12 +484,10 @@ export default function ProjectsTable({ projects, setProjects }) {
 
   // Auto-select the first project code when switching to the Bookings tab
   useEffect(() => {
-    if (activeMainTab === "bookings" && !selectedProjectId && effectiveProjects.length > 0) {
-      const firstProj = effectiveProjects[0];
-      const firstId = firstProj.projectCodeId || firstProj.code || firstProj.projectId || firstProj._id;
-      setSelectedProjectId(firstId);
+    if (activeMainTab === "bookings" && !selectedProjectId) {
+      setSelectedProjectId("all");
     }
-  }, [activeMainTab, effectiveProjects, selectedProjectId]);
+  }, [activeMainTab, selectedProjectId]);
 
   // Fetch flight and hotel expenses for selected project reactively
   useEffect(() => {
@@ -551,15 +549,17 @@ export default function ProjectsTable({ projects, setProjects }) {
 
   // Project Selector Dropdown options mapping
   const projectOptions = useMemo(() => {
-    return (effectiveProjects || []).map((p) => {
+    const opts = [{ value: "all", label: "All Projects" }];
+    (effectiveProjects || []).forEach((p) => {
       const id = p.projectCodeId || p.code || p.projectId || p.id || p._id;
       const name = p.projectName || p.name || "Untitled";
-      return {
+      opts.push({
         value: id,
         label: id,
         subLabel: name,
-      };
+      });
     });
+    return opts;
   }, [effectiveProjects]);
 
   // Employee Dropdown options mapping (no matter what roles they hold)
@@ -785,6 +785,28 @@ export default function ProjectsTable({ projects, setProjects }) {
     document.body.removeChild(a);
   };
 
+  const ledgerDateRange = useMemo(() => {
+    const fmt = (d) => {
+      if (!d || Number.isNaN(d.getTime())) return "—";
+      return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    };
+
+    if (bookingStartDate || bookingEndDate) {
+      const start = bookingStartDate ? fmt(new Date(bookingStartDate)) : "Beginning";
+      const end = bookingEndDate ? fmt(new Date(bookingEndDate)) : "Present";
+      return `${start} to ${end}`;
+    }
+
+    if (filteredBookings.length === 0) return "—";
+    const newest = new Date(filteredBookings[0].bookedDate);
+    const oldest = new Date(filteredBookings[filteredBookings.length - 1].bookedDate);
+    
+    const newStr = fmt(newest);
+    const oldStr = fmt(oldest);
+    if (newStr === "—" || oldStr === "—") return "—";
+    return newStr === oldStr ? newStr : `${oldStr} to ${newStr}`;
+  }, [filteredBookings, bookingStartDate, bookingEndDate]);
+
   return (
     <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
       
@@ -879,11 +901,22 @@ export default function ProjectsTable({ projects, setProjects }) {
             </div>
 
             {/* Table */}
-            <ResponsiveDataTable 
-              title="Project Registry" 
-              subtitle={`${filtered.length} entries located`} 
-              onExport={handleExport} 
-              wrapperClass="!border-none !shadow-none"
+              <ResponsiveDataTable 
+                title="Project Registry" 
+                subtitle={`${filtered.length} entries located`} 
+                exportConfig={{
+                  data: filtered,
+                  filename: `project_registry_${new Date().toISOString().split('T')[0]}.csv`,
+                  columns: [
+                    { header: "ID Protocol", accessor: (p) => p.projectCodeId || p.code || "—" },
+                    { header: "Project Title", accessor: (p) => p.projectName || p.name || "Untitled" },
+                    { header: "Client Entity", accessor: (p) => p.clientName || p.client || "—" },
+                    { header: "Flight Bookings", accessor: (p) => p.flightBookings?.length || 0 },
+                    { header: "Hotel Bookings", accessor: (p) => p.hotelBookings?.length || 0 },
+                    { header: "Ingestion Date", accessor: (p) => new Date(p.createdAt || p.addedOn).toLocaleDateString() }
+                  ]
+                }}
+                wrapperClass="!border-none !shadow-none"
               pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
             >
               <table className="w-full border-collapse">
@@ -939,17 +972,17 @@ export default function ProjectsTable({ projects, setProjects }) {
         ) : (
           <div className="space-y-8 animate-in fade-in duration-500">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <StatCard
                 label="Selected Project Code"
-                value={selectedProjectId || "None"}
+                value={selectedProjectId === "all" ? "All Projects" : selectedProjectId || "None"}
                 Icon={FaClipboardList}
                 borderCls="border-[#000D26]"
                 iconBgCls="bg-slate-100"
                 iconColorCls="text-[#000D26]"
               />
               <StatCard
-                label="Cumulative Outlay"
+                label="Total Amount"
                 value={`₹${bookingTotalSpend.toLocaleString()}`}
                 Icon={HiCurrencyRupee}
                 borderCls="border-violet-500"
@@ -957,20 +990,12 @@ export default function ProjectsTable({ projects, setProjects }) {
                 iconColorCls="text-violet-600"
               />
               <StatCard
-                label="Total Deployments"
-                value={bookingTotalBookings}
+                label="Ledger Timeline"
+                value={ledgerDateRange}
                 Icon={HiCalendarDays}
                 borderCls="border-emerald-500"
                 iconBgCls="bg-emerald-50"
                 iconColorCls="text-emerald-600"
-              />
-              <StatCard
-                label="Efficiency Index"
-                value={`₹${(bookingTotalBookings > 0 ? bookingTotalSpend / bookingTotalBookings : 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-                Icon={HiCalculator}
-                borderCls="border-amber-500"
-                iconBgCls="bg-amber-50"
-                iconColorCls="text-amber-600"
               />
             </div>
 
@@ -1080,7 +1105,19 @@ export default function ProjectsTable({ projects, setProjects }) {
                     : "Project Hotel Manifests"
                 }
                 subtitle={`${filteredBookings.length} deployment entries mapped`}
-                onExport={handleBookingExport}
+                exportConfig={{
+                  data: filteredBookings,
+                  filename: `project_bookings_${new Date().toISOString().split('T')[0]}.csv`,
+                  columns: [
+                    { header: "Type", key: "bookingType" },
+                    { header: "Order Reference", key: "orderId" },
+                    { header: "Personnel", accessor: (b) => b.bookingType === "flight" ? b.travellerName : b.guestName },
+                    { header: "Email Identifier", key: "employeeId" },
+                    { header: "Ingestion Date", accessor: (b) => new Date(b.bookedDate).toLocaleDateString() },
+                    { header: "Status", key: "status" },
+                    { header: "Net Outlay", accessor: (b) => `₹${b.amount.toLocaleString()}` },
+                  ]
+                }}
                 wrapperClass="!border-none !shadow-none"
                 pagination={
                   <Pagination

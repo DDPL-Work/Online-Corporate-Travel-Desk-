@@ -177,7 +177,24 @@ function FlightSection({ data, loading }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Rejection Ledger" subtitle={`${filtered.length} requests rejected`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Rejection Ledger" 
+        subtitle={`${filtered.length} requests rejected`} 
+        exportConfig={{
+          data: filtered,
+          filename: `rejected_flights_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "travellerName" },
+            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
+            { header: "Email", key: "employeeId" },
+            { header: "Rejected On", accessor: (r) => r.rejectedDate ? new Date(r.rejectedDate).toLocaleDateString("en-IN") : "—" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -302,7 +319,24 @@ function HotelSection({ data, loading }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Rejection Ledger" subtitle={`${filtered.length} requests rejected`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Rejection Ledger" 
+        subtitle={`${filtered.length} requests rejected`} 
+        exportConfig={{
+          data: filtered,
+          filename: `rejected_hotels_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order Reference", key: "orderId" },
+            { header: "Personnel", key: "guestName" },
+            { header: "Email", key: "employeeId" },
+            { header: "Asset Detail", key: "hotelName" },
+            { header: "Rejected On", accessor: (r) => r.rejectedDate ? new Date(r.rejectedDate).toLocaleDateString("en-IN") : "—" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

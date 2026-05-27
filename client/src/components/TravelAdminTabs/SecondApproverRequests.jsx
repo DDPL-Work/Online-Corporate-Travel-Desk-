@@ -114,28 +114,10 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Personnel", "Route", "Email Identifier", "Status", "PNR Ref", "Amount"];
-    const rows = filtered.map(r => [
-      r.orderId, 
-      r.employee, 
-      r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—", 
-      r.employeeId,
-      r.status,
-      r.pnr || "—",
-      `₹${r.estimatedCost.toLocaleString()}`
-    ]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `transferred-flights.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500">                             
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Pending Flights" value={filtered.length} Icon={FaPlane} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
         <StatCard label="Awaiting Review" value={filtered.length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
@@ -164,7 +146,24 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Queue" subtitle={`${filtered.length} records awaiting action`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Flight Queue" 
+        subtitle={`${filtered.length} records awaiting action`} 
+        exportConfig={{
+          data: filtered,
+          filename: `transferred_flights_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "employee" },
+            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
+            { header: "Email", key: "employeeId" },
+            { header: "Status", key: "status" },
+            { header: "PNR Ref", accessor: (r) => r.pnr || "—" },
+            { header: "Amount", accessor: (r) => `₹${r.estimatedCost.toLocaleString()}` },
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
@@ -265,25 +264,7 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order Reference", "Personnel", "Email Identifier", "Asset Detail", "Booked Date", "Status", "Amount"];
-    const rows = filtered.map(r => [
-      r.orderId, 
-      r.employee, 
-      r.employeeId, 
-      r.hotelName, 
-      r.bookedDate.toLocaleDateString(),
-      r.status,
-      `₹${r.estimatedCost.toLocaleString()}`
-    ]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `transferred-hotels.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -315,7 +296,24 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Queue" subtitle={`${filtered.length} records awaiting action`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Hotel Queue" 
+        subtitle={`${filtered.length} records awaiting action`} 
+        exportConfig={{
+          data: filtered,
+          filename: `transferred_hotels_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order Reference", key: "orderId" },
+            { header: "Personnel", key: "employee" },
+            { header: "Email", key: "employeeId" },
+            { header: "Asset Detail", key: "hotelName" },
+            { header: "Booked Date", accessor: (r) => r.bookedDate.toLocaleDateString() },
+            { header: "Status", key: "status" },
+            { header: "Amount", accessor: (r) => `₹${r.estimatedCost.toLocaleString()}` },
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">

@@ -669,7 +669,7 @@ function SelectedRoomDetailsCard({
         <div>
           {images.length > 0 && <RoomImageGallery images={images} />}
           <h4 className="text-base font-extrabold text-[#0A203E] leading-snug mb-1">
-            {roomNameDisplay}
+          {displaySearchParams?.rooms?.length} <span className="text-[#C9A84C]">X</span> {roomNameDisplay}
           </h4>
 
           {room?.BeddingGroup && (
@@ -726,7 +726,7 @@ function SelectedRoomDetailsCard({
             {/* Inclusions */}
             <div className="mb-4">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                Inclusions
+                Inclusions{" "}( <span className="text-[#C9A84C]"> {displaySearchParams?.rooms?.length} X rooms </span>)
               </p>
               {inclusion ? (
                 <InclusionBadges inclusion={inclusion} />
@@ -811,7 +811,7 @@ function SelectedRoomDetailsCard({
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <div className="divide-y divide-slate-100">
                   {/* Per-night rates from DayRates */}
-                  {dayRates?.[0]?.length > 0 && (
+                  {/* {dayRates?.[0]?.length > 0 && (
                     <div className="px-4 py-2 bg-white/60">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                         Per-Night Rates
@@ -828,7 +828,7 @@ function SelectedRoomDetailsCard({
                         ))}
                       </div>
                     </div>
-                  )}
+                  )} */}
                   <div className="flex justify-between px-4 py-2.5">
                     <span className="text-[13px] text-slate-600">
                       Base Fare
@@ -1004,6 +1004,8 @@ const HotelReviewBooking = () => {
   const [travelers, setTravelers] = useState([]);
   const [purposeOfTravel, setPurposeOfTravel] = useState("");
   const [bookingRequest, setBookingRequest] = useState(null);
+  const [flightRulesStatus, setFlightRulesStatus] = useState("loading"); // "loading", "ready", "error"
+  const [isCorporateBooking, setIsCorporateBooking] = useState(false);
   const [gstDetails, setGstDetails] = useState({
     gstin: "",
     legalName: "",
@@ -1130,8 +1132,8 @@ const HotelReviewBooking = () => {
             leadPassenger: isLead,
             email: email,
             phoneWithCode: phone,
-            countryCode: "IN",
-            nationality: "IN",
+            countryCode: searchParams?.guestNationality,
+            nationality: searchParams?.guestNationality,
             panCard: "",
             roomIndex: roomIdx,
           });
@@ -1150,8 +1152,8 @@ const HotelReviewBooking = () => {
             leadPassenger: false,
             email: "",
             phoneWithCode: "",
-            countryCode: "IN",
-            nationality: "IN",
+            countryCode: searchParams?.guestNationality, 
+            nationality: searchParams?.guestNationality,
             panCard: "",
             roomIndex: roomIdx,
           });
@@ -1198,8 +1200,8 @@ const HotelReviewBooking = () => {
           leadPassenger: true,
           email: email,
           phoneWithCode: phone,
-          countryCode: "IN",
-          nationality: "IN",
+          countryCode: searchParams?.guestNationality,
+          nationality: searchParams?.guestNationality ,
           panCard: "",
         });
       }
@@ -1239,8 +1241,8 @@ const HotelReviewBooking = () => {
         leadPassenger: false,
         email: "",
         phoneWithCode: "",
-        countryCode: "IN",
-        nationality: "IN",
+        countryCode: searchParams?.guestNationality ,
+        nationality: searchParams?.guestNationality ,
         PassportNo: "",
         PassportIssueDate: "",
         PassportExpDate: "",
@@ -1639,6 +1641,7 @@ const HotelReviewBooking = () => {
 
     const payload = {
       bookingType: "hotel",
+      ...(isCorporateBooking && { IsCorporate: true }),
       projectName: projectApproverData.project?.name,
       projectId: projectApproverData.project?.id,
       projectClient: projectApproverData.project?.client,
@@ -1647,6 +1650,7 @@ const HotelReviewBooking = () => {
       approverName: projectApproverData.approver?.name,
       approverRole: projectApproverData.approver?.role,
       hotelRequest: {
+        ...(isCorporateBooking && { IsCorporate: true }),
         hotelCode:
           safeHotel?.HotelCode ||
           safeHotel?.hotelCode ||
@@ -1688,6 +1692,7 @@ const HotelReviewBooking = () => {
         roomIndex: selectedRoom?.RoomIndex,
         checkIn: search?.checkIn,
         checkOut: search?.checkOut,
+        guestNationality: searchParams?.guestNationality ,
         roomGuests:
           displaySearchParams?.rooms?.map((r) => ({
             noOfAdults: r.Adults || r.adults || 0,
@@ -1744,7 +1749,7 @@ const HotelReviewBooking = () => {
         age: t.age,
         email: t.email,
         phoneWithCode: t.phoneWithCode,
-        nationality: t.nationality || "IN",
+        nationality: t.nationality ,
         isLeadPassenger: t.leadPassenger,
         panCard: t.panCard || "",
         PassportExpDate: t.PassportExpDate || "",
@@ -2288,7 +2293,7 @@ const HotelReviewBooking = () => {
                                 Nationality <Required />
                               </label>
                               <select
-                                value={t.nationality || "IN"}
+                                value={t.nationality }
                                 disabled
                                 onChange={(e) =>
                                   updateTraveler(
@@ -2508,6 +2513,31 @@ const HotelReviewBooking = () => {
                     .field-input::placeholder { color: #cbd5e1; }
                   `}</style>
                 </div>
+
+                {/* Make Corporate Booking Checkbox */}
+                {!isBookNowMode && (
+                  <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between rounded-b-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center h-5">
+                        <input
+                          id="corporateBooking"
+                          type="checkbox"
+                          checked={isCorporateBooking}
+                          onChange={(e) => setIsCorporateBooking(e.target.checked)}
+                          className="w-4 h-4 text-[#C9A84C] bg-white border-slate-300 rounded focus:ring-[#C9A84C] focus:ring-2 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label htmlFor="corporateBooking" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                          Make Corporate Booking
+                        </label>
+                        <p className="text-[11px] text-slate-500">
+                          Check this box if this is a corporate booking requiring special handling.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

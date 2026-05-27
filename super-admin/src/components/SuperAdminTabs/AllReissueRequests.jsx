@@ -316,7 +316,7 @@ export default function AllReissueRequests() {
             />
           </div>
           <div ref={tableScrollRef} className="overflow-x-auto">
-            <table className="min-w-[1280px] w-full">
+            <table className="min-w-7xl w-full">
               <thead className="bg-slate-900 text-left">
                 <tr>
                   {["Request", "Passenger", "Preferred Flight", "Status", "Assigned Agent", "SLA", "Reissued Ticket", "Updated", "Action"].map((heading) => (

@@ -100,10 +100,10 @@ export default function TravelersClassModal({
     onInc,
     disableInc,
   }) => (
-    <div className="flex items-center justify-between py-2.5 group">
+    <div className="flex items-center justify-between py-1.5 group">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center transition-all group-hover:bg-amber-50 group-hover:scale-110 shadow-sm">
-          <Icon className="text-slate-400 group-hover:text-amber-600 text-base" />
+        <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center transition-all group-hover:bg-amber-50 group-hover:scale-110 shadow-sm">
+          <Icon className="text-slate-400 group-hover:text-amber-600 text-sm" />
         </div>
         <div>
           <p className="text-[13px] font-black text-slate-800 tracking-tight leading-none">
@@ -119,7 +119,7 @@ export default function TravelersClassModal({
           type="button"
           onClick={onDec}
           disabled={value <= (label === "Adults" ? 1 : 0)}
-          className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-all disabled:opacity-20"
+          className="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-all disabled:opacity-20"
         >
           -
         </button>
@@ -130,7 +130,7 @@ export default function TravelersClassModal({
           type="button"
           onClick={onInc}
           disabled={disableInc}
-          className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-all disabled:opacity-20"
+          className="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-all disabled:opacity-20"
         >
           +
         </button>
@@ -152,7 +152,7 @@ export default function TravelersClassModal({
       style={isMobile ? {} : combinedStyle}
     >
       {/* Premium Header Container */}
-      <div className="bg-[#000D26] p-5 text-white relative overflow-hidden shrink-0">
+      <div className="bg-[#000D26] p-3 text-white relative overflow-hidden shrink-0">
         <div className="absolute -top-20 -right-20 w-64 h-64 bg-amber-500/10 rounded-full blur-[80px] animate-pulse" />
         <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px]" />
 
@@ -194,8 +194,8 @@ export default function TravelersClassModal({
 
       <div className="flex flex-col sm:flex-row overflow-y-auto custom-scrollbar">
         {/* Left Pane: Passengers */}
-        <div className="flex-1 p-5 border-b sm:border-b-0 sm:border-r border-slate-100 bg-slate-50/40">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="flex-1 p-3 border-b sm:border-b-0 sm:border-r border-slate-100 bg-slate-50/40">
+          <div className="flex items-center gap-2 mb-3">
             <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
             <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
               Passengers
@@ -212,7 +212,7 @@ export default function TravelersClassModal({
               onInc={() => updateCount("adults", 1)}
               disableInc={total >= MAX_TRAVELERS}
             />
-            <div className="h-px bg-slate-100 ml-12" />
+            <div className="h-px bg-slate-100 ml-11" />
             <PassengerRow
               label="Children"
               sub="2-11 years"
@@ -223,7 +223,7 @@ export default function TravelersClassModal({
               disableInc={total >= MAX_TRAVELERS}
             />
 
-            <div className="h-px bg-slate-100 ml-12" />
+            <div className="h-px bg-slate-100 ml-11" />
             <PassengerRow
               label="Infants"
               sub="0-2 years"
@@ -236,7 +236,7 @@ export default function TravelersClassModal({
           </div>
 
           {error && (
-            <div className="mt-4 p-2 rounded-xl bg-red-50 border border-red-100 flex items-center gap-2 animate-shake">
+            <div className="mt-3 p-2 rounded-xl bg-red-50 border border-red-100 flex items-center gap-2 animate-shake">
               <p className="text-[10px] text-red-600 font-bold leading-tight">
                 {error}
               </p>
@@ -245,8 +245,8 @@ export default function TravelersClassModal({
         </div>
 
         {/* Right Pane: Class */}
-        <div className="flex-1 p-5 bg-white">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="flex-1 p-3 bg-white">
+          <div className="flex items-center gap-2 mb-3">
             <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
             <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
               Cabin Class

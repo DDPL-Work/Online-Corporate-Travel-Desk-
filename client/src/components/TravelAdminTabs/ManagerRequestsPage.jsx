@@ -244,6 +244,19 @@ const ManagerRequestsPage = () => {
         <ResponsiveDataTable 
           title="Verification Ledger" 
           subtitle={`${filtered.length} authentication entries`} 
+          exportConfig={{
+            data: filtered,
+            filename: `manager_requests_${new Date().toISOString().split('T')[0]}.csv`,
+            columns: [
+              { header: "Personnel", accessor: (r) => getNameFromObj(r.employeeId || r.employee) || r.employeeName || "Unknown" },
+              { header: "Project Scope", accessor: (r) => r.projectName || "—" },
+              { header: "Booking Context", accessor: (r) => (r.bookingSnapshot || {}).hotelName || r.bookingType || "Hotel Booking" },
+              { header: "Order ID", accessor: (r) => r.orderId || "—" },
+              { header: "Designated Approver", accessor: (r) => getNameFromObj(r.managerId || r.manager) || r.managerName || "Manager" },
+              { header: "Requested On", accessor: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN") : "—" },
+              { header: "Status", key: "status" }
+            ]
+          }}
           wrapperClass="!border-none !shadow-none"
           pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
         >

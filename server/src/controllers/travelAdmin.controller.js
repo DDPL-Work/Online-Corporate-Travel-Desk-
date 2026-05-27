@@ -625,6 +625,81 @@ exports.getAllEmployees = async (req, res, next) => {
     next(err);
   }
 };
+
+// ===============================
+// ADMIN: GET EMPLOYEE EXPENSES
+// ===============================
+exports.getEmployeeExpenses = async (req, res, next) => {
+  try {
+    if (!req.user) return next(new ApiError(401, "Unauthorized"));
+    
+    const corporateId = req.user.corporateId || req.user._id;
+    if (!corporateId) return next(new ApiError(400, "CorporateId required"));
+
+    const { startDate, endDate } = req.query;
+
+    let dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+      };
+    }
+
+    // Flight aggregation
+    const flightAgg = await BookingRequest.aggregate([
+      { 
+        $match: { 
+          corporateId: new mongoose.Types.ObjectId(corporateId),
+          executionStatus: "ticketed",
+          ...dateFilter
+        }
+      },
+      {
+        $group: {
+          _id: "$userId",
+          totalSpend: { $sum: "$pricingSnapshot.totalAmount" }
+        }
+      }
+    ]);
+
+    // Hotel aggregation
+    const hotelAgg = await HotelBooking.aggregate([
+      { 
+        $match: { 
+          corporateId: new mongoose.Types.ObjectId(corporateId),
+          executionStatus: "voucher_generated",
+          ...dateFilter
+        }
+      },
+      {
+        $group: {
+          _id: "$userId",
+          totalSpend: { $sum: "$pricingSnapshot.totalAmount" }
+        }
+      }
+    ]);
+
+    // Combine results
+    const expensesMap = {};
+    flightAgg.forEach(f => {
+      const uId = f._id ? f._id.toString() : "unknown";
+      expensesMap[uId] = (expensesMap[uId] || 0) + (f.totalSpend || 0);
+    });
+    hotelAgg.forEach(h => {
+      const uId = h._id ? h._id.toString() : "unknown";
+      expensesMap[uId] = (expensesMap[uId] || 0) + (h.totalSpend || 0);
+    });
+
+    res.status(200).json({
+      success: true,
+      data: expensesMap
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ===============================
 // ADMIN: UPDATE EMPLOYEE
 // ===============================

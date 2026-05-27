@@ -14,6 +14,7 @@ import {
   demoteEmployeeAdmin,
   promoteEmployeeAdmin,
   promoteEmployeeToFinanceAdmin,
+  getEmployeeExpensesAdmin,
 } from "../Actions/travelAdmin.thunks";
 
 const initialState = {
@@ -22,12 +23,14 @@ const initialState = {
   cancelledHotelBookings: [],
   managerRequests: [],
   allEmployees: [],
+  employeeExpenses: {},
 
   loadingFlights: false,
   loadingHotels: false,
   loadingCancelledHotels: false,
   loadingManagerRequests: false,
   loadingEmployees: false,
+  loadingEmployeeExpenses: false,
 
   errorFlights: null,
   errorHotels: null,
@@ -193,6 +196,22 @@ const adminBookingSlice = createSlice({
       .addCase(getAllEmployeesAdmin.rejected, (state, action) => {
         state.loadingEmployees = false;
         state.errorEmployees = action.payload;
+      })
+
+      /**
+       * ============================================================
+       * 💰 EMPLOYEE EXPENSES
+       * ============================================================
+       */
+      .addCase(getEmployeeExpensesAdmin.pending, (state) => {
+        state.loadingEmployeeExpenses = true;
+      })
+      .addCase(getEmployeeExpensesAdmin.fulfilled, (state, action) => {
+        state.loadingEmployeeExpenses = false;
+        state.employeeExpenses = action.payload; // Map of userId -> amount
+      })
+      .addCase(getEmployeeExpensesAdmin.rejected, (state, action) => {
+        state.loadingEmployeeExpenses = false;
       })
 
       /**
