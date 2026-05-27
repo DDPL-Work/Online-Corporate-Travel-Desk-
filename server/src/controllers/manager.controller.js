@@ -315,7 +315,7 @@ exports.getApprovedHotelRequestsForApprover = async (req, res) => {
       approverId,
       corporateId,
       bookingType: "hotel",
-      requestStatus: "approved",
+      requestStatus: { $in: ["approved", "manager_approved"] },
     })
       .populate({
         path: "approvedBy",
@@ -519,7 +519,7 @@ exports.getApprovedFlightRequestsForApprover = async (req, res) => {
 
     const requests = await BookingRequest.find({
       bookingType: "flight",
-      requestStatus: "approved",
+      requestStatus: { $in: ["approved", "manager_approved"] },
       corporateId,
       approverId: { $in: [approverId, req.user._id] },
     })

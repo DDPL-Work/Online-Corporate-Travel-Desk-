@@ -174,20 +174,26 @@ export const NotificationProvider = ({ children }) => {
     prevUnreadCountRef.current = unreadCount;
   }, [unreadCount]);
 
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const openDrawer = () => setDrawerOpen(true);
+  const closeDrawer = () => setDrawerOpen(false);
+
   return (
     <NotificationContext.Provider
       value={{
         notifications,
         unreadCount,
         loading,
+        drawerOpen,
         fetchNotifications,
         markAsRead,
         markAllAsRead,
         deleteNotification,
+        openDrawer,
+        closeDrawer,
       }}
     >
       {children}
     </NotificationContext.Provider>
   );
 };
-

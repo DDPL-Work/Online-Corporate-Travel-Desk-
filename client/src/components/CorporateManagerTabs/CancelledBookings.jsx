@@ -214,7 +214,26 @@ function CancelledFlightSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Cancellation Registry" subtitle={`${filtered.length} records processed`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Cancellation Registry" 
+        subtitle={`${filtered.length} records processed`} 
+        exportConfig={{
+          data: filtered,
+          filename: `cancelled_flights_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "travellerName" },
+            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
+            { header: "Email", key: "employeeId" },
+            { header: "Status", key: "status" },
+            { header: "Cancelled On", accessor: (r) => r.cancelledDate ? new Date(r.cancelledDate).toLocaleDateString("en-IN") : "—" },
+            { header: "PNR Ref", key: "pnr" },
+            { header: "Refund Est.", accessor: (r) => `₹${r.refundAmount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -349,9 +368,9 @@ function CancelledHotelSection() {
           </LabeledField>
           <LabeledField label="Date Range" className="lg:col-span-4">
              <div className="flex items-center gap-2">
-                <input type="date" value={startDate} onChange={setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
-                <input type="date" value={endDate} onChange={setEndDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
              </div>
           </LabeledField>
           <div className="flex items-end lg:col-span-2">
@@ -360,7 +379,25 @@ function CancelledHotelSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Cancellation Registry" subtitle={`${filtered.length} records processed`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Cancellation Registry" 
+        subtitle={`${filtered.length} records processed`} 
+        exportConfig={{
+          data: filtered,
+          filename: `cancelled_hotels_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order Reference", key: "orderId" },
+            { header: "Personnel", key: "guestName" },
+            { header: "Email", key: "employeeId" },
+            { header: "Asset Detail", key: "hotelName" },
+            { header: "Status", key: "status" },
+            { header: "Cancelled On", accessor: (r) => r.cancelledDate ? new Date(r.cancelledDate).toLocaleDateString("en-IN") : "—" },
+            { header: "Refund Est.", accessor: (r) => `₹${r.refundAmount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

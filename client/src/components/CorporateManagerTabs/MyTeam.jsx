@@ -137,24 +137,7 @@ export default function MyTeam() {
     suspended: employees.filter(e => !e.isActive).length
   }), [employees]);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Personnel", "Email", "Role", "Project Code", "Status", "Joined"];
-    const rows = filtered.map(e => [
-      `${e.name?.firstName} ${e.name?.lastName}`,
-      e.email,
-      e.role,
-      e.project.code,
-      e.isActive ? "Active" : "Inactive",
-      new Date(e.createdAt).toLocaleDateString()
-    ]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `my-team-reportees.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+
 
   const handleRefresh = () => dispatch(getMyEmployees());
 
@@ -252,8 +235,18 @@ export default function MyTeam() {
           title="My Team Directory"
           subtitle={`${filtered.length} reportees active`}
           wrapperClass="!border-none !shadow-none"
-          onExport={handleExport}
-          exportLabel="Export Data"
+          exportConfig={{
+            data: filtered,
+            filename: `my_team_reportees_${new Date().toISOString().split('T')[0]}.csv`,
+            columns: [
+              { header: "Personnel", accessor: (row) => `${row.name?.firstName || ""} ${row.name?.lastName || ""}`.trim() },
+              { header: "Email", key: "email" },
+              { header: "Role", key: "role" },
+              { header: "Project Code", accessor: (row) => row.project?.code },
+              { header: "Status", accessor: (row) => row.isActive ? "Active" : "Inactive" },
+              { header: "Joined", accessor: (row) => new Date(row.createdAt).toLocaleDateString() }
+            ]
+          }}
           pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
         >
           <table className="w-full text-left border-collapse">

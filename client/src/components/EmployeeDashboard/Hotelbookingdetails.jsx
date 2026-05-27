@@ -1695,6 +1695,8 @@ export default function HotelBookingDetails() {
     amendmentStatus,
   } = useSelector((state) => state.hotelAmendment);
 
+  const [activeTab, setActiveTab] = useState("hotel_details");
+
   useEffect(() => {
     if (id) dispatch(fetchBookedHotelDetails(id));
   }, [id, dispatch]);
@@ -1794,137 +1796,137 @@ export default function HotelBookingDetails() {
         </div>
       </header>
 
+      {/* Tabs Navigation */}
+      <div className="bg-white border-b border-[#EAE4D9] sticky top-14 z-30">
+        <div className="w-full mx-auto px-8 flex items-center gap-8 overflow-x-auto no-scrollbar">
+          {[
+            { id: "hotel_details", label: "Hotel Details" },
+            { id: "room_details", label: "Room Details" },
+            { id: "rules", label: "Rules & Policies" },
+            { id: "guest", label: "Guest" },
+            { id: "amendment", label: "Amendment" },
+            { id: "history", label: "Booking History" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`py-4 text-[12px] font-bold tracking-[0.05em] uppercase whitespace-nowrap border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? "border-[#B5862A] text-[#1A1714]"
+                  : "border-transparent text-[#A89F94] hover:text-[#1A1714]"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── Main ── */}
-      <main className="max-w-[1200px] mx-auto p-[32px_24px_120px]">
-        {/* Hero */}
-        <div className="mb-10">
-          <HotelHeroCard
-            booking={booking}
-            bookingDetail={bookingDetail}
-            paymentSuccessful={paymentSuccessful}
-          />
-        </div>
-
-        {/* Payment status */}
-        <div className="mb-10">
-          <PaymentStatusCard
-            booking={booking}
-            paymentSuccessful={paymentSuccessful}
-            isConfirmed={isConfirmed}
-            hotelReq={hotelReq}
-          />
-        </div>
-
-        {/* ── Numbered sections ── */}
-
-        {/* 01 The Room */}
-        {rooms.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={1}
-              title="The Room"
+      <main className="w-full mx-auto p-[32px_24px_120px]">
+        {activeTab === "hotel_details" && (
+          <div className="space-y-10">
+            <HotelHeroCard
+              booking={booking}
+              bookingDetail={bookingDetail}
+              paymentSuccessful={paymentSuccessful}
             />
-            <RoomSection
-              rooms={rooms}
-              selectedRoom={selectedRoom}
+            <PaymentStatusCard
+              booking={booking}
+              paymentSuccessful={paymentSuccessful}
+              isConfirmed={isConfirmed}
+              hotelReq={hotelReq}
             />
-          </section>
+            <div className={`grid gap-6 ${isTravelAdmin && priceBreakUp ? "grid-cols-1 lg:grid-cols-[minmax(0,350px)_1fr]" : "grid-cols-1"}`}>
+              {isTravelAdmin && priceBreakUp && (
+                <section>
+                  <SectionHeader num={8} title="Fare Breakdown" />
+                  <FareBreakdownSection
+                    priceBreakUp={priceBreakUp}
+                    totalFare={totalFare}
+                    detailRoom={detailRoom}
+                  />
+                </section>
+              )}
+              <section>
+                <SectionHeader num={5} title="Order ID" />
+                <BookingReferencesSection
+                  booking={booking}
+                  bookingDetail={bookingDetail}
+                  result={result}
+                />
+              </section>
+            </div>
+          </div>
         )}
 
-        {/* 02 Amenities */}
-        {amenities.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={2}
-              title="Amenities"
-            />
-            <AmenitiesSection amenities={amenities} />
-          </section>
+        {activeTab === "room_details" && (
+          <div className="space-y-12">
+            {rooms.length > 0 && (
+              <section>
+                <SectionHeader num={1} title="The Room" />
+                <RoomSection rooms={rooms} selectedRoom={selectedRoom} />
+              </section>
+            )}
+            {amenities.length > 0 && (
+              <section>
+                <SectionHeader num={2} title="Amenities" />
+                <AmenitiesSection amenities={amenities} />
+              </section>
+            )}
+          </div>
         )}
 
-        {/* 03 Check-in Instructions */}
-        {rateConditions.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={3}
-              title="Check-in Instructions"
-            />
-            <CheckInInstructions conditions={rateConditions} />
-          </section>
+        {activeTab === "rules" && (
+          <div className="space-y-12">
+            {rateConditions.length > 0 && (
+              <section>
+                <SectionHeader num={3} title="Check-in Instructions" />
+                <CheckInInstructions conditions={rateConditions} />
+              </section>
+            )}
+            {cancelPolicies.length > 0 && (
+              <section>
+                <SectionHeader num={4} title="Cancellation Policy" />
+                <CancellationPolicySection
+                  policies={cancelPolicies}
+                  lastCancellationDate={detailRoom?.LastCancellationDate || bookingDetail?.LastCancellationDate}
+                />
+              </section>
+            )}
+          </div>
         )}
 
-        {/* 04 Cancellation Policy */}
-        {cancelPolicies.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={4}
-              title="Cancellation Policy"
-            />
-            <CancellationPolicySection
-              policies={cancelPolicies}
-              lastCancellationDate={
-                detailRoom?.LastCancellationDate ||
-                bookingDetail?.LastCancellationDate
-              }
-            />
-          </section>
+        {activeTab === "guest" && (
+          <div className="space-y-12">
+            {travellers.length > 0 && (
+              <section>
+                <SectionHeader num={6} title="Guest" />
+                <GuestSection travellers={travellers} />
+              </section>
+            )}
+          </div>
         )}
 
-        {/* 05 Booking References */}
-        <section className="mb-12">
-          <SectionHeader
-            num={5}
-            title="Order ID"
-          />
-          <BookingReferencesSection
-            booking={booking}
-            bookingDetail={bookingDetail}
-            result={result}
-          />
-        </section>
-
-        {/* 06 Guest */}
-        {travellers.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={6}
-              title="Guest"
-            />
-            <GuestSection travellers={travellers} />
-          </section>
+        {activeTab === "amendment" && (
+          <div className="space-y-12">
+            <section>
+              <SectionHeader num={7} title="Cancellation Request" />
+              <CancellationSection
+                booking={booking}
+                isConfirmed={isConfirmed}
+                cancelPolicies={cancelPolicies}
+                totalFare={totalFare}
+              />
+            </section>
+          </div>
         )}
 
-        {/* 08 Fare Breakdown (Travel Admin) */}
-        {isTravelAdmin && priceBreakUp && (
-          <section className="mb-12">
-            <SectionHeader
-              num={8}
-              title="Fare Breakdown"
-            />
-            <FareBreakdownSection
-              priceBreakUp={priceBreakUp}
-              totalFare={totalFare}
-              detailRoom={detailRoom}
-            />
-          </section>
+        {activeTab === "history" && (
+          <div className="space-y-12">
+            <BookingHistory booking={booking} />
+          </div>
         )}
-
-        {/* 07 Cancellation Request */}
-        <section className="mb-12">
-          <SectionHeader
-            num={7}
-            title="Cancellation Request"
-          />
-          <CancellationSection
-            booking={booking}
-            isConfirmed={isConfirmed}
-            cancelPolicies={cancelPolicies}
-            totalFare={totalFare}
-          />
-        </section>
-
-        {/* 09 Booking History */}
-        <BookingHistory booking={booking} />
       </main>
     </div>
   );

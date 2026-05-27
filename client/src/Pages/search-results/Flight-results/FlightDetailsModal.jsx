@@ -173,7 +173,7 @@ function FlightSegmentDetail({ segment }) {
             </span>
           )}
           <span className="px-3 py-1 bg-[#C9A84C] text-[#0A203E] text-[10px] font-black uppercase tracking-widest rounded-full">
-            {durationH}h {durationM}m
+            {durationH}h {durationM}
           </span>
         </div>
       </div>
@@ -205,11 +205,11 @@ function FlightSegmentDetail({ segment }) {
         <div className="flex-1 flex flex-col items-center gap-1 px-2">
           <div className="w-full flex items-center gap-1">
             <div className="w-2.5 h-2.5 rounded-full border-2 border-[#C9A84C] bg-white shrink-0" />
-            <div className="flex-1 h-0.5 bg-gradient-to-r from-[#C9A84C] via-slate-300 to-[#C9A84C]" />
+            <div className="flex-1 h-0.5 bg-linear-to-r from-[#C9A84C] via-slate-300 to-[#C9A84C]" />
             <div className="w-7 h-7 rounded-full bg-[#C9A84C] flex items-center justify-center shadow-md shrink-0">
               <FaPlane className="text-[#0A203E] text-xs" />
             </div>
-            <div className="flex-1 h-0.5 bg-gradient-to-r from-[#C9A84C] via-slate-300 to-[#C9A84C]" />
+            <div className="flex-1 h-0.5 bg-linear-to-r from-[#C9A84C] via-slate-300 to-[#C9A84C]" />
             <div className="w-2.5 h-2.5 rounded-full border-2 border-[#C9A84C] bg-white shrink-0" />
           </div>
           {craftType && (
@@ -533,7 +533,7 @@ export function FlightDetailsModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 bg-[#0A203E]/75 backdrop-blur-sm flex items-center justify-center z-[9999] sm:p-4">
+    <div className="fixed inset-0 bg-[#0A203E]/75 backdrop-blur-sm flex items-center justify-center z-9999 sm:p-4">
       <div className="bg-white sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto max-h-[100dvh] sm:max-h-[90vh] lg:max-w-5xl flex flex-col overflow-hidden border border-slate-200">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-[#0A203E] shrink-0">
@@ -979,7 +979,7 @@ export function FlightDetailsModal({
                                 <div className="flex items-center gap-2 mb-4">
                                   <div className="w-1.5 h-4 bg-[#C9A84C] rounded-full" />
                                   <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">
-                                    Date Change Fee
+                                    Airline Reissue Penalty
                                   </h4>
                                 </div>
                                 <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">

@@ -42,7 +42,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
 
     requestStatus: {
       type: String,
-      enum: ["draft", "pending_approval", "pending_second_approval", "approved", "rejected", "expired"],
+      enum: ["draft", "pending_approval", "pending_second_approval", "manager_approved", "approved", "rejected", "expired"],
       default: "draft",
       index: true,
     },
@@ -54,6 +54,13 @@ const hotelBookingRequestSchema = new mongoose.Schema(
     rejectedAt: Date,
 
     approverComments: String,
+
+    managerApproval: {
+      isApproved: { type: Boolean, default: false },
+      approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      approvedAt: Date,
+      comments: String,
+    },
 
     secondApprover: {
       userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

@@ -346,48 +346,7 @@ const MyReissueRequests = () => {
     setFilter("All");
   };
 
-  const handleExport = () => {
-    if (!currentRequests.length) return;
-    const headers = [
-      "Request ID",
-      "PNR",
-      "Booking Ref",
-      "Employee",
-      "Route",
-      "Type",
-      "Reason",
-      "Date",
-      "Status",
-    ];
-    const rows = currentRequests.map((r) => [
-      getRequestId(r),
-      getPnr(r),
-      r.bookingReference || r.bookingRef || "N/A",
-      getUserName(r),
-      getRoute(r),
-      r.reissueType || r.type || "REISSUE",
-      r.reason || r.remarks || "N/A",
-      getRequestedDate(r),
-      getStatus(r),
-    ]);
-    const tableHtml = rows
-      .map(
-        (r) =>
-          `<tr>${r.map((c) => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`,
-      )
-      .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `reissue_requests.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+
 
   return (
     <div
@@ -568,8 +527,22 @@ const MyReissueRequests = () => {
             activeTab === "my" ? "Amendment Ledger" : "Corporate Amendments"
           }
           subtitle={`${currentRequests.length} active records`}
-          onExport={handleExport}
           wrapperClass="!border-none !shadow-none"
+          exportConfig={{
+            data: currentRequests,
+            filename: `reissue_requests_${new Date().toISOString().split('T')[0]}.csv`,
+            columns: [
+              { header: "Request ID", accessor: (r) => getRequestId(r) },
+              { header: "PNR", accessor: (r) => getPnr(r) },
+              { header: "Booking Ref", accessor: (r) => r.bookingReference || r.bookingRef || "N/A" },
+              { header: "Employee", accessor: (r) => getUserName(r) },
+              { header: "Route", accessor: (r) => getRoute(r) },
+              { header: "Type", accessor: (r) => r.reissueType || r.type || "REISSUE" },
+              { header: "Reason", accessor: (r) => r.reason || r.remarks || "N/A" },
+              { header: "Date", accessor: (r) => getRequestedDate(r) },
+              { header: "Status", accessor: (r) => getStatus(r) }
+            ]
+          }}
           pagination={
             <Pagination
               currentPage={currentPage}

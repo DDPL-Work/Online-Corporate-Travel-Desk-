@@ -129,7 +129,23 @@ function FlightSection({ trips, refreshing, employeeOptions }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Deployment Manifest" subtitle={`${filtered.length} scheduled departures`} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Flight Deployment Manifest" 
+        subtitle={`${filtered.length} scheduled departures`} 
+        exportConfig={{
+          data: filtered,
+          filename: `upcoming_flight_trips_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "employee" },
+            { header: "Route", accessor: (t) => t.routes?.map(r => `${r.fromCode}→${r.toCode}`).join(" | ") || "—" },
+            { header: "Departure Date", accessor: (t) => new Date(t.departureDate).toLocaleDateString() },
+            { header: "Email Identifier", key: "employeeEmail" },
+            { header: "Status", key: "status" },
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -245,7 +261,23 @@ function HotelSection({ trips, refreshing, employeeOptions }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Deployment Manifest" subtitle={`${filtered.length} scheduled stays`} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Hotel Deployment Manifest" 
+        subtitle={`${filtered.length} scheduled stays`} 
+        exportConfig={{
+          data: filtered,
+          filename: `upcoming_hotel_stays_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "employee" },
+            { header: "Asset Detail", key: "destination" },
+            { header: "Duration", accessor: (t) => `${new Date(t.departureDate).toLocaleDateString()} — ${new Date(t.returnDate).toLocaleDateString()}` },
+            { header: "Email Identifier", key: "employeeId" },
+            { header: "Status", key: "status" },
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

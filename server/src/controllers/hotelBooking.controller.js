@@ -888,6 +888,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 });
 
 
+
 // @desc    Get my hotel booking requests (pending + approved)
 // @route   GET /api/v1/hotel-bookings/my
 // @access  Private (Employee)
@@ -897,7 +898,7 @@ exports.getMyHotelRequests = asyncHandler(async (req, res) => {
 
   const requests = await HotelBookingRequest.find({
     userId,
-    requestStatus: { $in: ["pending_approval", "approved"] },
+    requestStatus: { $in: ["pending_approval", "pending_second_approval", "manager_approved", "approved"] },
     executionStatus: { $ne: "voucher_generated" }, // not completed yet
   })
     .populate("approvedBy", "name email role")
@@ -1922,11 +1923,16 @@ exports.getProjectHotelExpenses = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Project ID is required");
   }
 
-  const expenses = await HotelBookingRequest.find({
-    projectId,
+  const query = {
     corporateId: req.user.corporateId,
     executionStatus: "voucher_generated",
-  })
+  };
+
+  if (projectId !== "all") {
+    query.projectId = projectId;
+  }
+
+  const expenses = await HotelBookingRequest.find(query)
     .populate("userId", "name email")
     .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 });

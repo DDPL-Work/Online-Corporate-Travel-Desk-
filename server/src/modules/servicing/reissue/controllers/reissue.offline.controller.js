@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const asyncHandler = require("../../../../utils/asyncHandler");
 const ApiResponse = require("../../../../utils/ApiResponse");
+const ApiError = require("../../../../utils/ApiError");
 const offlineReissueWorkflowService = require("../services/offlineReissueWorkflow.service");
 const { toOfflineReissueDto } = require("../transformers/offlineReissue.dto");
 
@@ -142,6 +143,7 @@ exports.downloadTicket = asyncHandler(async (req, res) => {
   });
 
   if (artifact.localPath) {
+    res.setHeader("Content-Type", "application/pdf");
     return res.download(artifact.localPath, artifact.fileName);
   }
 
@@ -149,5 +151,6 @@ exports.downloadTicket = asyncHandler(async (req, res) => {
     return res.redirect(artifact.url);
   }
 
-  return res.download(artifact.localPath, artifact.fileName);
+  // ── CRITICAL FIX: Neither localPath nor url available — throw instead of crash ──
+  throw new ApiError(404, "Ticket file is not available for download");
 });

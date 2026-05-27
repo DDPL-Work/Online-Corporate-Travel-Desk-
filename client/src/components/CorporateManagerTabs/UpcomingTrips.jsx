@@ -194,7 +194,25 @@ function FlightSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Upcoming Flight Manifest" subtitle={`${filtered.length} itineraries confirmed`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Upcoming Flight Manifest" 
+        subtitle={`${filtered.length} itineraries confirmed`} 
+        exportConfig={{
+          data: filtered,
+          filename: `upcoming_flights_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "travellerName" },
+            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
+            { header: "Email", key: "employeeId" },
+            { header: "Status", key: "status" },
+            { header: "PNR Ref", key: "pnr" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -341,7 +359,24 @@ function HotelSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Upcoming Hotel Manifest" subtitle={`${filtered.length} bookings confirmed`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Upcoming Hotel Manifest" 
+        subtitle={`${filtered.length} bookings confirmed`} 
+        exportConfig={{
+          data: filtered,
+          filename: `upcoming_hotels_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order Reference", key: "orderId" },
+            { header: "Personnel", key: "guestName" },
+            { header: "Email", key: "employeeId" },
+            { header: "Asset Detail", key: "hotelName" },
+            { header: "Status", key: "status" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

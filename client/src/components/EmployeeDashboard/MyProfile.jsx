@@ -304,7 +304,7 @@ export default function MyProfile() {
                      <thead>
                        <tr className="bg-slate-50/50">
                          <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">Project Name</th>
-                         <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">Primary Approver</th>
+                         <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">Approver</th>
                          <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">Status</th>
                          <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">Role</th>
                        </tr>
@@ -495,6 +495,7 @@ function Field({ field, value, editing, onChange }) {
             value={value || ""}
             onChange={(v) => onChange(v)}
             placeholder="Select Date of Birth"
+            maxDate={new Date().toISOString().split("T")[0]}
           />
         ) : (
           <input

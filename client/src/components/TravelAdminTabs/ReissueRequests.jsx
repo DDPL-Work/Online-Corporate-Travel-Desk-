@@ -13,6 +13,7 @@ import {
   FiXCircle,
 } from "react-icons/fi";
 import axios from "axios";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 
 import { updateReissueStatus } from "../../Redux/Actions/reissueThunks";
 import {
@@ -255,46 +256,7 @@ export default function ReissueRequests() {
     });
   }, [requests, search, statusFilter]);
 
-  /* CSV export */
-  const handleExport = () => {
-    const rows = [
-      [
-        "Request ID",
-        "PNR",
-        "Booking Ref",
-        "Employee",
-        "Route",
-        "Type",
-        "Reason",
-        "Date",
-        "Status",
-      ],
-      ...filtered.map((r) => [
-        getRequestId(r),
-        getPnr(r),
-        r.bookingReference || r.bookingRef || "N/A",
-        getUserName(r),
-        getRoute(r),
-        r.reissueType || r.type || "REISSUE",
-        r.reason || r.remarks || "N/A",
-        getRequestedDate(r),
-        getStatus(r),
-      ]),
-    ];
-    const csv = rows
-      .map((row) =>
-        row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","),
-      )
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "reissue_requests.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
+  // CSV export is now handled by ResponsiveDataTable's exportConfig
   return (
     <>
       <div className="space-y-6">
@@ -314,12 +276,6 @@ export default function ReissueRequests() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleExport}
-              className="px-3 py-2 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
-            >
-              Export CSV
-            </button>
             <button
               onClick={() => load()}
               className="flex items-center gap-2 px-3 py-2 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
@@ -416,6 +372,24 @@ export default function ReissueRequests() {
             </p>
           </div>
         ) : (
+          <ResponsiveDataTable
+            exportConfig={{
+              data: filtered,
+              filename: `reissue_requests_${new Date().toISOString().split('T')[0]}.csv`,
+              columns: [
+                { header: "Request ID", accessor: getRequestId },
+                { header: "PNR", accessor: getPnr },
+                { header: "Booking Ref", accessor: (r) => r.bookingReference || r.bookingRef || "N/A" },
+                { header: "Employee", accessor: getUserName },
+                { header: "Route", accessor: getRoute },
+                { header: "Type", accessor: (r) => r.reissueType || r.type || "REISSUE" },
+                { header: "Reason", accessor: (r) => r.reason || r.remarks || "N/A" },
+                { header: "Date", accessor: getRequestedDate },
+                { header: "Status", accessor: getStatus },
+              ]
+            }}
+            wrapperClass="!border-none !shadow-none"
+          >
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse min-w-[1000px]">
@@ -564,6 +538,7 @@ export default function ReissueRequests() {
               </table>
             </div>
           </div>
+          </ResponsiveDataTable>
         )}
 
         {/* Pagination */}

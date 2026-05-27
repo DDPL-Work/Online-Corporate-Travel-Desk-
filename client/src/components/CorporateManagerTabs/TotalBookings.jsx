@@ -168,25 +168,7 @@ function FlightSection() {
   const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
   const totalSpend = filtered.reduce((s, b) => s + (b.amount || 0), 0);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Personnel", "Route", "Booked Date", "Status", "PNR", "Amount"];
-    const rows = filtered.map(b => [
-      b.orderId, 
-      b.travellerName, 
-      b.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—",
-      new Date(b.bookedDate).toLocaleDateString(), 
-      b.status, 
-      b.pnr, 
-      `₹${b.amount.toLocaleString()}`
-    ]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `flight-manifest.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -221,7 +203,25 @@ function FlightSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Ledger" subtitle={`${filtered.length} active deployments`} onExport={handleExport} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Ledger" 
+        subtitle={`${filtered.length} active deployments`} 
+        exportConfig={{
+          data: filtered,
+          filename: `total_flights_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "travellerName" },
+            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
+            { header: "Email", key: "employeeId" },
+            { header: "Status", key: "status" },
+            { header: "PNR Ref", key: "pnr" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -332,17 +332,7 @@ function HotelSection() {
   const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
   const totalSpend = filtered.reduce((s, b) => s + (b.amount || 0), 0);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Personnel", "Hotel", "City", "Status", "Amount"];
-    const rows = filtered.map(b => [b.orderId, b.guestName, b.hotelName, b.city, b.status, `₹${b.amount.toLocaleString()}`]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `hotel-manifest.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -371,7 +361,25 @@ function HotelSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Ledger" subtitle={`${filtered.length} active stays`} onExport={handleExport} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Ledger" 
+        subtitle={`${filtered.length} active stays`} 
+        exportConfig={{
+          data: filtered,
+          filename: `total_hotels_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order Reference", key: "orderId" },
+            { header: "Personnel", key: "guestName" },
+            { header: "Email", key: "employeeId" },
+            { header: "Asset Detail", key: "hotelName" },
+            { header: "Booked Date", accessor: (r) => new Date(r.bookedDate).toLocaleDateString("en-IN") },
+            { header: "Status", key: "status" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

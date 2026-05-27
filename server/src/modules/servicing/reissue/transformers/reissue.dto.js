@@ -1,14 +1,3 @@
-/**
- * toReissueDto — Online ReissueRequest transformer
- *
- * After adding .populate("userId", "name email") to the repository,
- * item.userId is now a populated User object { _id, name: nameSchema, email }
- * where nameSchema = { firstName, lastName } (User model shape).
- *
- * We normalize it into a plain user: { name: String, email: String } so
- * the frontend never needs to know the User model internals.
- */
-
 function normalizeUserName(nameField) {
   if (!nameField) return null;
   if (typeof nameField === "string") return nameField.trim() || null;
@@ -22,8 +11,8 @@ function normalizeUserName(nameField) {
 function toReissueDto(doc) {
   if (!doc) return null;
   const item = doc.toObject ? doc.toObject() : doc;
+  const activeTicketSnapshot = item.activeTicketSnapshot || null;
 
-  // userId is populated → a User object; or raw ObjectId string if not populated
   const populatedUser =
     item.userId && typeof item.userId === "object" && item.userId.email
       ? item.userId
@@ -37,7 +26,81 @@ function toReissueDto(doc) {
       }
     : null;
 
+  const originCity =
+    item.oldJourney?.sectors?.[0]?.origin ||
+    item.oldJourney?.segments?.[0]?.origin ||
+    item.oldJourney?.segments?.[0]?.Origin ||
+    "";
+  const destinationCity =
+    item.oldJourney?.sectors?.[0]?.destination ||
+    item.oldJourney?.segments?.[0]?.destination ||
+    item.oldJourney?.segments?.[0]?.Destination ||
+    "";
+
+  const primaryNewSegment = item.newJourney?.segments?.[0] || {};
+  const primaryOldSegment = item.oldJourney?.segments?.[0] || {};
+  const activePrimarySegment = activeTicketSnapshot?.segments?.[0] || {};
+
+  const displayInfo = {
+    pnr: activeTicketSnapshot?.pnr || item.originalPnr || item.newPnr || null,
+    route:
+      (originCity && destinationCity
+        ? `${originCity} -> ${destinationCity}`
+        : activePrimarySegment?.originCode && activePrimarySegment?.destinationCode
+          ? `${activePrimarySegment.originCode} -> ${activePrimarySegment.destinationCode}`
+          : null),
+    status: item.status,
+    userEmail: user?.email || item.metadata?.employeeEmail || null,
+    userName: user?.name || item.metadata?.employeeName || null,
+    corporateName:
+      item.corporateId?.corporateName ||
+      item.companyId?.corporateName ||
+      item.metadata?.corporateName ||
+      null,
+    airline:
+      primaryNewSegment.airlineName ||
+      activePrimarySegment.airlineName ||
+      primaryOldSegment.airlineName ||
+      item.airline ||
+      null,
+    flightNumber:
+      primaryNewSegment.flightNumber ||
+      activePrimarySegment.flightNumber ||
+      primaryOldSegment.flightNumber ||
+      null,
+    departureTime:
+      primaryNewSegment.departureTime ||
+      activePrimarySegment.departureTime ||
+      primaryOldSegment.departureTime ||
+      null,
+    arrivalTime:
+      primaryNewSegment.arrivalTime ||
+      activePrimarySegment.arrivalTime ||
+      primaryOldSegment.arrivalTime ||
+      null,
+    duration:
+      primaryNewSegment.duration ||
+      activePrimarySegment.duration ||
+      primaryOldSegment.duration ||
+      null,
+    stops: primaryNewSegment.stops ?? primaryOldSegment.stops ?? 0,
+    cabinClass:
+      primaryNewSegment.cabinClass ||
+      activePrimarySegment.cabinClass ||
+      primaryOldSegment.cabinClass ||
+      "Economy",
+    journeyType: item.newJourney?.journeyType || item.oldJourney?.journeyType || "One Way",
+    oldFare: item.oldJourney?.totalFare || 0,
+    newFare: item.newJourney?.totalFare || activeTicketSnapshot?.fareSnapshot?.offeredFare || 0,
+    fareDifference: item.fareDifference || 0,
+    reissueCharge: item.reissueCharges || 0,
+    refundEstimate: item.normalizedPricing?.refundDue || 0,
+    totalEstimate: item.totalAdjustment || 0,
+    currency: item.newJourney?.currency || item.oldJourney?.currency || "INR",
+  };
+
   return {
+    _type: "ONLINE",
     id: item._id,
     reissueId: item.reissueId,
     bookingId: item.bookingId,
@@ -46,9 +109,13 @@ function toReissueDto(doc) {
     newBookingId: item.newBookingId,
     newPnr: item.newPnr,
     userId: populatedUser ? populatedUser._id : item.userId,
-    // Normalized user object — frontend reads req.user.name (always a String or null)
     user,
     corporateId: item.corporateId,
+    corporateName:
+      item.corporateId?.corporateName ||
+      item.companyId?.corporateName ||
+      item.metadata?.corporateName ||
+      null,
     companyId: item.companyId,
     supplier: item.supplier,
     airline: item.airline,
@@ -62,6 +129,7 @@ function toReissueDto(doc) {
     fareDifference: item.fareDifference,
     reissueCharges: item.reissueCharges,
     totalAdjustment: item.totalAdjustment,
+    activeTicketSnapshot,
     billingMode: item.billingMode,
     billingReservation: item.billingReservation,
     walletAdjustment: item.walletAdjustment,
@@ -73,6 +141,7 @@ function toReissueDto(doc) {
     revisedInvoice: item.revisedInvoice || item.uploadedInvoice || null,
     ticketData: item.ticketData || null,
     miniFareRules: item.miniFareRules,
+    normalizedPricing: item.normalizedPricing || null,
     supplierResponse: item.supplierResponse,
     metadata: item.metadata,
     correlationId: item.correlationId,
@@ -86,6 +155,7 @@ function toReissueDto(doc) {
     cancelledAt: item.cancelledAt,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
+    displayInfo,
   };
 }
 

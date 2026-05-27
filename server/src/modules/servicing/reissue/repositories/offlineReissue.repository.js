@@ -7,6 +7,7 @@ const detailPopulate = [
     select: "name email role department status currentWorkload lastAssignedAt",
   },
   { path: "employeeId", select: "name email role corporateId" },
+  { path: "corporateId", select: "corporateName" },
 ];
 
 class OfflineReissueRepository {

@@ -79,6 +79,69 @@ const getBaggageDesc = (desc) => {
   return d;
 };
 
+const ActionModal = ({ isOpen, onClose, onConfirm, action, type }) => {
+  const [comments, setComments] = useState("");
+  
+  useEffect(() => {
+    if (isOpen) {
+      setComments("");
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+  const isApprove = action === "approve";
+  
+  return (
+    <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-white/60 backdrop-blur-sm rounded-3xl">
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-300 border border-slate-200">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-black text-slate-800 tracking-tight">
+            {isApprove ? "Approve Request" : "Reject Request"}
+          </h2>
+          <button onClick={onClose} className="p-2 bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-colors">
+            <FiX size={18} />
+          </button>
+        </div>
+        {!isApprove && (
+          <div className="mb-6">
+            <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+              Comments (Required)
+            </label>
+            <textarea
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              className="w-full h-24 p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+              placeholder="Enter reason for rejecting..."
+            />
+          </div>
+        )}
+        {isApprove && (
+          <div className="mb-6">
+            <p className="text-sm text-slate-600 font-medium">
+              Are you sure you want to approve this request? This action will proceed with the booking workflow.
+            </p>
+          </div>
+        )}
+        <div className="flex gap-3 justify-end">
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(comments)}
+            disabled={!isApprove && !comments.trim()}
+            className={`px-5 py-2.5 rounded-xl font-bold text-white transition-colors flex items-center gap-2 ${
+              !isApprove && !comments.trim() ? "opacity-50 cursor-not-allowed" : ""
+            } ${isApprove ? "bg-[#22C55E] hover:bg-emerald-600" : "bg-red-500 hover:bg-red-600"}`}
+          >
+            {isApprove ? <FiCheckCircle size={16} /> : <FiXCircle size={16} />}
+            Confirm {isApprove ? "Approval" : "Rejection"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const resolveApproverDetails = (booking) => {
   if (booking?.approverName === "Auto Approve") {
     return {
@@ -366,10 +429,20 @@ export const PendingHotelDetailsModal = ({
   const tabsRef = useRef(null);
   const [isMounted, setIsMounted] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [actionModal, setActionModal] = useState({ isOpen: false, action: null });
+
+  const handleConfirmAction = (comments) => {
+    if (actionModal.action === "approve") {
+      onApprove(booking._id, "hotel", "approve", comments);
+    } else {
+      onReject(booking._id, "hotel", "reject", comments);
+    }
+    setActionModal({ isOpen: false, action: null });
+  };
   const { user } = useSelector((state) => state.auth);
 
   const isCurrentUserSecondApprover = booking?.secondApprover?.email === user?.email;
-  const isPendingWithMe = booking?.requestStatus === "pending_approval" || (booking?.requestStatus === "pending_second_approval" && isCurrentUserSecondApprover);
+  const isPendingWithMe = ["pending_approval", "manager_approved"].includes(booking?.requestStatus) || (booking?.requestStatus === "pending_second_approval" && isCurrentUserSecondApprover);
   
   useEffect(() => {
     setIsMounted(true);
@@ -512,7 +585,7 @@ export const PendingHotelDetailsModal = ({
           </div>
           <div className="flex items-center gap-2">
             {!isVerified &&
-              ["pending_approval", "pending_second_approval"].includes(booking.requestStatus) &&
+              ["pending_approval", "pending_second_approval", "manager_approved"].includes(booking.requestStatus) &&
               !isDiscarded && (
                 <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-200 animate-pulse">
                   <FiAlertCircle size={14} className="text-amber-600" />
@@ -549,7 +622,7 @@ export const PendingHotelDetailsModal = ({
                   </button>
                 )}
                 <button
-                  onClick={() => onReject(booking._id, "hotel", "reject")}
+                  onClick={() => setActionModal({ isOpen: true, action: "reject" })}
                   disabled={!isVerified}
                   className={`px-5 py-2 border border-red-100 text-red-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-[#EAE4D9]" : "hover:bg-red-50"}`}
                   title={!isVerified ? "Account pending verification" : ""}
@@ -557,7 +630,7 @@ export const PendingHotelDetailsModal = ({
                   Reject Request
                 </button>
                 <button
-                  onClick={() => onApprove(booking._id, "hotel", "approve")}
+                  onClick={() => setActionModal({ isOpen: true, action: "approve" })}
                   disabled={!isVerified}
                   className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
                   title={!isVerified ? "Account pending verification" : ""}
@@ -1226,6 +1299,13 @@ export const PendingHotelDetailsModal = ({
             )}
           </div>
         </div>
+        <ActionModal
+          isOpen={actionModal.isOpen}
+          action={actionModal.action}
+          type="hotel"
+          onClose={() => setActionModal({ isOpen: false, action: null })}
+          onConfirm={handleConfirmAction}
+        />
       </div>
       <TransferApproverModal
         isOpen={isTransferModalOpen}
@@ -1253,6 +1333,16 @@ export const PendingFlightDetailsModal = ({
 }) => {
   const [activeTab, setActiveTab] = useState("details");
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [actionModal, setActionModal] = useState({ isOpen: false, action: null });
+
+  const handleConfirmAction = (comments) => {
+    if (actionModal.action === "approve") {
+      onApprove(booking._id, "flight", "approve", comments);
+    } else {
+      onReject(booking._id, "flight", "reject", comments);
+    }
+    setActionModal({ isOpen: false, action: null });
+  };
   const { user } = useSelector((state) => state.auth);
   const [fetchedFareRules, setFetchedFareRules] = useState(null);
   const [fetchingRules, setFetchingRules] = useState(false);
@@ -1260,7 +1350,7 @@ export const PendingFlightDetailsModal = ({
   if (!booking) return null;
 
   const isCurrentUserSecondApprover = booking?.secondApprover?.email === user?.email;
-  const isPendingWithMe = booking?.requestStatus === "pending_approval" || (booking?.requestStatus === "pending_second_approval" && isCurrentUserSecondApprover);
+  const isPendingWithMe = ["pending_approval", "manager_approved"].includes(booking?.requestStatus) || (booking?.requestStatus === "pending_second_approval" && isCurrentUserSecondApprover);
 
   const flightRequest = booking.flightRequest || {};
   const segments = flightRequest.segments || [];
@@ -1406,7 +1496,7 @@ export const PendingFlightDetailsModal = ({
           </div>
           <div className="flex items-center gap-2">
             {!isVerified &&
-              ["pending_approval", "pending_second_approval"].includes(booking.requestStatus) &&
+              ["pending_approval", "pending_second_approval", "manager_approved"].includes(booking.requestStatus) &&
               !isDiscarded && (
                 <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-200 animate-pulse">
                   <FiAlertCircle size={14} className="text-amber-600" />
@@ -1443,7 +1533,7 @@ export const PendingFlightDetailsModal = ({
                   </button>
                 )}
                 <button
-                  onClick={() => onReject(booking._id, "flight", "reject")}
+                  onClick={() => setActionModal({ isOpen: true, action: "reject" })}
                   disabled={!isVerified}
                   className={`px-5 py-2 border border-red-100 text-red-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-[#EAE4D9]" : "hover:bg-red-50"}`}
                   title={!isVerified ? "Account pending verification" : ""}
@@ -1451,7 +1541,7 @@ export const PendingFlightDetailsModal = ({
                   Reject Request
                 </button>
                 <button
-                  onClick={() => onApprove(booking._id, "flight", "approve")}
+                  onClick={() => setActionModal({ isOpen: true, action: "approve" })}
                   disabled={!isVerified}
                   className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
                   title={!isVerified ? "Account pending verification" : ""}
@@ -2243,6 +2333,13 @@ export const PendingFlightDetailsModal = ({
             )}
           </div>
         </div>
+        <ActionModal
+          isOpen={actionModal.isOpen}
+          action={actionModal.action}
+          type="flight"
+          onClose={() => setActionModal({ isOpen: false, action: null })}
+          onConfirm={handleConfirmAction}
+        />
       </div>
       <TransferApproverModal
         isOpen={isTransferModalOpen}

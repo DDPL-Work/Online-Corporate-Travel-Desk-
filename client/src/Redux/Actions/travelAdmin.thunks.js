@@ -162,6 +162,30 @@ export const getAllEmployeesAdmin = createAsyncThunk(
 
 /**
  * ============================================================
+ * 💰 FETCH EMPLOYEE EXPENSES (ADMIN)
+ * ============================================================
+ */
+export const getEmployeeExpensesAdmin = createAsyncThunk(
+  "adminBooking/getEmployeeExpensesAdmin",
+  async ({ startDate, endDate } = {}, { rejectWithValue }) => {
+    try {
+      let query = "";
+      if (startDate && endDate) {
+        query = `?startDate=${startDate}&endDate=${endDate}`;
+      }
+      const res = await api.get(`/travel-admin/expenses/employees${query}`);
+
+      return res.data.data; // The map of { userId: totalSpend }
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch employee expenses"
+      );
+    }
+  }
+);
+
+/**
+ * ============================================================
  * 🔁 TOGGLE EMPLOYEE STATUS (ADMIN)
  * ============================================================
  */

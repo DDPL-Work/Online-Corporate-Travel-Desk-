@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   FiSearch,
   FiEdit2,
@@ -7,13 +8,17 @@ import {
   FiShield,
   FiCheckCircle,
   FiXCircle,
+  FiArrowLeft,
+  FiRefreshCw,
+  FiUsers,
+  FiBriefcase,
+  FiFilter,
 } from "react-icons/fi";
 import { toast } from "sonner";
 import { listOpsMembers, updateOpsStatus, deleteOpsMember } from "../../API/opsAPI";
 import OpsMemberModal from "../../Modal/OpsMemberModal";
-import { ToastConfirm } from "../../utils/ToastConfirm";
 import { useSelector } from "react-redux";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import TableActionBar from "../Shared/TableActionBar";
 import {
   normalizeOpsMemberRecord,
@@ -25,9 +30,14 @@ import { opsTeamExportTemplate } from "../../templates/exportTemplates/superAdmi
 
 const colors = {
   light: "#F8FAFC",
+  navy: "#003399",
+  dark: "#000D26",
+  border: "#e2e8f0",
+  white: "#ffffff",
 };
 
 export default function OpsTeamManagement() {
+  const navigate = useNavigate();
   const tableScrollRef = useRef(null);
   const { role } = useSelector((state) => state.auth);
   const isSuperAdmin = role === "super-admin";
@@ -37,13 +47,17 @@ export default function OpsTeamManagement() {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [statusToggleMember, setStatusToggleMember] = useState(null);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [deleteMember, setDeleteMember] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [designationFilter, setDesignationFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const isExporting = exportingKey === "ops_team";
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     if (!isSuperAdmin) return;
 
     setLoading(true);
@@ -55,49 +69,59 @@ export default function OpsTeamManagement() {
         status: statusFilter,
       });
       setMembers(res.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load OPS members");
     } finally {
       setLoading(false);
     }
-  };
+  }, [isSuperAdmin, search, designationFilter, departmentFilter, statusFilter]);
 
   useEffect(() => {
     if (!isSuperAdmin) return undefined;
 
     const timer = setTimeout(fetchMembers, 300);
     return () => clearTimeout(timer);
-  }, [isSuperAdmin, search, designationFilter, departmentFilter, statusFilter]);
+  }, [isSuperAdmin, fetchMembers]);
 
   const handleToggleStatus = (member) => {
-    const newStatus = member.status === "Active" ? "Inactive" : "Active";
-    ToastConfirm({
-      message: `Change status of ${member.name} to ${newStatus}?`,
-      onConfirm: async () => {
-        try {
-          await updateOpsStatus(member._id, newStatus);
-          toast.success(`Member is now ${newStatus}`);
-          fetchMembers();
-        } catch (err) {
-          toast.error("Failed to update status");
-        }
-      },
-    });
+    setStatusToggleMember(member);
+  };
+
+  const confirmStatusToggle = async () => {
+    if (!statusToggleMember) return;
+
+    const newStatus = statusToggleMember.status === "Active" ? "Inactive" : "Active";
+    setStatusUpdating(true);
+    try {
+      await updateOpsStatus(statusToggleMember._id, newStatus);
+      toast.success(`Member is now ${newStatus}`);
+      setStatusToggleMember(null);
+      fetchMembers();
+    } catch {
+      toast.error("Failed to update status");
+    } finally {
+      setStatusUpdating(false);
+    }
   };
 
   const handleDelete = (member) => {
-    ToastConfirm({
-      message: `Are you sure you want to delete ${member.name}?`,
-      onConfirm: async () => {
-        try {
-          await deleteOpsMember(member._id);
-          toast.success("Member deleted successfully");
-          fetchMembers();
-        } catch (err) {
-          toast.error("Failed to delete member");
-        }
-      },
-    });
+    setDeleteMember(member);
+  };
+
+  const confirmDeleteMember = async () => {
+    if (!deleteMember) return;
+
+    setDeleteLoading(true);
+    try {
+      await deleteOpsMember(deleteMember._id);
+      toast.success("Member deleted successfully");
+      setDeleteMember(null);
+      fetchMembers();
+    } catch {
+      toast.error("Failed to delete member");
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handleExport = () => {
@@ -121,72 +145,114 @@ export default function OpsTeamManagement() {
     });
   };
 
+  const handleRefresh = () => fetchMembers();
+
   if (!isSuperAdmin) {
     return <Navigate to="/unauthorized" replace />;
   }
 
   return (
-    <div className="min-h-screen p-6 font-sans" style={{ backgroundColor: colors.light }}>
-      <div className="mx-auto max-w-7xl space-y-6 animate-fadeIn">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0A4D68] to-[#088395] text-white shadow-lg">
-              <FiShield size={28} />
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ backgroundColor: colors.light }}>
+      <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 text-white shadow-sm"
+              >
+                <FiArrowLeft size={20} />
+              </button>
+              <button
+                onClick={handleRefresh}
+                className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 text-white shadow-sm ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                disabled={loading}
+              >
+                <FiRefreshCw size={20} className={loading ? "animate-spin" : ""} />
+              </button>
             </div>
-            <div className="text-left">
-              <h1 className="text-3xl font-black leading-none tracking-tight text-slate-900">
-                OPS TEAM
-              </h1>
-              <p className="mt-1 flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-slate-400">
-                Access Control and Member Management
-              </p>
+
+            <div className="h-12 w-px bg-white/10 mx-2 hidden md:block" />
+
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
+                <FiShield size={28} />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black tracking-tight leading-none">OPS Team</h1>
+                <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                  Access control, servicing roles, and member management
+                </p>
+              </div>
             </div>
           </div>
+
           <button
             onClick={() => {
               setSelectedMember(null);
               setShowModal(true);
             }}
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#0A4D68] px-6 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-xl transition-all hover:scale-[1.02] hover:shadow-teal-500/20"
+            className="flex w-fit items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-xs font-black uppercase tracking-widest text-[#003399] shadow-xl transition-all hover:scale-[1.02] active:scale-95"
           >
             <FiUserPlus size={18} />
             Add New Member
           </button>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatTile label="Total Members" value={members.length} color="border-[#0A4D68]" />
+      <div className="w-full px-4 md:px-10 -mt-10 space-y-10 animate-fadeIn">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <StatTile label="Total Members" value={members.length} color="border-[#000D26]" icon={<FiUsers />} iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+          <StatTile
+            label="Departments"
+            value={new Set(members.map((member) => normalizeOpsMemberRecord(member).department).filter(Boolean)).size}
+            color="border-indigo-500"
+            icon={<FiBriefcase />}
+            iconBgCls="bg-indigo-50"
+            iconColorCls="text-indigo-600"
+          />
           <StatTile
             label="Active"
             value={members.filter((member) => member.status === "Active").length}
             color="border-emerald-500"
+            icon={<FiCheckCircle />}
+            iconBgCls="bg-emerald-50"
+            iconColorCls="text-emerald-600"
           />
           <StatTile
             label="Inactive"
             value={members.filter((member) => member.status === "Inactive").length}
             color="border-rose-500"
+            icon={<FiXCircle />}
+            iconBgCls="bg-rose-50"
+            iconColorCls="text-rose-600"
           />
         </div>
 
-        <div className="flex flex-wrap items-end gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-          <FilterItem label="Search">
+        <div className="rounded-2xl border bg-white p-6 shadow-sm" style={{ borderColor: colors.border }}>
+          <div className="mb-4 flex items-center gap-2">
+            <FiFilter size={14} className="text-slate-400" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Directory Filters</span>
+          </div>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-12">
+          <FilterItem label="Search" className="lg:col-span-5">
             <div className="relative">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+              <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
               <input
                 type="text"
                 placeholder="Name, email, department..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border-none bg-slate-50 py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-[#0A4D68]/10 md:w-64"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-[13px] font-medium outline-none transition-all hover:bg-white focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10"
               />
             </div>
           </FilterItem>
 
-          <FilterItem label="Designation">
+          <FilterItem label="Designation" className="lg:col-span-3">
             <select
               value={designationFilter}
               onChange={(e) => setDesignationFilter(e.target.value)}
-              className="cursor-pointer rounded-xl border-none bg-slate-50 px-4 py-2 text-sm focus:ring-2 focus:ring-[#0A4D68]/10"
+              className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-[13px] font-medium outline-none transition-all hover:bg-white focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10"
             >
               <option value="">All Designations</option>
               {OPS_DESIGNATION_OPTIONS.map((designation) => (
@@ -197,11 +263,11 @@ export default function OpsTeamManagement() {
             </select>
           </FilterItem>
 
-          <FilterItem label="Department">
+          <FilterItem label="Department" className="lg:col-span-2">
             <select
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="cursor-pointer rounded-xl border-none bg-slate-50 px-4 py-2 text-sm focus:ring-2 focus:ring-[#0A4D68]/10"
+              className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-[13px] font-medium outline-none transition-all hover:bg-white focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10"
             >
               <option value="">All Departments</option>
               {OPS_DEPARTMENT_OPTIONS.map((department) => (
@@ -212,36 +278,49 @@ export default function OpsTeamManagement() {
             </select>
           </FilterItem>
 
-          <FilterItem label="Status">
+          <FilterItem label="Status" className="lg:col-span-2">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="cursor-pointer rounded-xl border-none bg-slate-50 px-4 py-2 text-sm focus:ring-2 focus:ring-[#0A4D68]/10"
+              className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-[13px] font-medium outline-none transition-all hover:bg-white focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10"
             >
               <option value="">All Status</option>
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
             </select>
           </FilterItem>
+          </div>
         </div>
 
-        <TableActionBar
-          scrollRef={tableScrollRef}
-          exportLabel="Export Team"
-          onExport={handleExport}
-          exportDisabled={loading || isExporting}
-          exportLoading={isExporting}
-          exportClassName="bg-[#7C2D12] shadow-[#7C2D12]/20 hover:bg-[#9A3412]"
-          arrowClassName="border-orange-100 bg-orange-50 text-[#9A3412] hover:border-orange-200 hover:bg-orange-100 hover:text-[#7C2D12] disabled:hover:bg-orange-50"
-        />
-
-        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl">
-          <div ref={tableScrollRef} className="overflow-x-auto">
+        <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+          <div className="px-6 py-4 border-b border-slate-50 flex flex-wrap items-center justify-between gap-4 bg-white">
+            <div>
+              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter leading-none">
+                OPS Member Records
+              </h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-2">
+                {members.length} member{members.length === 1 ? "" : "s"} in current view
+              </p>
+            </div>
+            <TableActionBar
+              scrollRef={tableScrollRef}
+              exportLabel="Export Team"
+              onExport={handleExport}
+              exportDisabled={loading || isExporting}
+              exportLoading={isExporting}
+              exportClassName="bg-[#003399] hover:bg-[#002266] shadow-[#003399]/20"
+              arrowClassName="border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 disabled:hover:bg-slate-50"
+            />
+          </div>
+          <div ref={tableScrollRef} className="overflow-x-auto overflow-y-visible">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-[#0A4D68] text-white">
+                <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
                   <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">
-                    Name and Designation
+                    Name
+                  </th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">
+                    Designation
                   </th>
                   <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">
                     Contact
@@ -260,7 +339,7 @@ export default function OpsTeamManagement() {
               <tbody className="divide-y divide-slate-50">
                 {loading ? (
                   <tr>
-                    <td colSpan="5" className="py-20 text-center">
+                    <td colSpan="6" className="py-20 text-center">
                       <div className="flex flex-col items-center gap-2">
                         <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#0A4D68]/20 border-t-[#0A4D68]"></div>
                         <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
@@ -271,7 +350,7 @@ export default function OpsTeamManagement() {
                   </tr>
                 ) : members.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="py-20 text-center">
+                    <td colSpan="6" className="py-20 text-center">
                       <span className="text-xs font-bold uppercase tracking-widest text-slate-300">
                         No members found
                       </span>
@@ -282,14 +361,21 @@ export default function OpsTeamManagement() {
                     const normalizedMember = normalizeOpsMemberRecord(member);
 
                     return (
-                      <tr key={member._id} className="group transition-colors hover:bg-slate-50/50">
+                      <tr key={member._id} className="transition-colors hover:bg-slate-50/50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <Avatar name={member.name} />
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-xs font-black uppercase tracking-tight text-[#003399]">{member.name}</span>
+                            </div>
+                          </div>
+                        </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
-                            <span className="text-sm font-bold text-slate-800">{member.name}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-tighter text-slate-400">
+                            <span className="text-xs font-black uppercase tracking-tight text-[#003399]">
                               {normalizedMember.designation}
                             </span>
-                            <span className="text-[10px] text-slate-400">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                               {normalizedMember.department} | {normalizedMember.servicingScope}
                             </span>
                           </div>
@@ -310,11 +396,13 @@ export default function OpsTeamManagement() {
                           <div className="flex items-center gap-2">
                             <ActionButton
                               icon={<FiEdit2 size={14} />}
+                              title="Edit Member"
+                              message="Update member profile and access details"
                               onClick={() => {
                                 setSelectedMember(member);
                                 setShowModal(true);
                               }}
-                              className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white"
+                              className="bg-blue-50 text-[#003399] hover:bg-[#003399] hover:text-white"
                             />
                             <ActionButton
                               icon={
@@ -323,6 +411,12 @@ export default function OpsTeamManagement() {
                                 ) : (
                                   <FiCheckCircle size={14} />
                                 )
+                              }
+                              title={member.status === "Active" ? "Deactivate Member" : "Activate Member"}
+                              message={
+                                member.status === "Active"
+                                  ? "Move this member to inactive status"
+                                  : "Restore this member to active status"
                               }
                               onClick={() => handleToggleStatus(member)}
                               className={
@@ -333,8 +427,10 @@ export default function OpsTeamManagement() {
                             />
                             <ActionButton
                               icon={<FiTrash2 size={14} />}
+                              title="Delete Member"
+                              message="Remove this OPS member from the team"
                               onClick={() => handleDelete(member)}
-                              className="bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white"
+                              className="bg-slate-50 text-slate-400 hover:bg-[#000D26] hover:text-white"
                             />
                           </div>
                         </td>
@@ -355,27 +451,69 @@ export default function OpsTeamManagement() {
           onSuccess={fetchMembers}
         />
       )}
+
+      {statusToggleMember && (
+        <StatusToggleModal
+          member={statusToggleMember}
+          loading={statusUpdating}
+          onCancel={() => {
+            if (!statusUpdating) setStatusToggleMember(null);
+          }}
+          onConfirm={confirmStatusToggle}
+        />
+      )}
+
+      {deleteMember && (
+        <DeleteMemberModal
+          member={deleteMember}
+          loading={deleteLoading}
+          onCancel={() => {
+            if (!deleteLoading) setDeleteMember(null);
+          }}
+          onConfirm={confirmDeleteMember}
+        />
+      )}
     </div>
   );
 }
 
-const StatTile = ({ label, value, color }) => (
-  <div className={`rounded-2xl border-b-4 bg-white p-5 shadow-sm ${color}`}>
-    <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
-      {label}
-    </p>
-    <p className="text-2xl font-black leading-none text-slate-900">{value}</p>
+const StatTile = ({ label, value, color, icon, iconBgCls, iconColorCls }) => (
+  <div className={`rounded-2xl border-b-4 bg-white p-6 shadow-sm flex items-center justify-between ${color}`}>
+    <div>
+      <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
+      <p className="text-3xl font-black leading-none text-slate-800">{value}</p>
+    </div>
+    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconBgCls} ${iconColorCls}`}>
+      {icon}
+    </div>
   </div>
 );
 
-const FilterItem = ({ label, children }) => (
-  <div className="flex min-w-[150px] flex-1 flex-col gap-1.5">
-    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+const FilterItem = ({ label, children, className = "" }) => (
+  <div className={`flex min-w-37.5 flex-col gap-1.5 ${className}`}>
+    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
       {label}
     </label>
     {children}
   </div>
 );
+
+const Avatar = ({ name = "" }) => {
+  const initials = String(name || "")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div className="w-9 h-9 rounded-xl bg-linear-to-br from-[#003399] to-[#000d26] flex items-center justify-center font-black text-white text-[10px] shrink-0 shadow-sm border border-white/20">
+      {initials || "?"}
+    </div>
+  );
+};
 
 const MemberStatusBadge = ({ status }) => {
   const isActive = status === "Active";
@@ -392,11 +530,185 @@ const MemberStatusBadge = ({ status }) => {
   );
 };
 
-const ActionButton = ({ icon, onClick, className }) => (
-  <button
-    onClick={onClick}
-    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 focus:scale-95 ${className}`}
-  >
-    {icon}
-  </button>
+const ActionButton = ({ icon, title, message, onClick, className }) => {
+  const buttonRef = useRef(null);
+  const [tooltipPosition, setTooltipPosition] = useState(null);
+
+  const showTooltip = () => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    setTooltipPosition({
+      top: rect.top - 10,
+      left: rect.left + rect.width / 2,
+    });
+  };
+
+  const hideTooltip = () => setTooltipPosition(null);
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={title}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+        onFocus={showTooltip}
+        onBlur={hideTooltip}
+        onClick={(event) => {
+          hideTooltip();
+          onClick?.(event);
+        }}
+        className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 focus:scale-95 ${className}`}
+      >
+        {icon}
+      </button>
+
+      {tooltipPosition && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="pointer-events-none fixed z-99999 w-52 -translate-x-1/2 -translate-y-full rounded-xl bg-[#000D26] px-3.5 py-3 text-left text-white opacity-100 shadow-2xl"
+              style={{ top: tooltipPosition.top, left: tooltipPosition.left }}
+            >
+              <span className="block text-[10px] font-black uppercase tracking-widest">
+                {title}
+              </span>
+              <span className="mt-1 block text-[10px] font-semibold normal-case leading-4 tracking-normal text-white/70">
+                {message}
+              </span>
+              <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 bg-[#000D26]" />
+            </div>,
+            document.body
+          )
+        : null}
+    </>
+  );
+};
+
+const StatusToggleModal = ({ member, loading, onCancel, onConfirm }) => {
+  const nextStatus = member.status === "Active" ? "Inactive" : "Active";
+  const isActivating = nextStatus === "Active";
+
+  return (
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="bg-linear-to-br from-[#003399] to-[#000D26] px-6 py-5 text-white">
+          <div className="flex items-center gap-4">
+            <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 ${isActivating ? "bg-emerald-400/20" : "bg-rose-400/20"}`}>
+              {isActivating ? <FiCheckCircle size={24} /> : <FiXCircle size={24} />}
+            </div>
+            <div>
+              <h3 className="text-lg font-black uppercase tracking-tight">Change Member Status</h3>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-white/60">
+                Confirm access status update
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-5 px-6 py-6">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Team Member</p>
+            <div className="mt-3 flex items-center gap-3">
+              <Avatar name={member.name} />
+              <div>
+                <p className="text-sm font-black uppercase tracking-tight text-slate-900">{member.name}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  Current status: {member.status}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-sm font-medium leading-6 text-slate-600">
+            This will update the member status to{" "}
+            <span className={isActivating ? "font-black text-emerald-600" : "font-black text-rose-600"}>
+              {nextStatus}
+            </span>
+            .
+          </p>
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={loading}
+              className="rounded-xl border border-slate-200 px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-600 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={loading}
+              className={`rounded-xl px-5 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+                isActivating ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
+              }`}
+            >
+              {loading ? "Updating..." : `Set ${nextStatus}`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DeleteMemberModal = ({ member, loading, onCancel, onConfirm }) => (
+  <div className="fixed inset-0 z-100 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
+    <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+      <div className="bg-linear-to-br from-rose-600 to-[#000D26] px-6 py-5 text-white">
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/10">
+            <FiTrash2 size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-black uppercase tracking-tight">Delete OPS Member</h3>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-white/60">
+              Confirm permanent member removal
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-5 px-6 py-6">
+        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4">
+          <p className="text-[10px] font-black uppercase tracking-widest text-rose-400">Team Member</p>
+          <div className="mt-3 flex items-center gap-3">
+            <Avatar name={member.name} />
+            <div>
+              <p className="text-sm font-black uppercase tracking-tight text-slate-900">{member.name}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-rose-400">
+                {member.email || "No email available"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-sm font-medium leading-6 text-slate-600">
+          This will delete the OPS member from the team. This action cannot be undone.
+        </p>
+
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="rounded-xl border border-slate-200 px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-600 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={loading}
+            className="rounded-xl bg-rose-600 px-5 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-rose-600/20 transition-all hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? "Deleting..." : "Delete Member"}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 );

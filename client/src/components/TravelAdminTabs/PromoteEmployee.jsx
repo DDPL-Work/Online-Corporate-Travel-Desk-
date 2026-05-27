@@ -174,17 +174,7 @@ export default function PromoteEmployee() {
     }
   }
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Name", "Email", "Role", "Status", "Department", "Joined"];
-    const rows = filtered.map(e => [`${e.name.firstName} ${e.name.lastName}`, e.email, e.role, e.status, e.department, e.joinedDate]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `employee-directory.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // Export handled via exportConfig in ResponsiveDataTable
 
   return (
     <div className="min-h-screen font-sans pb-20 px-6 pt-8" style={{ background: C.offWhite }}>
@@ -251,7 +241,23 @@ export default function PromoteEmployee() {
         </div>
 
         {/* Directory Table */}
-        <ResponsiveDataTable title="Member Ledger" subtitle={`${filtered.length} personnel found`} onExport={handleExport} pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+        <ResponsiveDataTable 
+          title="Member Ledger" 
+          subtitle={`${filtered.length} personnel found`} 
+          exportConfig={{
+            data: filtered,
+            filename: `employee_directory_${new Date().toISOString().split('T')[0]}.csv`,
+            columns: [
+              { header: "Name", accessor: (e) => `${e.name.firstName} ${e.name.lastName}` },
+              { header: "Email", key: "email" },
+              { header: "Role", key: "role" },
+              { header: "Status", key: "status" },
+              { header: "Department", key: "department" },
+              { header: "Joined Date", key: "joinedDate" },
+            ]
+          }}
+          pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+        >
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ background: C.navy, color: C.white }}>

@@ -42,6 +42,7 @@ function FlightSection() {
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [activeSubTab, setActiveSubTab] = useState("pending_approval");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ function FlightSection() {
 
   useEffect(() => { dispatch(fetchMyBookingRequests()); }, [dispatch]);
 
-  const pendingFlights = useMemo(() => {
+  const allActiveFlights = useMemo(() => {
     return (myRequests || []).filter(b => {
       const invalidRequestStatus = b.requestStatus === "rejected";
       const invalidExecutionStatus = ["ticketed", "cancelled", "cancel_requested", "failed"].includes((b.executionStatus || "").toLowerCase());
@@ -70,22 +71,40 @@ function FlightSection() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return pendingFlights.filter(b => {
+    return allActiveFlights.filter(b => {
+      if (activeSubTab === "pending_approval") {
+        if (!["pending_approval", "pending_second_approval", "manager_approved"].includes(b.requestStatus)) return false;
+      } else {
+        if (b.requestStatus !== activeSubTab) return false;
+      }
       const booked = b.bookedDate ? new Date(b.bookedDate).toISOString().slice(0, 10) : "";
       return (!q || b.orderId?.toLowerCase().includes(q) || b.route?.toLowerCase().includes(q)) &&
              (!startDate || booked >= startDate) && (!endDate || booked <= endDate);
     });
-  }, [search, startDate, endDate, pendingFlights]);
+  }, [search, startDate, endDate, allActiveFlights, activeSubTab]);
 
   const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
+
+  const totalPending = allActiveFlights.filter(r => ["pending_approval", "pending_second_approval", "manager_approved"].includes(r.requestStatus)).length;
+  const totalApproved = allActiveFlights.filter(r => r.requestStatus === "approved").length;
+  const totalPipeline = allActiveFlights.reduce((s, b) => s + (b.amount || 0), 0);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Pending Requests" value={filtered.length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Awaiting Approval" value={filtered.filter(r => r.requestStatus === "pending_approval").length} Icon={FiList} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-        <StatCard label="Approved (Queued)" value={filtered.filter(r => r.requestStatus === "approved").length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-        <StatCard label="Pipeline Value" value={`₹${filtered.reduce((s, b) => s + (b.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Total Active Requests" value={allActiveFlights.length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Awaiting Approval" value={totalPending} Icon={FiList} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+        <StatCard label="Approved (Queued)" value={totalApproved} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Pipeline Value" value={`₹${totalPipeline.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+      </div>
+
+      <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-sm rounded-2xl w-fit">
+         <button onClick={() => { setActiveSubTab("pending_approval"); setCurrentPage(1); }} className={`px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${activeSubTab === "pending_approval" ? "bg-[#003399] text-white shadow-md scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
+            <FiClock size={14} /> Pending Requests
+         </button>
+         <button onClick={() => { setActiveSubTab("approved"); setCurrentPage(1); }} className={`px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${activeSubTab === "approved" ? "bg-emerald-600 text-white shadow-md scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
+            <FiCheckCircle size={14} /> Approved Requests
+         </button>
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
@@ -106,7 +125,23 @@ function FlightSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Approval Pipeline" subtitle={`${filtered.length} active requests`} onExport={() => {}} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title={activeSubTab === "pending_approval" ? "Pending Approval Pipeline" : "Approved Pipeline"} 
+        subtitle={`${filtered.length} active requests`} 
+        exportConfig={{
+          data: filtered,
+          filename: `my_${activeSubTab}_flights_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Request ID", key: "orderId" },
+            { header: "Route / Details", accessor: (r) => `${r.route} | ${r.airlineName}` },
+            { header: "Travel Date", accessor: (r) => fmtDate(r.travelDate) },
+            { header: "Status", key: "requestStatus" },
+            { header: "Est. Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -143,7 +178,7 @@ function FlightSection() {
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan={6} className="!px-6 !py-20 text-center"><div className="flex flex-col items-center gap-3"><div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300"><FiClock size={32} /></div><p className="text-sm font-bold text-slate-400">No pending flight requests found.</p></div></td></tr>
+              <tr><td colSpan={6} className="!px-6 !py-20 text-center"><div className="flex flex-col items-center gap-3"><div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300"><FiClock size={32} /></div><p className="text-sm font-bold text-slate-400">No {activeSubTab === "pending_approval" ? "pending" : "approved"} flight requests found.</p></div></td></tr>
             )}
           </tbody>
         </table>
@@ -156,6 +191,7 @@ function HotelSection() {
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [activeSubTab, setActiveSubTab] = useState("pending_approval");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
   const navigate = useNavigate();
@@ -164,7 +200,7 @@ function HotelSection() {
 
   useEffect(() => { dispatch(fetchMyHotelRequests()); }, [dispatch]);
 
-  const pendingHotels = useMemo(() => {
+  const allActiveHotels = useMemo(() => {
     return (hotelRequests || []).filter(b => {
       const invalidRequestStatus = b.requestStatus === "rejected";
       const invalidExecutionStatus = ["ticketed", "cancelled", "cancel_requested", "failed"].includes((b.executionStatus || "").toLowerCase());
@@ -178,22 +214,40 @@ function HotelSection() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return pendingHotels.filter(b => {
+    return allActiveHotels.filter(b => {
+      if (activeSubTab === "pending_approval") {
+        if (!["pending_approval", "pending_second_approval", "manager_approved"].includes(b.requestStatus)) return false;
+      } else {
+        if (b.requestStatus !== activeSubTab) return false;
+      }
       const booked = b.bookedDate ? new Date(b.bookedDate).toISOString().slice(0, 10) : "";
       return (!q || b.hotelName?.toLowerCase().includes(q) || b.orderId?.toLowerCase().includes(q)) &&
              (!startDate || booked >= startDate) && (!endDate || booked <= endDate);
     });
-  }, [search, startDate, endDate, pendingHotels]);
+  }, [search, startDate, endDate, allActiveHotels, activeSubTab]);
 
   const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
+
+  const totalPending = allActiveHotels.filter(r => ["pending_approval", "pending_second_approval", "manager_approved"].includes(r.requestStatus)).length;
+  const totalApproved = allActiveHotels.filter(r => r.requestStatus === "approved").length;
+  const totalPipeline = allActiveHotels.reduce((s, b) => s + (b.amount || 0), 0);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Pending Requests" value={filtered.length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Awaiting Approval" value={filtered.filter(r => r.requestStatus === "pending_approval").length} Icon={FiList} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-        <StatCard label="Approved (Queued)" value={filtered.filter(r => r.requestStatus === "approved").length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-        <StatCard label="Pipeline Value" value={`₹${filtered.reduce((s, b) => s + (b.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Total Active Requests" value={allActiveHotels.length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Awaiting Approval" value={totalPending} Icon={FiList} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+        <StatCard label="Approved (Queued)" value={totalApproved} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Pipeline Value" value={`₹${totalPipeline.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+      </div>
+
+      <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-sm rounded-2xl w-fit">
+         <button onClick={() => { setActiveSubTab("pending_approval"); setCurrentPage(1); }} className={`px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${activeSubTab === "pending_approval" ? "bg-[#003399] text-white shadow-md scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
+            <FiClock size={14} /> Pending Requests
+         </button>
+         <button onClick={() => { setActiveSubTab("approved"); setCurrentPage(1); }} className={`px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${activeSubTab === "approved" ? "bg-emerald-600 text-white shadow-md scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
+            <FiCheckCircle size={14} /> Approved Requests
+         </button>
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
@@ -214,7 +268,23 @@ function HotelSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Approval Pipeline" subtitle={`${filtered.length} active requests`} onExport={() => {}} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title={activeSubTab === "pending_approval" ? "Hotel Pending Approval Pipeline" : "Hotel Approved Pipeline"} 
+        subtitle={`${filtered.length} active requests`} 
+        exportConfig={{
+          data: filtered,
+          filename: `my_${activeSubTab}_hotels_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Request ID", key: "orderId" },
+            { header: "Hotel", key: "hotelName" },
+            { header: "Check-In Date", accessor: (r) => fmtDate(r.ci) },
+            { header: "Status", key: "requestStatus" },
+            { header: "Est. Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -244,7 +314,7 @@ function HotelSection() {
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan={6} className="!px-6 !py-20 text-center"><div className="flex flex-col items-center gap-3"><div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300"><FiClock size={32} /></div><p className="text-sm font-bold text-slate-400">No pending hotel requests found.</p></div></td></tr>
+              <tr><td colSpan={6} className="!px-6 !py-20 text-center"><div className="flex flex-col items-center gap-3"><div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300"><FiClock size={32} /></div><p className="text-sm font-bold text-slate-400">No {activeSubTab === "pending_approval" ? "pending" : "approved"} hotel requests found.</p></div></td></tr>
             )}
           </tbody>
         </table>

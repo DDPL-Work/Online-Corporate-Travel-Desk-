@@ -159,6 +159,84 @@ const reissueRequestSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    normalizedPricing: {
+      reissuePenalty: { type: Number, default: 0 },
+      newFlightBase: { type: Number, default: 0 },
+      newSSRTotal: { type: Number, default: 0 },
+      reusablePreviousValue: { type: Number, default: 0 },
+      netPayable: { type: Number, default: 0 },
+    },
+    /**
+     * activeTicketSnapshot — single source of truth for the last successfully
+     * ticketed booking state across all reissue cycles.
+     * Populated at request creation and updated after each confirmed reissue.
+     */
+    activeTicketSnapshot: {
+      pnr: { type: String, default: null },
+      supplierBookingId: { type: String, default: null },
+      segments: { type: mongoose.Schema.Types.Mixed, default: [] },
+      fareSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+      ssrSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+      ssr: { type: mongoose.Schema.Types.Mixed, default: null },
+      ticketData: { type: mongoose.Schema.Types.Mixed, default: null },
+      revisedTicket: { type: mongoose.Schema.Types.Mixed, default: null },
+      revisedInvoice: { type: mongoose.Schema.Types.Mixed, default: null },
+      capturedAt: { type: Date, default: null },
+      sourceBookingId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "BookingRequest",
+        default: null,
+      },
+    },
+    financialLedger: {
+      originalTicketAmount: { type: Number, default: 0 },
+      originalSSR: { type: Number, default: 0 },
+      cumulativeReissueCharges: { type: Number, default: 0 },
+      cumulativeSSR: { type: Number, default: 0 },
+      cumulativeCollections: { type: Number, default: 0 },
+      cumulativeRefunds: { type: Number, default: 0 },
+      totalNetPaid: { type: Number, default: 0 },
+
+      originalBaseFare: { type: Number, default: 0 },
+      originalTaxes: { type: Number, default: 0 },
+      originalSeatSSR: { type: Number, default: 0 },
+      originalMealSSR: { type: Number, default: 0 },
+      originalBaggageSSR: { type: Number, default: 0 },
+      originalTotalPaid: { type: Number, default: 0 },
+      cumulativePaid: { type: Number, default: 0 },
+      cumulativeRefund: { type: Number, default: 0 },
+      cumulativeCollection: { type: Number, default: 0 },
+      currentTicketValue: { type: Number, default: 0 },
+      currentSSRValue: { type: Number, default: 0 },
+      currentTotalValue: { type: Number, default: 0 },
+    },
+    pricingHistory: [
+      {
+        cycle: { type: Number, required: true },
+        previousTotalPaid: { type: Number, default: 0 },
+        oldFare: { type: Number, default: 0 },
+        oldSSR: { type: Number, default: 0 },
+        newFare: { type: Number, default: 0 },
+        newSSR: { type: Number, default: 0 },
+        reissueCharge: { type: Number, default: 0 },
+        additionalCollection: { type: Number, default: 0 },
+        refundAmount: { type: Number, default: 0 },
+        totalPaidAfterCycle: { type: Number, default: 0 },
+        createdAt: { type: Date, default: Date.now },
+
+        newBaseFare: { type: Number, default: 0 },
+        newTaxes: { type: Number, default: 0 },
+        newSeatSSR: { type: Number, default: 0 },
+        newMealSSR: { type: Number, default: 0 },
+        newBaggageSSR: { type: Number, default: 0 },
+        newTotal: { type: Number, default: 0 },
+        reusableSSRValue: { type: Number, default: 0 },
+        refundSSRValue: { type: Number, default: 0 },
+        additionalSSRValue: { type: Number, default: 0 },
+        airlinePenalty: { type: Number, default: 0 },
+        netPayable: { type: Number, default: 0 },
+      },
+    ],
     billingMode: {
       type: String,
       enum: Object.values(BILLING_MODES),
@@ -200,6 +278,11 @@ const reissueRequestSchema = new mongoose.Schema(
     metadata: mongoose.Schema.Types.Mixed,
     correlationId: {
       type: String,
+      index: true,
+    },
+    isReissueLocked: {
+      type: Boolean,
+      default: false,
       index: true,
     },
     timeline: {
