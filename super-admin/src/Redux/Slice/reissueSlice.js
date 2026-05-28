@@ -66,6 +66,7 @@ const reissueSlice = createSlice({
         state.loading = false;
         state.requests = action.payload?.data || [];
         state.pagination = action.payload?.pagination || initialPagination;
+        state.analytics = action.payload?.metrics || null;
       })
       .addCase(fetchReissueRequests.rejected, (state, action) => {
         state.loading = false;

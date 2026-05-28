@@ -4,6 +4,11 @@ const AssignmentRotation = require("../../../models/AssignmentRotation");
 const ApiError = require("../../../utils/ApiError");
 const logger = require("../../../utils/logger");
 const { sendNotification } = require("../../../utils/notificationService");
+const {
+  MANAGE_REISSUES_PERMISSION,
+  evaluateReissueAssignmentEligibility,
+  normalizeServicingScope,
+} = require("../../../utils/reissueAssignmentEligibility.util");
 
 const QUEUE_TYPES = {
   reissue: "REISSUE",
@@ -12,15 +17,15 @@ const QUEUE_TYPES = {
 };
 
 const PERMISSION_MAP = {
-  reissue: "MANAGE_REISSUES",
-  cancellation: "MANAGE_CANCELLATIONS",
-  refund: "VIEW_FINANCE",
-  amendment: "MANAGE_CANCELLATIONS",
+  reissue: MANAGE_REISSUES_PERMISSION,
+  cancellation: "Manage Cancellations",
+  refund: "View Finance",
+  amendment: "Manage Cancellations",
 };
 
 class RoundRobinAssignmentService {
   async getRequiredPermission(requestType) {
-    return PERMISSION_MAP[requestType] || "MANAGE_REISSUES";
+    return PERMISSION_MAP[requestType] || MANAGE_REISSUES_PERMISSION;
   }
 
   getQueueType(requestType) {
@@ -35,27 +40,49 @@ class RoundRobinAssignmentService {
     const permission = await this.getRequiredPermission(requestType);
     const onlineCutoff = new Date(Date.now() - 5 * 60 * 1000);
     const query = {
-      status: "Active",
       isDeleted: false,
       autoAssignmentEnabled: true,
       availabilityStatus: "AVAILABLE",
-      permissions: { $in: [permission] },
       $or: [
         { isOnline: true },
         { lastSeenAt: { $gte: onlineCutoff } },
         { isOnline: { $exists: false } },
       ],
     };
-    if (department) {
-      query.$or = [
-        { servicingScope: { $in: [department, "Both"] } },
-        { servicingScope: { $exists: false }, department: { $in: [department, "Both"] } },
-      ];
-    }
 
-    return OpsMember.find(query)
+    const candidates = await OpsMember.find(query)
       .sort({ currentActiveAssignments: 1, lastAssignedAt: 1, name: 1 })
       .session(session || null);
+
+    return candidates.filter((member) => {
+      if (requestType === "reissue") {
+        const eligibility = evaluateReissueAssignmentEligibility(member, {
+          context: {
+            service: "roundRobinAssignmentService.getEligibleOpsMembers",
+            requestType,
+            department,
+          },
+        });
+
+        if (!eligibility.eligible) {
+          return false;
+        }
+
+        if (!department) {
+          return true;
+        }
+
+        return ["Flights", "Both"].includes(
+          normalizeServicingScope(member.servicingScope || department),
+        );
+      }
+
+      if (member.status !== "Active" || member.isDeleted) {
+        return false;
+      }
+
+      return Array.isArray(member.permissions) && member.permissions.includes(permission);
+    });
   }
 
   async getOrCreateRotation(queueType, session) {
@@ -139,6 +166,24 @@ class RoundRobinAssignmentService {
     const agent = await OpsMember.findById(agentId).session(session);
     if (!agent) {
       throw new ApiError(404, "OPS agent not found");
+    }
+    if (requestType === "reissue") {
+      const eligibility = evaluateReissueAssignmentEligibility(agent, {
+        context: {
+          service: "roundRobinAssignmentService.validateAgent",
+          requestType,
+          agentId: String(agentId),
+        },
+      });
+
+      if (!eligibility.eligible) {
+        throw new ApiError(
+          400,
+          "Selected OPS member is not eligible for offline reissue assignment",
+        );
+      }
+
+      return agent;
     }
     if (agent.status !== "Active" || agent.isDeleted) {
       throw new ApiError(400, "OPS agent is not currently active");

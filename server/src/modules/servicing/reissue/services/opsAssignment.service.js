@@ -8,6 +8,11 @@
 const OpsMember = require("../../../../models/OpsMember");
 const ApiError = require("../../../../utils/ApiError");
 const logger = require("../../../../utils/logger");
+const {
+  MANAGE_REISSUES_PERMISSION,
+  evaluateReissueAssignmentEligibility,
+  normalizeServicingScope,
+} = require("../../../../utils/reissueAssignmentEligibility.util");
 
 class OpsAssignmentService {
   /**
@@ -26,27 +31,49 @@ class OpsAssignmentService {
     try {
       // Build query for eligible agents
       const query = {
-        status: "Active",
-        permissions: { $in: [this.getRequiredPermission(requestType)] }
+        isDeleted: false,
       };
-
-      if (department) {
-        query.$or = [
-          { servicingScope: department },
-          { servicingScope: { $exists: false }, department },
-        ];
-      }
+      const requiredPermission = this.getRequiredPermission(requestType);
 
       // Get all eligible agents sorted by last assignment sequence
-      const eligibleAgents = await OpsMember.find(query)
+      const candidateAgents = await OpsMember.find(query)
         .sort({ assignmentSequence: 1, createdAt: 1 })
         .lean();
+      const eligibleAgents = candidateAgents.filter((agent) => {
+        if (requestType === "reissue") {
+          const eligibility = evaluateReissueAssignmentEligibility(agent, {
+            context: {
+              service: "opsAssignmentService.getNextEligibleAgent",
+              requestType,
+              department,
+            },
+          });
+
+          if (!eligibility.eligible) {
+            return false;
+          }
+
+          if (!department) {
+            return true;
+          }
+
+          return ["Flights", "Both"].includes(
+            normalizeServicingScope(agent.servicingScope || department),
+          );
+        }
+
+        if (agent.status !== "Active") {
+          return false;
+        }
+
+        return Array.isArray(agent.permissions) && agent.permissions.includes(requiredPermission);
+      });
 
       if (eligibleAgents.length === 0) {
         logger.warn("ops_assignment_no_eligible_agents", {
           requestType,
           department,
-          requiredPermission: this.getRequiredPermission(requestType)
+          requiredPermission,
         });
         return null;
       }
@@ -218,18 +245,7 @@ class OpsAssignmentService {
     agentId,
     requestType
   }) {
-    const agent = await OpsMember.findById(agentId);
-    if (!agent) {
-      throw new ApiError(404, "OPS agent not found");
-    }
-
-    if (agent.status !== "Active") {
-      throw new ApiError(400, "OPS agent is not active");
-    }
-
-    if (!agent.permissions.includes(this.getRequiredPermission(requestType))) {
-      throw new ApiError(403, "OPS agent does not have required permissions");
-    }
+    const agent = await this.validateAgent(agentId, requestType);
 
     return await this.assignRequest({
       requestId,
@@ -266,6 +282,24 @@ class OpsAssignmentService {
     if (!agent) {
       throw new ApiError(404, "Assigned OPS agent not found");
     }
+    if (requestType === "reissue") {
+      const eligibility = evaluateReissueAssignmentEligibility(agent, {
+        context: {
+          service: "opsAssignmentService.validateAgent",
+          requestType,
+          agentId: String(agentId),
+        },
+      });
+
+      if (!eligibility.eligible) {
+        throw new ApiError(
+          400,
+          "Selected OPS member is not eligible for offline reissue assignment",
+        );
+      }
+
+      return agent;
+    }
 
     if (agent.status !== "Active") {
       throw new ApiError(400, "Assigned OPS agent is inactive");
@@ -285,13 +319,13 @@ class OpsAssignmentService {
    */
   getRequiredPermission(requestType) {
     const permissionMap = {
-      reissue: "Manage Reissues",
+      reissue: MANAGE_REISSUES_PERMISSION,
       cancellation: "Manage Cancellations",
       refund: "View Finance",
       amendment: "Manage Cancellations" // Using cancellation permission for amendments
     };
 
-    return permissionMap[requestType] || "Manage Reissues";
+    return permissionMap[requestType] || MANAGE_REISSUES_PERMISSION;
   }
 
   /**
@@ -322,7 +356,7 @@ class OpsAssignmentService {
   getActiveStatusesForRequestType(requestType) {
     // Define active statuses for each request type
     const statusMap = {
-      reissue: ["ASSIGNED", "IN_PROGRESS", "WAITING_AIRLINE"],
+      reissue: ["PENDING_ASSIGNMENT", "ASSIGNED", "IN_PROGRESS", "WAITING_AIRLINE"],
       cancellation: ["ASSIGNED", "IN_PROGRESS", "PROCESSING"],
       refund: ["ASSIGNED", "IN_PROGRESS"],
       amendment: ["ASSIGNED", "IN_PROGRESS"]

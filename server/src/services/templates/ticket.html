@@ -14,6 +14,24 @@
     />
   </head>
   <body>
+    {{#*inline "ticketBarcodeBlock"}}
+    <div class="barcode-display minimal">
+      <span class="barcode-text">{{barcodeLabel}}</span>
+      {{#if barcodeImage}}
+      <img class="barcode-main-img" src="{{barcodeImage}}" alt="{{barcodeLabel}}" />
+      {{else}}
+      <span class="barcode-fallback-label">{{fallbackLabel}}</span>
+      {{/if}}
+      {{#if qrCodeImage}}
+      <img class="barcode-qr-img" src="{{qrCodeImage}}" alt="{{barcodeLabel}} QR" />
+      {{/if}}
+      {{#if fallbackLabel}}
+        {{#unless barcodeImage}}
+      <span class="barcode-fallback-copy">{{fallbackLabel}}</span>
+        {{/unless}}
+      {{/if}}
+    </div>
+    {{/inline}}
     <!-- ============================================================
        TOP HEADER
   ============================================================ -->
@@ -252,6 +270,11 @@
           </div>
 
           <div class="pax-barcode-group">
+            {{#if barcodeBlocks.length}}
+              {{#each barcodeBlocks}}
+            {{> ticketBarcodeBlock}}
+              {{/each}}
+            {{else}}
             {{#if onwardBarcodeBase64}}
             <div class="barcode-display minimal">
               <span class="barcode-text">ONWARD BARCODE — {{name}}</span>
@@ -276,6 +299,7 @@
                 {{/if}}
               {{/unless}}
             {{/unless}}
+            {{/if}}
           </div>
         </div>
       </div>

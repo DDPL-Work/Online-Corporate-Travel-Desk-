@@ -62,6 +62,7 @@ const ReissueStatusBadge = ({ req }) => {
   const tone = getStatusTone(status);
   const icons = {
     PENDING: <FiClock size={11} />,
+    PENDING_ASSIGNMENT: <FiClock size={11} />,
     APPROVED: <FiCheckCircle size={11} />,
     COMPLETED: <FiCheckCircle size={11} />,
     REJECTED: <FiXCircle size={11} />,
@@ -330,9 +331,18 @@ const MyReissueRequests = () => {
   const stats = useMemo(
     () => ({
       total: currentRequests.length,
-      pending: currentRequests.filter((r) => getStatus(r) === "PENDING").length,
+      pending: currentRequests.filter((r) =>
+        ["PENDING", "PENDING_ASSIGNMENT", "RAISED"].includes(getStatus(r)),
+      ).length,
       approved: currentRequests.filter((r) =>
-        ["APPROVED", "COMPLETED", "TICKET_GENERATED", "IN_PROGRESS"].includes(
+        [
+          "APPROVED",
+          "ASSIGNED",
+          "IN_PROGRESS",
+          "WAITING_AIRLINE",
+          "COMPLETED",
+          "TICKET_GENERATED",
+        ].includes(
           getStatus(r),
         ),
       ).length,
@@ -524,6 +534,7 @@ const MyReissueRequests = () => {
                 options={[
                   "All",
                   "PENDING",
+                  "PENDING_ASSIGNMENT",
                   "APPROVED",
                   "REJECTED",
                   "COMPLETED",

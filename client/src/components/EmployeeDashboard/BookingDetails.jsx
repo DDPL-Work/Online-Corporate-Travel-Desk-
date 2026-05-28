@@ -119,9 +119,10 @@ function formatLayoverDuration(mins) {
 
 function getOfflineReissueBadgeMeta(status) {
   switch (status) {
+    case "PENDING_ASSIGNMENT":
     case "RAISED":
       return {
-        label: "Offline Reissue Requested",
+        label: "Awaiting OPS Assignment",
         className: "bg-amber-50 text-amber-700 border border-amber-100",
       };
     case "ASSIGNED":
@@ -138,6 +139,7 @@ function getOfflineReissueBadgeMeta(status) {
         className: "bg-emerald-50 text-emerald-700 border border-emerald-100",
       };
     case "REJECTED":
+    case "CANCELLED":
       return {
         label: "Reissue Rejected",
         className: "bg-rose-50 text-rose-700 border border-rose-100",
@@ -1391,7 +1393,7 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
         }),
       ).unwrap();
       toast.success(
-        `Offline request ${request.requestId} raised. Our team will process it shortly.`,
+        "Your reissue request has been submitted successfully. Currently awaiting OPS assignment.",
       );
       onClose();
       await dispatch(fetchMyBookingById(booking._id));
@@ -3520,7 +3522,12 @@ export default function BookingDetails() {
                 }`}>
                   {bookingOfflineRequest ? (
                     <>
-                      <FiCheckCircle size={13} /> {offlineReissueBadge?.label}
+                      {bookingOfflineRequest.status === "PENDING_ASSIGNMENT" ? (
+                        <FiClock size={13} />
+                      ) : (
+                        <FiCheckCircle size={13} />
+                      )}{" "}
+                      {offlineReissueBadge?.label}
                       {bookingOfflineRequest.requestId ? ` • ${bookingOfflineRequest.requestId}` : ""}
                     </>
                   ) : isOnlineEligible ? (

@@ -982,7 +982,11 @@ export default function ReissueModal({ booking, onClose }) {
         type: "OFFLINE",
         requestId: response.requestId,
         pnr: booking?.bookingResult?.pnr || booking?.pnr || PLACEHOLDER,
+        status: response?.status || "PENDING_ASSIGNMENT",
       });
+      toast.success(
+        "Your reissue request has been submitted successfully. Currently awaiting OPS assignment.",
+      );
       await dispatch(fetchMyBookingById(booking._id));
       setCurrentStep(STEP.SUCCESS);
     } catch (error) {
@@ -1214,7 +1218,9 @@ export default function ReissueModal({ booking, onClose }) {
         <p className="mt-2 text-sm text-slate-500">
           {successSnapshot?.type === "ONLINE"
             ? "Your booking has been refreshed and the latest ticket will remain available from the same booking page."
-            : "Our servicing team will continue processing the selected replacement flight under the same booking journey."}
+            : successSnapshot?.status === "PENDING_ASSIGNMENT"
+              ? "Your reissue request has been submitted successfully. Currently awaiting OPS assignment."
+              : "Our servicing team will continue processing the selected replacement flight under the same booking journey."}
         </p>
       </div>
       <div className="rounded-3xl border border-slate-200 bg-slate-50 px-6 py-5 text-left">

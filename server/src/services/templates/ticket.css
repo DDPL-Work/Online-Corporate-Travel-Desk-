@@ -2320,6 +2320,8 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
   padding-left: var(--space-6);
   border-left: 1px dashed var(--light-border);
 }
@@ -2343,4 +2345,22 @@ a:hover {
   height: 52px;
   width: 240px;
   object-fit: cover;
+}
+
+.barcode-qr-img {
+  height: 74px;
+  width: 74px;
+  border: 4px solid var(--white);
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--white);
+}
+
+.barcode-fallback-label,
+.barcode-fallback-copy {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  text-align: center;
+  color: var(--navy-dark);
+  word-break: break-word;
 }

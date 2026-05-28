@@ -37,7 +37,8 @@ const { normalizeSsrSnapshot } = require("../utils/ssrSnapshot.util");
 const DEFAULT_SLA_HOURS = Number(process.env.OFFLINE_REISSUE_SLA_HOURS || 24);
 const ADMIN_ROLES = new Set(["super-admin", "master-admin", "ops-admin"]);
 const LEGACY_STATUS_MAP = Object.freeze({
-  UNASSIGNED: OFFLINE_STATUSES.RAISED,
+  UNASSIGNED: OFFLINE_STATUSES.PENDING_ASSIGNMENT,
+  RAISED: OFFLINE_STATUSES.PENDING_ASSIGNMENT,
   TICKET_UPLOADED: OFFLINE_STATUSES.TICKET_GENERATED,
 });
 const LEGACY_ACTIVE_STATUSES = Object.freeze(["UNASSIGNED"]);
@@ -192,6 +193,10 @@ class OfflineReissueWorkflowService {
 
   isOpsActor(actor) {
     return actor?.role === "ops-member";
+  }
+
+  isSuperAdminActor(actor) {
+    return actor?.role === "super-admin";
   }
 
   getActorObjectId(actor) {
@@ -506,6 +511,10 @@ class OfflineReissueWorkflowService {
       mongoQuery.assignedOpsMember = assigneeFilter;
     }
 
+    if (query.assignmentStatus) {
+      mongoQuery.assignmentStatus = query.assignmentStatus;
+    }
+
     if (query.airline) {
       const airlinePattern = new RegExp(String(query.airline).trim(), "i");
       mongoQuery.$or = [
@@ -673,7 +682,10 @@ class OfflineReissueWorkflowService {
             createdBy: actor?._id?.toString?.() || actor?.id?.toString?.() || null,
             workflow: "OFFLINE_REISSUE",
           },
-          status: OFFLINE_STATUSES.RAISED,
+          status: OFFLINE_STATUSES.PENDING_ASSIGNMENT,
+          assignmentStatus: "UNASSIGNED",
+          autoAssignmentAttempted: false,
+          assignmentFailureReason: null,
           billingMode,
           financialLedger: reissueFinancialLedgerService.initializeLedger(booking),
           pricingHistory: [],
@@ -698,7 +710,7 @@ class OfflineReissueWorkflowService {
         });
 
         this.appendTimeline(request, {
-          status: OFFLINE_STATUSES.RAISED,
+          status: OFFLINE_STATUSES.PENDING_ASSIGNMENT,
           eventType: OFFLINE_TIMELINE_EVENTS.REQUEST_CREATED,
           title: "Offline reissue request submitted",
           description: payload.remarks || "Passenger submitted an offline reissue request",
@@ -710,7 +722,7 @@ class OfflineReissueWorkflowService {
         });
 
         this.appendTimeline(request, {
-          status: OFFLINE_STATUSES.RAISED,
+          status: OFFLINE_STATUSES.PENDING_ASSIGNMENT,
           eventType: OFFLINE_TIMELINE_EVENTS.FLIGHT_SELECTED,
           title: "Replacement flight selected",
           description: this.buildFlightSelectionTitle(selectedFlightSnapshot),
@@ -752,37 +764,69 @@ class OfflineReissueWorkflowService {
         });
 
         assignedOpsMember = assignmentResult.assignedOpsMember;
+        if (assignedOpsMember) {
+          this.appendTimeline(request, {
+            status: OFFLINE_STATUSES.ASSIGNED,
+            eventType: OFFLINE_TIMELINE_EVENTS.AUTO_ASSIGNED,
+            title: "Auto assigned to OPS",
+            description: `Automatically assigned to ${assignedOpsMember.name}`,
+            actor: {
+              id: null,
+              name: "OPS Assignment Service",
+              role: "SYSTEM",
+            },
+            at: request.assignedAt,
+            metadata: {
+              assignedOpsMember: assignedOpsMember._id,
+              assignmentMethod: "ROUND_ROBIN",
+            },
+          });
 
-        this.appendTimeline(request, {
-          status: OFFLINE_STATUSES.ASSIGNED,
-          eventType: OFFLINE_TIMELINE_EVENTS.AUTO_ASSIGNED,
-          title: "Auto assigned to OPS",
-          description: `Automatically assigned to ${assignedOpsMember.name}`,
-          actor: {
-            id: null,
-            name: "OPS Assignment Service",
-            role: "SYSTEM",
-          },
-          at: request.assignedAt,
-          metadata: {
-            assignedOpsMember: assignedOpsMember._id,
-            assignmentMode: "ROUND_ROBIN",
-          },
-        });
+          this.appendAudit(request, {
+            action: "AUTO_ASSIGNED",
+            actor: {
+              id: null,
+              role: "SYSTEM",
+            },
+            message: `Auto assigned to ${assignedOpsMember.name}`,
+            at: request.assignedAt,
+            metadata: {
+              assignedOpsMember: assignedOpsMember._id,
+              assignmentMethod: "ROUND_ROBIN",
+            },
+          });
+        } else {
+          this.appendTimeline(request, {
+            status: OFFLINE_STATUSES.PENDING_ASSIGNMENT,
+            eventType: OFFLINE_TIMELINE_EVENTS.ASSIGNMENT_PENDING,
+            title: "Awaiting OPS assignment",
+            description:
+              "No eligible OPS member was available during auto-assignment. The request remains active in the unassigned queue.",
+            actor: {
+              id: null,
+              name: "OPS Assignment Service",
+              role: "SYSTEM",
+            },
+            at: now,
+            metadata: {
+              assignmentFailureReason: request.assignmentFailureReason || "NO_ELIGIBLE_OPS",
+            },
+          });
 
-        this.appendAudit(request, {
-          action: "AUTO_ASSIGNED",
-          actor: {
-            id: null,
-            role: "SYSTEM",
-          },
-          message: `Auto assigned to ${assignedOpsMember.name}`,
-          at: request.assignedAt,
-          metadata: {
-            assignedOpsMember: assignedOpsMember._id,
-            assignmentMode: "ROUND_ROBIN",
-          },
-        });
+          this.appendAudit(request, {
+            action: "ASSIGNMENT_PENDING",
+            actor: {
+              id: null,
+              role: "SYSTEM",
+            },
+            message: "Offline reissue request is awaiting OPS assignment",
+            at: now,
+            metadata: {
+              assignmentFailureReason: request.assignmentFailureReason || "NO_ELIGIBLE_OPS",
+              autoAssignmentAttempted: true,
+            },
+          });
+        }
 
         this.refreshSlaFlags(request, now);
         await request.save({ session });
@@ -797,16 +841,18 @@ class OfflineReissueWorkflowService {
 
     const request = await this.loadRequestOrThrow(createdRequestId);
 
-    await reissueAssignmentService.notifyAssignedOpsMember({
-      request,
-      assignedOpsMember,
-      assignedBy: {
-        id: null,
-        name: "OPS Assignment Service",
-        role: "SYSTEM",
-      },
-      mode: "ROUND_ROBIN",
-    });
+    if (assignedOpsMember) {
+      await reissueAssignmentService.notifyAssignedOpsMember({
+        request,
+        assignedOpsMember,
+        assignedBy: {
+          id: null,
+          name: "OPS Assignment Service",
+          role: "SYSTEM",
+        },
+        mode: "ROUND_ROBIN",
+      });
+    }
 
     this.emitPassengerEvent(DOMAIN_EVENTS.OFFLINE_REISSUE_CREATED, request);
 
@@ -886,9 +932,19 @@ class OfflineReissueWorkflowService {
       throw new ApiError(400, "Use the reassignment endpoint to change OPS ownership");
     }
 
+    if (payload.status === OFFLINE_STATUSES.ASSIGNED && !request.assignedOpsMember) {
+      throw new ApiError(400, "Use the reassignment endpoint to assign an OPS member");
+    }
+
     const now = new Date();
 
-    if (!request.firstResponseAt && payload.status !== OFFLINE_STATUSES.RAISED) {
+    if (
+      !request.firstResponseAt &&
+      ![
+        OFFLINE_STATUSES.PENDING_ASSIGNMENT,
+        OFFLINE_STATUSES.RAISED,
+      ].includes(payload.status)
+    ) {
       request.firstResponseAt = now;
     }
 
@@ -941,6 +997,11 @@ class OfflineReissueWorkflowService {
     }
 
     request.status = payload.status;
+    if (payload.status === OFFLINE_STATUSES.ASSIGNED) {
+      request.assignmentStatus = "ASSIGNED";
+      request.assignmentFailureReason = null;
+    }
+    if (payload.status === OFFLINE_STATUSES.CANCELLED) request.rejectedAt = now;
 
     if (payload.status === OFFLINE_STATUSES.COMPLETED) {
       if (!request.generatedTicketUrl && !request.reissuedTicketUrl) {
@@ -975,6 +1036,8 @@ class OfflineReissueWorkflowService {
     const timelineEventType =
       payload.status === OFFLINE_STATUSES.COMPLETED
         ? OFFLINE_TIMELINE_EVENTS.COMPLETED
+        : payload.status === OFFLINE_STATUSES.CANCELLED
+          ? OFFLINE_TIMELINE_EVENTS.CANCELLED
         : payload.status === OFFLINE_STATUSES.REJECTED
           ? OFFLINE_TIMELINE_EVENTS.REJECTED
           : payload.status === OFFLINE_STATUSES.FAILED
@@ -987,6 +1050,8 @@ class OfflineReissueWorkflowService {
       title:
         payload.status === OFFLINE_STATUSES.COMPLETED
           ? "Offline reissue completed"
+          : payload.status === OFFLINE_STATUSES.CANCELLED
+            ? "Offline reissue request cancelled"
           : payload.status === OFFLINE_STATUSES.REJECTED
             ? "Offline reissue request rejected"
             : `Status updated to ${payload.status}`,
@@ -1026,6 +1091,7 @@ class OfflineReissueWorkflowService {
         OFFLINE_STATUSES.COMPLETED,
         OFFLINE_STATUSES.FAILED,
         OFFLINE_STATUSES.REJECTED,
+        OFFLINE_STATUSES.CANCELLED,
       ].includes(request.status)
     ) {
       this.emitPassengerEvent(DOMAIN_EVENTS.OFFLINE_REISSUE_UPDATED, request, {
@@ -1099,7 +1165,63 @@ class OfflineReissueWorkflowService {
     request.isReissueLocked = true;
 
     if (!request.assignedOpsMember) {
-      throw new ApiError(409, "Request must be assigned before ticket generation");
+      if (!this.isSuperAdminActor(actor)) {
+        throw new ApiError(409, "Request must be assigned before ticket generation");
+      }
+
+      const overrideAt = new Date();
+      const previousStatus = request.status;
+
+      request.assignmentStatus = "ASSIGNED";
+      request.assignmentFailureReason = null;
+      request.assignmentMethod = "MANUAL";
+      request.assignedAt = request.assignedAt || overrideAt;
+
+      if (
+        !request.status ||
+        [
+          OFFLINE_STATUSES.PENDING_ASSIGNMENT,
+          OFFLINE_STATUSES.RAISED,
+        ].includes(request.status)
+      ) {
+        request.status = OFFLINE_STATUSES.ASSIGNED;
+      }
+
+      this.appendTimeline(request, {
+        status: request.status,
+        eventType: OFFLINE_TIMELINE_EVENTS.REASSIGNED,
+        title: "Super admin override applied",
+        description:
+          payload.message ||
+          "Super admin bypassed the missing assignment requirement for ticket generation",
+        actor,
+        at: overrideAt,
+        metadata: {
+          previousStatus,
+          overrideReason: "MISSING_ASSIGNMENT",
+        },
+      });
+
+      this.appendAudit(request, {
+        action: "SUPER_ADMIN_ASSIGNMENT_OVERRIDE",
+        actor,
+        message:
+          payload.message ||
+          "Super admin bypassed the missing assignment requirement for ticket generation",
+        at: overrideAt,
+        metadata: {
+          previousStatus,
+          newStatus: request.status,
+          requestId: request.requestId,
+        },
+      });
+
+      logger.info("offline_reissue_super_admin_assignment_override", {
+        requestId: request.requestId || request._id?.toString?.(),
+        actorId: actor?._id || actor?.id || null,
+        previousStatus,
+        status: request.status,
+      });
     }
 
     const now = new Date();

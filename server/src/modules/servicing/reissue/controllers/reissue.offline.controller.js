@@ -14,9 +14,13 @@ exports.create = asyncHandler(async (req, res) => {
     actor: req.user,
     payload: req.body,
   });
+  const message =
+    request?.status === "PENDING_ASSIGNMENT"
+      ? "Reissue request submitted successfully and awaiting OPS assignment."
+      : "Offline reissue request created and assigned successfully.";
 
   res.status(201).json(
-    new ApiResponse(201, toOfflineReissueDto(request), "Offline reissue request created"),
+    new ApiResponse(201, toOfflineReissueDto(request), message),
   );
 });
 

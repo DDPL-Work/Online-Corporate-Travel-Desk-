@@ -6,6 +6,7 @@ const logger = require("../utils/logger");
 const puppeteer = require("puppeteer");
 const puppeteerCore = require("puppeteer-core");
 const bwipjs = require("bwip-js");
+const QRCode = require("qrcode");
 const handlebars = require("handlebars");
 const axios = require("axios");
 
@@ -20,6 +21,17 @@ handlebars.registerHelper("includes", (str, sub) => {
 });
 handlebars.registerHelper("eq", (a, b) => a === b);
 handlebars.registerHelper("ne", (a, b) => a !== b);
+
+const normalizeText = (value) => {
+  if (value == null) return null;
+  const normalized = String(value).trim();
+  return normalized || null;
+};
+
+const toArray = (value) => {
+  if (value == null) return [];
+  return Array.isArray(value) ? value.filter(Boolean) : [value].filter(Boolean);
+};
 
 class PDFService {
   constructor() {
@@ -120,6 +132,268 @@ class PDFService {
       logger.error("Barcode generation failed", error);
       return null;
     }
+  }
+
+  async _generateQrCode(text) {
+    try {
+      if (!text) return null;
+      return await QRCode.toDataURL(text, {
+        errorCorrectionLevel: "M",
+        margin: 1,
+        scale: 5,
+        color: {
+          dark: "#10213d",
+          light: "#ffffff",
+        },
+      });
+    } catch (error) {
+      logger.error("QR code generation failed", error);
+      return null;
+    }
+  }
+
+  _buildJourneyGroups({ journeySegments, isRoundTrip, onwardSegmentsCount }) {
+    const onwardSegments =
+      isRoundTrip && onwardSegmentsCount > 0
+        ? journeySegments.slice(0, onwardSegmentsCount)
+        : journeySegments;
+    const returnSegments =
+      isRoundTrip && onwardSegmentsCount > 0
+        ? journeySegments.slice(onwardSegmentsCount)
+        : [];
+
+    if (!isRoundTrip) {
+      return [
+        {
+          key: "passenger",
+          labelPrefix: "Passenger Barcode",
+          segments: journeySegments,
+        },
+      ];
+    }
+
+    return [
+      {
+        key: "onward",
+        labelPrefix: "Onward Barcode",
+        segments: onwardSegments,
+      },
+      {
+        key: "return",
+        labelPrefix: "Return Barcode",
+        segments: returnSegments,
+      },
+    ].filter((group) => group.segments.length > 0);
+  }
+
+  _formatJourneySector(segments = []) {
+    const first = segments[0];
+    const last = segments[segments.length - 1];
+    const origin =
+      first?.Origin?.Airport?.AirportCode || first?.origin?.airportCode || first?.origin || null;
+    const destination =
+      last?.Destination?.Airport?.AirportCode ||
+      last?.destination?.airportCode ||
+      last?.destination ||
+      null;
+
+    if (!origin || !destination) return null;
+    return `${origin}-${destination}`;
+  }
+
+  _formatJourneyFlightNumbers(segments = []) {
+    return segments
+      .map((segment) => {
+        const airlineCode = normalizeText(segment?.Airline?.AirlineCode || segment?.airlineCode);
+        const flightNumber = normalizeText(
+          segment?.Airline?.FlightNumber || segment?.FlightNumber || segment?.flightNumber,
+        );
+        if (!airlineCode && !flightNumber) return null;
+        return [airlineCode, flightNumber].filter(Boolean).join("-");
+      })
+      .filter(Boolean)
+      .join(" / ");
+  }
+
+  _resolveFallbackTicketNumber(booking, travellerIndex) {
+    const directPassengerTicketNumber =
+      booking?.originalBookingSnapshot?.passengers?.[travellerIndex]?.ticketNumber ||
+      booking?.bookingResult?.ticketData?.passengers?.[travellerIndex]?.ticketNumber ||
+      booking?.reissueMeta?.ticketNumbers?.[travellerIndex] ||
+      null;
+
+    if (directPassengerTicketNumber) {
+      return normalizeText(directPassengerTicketNumber);
+    }
+
+    const providerTicketNumbers = [
+      booking?.bookingSnapshot?.providerReferences?.ticketNumbers,
+      booking?.originalBookingSnapshot?.providerReferences?.ticketNumbers,
+      booking?.activeTicketSnapshot?.providerReferences?.ticketNumbers,
+      booking?.reissueMeta?.providerReferences?.ticketNumbers,
+    ]
+      .flatMap((item) => toArray(item))
+      .map((item) => normalizeText(item))
+      .filter(Boolean);
+
+    return providerTicketNumbers[travellerIndex] || providerTicketNumbers[0] || null;
+  }
+
+  _buildFallbackBarcodePayload({
+    pnr,
+    ticketNumber,
+    passengerName,
+    sector,
+    flightNumber,
+    supplierContent,
+  }) {
+    if (normalizeText(supplierContent)) {
+      return normalizeText(supplierContent);
+    }
+
+    const requiredFields = {
+      pnr: normalizeText(pnr),
+      ticketNumber: normalizeText(ticketNumber),
+      passengerName: normalizeText(passengerName),
+      sector: normalizeText(sector),
+      flightNumber: normalizeText(flightNumber),
+    };
+
+    if (Object.values(requiredFields).some((value) => !value)) {
+      return null;
+    }
+
+    return [
+      `PNR:${requiredFields.pnr}`,
+      `TKT:${requiredFields.ticketNumber}`,
+      `PAX:${requiredFields.passengerName}`,
+      `SEC:${requiredFields.sector}`,
+      `FLT:${requiredFields.flightNumber}`,
+    ].join("|");
+  }
+
+  async _buildBarcodeBlock({
+    payload,
+    barcodeLabel,
+    fallbackLabel,
+    bookingReference,
+    passengerName,
+    travellerIndex,
+  }) {
+    if (!payload) {
+      logger.warn("ticket_barcode_payload_missing", {
+        bookingReference: bookingReference || null,
+        passengerName: passengerName || null,
+        travellerIndex,
+        barcodeLabel,
+      });
+
+      return {
+        barcodeImage: null,
+        qrCodeImage: null,
+        barcodeLabel,
+        fallbackLabel,
+      };
+    }
+
+    const [barcodeImage, qrCodeImage] = await Promise.all([
+      this._generateBarcode(payload),
+      this._generateQrCode(payload),
+    ]);
+
+    if (!barcodeImage) {
+      logger.warn("ticket_barcode_generation_unavailable", {
+        bookingReference: bookingReference || null,
+        passengerName: passengerName || null,
+        travellerIndex,
+        barcodeLabel,
+      });
+    }
+
+    if (!qrCodeImage) {
+      logger.warn("ticket_qrcode_generation_unavailable", {
+        bookingReference: bookingReference || null,
+        passengerName: passengerName || null,
+        travellerIndex,
+        barcodeLabel,
+      });
+    }
+
+    return {
+      barcodeImage,
+      qrCodeImage,
+      barcodeLabel,
+      fallbackLabel: !barcodeImage ? fallbackLabel : null,
+    };
+  }
+
+  async _buildTravellerBarcodeBlocks({
+    booking,
+    traveller,
+    travellerIndex,
+    tboPaxOnward,
+    tboPaxReturn,
+    pnr,
+    journeyGroups,
+    isInternationalRoundTrip,
+  }) {
+    const passengerName = normalizeText(
+      `${traveller?.firstName || ""} ${traveller?.lastName || ""}`.trim(),
+    );
+    const fallbackTicketNumber = this._resolveFallbackTicketNumber(booking, travellerIndex);
+    const onwardBarcodes = toArray(tboPaxOnward?.BarcodeDetails?.Barcode);
+    const returnBarcodes = toArray(tboPaxReturn?.BarcodeDetails?.Barcode);
+
+    return await Promise.all(
+      journeyGroups.map(async (group, groupIndex) => {
+        const supplierBarcodeContent =
+          group.key === "onward"
+            ? onwardBarcodes[0]?.Content
+            : group.key === "return" && isInternationalRoundTrip
+              ? onwardBarcodes[1]?.Content || returnBarcodes[0]?.Content
+              : group.key === "return"
+                ? returnBarcodes[0]?.Content
+                : onwardBarcodes[0]?.Content || returnBarcodes[0]?.Content;
+
+        const ticketNumber =
+          group.key === "return"
+            ? normalizeText(tboPaxReturn?.Ticket?.TicketNumber) || fallbackTicketNumber
+            : normalizeText(tboPaxOnward?.Ticket?.TicketNumber) ||
+              normalizeText(tboPaxReturn?.Ticket?.TicketNumber) ||
+              fallbackTicketNumber;
+        const sector = this._formatJourneySector(group.segments);
+        const flightNumber = this._formatJourneyFlightNumbers(group.segments);
+        const barcodeLabel = [
+          group.labelPrefix,
+          passengerName || `Passenger ${travellerIndex + 1}`,
+          sector,
+        ]
+          .filter(Boolean)
+          .join(" - ");
+        const payload = this._buildFallbackBarcodePayload({
+          pnr,
+          ticketNumber,
+          passengerName,
+          sector,
+          flightNumber,
+          supplierContent: supplierBarcodeContent,
+        });
+
+        return this._buildBarcodeBlock({
+          payload,
+          barcodeLabel,
+          fallbackLabel:
+            ticketNumber ||
+            sector ||
+            flightNumber ||
+            pnr ||
+            `Barcode unavailable for passenger ${travellerIndex + 1}`,
+          bookingReference: booking?.bookingReference,
+          passengerName,
+          travellerIndex,
+        });
+      }),
+    ).then((blocks) => blocks.filter(Boolean));
   }
 
   async _fetchAirlineLogo(code) {
@@ -252,6 +526,11 @@ class PDFService {
       const onwardSegmentsCount = onwardData.segments.filter(
         (s) => s.TripIndicator === 1,
       ).length;
+      const journeyGroups = this._buildJourneyGroups({
+        journeySegments,
+        isRoundTrip,
+        onwardSegmentsCount,
+      });
       const segmentsData = await Promise.all(
         journeySegments.map(async (seg, segIdx) => {
           const depTime = new Date(
@@ -396,6 +675,12 @@ class PDFService {
 
       // Barcode for the main PNR (general info)
       const barcodeBase64 = await this._generateBarcode(pnr);
+      if (!barcodeBase64) {
+        logger.warn("ticket_pdf_primary_barcode_missing", {
+          bookingReference: booking?.bookingReference || null,
+          pnr,
+        });
+      }
 
       // Load Template and CSS
       const templatePath = path.join(__dirname, "./templates/ticket.html");
@@ -460,6 +745,7 @@ class PDFService {
               ? `${onwardTicket.no} / ${returnTicket.no}`
               : onwardTicket?.no ||
                 returnTicket?.no ||
+                this._resolveFallbackTicketNumber(booking, tIdx) ||
                 onwardData.response?.FlightItinerary?.TBOConfNo ||
                 "E-TICKET";
 
@@ -469,30 +755,16 @@ class PDFService {
           const mergedAddInfo = [...onwardAddInfo, ...returnAddInfo];
 
           // ── BARCODE GENERATION (Dual for Round-Trip) ──
-          let onwardBarcodeBase64 = null;
-          let returnBarcodeBase64 = null;
-
-          const onwardBarcodes = tboPaxOnward?.BarcodeDetails?.Barcode || [];
-          const returnBarcodes = tboPaxReturn?.BarcodeDetails?.Barcode || [];
-
-          let onwardContent = onwardBarcodes[0]?.Content;
-          let returnContent = returnBarcodes[0]?.Content;
-
-          // Handle International Round-Trip where both barcodes are in the onward/provider response
-          if (
-            isInternationalRoundTrip &&
-            onwardBarcodes.length >= 2 &&
-            !returnContent
-          ) {
-            returnContent = onwardBarcodes[1]?.Content;
-          }
-
-          if (onwardContent) {
-            onwardBarcodeBase64 = await this._generateBarcode(onwardContent);
-          }
-          if (returnContent) {
-            returnBarcodeBase64 = await this._generateBarcode(returnContent);
-          }
+          const barcodeBlocks = await this._buildTravellerBarcodeBlocks({
+            booking,
+            traveller,
+            travellerIndex: tIdx,
+            tboPaxOnward,
+            tboPaxReturn,
+            pnr: normalizeText(booking?.reissueMeta?.activePnr) || pnr,
+            journeyGroups,
+            isInternationalRoundTrip,
+          });
 
           return {
             name: `${traveller.firstName} ${traveller.lastName}`.toUpperCase(),
@@ -506,14 +778,10 @@ class PDFService {
             returnTicket,
             email: traveller.isLeadPassenger ? traveller.email || "" : "",
             phone: traveller.isLeadPassenger
-              ? traveller.phoneWithCode || ""
+              ? traveller.phoneWithCode || traveller.phone || ""
               : "",
-            onwardBarcodeBase64,
-            returnBarcodeBase64,
-            // Fallback for one-way or if one is missing
-            barcodeBase64: onwardBarcodeBase64 || returnBarcodeBase64,
+            barcodeBlocks,
             segmentServices: journeySegments.map((seg, segIdx) => {
-              const addInfo = mergedAddInfo[segIdx] || {};
               const snapshotSegment = activeTicketSnapshot?.segments?.[segIdx] || null;
               const seatLabel = snapshotSegment?.ssr?.seat?.label || null;
               const mealLabel = snapshotSegment?.ssr?.meal?.label || null;
@@ -536,6 +804,18 @@ class PDFService {
           };
         }),
       );
+      const passengerBarcodeCount = consolidatedTravellers.reduce(
+        (count, traveller) =>
+          count + (traveller.barcodeBlocks || []).filter((block) => Boolean(block.barcodeImage)).length,
+        0,
+      );
+      if (!passengerBarcodeCount) {
+        logger.warn("ticket_pdf_rendered_without_passenger_barcode", {
+          bookingReference: booking?.bookingReference || null,
+          pnr,
+          isReissued: Boolean(booking?.reissueMeta?.isReissued || booking?.activeTicketSnapshot),
+        });
+      }
 
       const finalHtml = template({
         pnr,

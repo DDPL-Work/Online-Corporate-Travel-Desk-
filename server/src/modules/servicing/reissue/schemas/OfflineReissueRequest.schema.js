@@ -138,8 +138,22 @@ const offlineReissueRequestSchema = new mongoose.Schema(
       type: String,
       enum: Object.values(OFFLINE_STATUSES),
       required: true,
-      default: OFFLINE_STATUSES.RAISED,
+      default: OFFLINE_STATUSES.PENDING_ASSIGNMENT,
       index: true,
+    },
+    assignmentStatus: {
+      type: String,
+      enum: ["UNASSIGNED", "ASSIGNED"],
+      default: "UNASSIGNED",
+      index: true,
+    },
+    autoAssignmentAttempted: {
+      type: Boolean,
+      default: false,
+    },
+    assignmentFailureReason: {
+      type: String,
+      default: null,
     },
     assignedOpsMember: {
       type: mongoose.Schema.Types.ObjectId,
@@ -359,6 +373,7 @@ const offlineReissueRequestSchema = new mongoose.Schema(
 offlineReissueRequestSchema.index({ corporateId: 1, status: 1, createdAt: -1 });
 offlineReissueRequestSchema.index({ employeeId: 1, createdAt: -1 });
 offlineReissueRequestSchema.index({ assignedOpsMember: 1, status: 1, createdAt: -1 });
+offlineReissueRequestSchema.index({ assignmentStatus: 1, status: 1, createdAt: -1 });
 offlineReissueRequestSchema.index({ bookingId: 1, createdAt: -1 });
 offlineReissueRequestSchema.index({ status: 1, overdue: 1, breached: 1, slaDeadline: 1 });
 offlineReissueRequestSchema.index({ originalPnr: 1, status: 1, createdAt: -1 });

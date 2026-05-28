@@ -26,7 +26,7 @@ function toOfflineReissueDto(doc) {
         role: populatedEmployee.role || null,
       }
     : null;
-  const terminalStatuses = new Set(["COMPLETED", "FAILED", "REJECTED"]);
+  const terminalStatuses = new Set(["COMPLETED", "FAILED", "REJECTED", "CANCELLED"]);
   const now = Date.now();
   const slaDeadline = item.slaDeadline ? new Date(item.slaDeadline).getTime() : null;
   const completedAt = item.completedAt ? new Date(item.completedAt).getTime() : null;
@@ -140,11 +140,14 @@ function toOfflineReissueDto(doc) {
     remarks: item.remarks,
     creationSource: item.creationSource || null,
     status: item.status,
+    assignmentStatus: item.assignmentStatus || (item.assignedOpsMember ? "ASSIGNED" : "UNASSIGNED"),
+    autoAssignmentAttempted: Boolean(item.autoAssignmentAttempted),
+    assignmentFailureReason: item.assignmentFailureReason || null,
     assignedOpsMember: item.assignedOpsMember,
     assignedTo: item.assignedOpsMember,
     assignedAt: item.assignedAt,
-    assignmentMode: item.assignmentMode,
-    assignmentMethod: item.assignmentMode,
+    assignmentMode: item.assignmentMethod || item.assignmentMode || null,
+    assignmentMethod: item.assignmentMethod || item.assignmentMode || null,
     assignmentHistory: item.assignmentHistory || [],
     opsRemarks: item.opsRemarks,
     reissuedTicketUrl: item.reissuedTicketUrl || item.generatedTicketUrl,

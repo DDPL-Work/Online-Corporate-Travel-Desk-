@@ -1,7 +1,7 @@
 /* ============================================================
    reissueUi.js — Backend-aligned UI helpers
    Backend model enum: PENDING | APPROVED | REJECTED | COMPLETED
-   Offline statuses:   RAISED | ASSIGNED | IN_PROGRESS | WAITING_AIRLINE | TICKET_GENERATED | COMPLETED | FAILED | REJECTED
+   Offline statuses:   PENDING_ASSIGNMENT | ASSIGNED | IN_PROGRESS | WAITING_AIRLINE | TICKET_GENERATED | COMPLETED | FAILED | REJECTED | CANCELLED
    ============================================================ */
 
 // ── Online reissue status filter options (matches FlightReissueRequest.status enum) ──
@@ -173,6 +173,7 @@ export const getStatusTone = (status) => {
     case "CANCELLED":
       return "bg-rose-50 text-rose-700 border-rose-200";
     case "PENDING":
+    case "PENDING_ASSIGNMENT":
     case "RAISED":
       return "bg-amber-50 text-amber-700 border-amber-200";
     case "ASSIGNED":

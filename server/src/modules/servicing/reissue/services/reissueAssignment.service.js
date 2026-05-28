@@ -4,11 +4,14 @@ const ApiError = require("../../../../utils/ApiError");
 const logger = require("../../../../utils/logger");
 const { sendNotification } = require("../../../../utils/notificationService");
 const {
+  evaluateReissueAssignmentEligibility,
+  isEligibleForReissueAssignment,
+} = require("../../../../utils/reissueAssignmentEligibility.util");
+const {
   OFFLINE_STATUSES,
   TERMINAL_OFFLINE_STATUSES,
 } = require("../constants/reissue.constants");
 
-const MANAGE_REISSUES_PERMISSION = "Manage Reissues";
 const DEFAULT_MAX_CONCURRENT_ASSIGNMENTS = 10;
 
 const toObjectId = (value) => {
@@ -26,11 +29,9 @@ const isSameObjectId = (left, right) => {
 class ReissueAssignmentService {
   getEligibleOpsQuery() {
     return {
-      status: "Active",
       isDeleted: false,
       isAvailableForReissues: true,
       autoAssignmentEnabled: true,
-      permissions: { $in: [MANAGE_REISSUES_PERMISSION] },
       $expr: {
         $lt: [
           { $ifNull: ["$currentWorkload", 0] },
@@ -41,15 +42,33 @@ class ReissueAssignmentService {
   }
 
   async listEligibleOpsMembers({ session } = {}) {
-    return OpsMember.find(this.getEligibleOpsQuery())
+    const candidates = await OpsMember.find(this.getEligibleOpsQuery())
       .sort({ currentWorkload: 1, lastAssignedAt: 1, _id: 1 })
       .session(session || null);
+
+    return candidates.filter((member) =>
+      isEligibleForReissueAssignment(member, {
+        context: {
+          service: "reissueAssignmentService.listEligibleOpsMembers",
+        },
+      }),
+    );
   }
 
   async findNextEligibleOpsMember({ session } = {}) {
-    return OpsMember.findOne(this.getEligibleOpsQuery())
+    const candidates = await OpsMember.find(this.getEligibleOpsQuery())
       .sort({ currentWorkload: 1, lastAssignedAt: 1, _id: 1 })
       .session(session || null);
+
+    return (
+      candidates.find((member) =>
+        isEligibleForReissueAssignment(member, {
+          context: {
+            service: "reissueAssignmentService.findNextEligibleOpsMember",
+          },
+        }),
+      ) || null
+    );
   }
 
   async validateAssignableOpsMember(opsMemberId, { session } = {}) {
@@ -58,12 +77,16 @@ class ReissueAssignmentService {
       throw new ApiError(400, "A valid OPS member is required for reassignment");
     }
 
-    const opsMember = await OpsMember.findOne({
-      _id: normalizedId,
-      ...this.getEligibleOpsQuery(),
-    }).session(session || null);
+    const opsMember = await OpsMember.findById(normalizedId).session(session || null);
 
-    if (!opsMember) {
+    const eligibility = evaluateReissueAssignmentEligibility(opsMember, {
+      context: {
+        service: "reissueAssignmentService.validateAssignableOpsMember",
+        opsMemberId: String(normalizedId),
+      },
+    });
+
+    if (!eligibility.eligible) {
       throw new ApiError(
         400,
         "Selected OPS member is not eligible for offline reissue assignment",
@@ -168,11 +191,34 @@ class ReissueAssignmentService {
       ? await this.validateAssignableOpsMember(opsMemberId, { session })
       : await this.findNextEligibleOpsMember({ session });
 
+    request.assignmentHistory = Array.isArray(request.assignmentHistory)
+      ? request.assignmentHistory
+      : [];
+    request.autoAssignmentAttempted = true;
+
     if (!nextOpsMember) {
-      logger.error("[REISSUE AUTO ASSIGN] No eligible OPS member available", {
+      request.status = OFFLINE_STATUSES.PENDING_ASSIGNMENT;
+      request.assignmentStatus = "UNASSIGNED";
+      request.assignmentFailureReason = "NO_ELIGIBLE_OPS";
+      request.assignedOpsMember = null;
+      request.assignedAt = null;
+      request.assignmentMethod = mode;
+
+      logger.warn("offline_reissue_assignment_unavailable", {
         requestId: request.requestId || request._id?.toString?.(),
+        bookingId: request.bookingId?.toString?.() || request.bookingId || null,
+        mode,
       });
-      throw new ApiError(503, "No eligible OPS member is available for reissue assignment");
+
+      if (persistRequest && typeof request.save === "function") {
+        await request.save({ session });
+      }
+
+      return {
+        request,
+        assignedOpsMember: null,
+        assignmentAvailable: false,
+      };
     }
 
     if (previousAssigneeId && isSameObjectId(previousAssigneeId, nextOpsMember._id)) {
@@ -181,10 +227,9 @@ class ReissueAssignmentService {
 
     request.assignedOpsMember = nextOpsMember._id;
     request.assignedAt = now;
-    request.assignmentMode = mode;
-    request.assignmentHistory = Array.isArray(request.assignmentHistory)
-      ? request.assignmentHistory
-      : [];
+    request.assignmentMethod = mode;
+    request.assignmentStatus = "ASSIGNED";
+    request.assignmentFailureReason = null;
     request.assignmentHistory.push(
       this.buildAssignmentHistory({
         assignedTo: nextOpsMember._id,
@@ -195,7 +240,13 @@ class ReissueAssignmentService {
       }),
     );
 
-    if (!request.status || request.status === OFFLINE_STATUSES.RAISED) {
+    if (
+      !request.status ||
+      [
+        OFFLINE_STATUSES.PENDING_ASSIGNMENT,
+        OFFLINE_STATUSES.RAISED,
+      ].includes(request.status)
+    ) {
       request.status = OFFLINE_STATUSES.ASSIGNED;
     }
 
@@ -227,6 +278,7 @@ class ReissueAssignmentService {
     return {
       request,
       assignedOpsMember: nextOpsMember,
+      assignmentAvailable: true,
     };
   }
 
@@ -293,6 +345,44 @@ class ReissueAssignmentService {
                 $cond: [{ $ne: ["$assignedOpsMember", null] }, 1, 0],
               },
             },
+            pendingAssignmentCount: {
+              $sum: {
+                $cond: [{ $eq: ["$assignmentStatus", "UNASSIGNED"] }, 1, 0],
+              },
+            },
+            assignmentFailures: {
+              $sum: {
+                $cond: [{ $ne: ["$assignmentFailureReason", null] }, 1, 0],
+              },
+            },
+            totalAssignmentWaitMs: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: ["$assignedAt", null] },
+                      { $ne: ["$createdAt", null] },
+                    ],
+                  },
+                  { $subtract: ["$assignedAt", "$createdAt"] },
+                  0,
+                ],
+              },
+            },
+            totalAssignedWithWait: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: ["$assignedAt", null] },
+                      { $ne: ["$createdAt", null] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
             completedToday: {
               $sum: {
                 $cond: [{ $gte: ["$completedAt", todayStart] }, 1, 0],
@@ -320,6 +410,10 @@ class ReissueAssignmentService {
     const counters = requestMetrics[0] || {
       openRequests: 0,
       assignedRequests: 0,
+      pendingAssignmentCount: 0,
+      assignmentFailures: 0,
+      totalAssignmentWaitMs: 0,
+      totalAssignedWithWait: 0,
       completedToday: 0,
       overdue: 0,
       slaBreached: 0,
@@ -327,6 +421,10 @@ class ReissueAssignmentService {
 
     return {
       ...counters,
+      avgAssignmentWaitTime:
+        counters.totalAssignedWithWait > 0
+          ? Math.round(counters.totalAssignmentWaitMs / counters.totalAssignedWithWait)
+          : 0,
       perOpsWorkload: workloadMetrics,
     };
   }

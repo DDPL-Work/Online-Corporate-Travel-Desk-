@@ -862,6 +862,7 @@ export const resolveFinancialBreakdown = (req = {}) => {
 };
 
 const STATUS_PRIORITY = {
+  PENDING_ASSIGNMENT: 125,
   ASSIGNED: 120,
   IN_PROGRESS: 115,
   WAITING_AIRLINE: 110,
@@ -919,6 +920,7 @@ export const getStatusTone = (status) => {
     case "OFFLINE_REQUIRED":
       return "bg-blue-50 text-blue-700 border-blue-200";
     case "PENDING":
+    case "PENDING_ASSIGNMENT":
       return "bg-amber-50 text-amber-700 border-amber-200";
     case "REJECTED":
     case "FAILED":
