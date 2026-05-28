@@ -2,6 +2,8 @@ import { createSlice } from "@reduxjs/toolkit";
 import {
   fetchReissueAnalytics,
   fetchReissueRequests,
+  checkReissueEligibility,
+  fetchOfflineReissueRequestByBooking,
   generateReissueTicket,
   reassignReissueRequest,
   updateReissueStatus,
@@ -19,6 +21,9 @@ const initialState = {
   pagination: initialPagination,
   analytics: null,
   currentRequest: null,
+  eligibility: null,
+  eligibilityLoading: false,
+  bookingOfflineRequest: null,
   loading: false,
   analyticsLoading: false,
   actionLoading: false,
@@ -54,6 +59,11 @@ const reissueSlice = createSlice({
     setCurrentReissueRequest: (state, action) => {
       state.currentRequest = action.payload || null;
       state.error = null;
+    },
+    clearEligibility: (state) => {
+      state.eligibility = null;
+      state.bookingOfflineRequest = null;
+      state.eligibilityLoading = false;
     },
   },
   extraReducers: (builder) => {
@@ -124,10 +134,24 @@ const reissueSlice = createSlice({
       })
       .addCase(fetchReissueAnalytics.rejected, (state) => {
         state.analyticsLoading = false;
+      })
+      .addCase(checkReissueEligibility.pending, (state) => {
+        state.eligibilityLoading = true;
+      })
+      .addCase(checkReissueEligibility.fulfilled, (state, action) => {
+        state.eligibilityLoading = false;
+        state.eligibility = action.payload;
+      })
+      .addCase(checkReissueEligibility.rejected, (state) => {
+        state.eligibilityLoading = false;
+        state.eligibility = null;
+      })
+      .addCase(fetchOfflineReissueRequestByBooking.fulfilled, (state, action) => {
+        state.bookingOfflineRequest = action.payload || null;
       });
   },
 });
 
-export const { resetReissueState, setCurrentReissueRequest } =
+export const { resetReissueState, setCurrentReissueRequest, clearEligibility } =
   reissueSlice.actions;
 export default reissueSlice.reducer;

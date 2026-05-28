@@ -64,11 +64,10 @@ const RouteCell = ({ routes, airline }) => {
   return (
     <div className="flex items-center gap-3">
       <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
-        <img 
-          src={logoUrl} 
+        <img src={logoUrl} 
           alt={airlineName} 
           className="w-full h-full object-contain"
-          onError={(e) => { 
+          loading="eager" onError={(e) => { 
             e.target.onerror = null;
             e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
           }} 
@@ -191,17 +190,7 @@ function CancelledFlightSection() {
   const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
   const totalRefund = filtered.reduce((s, b) => s + (b.refundAmount || 0), 0);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Personnel", "Route", "Status", "PNR", "Refund"];
-    const rows = filtered.map(b => [b.orderId, b.travellerName, b.routes?.map(r => `${r.fromCode}→${r.toCode}`).join(" | "), mapCancelStatus(b.cancelStatus || b.status), b.pnr, `₹${b.refundAmount.toLocaleString()}`]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `cancelled-flights.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -236,7 +225,25 @@ function CancelledFlightSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Cancellation Ledger" subtitle={`${filtered.length} terminated assets`} onExport={handleExport} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Cancellation Ledger" 
+        subtitle={`${filtered.length} terminated assets`} 
+        exportConfig={{
+          data: filtered,
+          filename: `cancelled_flight_bookings_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "travellerName" },
+            { header: "Route", accessor: (b) => b.routes?.map(r => `${r.fromCode}→${r.toCode}`).join(" | ") || "—" },
+            { header: "Email Identifier", key: "employeeId" },
+            { header: "Recovery Status", accessor: (b) => mapCancelStatus(b.cancelStatus || b.status) },
+            { header: "PNR Ref", key: "pnr" },
+            { header: "Booking Amount", accessor: (b) => `₹${b.refundAmount.toLocaleString()}` },
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -344,17 +351,7 @@ function CancelledHotelSection() {
   const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
   const totalRefund = filtered.reduce((s, b) => s + (b.refundAmount || 0), 0);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Personnel", "Hotel", "Status", "Refund"];
-    const rows = filtered.map(b => [b.orderId, b.guestName, b.hotelRequest?.selectedHotel?.hotelName, mapCancelStatus(b.cancelStatus || b.status), `₹${b.refundAmount.toLocaleString()}`]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `cancelled-hotels.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -389,7 +386,24 @@ function CancelledHotelSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Cancellation Ledger" subtitle={`${filtered.length} terminated assets`} onExport={handleExport} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Cancellation Ledger" 
+        subtitle={`${filtered.length} terminated assets`} 
+        exportConfig={{
+          data: filtered,
+          filename: `cancelled_hotel_bookings_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order Reference", key: "orderId" },
+            { header: "Personnel", key: "guestName" },
+            { header: "Email Identifier", key: "employeeId" },
+            { header: "Asset Detail", accessor: (b) => b.hotelRequest?.selectedHotel?.hotelName || "—" },
+            { header: "Recovery Status", accessor: (b) => mapCancelStatus(b.cancelStatus || b.status) },
+            { header: "Booking Amount", accessor: (b) => `₹${b.refundAmount.toLocaleString()}` },
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

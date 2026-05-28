@@ -44,11 +44,10 @@ const RouteCell = ({ routes, airline }) => {
   return (
     <div className="flex items-center gap-3">
       <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
-        <img 
-          src={logoUrl} 
+        <img src={logoUrl} 
           alt={airlineName} 
           className="w-full h-full object-contain"
-          onError={(e) => { 
+          loading="eager" onError={(e) => { 
             e.target.onerror = null;
             e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
           }} 
@@ -128,7 +127,24 @@ function FlightSection({ trips, refreshing, employeeOptions }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight History Ledger" subtitle={`${filtered.length} archived deployments`} pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Flight History Ledger" 
+        subtitle={`${filtered.length} archived deployments`} 
+        exportConfig={{
+          data: filtered,
+          filename: `past_flight_trips_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "employee" },
+            { header: "Route", accessor: (t) => t.routes?.map(r => `${r.fromCode}→${r.toCode}`).join(" | ") || "—" },
+            { header: "Travel Date", accessor: (t) => new Date(t.departureDate).toLocaleDateString() },
+            { header: "Email Identifier", key: "employeeId" },
+            { header: "Status", key: "status" },
+          ]
+        }}
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />} 
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -245,7 +261,24 @@ function HotelSection({ trips, refreshing, employeeOptions }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel History Ledger" subtitle={`${filtered.length} archived stays`} pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Hotel History Ledger" 
+        subtitle={`${filtered.length} archived stays`} 
+        exportConfig={{
+          data: filtered,
+          filename: `past_hotel_stays_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "employee" },
+            { header: "Asset Detail", key: "destination" },
+            { header: "Duration", accessor: (t) => `${new Date(t.departureDate).toLocaleDateString()} — ${new Date(t.returnDate).toLocaleDateString()}` },
+            { header: "Email Identifier", key: "employeeId" },
+            { header: "Status", key: "status" },
+          ]
+        }}
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />} 
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

@@ -218,10 +218,10 @@ export default function OneWayFlightCard({
             <div className="flex items-center justify-between gap-3 mb-5">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <img
-                    src={airlineLogo(airlineCode)}
+                  <img src={airlineLogo(airlineCode)}
                     alt={airline}
                     className="w-12 h-12 rounded-xl shadow-md border-2 border-white object-contain"
+                    loading="eager"
                     onError={(e) => {
                       e.currentTarget.src = "https://via.placeholder.com/64";
                     }}

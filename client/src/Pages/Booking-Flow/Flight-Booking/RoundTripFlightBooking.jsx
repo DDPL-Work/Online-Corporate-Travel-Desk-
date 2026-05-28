@@ -125,6 +125,7 @@ export default function RoundTripFlightBooking() {
   });
   const [selectedMeals, setSelectedMeals] = useState({});
   const [selectedBaggage, setSelectedBaggage] = useState({});
+  const [selectedSpecialServices, setSelectedSpecialServices] = useState({});
 
   const [ssrData, setSSRData] = useState({ onward: {}, return: {} });
   const [ssrLoading, setSSRLoading] = useState(true);
@@ -140,6 +141,7 @@ export default function RoundTripFlightBooking() {
     legalName: "",
     address: "",
     gstEmail: "",
+    contactNumber: "",
   });
   const { actionLoading } = useSelector((state) => state.bookings);
   const fareQuote = useSelector((state) => state.flightsRT.fareQuoteRT);
@@ -254,6 +256,7 @@ export default function RoundTripFlightBooking() {
             legalName: data.data.legalName || "",
             address: data.data.address || "",
             gstEmail: data.data.gstEmail || "",
+            contactNumber: data.data.contactNumber || "",
           }));
         }
       } catch (err) {
@@ -567,7 +570,7 @@ export default function RoundTripFlightBooking() {
 
     const checkGenericError = (quote) => {
       const quoteResponse = quote?.Response;
-      return quoteResponse?.ResponseStatus === 2;
+      return quoteResponse?.ResponseStatus === 2 || quoteResponse?.Error?.ErrorCode > 0;
     };
 
     if (
@@ -793,6 +796,24 @@ export default function RoundTripFlightBooking() {
     }));
   };
 
+  const toggleSpecialServiceSelection = (
+    journeyType,
+    segmentIndex,
+    service,
+  ) => {
+    const key = `${journeyType}|${segmentIndex}`;
+    setSelectedSpecialServices((prev) => {
+      const list = prev[key] || [];
+      const exists = list.find((s) => s.Code === service.Code);
+
+      if (exists) {
+        return { ...prev, [key]: list.filter((s) => s.Code !== service.Code) };
+      }
+
+      return { ...prev, [key]: [...list, service] };
+    });
+  };
+
   const totalSeatPrice = useMemo(() => {
     let total = 0;
 
@@ -855,6 +876,10 @@ export default function RoundTripFlightBooking() {
 
     Object.values(selectedBaggage).forEach((bag) => {
       if (bag?.Price) total += Number(bag.Price) * travelers.length;
+    });
+
+    Object.values(selectedSpecialServices).forEach((svcs) => {
+      svcs?.forEach((s) => (total += Number(s.Price || 0)));
     });
 
     return total;
@@ -1072,6 +1097,30 @@ export default function RoundTripFlightBooking() {
     return seats;
   };
 
+  const buildSpecialServicesSSR = () => {
+    const services = [];
+
+    Object.entries(selectedSpecialServices).forEach(([key, serviceList]) => {
+      if (!Array.isArray(serviceList)) return;
+      const [journeyType, segmentIndex] = key.split("|");
+
+      serviceList.forEach((svc, index) => {
+        services.push({
+          ...svc,
+          journeyType,
+          segmentIndex: Number(segmentIndex),
+          travelerIndex: 0,
+          travelerId: travelers[0]?.id,
+          code: svc.Code,
+          text: svc.Text,
+          price: svc.Price,
+        });
+      });
+    });
+
+    return services;
+  };
+
   const buildConsolidatedFareQuote = () => {
     // ONE-WAY (unchanged behavior)
     if (!fareQuote?.onward && fareQuote?.Response?.Results) {
@@ -1212,6 +1261,7 @@ export default function RoundTripFlightBooking() {
           seats: buildSeatSSR(),
           meals: buildMealSSR(),
           baggage: buildBaggageSSR(),
+          specialServices: buildSpecialServicesSSR(),
         },
 
         fareExpiry,
@@ -1643,9 +1693,11 @@ export default function RoundTripFlightBooking() {
         selectedSeats={selectedSeats}
         selectedMeals={selectedMeals}
         selectedBaggage={selectedBaggage}
+        selectedSpecialServices={selectedSpecialServices}
         onSeatSelect={toggleSeatSelection}
         onToggleMeal={toggleMealSelection}
         onSelectBaggage={handleSelectBaggage}
+        onToggleSpecialService={toggleSpecialServiceSelection}
         date={showSeatModal.date}
         flightIndex={showSeatModal.segmentIndex}
       />
@@ -1890,6 +1942,7 @@ export default function RoundTripFlightBooking() {
               selectedSeats={selectedSeats}
               selectedMeals={selectedMeals}
               selectedBaggage={selectedBaggage}
+              selectedSpecialServices={selectedSpecialServices}
               travelers={travelers}
               segments={buildFullSegments()}
             />
@@ -1968,6 +2021,7 @@ export default function RoundTripFlightBooking() {
                 selectedSeats={selectedSeats}
                 selectedMeals={selectedMeals}
                 selectedBaggage={selectedBaggage}
+                selectedSpecialServices={selectedSpecialServices}
                 travelers={travelers}
                 approver={approver}
                 approverLoading={approverLoading}

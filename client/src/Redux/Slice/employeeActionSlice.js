@@ -131,6 +131,24 @@ export const promoteEmployee = createAsyncThunk(
   },
 );
 
+// 🔹 Admin: Promote employee/manager → finance_team
+export const promoteEmployeeToFinance = createAsyncThunk(
+  "employee/promoteEmployeeToFinance",
+  async (userId, { rejectWithValue }) => {
+    try {
+      const res = await api.put(`/travel-admin/promote-finance/${userId}`);
+      return {
+        userId,
+        role: res.data.data.role, // finance_team
+      };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to promote to Finance Team",
+      );
+    }
+  },
+);
+
 // 🔹 Admin: Demote manager → employee
 export const demoteEmployee = createAsyncThunk(
   "employee/demoteEmployee",
@@ -273,6 +291,16 @@ const employeeActionSlice = createSlice({
       // DEMOTE MANAGER
       // -------------------------
       .addCase(demoteEmployee.fulfilled, (state, action) => {
+        state.employees = state.employees.map((emp) =>
+          emp._id === action.payload.userId
+            ? { ...emp, role: action.payload.role }
+            : emp,
+        );
+      })
+      // -------------------------
+      // PROMOTE TO FINANCE TEAM
+      // -------------------------
+      .addCase(promoteEmployeeToFinance.fulfilled, (state, action) => {
         state.employees = state.employees.map((emp) =>
           emp._id === action.payload.userId
             ? { ...emp, role: action.payload.role }

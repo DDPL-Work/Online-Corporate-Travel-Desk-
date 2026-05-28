@@ -1,6 +1,7 @@
 // HotelDetailsPage.jsx
 
 import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchHotelDetails } from "../../../Redux/Actions/hotelThunks";
@@ -31,6 +32,11 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { FaPlane } from "react-icons/fa";
 import LandingHeader from "../../../layout/LandingHeader";
+import {
+  getHotelPreBookErrorMessage,
+  handleHotelPreBookSessionExpiry,
+  isHotelPreBookSessionExpired,
+} from "./hotelPreBookSession";
 
 const fmtDate = (
   d,
@@ -76,6 +82,8 @@ const HotelDetailsPage = () => {
 
   const hotelFromDetails = hotelDetailsById?.[hotelCode]?.HotelDetails?.[0];
   const roomsFromRedux = hotelDetailsById?.[hotelCode]?.Rooms || [];
+  const selectedRoomEntries = Object.values(selectedRooms);
+  const hasSelectedRooms = selectedRoomEntries.length > 0;
 
   const extractAttractions = (html) => {
     if (!html) return [];
@@ -279,9 +287,19 @@ const HotelDetailsPage = () => {
       setPreBookData(result);
     } catch (err) {
       console.error("PreBook Error:", err);
+
+      if (isHotelPreBookSessionExpired(err)) {
+        setRoomDetailsModalOpen(false);
+        handleHotelPreBookSessionExpiry({ navigate });
+        return;
+      }
+
       ToastWithTimer({
         type: "error",
-        message: err || "Failed to fetch room details. Please try again.",
+        message: getHotelPreBookErrorMessage(
+          err,
+          "Failed to fetch room details. Please try again.",
+        ),
       });
       setRoomDetailsModalOpen(false);
     } finally {
@@ -351,14 +369,14 @@ const HotelDetailsPage = () => {
 
       {/* ── Main Content ── */}
       <div
-        className={`max-w-7xl mx-auto px-4 pt-6 ${Object.keys(selectedRooms).length > 0 ? "pb-32" : "pb-6"}`}
+        className={`max-w-7xl mx-auto px-4 pt-6 ${hasSelectedRooms ? "pb-40 sm:pb-32" : "pb-6"}`}
       >
         {/* Gallery — full width */}
         <div className="mb-6">
           <HotelImageGallery images={mergedHotel.images} />
         </div>
 
-        <div className="mt-10">
+        <div className="my-10">
           {/* Rooms — full span under left column */}
           <RoomTypesList
             rooms={mergedHotel.rooms}
@@ -368,8 +386,8 @@ const HotelDetailsPage = () => {
             onSeeDetails={handleSeeRoomDetails}
           />
 
-          <div className="mb-4 text-sm font-semibold text-[#000D26]">
-            {Object.keys(selectedRooms).length > 0 ? (
+          {/* <div className="mb-4 text-sm font-semibold text-[#000D26]">
+            {hasSelectedRooms ? (
               <span className="flex items-center gap-2">
                 <MdCheckCircle className="text-emerald-500" /> All{" "}
                 {requiredRooms} rooms selected
@@ -377,7 +395,7 @@ const HotelDetailsPage = () => {
             ) : (
               <span>Select this room type for all {requiredRooms} rooms</span>
             )}
-          </div>
+          </div> */}
         </div>
 
         {/* Two-column layout: main (left) + sticky sidebar (right) */}
@@ -389,34 +407,71 @@ const HotelDetailsPage = () => {
               description={mergedHotel.description}
               checkIn={mergedHotel.checkIn}
               checkOut={mergedHotel.checkOut}
+              checkInDate={searchPayload?.CheckIn}
+              checkOutDate={searchPayload?.CheckOut}
               contact={mergedHotel.contact}
               map={mergedHotel.map}
             />
 
-            {/* Optional Fees */}
-            {mergedHotel.hotelFees?.optional?.length > 0 && (
-              <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden p-8 space-y-4">
+            {/* Hotel Fees & Taxes */}
+            {((mergedHotel.hotelFees?.mandatory?.length > 0) || (mergedHotel.hotelFees?.optional?.length > 0)) && (
+              <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden p-8 space-y-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#E7C695]/10 flex items-center justify-center text-[#E7C695] shadow-sm">
+                  <div className="w-10 h-10 rounded-xl bg-[#C9A84C]/10 flex items-center justify-center text-[#C9A84C] shadow-sm">
                     <FiInfo size={20} />
                   </div>
                   <div>
-                    <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-none">Optional Hotel Fees</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Additional charges that may apply</p>
+                    <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-none">Hotel Fees & Taxes</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Additional charges collected by the property</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-4">
-                  {mergedHotel.hotelFees.optional.map((fee, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-800">{fee.FeesType}</span>
-                        <span className="text-[10px] text-slate-500">{fee.ChargeType}</span>
+
+                <div className={`grid grid-cols-1 ${mergedHotel.hotelFees?.mandatory?.length > 0 && mergedHotel.hotelFees?.optional?.length > 0 ? "md:grid-cols-2" : ""} gap-6`}>
+                  {/* Mandatory Fees */}
+                  {mergedHotel.hotelFees?.mandatory?.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-rose-600">
+                        <FiAlertCircle size={16} />
+                        <h4 className="text-xs font-black uppercase tracking-widest">Mandatory Fees</h4>
                       </div>
-                      <span className="text-sm font-black text-[#C9A84C]">
-                        {fee.Currency} {fee.FeesValue}
-                      </span>
+                      <div className="grid grid-cols-1 gap-3">
+                        {mergedHotel.hotelFees.mandatory.map((fee, idx) => (
+                          <div key={idx} className="flex justify-between items-center p-4 bg-rose-50/30 rounded-xl border border-rose-100/50">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold text-slate-800">{fee.FeesType}</span>
+                              <span className="text-[10px] text-slate-500">{fee.ChargeType}</span>
+                            </div>
+                            <span className="text-sm font-black text-rose-600">
+                              {fee.Currency} {fee.FeesValue}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  )}
+
+                  {/* Optional Fees */}
+                  {mergedHotel.hotelFees?.optional?.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-[#C9A84C]">
+                        <FiInfo size={16} />
+                        <h4 className="text-xs font-black uppercase tracking-widest">Optional Fees</h4>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3">
+                        {mergedHotel.hotelFees.optional.map((fee, idx) => (
+                          <div key={idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold text-slate-800">{fee.FeesType}</span>
+                              <span className="text-[10px] text-slate-500">{fee.ChargeType}</span>
+                            </div>
+                            <span className="text-sm font-black text-[#C9A84C]">
+                              {fee.Currency} {fee.FeesValue}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -526,13 +581,15 @@ const HotelDetailsPage = () => {
             </div>
           </div>
 
-          {/* Sticky Bottom Bar for Selected Room */}
-          {Object.keys(selectedRooms).length > 0 && (
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] z-[9000] px-6 py-4 flex items-center justify-between">
-              <div className="flex flex-col max-w-[50%]">
+           {/* Sticky Bottom Bar for Selected Room */}
+          {hasSelectedRooms &&
+            typeof document !== "undefined" &&
+            createPortal(
+            <div className="fixed left-3 right-3 bottom-3 sm:left-6 sm:right-6 z-[99999] max-w-7xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-[0_-12px_40px_rgba(15,23,42,0.16)] px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex flex-col min-w-0">
                 <span className="text-sm font-black text-[#0A203E] truncate">
                   {(() => {
-                    const r = Object.values(selectedRooms)[0]?.room;
+                    const r = selectedRoomEntries[0]?.room;
                     if (!r) return "Selected Room";
                     return typeof r.RoomTypeName === "string" &&
                       r.RoomTypeName.trim() !== ""
@@ -548,14 +605,14 @@ const HotelDetailsPage = () => {
                   {requiredRooms} Room{requiredRooms > 1 ? "s" : ""} Selected
                 </span>
               </div>
-              <div className="flex items-center gap-6">
+              <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6">
                 <div className="flex flex-col items-end">
                   <span className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
                     Total Price
                   </span>
                   <span className="text-xl font-black text-[#000D26]">
                     ₹
-                    {Object.values(selectedRooms)
+                    {selectedRoomEntries
                       .reduce(
                         (sum, r) =>
                           sum +
@@ -567,9 +624,10 @@ const HotelDetailsPage = () => {
                 </div>
                 <button
                   onClick={handleContinue}
-                  className="bg-[#C9A84C] hover:brightness-110 text-[#0A203E] px-8 py-3.5 rounded-xl font-black text-[11px] tracking-widest uppercase shadow-xl shadow-[#C9A84C]/30 active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer border-none"
+                  className="shrink-0 bg-[#C9A84C] hover:brightness-110 text-[#0A203E] px-5 sm:px-8 py-3.5 rounded-xl font-black text-[11px] tracking-widest uppercase shadow-xl shadow-[#C9A84C]/30 active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer border-none"
                 >
-                  Proceed to Review
+                  <span className="hidden sm:inline">Proceed to Review</span>
+                  <span className="sm:hidden">Review</span>
                   <svg
                     width="16"
                     height="16"
@@ -585,8 +643,10 @@ const HotelDetailsPage = () => {
                   </svg>
                 </button>
               </div>
-            </div>
+            </div>,
+            document.body,
           )}
+
 
           <MapModal
             open={mapModalOpen}
@@ -634,7 +694,7 @@ function RoomDetailsModal({ open, onClose, room, preBookData, loading }) {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       onClick={onClose}
@@ -832,7 +892,8 @@ function RoomDetailsModal({ open, onClose, room, preBookData, loading }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -906,7 +967,7 @@ function MapModal({ open, onClose, lat, lng, name, address }) {
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center"
       onClick={onClose}
@@ -975,7 +1036,8 @@ function MapModal({ open, onClose, lat, lng, name, address }) {
           </a>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

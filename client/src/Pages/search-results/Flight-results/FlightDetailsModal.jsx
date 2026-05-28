@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-
+import { createPortal } from "react-dom";
 import { useDispatch } from "react-redux";
 import { IoClose } from "react-icons/io5";
 import { AiOutlineInfoCircle } from "react-icons/ai";
 import { BsSuitcase } from "react-icons/bs";
 import { BiSolidOffer } from "react-icons/bi";
-import { FaPlane } from "react-icons/fa";
+import { FaPlane, FaCrown, FaUtensils, FaChair, FaStar } from "react-icons/fa";
 import { FiCheckCircle } from "react-icons/fi";
 import {
   MdReceiptLong,
@@ -153,11 +153,9 @@ function FlightSegmentDetail({ segment }) {
       <div className="flex items-center justify-between px-5 py-3 bg-[#0A203E]">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-sm overflow-hidden p-1">
-            <img
-              src={airlineLogo(airlineCode)}
+            <img src={airlineLogo(airlineCode)}
               alt={airlineName}
-              className="w-full h-full object-contain"
-            />
+              className="w-full h-full object-contain" loading="eager" />
           </div>
           <div>
             <p className="text-sm font-black text-white leading-none">
@@ -175,7 +173,7 @@ function FlightSegmentDetail({ segment }) {
             </span>
           )}
           <span className="px-3 py-1 bg-[#C9A84C] text-[#0A203E] text-[10px] font-black uppercase tracking-widest rounded-full">
-            {durationH}h {durationM}m
+            {durationH}h {durationM}
           </span>
         </div>
       </div>
@@ -207,11 +205,11 @@ function FlightSegmentDetail({ segment }) {
         <div className="flex-1 flex flex-col items-center gap-1 px-2">
           <div className="w-full flex items-center gap-1">
             <div className="w-2.5 h-2.5 rounded-full border-2 border-[#C9A84C] bg-white shrink-0" />
-            <div className="flex-1 h-0.5 bg-gradient-to-r from-[#C9A84C] via-slate-300 to-[#C9A84C]" />
+            <div className="flex-1 h-0.5 bg-linear-to-r from-[#C9A84C] via-slate-300 to-[#C9A84C]" />
             <div className="w-7 h-7 rounded-full bg-[#C9A84C] flex items-center justify-center shadow-md shrink-0">
               <FaPlane className="text-[#0A203E] text-xs" />
             </div>
-            <div className="flex-1 h-0.5 bg-gradient-to-r from-[#C9A84C] via-slate-300 to-[#C9A84C]" />
+            <div className="flex-1 h-0.5 bg-linear-to-r from-[#C9A84C] via-slate-300 to-[#C9A84C]" />
             <div className="w-2.5 h-2.5 rounded-full border-2 border-[#C9A84C] bg-white shrink-0" />
           </div>
           {craftType && (
@@ -335,6 +333,96 @@ function LayoverBadge({ arrSeg, depSeg }) {
   );
 }
 
+// ─── Fare Inclusions Card ──────────────────────────────────────────────────
+
+function FareInclusionsCard({ inclusions }) {
+  if (!inclusions || inclusions.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-8 animate-in fade-in duration-300">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-xl bg-[#C9A84C]/10 border border-[#C9A84C]/20 flex items-center justify-center text-[#0A203E] shrink-0">
+          <BiSolidOffer size={22} className="text-[#C9A84C]" />
+        </div>
+        <div>
+          <h4 className="text-xs font-black text-[#0A203E] uppercase tracking-widest leading-none">
+            Fare Inclusions & Services
+          </h4>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1.5">
+            Services included in your selected fare class
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {inclusions.map((item, idx) => {
+          const key = item.key || "";
+          const value = item.value || "";
+          const isIncluded = /included|free|yes/i.test(value);
+          const isExcluded = /excluded|no/i.test(value);
+          const isPaid = /paid|chargeable/i.test(value);
+
+          let badgeClass = "bg-slate-50 text-slate-600 border-slate-200";
+          if (isIncluded) {
+            badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+          } else if (isExcluded) {
+            badgeClass = "bg-rose-50 text-rose-700 border-rose-200";
+          } else if (isPaid) {
+            badgeClass = "bg-amber-50 text-amber-700 border-amber-200";
+          }
+
+          // Icon parsing
+          const kLower = key.toLowerCase();
+          let icon = <AiOutlineInfoCircle className="text-slate-400 text-lg" />;
+          let iconBg = "bg-slate-100";
+
+          if (kLower.includes("lounge")) {
+            icon = <FaCrown className="text-amber-500 text-sm" />;
+            iconBg = "bg-amber-50 border border-amber-100";
+          } else if (kLower.includes("meal") || kLower.includes("food") || kLower.includes("snack") || kLower.includes("dining")) {
+            icon = <FaUtensils className="text-emerald-500 text-sm" />;
+            iconBg = "bg-emerald-50 border border-emerald-100";
+          } else if (kLower.includes("seat") || kLower.includes("recline") || kLower.includes("chair")) {
+            icon = <FaChair className="text-blue-500 text-sm" />;
+            iconBg = "bg-blue-50 border border-blue-100";
+          } else if (kLower.includes("priority") || kLower.includes("checkin") || kLower.includes("check-in") || kLower.includes("boarding")) {
+            icon = <FaStar className="text-indigo-500 text-sm" />;
+            iconBg = "bg-indigo-50 border border-indigo-100";
+          } else if (kLower.includes("baggage") || kLower.includes("luggage")) {
+            icon = <BsSuitcase className="text-teal-500 text-sm" />;
+            iconBg = "bg-teal-50 border border-teal-100";
+          }
+
+          // Format key cleanly
+          const displayKey = key
+            .split(/[\s_]+/)
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+
+          return (
+            <div
+              key={idx}
+              className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-200 transition-all duration-200"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center shrink-0`}>
+                  {icon}
+                </div>
+                <span className="text-xs font-black text-[#0A203E] uppercase tracking-wide truncate">
+                  {displayKey}
+                </span>
+              </div>
+              <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border tracking-wider shrink-0 ${badgeClass}`}>
+                {value}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Flight Details Modal ────────────────────────────────────────────────
 
 export function FlightDetailsModal({
@@ -406,8 +494,46 @@ export function FlightDetailsModal({
   // Cabin class from fare (numeric TBO code)
   const cabinClassLabel = getCabinClassLabel(selectedFlight?.Fare?.CabinClass);
 
-  return (
-    <div className="fixed inset-0 bg-[#0A203E]/75 backdrop-blur-sm flex items-center justify-center z-[100] sm:p-4">
+  // Extract fare inclusions
+  const fareInclusionsList = 
+    selectedFlight?.FareInclusionsList || 
+    selectedFlight?.Fare?.FareInclusionsList || 
+    firstSeg?.FareInclusionsList || 
+    null;
+
+  const fareInclusionsArray = 
+    selectedFlight?.FareInclusions || 
+    selectedFlight?.Fare?.FareInclusions || 
+    firstSeg?.FareInclusions || 
+    null;
+
+  let parsedInclusions = [];
+  if (Array.isArray(fareInclusionsList) && fareInclusionsList.length > 0) {
+    parsedInclusions = fareInclusionsList.map(item => ({
+      key: item.Key || item.key || "",
+      value: item.Value || item.value || ""
+    }));
+  } else if (Array.isArray(fareInclusionsArray) && fareInclusionsArray.length > 0) {
+    parsedInclusions = fareInclusionsArray.map(str => {
+      if (typeof str === "string") {
+        const parts = str.split(/\s*-\s*|\s*:\s*/);
+        if (parts.length > 1) {
+          return {
+            key: parts[0].trim(),
+            value: parts[1].trim()
+          };
+        }
+        return {
+          key: str.trim(),
+          value: "Included"
+        };
+      }
+      return null;
+    }).filter(Boolean);
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 bg-[#0A203E]/75 backdrop-blur-sm flex items-center justify-center z-9999 sm:p-4">
       <div className="bg-white sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto max-h-[100dvh] sm:max-h-[90vh] lg:max-w-5xl flex flex-col overflow-hidden border border-slate-200">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-[#0A203E] shrink-0">
@@ -415,10 +541,10 @@ export function FlightDetailsModal({
             {/* Airline Logo */}
             {airlineCode && (
               <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-md p-1.5 shrink-0">
-                <img
-                  src={`https://pics.avs.io/60/60/${airlineCode}.png`}
+                <img src={`https://pics.avs.io/60/60/${airlineCode}.png`}
                   alt={airlineName}
                   className="w-full h-full object-contain"
+                  loading="lazy" decoding="async"
                   onError={(e) => {
                     e.target.style.display = "none";
                   }}
@@ -582,6 +708,12 @@ export function FlightDetailsModal({
                   </div>
                 ))}
               </div>
+
+              {parsedInclusions.length > 0 && (
+                <div className="mt-6">
+                  <FareInclusionsCard inclusions={parsedInclusions} />
+                </div>
+              )}
             </div>
           )}
 
@@ -599,11 +731,20 @@ export function FlightDetailsModal({
                   selectedFlight?.Fare?.FareInclusions ||
                   seg?.FareInclusions ||
                   null;
+
+                const parsedMeal = parsedInclusions.find(i => i.key.toLowerCase().includes("meal"));
+                const parsedSeat = parsedInclusions.find(i => i.key.toLowerCase().includes("seat"));
+
                 const mealIncluded =
-                  inclObj?.MealIncluded === true ||
-                  inclObj?.Meal === true ||
-                  (inclObj?.Meal && typeof inclObj.Meal === "string" && inclObj.Meal !== "No Meal");
-                const seatIncluded = inclObj?.SeatIncluded === true || inclObj?.Seat === true;
+                  parsedMeal ? /included|free|yes/i.test(parsedMeal.value) : (
+                    inclObj?.MealIncluded === true ||
+                    inclObj?.Meal === true ||
+                    (inclObj?.Meal && typeof inclObj.Meal === "string" && inclObj.Meal !== "No Meal")
+                  );
+                const seatIncluded =
+                  parsedSeat ? /included|free|yes/i.test(parsedSeat.value) : (
+                    inclObj?.SeatIncluded === true || inclObj?.Seat === true
+                  );
 
                 const infoCards = [
                   {
@@ -632,19 +773,19 @@ export function FlightDetailsModal({
                   },
                   {
                     label: "Meal Service",
-                    value: mealIncluded ? "Included" : "Not Included",
+                    value: parsedMeal ? parsedMeal.value : (mealIncluded ? "Included" : "Not Included"),
                     valueClass: mealIncluded ? "text-emerald-600" : "text-slate-500",
                     icon: <FiCheckCircle className={mealIncluded ? "text-emerald-500" : "text-slate-400"} />,
                     iconBg: mealIncluded ? "bg-emerald-50" : "bg-slate-50",
-                    show: inclObj !== null,
+                    show: inclObj !== null || !!parsedMeal,
                   },
                   {
                     label: "Seat Selection",
-                    value: seatIncluded ? "Included" : "Standard",
-                    valueClass: seatIncluded ? "text-emerald-600" : "text-slate-500",
+                    value: parsedSeat ? parsedSeat.value : (seatIncluded ? "Included" : "Standard"),
+                    valueClass: seatIncluded ? "text-emerald-600" : (parsedSeat && /excluded|no/i.test(parsedSeat.value) ? "text-red-500" : "text-slate-500"),
                     icon: <FiCheckCircle className={seatIncluded ? "text-emerald-500" : "text-slate-400"} />,
                     iconBg: seatIncluded ? "bg-emerald-50" : "bg-slate-50",
-                    show: inclObj !== null,
+                    show: inclObj !== null || !!parsedSeat,
                   },
                 ].filter((c) => c.show);
 
@@ -920,6 +1061,7 @@ export function FlightDetailsModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

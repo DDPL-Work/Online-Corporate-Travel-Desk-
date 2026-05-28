@@ -11,6 +11,7 @@ import Unauthorized from "../Pages/Auth/Unauthorized";
 // Travel Admin
 import BookingsDashboard from "../components/TravelAdminTabs/TotalBookings";
 import PendingTravelRequests from "../components/TravelAdminTabs/PendingTravelRequests";
+import SecondApproverRequests from "../components/TravelAdminTabs/SecondApproverRequests";
 import ApprovedTravelRequests from "../components/TravelAdminTabs/ApprovedTravelRequests";
 import RejectedTravelRequests from "../components/TravelAdminTabs/RejectedTravelRequests";
 import UpcomingTrips from "../components/TravelAdminTabs/UpcomingTrips";
@@ -102,6 +103,9 @@ const HomeRedirect = () => {
   if (role === "travel-admin") {
     return <Navigate to="/total-bookings" replace />;
   }
+  if (role === "finance_team") {
+    return <Navigate to="/my-bookings" replace />;
+  }
   if (role === "manager") {
     return <Navigate to="/manager/total-bookings" replace />;
   }
@@ -128,7 +132,7 @@ export const appRouter = createBrowserRouter([
 
       // TRAVEL-ADMIN PROTECTED ROUTES
       {
-        element: <ProtectedRoute allowedRoles={["travel-admin"]} />,
+        element: <ProtectedRoute allowedRoles={["travel-admin", "finance_team"]} />,
         children: [
           {
             path: "/",
@@ -244,7 +248,7 @@ export const appRouter = createBrowserRouter([
       {
         element: (
           <ProtectedRoute
-            allowedRoles={["travel-admin", "manager", "employee"]}
+            allowedRoles={["travel-admin", "manager", "employee", "finance_team"]}
           />
         ),
         children: [
@@ -278,6 +282,7 @@ export const appRouter = createBrowserRouter([
               },
               { path: "/my-upcoming-trips", element: <MyUpcomingTrips /> },
               { path: "/my-past-trips", element: <MyPastTrips /> },
+              { path: "/second-approver-requests", element: <SecondApproverRequests /> },
               {
                 path: "/my-pending-approvals",
                 element: <MyPendingApprovals />,

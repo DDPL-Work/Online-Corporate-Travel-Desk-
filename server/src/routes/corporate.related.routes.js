@@ -67,6 +67,20 @@ router.get(
   corporateController.getCancelledOrRequestedHotels
 );
 
+router.get(
+  "/corporate-bookings/flights/:id",
+  authorizeRoles("super-admin", "ops-member"),
+  requireOpsPermission("View Bookings"),
+  corporateController.getFlightBookingById,
+);
+
+router.get(
+  "/corporate-bookings/hotels/:id",
+  authorizeRoles("super-admin", "ops-member"),
+  requireOpsPermission("View Bookings"),
+  corporateController.getHotelBookingById,
+);
+
 // Get All Corporates (Super Admin)
 router.get(
   "/",

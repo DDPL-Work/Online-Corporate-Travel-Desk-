@@ -35,6 +35,7 @@ export default function EditCorporateModal({ corporate, onClose }) {
     // BILLING & CREDIT
     billingCycle: corporate.billingCycle || "30days",
     customBillingDays: corporate.customBillingDays || "",
+    dueDays: corporate.dueDays || 15,
     creditLimit: corporate.creditLimit || 0,
 
     // TRAVEL POLICY
@@ -98,6 +99,11 @@ export default function EditCorporateModal({ corporate, onClose }) {
         form.billingCycle === "custom"
           ? Number(form.customBillingDays)
           : null,
+
+      dueDays:
+        corporate.classification === "postpaid"
+          ? Number(form.dueDays)
+          : undefined,
 
       creditLimit:
         corporate.classification === "postpaid"
@@ -168,6 +174,10 @@ export default function EditCorporateModal({ corporate, onClose }) {
     customBillingDays:
       form.billingCycle === "custom"
         ? Number(form.customBillingDays)
+        : undefined,
+    dueDays:
+      corporate.classification === "postpaid"
+        ? Number(form.dueDays)
         : undefined,
     creditLimit:
       corporate.classification === "postpaid"
@@ -351,13 +361,22 @@ export default function EditCorporateModal({ corporate, onClose }) {
             )}
 
             {corporate.classification === "postpaid" && (
-              <Field label="Credit Limit (₹)">
-                <Input
-                  type="number"
-                  value={form.creditLimit}
-                  onChange={(v) => setForm({ ...form, creditLimit: v })}
-                />
-              </Field>
+              <>
+                <Field label="Credit Limit (₹)">
+                  <Input
+                    type="number"
+                    value={form.creditLimit}
+                    onChange={(v) => setForm({ ...form, creditLimit: v })}
+                  />
+                </Field>
+                <Field label="Due Days">
+                  <Input
+                    type="number"
+                    value={form.dueDays}
+                    onChange={(v) => setForm({ ...form, dueDays: v })}
+                  />
+                </Field>
+              </>
             )}
 
             <Field label="Wallet Balance (₹)">

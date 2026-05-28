@@ -180,7 +180,23 @@ function FlightSection({ onSelect }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Rejection Ledger" subtitle={`${filtered.length} denied authorizations`} onExport={() => {}} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Rejection Ledger" 
+        subtitle={`${filtered.length} denied authorizations`} 
+        exportConfig={{
+          data: filtered,
+          filename: `my_rejected_flights_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Request ID", key: "id" },
+            { header: "Destination", accessor: (r) => `${r.destination} | ${r.airlineName}` },
+            { header: "Rejection Date", accessor: (r) => fmtDate(r.rejectedDate) },
+            { header: "Reason", key: "reason" },
+            { header: "Status", accessor: () => "Rejected" }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -199,7 +215,7 @@ function FlightSection({ onSelect }) {
                 <td className="!px-6 !py-5">
                    <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
-                         <img src={airlineLogo(b.airlineCode)} alt={b.airlineName} className="w-full h-full object-contain" onError={(e) => { e.target.onerror = null; e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; }} />
+                         <img src={airlineLogo(b.airlineCode)} alt={b.airlineName} className="w-full h-full object-contain" loading="eager" onError={(e) => { e.target.onerror = null; e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; }} />
                       </div>
                       <div>
                          <p className="text-xs font-black uppercase tracking-tight" style={{ color: C.navy }}>{b.destination}</p>
@@ -290,7 +306,23 @@ function HotelSection({ onSelect }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Rejection Ledger" subtitle={`${filtered.length} denied authorizations`} onExport={() => {}} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Rejection Ledger" 
+        subtitle={`${filtered.length} denied authorizations`} 
+        exportConfig={{
+          data: filtered,
+          filename: `my_rejected_hotels_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Request ID", key: "id" },
+            { header: "Hotel", accessor: (r) => `${r.destination} | ${r.city}` },
+            { header: "Rejection Date", accessor: (r) => fmtDate(r.rejectedDate) },
+            { header: "Reason", key: "reason" },
+            { header: "Status", accessor: () => "Rejected" }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

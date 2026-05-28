@@ -37,6 +37,7 @@ import { Pagination } from "./Shared/Pagination";
 import { C } from "../Shared/color";
 import { useNavigate } from "react-router-dom";
 import { airlineLogo } from "../../utils/formatter";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 
 const fmt = (d) =>
   d
@@ -51,6 +52,17 @@ const fmtAmt = (n) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+const calculateDelayDays = ({ dueDate, statementAmount, receivedAmount, paymentReceivedAt }) => {
+  if (!dueDate) return 0;
+  if (Number(statementAmount || 0) <= 0) return 0;
+  const normalizedDueDate = new Date(dueDate);
+  const paidInFull = Number(receivedAmount || 0) >= Number(statementAmount || 0);
+  const stopAt = paidInFull && paymentReceivedAt ? new Date(paymentReceivedAt) : new Date();
+  return stopAt > normalizedDueDate
+    ? Math.floor((stopAt.getTime() - normalizedDueDate.getTime()) / 86400000)
+    : 0;
+};
 
 const DRILL_PAGE_SIZE = 10;
 
@@ -130,6 +142,7 @@ export default function CreditUtilizationPostpaid() {
   } = useSelector((s) => s.postpaid || {});
 
   const { allEmployees: companyUsers = [] } = useSelector((s) => s.adminBooking || {});
+  const { corporate } = useSelector((s) => s.corporateAdmin || {});
 
   const daysRemaining = useMemo(() => {
     if (!balance?.currentCycleEnd) return null;
@@ -154,8 +167,9 @@ export default function CreditUtilizationPostpaid() {
     const stmtDate = balance.currentCycleEnd
       ? new Date(new Date(balance.currentCycleEnd).getTime() + 86400000)
       : null;
+    const dueDays = corporate?.dueDays ?? 15;
     const dueDate = stmtDate
-      ? new Date(stmtDate.getTime() + 8 * 86400000)
+      ? new Date(stmtDate.getTime() + dueDays * 86400000)
       : null;
     const delayDays =
       dueDate && new Date() > dueDate
@@ -174,7 +188,7 @@ export default function CreditUtilizationPostpaid() {
       statementAmount: balance.usedCredit || 0,
       isCurrent: true,
     };
-  }, [balance]);
+  }, [balance, corporate]);
 
   const displayStats = useMemo(() => {
     if (drillCycle) {
@@ -244,34 +258,7 @@ export default function CreditUtilizationPostpaid() {
     dispatch(clearCycleTransactions());
   };
 
-  const handleExport = () => {
-    const list = activeTab === "current" ? [currentCycleRow] : previousCycles;
-    if (!list.length) return;
-    const headers = ["Statement ID", "Billing Cycle", "Usage", "Due Date"];
-    const rows = list.map((c) => [
-      c.statementId,
-      `${fmt(c.periodStart)} - ${fmt(c.periodEnd)}`,
-      `₹${c.statementAmount.toLocaleString()}`,
-      fmt(c.dueDate),
-    ]);
-    const tableHtml = rows
-      .map(
-        (r) =>
-          `<tr>${r.map((c) => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`,
-      )
-      .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;font-weight:700;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `credit-ledger-report.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+  // `handleExport` is now handled by ResponsiveDataTable's exportConfig
 
   const handleScroll = (dir) => {
     if (scrollRef.current) {
@@ -616,15 +603,6 @@ export default function CreditUtilizationPostpaid() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              {!drillCycle && (
-                <button
-                  onClick={handleExport}
-                  className="px-4 py-2.5 rounded-xl font-black text-[10px] flex items-center gap-2 border shadow-sm hover:bg-slate-50 transition-all uppercase tracking-widest"
-                  style={{ borderColor: C.border, color: C.muted }}
-                >
-                  <FiDownload size={14} /> Export Registry
-                </button>
-              )}
               {drillCycle && (
                 <button
                   onClick={handleBack}
@@ -653,7 +631,21 @@ export default function CreditUtilizationPostpaid() {
             </div>
           </div>
 
-          <div className="overflow-x-auto" ref={scrollRef}>
+          <ResponsiveDataTable
+            exportConfig={!drillCycle ? {
+              data: activeTab === "current" && currentCycleRow ? [currentCycleRow] : (previousCycles || []),
+              filename: `credit_ledger_report_${new Date().toISOString().split('T')[0]}.csv`,
+              columns: [
+                { header: "Statement ID", key: "statementId" },
+                { header: "Billing Cycle", accessor: (c) => `${fmt(c.periodStart)} - ${fmt(c.periodEnd)}` },
+                { header: "Usage", accessor: (c) => `₹${(c.statementAmount || 0).toLocaleString()}` },
+                { header: "Due Date", accessor: (c) => fmt(c.dueDate) },
+                { header: "Payment Received", accessor: (c) => c.isCurrent ? "N/A" : fmt(c.paymentReceivedAt) }
+              ]
+            } : null}
+            wrapperClass="!border-none !shadow-none"
+          >
+            <div className="overflow-x-auto" ref={scrollRef}>
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -675,8 +667,10 @@ export default function CreditUtilizationPostpaid() {
                       <Th className="!px-6 !py-5">Statement Registry</Th>
                       <Th className="!px-6 !py-5">Billing Horizon</Th>
                       <Th className="!px-6 !py-5">Due Protocol</Th>
+                      <Th className="!px-6 !py-5">Payment Received</Th>
                       <Th className="!px-6 !py-5">Compliance Status</Th>
-                      <Th className="!px-6 !py-5 text-right">Deployment Value</Th>
+                      <Th className="!px-6 !py-5 text-right">Paid Amount</Th>
+                      <Th className="!px-6 !py-5 text-right">Remaining</Th>
                     </>
                   )}
                 </tr>
@@ -685,7 +679,7 @@ export default function CreditUtilizationPostpaid() {
                 {drillCycle ? (
                   drillLoading ? (
                     <tr>
-                      <td colSpan={8} className="py-24 text-center">
+                      <td colSpan={9} className="py-24 text-center">
                         <div className="animate-spin mb-4 flex justify-center">
                           <FiRefreshCw size={32} className="text-gold" />
                         </div>
@@ -753,11 +747,10 @@ export default function CreditUtilizationPostpaid() {
                           return (
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden shrink-0">
-                                <img 
-                                  src={logoUrl} 
+                                <img src={logoUrl} 
                                   alt={airlineName} 
                                   className="w-full h-full object-contain"
-                                  onError={(e) => { 
+                                  loading="eager" onError={(e) => { 
                                     e.target.onerror = null;
                                     e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
                                   }} 
@@ -869,7 +862,7 @@ export default function CreditUtilizationPostpaid() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={8} className="py-20 text-center">
+                      <td colSpan={9} className="py-20 text-center">
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                           No transactions found in this matrix
                         </p>
@@ -898,7 +891,8 @@ export default function CreditUtilizationPostpaid() {
                 )}
               </tbody>
             </table>
-          </div>
+            </div>
+          </ResponsiveDataTable>
 
           <div className="p-6 border-t" style={{ borderColor: C.border }}>
             <Pagination
@@ -915,6 +909,13 @@ export default function CreditUtilizationPostpaid() {
 }
 
 function StatementRow({ row, onClick, idx = 0 }) {
+  const delayDays = calculateDelayDays({
+    dueDate: row.dueDate,
+    statementAmount: row.statementAmount,
+    receivedAmount: row.receivedAmount,
+    paymentReceivedAt: row.paymentReceivedAt,
+  });
+
   return (
     <tr
       onClick={onClick}
@@ -952,20 +953,30 @@ function StatementRow({ row, onClick, idx = 0 }) {
         </p>
       </td>
       <td className="px-6 py-5">
+        <p className="text-[10px] font-bold text-slate-400 uppercase">
+          {row.isCurrent ? "—" : fmt(row.paymentReceivedAt)}
+        </p>
+      </td>
+      <td className="px-6 py-5">
         <span
           className="px-3 py-1 rounded-full font-black text-[9px] uppercase tracking-widest border shadow-sm"
           style={{
-            backgroundColor: row.delayDays > 0 ? "#FEF2F2" : "#ECFDF5",
-            color: row.delayDays > 0 ? "#EF4444" : "#10B981",
-            borderColor: row.delayDays > 0 ? "#FECACA" : "#A7F3D0",
+            backgroundColor: delayDays > 0 ? "#FEF2F2" : "#ECFDF5",
+            color: delayDays > 0 ? "#EF4444" : "#10B981",
+            borderColor: delayDays > 0 ? "#FECACA" : "#A7F3D0",
           }}
         >
-          {row.delayDays > 0 ? `${row.delayDays} Days Overdue` : "Strategic Standby"}
+          {delayDays > 0 ? `${delayDays} Days Overdue` : "Strategic Standby"}
         </span>
       </td>
       <td className="px-6 py-5 text-right">
-        <p className="text-sm font-black text-navy">
-          ₹{fmtAmt(row.statementAmount)}
+        <p className="text-sm font-black text-[#088395]">
+          ₹{fmtAmt(row.receivedAmount || 0)}
+        </p>
+      </td>
+      <td className="px-6 py-5 text-right">
+        <p className={`text-sm font-black ${row.statementAmount - (row.receivedAmount || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+          ₹{fmtAmt(Math.max(0, row.statementAmount - (row.receivedAmount || 0)))}
         </p>
         <button className="text-[9px] font-black text-gold uppercase tracking-tighter mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 justify-end ml-auto">
           View Protocol <FiChevronRight />

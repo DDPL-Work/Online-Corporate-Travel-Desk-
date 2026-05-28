@@ -12,8 +12,8 @@ import {
   FaTag,
 } from "react-icons/fa";
 import { MdLocationOn, MdBreakfastDining } from "react-icons/md";
-import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
+import LazyImage from "../../../components/common/LazyImage";
 
 /* ─── Color Tokens ─── */
 const ORANGE = "#C9A84C";
@@ -32,7 +32,6 @@ const Stars = ({ rating = 0 }) =>
 
 /* 🏨 Main Card */
 const HotelCard = ({ hotel }) => {
-  const navigate = useNavigate();
   const { hotels, searchPayload } = useSelector((state) => state.hotel);
   const [imgIndex, setImgIndex] = useState(0);
   const [wishlisted, setWishlisted] = useState(false);
@@ -66,11 +65,11 @@ const HotelCard = ({ hotel }) => {
       <div className="flex flex-col md:flex-row">
         {/* 🖼 Image Section */}
         <div className="relative w-full md:w-72 h-52 md:h-52 shrink-0 bg-slate-100">
-          <img
+          <LazyImage
             src={images[imgIndex]}
             alt={hotel.name}
-            loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-500"
+            className="w-full h-full"
+            imgClassName="w-full h-full object-cover transition-transform duration-500"
           />
 
           {totalImages > 1 && (
@@ -195,15 +194,15 @@ const HotelCard = ({ hotel }) => {
             Starts From
           </div>
           <div className="w-full text-center">
-            <div className="text-xl font-black" style={{ color: AZURE }}>
+            {/* <div className="text-xl font-black" style={{ color: AZURE }}>
               ₹{hotel.perNight?.toLocaleString()}{" "}
               <span className="text-sm font-normal">/ room / night</span>
-            </div>
+            </div> */}
 
-            <div className="bg-white border border-slate-200 rounded-lg p-2 mt-3">
-              <div className="text-[10px] text-slate-400 uppercase">
+            <div className="bg-white border border-slate-200 rounded-lg p-2">
+              {/* <div className="text-[10px] text-slate-400 uppercase">
                 Total Amount
-              </div>
+              </div> */}
               <div className="text-lg font-black" style={{ color: ORANGE }}>
                 ₹{hotel.price?.toLocaleString()}
               </div>
@@ -216,8 +215,8 @@ const HotelCard = ({ hotel }) => {
           <a
             href="/one-hotel-details"
             target="_blank"
-            rel="noreferrer"
-            onClick={(e) => {
+            rel="opener"
+            onClick={() => {
               // We don't preventDefault so the link opens
               const rawHotel = hotels?.find((h) => h.HotelCode === hotel.id) || null;
               const stateObj = { 

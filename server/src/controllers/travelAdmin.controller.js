@@ -424,6 +424,91 @@ exports.demoteToEmployee = async (req, res) => {
   }
 };
 
+/**
+ * ============================================================
+ * 🔐 PROMOTE USER TO FINANCE TEAM (SSO DOMAIN SAFE)
+ * ============================================================
+ */
+exports.promoteToFinanceTeam = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const admin = req.user;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Prevent self-modification
+    if (admin._id.toString() === user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot modify your own role",
+      });
+    }
+
+    // SSO domain check
+    const getDomain = (email) => email.split("@")[1];
+    if (getDomain(admin.email) !== getDomain(user.email)) {
+      return res.status(403).json({
+        success: false,
+        message: "This employee does not belong to same organization/domain",
+      });
+    }
+
+    if (
+      admin.corporateId &&
+      user.corporateId &&
+      admin.corporateId.toString() !== user.corporateId.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "This employee belongs to a different corporate account",
+      });
+    }
+
+    // Role safety checks
+    if (user.role === "finance_team") {
+      return res.status(400).json({
+        success: false,
+        message: "User is already on the Finance Team",
+      });
+    }
+
+    if (user.role === "super-admin" || user.role === "travel-admin" || user.role === "corporate-admin") {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot modify admin role",
+      });
+    }
+
+    // Promote
+    user.role = "finance_team";
+    user.promotedBy = admin._id;
+    user.promotedAt = new Date();
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "User promoted to Finance Team successfully",
+      data: {
+        id: user._id,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error("FINANCE PROMOTION ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to promote user to Finance Team",
+    });
+  }
+};
+
 // ===============================
 // ADMIN: GET SINGLE EMPLOYEE
 // ===============================
@@ -480,7 +565,7 @@ exports.getAllEmployees = async (req, res, next) => {
 
     // ✅ Base query (role filter)
     let query = {
-      role: { $in: ["manager", "employee", "travel-admin", "corporate-admin"] },
+      role: { $in: ["manager", "employee", "travel-admin", "corporate-admin", "finance_team"] },
     };
 
     // ✅ Scope filter (corporate OR domain)
@@ -540,6 +625,81 @@ exports.getAllEmployees = async (req, res, next) => {
     next(err);
   }
 };
+
+// ===============================
+// ADMIN: GET EMPLOYEE EXPENSES
+// ===============================
+exports.getEmployeeExpenses = async (req, res, next) => {
+  try {
+    if (!req.user) return next(new ApiError(401, "Unauthorized"));
+    
+    const corporateId = req.user.corporateId || req.user._id;
+    if (!corporateId) return next(new ApiError(400, "CorporateId required"));
+
+    const { startDate, endDate } = req.query;
+
+    let dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+      };
+    }
+
+    // Flight aggregation
+    const flightAgg = await BookingRequest.aggregate([
+      { 
+        $match: { 
+          corporateId: new mongoose.Types.ObjectId(corporateId),
+          executionStatus: "ticketed",
+          ...dateFilter
+        }
+      },
+      {
+        $group: {
+          _id: "$userId",
+          totalSpend: { $sum: "$pricingSnapshot.totalAmount" }
+        }
+      }
+    ]);
+
+    // Hotel aggregation
+    const hotelAgg = await HotelBooking.aggregate([
+      { 
+        $match: { 
+          corporateId: new mongoose.Types.ObjectId(corporateId),
+          executionStatus: "voucher_generated",
+          ...dateFilter
+        }
+      },
+      {
+        $group: {
+          _id: "$userId",
+          totalSpend: { $sum: "$pricingSnapshot.totalAmount" }
+        }
+      }
+    ]);
+
+    // Combine results
+    const expensesMap = {};
+    flightAgg.forEach(f => {
+      const uId = f._id ? f._id.toString() : "unknown";
+      expensesMap[uId] = (expensesMap[uId] || 0) + (f.totalSpend || 0);
+    });
+    hotelAgg.forEach(h => {
+      const uId = h._id ? h._id.toString() : "unknown";
+      expensesMap[uId] = (expensesMap[uId] || 0) + (h.totalSpend || 0);
+    });
+
+    res.status(200).json({
+      success: true,
+      data: expensesMap
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ===============================
 // ADMIN: UPDATE EMPLOYEE
 // ===============================
@@ -552,6 +712,7 @@ exports.updateEmployee = async (req, res, next) => {
       "designation",
       "employeeCode",
       "status",
+      "role",
     ];
     const updates = {};
     if (req.body) {
@@ -572,6 +733,11 @@ exports.updateEmployee = async (req, res, next) => {
 
     Object.assign(emp, updates);
     await emp.save();
+
+    // Sync role to User document if updated
+    if (updates.role && emp.userId) {
+      await User.findByIdAndUpdate(emp.userId, { role: updates.role });
+    }
 
     res.json({
       success: true,

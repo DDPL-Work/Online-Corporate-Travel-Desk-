@@ -32,11 +32,9 @@ const FlightSegmentCard = ({ seg }) => (
   <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-3">
-        <img
-          src={airlineLogo(seg.airlineCode)}
+        <img src={airlineLogo(seg.airlineCode)}
           alt={seg.airlineName}
-          className="w-8 h-8 object-contain"
-        />
+          className="w-8 h-8 object-contain" loading="eager" />
         <div>
           <p className="font-semibold text-[#0A4D68] text-sm">
             {seg.airlineName} ({seg.airlineCode}-{seg.flightNumber})

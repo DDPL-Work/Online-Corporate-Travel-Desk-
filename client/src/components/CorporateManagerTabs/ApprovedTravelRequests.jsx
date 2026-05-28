@@ -17,9 +17,9 @@ import {
   getApprovedFlightRequests,
 } from "../../Redux/Actions/manager.thunk";
 import {
-  FlightBookingModal,
-  HotelBookingModal,
-} from "./Modal/BookingRequestDetailsModal";
+  PendingFlightDetailsModal,
+  PendingHotelDetailsModal,
+} from "./Modal/PendingHotelDetailsModal";
 import {
   LabeledField,
   StatCard,
@@ -54,11 +54,10 @@ const RouteCell = ({ routes, airline }) => {
   return (
     <div className="flex items-center gap-3">
       <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
-        <img 
-          src={logoUrl} 
+        <img src={logoUrl} 
           alt={airlineName} 
           className="w-full h-full object-contain"
-          onError={(e) => { 
+          loading="eager" onError={(e) => { 
             e.target.onerror = null;
             e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
           }} 
@@ -147,7 +146,7 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading, onCountCha
         travelDate,
         amount: a.pricingSnapshot?.totalAmount || 0
       };
-    });
+    }).filter(a => !isDiscarded(a.travelDate));
   }, [flightRaw]);
 
   const execStatuses = useMemo(() => ["All", ...new Set(flightRaw.map(a => a.executionStatus).filter(Boolean))], [flightRaw]);
@@ -196,54 +195,79 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading, onCountCha
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Approval Ledger" subtitle={`${filtered.length} requests pending execution`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Approval Ledger" 
+        subtitle={`${filtered.length} requests pending execution`} 
+        exportConfig={{
+          data: filtered,
+          filename: `approved_flights_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "travellerName" },
+            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
+            { header: "Email", key: "employeeId" },
+            { header: "Approved On", accessor: (r) => r.approvedAt ? new Date(r.approvedAt).toLocaleDateString("en-IN") : "—" },
+            { header: "Travel Date", accessor: (r) => r.travelDate ? new Date(r.travelDate).toLocaleDateString("en-IN") : "—" },
+            { header: "Status", key: "executionStatus" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
-              <Th className="!px-6 !py-5">Route</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Approved On</Th>
-              <Th className="!px-6 !py-5">Travel Date</Th>
-              <Th className="!px-6 !py-5">Status</Th>
-              <Th className="!px-6 !py-5">Amount</Th>
-              <Th className="!px-6 !py-5 !text-center">Action</Th>
+            <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="px-6! py-5!">Order ID</Th>
+              <Th className="px-6! py-5!">Personnel</Th>
+              <Th className="px-6! py-5!">Route</Th>
+              <Th className="px-6! py-5!">Email Identifier</Th>
+              <Th className="px-6! py-5!">Approved On</Th>
+              <Th className="px-6! py-5!">Travel Date</Th>
+              <Th className="px-6! py-5!">Status</Th>
+              <Th className="px-6! py-5!">Amount</Th>
+              <Th className="px-6! py-5! text-center!">Action</Th>
             </tr>
           </thead>
           <tbody>
             {paginated.length > 0 ? paginated.map((a, i) => (
               <tr key={a._id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.gold + "08" }}>
-                <td className="!px-6 !py-5"><IdCell id={a.orderId} /></td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!"><IdCell id={a.orderId} /></td>
+                <td className="px-6! py-5!">
                    <p className="text-xs font-black" style={{ color: C.navy }}>{a.travellerName}</p>
                    <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{a.flightRequest?.purposeOfTravel}</p>
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <RouteCell routes={a.routes} airline={a.airline} />
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{a.employeeId}</span>
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <p className="text-xs font-black" style={{ color: C.navy }}>{a.approvedAt ? new Date(a.approvedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
                    <p className="text-[9px] font-bold text-slate-400 uppercase">{a.approvedAt ? new Date(a.approvedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : ""}</p>
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <p className="text-xs font-black" style={{ color: C.navy }}>{a.travelDate ? new Date(a.travelDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
                    <p className="text-[9px] font-bold text-slate-400 uppercase">{a.travelDate ? new Date(a.travelDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : ""}</p>
                 </td>
-                <td className="!px-6 !py-5"><ExecStatusBadge status={isDiscarded(a.travelDate) ? "discarded" : a.executionStatus} /></td>
-                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{a.amount.toLocaleString()}</td>
-                <td className="!px-6 !py-5 !text-center">
-                    <button onClick={() => setSelected(a)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
+                <td className="px-6! py-5!">
+                  {a.requestStatus === "manager_approved" ? (
+                    <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-1 rounded border border-amber-200 uppercase tracking-tight">Awaiting Travel Admin Approval</span>
+                  ) : (
+                    <ExecStatusBadge status={isDiscarded(a.travelDate) ? "discarded" : a.executionStatus} />
+                  )}
+                </td>
+                <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{a.amount.toLocaleString()}</td>
+                <td className="px-6! py-5! text-center!">
+                    <button onClick={() => setSelected(a)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
                       <FiEye size={16} className="text-[#E7C695] group-hover:scale-110 transition-transform" />
                     </button>
                 </td>
               </tr>
             )) : (
               <tr>
-                <td colSpan={9} className="!px-6 !py-20 text-center">
+                <td colSpan={9} className="px-6! py-20! text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <FiSearch size={32} />
@@ -256,7 +280,7 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading, onCountCha
           </tbody>
         </table>
       </ResponsiveDataTable>
-      {selected && <FlightBookingModal booking={selected} traceTimers={traceTimers} onClose={() => setSelected(null)} />}
+      {selected && <PendingFlightDetailsModal booking={selected} onClose={() => setSelected(null)} isVerified={true} isDiscarded={isDiscarded(selected.travelDate)} />}
     </div>
   );
 }
@@ -290,7 +314,7 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
         amount,
         checkIn
       };
-    });
+    }).filter(a => !isDiscarded(a.checkIn));
   }, [hotelRaw]);
 
   const execStatuses = useMemo(() => ["All", ...new Set(hotelRaw.map(a => a.executionStatus).filter(Boolean))], [hotelRaw]);
@@ -339,54 +363,79 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Approval Ledger" subtitle={`${filtered.length} requests pending execution`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Approval Ledger" 
+        subtitle={`${filtered.length} requests pending execution`} 
+        exportConfig={{
+          data: filtered,
+          filename: `approved_hotels_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order Reference", key: "orderId" },
+            { header: "Personnel", key: "guestName" },
+            { header: "Email", key: "employeeId" },
+            { header: "Approved On", accessor: (r) => r.approvedAt ? new Date(r.approvedAt).toLocaleDateString("en-IN") : "—" },
+            { header: "Check-in", accessor: (r) => r.checkIn ? new Date(r.checkIn).toLocaleDateString("en-IN") : "—" },
+            { header: "Asset Detail", key: "hotelName" },
+            { header: "Status", key: "executionStatus" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order Reference</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Approved On</Th>
-              <Th className="!px-6 !py-5">Check-in</Th>
-              <Th className="!px-6 !py-5">Asset Detail</Th>
-              <Th className="!px-6 !py-5">Status</Th>
-              <Th className="!px-6 !py-5">Amount</Th>
-              <Th className="!px-6 !py-5 !text-center">Action</Th>
+            <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="px-6! py-5!">Order Reference</Th>
+              <Th className="px-6! py-5!">Personnel</Th>
+              <Th className="px-6! py-5!">Email Identifier</Th>
+              <Th className="px-6! py-5!">Approved On</Th>
+              <Th className="px-6! py-5!">Check-in</Th>
+              <Th className="px-6! py-5!">Asset Detail</Th>
+              <Th className="px-6! py-5!">Status</Th>
+              <Th className="px-6! py-5!">Amount</Th>
+              <Th className="px-6! py-5! text-center!">Action</Th>
             </tr>
           </thead>
           <tbody>
             {paginated.length > 0 ? paginated.map((a, i) => (
               <tr key={a._id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.gold + "08" }}>
-                <td className="!px-6 !py-5"><IdCell id={a.orderId} /></td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!"><IdCell id={a.orderId} /></td>
+                <td className="px-6! py-5!">
                    <p className="text-xs font-black" style={{ color: C.navy }}>{a.guestName}</p>
                    <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{a.hotelRequest?.purposeOfTravel}</p>
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{a.employeeId}</span>
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <p className="text-xs font-black" style={{ color: C.navy }}>{a.approvedAt ? new Date(a.approvedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
                    <p className="text-[9px] font-bold text-slate-400 uppercase">{a.approvedAt ? new Date(a.approvedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : ""}</p>
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <p className="text-xs font-black" style={{ color: C.navy }}>{a.checkIn ? new Date(a.checkIn).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <p className="text-xs font-black" style={{ color: C.navy }}>{a.hotelName}</p>
                    <p className="text-[10px] font-bold text-gold uppercase">{a.city}</p>
                 </td>
-                <td className="!px-6 !py-5"><ExecStatusBadge status={isDiscarded(a.checkIn) ? "discarded" : a.executionStatus} /></td>
-                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{a.amount.toLocaleString()}</td>
-                <td className="!px-6 !py-5 !text-center">
-                    <button onClick={() => setSelected(a)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
+                <td className="px-6! py-5!">
+                  {a.requestStatus === "manager_approved" ? (
+                    <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-1 rounded border border-amber-200 uppercase tracking-tight">Awaiting Travel Admin Approval</span>
+                  ) : (
+                    <ExecStatusBadge status={isDiscarded(a.checkIn) ? "discarded" : a.executionStatus} />
+                  )}
+                </td>
+                <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{a.amount.toLocaleString()}</td>
+                <td className="px-6! py-5! text-center!">
+                    <button onClick={() => setSelected(a)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
                       <FiEye size={16} className="text-[#E7C695] group-hover:scale-110 transition-transform" />
                     </button>
                 </td>
               </tr>
             )) : (
               <tr>
-                <td colSpan={9} className="!px-6 !py-20 text-center">
+                <td colSpan={9} className="px-6! py-20! text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <FiSearch size={32} />
@@ -399,7 +448,7 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
           </tbody>
         </table>
       </ResponsiveDataTable>
-      {selected && <HotelBookingModal booking={selected} onClose={() => setSelected(null)} />}
+      {selected && <PendingHotelDetailsModal booking={selected} onClose={() => setSelected(null)} isVerified={true} isDiscarded={isDiscarded(selected.checkIn)} />}
     </div>
   );
 }
@@ -450,7 +499,7 @@ export default function ApprovedTravelRequestsForManager() {
 
   return (
     <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
-      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-10 pb-24 px-6 md:px-10">
+      <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-10 pb-24 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
              <div className="flex items-center gap-3">
@@ -463,9 +512,9 @@ export default function ApprovedTravelRequestsForManager() {
                  </div>
                </button>
              </div>
-             <div className="h-16 w-[1px] bg-white/10 mx-2 hidden md:block" />
+             <div className="h-16 w-px bg-white/10 mx-2 hidden md:block" />
              <div className="flex items-center gap-5">
-               <div className="w-16 h-16 rounded-[2rem] flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
+               <div className="w-16 h-16 rounded-[4xl] flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
                  <FiCheckCircle size={32} />
                </div>
                <div>

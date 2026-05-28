@@ -269,6 +269,16 @@ const HotelBookNow = () => {
       sub: "Waiting for Approval",
       className: "text-[#C9A84C] bg-amber-400/10 border-amber-400/20",
     },
+    pending_second_approval: {
+      label: "Pending",
+      sub: "Waiting for Travel Admin Approval",
+      className: "text-[#C9A84C] bg-amber-400/10 border-amber-400/20",
+    },
+    manager_approved: {
+      label: "Pending",
+      sub: "Waiting for Travel Admin Approval",
+      className: "text-[#C9A84C] bg-amber-400/10 border-amber-400/20",
+    },
     approved: {
       label: "Approved",
       sub: "Ready to Book",
@@ -291,6 +301,8 @@ const HotelBookNow = () => {
           color: "emerald",
         };
       case "pending_approval":
+      case "pending_second_approval":
+      case "manager_approved":
         return {
           icon: <FiAlertCircle size={18} />,
           color: "amber",
@@ -402,11 +414,9 @@ const HotelBookNow = () => {
           <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end pb-8">
             {/* Hotel image */}
             <div className="relative shrink-0">
-              <img
-                src={hotel.image}
+              <img src={hotel.image}
                 alt={hotel.name}
-                className="w-28 h-28 sm:w-32 sm:h-32 object-cover rounded-2xl border-2 border-white/20 shadow-2xl transition-all duration-700 ease-in-out"
-              />
+                className="w-28 h-28 sm:w-32 sm:h-32 object-cover rounded-2xl border-2 border-white/20 shadow-2xl transition-all duration-700 ease-in-out" loading="lazy" decoding="async" />
               <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-emerald-500 border-2 border-[#0A203E] flex items-center justify-center shadow-lg">
                 <MdVerifiedUser size={14} className="text-white" />
               </div>

@@ -19,8 +19,10 @@ export const fetchFlightBookings = createAsyncThunk(
   "superAdmin/fetchFlightBookings",
   async (params = {}, { getState, rejectWithValue }) => {
     try {
-      // Only keep filters (no pagination)
-      const query = new URLSearchParams(params).toString();
+      const query = new URLSearchParams({
+        view: "table",
+        ...params,
+      }).toString();
 
       const res = await api.get(
         `${BASE_URL}/flights${query ? `?${query}` : ""}`,
@@ -36,6 +38,18 @@ export const fetchFlightBookings = createAsyncThunk(
       return rejectWithValue(err.response?.data || err.message);
     }
   }
+);
+
+export const fetchSuperAdminFlightBookingById = createAsyncThunk(
+  "superAdmin/fetchFlightBookingById",
+  async (id, { getState, rejectWithValue }) => {
+    try {
+      const res = await api.get(`${BASE_URL}/flights/${id}`, getConfig(getState));
+      return res.data?.data || res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  },
 );
 
 // ✈️ FLIGHT CANCELLATIONS
@@ -165,9 +179,10 @@ export const fetchHotelBookings = createAsyncThunk(
   "superAdmin/fetchHotelBookings",
   async (params = {}, { getState, rejectWithValue }) => {
     try {
-      // No page/limit — fetch all data for frontend pagination
-      const query = new URLSearchParams(params).toString();
-
+      const query = new URLSearchParams({
+        view: "table",
+        ...params,
+      }).toString();
       const res = await api.get(
         `${BASE_URL}/hotels${query ? `?${query}` : ""}`,
         getConfig(getState),
@@ -183,12 +198,23 @@ export const fetchHotelBookings = createAsyncThunk(
   },
 );
 
+export const fetchSuperAdminHotelBookingById = createAsyncThunk(
+  "superAdmin/fetchHotelBookingById",
+  async (id, { getState, rejectWithValue }) => {
+    try {
+      const res = await api.get(`${BASE_URL}/hotels/${id}`, getConfig(getState));
+      return res.data?.data || res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  },
+);
+
 // 🏨 HOTEL CANCELLATIONS
 export const fetchHotelCancellations = createAsyncThunk(
   "corporateRelated/fetchHotelCancellations",
   async (params = {}, { getState, rejectWithValue }) => {
     try {
-      // No page/limit — fetch all data for frontend pagination
       const query = new URLSearchParams(params).toString();
 
       const res = await api.get(
@@ -355,11 +381,9 @@ export const fetchQuarterlyRevenue = createAsyncThunk(
 
 export const fetchCorporateDetailedBookings = createAsyncThunk(
   "revenue/fetchCorporateDetailed",
-  async ({ id, fromDate, toDate }, { rejectWithValue }) => {
+  async ({ id }, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/corporate-related/revenue/corporate-details/${id}`, { 
-        params: { fromDate, toDate } 
-      });
+      const res = await api.get(`/corporate-related/revenue/corporate-details/${id}`);
       return res.data;
     } catch (err) {
       return rejectWithValue(err?.response?.data || { message: "Fetch failed" });
@@ -413,4 +437,18 @@ export const fetchCorporates = createAsyncThunk(
       return rejectWithValue(err.response?.data || err.message);
     }
   }
+);
+
+export const createCancellationQuery = createAsyncThunk(
+  "cancellation/createQuery",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const res = await api.post(`/corporate-related/cancellation-queries`, payload);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err?.response?.data || { message: "Create cancellation query failed" },
+      );
+    }
+  },
 );

@@ -1,3 +1,6 @@
+import React from "react";
+import { C } from "../../Shared/color";
+
 export function Pagination({
   currentPage,
   totalItems,
@@ -10,17 +13,30 @@ export function Pagination({
   const pages = [];
   for (let i = 1; i <= totalPages; i++) pages.push(i);
 
+  const activeGoldenStyle = {
+    background: `${C.gold}10`,
+    borderColor: `${C.gold}40`,
+    color: C.gold,
+  };
+
+  const defaultButtonStyle = {
+    background: C.white,
+    borderColor: C.border,
+    color: C.muted,
+  };
+
   return (
-    <div className="px-4 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2">
+    <div className="px-4 py-3 border-t flex items-center justify-between gap-2" style={{ borderColor: C.border, background: C.offWhite }}>
       <span className="text-xs text-slate-400">
         Page <strong className="text-slate-600">{currentPage}</strong> of{" "}
         <strong className="text-slate-600">{totalPages}</strong>
       </span>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="px-2.5 py-1 text-xs font-semibold rounded-md border border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="px-3 py-1 text-xs font-semibold rounded-md border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none"
+          style={currentPage !== 1 ? activeGoldenStyle : defaultButtonStyle}
         >
           ← Prev
         </button>
@@ -45,11 +61,12 @@ export function Pagination({
             <button
               key={p}
               onClick={() => onPageChange(p)}
-              className={`w-7 h-7 text-xs font-bold rounded-md transition-colors ${
-                p === currentPage
-                  ? "bg-[#0A4D68] text-white shadow-sm"
-                  : "border border-slate-200 text-slate-500 hover:bg-slate-100"
-              }`}
+              className="w-7 h-7 text-xs font-bold rounded-md transition-all border cursor-pointer select-none"
+              style={p === currentPage ? {
+                background: C.navy,
+                borderColor: C.navy,
+                color: C.white,
+              } : defaultButtonStyle}
             >
               {p}
             </button>
@@ -59,7 +76,8 @@ export function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="px-2.5 py-1 text-xs font-semibold rounded-md border border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="px-3 py-1 text-xs font-semibold rounded-md border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none"
+          style={currentPage !== totalPages ? activeGoldenStyle : defaultButtonStyle}
         >
           Next →
         </button>

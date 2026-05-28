@@ -242,11 +242,9 @@ export default function PendingHotelApprovalPage() {
             <div className="bg-white rounded-2xl border overflow-hidden shadow-sm" style={{ borderColor: C.border }}>
               <div className="flex flex-col md:flex-row">
                 <div className="md:w-1/3 relative h-64 md:h-auto overflow-hidden bg-slate-100">
-                  <img
-                    src={hotel.images?.[0] || bookingSnapshot.hotelImage || "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=800"}
+                  <img src={hotel.images?.[0] || bookingSnapshot.hotelImage || "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=800"}
                     alt={hotel.hotelName}
-                    className="w-full h-full object-cover"
-                  />
+                    className="w-full h-full object-cover" loading="eager" />
                   <div className="absolute top-4 left-4">
                     <InfoBadge color="amber">
                       <FiStar size={10} className="mr-1 fill-amber-500" /> {hotel.starRating} Stars

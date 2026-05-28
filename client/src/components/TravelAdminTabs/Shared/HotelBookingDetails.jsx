@@ -245,9 +245,9 @@ function Stars({ count = 0 }) {
 function SectionHeader({ num, title }) {
   return (
     <div className="flex items-center pb-3 border-b border-[#EAE4D9] mb-6">
-      <span className="font-['DM_Mono'] text-[#B5862A] text-[11px] tracking-wider mr-3">
+      {/* <span className="font-['DM_Mono'] text-[#B5862A] text-[11px] tracking-wider mr-3">
         {String(num).padStart(2, "0")}
-      </span>
+      </span> */}
       <h2 className="font-['Cormorant_Garamond'] text-[22px] font-semibold text-[#1A1714] md:text-[18px]">
         {title}
       </h2>
@@ -336,11 +336,9 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
         {/* Image */}
         <div className="relative min-h-[320px] overflow-hidden bg-[#E8E0D0]">
           {images.length > 0 ? (
-            <img
-              src={images[activeIndex]}
+            <img src={images[activeIndex]}
               alt={hotelName}
-              className="w-full h-full object-cover block absolute inset-0 transition-opacity duration-700"
-            />
+              className="w-full h-full object-cover block absolute inset-0 transition-opacity duration-700" loading="lazy" decoding="async" />
           ) : (
             <div className="w-full h-full min-h-[320px] flex items-center justify-center bg-[#E8E0D0]">
               <MdHotel size={48} className="text-[#EAE4D9]" />
@@ -376,7 +374,9 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
             {executionStatus && (
               <div className="mt-[10px] flex items-center gap-2 flex-wrap">
                 <StatusPill status={executionStatus} />
-                {booking?.amendment?.status && booking.amendment.status !== "completed" && (
+                {booking?.amendment?.status && 
+                 booking.amendment.status !== "completed" && 
+                 booking.amendment.status !== "not_requested" && (
                   <StatusPill status={`amendment_${booking.amendment.status}`} />
                 )}
               </div>
@@ -545,14 +545,24 @@ function PaymentStatusCard({
 /* ─────────────────────────────────────────────────────────────── */
 /*  Room Section                                                   */
 /* ─────────────────────────────────────────────────────────────── */
-function RoomSection({ rooms = [], selectedRoom = {}, noOfRooms }) {
-  if (!rooms?.length) return null;
+function RoomSection({ rooms = [], preBookRooms = [], allRooms = [], selectedRoom = {}, noOfRooms = 1 }) {
+  if (!rooms || rooms.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-8">
       {rooms.map((room, index) => {
-        const descriptionHtml = room.RoomDescription || "";
+        const descriptionHtml = room.RoomDescription || room.Description || "";
         const perNight = room.Price?.perNight || room.totalFare / (room.Price?.nights || 1) || 0;
+
+        const preBookRoom = preBookRooms[index] || {};
+        const allRoomMatch = allRooms.find(r => r.name === room.Name?.[0] || r.name === room.Name || r.name === room.roomTypeName) || allRooms[index] || {};
+        
+        let isRefundable = room.IsRefundable !== undefined ? room.IsRefundable : room.isRefundable;
+        if (preBookRoom.IsRefundable !== undefined) {
+          isRefundable = preBookRoom.IsRefundable;
+        } else if (allRoomMatch.isRefundable !== undefined) {
+          isRefundable = allRoomMatch.isRefundable;
+        }
 
         return (
           <div key={index}>
@@ -577,17 +587,20 @@ function RoomSection({ rooms = [], selectedRoom = {}, noOfRooms }) {
                       {room.MealType.replace(/_/g, " ")}
                     </span>
                   )}
-                  {room.IsRefundable !== undefined && (
-                    <span
-                      className={`inline-flex items-center gap-[5px] px-[10px] py-1 border text-[10px] font-bold uppercase tracking-wider ${
-                        room.IsRefundable
-                          ? "border-[#2C7A4B] text-[#2C7A4B] bg-[#EDF7F2]"
-                          : "border-[#B5341A] text-[#B5341A] bg-[#FDF1EE]"
-                      }`}
-                    >
-                      {room.IsRefundable ? "Refundable" : "Non-Refundable"}
-                    </span>
-                  )}
+                  {isRefundable !== undefined && (() => {
+                    const isRefBool = isRefundable === true || isRefundable === "true" || isRefundable === "True";
+                    return (
+                      <span
+                        className={`inline-flex items-center gap-[5px] px-[10px] py-1 border text-[10px] font-bold uppercase tracking-wider ${
+                          isRefBool
+                            ? "border-[#2C7A4B] text-[#2C7A4B] bg-[#EDF7F2]"
+                            : "border-[#B5341A] text-[#B5341A] bg-[#FDF1EE]"
+                        }`}
+                      >
+                        {isRefBool ? "Refundable" : "Non-Refundable"}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -606,8 +619,18 @@ function RoomSection({ rooms = [], selectedRoom = {}, noOfRooms }) {
                       __html: descriptionHtml.replace(/<p><\/p>/g, ""),
                     }}
                   />
-                </div>
-              )}
+                  </div>
+                )}
+
+                {/* Amenities */}
+                {room.Amenities && room.Amenities.length > 0 && (
+                  <div className="bg-white p-6 border-t border-[#EAE4D9]">
+                    <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
+                      Room Amenities
+                    </div>
+                    <AmenitiesSection amenities={room.Amenities} />
+                  </div>
+                )}
 
               {/* Inclusions & Promotions */}
               {(() => {
@@ -741,12 +764,18 @@ function AmenitiesSection({ amenities = [] }) {
 /* ─────────────────────────────────────────────────────────────── */
 function CheckInInstructions({ conditions = [] }) {
   const filtered = conditions.filter(
-    (c) => c && c.trim() && !c.startsWith("&lt;"),
+    (c) => c && c.trim(),
   );
   if (!filtered.length) return null;
 
+  const decodeHtml = (html) => {
+    const txt = document.createElement("textarea");
+    txt.innerHTML = html;
+    return txt.value;
+  };
+
   return (
-    <div className="grid grid-cols-[1fr_2fr] gap-[1px] bg-[#EAE4D9]">
+    <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-[1px] bg-[#EAE4D9]">
       <div className="bg-[#FDF8EE] p-6 border-l-[3px] border-[#B5862A]">
         <div className="flex gap-[10px] items-start">
           <FiInfo
@@ -759,19 +788,20 @@ function CheckInInstructions({ conditions = [] }) {
           </p>
         </div>
       </div>
-      <div className="bg-white p-6">
-        <ol className="list-none p-0 m-0 flex flex-col gap-[14px]">
+      <div className="bg-white p-6 overflow-hidden">
+        <ul className="list-none p-0 m-0 flex flex-col gap-4">
           {filtered.map((c, i) => (
             <li key={i} className="flex gap-4 items-start">
               <span className="font-['DM_Mono'] text-[10px] text-[#B5862A] font-medium min-w-[18px] pt-[2px]">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <span className="text-[13px] text-[#7A7068] leading-[1.6]">
-                {c}
-              </span>
+              <div 
+                className="text-[13px] text-[#7A7068] leading-[1.6] checkin-html-content"
+                dangerouslySetInnerHTML={{ __html: decodeHtml(c) }}
+              />
             </li>
           ))}
-        </ol>
+        </ul>
       </div>
     </div>
   );
@@ -800,95 +830,81 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
   };
 
   return (
-    <div>
+    <div className="flex flex-col gap-6">
       {lastCancellationDate && (
-        <div className="flex items-center gap-[10px] padding-[12px_16px] bg-[#EDF7F2] border border-[#C3E4D2] mb-4">
-          <FiCheckCircle
-            size={14}
-            className="text-[#2C7A4B]"
-          />
-          <span className="text-[13px] text-[#2C7A4B]">
+        <div className="flex items-center gap-[10px] p-4 bg-[#EDF7F2] border border-[#C3E4D2] rounded-xl shadow-sm">
+          <FiCheckCircle size={18} className="text-[#2C7A4B]" />
+          <span className="text-[14px] text-[#2C7A4B]">
             <strong>Free cancellation</strong> until{" "}
             <strong>{fmtDate(lastCancellationDate)}</strong>
           </span>
         </div>
       )}
-      <table className="w-full border-collapse">
-        <thead>
-          <tr>
-            <th className="text-left p-[8px_12px] text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] border-b border-[#EAE4D9]">
-              # FROM DATE
-            </th>
-            <th className="text-left p-[8px_12px] text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] border-b border-[#EAE4D9]">
-              TO DATE
-            </th>
-            <th className="text-left p-[8px_12px] text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] border-b border-[#EAE4D9]">
-              CHARGE TYPE
-            </th>
-            <th className="text-right p-[8px_12px] text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] border-b border-[#EAE4D9]">
-              CHARGE
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {policies.map((p, i) => {
-            const nextPolicy = policies[i + 1];
-            const displayToDate = p.ToDate || nextPolicy?.FromDate || "Check-in";
 
-            const fromDateObj = parseDate(p.FromDate);
-            const toDateObj = parseDate(displayToDate === "Check-in" ? null : displayToDate);
-            
-            const fromTime = fromDateObj?.getTime() || 0;
-            const toTime = toDateObj?.getTime() || Infinity;
-            const nowTime = now.getTime();
-            
-            const isActive = nowTime >= fromTime && nowTime < toTime;
+      <div className="relative border-l-[2px] border-dashed border-[#EAE4D9] ml-4 pl-8 space-y-8 py-2">
+        {policies.map((p, i) => {
+          const nextPolicy = policies[i + 1];
+          const displayToDate = p.ToDate || nextPolicy?.FromDate || "Check-in";
 
-            return (
-              <tr
-                key={i}
-                className={`${isActive ? "bg-[#B5862A08]" : "hover:bg-[#B5862A04]"}`}
-              >
-                <td className="p-[14px_12px] border-b border-[#EAE4D9] text-[13px] text-[#7A7068]">
-                  <div className="flex items-center gap-2">
-                    {p.FromDate || "—"}
-                    {isActive && (
-                      <span className="text-[8px] font-bold tracking-widest uppercase bg-[#B5862A] text-white px-1.5 py-0.5 rounded-sm animate-pulse">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="p-[14px_12px] border-b border-[#EAE4D9] text-[13px] text-[#A89F94]">
-                  {displayToDate}
-                </td>
-              <td className="p-[14px_12px] border-b border-[#EAE4D9]">
-                <span
-                  className={`text-[10px] font-semibold tracking-[0.1em] uppercase px-2 py-[2px] ${
-                    p.CancellationCharge === 0
-                      ? "bg-[#EDF7F2] text-[#2C7A4B]"
-                      : "bg-[#FDF1EE] text-[#B5341A]"
-                  }`}
-                >
-                  {typeLabel(p.ChargeType)}
-                </span>
-              </td>
-              <td className="p-[14px_12px] border-b border-[#EAE4D9] text-right font-semibold text-[14px]">
-                {p.CancellationCharge === 0 ? (
-                  <span className="text-[#2C7A4B]">Free</span>
-                ) : (
-                  <span className="text-[#1A1714]">
-                    {p.ChargeType === 2 || p.ChargeType === "Percentage"
-                      ? `${p.CancellationCharge}%`
-                      : `₹${Number(p.CancellationCharge).toLocaleString("en-IN")}`}
+          const fromDateObj = parseDate(p.FromDate);
+          const toDateObj = parseDate(displayToDate === "Check-in" ? null : displayToDate);
+          
+          const fromTime = fromDateObj?.getTime() || 0;
+          const toTime = toDateObj?.getTime() || Infinity;
+          const nowTime = now.getTime();
+          
+          const isActive = nowTime >= fromTime && nowTime < toTime;
+          const isFree = p.CancellationCharge === 0;
+
+          return (
+            <div key={i} className="relative">
+              {/* Timeline marker */}
+              <div className={`absolute -left-[41px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full border-4 border-white ${isActive ? 'bg-[#B5862A] shadow-[0_0_0_3px_rgba(181,134,42,0.2)]' : 'bg-[#EAE4D9]'}`} />
+              
+              <div className={`bg-white rounded-xl p-5 border transition-all ${isActive ? 'border-[#B5862A] shadow-md relative' : 'border-[#EAE4D9] shadow-sm hover:shadow-md'}`}>
+                {isActive && (
+                  <span className="absolute -top-3 left-4 bg-[#B5862A] text-white text-[9px] font-bold tracking-widest uppercase px-2 py-1 rounded-sm shadow-sm animate-pulse">
+                    Current Phase
                   </span>
                 )}
-              </td>
-            </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Valid Timeline
+                    </span>
+                    <div className="flex items-center gap-2 text-[14px] font-medium text-gray-800">
+                      <span>{p.FromDate || "—"}</span>
+                      <span className="text-gray-400">→</span>
+                      <span>{displayToDate}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-start md:items-end gap-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Cancellation Penalty
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-[10px] font-bold tracking-[0.1em] uppercase px-2 py-1 rounded-sm ${isFree ? 'bg-[#EDF7F2] text-[#2C7A4B]' : 'bg-[#FDF1EE] text-[#B5341A]'}`}>
+                        {typeLabel(p.ChargeType)}
+                      </span>
+                      <span className={`text-[18px] font-black ${isFree ? 'text-[#2C7A4B]' : 'text-[#1A1714]'}`}>
+                        {isFree ? (
+                          "Free"
+                        ) : (
+                          p.ChargeType === 2 || p.ChargeType === "Percentage"
+                            ? `${p.CancellationCharge}%`
+                            : `₹${Number(p.CancellationCharge).toLocaleString("en-IN")}`
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1013,7 +1029,7 @@ function GuestSection({ travellers = [] }) {
 
             <hr className="border-t border-[#EAE4D9] mt-0 mb-4" />
 
-            <div className="grid grid-cols-[repeat(3,1fr)_auto_auto_auto] gap-[8px_24px] items-center">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-[16px_24px] items-start">
               <div>
                 <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
                   Email
@@ -1034,6 +1050,30 @@ function GuestSection({ travellers = [] }) {
                 </div>
                 <div className="text-[12px] text-[#7A7068]">{nationality}</div>
               </div>
+              {(t.PanCard || t.panCard) && (
+                <div>
+                  <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
+                    PAN Card
+                  </div>
+                  <div className="text-[12px] text-[#7A7068] uppercase font-['DM_Mono']">
+                    {t.PanCard || t.panCard}
+                  </div>
+                </div>
+              )}
+              {(t.Dob || t.dob) && (
+                <div>
+                  <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
+                    Date of Birth
+                  </div>
+                  <div className="text-[12px] text-[#7A7068]">
+                    {new Date(t.Dob || t.dob).toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric"
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -1918,6 +1958,8 @@ export default function HotelBookingDetails() {
   const user = useSelector((state) => state.auth?.user);
   const isTravelAdmin = user?.role === "travel-admin";
 
+  const [activeTab, setActiveTab] = useState("hotel_details");
+
   // Detect source: cancelled table or total bookings table
   const searchParams = new URLSearchParams(location.search);
   const source = searchParams.get("source");
@@ -2009,13 +2051,16 @@ export default function HotelBookingDetails() {
     ? booking.rooms
     : (Array.isArray(rawData) ? rawData : (rawData ? [rawData] : allRooms));
 
-  const cancelPolicies = selectedRoomRaw?.CancelPolicies || [];
+  const cancelPolicies = hotelReq.selectedRoom?.cancelPolicies || selectedRoomRaw?.CancelPolicies || [];
   const amenities = selectedRoomRaw?.Amenities || [];
 
   const travellers = booking?.travellers || [];
   const bookingDetail = null; // no raw TBO detail in this API
   const detailRoom = selectedRoomRaw;
-  const rateConditions = [];
+  const preBookResult = hotelReq?.preBookResponse?.HotelResult?.[0] || {};
+  const rateConditions = hotelReq.selectedRoom?.RateConditions || selectedRoomRaw?.RateConditions || preBookResult?.RateConditions || [];
+  const rawSupplements = hotelReq.selectedRoom?.Supplements || selectedRoomRaw?.Supplements || preBookResult?.Rooms?.[0]?.Supplements || [];
+  const supplements = Array.isArray(rawSupplements[0]) ? rawSupplements.flat() : rawSupplements;
 
   const paymentSuccessful = booking?.payment?.status === "completed";
   const executionStatus = booking?.executionStatus || "";
@@ -2049,8 +2094,9 @@ export default function HotelBookingDetails() {
       `}</style>
 
       {/* ── Sticky nav ── */}
-      <header className="sticky top-0 z-10 bg-white border-b border-[#EAE4D9] h-14 px-8 flex items-center gap-4">
-        <button
+      <header className="sticky top-0 z-10 bg-white border-b border-[#EAE4D9]">
+       <div className="max-w-[1440px] mx-auto px-5 h-14 flex items-center gap-6">
+         <button
           onClick={() => navigate(backPath)}
           className="flex items-center gap-[6px] bg-none border-none cursor-pointer text-[12px] font-semibold text-[#B5862A] font-['DM_Sans'] tracking-[0.05em] uppercase hover:opacity-80 transition-opacity"
         >
@@ -2077,116 +2123,193 @@ export default function HotelBookingDetails() {
             </span>
           )}
         </div>
+       </div>
+         {/* Tabs Navigation */}
+        <div className="max-w-[1440px] mx-auto px-5 h-14 flex items-center gap-6 border-t border-[#EAE4D9] ">
+          {[
+            { id: "hotel_details", label: "Hotel Details" },
+            { id: "room_details", label: "Room Details" },
+            { id: "rules", label: "Rules & Policies" },
+            { id: "guest", label: "Guest" },
+            { id: "amendment", label: "Amendment" },
+            { id: "history", label: "History" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`pb-3 text-sm font-bold tracking-wide transition-colors whitespace-nowrap relative ${
+                activeTab === tab.id
+                  ? "text-[#1A1714]"
+                  : "text-[#A89F94] hover:text-[#7A7068]"
+              }`}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#B5862A]" />
+              )}
+            </button>
+          ))}
+        </div>
       </header>
 
       {/* ── Main ── */}
-      <main className="max-w-[1440px] mx-auto p-[32px_24px_120px]">
-        {/* Hero */}
-        <div className="mb-10">
-          <HotelHeroCard
-            booking={booking}
-            bookingDetail={bookingDetail}
-            paymentSuccessful={paymentSuccessful}
-          />
-        </div>
+      <main className="w-full px-4 lg:px-10 py-8 pb-24 space-y-6">
+       
 
-        {/* Payment status */}
-        <div className="mb-10">
-          <PaymentStatusCard
-            booking={booking}
-            paymentSuccessful={paymentSuccessful}
-            isConfirmed={isConfirmed}
-            hotelReq={hotelReq}
-            isTravelAdmin={isTravelAdmin}
-          />
-        </div>
-
-        {/* ── Numbered sections ── */}
-
-        {/* 01 The Room */}
-        {rooms.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={1}
-              title="The Room"
+        {activeTab === "hotel_details" && (
+          <div className="space-y-6">
+            <HotelHeroCard
+              booking={booking}
+              bookingDetail={bookingDetail}
+              paymentSuccessful={paymentSuccessful}
             />
-            <RoomSection
-              rooms={rooms}
-              selectedRoom={selectedRoom}
-              noOfRooms={hotelReq?.noOfRooms}
-            />
-          </section>
+
+            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+              <div className="space-y-6">
+                <PaymentStatusCard
+                  booking={booking}
+                  paymentSuccessful={paymentSuccessful}
+                  isConfirmed={isConfirmed}
+                  hotelReq={hotelReq}
+                  isTravelAdmin={isTravelAdmin}
+                />
+              </div>
+              <div className="space-y-6">
+                <section>
+                  <SectionHeader num={3} title="Order ID" />
+                  <BookingReferencesSection
+                    booking={booking}
+                    bookingDetail={bookingDetail}
+                    result={result}
+                  />
+                </section>
+
+                {isTravelAdmin && priceBreakUp && (
+                  <section>
+                    <SectionHeader num={6} title="Fare Breakdown" />
+                    <FareBreakdownSection
+                      priceBreakUp={priceBreakUp}
+                      totalFare={totalFare}
+                    />
+                  </section>
+                )}
+
+                {supplements.length > 0 && (
+                  <section>
+                    <SectionHeader  title="Mandatory Supplements" />
+                    <div className="bg-white border border-[#EAE4D9] p-5">
+                      <ul className="space-y-3 m-0 p-0 list-none">
+                        {supplements.map((s, i) => (
+                          <li key={i} className="flex justify-between items-center pb-3 border-b border-gray-100 last:border-0 last:pb-0">
+                            <div>
+                              <div className="text-[11px] font-bold text-[#1A1714] uppercase tracking-wide">
+                                {s.Type || s.type || "Supplement"}
+                              </div>
+                              <div className="text-[12px] text-[#7A7068]">
+                                {s.Description || s.description || "Additional Charge"}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[14px] font-bold text-[#B5862A]">
+                                {s.Currency || "AED"} {s.Price || s.SuppAmount || 0}
+                              </span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </section>
+                )}
+              </div>
+            </div>
+          </div>
         )}
 
-        {/* 04 Cancellation Policy */}
-        {cancelPolicies.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={2}
-              title="Cancellation Policy"
-            />
-            <CancellationPolicySection
-              policies={cancelPolicies}
-              lastCancellationDate={
-                detailRoom?.LastCancellationDate ||
-                bookingDetail?.LastCancellationDate
-              }
-            />
-          </section>
+        {activeTab === "room_details" && (
+          <div className="space-y-6">
+            {rooms.length > 0 ? (
+              <section className="mb-12">
+                <SectionHeader num={1} title="The Room" />
+                <RoomSection
+                  rooms={rooms}
+                  preBookRooms={preBookResult?.Rooms || []}
+                  allRooms={allRooms}
+                  selectedRoom={selectedRoom}
+                  noOfRooms={hotelReq?.noOfRooms}
+                />
+              </section>
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-gray-500">No room details available.</p>
+              </div>
+            )}
+          </div>
         )}
 
-        {/* 05 Booking References */}
-        <section className="mb-12">
-          <SectionHeader
-            num={3}
-            title="Order ID"
-          />
-          <BookingReferencesSection
-            booking={booking}
-            bookingDetail={bookingDetail}
-            result={result}
-          />
-        </section>
+        {activeTab === "rules" && (
+          <div className="space-y-6">
+            {cancelPolicies.length > 0 && (
+              <section className="mb-12">
+                <SectionHeader num={2} title="Cancellation Policy" />
+                <CancellationPolicySection
+                  policies={cancelPolicies}
+                  lastCancellationDate={
+                    detailRoom?.LastCancellationDate ||
+                    bookingDetail?.LastCancellationDate
+                  }
+                />
+              </section>
+            )}
 
-        {/* 06 Guest */}
-        {travellers.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={4}
-              title="Guest"
-            />
-            <GuestSection travellers={travellers} />
-          </section>
+            {rateConditions.length > 0 && (
+              <section className="mb-12">
+                <SectionHeader num={3} title="Rate Conditions & Hotel Policies" />
+                <CheckInInstructions conditions={rateConditions} />
+              </section>
+            )}
+
+            {cancelPolicies.length === 0 && rateConditions.length === 0 && (
+              <div className="text-center py-10">
+                <p className="text-gray-500">No rules and policies provided.</p>
+              </div>
+            )}
+          </div>
         )}
 
-        {/* 08 Fare Breakdown (Travel Admin) */}
-        {isTravelAdmin && priceBreakUp && (
-          <section className="mb-12">
-            <SectionHeader
-              num={6}
-              title="Fare Breakdown"
-            />
-            <FareBreakdownSection
-              priceBreakUp={priceBreakUp}
-              totalFare={totalFare}
-            />
-          </section>
+        {activeTab === "guest" && (
+          <div className="space-y-6">
+            {travellers.length > 0 ? (
+              <section className="mb-12">
+                <SectionHeader num={4} title="Guest" />
+                <GuestSection travellers={travellers} />
+              </section>
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-gray-500">No guest details provided.</p>
+              </div>
+            )}
+          </div>
         )}
 
-        {/* 07 Cancellation Request */}
-        <section className="mb-12">
-          <SectionHeader
-            num={5}
-            title="Cancellation Request"
-          />
-          <CancellationSection
-            booking={booking}
-            isConfirmed={isConfirmed}
-            cancelPolicies={cancelPolicies}
-            totalFare={totalFare}
-          />
-        </section>
-        <BookingHistory booking={booking} />
+        {activeTab === "amendment" && (
+          <div className="space-y-6">
+            <section className="mb-12">
+              <SectionHeader num={5} title="Cancellation Request" />
+              <CancellationSection
+                booking={booking}
+                isConfirmed={isConfirmed}
+                cancelPolicies={cancelPolicies}
+                totalFare={totalFare}
+              />
+            </section>
+          </div>
+        )}
+
+        {activeTab === "history" && (
+          <div className="space-y-6">
+            <BookingHistory booking={booking} />
+          </div>
+        )}
       </main>
     </div>
   );

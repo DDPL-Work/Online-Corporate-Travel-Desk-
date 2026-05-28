@@ -40,7 +40,7 @@ const bookingRequestSchema = new mongoose.Schema(
 
     requestStatus: {
       type: String,
-      enum: ["draft", "pending_approval", "approved", "rejected", "expired"],
+      enum: ["draft", "pending_approval", "pending_second_approval", "manager_approved", "approved", "rejected", "expired"],
       default: "draft",
       index: true,
     },
@@ -60,6 +60,22 @@ const bookingRequestSchema = new mongoose.Schema(
     rejectedAt: Date,
 
     approverComments: String,
+
+    managerApproval: {
+      isApproved: { type: Boolean, default: false },
+      approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      approvedAt: Date,
+      comments: String,
+    },
+
+    secondApprover: {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      email: String,
+      name: String,
+      role: String,
+      transferRemark: String,
+      transferredAt: Date,
+    },
 
     /* ================= PROJECT / APPROVER METADATA ================= */
     projectCodeId: String,
@@ -298,6 +314,12 @@ const bookingRequestSchema = new mongoose.Schema(
         enum: ["wallet", "gateway", "postpaid"],
       },
       transactionId: String,
+      paymentId: {
+        type: String,
+        index: true,
+        sparse: true,
+        comment: "Platform Payment ID — format: TVR-[F|H]-[PRE|POST]-[000AAA]",
+      },
       paidAt: Date,
       status: {
         type: String,
@@ -428,7 +450,9 @@ bookingRequestSchema.pre("save", function () {
 /* 2️⃣ Enforce status transitions */
 const ALLOWED_STATUS_TRANSITIONS = {
   draft: ["pending_approval", "approved"],
-  pending_approval: ["approved", "rejected"],
+  pending_approval: ["approved", "rejected", "pending_second_approval", "manager_approved"],
+  pending_second_approval: ["approved", "rejected", "manager_approved"],
+  manager_approved: ["approved", "rejected"],
   approved: [],
   rejected: [],
   expired: [],
@@ -486,5 +510,6 @@ bookingRequestSchema.index({ corporateId: 1, createdAt: -1 });
 bookingRequestSchema.index({ approvedBy: 1 });
 bookingRequestSchema.index({ rejectedBy: 1 });
 bookingRequestSchema.index({ executionStatus: 1 });
+bookingRequestSchema.index({ "payment.paymentId": 1 }, { sparse: true, unique: true });
 
 module.exports = mongoose.model("BookingRequest", bookingRequestSchema);

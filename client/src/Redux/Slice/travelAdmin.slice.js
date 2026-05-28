@@ -11,6 +11,10 @@ import {
   reviewManagerRequest,
   getAllEmployeesAdmin,
   toggleEmployeeStatusAdmin,
+  demoteEmployeeAdmin,
+  promoteEmployeeAdmin,
+  promoteEmployeeToFinanceAdmin,
+  getEmployeeExpensesAdmin,
 } from "../Actions/travelAdmin.thunks";
 
 const initialState = {
@@ -19,12 +23,14 @@ const initialState = {
   cancelledHotelBookings: [],
   managerRequests: [],
   allEmployees: [],
+  employeeExpenses: {},
 
   loadingFlights: false,
   loadingHotels: false,
   loadingCancelledHotels: false,
   loadingManagerRequests: false,
   loadingEmployees: false,
+  loadingEmployeeExpenses: false,
 
   errorFlights: null,
   errorHotels: null,
@@ -194,6 +200,22 @@ const adminBookingSlice = createSlice({
 
       /**
        * ============================================================
+       * 💰 EMPLOYEE EXPENSES
+       * ============================================================
+       */
+      .addCase(getEmployeeExpensesAdmin.pending, (state) => {
+        state.loadingEmployeeExpenses = true;
+      })
+      .addCase(getEmployeeExpensesAdmin.fulfilled, (state, action) => {
+        state.loadingEmployeeExpenses = false;
+        state.employeeExpenses = action.payload; // Map of userId -> amount
+      })
+      .addCase(getEmployeeExpensesAdmin.rejected, (state, action) => {
+        state.loadingEmployeeExpenses = false;
+      })
+
+      /**
+       * ============================================================
        * 🔁 TOGGLE EMPLOYEE STATUS
        * ============================================================
        */
@@ -212,6 +234,51 @@ const adminBookingSlice = createSlice({
       })
       .addCase(toggleEmployeeStatusAdmin.rejected, (state, action) => {
         // optional: you can add error handling if needed
+        state.errorEmployees = action.payload;
+      })
+      /**
+       * ============================================================
+       * 🔐 DEMOTE EMPLOYEE ADMIN
+       * ============================================================
+       */
+      .addCase(demoteEmployeeAdmin.fulfilled, (state, action) => {
+        const { userId, role } = action.payload;
+        const emp = state.allEmployees.find((u) => u._id === userId);
+        if (emp) {
+          emp.role = role;
+        }
+      })
+      .addCase(demoteEmployeeAdmin.rejected, (state, action) => {
+        state.errorEmployees = action.payload;
+      })
+      /**
+       * ============================================================
+       * 🔐 PROMOTE EMPLOYEE ADMIN
+       * ============================================================
+       */
+      .addCase(promoteEmployeeAdmin.fulfilled, (state, action) => {
+        const { userId, role } = action.payload;
+        const emp = state.allEmployees.find((u) => u._id === userId);
+        if (emp) {
+          emp.role = role;
+        }
+      })
+      .addCase(promoteEmployeeAdmin.rejected, (state, action) => {
+        state.errorEmployees = action.payload;
+      })
+      /**
+       * ============================================================
+       * 🔐 PROMOTE USER TO FINANCE TEAM ADMIN
+       * ============================================================
+       */
+      .addCase(promoteEmployeeToFinanceAdmin.fulfilled, (state, action) => {
+        const { userId, role } = action.payload;
+        const emp = state.allEmployees.find((u) => u._id === userId);
+        if (emp) {
+          emp.role = role;
+        }
+      })
+      .addCase(promoteEmployeeToFinanceAdmin.rejected, (state, action) => {
         state.errorEmployees = action.payload;
       });
   },

@@ -8,6 +8,7 @@ const {
   getPostpaidTransactions,
   getPreviousCycles,
   getCycleTransactions,
+  updateCycleReceipt,
 } = require("../controllers/postPaid.corporate.controller");
 
 const {
@@ -49,6 +50,13 @@ router.get(
   verifyToken,
   authorizeRoles("travel-admin", "super-admin", "ops-member"),
   getCycleTransactions,
+);
+
+router.post(
+  "/cycles/receipt",
+  verifyToken,
+  authorizeRoles("travel-admin", "super-admin", "ops-member"),
+  updateCycleReceipt,
 );
 
 module.exports = router;

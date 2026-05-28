@@ -18,6 +18,7 @@ import {
   fetchApprovals,
   approveApproval,
   rejectApproval,
+  transferApproval,
 } from "../../Redux/Actions/approval.thunks";
 import { fetchCorporateAdmin } from "../../Redux/Slice/corporateAdminSlice";
 import { fetchEmployees } from "../../Redux/Slice/employeeActionSlice";
@@ -53,11 +54,10 @@ const RouteCell = ({ routes, airline }) => {
   return (
     <div className="flex items-center gap-3">
       <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
-        <img 
-          src={logoUrl} 
+        <img src={logoUrl} 
           alt={airlineName} 
           className="w-full h-full object-contain"
-          onError={(e) => { 
+          loading="eager" onError={(e) => { 
             e.target.onerror = null;
             e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
           }} 
@@ -114,25 +114,7 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Personnel", "Route", "Email Identifier", "Status", "PNR Ref", "Amount"];
-    const rows = filtered.map(r => [
-      r.orderId, 
-      r.employee, 
-      r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—", 
-      r.employeeId,
-      r.status,
-      r.pnr || "—",
-      `₹${r.estimatedCost.toLocaleString()}`
-    ]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `pending-flights.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -164,18 +146,35 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Queue" subtitle={`${filtered.length} records awaiting action`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Flight Queue" 
+        subtitle={`${filtered.length} records awaiting action`} 
+        exportConfig={{
+          data: filtered,
+          filename: `pending_flight_requests_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "employee" },
+            { header: "Email Identifier", key: "employeeId" },
+            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
+            { header: "Status", key: "status" },
+            { header: "PNR Ref", key: "pnr" },
+            { header: "Amount", accessor: (r) => `₹${r.estimatedCost.toLocaleString()}` },
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
-              <Th className="!px-6 !py-5">Route</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Status</Th>
-              <Th className="!px-6 !py-5">Requested Date & Time</Th>
-              <Th className="!px-6 !py-5">Amount</Th>
-              <Th className="!px-6 !py-5 text-center">Action</Th>
+            <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="px-6! py-5!">Order ID</Th>
+              <Th className="px-6! py-5!">Personnel</Th>
+              <Th className="px-6! py-5!">Route</Th>
+              <Th className="px-6! py-5!">Email Identifier</Th>
+              <Th className="px-6! py-5!">Status</Th>
+              <Th className="px-6! py-5!">Requested Date & Time</Th>
+              <Th className="px-6! py-5!">Amount</Th>
+              <Th className="px-6! py-5! text-center">Action</Th>
             </tr>
           </thead>
           <tbody>
@@ -183,34 +182,34 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
               const isDiscarded = r.isTravelPassed && r.status === "pending_approval";
               return (
                 <tr key={r.id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray, opacity: isDiscarded ? 0.6 : 1 }}>
-                  <td className="!px-6 !py-5"><IdCell id={r.orderId} /></td>
-                  <td className="!px-6 !py-5">
+                  <td className="px-6! py-5!"><IdCell id={r.orderId} /></td>
+                  <td className="px-6! py-5!">
                      <p className="text-xs font-black" style={{ color: C.navy }}>{r.employee}</p>
                      <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{r.originalData?.flightRequest?.purposeOfTravel}</p>
                   </td>
-                  <td className="!px-6 !py-5">
+                  <td className="px-6! py-5!">
                     <RouteCell routes={r.routes} airline={r.airline} />
                   </td>
-                  <td className="!px-6 !py-5">
+                  <td className="px-6! py-5!">
                      <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{r.employeeId}</span>
                   </td>
-                  <td className="!px-6 !py-5">
+                  <td className="px-6! py-5!">
                      {isDiscarded ? (
                         <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase border" style={{ background: C.offWhite, color: C.muted, borderColor: C.border }}>Expired</span>
                      ) : (
                         <StatusBadge status={r.status} />
                      )}
                   </td>
-                  <td className="!px-6 !py-5">
+                  <td className="px-6! py-5!">
                      <p className="text-[11px] font-black text-slate-700">{r.bookedDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{r.bookedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                   </td>
-                  <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{r.estimatedCost.toLocaleString()}</td>
-                  <td className="!px-6 !py-5 text-center">
+                  <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{r.estimatedCost.toLocaleString()}</td>
+                  <td className="px-6! py-5! text-center">
                     <button 
                       onClick={() => onSelect(r)} 
                       disabled={isDiscarded} 
-                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
                     </button>
@@ -219,7 +218,7 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
               );
             }) : (
               <tr>
-                <td colSpan={8} className="!px-6 !py-20 text-center">
+                <td colSpan={8} className="px-6! py-20! text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <FiSearch size={32} />
@@ -265,25 +264,7 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order Reference", "Personnel", "Email Identifier", "Asset Detail", "Booked Date", "Status", "Amount"];
-    const rows = filtered.map(r => [
-      r.orderId, 
-      r.employee, 
-      r.employeeId, 
-      r.hotelName, 
-      r.bookedDate.toLocaleDateString(),
-      r.status,
-      `₹${r.estimatedCost.toLocaleString()}`
-    ]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `pending-hotels.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -315,18 +296,35 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Queue" subtitle={`${filtered.length} records awaiting action`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Hotel Queue" 
+        subtitle={`${filtered.length} records awaiting action`} 
+        exportConfig={{
+          data: filtered,
+          filename: `pending_hotel_requests_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order Reference", key: "orderId" },
+            { header: "Personnel", key: "employee" },
+            { header: "Email Identifier", key: "employeeId" },
+            { header: "Hotel", key: "hotelName" },
+            { header: "Booked Date", accessor: (r) => r.bookedDate.toLocaleDateString() },
+            { header: "Status", key: "status" },
+            { header: "Amount", accessor: (r) => `₹${r.estimatedCost.toLocaleString()}` },
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order Reference</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Asset Detail</Th>
-              <Th className="!px-6 !py-5">Requested Date & Time</Th>
-              <Th className="!px-6 !py-5">Status</Th>
-              <Th className="!px-6 !py-5">Amount</Th>
-              <Th className="!px-6 !py-5 text-center">Action</Th>
+            <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="px-6! py-5!">Order Reference</Th>
+              <Th className="px-6! py-5!">Personnel</Th>
+              <Th className="px-6! py-5!">Email Identifier</Th>
+              <Th className="px-6! py-5!">Asset Detail</Th>
+              <Th className="px-6! py-5!">Requested Date & Time</Th>
+              <Th className="px-6! py-5!">Status</Th>
+              <Th className="px-6! py-5!">Amount</Th>
+              <Th className="px-6! py-5! text-center">Action</Th>
             </tr>
           </thead>
           <tbody>
@@ -334,35 +332,35 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
               const isDiscarded = r.isTravelPassed && r.status === "pending_approval";
               return (
                 <tr key={r.id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray, opacity: isDiscarded ? 0.6 : 1 }}>
-                  <td className="!px-6 !py-5"><IdCell id={r.orderId} /></td>
-                  <td className="!px-6 !py-5">
+                  <td className="px-6! py-5!"><IdCell id={r.orderId} /></td>
+                  <td className="px-6! py-5!">
                      <p className="text-xs font-black" style={{ color: C.navy }}>{r.employee}</p>
                      <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{r.originalData?.hotelRequest?.purposeOfTravel}</p>
                   </td>
-                  <td className="!px-6 !py-5">
+                  <td className="px-6! py-5!">
                      <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{r.employeeId}</span>
                   </td>
-                  <td className="!px-6 !py-5">
+                  <td className="px-6! py-5!">
                      <p className="text-xs font-black" style={{ color: C.navy }}>{r.hotelName}</p>
                      <p className="text-[10px] font-bold text-gold uppercase">{r.city}</p>
                   </td>
-                  <td className="!px-6 !py-5">
+                  <td className="px-6! py-5!">
                      <p className="text-[11px] font-black text-slate-700">{r.bookedDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{r.bookedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                   </td>
-                  <td className="!px-6 !py-5">
+                  <td className="px-6! py-5!">
                      {isDiscarded ? (
                         <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase border" style={{ background: C.offWhite, color: C.muted, borderColor: C.border }}>Expired</span>
                      ) : (
                         <StatusBadge status={r.status} />
                      )}
                   </td>
-                  <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{r.estimatedCost.toLocaleString()}</td>
-                  <td className="!px-6 !py-5 text-center">
+                  <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{r.estimatedCost.toLocaleString()}</td>
+                  <td className="px-6! py-5! text-center">
                     <button 
                       onClick={() => onSelect(r)} 
                       disabled={isDiscarded} 
-                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
                     </button>
@@ -371,7 +369,7 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
               );
             }) : (
               <tr>
-                <td colSpan={8} className="!px-6 !py-20 text-center">
+                <td colSpan={8} className="px-6! py-20! text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <FiSearch size={32} />
@@ -529,7 +527,7 @@ export default function PendingTravelRequests() {
     });
   }, [list]);
 
-  const handleAction = async (id, type, action) => {
+  const handleAction = async (id, type, action, comments = "") => {
     const isApprove = action === "approve";
     if (isApprove) {
       const request = requests.find((r) => r.id === id);
@@ -557,29 +555,29 @@ export default function PendingTravelRequests() {
       }
     }
 
-    const result = await Swal.fire({
-      title: `${isApprove ? "Approve" : "Reject"} Travel Request`,
-      input: isApprove ? null : "textarea",
-      inputPlaceholder: isApprove ? "" : "Provide rejection reason...",
-      icon: isApprove ? "question" : "warning",
-      showCancelButton: true,
-      confirmButtonColor: isApprove ? "#10B981" : "#EF4444",
-      confirmButtonText: `Confirm ${action}`
-    });
+    dispatch(isApprove ? approveApproval({ id, type, comments }) : rejectApproval({ id, comments, type }))
+      .unwrap().then(() => { 
+        Swal.fire("Success", `Request ${action}d`, "success"); 
+        handleRefresh();
+      })
+      .catch(err => Swal.fire("Error", err || "Update failed", "error"));
+  };
 
-    if (result.isConfirmed) {
-      dispatch(isApprove ? approveApproval({ id, type }) : rejectApproval({ id, comments: result.value, type }))
-        .unwrap().then(() => { 
-          Swal.fire("Success", `Request ${action}d`, "success"); 
-        })
-        .catch(err => Swal.fire("Error", err || "Update failed", "error"));
+  const handleTransfer = async (id, type, secondApproverId, remark) => {
+    try {
+      await dispatch(transferApproval({ id, secondApproverId, remark, type })).unwrap();
+      Swal.fire("Success", "Request transferred successfully", "success");
+      setSelectedRequest(null);
+      handleRefresh();
+    } catch (err) {
+      Swal.fire("Error", err || "Transfer failed", "error");
     }
   };
 
   return (
     <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
       {/* Navy Header Section */}
-      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+      <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
              <div className="flex items-center gap-3">
@@ -600,7 +598,7 @@ export default function PendingTravelRequests() {
                </button>
              </div>
              
-             <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+             <div className="h-12 w-px bg-white/10 mx-2 hidden md:block" />
 
              <div className="flex items-center gap-5">
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
@@ -654,8 +652,9 @@ export default function PendingTravelRequests() {
         <PendingFlightDetailsModal 
           booking={selectedRequest.originalData} 
           onClose={() => setSelectedRequest(null)} 
-          onApprove={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
-          onReject={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
+          onApprove={(id, type, action, comments) => { handleAction(id, type, action, comments); setSelectedRequest(null); }} 
+          onReject={(id, type, action, comments) => { handleAction(id, type, action, comments); setSelectedRequest(null); }} 
+          onTransfer={(secondApproverId, remark, type) => handleTransfer(selectedRequest.id, type, secondApproverId, remark)}
           isDiscarded={selectedRequest.isTravelPassed} 
         />
       )}
@@ -664,8 +663,9 @@ export default function PendingTravelRequests() {
         <PendingHotelDetailsModal 
           booking={selectedRequest.originalData} 
           onClose={() => setSelectedRequest(null)} 
-          onApprove={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
-          onReject={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
+          onApprove={(id, type, action, comments) => { handleAction(id, type, action, comments); setSelectedRequest(null); }} 
+          onReject={(id, type, action, comments) => { handleAction(id, type, action, comments); setSelectedRequest(null); }} 
+          onTransfer={(secondApproverId, remark, type) => handleTransfer(selectedRequest.id, type, secondApproverId, remark)}
           isDiscarded={selectedRequest.isTravelPassed} 
         />
       )}

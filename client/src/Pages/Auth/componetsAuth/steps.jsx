@@ -317,11 +317,34 @@ export const Step2 = ({ form, setForm, errors }) => (
               <PhoneInput
                 country={'in'}
                 value={form.primaryMobile}
-                onChange={(phone) => setForm({ ...form, primaryMobile: phone })}
+                onChange={(phone) => {
+                  const isLinked = form.gstContactSource === "primary";
+                  setForm({ 
+                    ...form, 
+                    primaryMobile: phone,
+                    ...(isLinked ? { gstContactNumber: phone } : {})
+                  });
+                }}
                 inputStyle={{width: '100%', border: errors.primaryMobile ? '1px solid #f87171' : '1px solid #e2e8f0', borderRadius: '0.75rem', paddingLeft: '3rem', height: '46px', fontSize: '0.875rem'}}
                 buttonStyle={{border: errors.primaryMobile ? '1px solid #f87171' : '1px solid #e2e8f0', borderRadius: '0.75rem 0 0 0.75rem', backgroundColor: errors.primaryMobile ? '#fef2f2' : '#ffffff'}}
                 containerStyle={{marginTop: '0.25rem'}}
               />
+              <label className="flex items-center gap-1.5 mt-1.5 ml-1 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-[#C9A240] focus:ring-[#C9A240] cursor-pointer"
+                  checked={form.gstContactSource === "primary"}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setForm({ 
+                      ...form, 
+                      gstContactSource: checked ? "primary" : "manual",
+                      ...(checked ? { gstContactNumber: form.primaryMobile } : {})
+                    });
+                  }}
+                />
+                <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#C9A240] transition-colors uppercase tracking-tight">Set as GST Contact Number</span>
+              </label>
               {errors.primaryMobile && <p className="text-xs text-red-500 mt-1 font-medium">{errors.primaryMobile}</p>}
             </F>
           </Grid>
@@ -381,11 +404,34 @@ export const Step2 = ({ form, setForm, errors }) => (
               <PhoneInput
                 country={'in'}
                 value={form.billingMobile}
-                onChange={(phone) => setForm({ ...form, billingMobile: phone })}
+                onChange={(phone) => {
+                  const isLinked = form.gstContactSource === "billing";
+                  setForm({ 
+                    ...form, 
+                    billingMobile: phone,
+                    ...(isLinked ? { gstContactNumber: phone } : {})
+                  });
+                }}
                 inputStyle={{width: '100%', border: errors.billingMobile ? '1px solid #f87171' : '1px solid #e2e8f0', borderRadius: '0.75rem', paddingLeft: '3rem', height: '46px', fontSize: '0.875rem'}}
                 buttonStyle={{border: errors.billingMobile ? '1px solid #f87171' : '1px solid #e2e8f0', borderRadius: '0.75rem 0 0 0.75rem', backgroundColor: errors.billingMobile ? '#fef2f2' : '#ffffff'}}
                 containerStyle={{marginTop: '0.25rem'}}
               />
+              <label className="flex items-center gap-1.5 mt-1.5 ml-1 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-[#C9A240] focus:ring-[#C9A240] cursor-pointer"
+                  checked={form.gstContactSource === "billing"}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setForm({ 
+                      ...form, 
+                      gstContactSource: checked ? "billing" : "manual",
+                      ...(checked ? { gstContactNumber: form.billingMobile } : {})
+                    });
+                  }}
+                />
+                <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#C9A240] transition-colors uppercase tracking-tight">Set as GST Contact Number</span>
+              </label>
               {errors.billingMobile && <p className="text-xs text-red-500 mt-1 font-medium">{errors.billingMobile}</p>}
             </F>
           </Grid>
@@ -962,6 +1008,17 @@ export const Step5 = ({ form, setForm, errors, gstAutoFilled, ...props }) => (
         placeholder="finance@company.com"
         error={errors.gstEmail}
       />
+    </F>
+    <F label="GST Contact Number" required>
+      <PhoneInput
+        country={'in'}
+        value={form.gstContactNumber}
+        onChange={(phone) => setForm({ ...form, gstContactNumber: phone, gstContactSource: "manual" })}
+        inputStyle={{width: '100%', border: errors.gstContactNumber ? '1px solid #f87171' : '1px solid #e2e8f0', borderRadius: '0.75rem', paddingLeft: '3rem', height: '46px', fontSize: '0.875rem'}}
+        buttonStyle={{border: errors.gstContactNumber ? '1px solid #f87171' : '1px solid #e2e8f0', borderRadius: '0.75rem 0 0 0.75rem', backgroundColor: errors.gstContactNumber ? '#fef2f2' : '#ffffff'}}
+        containerStyle={{marginTop: '0.25rem'}}
+      />
+      {errors.gstContactNumber && <p className="text-xs text-red-500 mt-1 font-medium">{errors.gstContactNumber}</p>}
     </F>
 
     <F label="GST Registered Address">

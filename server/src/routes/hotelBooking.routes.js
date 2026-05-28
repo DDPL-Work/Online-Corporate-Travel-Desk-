@@ -19,7 +19,7 @@ router.use(verifyToken);
 ====================================================== */
 router.post(
   "/prebook",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   corporateContext,
   hotelBookingController.preBookHotel,
 );
@@ -29,14 +29,14 @@ router.post(
 ====================================================== */
 router.post(
   "/create-request",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   corporateContext,
   hotelBookingController.createHotelBookingRequest,
 );
 
 router.post(
   "/instant-book",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   corporateContext,
   hotelBookingController.instantHotelBooking,
 );
@@ -48,20 +48,20 @@ router.post(
 // ✅ Get all my hotel requests (pending + approved)
 router.get(
   "/my",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   hotelBookingController.getMyHotelRequests,
 );
 
 // ✅ Specific routes FIRST (VERY IMPORTANT)
 router.get(
   "/my/rejected",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   hotelBookingController.getMyRejectedHotelRequests,
 );
 
 router.get(
   "/my/completed",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   hotelBookingController.getMyHotelBookings,
   // OR use: getMyCompletedHotelBookings (if separate logic exists)
 );
@@ -69,7 +69,7 @@ router.get(
 // ❗ Dynamic route ALWAYS LAST
 router.get(
   "/my/:id",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   hotelBookingController.getMyHotelRequestById,
 );
 
@@ -79,20 +79,20 @@ router.get(
 
 router.post(
   "/:bookingId/execute",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   hotelBookingController.executeApprovedHotelBooking,
 );
 
 // ✅ Keep this AFTER /my routes to avoid conflicts
 router.get(
   "/:id/details",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   hotelBookingController.getBookedHotelDetails,
 );
 
 router.post(
   "/:id/voucher",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("super-admin", "ops-member", "manager", "travel-admin", "finance_team", "employee"),
   hotelBookingController.generateHotelVoucher,
 );
 

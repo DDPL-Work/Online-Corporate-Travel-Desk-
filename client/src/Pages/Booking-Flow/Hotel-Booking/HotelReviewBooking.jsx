@@ -59,6 +59,10 @@ import { ProjectApproverBlock } from "./components/ProjectApproverBlock";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
 import { fetchMyProfile } from "../../../Redux/Slice/employeeActionSlice";
+import {
+  handleHotelPreBookSessionExpiry,
+  isHotelPreBookSessionExpired,
+} from "./hotelPreBookSession";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Utility: calculateNights                                       */
@@ -142,10 +146,10 @@ function RoomImageGallery({ images = [] }) {
   return (
     <div className="mb-5">
       <div className="relative rounded-xl overflow-hidden bg-white h-52 sm:h-64 group">
-        <img
-          src={images[active]}
+        <img src={images[active]}
           alt={`Room image ${active + 1}`}
           className="w-full h-full object-cover transition-all duration-500"
+          loading="lazy" decoding="async"
           onError={(e) => {
             e.target.style.display = "none";
           }}
@@ -182,10 +186,10 @@ function RoomImageGallery({ images = [] }) {
                   : "border-transparent hover:border-slate-300"
               }`}
             >
-              <img
-                src={img}
+              <img src={img}
                 alt={`thumb ${i}`}
                 className="w-full h-full object-cover"
+                loading="lazy" decoding="async"
                 onError={(e) => {
                   e.target.style.display = "none";
                 }}
@@ -477,12 +481,10 @@ function HotelHeroBanner({
     <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-md shadow-black/20 overflow-hidden mb-6">
       {/* Hero image strip */}
       <div className="relative h-48 sm:h-64 w-full overflow-hidden bg-white/10">
-        <img
-          src={displayHotel?.images?.[0] || "/placeholder-hotel.jpg"}
+        <img src={displayHotel?.images?.[0] || "/placeholder-hotel.jpg"}
           alt={displayHotel?.name}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+          className="w-full h-full object-cover" loading="lazy" decoding="async" />
+        <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent" />
 
         {displayHotel?.rating > 0 && (
           <div className="absolute top-4 left-4 flex items-center gap-1 bg-black/40 backdrop-blur-sm border border-slate-300 px-3 py-1.5 rounded-full">
@@ -648,7 +650,7 @@ function SelectedRoomDetailsCard({
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden mb-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] px-6 py-4 flex items-center gap-2.5">
+      <div className="bg-linear-to-r from-[#C9A84C] to-[#C9A84C] px-6 py-4 flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
           <MdKingBed size={16} className="text-white" />
         </div>
@@ -667,7 +669,7 @@ function SelectedRoomDetailsCard({
         <div>
           {images.length > 0 && <RoomImageGallery images={images} />}
           <h4 className="text-base font-extrabold text-[#0A203E] leading-snug mb-1">
-            {roomNameDisplay}
+          {displaySearchParams?.rooms?.length} <span className="text-[#C9A84C]">X</span> {roomNameDisplay}
           </h4>
 
           {room?.BeddingGroup && (
@@ -724,7 +726,7 @@ function SelectedRoomDetailsCard({
             {/* Inclusions */}
             <div className="mb-4">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                Inclusions
+                Inclusions{" "}( <span className="text-[#C9A84C]"> {displaySearchParams?.rooms?.length} X rooms </span>)
               </p>
               {inclusion ? (
                 <InclusionBadges inclusion={inclusion} />
@@ -809,7 +811,7 @@ function SelectedRoomDetailsCard({
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <div className="divide-y divide-slate-100">
                   {/* Per-night rates from DayRates */}
-                  {dayRates?.[0]?.length > 0 && (
+                  {/* {dayRates?.[0]?.length > 0 && (
                     <div className="px-4 py-2 bg-white/60">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                         Per-Night Rates
@@ -826,7 +828,7 @@ function SelectedRoomDetailsCard({
                         ))}
                       </div>
                     </div>
-                  )}
+                  )} */}
                   <div className="flex justify-between px-4 py-2.5">
                     <span className="text-[13px] text-slate-600">
                       Base Fare
@@ -843,7 +845,7 @@ function SelectedRoomDetailsCard({
                       ₹{Number(totalTax).toLocaleString("en-IN")}
                     </span>
                   </div>
-                  <div className="flex justify-between px-4 py-3 bg-gradient-to-r from-cyan-50 to-teal-50">
+                  <div className="flex justify-between px-4 py-3 bg-linear-to-r from-cyan-50 to-teal-50">
                     <span className="text-[14px] font-bold text-teal-700">
                       Total
                     </span>
@@ -1002,6 +1004,8 @@ const HotelReviewBooking = () => {
   const [travelers, setTravelers] = useState([]);
   const [purposeOfTravel, setPurposeOfTravel] = useState("");
   const [bookingRequest, setBookingRequest] = useState(null);
+  const [flightRulesStatus, setFlightRulesStatus] = useState("loading"); // "loading", "ready", "error"
+  const [isCorporateBooking, setIsCorporateBooking] = useState(false);
   const [gstDetails, setGstDetails] = useState({
     gstin: "",
     legalName: "",
@@ -1128,8 +1132,8 @@ const HotelReviewBooking = () => {
             leadPassenger: isLead,
             email: email,
             phoneWithCode: phone,
-            countryCode: "IN",
-            nationality: "IN",
+            countryCode: searchParams?.guestNationality,
+            nationality: searchParams?.guestNationality,
             panCard: "",
             roomIndex: roomIdx,
           });
@@ -1148,8 +1152,8 @@ const HotelReviewBooking = () => {
             leadPassenger: false,
             email: "",
             phoneWithCode: "",
-            countryCode: "IN",
-            nationality: "IN",
+            countryCode: searchParams?.guestNationality, 
+            nationality: searchParams?.guestNationality,
             panCard: "",
             roomIndex: roomIdx,
           });
@@ -1196,8 +1200,8 @@ const HotelReviewBooking = () => {
           leadPassenger: true,
           email: email,
           phoneWithCode: phone,
-          countryCode: "IN",
-          nationality: "IN",
+          countryCode: searchParams?.guestNationality,
+          nationality: searchParams?.guestNationality ,
           panCard: "",
         });
       }
@@ -1237,8 +1241,8 @@ const HotelReviewBooking = () => {
         leadPassenger: false,
         email: "",
         phoneWithCode: "",
-        countryCode: "IN",
-        nationality: "IN",
+        countryCode: searchParams?.guestNationality ,
+        nationality: searchParams?.guestNationality ,
         PassportNo: "",
         PassportIssueDate: "",
         PassportExpDate: "",
@@ -1362,8 +1366,28 @@ const HotelReviewBooking = () => {
   useEffect(() => {
     if (!bookingCode) return;
     console.log("🔥 PreBook Triggered:", bookingCode);
-    dispatch(preBookHotel({ BookingCode: bookingCode }));
-  }, [bookingCode]);
+    let isMounted = true;
+
+    const runPreBook = async () => {
+      try {
+        await dispatch(preBookHotel({ BookingCode: bookingCode })).unwrap();
+      } catch (err) {
+        if (!isMounted) return;
+
+        console.error("PreBook Error:", err);
+
+        if (isHotelPreBookSessionExpired(err)) {
+          handleHotelPreBookSessionExpiry({ navigate });
+        }
+      }
+    };
+
+    runPreBook();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [bookingCode, dispatch, navigate]);
 
   const displaySearchParams = isBookNowMode
     ? {
@@ -1617,6 +1641,7 @@ const HotelReviewBooking = () => {
 
     const payload = {
       bookingType: "hotel",
+      ...(isCorporateBooking && { IsCorporate: true }),
       projectName: projectApproverData.project?.name,
       projectId: projectApproverData.project?.id,
       projectClient: projectApproverData.project?.client,
@@ -1625,6 +1650,7 @@ const HotelReviewBooking = () => {
       approverName: projectApproverData.approver?.name,
       approverRole: projectApproverData.approver?.role,
       hotelRequest: {
+        ...(isCorporateBooking && { IsCorporate: true }),
         hotelCode:
           safeHotel?.HotelCode ||
           safeHotel?.hotelCode ||
@@ -1666,6 +1692,7 @@ const HotelReviewBooking = () => {
         roomIndex: selectedRoom?.RoomIndex,
         checkIn: search?.checkIn,
         checkOut: search?.checkOut,
+        guestNationality: searchParams?.guestNationality ,
         roomGuests:
           displaySearchParams?.rooms?.map((r) => ({
             noOfAdults: r.Adults || r.adults || 0,
@@ -1722,7 +1749,7 @@ const HotelReviewBooking = () => {
         age: t.age,
         email: t.email,
         phoneWithCode: t.phoneWithCode,
-        nationality: t.nationality || "IN",
+        nationality: t.nationality ,
         isLeadPassenger: t.leadPassenger,
         panCard: t.panCard || "",
         PassportExpDate: t.PassportExpDate || "",
@@ -1873,11 +1900,14 @@ const HotelReviewBooking = () => {
       <LandingHeader />
 
       {/* ── Sticky back bar ── */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div className="bg-[#0A203E] border-b border-slate-200 sticky top-[64px] z-40">
+        <div className="max-w-7xl mx-auto px-4 py-5 flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-[#C9A84C] tracking-tight">
+          Review your Booking
+        </h1>
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-[#C9A84C] transition font-medium"
+            className="flex items-center gap-1.5 text-sm text-slate-100 hover:text-[#C9A84C] transition font-medium"
           >
             <MdArrowBack size={18} />
             Back to Details
@@ -1892,30 +1922,12 @@ const HotelReviewBooking = () => {
             </div>
           )}
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() =>
-                navigate("/travel", { state: { activeTab: "flight" } })
-              }
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A84C] text-[#000D26] hover:bg-[#C9A84C] transition-colors text-xs font-bold shadow-md shadow-black/20"
-            >
-              <FaPlane className="text-sm" />
-              SEARCH FLIGHT
-            </button>
-            {/* {isApproved && (
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-emerald-500/10 border border-green-200 px-3 py-1.5 rounded-full">
-                <MdVerifiedUser size={14} />
-                Approved {approvedBy ? `by ${approvedBy?.name || "Manager"}` : ""}
-              </div>
-            )} */}
-          </div>
+          
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-[#0A203E] tracking-tight mb-6">
-          Review your Booking
-        </h1>
+        
 
         {/* ── FULL-WIDTH HOTEL HERO ── */}
         <HotelHeroBanner
@@ -1947,7 +1959,7 @@ const HotelReviewBooking = () => {
             {/* BookNow mode: read-only approved guests */}
             {isBookNowMode ? (
               <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">
-                <div className="bg-gradient-to-r from-green-600 to-emerald-500 px-6 py-4 flex items-center justify-between">
+                <div className="bg-linear-to-r from-green-600 to-emerald-500 px-6 py-4 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
                       <MdVerifiedUser size={16} className="text-white" />
@@ -2079,7 +2091,7 @@ const HotelReviewBooking = () => {
                       className="rounded-2xl border border-slate-200 overflow-hidden shadow-md shadow-black/20"
                     >
                       {/* Card Header */}
-                      <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-[#C9A84C]/5 to-[#C9A84C]/10 border-b border-slate-200">
+                      <div className="flex items-center justify-between px-5 py-3 bg-linear-to-r from-[#C9A84C]/5 to-[#C9A84C]/10 border-b border-slate-200">
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full bg-[#C9A84C] flex items-center justify-center text-white text-xs font-bold">
                             {index + 1}
@@ -2281,7 +2293,7 @@ const HotelReviewBooking = () => {
                                 Nationality <Required />
                               </label>
                               <select
-                                value={t.nationality || "IN"}
+                                value={t.nationality }
                                 disabled
                                 onChange={(e) =>
                                   updateTraveler(
@@ -2501,6 +2513,31 @@ const HotelReviewBooking = () => {
                     .field-input::placeholder { color: #cbd5e1; }
                   `}</style>
                 </div>
+
+                {/* Make Corporate Booking Checkbox */}
+                {!isBookNowMode && (
+                  <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between rounded-b-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center h-5">
+                        <input
+                          id="corporateBooking"
+                          type="checkbox"
+                          checked={isCorporateBooking}
+                          onChange={(e) => setIsCorporateBooking(e.target.checked)}
+                          className="w-4 h-4 text-[#C9A84C] bg-white border-slate-300 rounded focus:ring-[#C9A84C] focus:ring-2 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label htmlFor="corporateBooking" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                          Make Corporate Booking
+                        </label>
+                        <p className="text-[11px] text-slate-500">
+                          Check this box if this is a corporate booking requiring special handling.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2604,7 +2641,7 @@ const HotelReviewBooking = () => {
               />
 
               <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">
-                <div className="bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] px-5 py-4">
+                <div className="bg-linear-to-r from-[#C9A84C] to-[#C9A84C] px-5 py-4">
                   <h3 className="text-sm font-bold text-[#0A203E] mb-0.5">
                     Price Summary
                   </h3>
@@ -2653,7 +2690,7 @@ const HotelReviewBooking = () => {
                 <button
                   onClick={handleAction}
                   disabled={actionLoading}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-[#000D26] uppercase tracking-wider bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] hover:bg-[#B39340] hover:from-[#B39340] hover:to-[#B39340] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[#C9A84C]/20"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-[#000D26] uppercase tracking-wider bg-linear-to-r from-[#C9A84C] to-[#C9A84C] hover:bg-[#B39340] hover:from-[#B39340] hover:to-[#B39340] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[#C9A84C]/20"
                 >
                   {actionLoading ? (
                     <>

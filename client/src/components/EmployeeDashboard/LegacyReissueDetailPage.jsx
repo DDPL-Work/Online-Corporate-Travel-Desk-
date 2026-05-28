@@ -602,7 +602,7 @@ export default function LegacyReissueDetailPage() {
               </div>
 
               {/* Connector */}
-              <div className="flex flex-col items-center gap-1 min-w-[160px]">
+              <div className="flex flex-col items-center gap-1 min-w-40">
                 <span className="text-[10px] font-semibold text-gray-500">
                   {bookingInfo.duration || "Duration N/A"}
                 </span>
@@ -919,7 +919,7 @@ export default function LegacyReissueDetailPage() {
             </div>
 
             <div className="relative pl-1.5">
-              <div className="absolute left-[13px] top-3 bottom-3 w-[1.5px] bg-gradient-to-b from-[#A07840]/40 via-[#E8E0D0] to-transparent" />
+              <div className="absolute left-[13px] top-3 bottom-3 w-[1.5px] bg-linear-to-b from-[#A07840]/40 via-[#E8E0D0] to-transparent" />
               
               <div className="space-y-8">
                 {sortedSteps.map((step, idx) => (

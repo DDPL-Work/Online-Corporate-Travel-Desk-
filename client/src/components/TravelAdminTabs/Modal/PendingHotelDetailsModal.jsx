@@ -1,4 +1,6 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { useSelector } from "react-redux";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import {
   FiX,
@@ -24,6 +26,7 @@ import {
   FiMail,
   FiChevronLeft,
   FiChevronRight,
+  FiSearch,
 } from "react-icons/fi";
 import {
   formatDate,
@@ -32,6 +35,9 @@ import {
 } from "../../../utils/formatter";
 import { InfoBadge, SectionLabel } from "../Shared/CommonComponents";
 import { C } from "../../Shared/color";
+import api from "../../../API/axios";
+import { FareRulesAccordion } from "../../../Pages/Booking-Flow/Flight-Booking/CommonComponents";
+import { processFareRulesData } from "../../../utils/fareRulesParser";
 
 // ─────────────────────────────────────────────
 // SHARED HELPERS
@@ -71,6 +77,69 @@ const getBaggageDesc = (desc) => {
   if (d === "4") return "UpGrade";
   if (d === "5") return "ImportedUpgrade";
   return d;
+};
+
+const ActionModal = ({ isOpen, onClose, onConfirm, action, type }) => {
+  const [comments, setComments] = useState("");
+  
+  useEffect(() => {
+    if (isOpen) {
+      setComments("");
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+  const isApprove = action === "approve";
+  
+  return (
+    <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-white/60 backdrop-blur-sm rounded-3xl">
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-300 border border-slate-200">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-black text-slate-800 tracking-tight">
+            {isApprove ? "Approve Request" : "Reject Request"}
+          </h2>
+          <button onClick={onClose} className="p-2 bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-colors">
+            <FiX size={18} />
+          </button>
+        </div>
+        {!isApprove && (
+          <div className="mb-6">
+            <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+              Comments (Required)
+            </label>
+            <textarea
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              className="w-full h-24 p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+              placeholder="Enter reason for rejecting..."
+            />
+          </div>
+        )}
+        {isApprove && (
+          <div className="mb-6">
+            <p className="text-sm text-slate-600 font-medium">
+              Are you sure you want to approve this request? This action will proceed with the booking workflow.
+            </p>
+          </div>
+        )}
+        <div className="flex gap-3 justify-end">
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(comments)}
+            disabled={!isApprove && !comments.trim()}
+            className={`px-5 py-2.5 rounded-xl font-bold text-white transition-colors flex items-center gap-2 ${
+              !isApprove && !comments.trim() ? "opacity-50 cursor-not-allowed" : ""
+            } ${isApprove ? "bg-[#22C55E] hover:bg-emerald-600" : "bg-red-500 hover:bg-red-600"}`}
+          >
+            {isApprove ? <FiCheckCircle size={16} /> : <FiXCircle size={16} />}
+            Confirm {isApprove ? "Approval" : "Rejection"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const resolveApproverDetails = (booking) => {
@@ -150,7 +219,7 @@ const TimelineItem = ({
       className={`flex ${horizontal ? "w-full items-center mb-4" : "flex-col items-center"}`}
     >
       {horizontal && (
-        <div className="flex-1 h-[2px] bg-slate-100 group-first:bg-transparent" />
+        <div className="flex-1 h-0.5 bg-slate-100 group-first:bg-transparent" />
       )}
       <div
         className={`w-4 h-4 rounded-full border-2 z-10 transition-all duration-300 shadow-sm shrink-0 ${
@@ -164,7 +233,7 @@ const TimelineItem = ({
         }`}
       />
       {horizontal && (
-        <div className="flex-1 h-[2px] bg-slate-100 group-last:bg-transparent" />
+        <div className="flex-1 h-0.5 bg-slate-100 group-last:bg-transparent" />
       )}
     </div>
     <div className={`${horizontal ? "px-4" : "-mt-1 pb-10"}`}>
@@ -186,6 +255,164 @@ const TimelineItem = ({
 );
 
 // ─────────────────────────────────────────────
+// TRANSFER APPROVER MODAL
+// ─────────────────────────────────────────────
+
+export const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType }) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [remark, setRemark] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedApprover, setSelectedApprover] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!searchTerm) {
+      setSearchResults([]);
+      return;
+    }
+    const delayDebounceFn = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const { data } = await api.get("/travel-admin/all-employees");
+        const users = data.employees || [];
+        const filtered = users.filter(
+          (u) =>
+            u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            u.name?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            u.name?.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setSearchResults(filtered);
+        setDropdownOpen(true);
+      } catch (err) {
+        console.error("Failed to fetch employees", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
+
+  if (!isOpen) return null;
+
+  const handleSelect = (user) => {
+    setSelectedApprover(user);
+    setSearchTerm(user.email);
+    setDropdownOpen(false);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setSelectedApprover(null);
+  };
+
+  const handleSubmit = () => {
+    if (selectedApprover) {
+      if (onTransfer) {
+        onTransfer(selectedApprover._id, remark, bookingType);
+      } else {
+        console.log("Transfer requested:", { approver: selectedApprover, remark, bookingType });
+      }
+      onClose();
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 bg-[#1A1C20]/60 backdrop-blur-md">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+        <div className="bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center">
+          <h2 className="text-lg font-black tracking-tight uppercase">Transfer Approver</h2>
+          <button
+            onClick={onClose}
+            className="hover:bg-white/10 p-2 rounded-full transition-colors text-slate-400"
+          >
+            <FiX size={22} />
+          </button>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="space-y-2 relative" ref={wrapperRef}>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Select Approver Email
+            </label>
+            <div className="relative">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                placeholder="Search by name or email..."
+                className="w-full pl-10 pr-4 py-3 bg-[#FAF8F4] border border-[#EAE4D9] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B5862A]/50 transition-all font-medium text-slate-700"
+              />
+            </div>
+            {dropdownOpen && searchResults.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-[#EAE4D9] rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                {searchResults.map((user) => (
+                  <div
+                    key={user._id}
+                    onClick={() => handleSelect(user)}
+                    className="px-4 py-3 hover:bg-[#FAF8F4] cursor-pointer border-b border-[#EAE4D9] last:border-b-0"
+                  >
+                    <p className="text-sm font-black text-[#1A1714]">
+                      {user.name?.firstName} {user.name?.lastName}
+                    </p>
+                    <p className="text-xs font-medium text-slate-500">{user.email}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {dropdownOpen && searchTerm && searchResults.length === 0 && !isSearching && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-[#EAE4D9] rounded-xl shadow-lg px-4 py-3">
+                <p className="text-sm font-medium text-slate-500">No users found.</p>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Remark
+            </label>
+            <textarea
+              value={remark}
+              onChange={(e) => setRemark(e.target.value)}
+              placeholder="Add a remark for the transfer..."
+              rows={3}
+              className="w-full px-4 py-3 bg-[#FAF8F4] border border-[#EAE4D9] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B5862A]/50 transition-all font-medium text-slate-700 resize-none"
+            />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-[#EAE4D9] bg-slate-50 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 border border-[#EAE4D9] text-slate-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!selectedApprover}
+            className={`px-5 py-2 bg-[#B5862A] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!selectedApprover ? "opacity-50 cursor-not-allowed shadow-none" : "hover:bg-[#966b1e] shadow-amber-100"}`}
+          >
+            Transfer
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// ─────────────────────────────────────────────
 // HOTEL MODAL
 // ─────────────────────────────────────────────
 
@@ -194,11 +421,32 @@ export const PendingHotelDetailsModal = ({
   onClose,
   onApprove,
   onReject,
+  onTransfer,
   isVerified = true,
   isDiscarded = false,
 }) => {
   const [activeTab, setActiveTab] = useState("details");
   const tabsRef = useRef(null);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [actionModal, setActionModal] = useState({ isOpen: false, action: null });
+
+  const handleConfirmAction = (comments) => {
+    if (actionModal.action === "approve") {
+      onApprove(booking._id, "hotel", "approve", comments);
+    } else {
+      onReject(booking._id, "hotel", "reject", comments);
+    }
+    setActionModal({ isOpen: false, action: null });
+  };
+  const { user } = useSelector((state) => state.auth);
+
+  const isCurrentUserSecondApprover = booking?.secondApprover?.email === user?.email;
+  const isPendingWithMe = ["pending_approval", "manager_approved"].includes(booking?.requestStatus) || (booking?.requestStatus === "pending_second_approval" && isCurrentUserSecondApprover);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const scrollTabs = (direction) => {
     if (tabsRef.current) {
@@ -274,11 +522,13 @@ export const PendingHotelDetailsModal = ({
     return { totalAmount: total || 0, baseFare: base || 0, tax: tx || 0 };
   })();
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1A1C20]/60 backdrop-blur-md overflow-y-auto">
-      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-[1440px] w-[96%] my-2 overflow-hidden flex flex-col h-[96vh]">
+  if (!isMounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-99999 flex items-center justify-center p-4 bg-[#1A1C20]/60 backdrop-blur-md overflow-y-auto">
+      <div className="bg-white rounded-4xl shadow-2xl w-full max-w-[1440px]  my-2 overflow-hidden flex flex-col h-[96vh]">
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center shrink-0 shadow-lg relative z-10">
+        <div className="bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center shrink-0 shadow-lg relative z-10">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-[#C9A84C]/20 rounded-lg text-[#C9A84C]">
               <FaHotel size={20} />
@@ -335,7 +585,7 @@ export const PendingHotelDetailsModal = ({
           </div>
           <div className="flex items-center gap-2">
             {!isVerified &&
-              booking.requestStatus === "pending_approval" &&
+              ["pending_approval", "pending_second_approval", "manager_approved"].includes(booking.requestStatus) &&
               !isDiscarded && (
                 <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-200 animate-pulse">
                   <FiAlertCircle size={14} className="text-amber-600" />
@@ -345,11 +595,11 @@ export const PendingHotelDetailsModal = ({
                 </div>
               )}
 
-            {booking.requestStatus !== "pending_approval" ? (
+            {!isPendingWithMe ? (
               <div className="flex items-center gap-2 px-4 py-2 bg-[#FAF8F4] text-slate-500 rounded-xl border border-[#EAE4D9] italic">
                 <FiInfo size={14} className="text-slate-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight">
-                  Request already {booking.requestStatus}
+                  {booking.requestStatus === "pending_second_approval" ? "Awaiting Second Approval" : `Request already ${booking.requestStatus}`}
                 </span>
               </div>
             ) : isDiscarded ? (
@@ -361,8 +611,18 @@ export const PendingHotelDetailsModal = ({
               </div>
             ) : (
               <>
+                {onTransfer && (
+                  <button
+                    onClick={() => setIsTransferModalOpen(true)}
+                    disabled={!isVerified}
+                    className={`px-5 py-2 border border-amber-200 text-amber-700 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-[#EAE4D9]" : "hover:bg-amber-50"}`}
+                    title={!isVerified ? "Account pending verification" : ""}
+                  >
+                    Transfer Approver
+                  </button>
+                )}
                 <button
-                  onClick={() => onReject(booking._id, "hotel", "reject")}
+                  onClick={() => setActionModal({ isOpen: true, action: "reject" })}
                   disabled={!isVerified}
                   className={`px-5 py-2 border border-red-100 text-red-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-[#EAE4D9]" : "hover:bg-red-50"}`}
                   title={!isVerified ? "Account pending verification" : ""}
@@ -370,7 +630,7 @@ export const PendingHotelDetailsModal = ({
                   Reject Request
                 </button>
                 <button
-                  onClick={() => onApprove(booking._id, "hotel", "approve")}
+                  onClick={() => setActionModal({ isOpen: true, action: "approve" })}
                   disabled={!isVerified}
                   className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
                   title={!isVerified ? "Account pending verification" : ""}
@@ -451,14 +711,12 @@ export const PendingHotelDetailsModal = ({
                   {/* Hotel Snapshot */}
                   <div className="bg-white border border-[#EAE4D9] rounded-3xl overflow-hidden shadow-sm flex flex-col md:flex-row">
                     <div className="w-full md:w-72 h-64 md:h-auto relative shrink-0 overflow-hidden">
-                      <img
-                        src={
+                      <img src={
                           bookSnap.hotelImage ||
                           "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500"
                         }
                         alt={bookSnap.hotelName}
-                        className="md:absolute md:inset-0 w-full h-full object-cover"
-                      />
+                        className="md:absolute md:inset-0 w-full h-full object-cover" loading="eager" />
                       <div className="absolute top-4 left-4">
                         <span className="bg-[#1A1C20]/80 backdrop-blur-sm text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-white/20 shadow-xl">
                           Confirmed Rate
@@ -718,7 +976,7 @@ export const PendingHotelDetailsModal = ({
                 {/* Right Column */}
                 <div className="w-full lg:w-96 space-y-6">
                   {/* Pricing Snapshot */}
-                  <div className="bg-gradient-to-br from-[#003399] to-[#000d26] text-white rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+                  <div className="bg-linear-to-br from-[#003399] to-[#000d26] text-white rounded-3xl p-6 shadow-2xl relative overflow-hidden">
                     <SectionLabel
                       icon={<FiDollarSign />}
                       title="Fare Summary"
@@ -833,7 +1091,7 @@ export const PendingHotelDetailsModal = ({
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
                         Reason for Travel
                       </p>
-                      <div className="bg-[#FAF8F4] p-6 rounded-[2rem] border border-[#EAE4D9] italic text-sm font-black text-slate-700 leading-relaxed shadow-inner">
+                      <div className="bg-[#FAF8F4] p-6 rounded-4xl border border-[#EAE4D9] italic text-sm font-black text-slate-700 leading-relaxed shadow-inner">
                         "
                         {booking.purposeOfTravel ||
                           "Internal business requirement"}
@@ -841,6 +1099,41 @@ export const PendingHotelDetailsModal = ({
                       </div>
                     </div>
                   </div>
+
+                  {booking.secondApprover && booking.secondApprover.email && (
+                    <div className="bg-white border border-amber-200 rounded-3xl p-8 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-5">
+                        <FiAlertCircle size={64} />
+                      </div>
+                      <SectionLabel icon={<FiUser />} title="Transferred Approver Details" />
+                      <div className="mt-8 flex items-center gap-6">
+                        <div className="w-20 h-20 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-500 font-black text-2xl italic shadow-inner">
+                          {(booking.secondApprover.name || booking.secondApprover.email)[0].toUpperCase()}
+                        </div>
+                        <div className="relative z-10">
+                          <p className="text-xl font-black text-[#1A1714] uppercase tracking-tighter italic">
+                            {booking.secondApprover.name || booking.secondApprover.email.split('@')[0]}
+                          </p>
+                          <p className="text-xs font-bold text-slate-400 mt-1">
+                            {booking.secondApprover.email}
+                          </p>
+                          <div className="mt-2 flex gap-2">
+                            <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-amber-200">
+                              Second Approver
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-8 pt-8 border-t border-slate-50 relative z-10">
+                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-4">
+                          Transfer Remark
+                        </p>
+                        <div className="bg-amber-50 p-6 rounded-4xl border border-amber-100 italic text-sm font-black text-amber-900 leading-relaxed shadow-inner">
+                          "{booking.secondApprover.transferRemark || booking.secondApprover.remark || "No remark provided"}"
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1006,8 +1299,22 @@ export const PendingHotelDetailsModal = ({
             )}
           </div>
         </div>
+        <ActionModal
+          isOpen={actionModal.isOpen}
+          action={actionModal.action}
+          type="hotel"
+          onClose={() => setActionModal({ isOpen: false, action: null })}
+          onConfirm={handleConfirmAction}
+        />
       </div>
-    </div>
+      <TransferApproverModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        onTransfer={onTransfer}
+        bookingType="hotel"
+      />
+    </div>,
+    document.body
   );
 };
 
@@ -1020,19 +1327,45 @@ export const PendingFlightDetailsModal = ({
   onClose,
   onApprove,
   onReject,
+  onTransfer,
   isVerified = true,
   isDiscarded = false,
 }) => {
   const [activeTab, setActiveTab] = useState("details");
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [actionModal, setActionModal] = useState({ isOpen: false, action: null });
+
+  const handleConfirmAction = (comments) => {
+    if (actionModal.action === "approve") {
+      onApprove(booking._id, "flight", "approve", comments);
+    } else {
+      onReject(booking._id, "flight", "reject", comments);
+    }
+    setActionModal({ isOpen: false, action: null });
+  };
+  const { user } = useSelector((state) => state.auth);
+  const [fetchedFareRules, setFetchedFareRules] = useState(null);
+  const [fetchingRules, setFetchingRules] = useState(false);
 
   if (!booking) return null;
+
+  const isCurrentUserSecondApprover = booking?.secondApprover?.email === user?.email;
+  const isPendingWithMe = ["pending_approval", "manager_approved"].includes(booking?.requestStatus) || (booking?.requestStatus === "pending_second_approval" && isCurrentUserSecondApprover);
 
   const flightRequest = booking.flightRequest || {};
   const segments = flightRequest.segments || [];
   const fareSnapshot = flightRequest.fareSnapshot || {};
-  const fareQuoteResult = flightRequest.fareQuote?.Results?.[0] || {};
+  const fareQuoteResult = flightRequest.fareQuote?.Response?.Results?.[0] || flightRequest.fareQuote?.Results?.[0] || {};
   const fareBreakdown = fareQuoteResult.FareBreakdown || [];
+  const bookingItinerary = booking.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary || {};
+
   const miniFareRules = (() => {
+    // Priority 0: From bookingResult if it's an approved/ticketed booking
+    const fromBooking = bookingItinerary.MiniFareRules;
+    if (fromBooking && fromBooking.length > 0) {
+      // Ensure it's always array-of-arrays so the render loop works
+      return Array.isArray(fromBooking[0]) ? fromBooking : [fromBooking];
+    }
     // Priority 1: live fareQuote result (nested array-of-arrays)
     const fromQuote = fareQuoteResult.MiniFareRules;
     if (fromQuote && fromQuote.length > 0) return fromQuote;
@@ -1044,7 +1377,7 @@ export const PendingFlightDetailsModal = ({
     }
     return [];
   })();
-  const fareRules = fareQuoteResult.FareRules || [];
+  const fareRules = bookingItinerary.FareRules || fareQuoteResult.FareRules || [];
   const travelers = booking.travellers || [];
   const bookSnap = booking.bookingSnapshot || {};
   const approver = resolveApproverDetails(booking);
@@ -1078,11 +1411,35 @@ export const PendingFlightDetailsModal = ({
   // Flatten detailed segments from fareQuote for easy lookup
   const allDetailedSegments = (fareQuoteResult.Segments || []).flat();
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1A1C20]/60 backdrop-blur-md overflow-y-auto">
-      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-[1440px] w-[96%] my-2 overflow-hidden flex flex-col h-[96vh]">
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "charges" && !fetchedFareRules && !fetchingRules) {
+      // Check if we already have it in the payload first (we just added it to the backend save)
+      if (flightRequest.fareRules) {
+         setFetchedFareRules(flightRequest.fareRules);
+      }
+    }
+  }, [activeTab, flightRequest, fetchedFareRules, fetchingRules]);
+
+  const parsedFareRules = useMemo(() => {
+     let rules = fetchedFareRules?.data?.Response?.FareRules || fetchedFareRules?.Response?.FareRules || fareRules || [];
+     let quote = fareQuoteResult?.Results || fareQuoteResult || [];
+     // Just pass the array to processFareRulesData
+     return processFareRulesData(rules, quote);
+  }, [fetchedFareRules, fareRules, fareQuoteResult]);
+
+  if (!isMounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-99999 flex items-center justify-center p-4 bg-[#1A1C20]/60 backdrop-blur-md overflow-y-auto">
+      <div className="bg-white rounded-4xl shadow-2xl w-full max-w-[1440px] my-2 overflow-hidden flex flex-col h-[96vh]">
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center shrink-0 shadow-lg relative z-10">
+        <div className="bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center shrink-0 shadow-lg relative z-10">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-[#C9A84C]/20 rounded-lg text-[#C9A84C]">
               <FaPlane size={20} />
@@ -1139,7 +1496,7 @@ export const PendingFlightDetailsModal = ({
           </div>
           <div className="flex items-center gap-2">
             {!isVerified &&
-              booking.requestStatus === "pending_approval" &&
+              ["pending_approval", "pending_second_approval", "manager_approved"].includes(booking.requestStatus) &&
               !isDiscarded && (
                 <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-200 animate-pulse">
                   <FiAlertCircle size={14} className="text-amber-600" />
@@ -1149,11 +1506,11 @@ export const PendingFlightDetailsModal = ({
                 </div>
               )}
 
-            {booking.requestStatus !== "pending_approval" ? (
+            {!isPendingWithMe ? (
               <div className="flex items-center gap-2 px-4 py-2 bg-[#FAF8F4] text-slate-500 rounded-xl border border-[#EAE4D9] italic">
                 <FiInfo size={14} className="text-slate-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight">
-                  Request already {booking.requestStatus}
+                  {booking.requestStatus === "pending_second_approval" ? "Awaiting Second Approval" : `Request already ${booking.requestStatus}`}
                 </span>
               </div>
             ) : isDiscarded ? (
@@ -1165,8 +1522,18 @@ export const PendingFlightDetailsModal = ({
               </div>
             ) : (
               <>
+                {onTransfer && (
+                  <button
+                    onClick={() => setIsTransferModalOpen(true)}
+                    disabled={!isVerified}
+                    className={`px-5 py-2 border border-amber-200 text-amber-700 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-[#EAE4D9]" : "hover:bg-amber-50"}`}
+                    title={!isVerified ? "Account pending verification" : ""}
+                  >
+                    Transfer Approver
+                  </button>
+                )}
                 <button
-                  onClick={() => onReject(booking._id, "flight", "reject")}
+                  onClick={() => setActionModal({ isOpen: true, action: "reject" })}
                   disabled={!isVerified}
                   className={`px-5 py-2 border border-red-100 text-red-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-[#EAE4D9]" : "hover:bg-red-50"}`}
                   title={!isVerified ? "Account pending verification" : ""}
@@ -1174,7 +1541,7 @@ export const PendingFlightDetailsModal = ({
                   Reject Request
                 </button>
                 <button
-                  onClick={() => onApprove(booking._id, "flight", "approve")}
+                  onClick={() => setActionModal({ isOpen: true, action: "approve" })}
                   disabled={!isVerified}
                   className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
                   title={!isVerified ? "Account pending verification" : ""}
@@ -1636,7 +2003,7 @@ export const PendingFlightDetailsModal = ({
                 {/* Right Column */}
                 <div className="w-full lg:w-96 space-y-6">
                   {/* Fare Breakdown */}
-                  <div className="bg-gradient-to-br from-[#003399] to-[#000d26] text-white rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
+                  <div className="bg-linear-to-br from-[#003399] to-[#000d26] text-white rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
                     <SectionLabel
                       icon={<FiDollarSign />}
                       title="Fare Snapshot"
@@ -1773,7 +2140,7 @@ export const PendingFlightDetailsModal = ({
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
                         Reason for Travel
                       </p>
-                      <div className="bg-[#FAF8F4] p-6 rounded-[2rem] border border-[#EAE4D9] italic text-sm font-black text-slate-700 leading-relaxed shadow-inner">
+                      <div className="bg-[#FAF8F4] p-6 rounded-4xl border border-[#EAE4D9] italic text-sm font-black text-slate-700 leading-relaxed shadow-inner">
                         "
                         {booking.purposeOfTravel ||
                           "Internal business requirement"}
@@ -1781,6 +2148,41 @@ export const PendingFlightDetailsModal = ({
                       </div>
                     </div>
                   </div>
+
+                  {booking.secondApprover && booking.secondApprover.email && (
+                    <div className="bg-white border border-amber-200 rounded-3xl p-8 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-5">
+                        <FiAlertCircle size={64} />
+                      </div>
+                      <SectionLabel icon={<FiUser />} title="Transferred Approver Details" />
+                      <div className="mt-8 flex items-center gap-6">
+                        <div className="w-20 h-20 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-500 font-black text-2xl italic shadow-inner">
+                          {(booking.secondApprover.name || booking.secondApprover.email)[0].toUpperCase()}
+                        </div>
+                        <div className="relative z-10">
+                          <p className="text-xl font-black text-[#1A1714] uppercase tracking-tighter italic">
+                            {booking.secondApprover.name || booking.secondApprover.email.split('@')[0]}
+                          </p>
+                          <p className="text-xs font-bold text-slate-400 mt-1">
+                            {booking.secondApprover.email}
+                          </p>
+                          <div className="mt-2 flex gap-2">
+                            <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-amber-200">
+                              Second Approver
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-8 pt-8 border-t border-slate-50 relative z-10">
+                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-4">
+                          Transfer Remark
+                        </p>
+                        <div className="bg-amber-50 p-6 rounded-4xl border border-amber-100 italic text-sm font-black text-amber-900 leading-relaxed shadow-inner">
+                          "{booking.secondApprover.transferRemark || booking.secondApprover.remark || "No remark provided"}"
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1788,101 +2190,15 @@ export const PendingFlightDetailsModal = ({
             {activeTab === "charges" && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-6">
-                  {/* Cancellation & Fare Rules */}
-                  {(miniFareRules.length > 0 || fareRules.length > 0) && (
-                    <div className="bg-white border border-[#EAE4D9] rounded-3xl p-8 shadow-sm">
-                      <SectionLabel
-                        icon={<FiAlertCircle />}
-                        title="Cancellation & Date Change Rules"
-                      />
-                      <div className="mt-8 grid grid-cols-1 gap-6">
-                        {miniFareRules.map((group, gIdx) => (
-                          <div
-                            key={gIdx}
-                            className="bg-[#FAF8F4]/50 border border-[#EAE4D9] rounded-3xl p-6 space-y-6"
-                          >
-                            <div className="flex items-center gap-3 pb-4 border-b border-[#EAE4D9]">
-                              <div className="p-2 bg-[#B5862A] text-white rounded-xl shadow-lg shadow-indigo-100">
-                                <FiMapPin size={14} />
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                  Sector Route
-                                </p>
-                                <p className="text-sm font-black text-[#1A1714] uppercase italic">
-                                  {group[0]?.JourneyPoints || "All Sectors"}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {group.map((rule, rIdx) => (
-                                <div
-                                  key={rIdx}
-                                  className="p-5 bg-white rounded-2xl border border-[#EAE4D9] shadow-sm flex flex-col justify-between hover:border-indigo-200 transition-all"
-                                >
-                                  <div className="flex justify-between items-start mb-4">
-                                    <span
-                                      className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${rule.Type === "Cancellation" ? "bg-red-50 text-red-600 border border-red-100" : "bg-[#FAF8F4] text-blue-600 border border-blue-100"}`}
-                                    >
-                                      {rule.Type}
-                                    </span>
-                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                                      {rule.Unit}
-                                    </span>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase">
-                                      {rule.From ? `From ${rule.From} ` : ""}{" "}
-                                      {rule.To ? `to ${rule.To} ` : "onwards "}
-                                    </p>
-                                    <p
-                                      className={`text-xl font-black tracking-tighter ${rule.Details === "100%" || rule.Details?.toLowerCase().includes("non") ? "text-red-600" : rule.Details?.toLowerCase() === "nil" ? "text-emerald-600" : "text-[#B5862A]"}`}
-                                    >
-                                      {rule.Details}
-                                    </p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-
-                        {fareRules.map(
-                          (rule, idx) =>
-                            rule.FareRuleDetail && (
-                              <div
-                                key={idx}
-                                className="bg-[#FAF8F4] border border-[#EAE4D9] rounded-2xl p-6"
-                              >
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 italic">
-                                  Detailed Rule: {rule.Origin} to{" "}
-                                  {rule.Destination}
-                                </p>
-                                <div className="text-[11px] text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">
-                                  {rule.FareRuleDetail}
-                                </div>
-                              </div>
-                            ),
-                        )}
-                      </div>
+                  <div className="bg-white border border-[#EAE4D9] rounded-3xl p-8 shadow-sm">
+                    <SectionLabel
+                      icon={<FiAlertCircle />}
+                      title="Cancellation & Date Change Rules"
+                    />
+                    <div className="mt-8">
+                      <FareRulesAccordion parsedRules={parsedFareRules} />
                     </div>
-                  )}
-
-                  {!miniFareRules.length &&
-                    !fareRules.some((r) => r.FareRuleDetail) && (
-                      <div className="py-20 text-center bg-white rounded-[2.5rem] border border-dashed border-[#EAE4D9] shadow-sm">
-                        <FiAlertCircle
-                          className="mx-auto text-amber-400 mb-4 animate-bounce"
-                          size={48}
-                        />
-                        <h3 className="text-xl font-black text-[#1A1714] uppercase tracking-tight italic">
-                          Policy Data Not Available
-                        </h3>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">
-                          Fare rules were not captured for this request
-                        </p>
-                      </div>
-                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -2017,8 +2333,22 @@ export const PendingFlightDetailsModal = ({
             )}
           </div>
         </div>
+        <ActionModal
+          isOpen={actionModal.isOpen}
+          action={actionModal.action}
+          type="flight"
+          onClose={() => setActionModal({ isOpen: false, action: null })}
+          onConfirm={handleConfirmAction}
+        />
       </div>
-    </div>
+      <TransferApproverModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        onTransfer={onTransfer}
+        bookingType="flight"
+      />
+    </div>,
+    document.body
   );
 };
 

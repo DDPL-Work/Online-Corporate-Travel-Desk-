@@ -482,6 +482,13 @@ export default function BookApprovedFlight() {
         bg: "bg-yellow-50",
         canBook: false,
       };
+    if (booking.requestStatus === "manager_approved" || booking.requestStatus === "pending_second_approval")
+      return {
+        text: "Waiting for travel-admin approval",
+        color: "text-amber-600",
+        bg: "bg-amber-50",
+        canBook: false,
+      };
     if (booking.requestStatus === "rejected")
       return {
         text: "Rejected by admin",
@@ -818,11 +825,9 @@ const FlightSegmentCard = ({ seg }) => (
     {/* AIRLINE */}
     <div className="flex items-center justify-between border-b border-slate-50 pb-3">
       <div className="flex items-center gap-4">
-        <img
-          src={airlineLogo(seg.airlineCode)}
+        <img src={airlineLogo(seg.airlineCode)}
           alt={seg.airlineName}
-          className="w-10 h-10 object-contain"
-        />
+          className="w-10 h-10 object-contain" loading="eager" />
         <div>
           <p className="font-black text-[#0A203E] text-xs uppercase tracking-tight">
             {seg.airlineName}

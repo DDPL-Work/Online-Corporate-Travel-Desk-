@@ -16,6 +16,7 @@ export default function EditUserModal({ user, onClose }) {
     employeeCode: "",
     mobile: "",
     status: "active",
+    role: "employee",
   });
 
   // -------------------------
@@ -33,6 +34,7 @@ export default function EditUserModal({ user, onClose }) {
       employeeCode: user.employeeCode || "",
       mobile: user.mobile || "",
       status: user.status || "active",
+      role: user.role || "employee",
     });
   }, [user]);
 
@@ -63,6 +65,7 @@ export default function EditUserModal({ user, onClose }) {
           employeeCode: form.employeeCode,
           mobile: form.mobile,
           status: form.status,
+          role: form.role,
         },
       })
     );
@@ -151,16 +154,35 @@ export default function EditUserModal({ user, onClose }) {
             className="border p-2 rounded w-full"
           />
 
+          {/* ROLE */}
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</label>
+            <select
+              name="role"
+              value={form.role}
+              onChange={handleChange}
+              className="border p-2 rounded w-full"
+              required
+            >
+              <option value="employee">Employee</option>
+              <option value="manager">Manager</option>
+              <option value="finance_team">Finance Team</option>
+            </select>
+          </div>
+
           {/* STATUS */}
-          <select
-            name="status"
-            value={form.status}
-            onChange={handleChange}
-            className="border p-2 rounded w-full"
-          >
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</label>
+            <select
+              name="status"
+              value={form.status}
+              onChange={handleChange}
+              className="border p-2 rounded w-full"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
 
           {/* ACTIONS */}
           <div className="flex justify-end gap-3 pt-4 border-t">

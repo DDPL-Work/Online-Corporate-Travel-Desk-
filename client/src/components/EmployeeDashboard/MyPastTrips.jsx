@@ -48,7 +48,7 @@ const RouteCell = ({ routes, airline }) => {
   return (
     <div className="flex items-center gap-3">
       <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
-        <img src={logoUrl} alt={airlineName} className="w-full h-full object-contain" onError={(e) => { e.target.onerror = null; e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; }} />
+        <img src={logoUrl} alt={airlineName} className="w-full h-full object-contain" loading="eager" onError={(e) => { e.target.onerror = null; e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; }} />
       </div>
       <div className="flex flex-col gap-0.5">
         <div className="flex items-center gap-2">
@@ -145,30 +145,47 @@ function FlightSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight History Ledger" subtitle={`${filtered.length} completed journeys`} onExport={() => {}} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight History Ledger" 
+        subtitle={`${filtered.length} completed journeys`} 
+        exportConfig={{
+          data: filtered,
+          filename: `my_past_flights_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
+            { header: "Travel Date", accessor: (r) => fmtDate(r.travelDate) },
+            { header: "Status", accessor: () => "Completed" },
+            { header: "PNR Ref", key: "pnr" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Route</Th>
-              <Th className="!px-6 !py-5">Travel Date</Th>
-              <Th className="!px-6 !py-5">Status</Th>
-              <Th className="!px-6 !py-5">PNR Ref</Th>
-              <Th className="!px-6 !py-5">Amount</Th>
-              <Th className="!px-6 !py-5 !text-left">Action</Th>
+            <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="px-6! py-5!">Order ID</Th>
+              <Th className="px-6! py-5!">Route</Th>
+              <Th className="px-6! py-5!">Travel Date</Th>
+              <Th className="px-6! py-5!">Status</Th>
+              <Th className="px-6! py-5!">PNR Ref</Th>
+              <Th className="px-6! py-5!">Amount</Th>
+              <Th className="px-6! py-5! !text-left">Action</Th>
             </tr>
           </thead>
           <tbody>
             {paginated.length > 0 ? paginated.map((b, i) => (
               <tr key={b._id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
-                <td className="!px-6 !py-5"><IdCell id={b.orderId} /></td>
-                <td className="!px-6 !py-5"><RouteCell routes={b.routes} airline={b.airline} /></td>
-                <td className="!px-6 !py-5 text-[11px] font-bold text-slate-500 uppercase">{fmtDate(b.travelDate)}</td>
-                <td className="!px-6 !py-5"><StatusBadge status="completed" /></td>
-                <td className="!px-6 !py-5 font-black text-blue-500 text-xs">{b.pnr}</td>
-                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
-                <td className="!px-6 !py-5 !text-left">
-                    <button onClick={() => navigate(`/my-booking/${b._id}`)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group">
+                <td className="px-6! py-5!"><IdCell id={b.orderId} /></td>
+                <td className="px-6! py-5!"><RouteCell routes={b.routes} airline={b.airline} /></td>
+                <td className="px-6! py-5! text-[11px] font-bold text-slate-500 uppercase">{fmtDate(b.travelDate)}</td>
+                <td className="px-6! py-5!"><StatusBadge status="completed" /></td>
+                <td className="px-6! py-5! font-black text-blue-500 text-xs">{b.pnr}</td>
+                <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
+                <td className="px-6! py-5! !text-left">
+                    <button onClick={() => navigate(`/my-booking/${b._id}`)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group">
                       <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
                     </button>
                 </td>
@@ -256,34 +273,50 @@ function HotelSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel History Ledger" subtitle={`${filtered.length} completed stays`} onExport={() => {}} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel History Ledger" 
+        subtitle={`${filtered.length} completed stays`} 
+        exportConfig={{
+          data: filtered,
+          filename: `my_past_hotels_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Hotel", key: "hotelName" },
+            { header: "Stay Period", accessor: (r) => `${fmtDate(r.ci)} to ${fmtDate(r.bookingSnapshot?.checkOutDate || r.checkOutDate)}` },
+            { header: "Status", accessor: () => "Completed" },
+            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Hotel Detail</Th>
-              <Th className="!px-6 !py-5">Stay Period</Th>
-              <Th className="!px-6 !py-5">Status</Th>
-              <Th className="!px-6 !py-5">Amount</Th>
-              <Th className="!px-6 !py-5 !text-left">Action</Th>
+            <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="px-6! py-5!">Order ID</Th>
+              <Th className="px-6! py-5!">Hotel Detail</Th>
+              <Th className="px-6! py-5!">Stay Period</Th>
+              <Th className="px-6! py-5!">Status</Th>
+              <Th className="px-6! py-5!">Amount</Th>
+              <Th className="px-6! py-5! !text-left">Action</Th>
             </tr>
           </thead>
           <tbody>
             {paginated.length > 0 ? paginated.map((b, i) => (
               <tr key={b._id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
-                <td className="!px-6 !py-5"><IdCell id={b.orderId} /></td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!"><IdCell id={b.orderId} /></td>
+                <td className="px-6! py-5!">
                    <p className="text-xs font-black" style={{ color: C.navy }}>{b.hotelName}</p>
                    <p className="text-[10px] font-bold text-gold uppercase">{b.city}</p>
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <p className="text-[11px] font-bold text-slate-700">{fmtDate(b.ci)}</p>
                    <p className="text-[9px] text-slate-400">to {fmtDate(b.bookingSnapshot?.checkOutDate || b.checkOutDate)}</p>
                 </td>
-                <td className="!px-6 !py-5"><StatusBadge status="completed" /></td>
-                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
-                <td className="!px-6 !py-5 !text-left">
-                    <button onClick={() => navigate(`/my-hotel-booking/${b._id}`)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group">
+                <td className="px-6! py-5!"><StatusBadge status="completed" /></td>
+                <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
+                <td className="px-6! py-5! !text-left">
+                    <button onClick={() => navigate(`/my-hotel-booking/${b._id}`)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group">
                       <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
                     </button>
                 </td>
@@ -318,7 +351,7 @@ export default function MyPastTrips() {
 
   return (
     <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
-      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+      <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
              <div className="flex items-center gap-3">

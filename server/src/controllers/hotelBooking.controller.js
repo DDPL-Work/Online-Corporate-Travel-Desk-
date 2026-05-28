@@ -218,6 +218,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
     },
     providerBookingId: hotelRequest.bookingCode || null,
     preBookResponse: hotelRequest.preBookResponse || null,
+    ...(hotelRequest.IsCorporate && { IsCorporate: true }),
   };
 
   const bookingSnapshot = {
@@ -439,6 +440,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
         ClientReferenceId: bookingRequest.bookingReference,
         TraceId: hotelRequest.traceId || hotelRequest.TraceId,
         HotelRoomsDetails,
+        ...(hotelRequest.IsCorporate && { IsCorporate: true }),
         ...(gstDetails?.gstin && {
           GSTCompanyInformation: {
             GSTNumber: gstDetails.gstin,
@@ -651,7 +653,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
     cityName: hotelRequest.city || hotelRequest.rawHotelData?.CityName,
     countryName: hotelRequest.country || hotelRequest.rawHotelData?.CountryName,
-    guestNationality: hotelRequest.guestNationality || "IN",
+    guestNationality: hotelRequest.guestNationality,
 
     roomGuests,
     paxRooms,
@@ -886,6 +888,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 });
 
 
+
 // @desc    Get my hotel booking requests (pending + approved)
 // @route   GET /api/v1/hotel-bookings/my
 // @access  Private (Employee)
@@ -895,7 +898,7 @@ exports.getMyHotelRequests = asyncHandler(async (req, res) => {
 
   const requests = await HotelBookingRequest.find({
     userId,
-    requestStatus: { $in: ["pending_approval", "approved"] },
+    requestStatus: { $in: ["pending_approval", "pending_second_approval", "manager_approved", "approved"] },
     executionStatus: { $ne: "voucher_generated" }, // not completed yet
   })
     .populate("approvedBy", "name email role")
@@ -1264,7 +1267,7 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
         booking.hotelRequest?.TraceId,
 
       HotelRoomsDetails,
-
+      ...(booking.hotelRequest?.IsCorporate && { IsCorporate: true }),
       ...(booking.gstDetails?.gstin && {
         GSTCompanyInformation: {
           GSTNumber: booking.gstDetails.gstin || "",
@@ -1754,7 +1757,8 @@ exports.generateHotelVoucher = asyncHandler(async (req, res) => {
 
   if (!booking) throw new ApiError(404, "Booking not found");
 
-  if (booking.userId.toString() !== req.user._id.toString()) {
+  const isAdmin = ["super-admin", "ops-member", "manager", "travel-admin", "finance_team"].includes(req.user.role);
+  if (booking.userId.toString() !== req.user._id.toString() && !isAdmin) {
     throw new ApiError(403, "Not authorized");
   }
 
@@ -1919,11 +1923,16 @@ exports.getProjectHotelExpenses = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Project ID is required");
   }
 
-  const expenses = await HotelBookingRequest.find({
-    projectId,
+  const query = {
     corporateId: req.user.corporateId,
     executionStatus: "voucher_generated",
-  })
+  };
+
+  if (projectId !== "all") {
+    query.projectId = projectId;
+  }
+
+  const expenses = await HotelBookingRequest.find(query)
     .populate("userId", "name email")
     .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 });

@@ -35,6 +35,7 @@ const hasValidSSR = (ssr) => {
     const flatSeat = Array.isArray(ssr?.seats) && ssr.seats.length > 0;
     const flatMeal = Array.isArray(ssr?.meals) && ssr.meals.length > 0;
     const flatBaggage = Array.isArray(ssr?.baggage) && ssr.baggage.length > 0;
+    const flatSpecial = Array.isArray(ssr?.specialServices) && ssr.specialServices.length > 0;
 
     const seat = ssr?.SeatDynamic?.[0]?.SegmentSeat?.some(
       (segment) => segment.Seat?.length > 0,
@@ -46,7 +47,7 @@ const hasValidSSR = (ssr) => {
 
     const baggage = ssr?.Baggage?.some((item) => item.Weight > 0);
 
-    return flatSeat || flatMeal || flatBaggage || seat || meal || baggage;
+    return flatSeat || flatMeal || flatBaggage || flatSpecial || seat || meal || baggage;
   } catch {
     return false;
   }
@@ -60,6 +61,9 @@ const splitSSR = (snapshot, type) => {
     meals: (snapshot.meals || []).filter((meal) => meal.journeyType === type),
     baggage: (snapshot.baggage || []).filter(
       (bag) => bag.journeyType === type,
+    ),
+    specialServices: (snapshot.specialServices || []).filter(
+      (svc) => svc.journeyType === type,
     ),
   };
 };
@@ -196,6 +200,11 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
   const segments = booking.flightRequest.segments || [];
   const fareResults = getFareResults(booking.flightRequest.fareQuote);
 
+  const gstDetailsPayload = booking.gstDetails ? {
+    ...(typeof booking.gstDetails.toObject === "function" ? booking.gstDetails.toObject() : booking.gstDetails),
+    gstPhone: corporate?.primaryContact?.mobile,
+  } : undefined;
+
   const isRoundTrip = segments.some((segment) => segment.journeyType === "return");
   const isInternational = segments.some(
     (segment) => segment.origin.country !== "IN" || segment.destination.country !== "IN",
@@ -279,7 +288,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         passengers,
         ...(ssrPayload && { ssr: ssrPayload }),
         isLCC: true,
-        gstDetails: booking.gstDetails,
+        gstDetails: gstDetailsPayload,
       });
 
       const pnr = extractPnr(ticketResponse);
@@ -312,7 +321,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       result: fareResults[0],
       passengers,
       ssr: booking.flightRequest.ssrSnapshot,
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const supplierBookingId = bookingResponse?.raw?.Response?.Response?.BookingId;
@@ -339,7 +348,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr,
       passengers,
       isLCC: false,
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const ticketStatus = ticketResponse?.Response?.Response?.TicketStatus;
@@ -381,7 +390,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         passengers,
         ssr: splitSSR(booking.flightRequest.ssrSnapshot, "onward"),
         isLCC: true,
-        gstDetails: booking.gstDetails,
+        gstDetails: gstDetailsPayload,
       });
 
       const returnResponse = await tboService.ticketFlight({
@@ -391,7 +400,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         passengers,
         ssr: splitSSR(booking.flightRequest.ssrSnapshot, "return"),
         isLCC: true,
-        gstDetails: booking.gstDetails,
+        gstDetails: gstDetailsPayload,
       });
 
       const onwardPNR = extractPnr(onwardResponse);
@@ -429,7 +438,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       result: fareResults[0],
       passengers,
       ssr: splitSSR(booking.flightRequest.ssrSnapshot, "onward"),
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const returnResponse = await tboService.bookFlight({
@@ -439,7 +448,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       result: fareResults[1],
       passengers,
       ssr: splitSSR(booking.flightRequest.ssrSnapshot, "return"),
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const onwardPNR = extractPnr(onwardResponse);
@@ -474,7 +483,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: onwardPNR,
       passengers,
       isLCC: false,
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const returnTicketResponse = await tboService.ticketFlight({
@@ -483,7 +492,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: returnPNR,
       passengers,
       isLCC: false,
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const onwardSuccess =
@@ -539,7 +548,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       passengers,
       ...(ssrPayload && { ssr: ssrPayload }),
       isLCC: true,
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const pnr = extractPnr(ticketResponse);
@@ -595,7 +604,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       passengers,
       ...(ssrPayload && { ssr: ssrPayload }),
       isLCC: true,
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const pnr = extractPnr(ticketResponse);
@@ -628,7 +637,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     result: fareResults[0],
     passengers,
     ssr: booking.flightRequest.ssrSnapshot,
-    gstDetails: booking.gstDetails,
+    gstDetails: gstDetailsPayload,
   });
 
   const supplierBookingId = bookingResponse?.raw?.Response?.Response?.BookingId;
@@ -655,7 +664,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     pnr,
     passengers,
     isLCC: false,
-    gstDetails: booking.gstDetails,
+    gstDetails: gstDetailsPayload,
   });
 
   const ticketStatus = ticketResponse?.Response?.Response?.TicketStatus;

@@ -1160,8 +1160,8 @@ exports.getMyRequests = asyncHandler(async (req, res) => {
     userId: req.user._id, // 🔐 ownership enforced
     bookingType: "flight",
 
-    // ✅ approved OR pending_approval
-    requestStatus: { $in: ["approved", "pending_approval"] },
+    // ✅ approved OR pending_approval OR manager_approved
+    requestStatus: { $in: ["approved", "pending_approval", "pending_second_approval", "manager_approved"] },
 
     // ✅ exclude ticketed
     executionStatus: { $ne: "ticketed" },
@@ -1312,51 +1312,32 @@ const buildTboRevalidationSearchPayload = (booking, intent) => {
 
   console.log("ORIGINAL STORED SEGMENT:", booking.flightRequest.segments[0]);
 
-  const basePayload = {
-    AdultCount: adultCount,
-    ChildCount: childCount,
-    InfantCount: infantCount,
-    DirectFlight: false,
-    OneStopFlight: false,
-    JourneyType: isRoundTrip ? 2 : 1,
-    Segments: [],
-    // Sources: intent.airlineCodes?.length ? intent.airlineCodes : null,
+  const baseParams = {
+    adults: adultCount,
+    children: childCount,
+    infants: infantCount,
+    journeyType: isRoundTrip ? 2 : 1,
+    cabinClass: segments[0].cabinClass,
   };
 
-  // ✅ ONE-WAY (UNCHANGED BEHAVIOR)
+  // ✅ ONE-WAY
   if (!isRoundTrip) {
-    const segment = segments[0];
-
-    basePayload.Segments.push({
-      Origin: segment.origin.airportCode,
-      Destination: segment.destination.airportCode,
-      FlightCabinClass: cabinClassToTboCode(segment.cabinClass),
-      PreferredDepartureTime: segment.departureDateTime.slice(0, 19),
-    });
-
-    return basePayload;
+    return {
+      ...baseParams,
+      origin: segments[0].origin.airportCode,
+      destination: segments[0].destination.airportCode,
+      departureDate: segments[0].departureDateTime.slice(0, 19),
+    };
   }
 
-  // ✅ ROUND-TRIP (TBO COMPLIANT)
-  const onward = segments[0];
-  const ret = segments[1];
-
-  basePayload.Segments.push(
-    {
-      Origin: onward.origin.airportCode,
-      Destination: onward.destination.airportCode,
-      FlightCabinClass: onward.cabinClass,
-      PreferredDepartureTime: onward.departureDateTime.slice(0, 19),
-    },
-    {
-      Origin: ret.origin.airportCode,
-      Destination: ret.destination.airportCode,
-      FlightCabinClass: ret.cabinClass,
-      PreferredDepartureTime: ret.departureDateTime.slice(0, 19),
-    },
-  );
-
-  return basePayload;
+  // ✅ ROUND-TRIP
+  return {
+    ...baseParams,
+    origin: segments[0].origin.airportCode,
+    destination: segments[0].destination.airportCode,
+    departureDate: segments[0].departureDateTime.slice(0, 19),
+    returnDate: segments[1].departureDateTime.slice(0, 19),
+  };
 };
 
 const hasValidSSR = (ssr) => {
@@ -1366,6 +1347,7 @@ const hasValidSSR = (ssr) => {
     const flatSeat = Array.isArray(ssr?.seats) && ssr.seats.length > 0;
     const flatMeal = Array.isArray(ssr?.meals) && ssr.meals.length > 0;
     const flatBaggage = Array.isArray(ssr?.baggage) && ssr.baggage.length > 0;
+    const flatSpecial = Array.isArray(ssr?.specialServices) && ssr.specialServices.length > 0;
 
     const seat = ssr?.SeatDynamic?.[0]?.SegmentSeat?.some(
       (s) => s.Seat?.length > 0,
@@ -1377,7 +1359,7 @@ const hasValidSSR = (ssr) => {
 
     const baggage = ssr?.Baggage?.some((b) => b.Weight > 0);
 
-    return flatSeat || flatMeal || flatBaggage || seat || meal || baggage;
+    return flatSeat || flatMeal || flatBaggage || flatSpecial || seat || meal || baggage;
   } catch {
     return false;
   }
@@ -1387,6 +1369,11 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
   const rawResultIndex = booking.flightRequest.resultIndex;
 
   const segments = booking.flightRequest.segments;
+
+  const gstDetailsPayload = booking.gstDetails ? {
+    ...(typeof booking.gstDetails.toObject === "function" ? booking.gstDetails.toObject() : booking.gstDetails),
+    gstPhone: corporate?.primaryContact?.mobile,
+  } : undefined;
 
   // ✅ detect round trip
   const isRoundTrip = segments.some((s) => s.journeyType === "return");
@@ -1489,7 +1476,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         passengers,
         ...(ssrPayload && { ssr: ssrPayload }),
         isLCC: true,
-        gstDetails: booking.gstDetails,
+        gstDetails: gstDetailsPayload,
       });
 
       const extractedPNR =
@@ -1525,7 +1512,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       result: booking.flightRequest.fareQuote.Results[0],
       passengers,
       ssr: booking.flightRequest.ssrSnapshot,
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const tboBookingId = bookResp?.raw?.Response?.Response?.BookingId;
@@ -1554,7 +1541,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: extractedPNR,
       passengers,
       isLCC: false,
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const ticketStatus = ticketResp?.Response?.Response?.TicketStatus;
@@ -1596,6 +1583,9 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
           baggage: (snapshot.baggage || []).filter(
             (b) => b.journeyType === type,
           ),
+          specialServices: (snapshot.specialServices || []).filter(
+            (svc) => svc.journeyType === type,
+          ),
         };
       };
 
@@ -1606,7 +1596,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         passengers,
         ssr: splitSSR(booking.flightRequest.ssrSnapshot, "onward"),
         isLCC: true,
-        gstDetails: booking.gstDetails,
+        gstDetails: gstDetailsPayload,
       });
 
       const returnResp = await tboService.ticketFlight({
@@ -1616,7 +1606,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         passengers,
         ssr: splitSSR(booking.flightRequest.ssrSnapshot, "return"),
         isLCC: true,
-        gstDetails: booking.gstDetails,
+        gstDetails: gstDetailsPayload,
       });
 
       console.log(
@@ -1670,6 +1660,9 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
         seats: (snapshot.seats || []).filter((s) => s.journeyType === type),
         meals: (snapshot.meals || []).filter((m) => m.journeyType === type),
         baggage: (snapshot.baggage || []).filter((b) => b.journeyType === type),
+        specialServices: (snapshot.specialServices || []).filter(
+          (svc) => svc.journeyType === type,
+        ),
       };
     };
 
@@ -1680,7 +1673,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       result: booking.flightRequest.fareQuote.Results[0],
       passengers,
       ssr: splitSSR(booking.flightRequest.ssrSnapshot, "onward"),
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const returnResp = await tboService.bookFlight({
@@ -1690,7 +1683,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       result: booking.flightRequest.fareQuote.Results[1],
       passengers,
       ssr: splitSSR(booking.flightRequest.ssrSnapshot, "return"),
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const onwardPNR =
@@ -1729,7 +1722,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: onwardPNR,
       passengers,
       isLCC: false,
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const returnTicketResp = await tboService.ticketFlight({
@@ -1738,7 +1731,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       pnr: returnPNR,
       passengers,
       isLCC: false,
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     /* ✅ VALIDATE */
@@ -1804,7 +1797,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       passengers,
       ...(ssrPayload && { ssr: ssrPayload }),
       isLCC: true,
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const extractedPNR =
@@ -1861,7 +1854,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
       passengers,
       ...(ssrPayload && { ssr: ssrPayload }),
       isLCC: true,
-      gstDetails: booking.gstDetails,
+      gstDetails: gstDetailsPayload,
     });
 
     const extractedPNR =
@@ -1896,7 +1889,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     result: booking.flightRequest.fareQuote.Results[0],
     passengers,
     ssr: booking.flightRequest.ssrSnapshot,
-    gstDetails: booking.gstDetails,
+    gstDetails: gstDetailsPayload,
   });
 
   /* ✅ EXTRACT BOOKING ID (VERY IMPORTANT) */
@@ -1936,7 +1929,7 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     pnr: extractedPNR,
     passengers,
     isLCC: false,
-    gstDetails: booking.gstDetails,
+    gstDetails: gstDetailsPayload,
   });
 
   /* ✅ VALIDATE TICKET RESPONSE */
@@ -2321,8 +2314,15 @@ exports.downloadTicketPdf = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Booking not found");
   }
 
+  const isAdminOrOps = ["super-admin", "travel-admin", "ops-member"].includes(
+    req.user.role
+  );
+
   // 🔐 ownership check
-  if (context.requestedBooking.userId.toString() !== req.user._id.toString()) {
+  if (
+    !isAdminOrOps &&
+    context.requestedBooking.userId.toString() !== req.user._id.toString()
+  ) {
     throw new ApiError(403, "Not authorized");
   }
 
@@ -2676,11 +2676,16 @@ exports.getProjectFlightExpenses = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Project ID is required");
   }
 
-  const expenses = await BookingRequest.find({
-    projectId,
+  const query = {
     corporateId: req.user.corporateId,
     executionStatus: "ticketed",
-  })
+  };
+
+  if (projectId !== "all") {
+    query.projectId = projectId;
+  }
+
+  const expenses = await BookingRequest.find(query)
     .populate("userId", "name email")
     .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 });

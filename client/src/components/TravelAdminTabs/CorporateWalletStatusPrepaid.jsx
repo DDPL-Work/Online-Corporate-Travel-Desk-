@@ -37,6 +37,8 @@ import {
 } from "../../Redux/Slice/walletSlice";
 import { C } from "../Shared/color";
 import { useNavigate } from "react-router-dom";
+import { exportToCSV } from "../../utils/exportToCSV";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 
 const StatusBadge = ({ status }) => {
   const config = {
@@ -242,51 +244,33 @@ export default function CorporateWallet() {
     .filter((tx) => tx.type === "debit")
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
-  const handleExport = () => {
-    if (!filteredTransactions.length) return;
-    const headers = [
-      "Date",
-      "Description",
-      "Order ID",
-      "Type",
-      "Amount",
-      "Status",
-    ];
-    const rows = filteredTransactions.map((tx) => [
-      new Date(tx.createdAt).toLocaleDateString("en-IN"),
-      tx.description || "—",
-      tx.orderId || tx._id || tx.bookingId || "—",
-      tx.type || "—",
-      `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}`,
-      getTransactionStatus(tx),
-    ]);
-    const tableHtml = rows
-      .map(
-        (r) =>
-          `<tr>${r.map((c) => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`,
-      )
-      .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;font-weight:700;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `wallet-ledger.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const exportConfig = {
+    data: filteredTransactions,
+    filename: `wallet_ledger_${new Date().toISOString().split('T')[0]}.csv`,
+    columns: [
+      { header: "Date", accessor: (tx) => new Date(tx.createdAt).toLocaleDateString("en-IN") },
+      { header: "Description", accessor: (tx) => tx.description || "—" },
+      { header: "Order ID", accessor: (tx) => tx.orderId || tx._id || tx.bookingId || "—" },
+      { header: "Type", accessor: (tx) => tx.type || "—" },
+      { header: "Amount", accessor: (tx) => `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}` },
+      { header: "Status", accessor: (tx) => getTransactionStatus(tx) }
+    ]
   };
 
   useEffect(() => {
-    if (rechargeOrder?.gateway === "phonepe" && rechargeOrder.redirectUrl)
+    if (rechargeOrder?.gateway === "phonepe" && rechargeOrder.redirectUrl) {
       window.location.assign(rechargeOrder.redirectUrl);
+    }
   }, [rechargeOrder]);
 
   const handleRecharge = async () => {
     if (!rechargeAmount || rechargeAmount <= 0) return;
-    await dispatch(initiateWalletRecharge({ amount: Number(rechargeAmount) }));
+    await dispatch(
+      initiateWalletRecharge({
+        amount: Number(rechargeAmount),
+        returnUrl: window.location.href, // Tell PhonePe to redirect directly back here
+      })
+    );
     setShowRecharge(false);
     setRechargeAmount("");
   };
@@ -481,7 +465,7 @@ export default function CorporateWallet() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 mr-2">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleScroll("left")}
                   className="p-2.5 rounded-xl border bg-white hover:bg-slate-50 text-slate-400 hover:text-navy transition-all active:scale-90"
@@ -499,17 +483,25 @@ export default function CorporateWallet() {
                   <FiChevronRight size={16} />
                 </button>
               </div>
-              <button
-                onClick={handleExport}
-                className="px-4 py-2.5 rounded-xl font-black text-[10px] flex items-center gap-2 border shadow-sm hover:bg-slate-50 transition-all uppercase tracking-widest"
-                style={{ borderColor: C.border, color: C.muted }}
-              >
-                <FiDownload size={14} /> Export XLS
-              </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto" ref={ledgerScrollRef}>
+          <ResponsiveDataTable
+            exportConfig={{
+              data: filteredTransactions,
+              filename: `wallet_ledger_${new Date().toISOString().split('T')[0]}.csv`,
+              columns: [
+                { header: "Date", accessor: (tx) => new Date(tx.createdAt).toLocaleDateString("en-IN") },
+                { header: "Description", accessor: (tx) => tx.description || "—" },
+                { header: "Order ID", accessor: (tx) => tx.orderId || tx._id || tx.bookingId || "—" },
+                { header: "Type", accessor: (tx) => tx.type || "—" },
+                { header: "Amount", accessor: (tx) => `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}` },
+                { header: "Status", accessor: (tx) => getTransactionStatus(tx) }
+              ]
+            }}
+            wrapperClass="!border-none !shadow-none"
+          >
+            <div className="overflow-x-auto" ref={ledgerScrollRef}>
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -649,7 +641,8 @@ export default function CorporateWallet() {
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+          </ResponsiveDataTable>
 
           <div className="p-6 border-t" style={{ borderColor: C.border }}>
             <Pagination

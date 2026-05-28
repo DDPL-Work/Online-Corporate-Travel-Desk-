@@ -338,6 +338,18 @@ const OfflineCancellationQueries = () => {
             title="Governance Ledger"
             subtitle={`${filteredQueries.length} active queries tracked`}
             tableMinWidth="1000px"
+            exportConfig={{
+              data: filteredQueries,
+              filename: `offline_cancellation_queries_${new Date().toISOString().split('T')[0]}.csv`,
+              columns: [
+                { header: "Query ID", accessor: (q) => `Q-${String(q.queryId || q._id).slice(-6).toUpperCase()}` },
+                { header: "Travel Asset", key: "bookingReference" },
+                { header: "Personnel", accessor: (q) => q.corporate?.employeeName || "—" },
+                { header: "Email Identifier", accessor: (q) => q.corporate?.employeeEmail || "—" },
+                { header: "Submission Time", accessor: (q) => new Date(q.requestedAt).toLocaleString() },
+                { header: "Protocol Status", key: "status" },
+              ]
+            }}
           >
             <table className="w-full text-left border-collapse">
               <thead>

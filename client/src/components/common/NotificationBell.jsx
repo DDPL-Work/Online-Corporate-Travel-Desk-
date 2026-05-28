@@ -68,8 +68,7 @@ const NotificationBell = ({ onOpen }) => {
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={toggleDropdown}
-
-          className="relative p-2 text-gray-600 bg-gray-100 rounded transition-colors focus:outline-none"
+          className="relative p-2 sm:p-2.5 text-gray-600 bg-gray-100 rounded-xl transition-all hover:bg-gray-200 active:scale-95 focus:outline-none"
         >
           <IoNotificationsOutline size={24} />
           {unreadCount > 0 && (
@@ -80,7 +79,9 @@ const NotificationBell = ({ onOpen }) => {
         </button>
 
         {isOpen && (
-          <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+          <div
+            className="absolute right-0 mt-2 w-[92vw] sm:w-[380px] md:w-[420px] max-w-[420px] bg-white rounded-2xl shadow-2xl border border-gray-100 z-999 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-h-[75vh] sm:max-h-[70vh] right-0 sm:right-0 mobile-dropdown"
+          >
             <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
               <h3 className="font-semibold text-gray-800">Notifications</h3>
               {unreadCount > 0 && (
@@ -93,25 +94,29 @@ const NotificationBell = ({ onOpen }) => {
               )}
             </div>
 
-            <div className="max-h-[400px] overflow-y-auto">
+            <div className="overflow-y-auto max-h-[60vh] sm:max-h-[55vh]">
               {notifications.length > 0 ? (
                 notifications.map((notification) => (
                   <div
                     key={notification._id}
                     onClick={() => handleNotificationClick(notification)}
-                    className={`p-4 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${
-                      !notification.isRead ? "bg-blue-50/30" : ""
-                    }`}
+                    className={`p-3 sm:p-4 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors flex flex-col gap-1 ${!notification.isRead ? "bg-blue-50/30" : ""}`}
                   >
                     <div className="flex justify-between items-start mb-1">
-                      <h4 className={`text-sm ${!notification.isRead ? "font-bold text-gray-900" : "font-medium text-gray-700"}`}>
+                      <h4
+                        className={`text-[13px] sm:text-sm leading-5 wrap-break-word ${!notification.isRead
+                          ? "font-bold text-gray-900"
+                          : "font-medium text-gray-700"
+                          }
+  `}
+                      >
                         {notification.title}
                       </h4>
                       {!notification.isRead && (
                         <span className="h-2 w-2 rounded-full bg-blue-500 mt-1.5"></span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-600 line-clamp-2 mb-2">
+                    <p className="text-[11px] sm:text-xs text-gray-600 line-clamp-3 wrap-break-word leading-5">
                       {notification.message}
                     </p>
                     <span className="text-[10px] text-gray-400">

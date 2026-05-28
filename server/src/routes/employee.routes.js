@@ -20,7 +20,7 @@ router.patch("/profile", employeeCtrl.updateProfile); // Update own profile (Man
 
 router.post(
   "/documents",
-  authorizeRoles("employee", "travel-admin", "manager"),
+  authorizeRoles("employee", "travel-admin", "manager", "finance_team"),
   uploadMultiple,
   processImage,
   employeeCtrl.uploadTravelDocument,
@@ -28,25 +28,25 @@ router.post(
 
 router.delete(
   "/documents/:id",
-  authorizeRoles("employee", "travel-admin", "manager"),
+  authorizeRoles("employee", "travel-admin", "manager", "finance_team"),
   employeeCtrl.deleteTravelDocument,
 );
 
 router.get(
   "/documents",
-  authorizeRoles("employee", "travel-admin", "manager"),
+  authorizeRoles("employee", "travel-admin", "manager", "finance_team"),
   employeeCtrl.getMyDocuments,
 );
 
 router.get(
   "/me",
-  authorizeRoles("employee", "manager"),
+  authorizeRoles("employee", "manager", "finance_team"),
   employeeCtrl.getMyTravelAdmin,
 );
 
 router.get(
   "/gst",
-  authorizeRoles("employee", "travel-admin", "manager"),
+  authorizeRoles("employee", "travel-admin", "manager", "finance_team"),
   employeeCtrl.getMyGstDetails,
 );
 

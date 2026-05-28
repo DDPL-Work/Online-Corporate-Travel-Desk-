@@ -6,8 +6,10 @@ import {
   fetchChangeStatus,
   fetchFlightBookings,
   fetchFlightCancellations,
+  fetchSuperAdminFlightBookingById,
   fetchHotelBookings,
   fetchHotelCancellations,
+  fetchSuperAdminHotelBookingById,
   fullCancellation,
   getHotelAmendmentStatus,
   partialCancellation,
@@ -19,6 +21,8 @@ import {
 const initialState = {
   // ✈️ Flights
   flightBookings: [],
+  selectedFlightBooking: null,
+  loadingSelectedFlightBooking: false,
   flightPagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
   loadingFlights: false,
   flightCancellations: [],
@@ -54,6 +58,8 @@ const initialState = {
 
   // 🏨 Hotels
   hotelBookings: [],
+  selectedHotelBooking: null,
+  loadingSelectedHotelBooking: false,
   hotelPagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
   loadingHotels: false,
 
@@ -153,6 +159,18 @@ const corporateRelatedSlice = createSlice({
       })
       .addCase(fetchFlightBookings.rejected, (state, action) => {
         state.loadingFlights = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchSuperAdminFlightBookingById.pending, (state) => {
+        state.loadingSelectedFlightBooking = true;
+        state.error = null;
+      })
+      .addCase(fetchSuperAdminFlightBookingById.fulfilled, (state, action) => {
+        state.loadingSelectedFlightBooking = false;
+        state.selectedFlightBooking = action.payload;
+      })
+      .addCase(fetchSuperAdminFlightBookingById.rejected, (state, action) => {
+        state.loadingSelectedFlightBooking = false;
         state.error = action.payload;
       })
 
@@ -269,6 +287,18 @@ const corporateRelatedSlice = createSlice({
       })
       .addCase(fetchHotelBookings.rejected, (state, action) => {
         state.loadingHotels = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchSuperAdminHotelBookingById.pending, (state) => {
+        state.loadingSelectedHotelBooking = true;
+        state.error = null;
+      })
+      .addCase(fetchSuperAdminHotelBookingById.fulfilled, (state, action) => {
+        state.loadingSelectedHotelBooking = false;
+        state.selectedHotelBooking = action.payload;
+      })
+      .addCase(fetchSuperAdminHotelBookingById.rejected, (state, action) => {
+        state.loadingSelectedHotelBooking = false;
         state.error = action.payload;
       })
 

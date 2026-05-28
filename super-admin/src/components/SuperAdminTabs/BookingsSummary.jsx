@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   FiEye,
-  FiDownload,
   FiSearch,
   FiList,
   FiCheckCircle,
   FiClock,
+  FiArrowDown,
+  FiArrowUp,
 } from "react-icons/fi";
 import { FaPlane, FaHotel, FaRupeeSign } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchFlightBookings,
@@ -16,10 +18,11 @@ import {
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import Pagination from "../Shared/Pagination";
 import TableActionBar from "../Shared/TableActionBar";
+import useCsvExporter from "../../services/export/useCsvExporter";
 import {
-  FlightBookingModal,
-  HotelBookingModal,
-} from "../Shared/BookingRequestDetailsModal";
+  flightBookingsExportTemplate,
+  hotelBookingsExportTemplate,
+} from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const colors = {
   primary: "#0A4D68",
@@ -30,6 +33,7 @@ const colors = {
 };
 
 const DEFAULT_LIMIT = 10;
+const EMPTY_VALUE = "—";
 
 const getCorporateName = (b = {}) => {
   const corp = b.corporateName || b.corporate || b.corporateId;
@@ -109,8 +113,11 @@ const normalizeFlight = (b = {}) => {
 
   return {
     id: b._id || b.bookingId || "—",
+    orderId: b.orderId || b.bookingSnapshot?.orderId || b.bookingReference || EMPTY_VALUE,
+    paymentId: b.paymentId || b.payment?.paymentId || EMPTY_VALUE,
+    bookedDate: b.bookedDate || b.createdAt || b.approvedAt || b.ticketedAt || "",
     pnr: b.bookingResult?.pnr || b.pnr || b.itinerary?.PNR || "—",
-    bookingRef: b.bookingReference || b._id || "—",
+    bookingRef: b.bookingReference || EMPTY_VALUE,
     corporate: getCorporateName(b),
     corpId: getCorporateId(b),
     employee: b.employeeName || travelerName,
@@ -170,7 +177,10 @@ const normalizeHotel = (b = {}) => {
 
   return {
     id: b._id || b.bookingId || "—",
-    bookingRef: b.bookingReference || b._id || "—",
+    orderId: b.orderId || b.bookingSnapshot?.orderId || b.bookingReference || EMPTY_VALUE,
+    paymentId: b.paymentId || b.payment?.paymentId || EMPTY_VALUE,
+    bookedDate: b.bookedDate || b.createdAt || b.approvedAt || b.voucheredAt || "",
+    bookingRef: b.bookingReference || EMPTY_VALUE,
     corporate: getCorporateName(b),
     corpId: getCorporateId(b),
     employee:
@@ -230,9 +240,9 @@ const isBlockedStatus = (status) => {
 };
 
 const formatDisplayDate = (value) => {
-  if (!value) return "—";
+  if (!value) return EMPTY_VALUE;
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "—";
+  if (Number.isNaN(parsed.getTime())) return EMPTY_VALUE;
   return parsed.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -240,34 +250,53 @@ const formatDisplayDate = (value) => {
   });
 };
 
-const formatExportDate = (value) => {
-  if (!value) return "N/A";
+const formatDisplayDateTime = (value) => {
+  if (!value) return EMPTY_VALUE;
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "N/A";
-  return parsed.toLocaleDateString("en-IN", {
+  if (Number.isNaN(parsed.getTime())) return EMPTY_VALUE;
+  return parsed.toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 };
 
-const escapeHtml = (value) =>
-  String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+const getTimeValue = (value) => {
+  const parsed = value ? new Date(value) : null;
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0;
+};
+
+const compareText = (a, b) => String(a || "").localeCompare(String(b || ""));
+
+const SortHeader = ({ label, sortKey, sort, onSort }) => {
+  const active = sort.key === sortKey;
+  const Icon = sort.direction === "asc" ? FiArrowUp : FiArrowDown;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className="inline-flex items-center gap-1.5 text-left uppercase tracking-wider"
+    >
+      <span>{label}</span>
+      <Icon size={11} className={active ? "opacity-100" : "opacity-35"} />
+    </button>
+  );
+};
 
 // Truncate long IDs for display
 const truncateId = (id = "", maxLen = 16) => {
-  if (!id || id === "—") return id;
+  if (!id || id === EMPTY_VALUE) return id;
   return id.length > maxLen ? `${id.slice(0, maxLen)}…` : id;
 };
 
 export default function GlobalBookingsDashboard() {
   const tableScrollRef = useRef(null);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { exportCsv, exportingKey } = useCsvExporter();
   const {
     flightBookings,
     hotelBookings,
@@ -280,9 +309,9 @@ export default function GlobalBookingsDashboard() {
   const [activeTab, setActiveTab] = useState("Flight");
   const [corporate, setCorporate] = useState("All");
   const [search, setSearch] = useState("");
-  const [selectedBooking, setSelectedBooking] = useState(null);
   const [flightPage, setFlightPage] = useState(1);
   const [hotelPage, setHotelPage] = useState(1);
+  const [sort, setSort] = useState({ key: "bookedDate", direction: "desc" });
 
   const [travelDate, setTravelDate] = useState("");
   const [checkIn, setCheckIn] = useState("");
@@ -333,9 +362,11 @@ export default function GlobalBookingsDashboard() {
       const searchMatch =
         !searchText ||
         b.employee?.toLowerCase().includes(searchText) ||
-        b.id?.toLowerCase().includes(searchText) ||
+        b.orderId?.toLowerCase().includes(searchText) ||
+        b.paymentId?.toLowerCase().includes(searchText) ||
         b.empId?.toLowerCase().includes(searchText) ||
-        b.bookingRef?.toLowerCase?.().includes(searchText);
+        b.bookingRef?.toLowerCase?.().includes(searchText) ||
+        formatDisplayDateTime(b.bookedDate).toLowerCase().includes(searchText);
 
       let dateMatch = true;
       if (activeTab === "Flight" && travelDate) {
@@ -346,26 +377,47 @@ export default function GlobalBookingsDashboard() {
         dateMatch = cinMatch && coutMatch;
       }
 
-      const dStart = b.date || b.checkIn;
+      const dStart = b.bookedDate;
       const startOk = !startDate || (dStart && new Date(dStart) >= new Date(startDate));
-      const dEnd = b.date || b.checkOut;
+      const dEnd = b.bookedDate;
       const endOk = !endDate || (dEnd && new Date(dEnd) <= new Date(endDate));
 
       return corpMatch && typeMatch && searchMatch && dateMatch && startOk && endOk;
     });
   }, [activeTab, flights, hotels, corporate, search, travelDate, checkIn, checkOut, startDate, endDate]);
 
-  const totalSpend = filtered.reduce((sum, b) => sum + (b.amount || 0), 0);
-  const handleModalClose = () => setSelectedBooking(null);
+  const sortedFiltered = useMemo(() => {
+    const direction = sort.direction === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      if (["bookedDate", "date", "checkIn", "checkOut"].includes(sort.key)) {
+        return (getTimeValue(a[sort.key]) - getTimeValue(b[sort.key])) * direction;
+      }
+      return compareText(a[sort.key], b[sort.key]) * direction;
+    });
+  }, [filtered, sort]);
+
+  const totalSpend = sortedFiltered.reduce((sum, b) => sum + (b.amount || 0), 0);
+  const handleViewBooking = (booking, type = activeTab) => {
+    const id = booking?._raw?._id || booking?.id || booking?._id;
+    if (!id) return;
+    navigate(`/bookings/${type.toLowerCase()}/${id}`);
+  };
 
   const currentPage = activeTab === "Flight" ? flightPage : hotelPage;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / DEFAULT_LIMIT));
+  const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / DEFAULT_LIMIT));
 
   const paginatedData = useMemo(() => {
     const pg = activeTab === "Flight" ? flightPage : hotelPage;
     const start = (pg - 1) * DEFAULT_LIMIT;
-    return filtered.slice(start, start + DEFAULT_LIMIT);
-  }, [filtered, flightPage, hotelPage, activeTab]);
+    return sortedFiltered.slice(start, start + DEFAULT_LIMIT);
+  }, [sortedFiltered, flightPage, hotelPage, activeTab]);
+
+  const handleSort = (key) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === "desc" ? "asc" : "desc",
+    }));
+  };
 
   const handlePageChange = (page) => {
     if (activeTab === "Flight") setFlightPage(page);
@@ -373,106 +425,23 @@ export default function GlobalBookingsDashboard() {
   };
 
   const isLoading = activeTab === "Flight" ? loadingFlights : loadingHotels;
+  const exportKey = `bookings_${activeTab.toLowerCase()}`;
+  const isExporting = exportingKey === exportKey;
 
   const handleExport = () => {
-    if (isLoading || filtered.length === 0) return;
+    if (isLoading) return;
 
-    const isFlightTab = activeTab === "Flight";
-    const headers = isFlightTab
-      ? [
-          "Booking ID",
-          "Corporate Account",
-          "Traveller / ID",
-          "Travel Date",
-          "PNR",
-          "Status",
-          "Airline / Route",
-        ]
-      : [
-          "Booking ID",
-          "Corporate Account",
-          "Guest / ID",
-          "Duration",
-          "Amount",
-          "Status",
-          "Hotel / Room",
-        ];
-
-    const rows = filtered.map((booking) =>
-      isFlightTab
-        ? [
-            booking.id || "N/A",
-            booking.corporate || "N/A",
-            `${booking.employee || "N/A"} | ${booking.empId || "N/A"}`,
-            formatExportDate(booking.date),
-            booking.pnr || "N/A",
-            booking.refundStatus
-              ? `${booking.status || "Pending"} | Refund: ${booking.refundStatus}`
-              : booking.status || "Pending",
-            `${booking.destination || "N/A"} | ${booking.airline || "N/A"}`,
-          ]
-        : [
-            booking.id || "N/A",
-            booking.corporate || "N/A",
-            `${booking.employee || "N/A"} | ${booking.empId || "N/A"}`,
-            `${formatExportDate(booking.checkIn)} -> ${formatExportDate(booking.checkOut)}`,
-            `INR ${Number(booking.amount || 0).toLocaleString("en-IN")}`,
-            booking.refundStatus
-              ? `${booking.status || "Pending"} | Refund: ${booking.refundStatus}`
-              : booking.status || "Pending",
-            `${booking.destination || "N/A"} | ${booking.roomType || "N/A"}`,
-          ],
-    );
-
-    const tableRows = rows
-      .map(
-        (row) =>
-          `<tr>${row
-            .map(
-              (cell) =>
-                `<td style="border:1px solid #dbe4f0;padding:10px;vertical-align:top;">${escapeHtml(cell)}</td>`,
-            )
-            .join("")}</tr>`,
-      )
-      .join("");
-
-    const html = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-  </head>
-  <body>
-    <table>
-      <thead>
-        <tr>
-          ${headers
-            .map(
-              (header) =>
-                `<th style="border:1px solid #cbd5e1;padding:10px;background:#0f172a;color:#ffffff;font-weight:700;text-align:left;">${escapeHtml(header)}</th>`,
-            )
-            .join("")}
-        </tr>
-      </thead>
-      <tbody>
-        ${tableRows}
-      </tbody>
-    </table>
-  </body>
-</html>`;
-
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
+    exportCsv({
+      key: exportKey,
+      data: paginatedData,
+      columns:
+        activeTab === "Flight"
+          ? flightBookingsExportTemplate
+          : hotelBookingsExportTemplate,
+      filenamePrefix: `${activeTab.toLowerCase()}_bookings_export`,
+      emptyMessage: `No ${activeTab.toLowerCase()} bookings available to export`,
+      successMessage: `${activeTab} bookings exported`,
     });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    const stamp = new Date().toISOString().slice(0, 10);
-
-    link.href = url;
-    link.download = `bookings-summary-${activeTab.toLowerCase()}-${stamp}.xls`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -642,6 +611,8 @@ export default function GlobalBookingsDashboard() {
               scrollRef={tableScrollRef}
               exportLabel="Export CSV"
               onExport={handleExport}
+              exportDisabled={isLoading || isExporting}
+              exportLoading={isExporting}
               exportClassName={activeTab === "Flight"
                 ? "bg-[#0A4D68] hover:bg-[#083d52] shadow-[#0A4D68]/20"
                 : "bg-[#088395] hover:bg-[#066f7e] shadow-[#088395]/20"}
@@ -657,23 +628,23 @@ export default function GlobalBookingsDashboard() {
               <div className="p-8 text-center text-sm text-slate-500">
                 Loading {activeTab.toLowerCase()} bookings...
               </div>
-            ) : filtered.length === 0 ? (
+            ) : sortedFiltered.length === 0 ? (
               <div className="p-8 text-center text-sm text-slate-500">
                 No {activeTab.toLowerCase()} bookings found.
               </div>
             ) : activeTab === "Flight" ? (
               <FlightTable
                 data={paginatedData}
-                onClose={handleModalClose}
-                selectedBooking={selectedBooking}
-                setSelectedBooking={setSelectedBooking}
+                onView={handleViewBooking}
+                sort={sort}
+                onSort={handleSort}
               />
             ) : (
               <HotelTable
                 data={paginatedData}
-                onClose={handleModalClose}
-                selectedBooking={selectedBooking}
-                setSelectedBooking={setSelectedBooking}
+                onView={handleViewBooking}
+                sort={sort}
+                onSort={handleSort}
               />
             )}
           </div>
@@ -693,7 +664,7 @@ export default function GlobalBookingsDashboard() {
 
           {/* Footer */}
           <div className="bg-slate-50 px-4 xl:px-5 py-3 border-t border-slate-100 flex flex-wrap gap-2 justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            <span>Showing {filtered.length} {activeTab} Records</span>
+            <span>Showing {sortedFiltered.length} {activeTab} Records</span>
             <span>
               Est. Market Value:{" "}
               <span className={activeTab === "Flight" ? "text-[#0A4D68]" : "text-[#088395]"}>
@@ -708,12 +679,13 @@ export default function GlobalBookingsDashboard() {
 }
 
 // ─── FLIGHT TABLE ────────────────────────────────────────────────────────────
-const FlightTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => (
+const FlightTable = ({ data, onView, sort, onSort }) => (
   <>
     {/*
       table-fixed + w-full = fills container exactly, no horizontal scroll.
       Column widths sum to 100%. Adjust percentages as needed.
-        Booking ID    : 18%
+        Order ID      : 14%
+        Booked Date   : 12%
         Corporate     : 16%
         Traveller/ID  : 15%
         Travel Date   : 10%
@@ -722,20 +694,35 @@ const FlightTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => 
         Airline/Route : 13%
         Action        :  5%
     */}
-    <table className="min-w-[1120px] w-full table-fixed text-left border-collapse">
+    <table className="min-w-[1240px] w-full table-fixed text-left border-collapse">
       <colgroup>
-        <col style={{ width: "18%" }} />
-        <col style={{ width: "16%" }} />
-        <col style={{ width: "15%" }} />
-        <col style={{ width: "10%" }} />
-        <col style={{ width: "9%" }} />
-        <col style={{ width: "14%" }} />
+        <col style={{ width: "12%" }} />
+        <col style={{ width: "12%" }} />
+        <col style={{ width: "12%" }} />
         <col style={{ width: "13%" }} />
+        <col style={{ width: "12%" }} />
+        <col style={{ width: "9%" }} />
+        <col style={{ width: "8%" }} />
+        <col style={{ width: "12%" }} />
+        <col style={{ width: "15%" }} />
         <col style={{ width: "5%" }} />
       </colgroup>
       <thead>
         <tr className="bg-[#0A4D68]">
-          {["Booking ID", "Corporate Account", "Traveller / ID", "Travel Date", "PNR", "Status", "Airline / Route", ""].map((h) => (
+          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-teal-50 uppercase tracking-wider">Order ID</th>
+          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-teal-50 uppercase tracking-wider">Payment ID</th>
+          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-teal-50">
+            <SortHeader label="Booked Date" sortKey="bookedDate" sort={sort} onSort={onSort} />
+          </th>
+          {["Corporate Account", "Traveller / ID"].map((h) => (
+            <th key={h} className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-teal-50 uppercase tracking-wider">
+              {h}
+            </th>
+          ))}
+          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-teal-50">
+            <SortHeader label="Travel Date" sortKey="date" sort={sort} onSort={onSort} />
+          </th>
+          {["PNR", "Status", "Airline / Route", ""].map((h) => (
             <th key={h} className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-teal-50 uppercase tracking-wider">
               {h}
             </th>
@@ -744,14 +731,30 @@ const FlightTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => 
       </thead>
       <tbody className="divide-y divide-slate-100 text-sm">
         {data.map((b) => (
-          <tr key={b.id || b.empId} className="h-[92px] hover:bg-slate-50/70 transition-colors bg-white">
+          <tr key={b.id || b.orderId || b.empId} className="h-[92px] hover:bg-slate-50/70 transition-colors bg-white">
 
-            {/* Booking ID */}
+            {/* Order ID */}
             <td className="px-4 xl:px-5 py-4 align-middle">
               <div className="flex min-h-[52px] items-center">
-                <span className="font-mono text-[11px] text-slate-400 truncate block">
-                  #{truncateId(b.id, 22)}
+                <span className="font-mono text-[11px] text-[#0A4D68] font-black truncate block">
+                  {truncateId(b.orderId, 22)}
                 </span>
+              </div>
+            </td>
+
+            {/* Payment ID */}
+            <td className="px-4 xl:px-5 py-4 align-middle">
+              <div className="flex min-h-[52px] items-center">
+                <span className="font-mono text-[11px] text-amber-700 font-black truncate block">
+                  {truncateId(b.paymentId, 22)}
+                </span>
+              </div>
+            </td>
+
+            {/* Booked Date */}
+            <td className="px-4 xl:px-5 py-4 align-middle">
+              <div className="flex min-h-[52px] items-center whitespace-nowrap text-slate-500 font-medium text-[12px]">
+                {formatDisplayDateTime(b.bookedDate)}
               </div>
             </td>
 
@@ -803,7 +806,7 @@ const FlightTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => 
             <td className="px-4 xl:px-5 py-4 align-middle text-center">
               <div className="flex min-h-[52px] items-center justify-center">
                 <button
-                  onClick={() => setSelectedBooking(b._raw)}
+                  onClick={() => onView(b, "Flight")}
                   className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-[#0A4D68] hover:bg-[#0A4D68]/10 transition-colors"
                   title="View details"
                 >
@@ -815,17 +818,16 @@ const FlightTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => 
         ))}
       </tbody>
     </table>
-
-    {selectedBooking && <FlightBookingModal booking={selectedBooking} onClose={onClose} />}
   </>
 );
 
 // ─── HOTEL TABLE ─────────────────────────────────────────────────────────────
-const HotelTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => (
+const HotelTable = ({ data, onView, sort, onSort }) => (
   <>
     {/*
       Column widths:
-        Booking ID    : 18%
+        Order ID      : 14%
+        Booked Date   : 12%
         Corporate     : 15%
         Guest/ID      : 15%
         Duration      : 13%
@@ -834,20 +836,35 @@ const HotelTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => (
         Hotel/Room    : 11%
         Action        :  5%
     */}
-    <table className="min-w-[1120px] w-full table-fixed text-left border-collapse">
+    <table className="min-w-[1240px] w-full table-fixed text-left border-collapse">
       <colgroup>
-        <col style={{ width: "18%" }} />
-        <col style={{ width: "15%" }} />
-        <col style={{ width: "15%" }} />
+        <col style={{ width: "12%" }} />
+        <col style={{ width: "12%" }} />
+        <col style={{ width: "12%" }} />
         <col style={{ width: "13%" }} />
-        <col style={{ width: "9%" }} />
-        <col style={{ width: "14%" }} />
+        <col style={{ width: "12%" }} />
         <col style={{ width: "11%" }} />
+        <col style={{ width: "8%" }} />
+        <col style={{ width: "11%" }} />
+        <col style={{ width: "16%" }} />
         <col style={{ width: "5%" }} />
       </colgroup>
       <thead>
         <tr className="bg-[#088395]">
-          {["Booking ID", "Corporate Account", "Guest / ID", "Duration", "Amount", "Status", "Hotel / Room", ""].map((h) => (
+          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-cyan-50 uppercase tracking-wider">Order ID</th>
+          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-cyan-50 uppercase tracking-wider">Payment ID</th>
+          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-cyan-50">
+            <SortHeader label="Booked Date" sortKey="bookedDate" sort={sort} onSort={onSort} />
+          </th>
+          {["Corporate Account", "Guest / ID"].map((h) => (
+            <th key={h} className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-cyan-50 uppercase tracking-wider">
+              {h}
+            </th>
+          ))}
+          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-cyan-50">
+            <SortHeader label="Duration" sortKey="checkIn" sort={sort} onSort={onSort} />
+          </th>
+          {["Amount", "Status", "Hotel / Room", ""].map((h) => (
             <th key={h} className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-cyan-50 uppercase tracking-wider">
               {h}
             </th>
@@ -856,14 +873,30 @@ const HotelTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => (
       </thead>
       <tbody className="divide-y divide-slate-100 text-sm">
         {data.map((b) => (
-          <tr key={b.id || b.empId} className="h-[92px] hover:bg-slate-50/70 transition-colors bg-white">
+          <tr key={b.id || b.orderId || b.empId} className="h-[92px] hover:bg-slate-50/70 transition-colors bg-white">
 
-            {/* Booking ID */}
+            {/* Order ID */}
             <td className="px-4 xl:px-5 py-4 align-middle">
               <div className="flex min-h-[52px] items-center">
-                <span className="font-mono text-[11px] text-slate-400 truncate block">
-                  #{truncateId(b.id, 22)}
+                <span className="font-mono text-[11px] text-[#088395] font-black truncate block">
+                  {truncateId(b.orderId, 22)}
                 </span>
+              </div>
+            </td>
+
+            {/* Payment ID */}
+            <td className="px-4 xl:px-5 py-4 align-middle">
+              <div className="flex min-h-[52px] items-center">
+                <span className="font-mono text-[11px] text-amber-700 font-black truncate block">
+                  {truncateId(b.paymentId, 22)}
+                </span>
+              </div>
+            </td>
+
+            {/* Booked Date */}
+            <td className="px-4 xl:px-5 py-4 align-middle">
+              <div className="flex min-h-[52px] items-center whitespace-nowrap text-slate-500 font-medium text-[12px]">
+                {formatDisplayDateTime(b.bookedDate)}
               </div>
             </td>
 
@@ -909,7 +942,7 @@ const HotelTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => (
             {/* Action */}
             <td className="pl-3 pr-6 xl:pl-4 xl:pr-8 py-3.5 align-middle text-center">
               <button
-                onClick={() => setSelectedBooking(b._raw)}
+                onClick={() => onView(b, "Hotel")}
                 className="p-1.5 rounded-lg bg-slate-100 text-[#088395] hover:bg-[#088395]/10 transition-colors"
                 title="View details"
               >
@@ -920,8 +953,6 @@ const HotelTable = ({ data, selectedBooking, setSelectedBooking, onClose }) => (
         ))}
       </tbody>
     </table>
-
-    {selectedBooking && <HotelBookingModal booking={selectedBooking} onClose={onClose} />}
   </>
 );
 

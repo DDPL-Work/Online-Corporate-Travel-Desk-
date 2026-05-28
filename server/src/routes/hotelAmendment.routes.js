@@ -30,7 +30,7 @@ router.use(verifyToken);
  */
 router.post(
   "/request",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   (req, res, next) => {
     if (!req.body.bookingId) {
       return res.status(400).json({
@@ -49,7 +49,7 @@ router.post(
  */
 router.post(
   "/status",
-  authorizeRoles("manager", "travel-admin", "corporateAdmin", "employee"),
+  // authorizeRoles("manager", "travel-admin", "finance_team", "employee"),
   getAmendmentStatus,
 );
 

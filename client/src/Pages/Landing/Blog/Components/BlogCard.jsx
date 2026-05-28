@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { FiEye } from "react-icons/fi";
 import { GOLD, GOLD_FADE, MUTED, BORDER, NAVY } from "./blogConstants";
+import LazyImage from "../../../../components/common/LazyImage";
 
 /**
  * BlogCard – vertical card matching the reference screenshot layout.
@@ -24,10 +25,11 @@ export default function BlogCard({ post }) {
     >
       {/* ── Thumbnail ── */}
       <div className="relative overflow-hidden flex-shrink-0" style={{ height: "200px" }}>
-        <img
+        <LazyImage
           src={post.featured_image || "https://images.unsplash.com/photo-1436491865332-7a61a109c0f3?w=800&q=80"}
           alt={post.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className="w-full h-full"
+          imgClassName="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
       </div>
 

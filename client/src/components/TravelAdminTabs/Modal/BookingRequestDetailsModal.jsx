@@ -964,12 +964,11 @@ export const HotelBookingModal = ({ booking: raw, onClose }) => {
                             </p>
                             <div className="flex gap-2 overflow-x-auto pb-1">
                               {roomImages.slice(0, 5).map((url, i) => (
-                                <img
-                                  key={i}
+                                <img key={i}
                                   src={url}
                                   alt={`Room ${idx + 1} image ${i + 1}`}
                                   className="h-20 w-28 object-cover rounded-lg border border-slate-200 shrink-0"
-                                  onError={(e) => {
+                                  loading="lazy" decoding="async" onError={(e) => {
                                     e.target.style.display = "none";
                                   }}
                                 />

@@ -123,11 +123,9 @@ export default function ReturnInternationalFlightCard({
         {/* ---------- Basic Flight Info Header ---------- */}
         <div className="flex justify-between w-full items-center px-4 py-3 bg-slate-50/50 rounded-xl">
           <div className="flex items-center gap-3">
-            <img
-              src={airlineLogo(airlineCode)}
+            <img src={airlineLogo(airlineCode)}
               alt={airline}
-              className="w-10 h-10 border border-slate-200 rounded-lg object-contain bg-white p-1"
-            />
+              className="w-10 h-10 border border-slate-200 rounded-lg object-contain bg-white p-1" loading="eager" />
             <div className="flex flex-col text-left">
               <div className="font-bold text-slate-800 text-sm">
                 {from} → {to}

@@ -1,6 +1,6 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
   clearPaymentStatus,
   fetchWalletBalance,
@@ -37,7 +37,13 @@ const statusConfig = {
 
 export default function WalletPhonePeStatusPage() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // 💾 Read origin stored before PhonePe redirect — fallback to /corporate-wallet
+  const returnUrl = useRef(
+    sessionStorage.getItem("phonepe_return_url") || "/corporate-wallet"
+  ).current;
   const merchantOrderId =
     searchParams.get("merchantOrderId") ||
     searchParams.get("merchant_order_id") ||
@@ -94,8 +100,21 @@ export default function WalletPhonePeStatusPage() {
     if (paymentStatus?.status === "SUCCESS") {
       dispatch(fetchWalletBalance());
       dispatch(fetchWalletTransactions({ page: 1, limit: 10 }));
+      // ✅ Clean up and redirect immediately back to origin page
+      sessionStorage.removeItem("phonepe_return_url");
+      navigate(returnUrl, { replace: true });
     }
-  }, [dispatch, paymentStatus?.status]);
+  }, [dispatch, paymentStatus?.status, navigate, returnUrl]);
+
+  // ⏱️ Fallback: if payment stays PENDING >30s, redirect anyway
+  useEffect(() => {
+    if (!merchantOrderId) return undefined;
+    const timeout = window.setTimeout(() => {
+      sessionStorage.removeItem("phonepe_return_url");
+      navigate(returnUrl, { replace: true });
+    }, 30000);
+    return () => window.clearTimeout(timeout);
+  }, [merchantOrderId, navigate, returnUrl]);
 
   const currentStatus = paymentStatus?.status || "PENDING";
   const ui = statusConfig[currentStatus] || statusConfig.PENDING;

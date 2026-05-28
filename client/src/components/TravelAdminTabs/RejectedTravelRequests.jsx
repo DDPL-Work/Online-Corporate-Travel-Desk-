@@ -47,11 +47,10 @@ const RouteCell = ({ routes, airline }) => {
   return (
     <div className="flex items-center gap-3">
       <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
-        <img 
-          src={logoUrl} 
+        <img src={logoUrl} 
           alt={airlineName} 
           className="w-full h-full object-contain"
-          onError={(e) => { 
+          loading="eager" onError={(e) => { 
             e.target.onerror = null;
             e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
           }} 
@@ -100,17 +99,7 @@ function FlightRejectionsSection({ requests, refreshing, employeeOptions }) {
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Personnel", "Email", "Route", "Rejected Date", "Reason", "Cost"];
-    const rows = filtered.map(r => [r.orderId, r.employee, r.employeeId, `${r.routes[0]?.fromCode} → ${r.routes[r.routes.length-1]?.toCode}`, r.rejectedDate.toLocaleDateString(), r.reason, `₹${r.estimatedCost.toLocaleString()}`]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `rejected-flights.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -142,7 +131,24 @@ function FlightRejectionsSection({ requests, refreshing, employeeOptions }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Rejection Ledger" subtitle={`${filtered.length} denied authorizations`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Flight Rejection Ledger" 
+        subtitle={`${filtered.length} denied authorizations`} 
+        exportConfig={{
+          data: filtered,
+          filename: `rejected_flight_requests_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "employee" },
+            { header: "Email", key: "employeeId" },
+            { header: "Route", accessor: (r) => `${r.routes[0]?.fromCode || ""} → ${r.routes[r.routes.length-1]?.toCode || ""}` },
+            { header: "Rejected Date", accessor: (r) => r.rejectedDate.toLocaleDateString() },
+            { header: "Reason", key: "reason" },
+            { header: "Cost", accessor: (r) => `₹${r.estimatedCost.toLocaleString()}` },
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -233,17 +239,7 @@ function HotelRejectionsSection({ requests, refreshing, employeeOptions }) {
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order Reference", "Personnel", "Email", "Hotel", "Rejected Date", "Reason", "Cost"];
-    const rows = filtered.map(r => [r.orderId, r.employee, r.employeeId, r.hotelName, r.rejectedDate.toLocaleDateString(), r.reason, `₹${r.estimatedCost.toLocaleString()}`]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `rejected-hotels.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -275,7 +271,24 @@ function HotelRejectionsSection({ requests, refreshing, employeeOptions }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Rejection Ledger" subtitle={`${filtered.length} denied authorizations`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Hotel Rejection Ledger" 
+        subtitle={`${filtered.length} denied authorizations`} 
+        exportConfig={{
+          data: filtered,
+          filename: `rejected_hotel_requests_${new Date().toISOString().split('T')[0]}.csv`,
+          columns: [
+            { header: "Order Reference", key: "orderId" },
+            { header: "Personnel", key: "employee" },
+            { header: "Email", key: "employeeId" },
+            { header: "Hotel", key: "hotelName" },
+            { header: "Rejected Date", accessor: (r) => r.rejectedDate.toLocaleDateString() },
+            { header: "Reason", key: "reason" },
+            { header: "Cost", accessor: (r) => `₹${r.estimatedCost.toLocaleString()}` },
+          ]
+        }}
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

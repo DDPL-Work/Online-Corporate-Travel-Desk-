@@ -37,8 +37,6 @@ import {
   getRequestedDate,
   getStatusTone,
   resolvePrimarySegment,
-  isVisibleLedgerRequest,
-  resolveWorkflowType,
 } from "../../utils/reissueResolvers";
 import { airlineLogo } from "../../utils/formatter";
 import {
@@ -62,7 +60,6 @@ const ReissueStatusBadge = ({ req }) => {
   const tone = getStatusTone(status);
   const icons = {
     PENDING: <FiClock size={11} />,
-    PENDING_ASSIGNMENT: <FiClock size={11} />,
     APPROVED: <FiCheckCircle size={11} />,
     COMPLETED: <FiCheckCircle size={11} />,
     REJECTED: <FiXCircle size={11} />,
@@ -210,7 +207,7 @@ const MyReissueRequests = () => {
       corporateId = d.corporateId;
       role = d.role || d.userRole || "employee";
     }
-  } catch {}
+  } catch { }
 
   const buildParams = () => ({
     page: currentPage,
@@ -247,8 +244,8 @@ const MyReissueRequests = () => {
           typeof u.name === "string"
             ? u.name
             : [u.name?.firstName, u.name?.lastName].filter(Boolean).join(" ") ||
-              "Admin";
-      } catch {}
+            "Admin";
+      } catch { }
       await dispatch(
         updateReissueStatus({
           requestId,
@@ -280,13 +277,12 @@ const MyReissueRequests = () => {
       baseRequests = [...(onlineRequests || []), ...(offlineRequests || [])];
     }
 
-    let sorted = baseRequests
-      .filter((request) => isVisibleLedgerRequest(request))
-      .sort((a, b) => {
+    // Sort
+    let sorted = baseRequests.sort((a, b) => {
       const d1 = new Date(a.createdAt || a.date);
       const d2 = new Date(b.createdAt || b.date);
       return d2 - d1;
-      });
+    });
 
     // Client-side search filter
     if (searchQuery.trim()) {
@@ -331,18 +327,9 @@ const MyReissueRequests = () => {
   const stats = useMemo(
     () => ({
       total: currentRequests.length,
-      pending: currentRequests.filter((r) =>
-        ["PENDING", "PENDING_ASSIGNMENT", "RAISED"].includes(getStatus(r)),
-      ).length,
+      pending: currentRequests.filter((r) => getStatus(r) === "PENDING").length,
       approved: currentRequests.filter((r) =>
-        [
-          "APPROVED",
-          "ASSIGNED",
-          "IN_PROGRESS",
-          "WAITING_AIRLINE",
-          "COMPLETED",
-          "TICKET_GENERATED",
-        ].includes(
+        ["APPROVED", "COMPLETED", "TICKET_GENERATED", "IN_PROGRESS"].includes(
           getStatus(r),
         ),
       ).length,
@@ -359,48 +346,7 @@ const MyReissueRequests = () => {
     setFilter("All");
   };
 
-  const handleExport = () => {
-    if (!currentRequests.length) return;
-    const headers = [
-      "Request ID",
-      "PNR",
-      "Booking Ref",
-      "Employee",
-      "Route",
-      "Type",
-      "Reason",
-      "Date",
-      "Status",
-    ];
-    const rows = currentRequests.map((r) => [
-      getRequestId(r),
-      getPnr(r),
-      r.bookingReference || r.bookingRef || "N/A",
-      getUserName(r),
-      getRoute(r),
-      resolveWorkflowType(r),
-      r.reason || r.remarks || "N/A",
-      getRequestedDate(r),
-      getStatus(r),
-    ]);
-    const tableHtml = rows
-      .map(
-        (r) =>
-          `<tr>${r.map((c) => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`,
-      )
-      .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `reissue_requests.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+
 
   return (
     <div
@@ -408,7 +354,7 @@ const MyReissueRequests = () => {
       style={{ background: C.offWhite }}
     >
       {/* Navy Header Section */}
-      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+      <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
@@ -429,7 +375,7 @@ const MyReissueRequests = () => {
               </button>
             </div>
 
-            <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+            <div className="h-12 w-px bg-white/10 mx-2 hidden md:block" />
 
             <div className="flex items-center gap-5">
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
@@ -534,7 +480,6 @@ const MyReissueRequests = () => {
                 options={[
                   "All",
                   "PENDING",
-                  "PENDING_ASSIGNMENT",
                   "APPROVED",
                   "REJECTED",
                   "COMPLETED",
@@ -582,8 +527,22 @@ const MyReissueRequests = () => {
             activeTab === "my" ? "Amendment Ledger" : "Corporate Amendments"
           }
           subtitle={`${currentRequests.length} active records`}
-          onExport={handleExport}
           wrapperClass="!border-none !shadow-none"
+          exportConfig={{
+            data: currentRequests,
+            filename: `reissue_requests_${new Date().toISOString().split('T')[0]}.csv`,
+            columns: [
+              { header: "Request ID", accessor: (r) => getRequestId(r) },
+              { header: "PNR", accessor: (r) => getPnr(r) },
+              { header: "Booking Ref", accessor: (r) => r.bookingReference || r.bookingRef || "N/A" },
+              { header: "Employee", accessor: (r) => getUserName(r) },
+              { header: "Route", accessor: (r) => getRoute(r) },
+              { header: "Type", accessor: (r) => r.reissueType || r.type || "REISSUE" },
+              { header: "Reason", accessor: (r) => r.reason || r.remarks || "N/A" },
+              { header: "Date", accessor: (r) => getRequestedDate(r) },
+              { header: "Status", accessor: (r) => getStatus(r) }
+            ]
+          }}
           pagination={
             <Pagination
               currentPage={currentPage}
@@ -595,17 +554,17 @@ const MyReissueRequests = () => {
         >
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-                <Th className="!px-6 !py-5">Request ID</Th>
+              <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+                <Th className="px-6! py-5!">Request ID</Th>
                 {activeTab === "company" && (
-                  <Th className="!px-6 !py-5">Employee / Context</Th>
+                  <Th className="px-6! py-5!">Employee / Context</Th>
                 )}
-                <Th className="!px-6 !py-5">PNR / Ref</Th>
-                <Th className="!px-6 !py-5">Airline & Route</Th>
-                <Th className="!px-6 !py-5">Type & Reason</Th>
-                <Th className="!px-6 !py-5">Status</Th>
-                <Th className="!px-6 !py-5">Ticket</Th>
-                <Th className="!px-6 !py-5 !text-left">Action</Th>
+                <Th className="px-6! py-5!">PNR / Ref</Th>
+                <Th className="px-6! py-5!">Airline & Route</Th>
+                <Th className="px-6! py-5!">Type & Reason</Th>
+                <Th className="px-6! py-5!">Status</Th>
+                <Th className="px-6! py-5!">Ticket</Th>
+                <Th className="px-6! py-5! text-left!">Action</Th>
               </tr>
             </thead>
             <tbody>
@@ -613,7 +572,7 @@ const MyReissueRequests = () => {
                 <tr>
                   <td
                     colSpan={activeTab === "company" ? 8 : 7}
-                    className="!px-6 !py-20 text-center"
+                    className="px-6! py-20! text-center"
                   >
                     <div className="flex flex-col items-center gap-3 text-slate-400">
                       <FiRefreshCw size={28} className="animate-spin" />
@@ -643,7 +602,7 @@ const MyReissueRequests = () => {
                       }}
                     >
                       {/* Request ID */}
-                      <td className="!px-6 !py-5">
+                      <td className="px-6! py-5!">
                         <IdCell id={requestId} />
                         <p className="text-[10px] font-semibold text-slate-400 mt-1">
                           {requestedAt}
@@ -652,7 +611,7 @@ const MyReissueRequests = () => {
 
                       {/* Employee (Corporate View Only) */}
                       {activeTab === "company" && (
-                        <td className="!px-6 !py-5">
+                        <td className="px-6! py-5!">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-[#000D26]/10 text-[#000D26] flex items-center justify-center text-[11px] font-black shrink-0">
                               {userName?.[0]?.toUpperCase() || "?"}
@@ -670,7 +629,7 @@ const MyReissueRequests = () => {
                       )}
 
                       {/* PNR / Ref */}
-                      <td className="!px-6 !py-5">
+                      <td className="px-6! py-5!">
                         <p className="font-black text-sm text-slate-900 uppercase">
                           {pnr}
                         </p>
@@ -680,11 +639,10 @@ const MyReissueRequests = () => {
                       </td>
 
                       {/* Airline & Route */}
-                      <td className="!px-6 !py-5">
+                      <td className="px-6! py-5!">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden shrink-0">
-                            <img
-                              src={airlineLogo(getAirlineCode(req))}
+                            <img src={airlineLogo(getAirlineCode(req))}
                               alt={airline}
                               className="w-full h-full object-contain"
                               onError={(e) => {
@@ -706,9 +664,9 @@ const MyReissueRequests = () => {
                       </td>
 
                       {/* Type & Reason */}
-                      <td className="!px-6 !py-5">
+                      <td className="px-6! py-5!">
                         <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded text-[9px] font-black uppercase tracking-wider inline-block mb-1">
-                          {resolveWorkflowType(req)}
+                          {req.reissueType || req.type || "REISSUE"}
                         </span>
                         <p
                           className="text-[11px] text-slate-600 italic line-clamp-1 max-w-[200px]"
@@ -719,21 +677,21 @@ const MyReissueRequests = () => {
                       </td>
 
                       {/* Status */}
-                      <td className="!px-6 !py-5">
+                      <td className="px-6! py-5!">
                         <ReissueStatusBadge req={req} />
                       </td>
 
                       {/* Ticket */}
-                      <td className="!px-6 !py-5">
+                      <td className="px-6! py-5!">
                         <TicketActions req={req} />
                       </td>
 
                       {/* Action */}
-                      <td className="!px-6 !py-5 !text-left">
+                      <td className="px-6! py-5! text-left!">
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => navigate(`/my-reissue/${req._id || req.id}`)}
-                            className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group cursor-pointer"
+                            className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group cursor-pointer"
                             title="View Details"
                           >
                             <FiEye
@@ -776,7 +734,7 @@ const MyReissueRequests = () => {
                 <tr>
                   <td
                     colSpan={activeTab === "company" ? 8 : 7}
-                    className="!px-6 !py-20 text-center"
+                    className="px-6! py-20! text-center"
                   >
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">

@@ -19,6 +19,7 @@ const {
   normalizeGateway,
   isGatewayEnabled,
 } = require("../config/payment.config");
+const { generatePaymentId } = require("../utils/paymentIdGenerator");
 
 const RECHARGE_LOG_STATUS = Object.freeze({
   PENDING: "PENDING",
@@ -1086,7 +1087,9 @@ class PaymentService {
     gateway,
     customerPhone,
     customerEmail,
+    returnUrl,
   }) {
+    logger.info("Initiating wallet recharge with dynamic returnUrl:", { returnUrl });
     const validAmount = this.validateRechargeAmount(amount);
     const normalizedGateway = normalizeGateway(
       gateway || paymentConfig.defaultGateway,
@@ -1105,6 +1108,7 @@ class PaymentService {
             bookingReference,
             customerPhone,
             customerEmail,
+            returnUrl,
           })
         : await gatewayClient.createOrder({
             amount: validAmount,
@@ -1526,12 +1530,25 @@ class PaymentService {
         status: "completed",
       });
 
+      // ── Generate Platform Payment ID ─────────────────────────────
+      let paymentId = null;
+      try {
+        paymentId = await generatePaymentId(booking.bookingType || "flight", "prepaid");
+      } catch (pidErr) {
+        logger.error("Payment ID generation failed (prepaid)", {
+          bookingId: booking._id,
+          error: pidErr.message,
+        });
+        throw new ApiError(500, "Failed to generate Payment ID. Payment aborted.");
+      }
+
       if (booking.payment !== undefined) {
         booking.payment = {
           ...booking.payment,
           method: "wallet",
           status: "completed",
           paidAt: new Date(),
+          paymentId,
         };
       }
 
@@ -1545,7 +1562,7 @@ class PaymentService {
       }
 
       await booking.save();
-      return { method: "wallet" };
+      return { method: "wallet", paymentId };
     }
 
     if (corporate.classification === "postpaid") {
@@ -1615,12 +1632,25 @@ class PaymentService {
         },
       });
 
+      // ── Generate Platform Payment ID ─────────────────────────────
+      let paymentId = null;
+      try {
+        paymentId = await generatePaymentId(booking.bookingType || "flight", "postpaid");
+      } catch (pidErr) {
+        logger.error("Payment ID generation failed (postpaid)", {
+          bookingId: booking._id,
+          error: pidErr.message,
+        });
+        throw new ApiError(500, "Failed to generate Payment ID. Payment aborted.");
+      }
+
       if (booking.payment !== undefined) {
         booking.payment = {
           ...booking.payment,
           method: "postpaid",
           status: "completed",
           paidAt: new Date(),
+          paymentId,
         };
       }
 
@@ -1634,7 +1664,7 @@ class PaymentService {
       }
 
       await booking.save();
-      return { method: "agency" };
+      return { method: "agency", paymentId };
     }
 
     throw new ApiError(400, "Invalid corporate classification");
