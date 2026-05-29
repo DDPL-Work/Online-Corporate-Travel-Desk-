@@ -244,7 +244,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
     const isChild =
       incomingPaxType === "child" ||
       incomingPaxType === "2" ||
-      (t.age != null && Number(t.age) < 12);
+      (t.age !== "" && t.age != null && !isNaN(t.age) && Number(t.age) < 18);
     const paxType = isChild ? "child" : index === 0 ? "lead" : "adult";
 
     return {
@@ -420,11 +420,12 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
             PassportExpDate: traveller.PassportExpDate || null,
           };
           const ages = room.childAge || [];
-          passenger.Age = ages[i]
-            ? parseInt(ages[i])
-            : traveller.age
+          passenger.Age =
+            traveller.age != null && traveller.age !== ""
               ? parseInt(traveller.age)
-              : 10;
+              : ages[i]
+                ? parseInt(ages[i])
+                : 10;
           passengers.push(passenger);
           childIdx++;
         }
@@ -748,7 +749,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     const isChild =
       incomingPaxType === "child" ||
       incomingPaxType === "2" ||
-      (t.age != null && Number(t.age) < 12);
+      (t.age !== "" && t.age != null && !isNaN(t.age) && Number(t.age) < 18);
     const paxType = isChild ? "child" : index === 0 ? "lead" : "adult";
 
     return {

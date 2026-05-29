@@ -51,6 +51,7 @@ import {
 import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
 
 /* ─────────────────────────────────────────────────────────────────
    STATUS BADGE
@@ -182,6 +183,8 @@ const MyReissueRequests = () => {
     companyRequests,
     companyLoading,
   } = useSelector((s) => s.reissue);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   // If URL has ?scope=company (e.g. from sidebar), start on company tab
   const initialTab = searchParams.get("scope") === "company" ? "company" : "my";
@@ -528,21 +531,36 @@ const MyReissueRequests = () => {
           }
           subtitle={`${currentRequests.length} active records`}
           wrapperClass="!border-none !shadow-none"
-          exportConfig={{
+          exportLabel="Export Excel"
+          exportLoading={isExporting}
+          exportDisabled={isExporting}
+          onExport={() => exportExcel({
+            pageHeader: activeTab === "my" ? "Amendment Ledger" : "Corporate Amendments",
+            statCards: [
+              { label: "Total Requests", value: stats.total },
+              { label: "Pending Review", value: stats.pending },
+              { label: "Processed", value: stats.approved },
+              { label: "Rejected", value: stats.rejected }
+            ],
+            appliedFilters: [
+              { label: "Search", value: searchQuery || "None" },
+              { label: "Status", value: filter },
+              { label: "Request Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+            ],
             data: currentRequests,
-            filename: `reissue_requests_${new Date().toISOString().split('T')[0]}.csv`,
             columns: [
-              { header: "Request ID", accessor: (r) => getRequestId(r) },
-              { header: "PNR", accessor: (r) => getPnr(r) },
-              { header: "Booking Ref", accessor: (r) => r.bookingReference || r.bookingRef || "N/A" },
-              { header: "Employee", accessor: (r) => getUserName(r) },
-              { header: "Route", accessor: (r) => getRoute(r) },
-              { header: "Type", accessor: (r) => r.reissueType || r.type || "REISSUE" },
-              { header: "Reason", accessor: (r) => r.reason || r.remarks || "N/A" },
-              { header: "Date", accessor: (r) => getRequestedDate(r) },
-              { header: "Status", accessor: (r) => getStatus(r) }
-            ]
-          }}
+              { header: "Request ID", value: (r) => getRequestId(r) },
+              { header: "PNR", value: (r) => getPnr(r) },
+              { header: "Booking Ref", value: (r) => r.bookingReference || r.bookingRef || "N/A" },
+              { header: "Employee", value: (r) => getUserName(r) },
+              { header: "Route", value: (r) => getRoute(r) },
+              { header: "Type", value: (r) => r.reissueType || r.type || "REISSUE" },
+              { header: "Reason", value: (r) => r.reason || r.remarks || "N/A" },
+              { header: "Date", value: (r) => getRequestedDate(r) },
+              { header: "Status", value: (r) => getStatus(r) }
+            ],
+            filenamePrefix: "reissue_requests"
+          })}
           pagination={
             <Pagination
               currentPage={currentPage}

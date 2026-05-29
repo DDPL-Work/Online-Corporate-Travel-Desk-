@@ -33,6 +33,8 @@ import {
 import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { myPastFlightsExportTemplate, myPastHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─── helpers ─── */
 function fmtDate(d, opts = { day: "2-digit", month: "short", year: "numeric" }) {
@@ -76,6 +78,8 @@ function FlightSection() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { list: flightBookings = [], loading } = useSelector((state) => state.bookings);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { dispatch(fetchMyBookings()); }, [dispatch]);
 
@@ -148,18 +152,25 @@ function FlightSection() {
       <ResponsiveDataTable 
         title="Flight History Ledger" 
         subtitle={`${filtered.length} completed journeys`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight History Ledger",
+          statCards: [
+            { label: "Archived Flights", value: filtered.length },
+            { label: "Completed", value: filtered.length },
+            { label: "Travel History", value: filtered.length },
+            { label: "Total Spent", value: `₹${totalValue.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `my_past_flights_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
-            { header: "Travel Date", accessor: (r) => fmtDate(r.travelDate) },
-            { header: "Status", accessor: () => "Completed" },
-            { header: "PNR Ref", key: "pnr" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: myPastFlightsExportTemplate,
+          filenamePrefix: "my_past_flights"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
@@ -209,6 +220,8 @@ function HotelSection() {
   const navigate = useNavigate();
   const [hotelBookings, setHotelBookings] = useState([]);
   const [hotelLoading, setHotelLoading] = useState(false);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => {
     const fetchHotels = async () => {
@@ -276,17 +289,25 @@ function HotelSection() {
       <ResponsiveDataTable 
         title="Hotel History Ledger" 
         subtitle={`${filtered.length} completed stays`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel History Ledger",
+          statCards: [
+            { label: "Archived Hotels", value: filtered.length },
+            { label: "Completed", value: filtered.length },
+            { label: "Past Stays", value: filtered.length },
+            { label: "Total Spent", value: `₹${totalValue.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `my_past_hotels_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Hotel", key: "hotelName" },
-            { header: "Stay Period", accessor: (r) => `${fmtDate(r.ci)} to ${fmtDate(r.bookingSnapshot?.checkOutDate || r.checkOutDate)}` },
-            { header: "Status", accessor: () => "Completed" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: myPastHotelsExportTemplate,
+          filenamePrefix: "my_past_hotels"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >

@@ -35,6 +35,8 @@ import {
   extractRequestArray,
 } from "../../utils/reissueResolvers";
 import { IdCell, Th } from "./Shared/CommonComponents";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminReissueRequestsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─────────────────────────────────────────────────────────────────
    STATUS BADGE
@@ -256,7 +258,8 @@ export default function ReissueRequests() {
     });
   }, [requests, search, statusFilter]);
 
-  // CSV export is now handled by ResponsiveDataTable's exportConfig
+  const { exportExcel, isExporting } = useExcelExporter();
+
   return (
     <>
       <div className="space-y-6">
@@ -373,21 +376,25 @@ export default function ReissueRequests() {
           </div>
         ) : (
           <ResponsiveDataTable
-            exportConfig={{
+            exportLabel="Export Excel"
+            exportLoading={isExporting}
+            exportDisabled={isExporting}
+            onExport={() => exportExcel({
+              pageHeader: "Reissue Requests",
+              statCards: [
+                { label: "Total", value: stats.total },
+                { label: "Pending", value: stats.pending },
+                { label: "Approved", value: stats.approved },
+                { label: "Rejected", value: stats.rejected }
+              ],
+              appliedFilters: [
+                { label: "Search", value: search || "None" },
+                { label: "Status", value: statusFilter }
+              ],
               data: filtered,
-              filename: `reissue_requests_${new Date().toISOString().split('T')[0]}.csv`,
-              columns: [
-                { header: "Request ID", accessor: getRequestId },
-                { header: "PNR", accessor: getPnr },
-                { header: "Booking Ref", accessor: (r) => r.bookingReference || r.bookingRef || "N/A" },
-                { header: "Employee", accessor: getUserName },
-                { header: "Route", accessor: getRoute },
-                { header: "Type", accessor: (r) => r.reissueType || r.type || "REISSUE" },
-                { header: "Reason", accessor: (r) => r.reason || r.remarks || "N/A" },
-                { header: "Date", accessor: getRequestedDate },
-                { header: "Status", accessor: getStatus },
-              ]
-            }}
+              columns: adminReissueRequestsExportTemplate,
+              filenamePrefix: "reissue_requests"
+            })}
             wrapperClass="!border-none !shadow-none"
           >
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">

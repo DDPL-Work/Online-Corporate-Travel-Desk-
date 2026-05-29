@@ -50,7 +50,7 @@ exports.getProfile = async (req, res, next) => {
       profilePicture: user.profilePicture,
       role: user.role,
       corporateId: user.corporateId?._id || user.corporateId,
-      corporate: user.corporateId,
+      // corporate: user.corporateId,
 
       // Professional from Employee
       employeeId: employeeDoc?.employeeCode || (["travel-admin", "corporate-admin"].includes(user.role) ? "ADMIN" : "PENDING"),

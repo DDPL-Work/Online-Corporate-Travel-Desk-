@@ -35,6 +35,8 @@ import {
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { approvedFlightsExportTemplate, approvedHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const FLIGHT_EXCLUDE = new Set(["ticketed", "cancel_requested", "cancelled"]);
 const HOTEL_EXCLUDE = new Set(["voucher_generated", "cancelled"]);
@@ -94,6 +96,8 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading, onCountCha
   const [currentPage, setCurrentPage] = useState(1);
   const [selected, setSelected] = useState(null);
   const PAGE_SIZE = 10;
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const flightRaw = useMemo(() => (rawApprovals || []).filter(a => a.bookingType === "flight" && !FLIGHT_EXCLUDE.has(a.executionStatus)), [rawApprovals]);
   
@@ -198,20 +202,26 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading, onCountCha
       <ResponsiveDataTable 
         title="Flight Approval Ledger" 
         subtitle={`${filtered.length} requests pending execution`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Approval Ledger",
+          statCards: [
+            { label: "Approved Flights", value: filtered.length },
+            { label: "Pending Ticket", value: filtered.filter(a => a.executionStatus === "not_started").length },
+            { label: "Failed Exec", value: filtered.filter(a => a.executionStatus === "failed").length },
+            { label: "Total Value", value: `₹${filtered.reduce((s, a) => s + a.amount, 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Execution", value: execFilter },
+            { label: "Approval Date", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `approved_flights_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Personnel", key: "travellerName" },
-            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
-            { header: "Email", key: "employeeId" },
-            { header: "Approved On", accessor: (r) => r.approvedAt ? new Date(r.approvedAt).toLocaleDateString("en-IN") : "—" },
-            { header: "Travel Date", accessor: (r) => r.travelDate ? new Date(r.travelDate).toLocaleDateString("en-IN") : "—" },
-            { header: "Status", key: "executionStatus" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: approvedFlightsExportTemplate,
+          filenamePrefix: "approved_flights"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
@@ -294,6 +304,8 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
   const [selected, setSelected] = useState(null);
   const PAGE_SIZE = 10;
 
+  const { exportExcel, isExporting } = useExcelExporter();
+
   const hotelRaw = useMemo(() => (rawApprovals || []).filter(a => a.bookingType === "hotel" && !HOTEL_EXCLUDE.has(a.executionStatus)), [rawApprovals]);
   
   const formatted = useMemo(() => {
@@ -366,20 +378,26 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
       <ResponsiveDataTable 
         title="Hotel Approval Ledger" 
         subtitle={`${filtered.length} requests pending execution`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Approval Ledger",
+          statCards: [
+            { label: "Approved Hotels", value: filtered.length },
+            { label: "Pending Voucher", value: filtered.filter(a => a.executionStatus === "not_started").length },
+            { label: "Failed Exec", value: filtered.filter(a => a.executionStatus === "failed").length },
+            { label: "Total Value", value: `₹${filtered.reduce((s, a) => s + a.amount, 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Execution", value: execFilter },
+            { label: "Approval Date", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `approved_hotels_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order Reference", key: "orderId" },
-            { header: "Personnel", key: "guestName" },
-            { header: "Email", key: "employeeId" },
-            { header: "Approved On", accessor: (r) => r.approvedAt ? new Date(r.approvedAt).toLocaleDateString("en-IN") : "—" },
-            { header: "Check-in", accessor: (r) => r.checkIn ? new Date(r.checkIn).toLocaleDateString("en-IN") : "—" },
-            { header: "Asset Detail", key: "hotelName" },
-            { header: "Status", key: "executionStatus" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: approvedHotelsExportTemplate,
+          filenamePrefix: "approved_hotels"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >

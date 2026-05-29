@@ -36,7 +36,7 @@ import { clearCycleTransactions } from "../../Redux/Slice/postpaidSlice";
 import { toast } from "sonner";
 import Pagination from "../Shared/Pagination";
 import TableActionBar from "../Shared/TableActionBar";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import {
   creditAlertsExportTemplate,
   creditStatementsExportTemplate,
@@ -92,7 +92,7 @@ export default function CreditStatusAlerts() {
   const tableScrollRef = useRef(null);
   const cycleTableScrollRef = useRef(null);
   const creditTransactionsScrollRef = useRef(null);
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
   
   // Filters & Pagination
   const [searchTerm, setSearchTerm] = useState("");
@@ -408,8 +408,25 @@ export default function CreditStatusAlerts() {
   const isAlertsExporting = exportingKey === "credit_alerts";
 
   const handleAlertsExport = () => {
-    exportCsv({
+    const statCards = [
+      { label: "Critical Corporates", value: stats.criticalCount },
+      { label: "Warning Corporates", value: stats.warningCount },
+      { label: stats.isHistory ? "Period Spend" : "Current Exposure", value: inr(stats.totalExposure) },
+      { label: "Total Approved Limits", value: inr(stats.totalLimit) },
+    ];
+    const appliedFilters = [
+      { label: "Search", value: searchTerm || "None" },
+      { label: "Status", value: filterStatus },
+      { label: "Cycle", value: filterCycle },
+      { label: "Min Limit", value: minLimit || "None" },
+      { label: "Max Limit", value: maxLimit || "None" },
+      { label: "Usage Threshold", value: usageThreshold + "%" },
+    ];
+    exportExcel({
       key: "credit_alerts",
+      pageHeader: "Credit Profiles & Risk Alert Board",
+      statCards,
+      appliedFilters,
       data: filtered,
       columns: creditAlertsExportTemplate,
       filenamePrefix: "credit_alerts_export",
@@ -437,8 +454,11 @@ export default function CreditStatusAlerts() {
     const isTransactionsExporting = exportingKey === "credit_transactions";
 
     const handleStatementsExport = () => {
-      exportCsv({
+      exportExcel({
         key: "credit_statements",
+        pageHeader: `${target.corporateName} - Statements`,
+        statCards: [],
+        appliedFilters: [],
         data: statementRows,
         columns: creditStatementsExportTemplate,
         filenamePrefix: "credit_statements_export",
@@ -450,9 +470,17 @@ export default function CreditStatusAlerts() {
     const handleTransactionsExport = () => {
       if (drillLoading) return;
 
-      exportCsv({
+      exportExcel({
         key: "credit_transactions",
-                data: paginatedDrillTx,
+        pageHeader: `${target.corporateName} - Transactions`,
+        statCards: [],
+        appliedFilters: [
+          { label: "Search", value: txSearch || "None" },
+          { label: "From Date", value: txStartDate || "Any" },
+          { label: "To Date", value: txEndDate || "Any" },
+          { label: "Category", value: txCategory },
+        ],
+        data: filteredDrillTx,
         columns: creditTransactionsExportTemplate,
         filenamePrefix: "credit_transactions_export",
         emptyMessage: "No credit transactions available to export",

@@ -11,9 +11,14 @@ import {
   FiX,
   FiClock,
   FiCheckCircle,
+  FiArrowRight,
+  FiArrowLeft,
+  FiList,
+  FiRefreshCw
 } from "react-icons/fi";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   fetchCancellationQueries,
@@ -25,11 +30,12 @@ import {
   FlightBookingModal,
   HotelBookingModal,
 } from "../Shared/BookingRequestDetailsModal";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import {
   flightCancellationQueriesExportTemplate,
   hotelCancellationQueriesExportTemplate,
 } from "../../templates/exportTemplates/superAdminExportTemplates";
+import QueryDetailModal from "../Modals/QueryDetailModal";
 
 // ─────────────────────────────────────────────
 // CONSTANTS
@@ -56,22 +62,8 @@ const PRIORITY_STYLES = {
 };
 
 // ─────────────────────────────────────────────
-// DUMMY HOTEL CANCELLATION QUERIES
+// DUMMY HOTEL CANCELLATION QUERIES (Removed)
 // ─────────────────────────────────────────────
-const DUMMY_HOTEL_QUERIES = [
-  { _id: "h001", queryId: "HCQ-001", status: "OPEN",        priority: "HIGH",   requestedAt: "2026-04-10T09:30:00Z", corporate: { companyName: "Acme Corp", employeeName: "Ravi Kumar",   employeeEmail: "ravi@acme.com"   }, bookingSnapshot: { hotelName: "The Leela Palace",    checkInDate: "2026-04-15", checkOutDate: "2026-04-18", totalFare: 42000, roomType: "Deluxe Suite"   }, remarks: "Urgent cancellation due to client meeting cancelled." },
-  { _id: "h002", queryId: "HCQ-002", status: "IN_PROGRESS", priority: "MEDIUM", requestedAt: "2026-04-11T11:00:00Z", corporate: { companyName: "TechStar Pvt", employeeName: "Priya Sharma",  employeeEmail: "priya@ts.com"    }, bookingSnapshot: { hotelName: "Taj Mahal Hotel",      checkInDate: "2026-04-20", checkOutDate: "2026-04-22", totalFare: 28000, roomType: "Executive Room" }, remarks: "Guest unable to travel — visa issue." },
-  { _id: "h003", queryId: "HCQ-003", status: "RESOLVED",   priority: "LOW",    requestedAt: "2026-04-08T14:15:00Z", corporate: { companyName: "GlobalLink",   employeeName: "Anjali Verma",   employeeEmail: "anjali@gl.com"   }, bookingSnapshot: { hotelName: "ITC Grand Bharat",    checkInDate: "2026-04-12", checkOutDate: "2026-04-14", totalFare: 19500, roomType: "Superior Room"  }, remarks: "Refund processed successfully." },
-  { _id: "h004", queryId: "HCQ-004", status: "OPEN",        priority: "HIGH",   requestedAt: "2026-04-12T08:00:00Z", corporate: { companyName: "Synergy Ltd",  employeeName: "Mohan Das",      employeeEmail: "mohan@synergy.com" }, bookingSnapshot: { hotelName: "Oberoi Trident",      checkInDate: "2026-04-25", checkOutDate: "2026-04-27", totalFare: 35000, roomType: "Ocean View Suite"}, remarks: "Flight cancelled, need hotel refund." },
-  { _id: "h005", queryId: "HCQ-005", status: "REJECTED",   priority: "LOW",    requestedAt: "2026-04-07T16:45:00Z", corporate: { companyName: "BrightPath",   employeeName: "Sunita Patel",   employeeEmail: "sunita@bp.com"   }, bookingSnapshot: { hotelName: "Hyatt Regency",       checkInDate: "2026-04-10", checkOutDate: "2026-04-11", totalFare: 8500,  roomType: "Standard Room"  }, remarks: "Cancellation requested after check-in." },
-  { _id: "h006", queryId: "HCQ-006", status: "IN_PROGRESS", priority: "HIGH",   requestedAt: "2026-04-13T10:30:00Z", corporate: { companyName: "NovaTech",     employeeName: "Karan Mehta",    employeeEmail: "karan@nova.com"  }, bookingSnapshot: { hotelName: "Marriott Mumbai",     checkInDate: "2026-04-28", checkOutDate: "2026-05-01", totalFare: 55000, roomType: "Presidential"   }, remarks: "Conference event postponed." },
-  { _id: "h007", queryId: "HCQ-007", status: "OPEN",        priority: "MEDIUM", requestedAt: "2026-04-14T07:20:00Z", corporate: { companyName: "Acme Corp",    employeeName: "Deepak Raj",     employeeEmail: "deepak@acme.com" }, bookingSnapshot: { hotelName: "Sheraton Grand",      checkInDate: "2026-04-30", checkOutDate: "2026-05-02", totalFare: 22000, roomType: "Club Room"      }, remarks: "Internal policy change." },
-  { _id: "h008", queryId: "HCQ-008", status: "RESOLVED",   priority: "MEDIUM", requestedAt: "2026-04-09T13:00:00Z", corporate: { companyName: "PearlGate",    employeeName: "Nisha Jain",     employeeEmail: "nisha@pg.com"    }, bookingSnapshot: { hotelName: "Radisson Blu",        checkInDate: "2026-04-17", checkOutDate: "2026-04-19", totalFare: 16000, roomType: "Business Room"  }, remarks: "Credit note issued." },
-  { _id: "h009", queryId: "HCQ-009", status: "OPEN",        priority: "LOW",    requestedAt: "2026-04-15T09:00:00Z", corporate: { companyName: "SkyLane",      employeeName: "Arjun Singh",    employeeEmail: "arjun@sl.com"    }, bookingSnapshot: { hotelName: "Crowne Plaza",        checkInDate: "2026-05-05", checkOutDate: "2026-05-07", totalFare: 13000, roomType: "Deluxe Room"    }, remarks: "Medical emergency." },
-  { _id: "h010", queryId: "HCQ-010", status: "IN_PROGRESS", priority: "HIGH",   requestedAt: "2026-04-16T11:45:00Z", corporate: { companyName: "CoreEdge",     employeeName: "Meena Bose",     employeeEmail: "meena@ce.com"    }, bookingSnapshot: { hotelName: "Four Seasons Delhi",  checkInDate: "2026-05-10", checkOutDate: "2026-05-12", totalFare: 48000, roomType: "Luxury Suite"   }, remarks: "Budget freeze by management." },
-  { _id: "h011", queryId: "HCQ-011", status: "OPEN",        priority: "MEDIUM", requestedAt: "2026-04-17T08:30:00Z", corporate: { companyName: "DataAxis",     employeeName: "Rahul Gupta",    employeeEmail: "rahul@da.com"    }, bookingSnapshot: { hotelName: "JW Marriott Pune",    checkInDate: "2026-05-15", checkOutDate: "2026-05-17", totalFare: 31000, roomType: "Superior Suite"  }, remarks: "Project site changed." },
-  { _id: "h012", queryId: "HCQ-012", status: "REJECTED",   priority: "LOW",    requestedAt: "2026-04-06T15:00:00Z", corporate: { companyName: "FinServe",     employeeName: "Pooja Iyer",     employeeEmail: "pooja@fs.com"    }, bookingSnapshot: { hotelName: "Novotel Hyderabad",   checkInDate: "2026-04-09", checkOutDate: "2026-04-10", totalFare: 7200,  roomType: "Standard Room"  }, remarks: "Late cancellation — charges applied." },
-];
 
 // ─────────────────────────────────────────────
 // NORMALIZERS
@@ -255,348 +247,7 @@ const _normalizeHotel = (b = {}) => {
   };
 };
 
-// ─────────────────────────────────────────────
-// QUERY DETAIL MODAL
-// ─────────────────────────────────────────────
 
-function QueryDetailModal({ query, onClose, onStatusChange }) {
-  const [status, setStatus] = useState(query.status || "OPEN");
-  const [resolutionMsg, setResolutionMsg] = useState(
-    query.resolution?.message || "",
-  );
-  const [refundAmount, setRefundAmount] = useState(
-    query.resolution?.refundAmount || "",
-  );
-  const [cancelCharge, setCancelCharge] = useState(
-    query.resolution?.cancellationCharge || "",
-  );
-  const [creditNoteNo, setCreditNoteNo] = useState(
-    query.resolution?.creditNoteNo || "",
-  );
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setStatus(query.status || "OPEN");
-    setResolutionMsg(query.resolution?.message || "");
-    setRefundAmount(query.resolution?.refundAmount || "");
-    setCancelCharge(query.resolution?.cancellationCharge || "");
-    setCreditNoteNo(query.resolution?.creditNoteNo || "");
-  }, [query]);
-
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      await onStatusChange(query._id || query.queryId, {
-        status,
-        remarks: query.remarks,
-        resolution: {
-          message: resolutionMsg,
-          refundAmount: Number(refundAmount) || 0,
-          cancellationCharge: Number(cancelCharge) || 0,
-          creditNoteNo,
-          resolvedAt:
-            status === "RESOLVED" ? new Date().toISOString() : undefined,
-        },
-      });
-      onClose();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const fmt = (d) =>
-    d
-      ? new Date(d).toLocaleDateString("en-IN", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-      : "—";
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">
-              Cancellation Query
-            </p>
-            <h2 className="text-lg font-black text-slate-900 leading-none">
-              {query.queryId || query._id || "—"}
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-500"
-          >
-            <FiX size={18} />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {/* Booking Info */}
-          <section>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-              Booking Details
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <InfoCell
-                label="Booking Ref"
-                value={query.bookingReference || "—"}
-              />
-              <InfoCell
-                label="Journey Type"
-                value={query.bookingSnapshot?.journeyType || "—"}
-              />
-              <InfoCell
-                label="Travel Date"
-                value={fmt(query.bookingSnapshot?.travelDate)}
-              />
-              <InfoCell
-                label="Return Date"
-                value={fmt(query.bookingSnapshot?.returnDate)}
-              />
-              <InfoCell
-                label="Airline / PNR"
-                value={`${query.bookingSnapshot?.airline || "—"} / ${query.bookingSnapshot?.pnr || "—"}`}
-              />
-              <InfoCell label="Requested On" value={fmt(query.requestedAt)} />
-            </div>
-          </section>
-
-          {/* Fare Breakdown */}
-          <section>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-              Fare Breakdown
-            </p>
-            <div className="bg-slate-50 rounded-xl p-4 grid grid-cols-2 gap-2 text-sm">
-              {[
-                ["Total Fare", query.bookingSnapshot?.totalFare],
-                ["Base Fare", query.bookingSnapshot?.baseFare],
-                ["Taxes", query.bookingSnapshot?.taxes],
-                ["Service Fee", query.bookingSnapshot?.serviceFee],
-              ].map(([l, v]) => (
-                <div key={l} className="flex justify-between">
-                  <span className="text-slate-500 text-[12px]">{l}</span>
-                  <span className="font-bold text-slate-800 text-[12px]">
-                    {v != null ? `₹${Number(v).toLocaleString()}` : "—"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Corporate */}
-          <section>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-              Corporate & Employee
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <InfoCell
-                label="Company"
-                value={query.corporate?.companyName || "—"}
-              />
-              <InfoCell
-                label="Employee"
-                value={query.corporate?.employeeName || "—"}
-              />
-              <InfoCell
-                label="Email"
-                value={query.corporate?.employeeEmail || "—"}
-              />
-              <InfoCell
-                label="Employee ID"
-                value={query.corporate?.employeeId || "—"}
-              />
-            </div>
-          </section>
-
-          {/* Sectors */}
-          {query.bookingSnapshot?.sectors?.length > 0 && (
-            <section>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                Sectors
-              </p>
-              <div className="space-y-2">
-                {query.bookingSnapshot.sectors.map((s, i) => (
-                  <div
-                    key={i}
-                    className="bg-slate-50 rounded-xl p-3 flex items-center justify-between text-sm"
-                  >
-                    <div>
-                      <p className="font-black text-slate-800">
-                        {s.origin} → {s.destination}
-                      </p>
-                      <p className="text-[11px] text-slate-500">
-                        {s.airline} · {s.flightNumber}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[11px] text-slate-500">
-                        {s.departureTime ? fmt(s.departureTime) : "—"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Passengers */}
-          {query.passengers?.length > 0 && (
-            <section>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                Passengers
-              </p>
-              <div className="space-y-2">
-                {query.passengers.map((p, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3"
-                  >
-                    <div>
-                      <p className="font-bold text-slate-800 text-sm">
-                        {p.name || "—"}
-                      </p>
-                      <p className="text-[11px] text-slate-400 uppercase">
-                        {p.type || "—"}
-                      </p>
-                    </div>
-                    <span className="font-mono text-[11px] text-slate-500">
-                      {p.ticketNumber || "—"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Remarks */}
-          {query.remarks && (
-            <section>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                Remarks
-              </p>
-              <p className="text-sm text-slate-700 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-                {query.remarks}
-              </p>
-            </section>
-          )}
-
-          {/* Status Update */}
-          <section className="border-t border-slate-100 pt-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-              Update Status
-            </p>
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <LabeledInput label="Status">
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer"
-                >
-                  {QUERY_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s.replace("_", " ")}
-                    </option>
-                  ))}
-                </select>
-              </LabeledInput>
-              <LabeledInput label="Credit Note No.">
-                <input
-                  type="text"
-                  value={creditNoteNo}
-                  onChange={(e) => setCreditNoteNo(e.target.value)}
-                  placeholder="e.g. CN-2024-001"
-                  className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
-                />
-              </LabeledInput>
-              <LabeledInput label="Refund Amount (₹)">
-                <input
-                  type="number"
-                  value={refundAmount}
-                  onChange={(e) => setRefundAmount(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
-                />
-              </LabeledInput>
-              <LabeledInput label="Cancellation Charge (₹)">
-                <input
-                  type="number"
-                  value={cancelCharge}
-                  onChange={(e) => setCancelCharge(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
-                />
-              </LabeledInput>
-            </div>
-            <LabeledInput label="Resolution Message">
-              <textarea
-                value={resolutionMsg}
-                onChange={(e) => setResolutionMsg(e.target.value)}
-                rows={3}
-                placeholder="Describe the resolution or reason for rejection..."
-                className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 resize-none"
-              />
-            </LabeledInput>
-          </section>
-
-          {/* Logs */}
-          {query.logs?.length > 0 && (
-            <section>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                Activity Log
-              </p>
-              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-                {[...query.logs].reverse().map((log, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3 text-sm py-2 border-b border-slate-50"
-                  >
-                    <div className="w-1.5 h-1.5 rounded-full bg-rose-400 mt-1.5 shrink-0" />
-                    <div>
-                      <p className="text-slate-700 font-medium">
-                        {log.message || log.action}
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        {log.by && `by ${log.by} · `}
-                        {log.at ? new Date(log.at).toLocaleString("en-IN") : ""}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Save */}
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-6 py-2 rounded-lg bg-rose-700 text-white text-sm font-bold shadow hover:bg-rose-800 transition-colors disabled:opacity-60"
-            >
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────
 // CANCELLATION QUERY TAB
@@ -605,7 +256,7 @@ function QueryDetailModal({ query, onClose, onStatusChange }) {
 function CancellationQueryTab() {
   const tableScrollRef = useRef(null);
   const dispatch = useDispatch();
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
   const {
     cancellationQueries,
     loadingCancellationQueries,
@@ -635,7 +286,11 @@ function CancellationQueryTab() {
   }, [dispatch]);
 
   const queries = useMemo(
-    () => cancellationQueries || [],
+    () => {
+      const flights = Array.isArray(cancellationQueries) ? cancellationQueries : [];
+      // Sort them descending by requestedAt date
+      return [...flights].sort((a, b) => new Date(b.requestedAt || 0) - new Date(a.requestedAt || 0));
+    },
     [cancellationQueries],
   );
 
@@ -665,6 +320,9 @@ function CancellationQueryTab() {
             .toLowerCase()
             .includes(search.toLowerCase()) ||
           (q.corporate?.companyName || "")
+            .toLowerCase()
+            .includes(search.toLowerCase()) ||
+          (q.bookingSnapshot?.hotelName || "")
             .toLowerCase()
             .includes(search.toLowerCase());
 
@@ -722,9 +380,28 @@ function CancellationQueryTab() {
   const handleExport = () => {
     if (loadingCancellationQueries) return;
 
-    exportCsv({
+    const statCards = [
+      { label: "Open", value: statusCounts.OPEN },
+      { label: "In Progress", value: statusCounts.IN_PROGRESS },
+      { label: "Resolved", value: statusCounts.RESOLVED },
+      { label: "Rejected", value: statusCounts.REJECTED },
+    ];
+
+    const appliedFilters = [
+      { label: "Search", value: search || "None" },
+      { label: "Status", value: statusFilter },
+      { label: "Priority", value: priorityFilter },
+      { label: "Booking From", value: fromDate || "Any" },
+      { label: "Booking To", value: toDate || "Any" },
+      { label: "Requested Date", value: requestedDate || "Any" },
+    ];
+
+    exportExcel({
       key: "flight_cancellation_queries",
-      data: paginatedQueries,
+      pageHeader: "Cancellation Archive",
+      statCards,
+      appliedFilters,
+      data: filtered,
       columns: flightCancellationQueriesExportTemplate,
       filenamePrefix: "flight_cancellation_queries_export",
       emptyMessage: "No flight cancellation queries available to export",
@@ -748,36 +425,40 @@ function CancellationQueryTab() {
         <StatCard
           label="Open"
           value={statusCounts.OPEN}
-          icon={<FiAlertCircle size={18} className="text-blue-600" />}
+          Icon={FiAlertCircle}
           borderCls="border-blue-500"
           iconBgCls="bg-blue-50"
+          iconColorCls="text-blue-600"
         />
         <StatCard
           label="In Progress"
           value={statusCounts.IN_PROGRESS}
-          icon={<FiClock size={18} className="text-amber-600" />}
+          Icon={FiClock}
           borderCls="border-amber-500"
           iconBgCls="bg-amber-50"
+          iconColorCls="text-amber-600"
         />
         <StatCard
           label="Resolved"
           value={statusCounts.RESOLVED}
-          icon={<FiCheckCircle size={18} className="text-emerald-600" />}
+          Icon={FiCheckCircle}
           borderCls="border-emerald-500"
           iconBgCls="bg-emerald-50"
+          iconColorCls="text-emerald-600"
         />
         <StatCard
           label="Rejected"
           value={statusCounts.REJECTED}
-          icon={<FiXCircle size={18} className="text-rose-600" />}
+          Icon={FiXCircle}
           borderCls="border-rose-500"
           iconBgCls="bg-rose-50"
+          iconColorCls="text-rose-600"
         />
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
-        <div className="grid gap-4 grid-cols-3">
+      <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: "#e2e8f0" }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5">
           <LabeledInput label="Search">
             <div className="relative">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -786,7 +467,7 @@ function CancellationQueryTab() {
                 placeholder="Query ID / Employee..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50"
+                className="w-full pl-9 pr-3 py-2 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white"
               />
             </div>
           </LabeledInput>
@@ -849,7 +530,7 @@ function CancellationQueryTab() {
       <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
         <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg flex items-center gap-2">
-            <FiMessageSquare size={18} className="text-rose-600" />
+            <FiMessageSquare size={18} className="text-[#003399]" />
             Query List
           </h2>
           <TableActionBar
@@ -858,8 +539,8 @@ function CancellationQueryTab() {
             onExport={handleExport}
             exportDisabled={loadingCancellationQueries || isExporting}
             exportLoading={isExporting}
-            exportClassName="bg-rose-700 hover:bg-rose-800 shadow-rose-700/20"
-            arrowClassName="border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:border-rose-200 hover:text-rose-800 disabled:hover:bg-rose-50"
+            exportClassName="bg-[#003399] hover:bg-[#000d26] shadow-[#003399]/20"
+            arrowClassName="border-[#003399]/20 bg-[#003399]/5 text-[#003399] hover:bg-[#003399]/10 hover:border-[#003399]/30 disabled:hover:bg-[#003399]/5"
           />
         </div>
 
@@ -875,11 +556,12 @@ function CancellationQueryTab() {
           ) : (
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-800">
+                <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
                   {[
                     "Query ID",
+                    "Type",
                     "Corporate / Employee",
-                    "Airline / PNR",
+                    "Booking Details",
                     "Travel Date",
                     "Total Fare",
                     "Priority",
@@ -889,7 +571,7 @@ function CancellationQueryTab() {
                   ].map((h) => (
                     <th
                       key={h}
-                      className="px-5 py-4 text-[11px] font-bold text-slate-300 uppercase tracking-widest whitespace-nowrap"
+                      className="px-5 py-4 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap"
                     >
                       {h}
                     </th>
@@ -939,34 +621,49 @@ function CancellationQueryTab() {
 // ─────────────────────────────────────────────
 
 function QueryRow({ query, fmt, onView }) {
+  const isHotel = !!query.bookingSnapshot?.hotelName;
+
   return (
     <tr className="hover:bg-rose-50/20 transition-all bg-white">
       <td className="px-5 py-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">
         {query.queryId || query._id || "—"}
       </td>
-     
+      <td className="px-5 py-4">
+        {isHotel ? (
+          <span className="flex items-center gap-1.5 text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase w-max"><FaHotel size={12}/> Hotel</span>
+        ) : (
+          <span className="flex items-center gap-1.5 text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase w-max"><FaPlane size={12}/> Flight</span>
+        )}
+      </td>
       <td className="px-5 py-4">
         <div className="flex flex-col">
           <span className="font-bold text-slate-800 text-[13px]">
             {query.corporate?.companyName || "—"}
           </span>
           <span className="text-[11px] text-slate-400">
-            {query.user?.email || "—"}
+            {query.user?.email || query.corporate?.employeeEmail || "—"}
           </span>
         </div>
       </td>
       <td className="px-5 py-4">
         <div className="flex flex-col">
-          <span className="text-[12px] font-semibold text-slate-700">
-            {query.bookingSnapshot.sectors[0].airline + " / " + query.bookingSnapshot.sectors[0].flightNumber || "—"}
+          <span className="text-[12px] font-semibold text-slate-700 truncate max-w-[150px]" title={isHotel ? query.bookingSnapshot?.hotelName : (query.bookingSnapshot?.sectors?.[0]?.airline + " / " + query.bookingSnapshot?.sectors?.[0]?.flightNumber)}>
+            {isHotel ? query.bookingSnapshot?.hotelName : (query.bookingSnapshot?.sectors?.[0]?.airline + " / " + query.bookingSnapshot?.sectors?.[0]?.flightNumber || "—")}
           </span>
           <span className="font-mono text-[10px] text-slate-400">
-            {query.bookingSnapshot?.pnr || "—"}
+            {isHotel ? query.bookingSnapshot?.roomType : (query.bookingSnapshot?.pnr || "—")}
           </span>
         </div>
       </td>
       <td className="px-5 py-4 text-[12px] text-slate-600 whitespace-nowrap">
-        {fmt(query.bookingSnapshot.sectors[0].departureTime)}
+        {isHotel ? (
+          <>
+            <div>{fmt(query.bookingSnapshot?.checkInDate)}</div>
+            <div className="text-[10px] text-slate-400">to {fmt(query.bookingSnapshot?.checkOutDate)}</div>
+          </>
+        ) : (
+          fmt(query.bookingSnapshot?.sectors?.[0]?.departureTime)
+        )}
       </td>
       <td className="px-5 py-4 font-bold text-slate-800 text-[12px] whitespace-nowrap">
         {query.bookingSnapshot?.totalFare != null
@@ -994,254 +691,20 @@ function QueryRow({ query, fmt, onView }) {
       <td className="px-5 py-4">
         <button
           onClick={onView}
-          className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700 transition-colors"
-          title="View Details"
+          className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-white hover:to-white group"
+          title="View details"
         >
-          <FiEye size={15} />
+          <FiArrowRight
+            size={16}
+            className="text-[#E7C695] group-hover:text-[#000d26] transition-colors"
+          />
         </button>
       </td>
     </tr>
   );
 }
 
-// ─────────────────────────────────────────────
-// HOTEL CANCELLATION QUERY TAB (dummy data)
-// ─────────────────────────────────────────────
 
-function HotelCancellationQueryTab() {
-  const tableScrollRef = useRef(null);
-  const { exportCsv, exportingKey } = useCsvExporter();
-  const [search, setSearch]               = useState("");
-  const [statusFilter, setStatusFilter]   = useState("ALL");
-  const [priorityFilter, setPriorityFilter] = useState("ALL");
-  const [fromDate, setFromDate]           = useState("");
-  const [toDate, setToDate]               = useState("");
-  const [requestedDate, setRequestedDate] = useState("");
-  const [page, setPage]                   = useState(1);
-  const [selectedQuery, setSelectedQuery] = useState(null);
-  const isExporting = exportingKey === "hotel_cancellation_queries";
-
-  useEffect(() => {
-    const resetId = window.requestAnimationFrame(() => {
-      setPage(1);
-    });
-    return () => window.cancelAnimationFrame(resetId);
-  }, [statusFilter, search, fromDate, toDate, requestedDate]);
-
-  const fmt = (d) =>
-    d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-
-  const filtered = useMemo(() =>
-    DUMMY_HOTEL_QUERIES.filter((q) => {
-      const matchStatus   = statusFilter   === "ALL" || q.status   === statusFilter;
-      const matchPriority = priorityFilter === "ALL" || q.priority === priorityFilter;
-      const matchSearch   =
-        !search ||
-        (q.queryId || "").toLowerCase().includes(search.toLowerCase()) ||
-        (q.corporate?.companyName  || "").toLowerCase().includes(search.toLowerCase()) ||
-        (q.corporate?.employeeName || "").toLowerCase().includes(search.toLowerCase()) ||
-        (q.bookingSnapshot?.hotelName || "").toLowerCase().includes(search.toLowerCase());
-      const reqAt = q.requestedAt ? new Date(q.requestedAt) : null;
-      const matchFrom      = !fromDate      || (reqAt && reqAt >= new Date(fromDate));
-      const matchTo        = !toDate        || (reqAt && reqAt <= new Date(toDate + "T23:59:59"));
-      const matchRequested = !requestedDate || (q.requestedAt || "").slice(0, 10) === requestedDate;
-      return matchStatus && matchPriority && matchSearch && matchFrom && matchTo && matchRequested;
-    }),
-    [search, statusFilter, priorityFilter, fromDate, toDate, requestedDate],
-  );
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / 10));
-  const paginatedQueries = useMemo(
-    () => filtered.slice((page - 1) * 10, page * 10),
-    [filtered, page],
-  );
-
-  const statusCounts = useMemo(() => {
-    const counts = { OPEN: 0, IN_PROGRESS: 0, RESOLVED: 0, REJECTED: 0 };
-    DUMMY_HOTEL_QUERIES.forEach((q) => { if (counts[q.status] !== undefined) counts[q.status]++; });
-    return counts;
-  }, []);
-
-  const handleExport = () => {
-    exportCsv({
-      key: "hotel_cancellation_queries",
-      data: paginatedQueries,
-      columns: hotelCancellationQueriesExportTemplate,
-      filenamePrefix: "hotel_cancellation_queries_export",
-      emptyMessage: "No hotel cancellation queries available to export",
-      successMessage: "Hotel cancellation queries exported",
-    });
-  };
-
-  return (
-    <div className="space-y-5">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Open"        value={statusCounts.OPEN}        icon={<FiAlertCircle size={18} className="text-blue-600" />} borderCls="border-blue-500"    iconBgCls="bg-blue-50" />
-        <StatCard label="In Progress" value={statusCounts.IN_PROGRESS} icon={<FiClock size={18} className="text-amber-600" />}       borderCls="border-amber-500"   iconBgCls="bg-amber-50" />
-        <StatCard label="Resolved"    value={statusCounts.RESOLVED}    icon={<FiCheckCircle size={18} className="text-emerald-600" />} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" />
-        <StatCard label="Rejected"    value={statusCounts.REJECTED}    icon={<FiXCircle size={18} className="text-rose-600" />}     borderCls="border-rose-500"    iconBgCls="bg-rose-50" />
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
-        <div className="grid gap-4 grid-cols-3">
-          <LabeledInput label="Search">
-            <div className="relative">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input type="text" placeholder="Hotel / Company / ID..." value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50" />
-            </div>
-          </LabeledInput>
-          <LabeledInput label="Status">
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer">
-              <option value="ALL">All Statuses</option>
-              {QUERY_STATUSES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
-            </select>
-          </LabeledInput>
-          <LabeledInput label="Priority">
-            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer">
-              <option value="ALL">All Priorities</option>
-              {QUERY_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </LabeledInput>
-          <LabeledInput label="From Date">
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
-              className={FILTER_DATE_INPUT_CLASS} />
-          </LabeledInput>
-          <LabeledInput label="To Date">
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
-              className={FILTER_DATE_INPUT_CLASS} />
-          </LabeledInput>
-          <LabeledInput label="Requested Date">
-            <input type="date" value={requestedDate} onChange={(e) => setRequestedDate(e.target.value)}
-              className={FILTER_DATE_INPUT_CLASS} />
-          </LabeledInput>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg flex items-center gap-2">
-            <FiMessageSquare size={18} className="text-teal-600" />
-            Hotel Query List
-          </h2>
-          <TableActionBar
-            scrollRef={tableScrollRef}
-            exportLabel="Export Queries"
-            onExport={handleExport}
-            exportDisabled={isExporting}
-            exportLoading={isExporting}
-            exportClassName="bg-teal-700 hover:bg-teal-800 shadow-teal-700/20"
-            arrowClassName="border-teal-100 bg-teal-50 text-teal-700 hover:bg-teal-100 hover:border-teal-200 hover:text-teal-800 disabled:hover:bg-teal-50"
-          />
-        </div>
-
-        <div ref={tableScrollRef} className="overflow-x-auto">
-          {filtered.length === 0 ? (
-            <div className="p-10 text-center text-sm text-slate-400">No hotel cancellation queries found.</div>
-          ) : (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-teal-800">
-                  {["Query ID", "Corporate / Employee", "Hotel Name", "Check-In", "Check-Out", "Room Type", "Total Fare", "Priority", "Status", "Requested On", "Actions"].map((h) => (
-                    <th key={h} className="px-5 py-4 text-[11px] font-bold text-teal-100 uppercase tracking-widest whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {paginatedQueries.map((q) => (
-                  <tr key={q._id} className="hover:bg-teal-50/20 transition-all bg-white">
-                    <td className="px-5 py-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">{q.queryId}</td>
-                    <td className="px-5 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-slate-800 text-[13px]">{q.corporate?.companyName || "—"}</span>
-                        <span className="text-[11px] text-slate-400">{q.corporate?.employeeName || "—"}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 font-semibold text-slate-700 text-[12px] whitespace-nowrap">{q.bookingSnapshot?.hotelName || "—"}</td>
-                    <td className="px-5 py-4 text-[12px] text-slate-600 whitespace-nowrap">{fmt(q.bookingSnapshot?.checkInDate)}</td>
-                    <td className="px-5 py-4 text-[12px] text-slate-600 whitespace-nowrap">{fmt(q.bookingSnapshot?.checkOutDate)}</td>
-                    <td className="px-5 py-4 text-[11px] text-slate-500">{q.bookingSnapshot?.roomType || "—"}</td>
-                    <td className="px-5 py-4 font-bold text-slate-800 text-[12px] whitespace-nowrap">
-                      {q.bookingSnapshot?.totalFare != null ? `₹${Number(q.bookingSnapshot.totalFare).toLocaleString()}` : "—"}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase border whitespace-nowrap ${PRIORITY_STYLES[q.priority] || PRIORITY_STYLES.MEDIUM}`}>
-                        {q.priority || "MEDIUM"}
-                      </span>
-                    </td>
-                    {/* FIX 2: Added whitespace-nowrap so "IN PROGRESS" never wraps to two lines */}
-                    <td className="px-5 py-4">
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase border whitespace-nowrap ${STATUS_STYLES[q.status] || STATUS_STYLES.OPEN}`}>
-                        {(q.status || "OPEN").replace("_", " ")}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-[11px] text-slate-500 whitespace-nowrap">{fmt(q.requestedAt)}</td>
-                    <td className="px-5 py-4">
-                      <button onClick={() => setSelectedQuery(q)}
-                        className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-700 transition-colors" title="View Details">
-                        <FiEye size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-white">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-            Page {page} of {totalPages}
-          </div>
-          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} showFirstLast />
-        </div>
-      </div>
-
-      {/* Detail Modal */}
-      {selectedQuery && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setSelectedQuery(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Hotel Cancellation Query</p>
-                <h2 className="text-lg font-black text-slate-900 leading-none">{selectedQuery.queryId}</h2>
-              </div>
-              <button onClick={() => setSelectedQuery(null)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-500">
-                <FiX size={18} />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <InfoCell label="Hotel"      value={selectedQuery.bookingSnapshot?.hotelName} />
-                <InfoCell label="Room Type"  value={selectedQuery.bookingSnapshot?.roomType} />
-                <InfoCell label="Check-In"   value={fmt(selectedQuery.bookingSnapshot?.checkInDate)} />
-                <InfoCell label="Check-Out"  value={fmt(selectedQuery.bookingSnapshot?.checkOutDate)} />
-                <InfoCell label="Total Fare" value={selectedQuery.bookingSnapshot?.totalFare != null ? `₹${Number(selectedQuery.bookingSnapshot.totalFare).toLocaleString()}` : "—"} />
-                <InfoCell label="Requested"  value={fmt(selectedQuery.requestedAt)} />
-                <InfoCell label="Company"    value={selectedQuery.corporate?.companyName} />
-                <InfoCell label="Employee"   value={selectedQuery.corporate?.employeeName} />
-                <InfoCell label="Email"      value={selectedQuery.corporate?.employeeEmail} />
-                <InfoCell label="Priority"   value={selectedQuery.priority} />
-              </div>
-              {selectedQuery.remarks && (
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Remarks</p>
-                  <p className="text-sm text-slate-700 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">{selectedQuery.remarks}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────
 // MAIN DASHBOARD
@@ -1249,56 +712,63 @@ function HotelCancellationQueryTab() {
 
 export default function CancellationQueries() {
   const [activeTab, setActiveTab] = useState("Flight");
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    // Trigger re-fetching for the current tab. In a real scenario, you might dispatch fetchCancellationQueries here.
+    dispatch(fetchCancellationQueries()).finally(() => {
+      setTimeout(() => setIsRefreshing(false), 500); // UI feedback
+    });
+  };
 
   return (
-    <div className="min-h-screen p-6 font-sans bg-slate-50">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-700 to-rose-500 flex items-center justify-center shadow-lg text-white">
-            <FiXCircle size={24} />
-          </div>
-          <div className="text-left">
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase leading-none">
-              Cancellation Archive
-            </h1>
-            <p className="text-xs text-rose-600 mt-1 font-bold uppercase tracking-widest">
-              Super Admin Monitor
-            </p>
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: "#f8fafc" }}>
+      {/* ── Navy Gradient Header ── */}
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 text-white shadow-sm"
+              >
+                <FiArrowLeft size={18} />
+              </button>
+              <button
+                onClick={handleRefresh}
+                className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${isRefreshing ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                disabled={isRefreshing}
+              >
+                <div className={isRefreshing ? "animate-spin" : ""}>
+                  <FiRefreshCw size={20} />
+                </div>
+              </button>
+            </div>
+
+            <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
+                <FiList size={28} />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black text-white tracking-tight leading-none">
+                  Cancellation Archive
+                </h1>
+                <p className="text-[10px] text-white/60 mt-2 font-bold uppercase tracking-[2px]">
+                  Super Admin Monitor
+                </p>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Tabs */}
-        <div className="flex items-end gap-1 border-b-2 border-slate-200">
-          {[
-            {
-              key: "Flight",
-              icon: <FiMessageSquare size={14} />,
-              label: "Flight Cancellation Queries",
-            },
-            {
-              key: "Hotel",
-              icon: <FiMessageSquare size={14} />,
-              label: "Hotel Cancellation Queries",
-            },
-          ].map(({ key, icon, label }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-2 px-8 py-3 text-[13px] font-bold transition-all border-b-2 -mb-0.5 rounded-t-lg ${
-                activeTab === key
-                  ? "bg-white text-rose-700 border-b-rose-700 shadow-sm"
-                  : "text-slate-400 border-transparent hover:text-slate-600"
-              }`}
-            >
-              {icon} {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Query Tab */}
-        {activeTab === "Flight" && <CancellationQueryTab />}
-        {activeTab === "Hotel"  && <HotelCancellationQueryTab />}
+      <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
+        <CancellationQueryTab />
       </div>
     </div>
   );
@@ -1308,23 +778,15 @@ export default function CancellationQueries() {
 // SHARED COMPONENTS
 // ─────────────────────────────────────────────
 
-function StatCard({ label, value, iconBgCls, borderCls, icon }) {
+function StatCard({ label, value, iconBgCls, iconColorCls, borderCls, Icon }) {
   return (
-    <div
-      className={`bg-white rounded-xl p-4 flex items-center gap-3 shadow-sm border-l-4 ${borderCls}`}
-    >
-      <div
-        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBgCls}`}
-      >
-        {icon}
+    <div className={`bg-white rounded-2xl p-6 border-b-4 ${borderCls} shadow-sm flex items-center justify-between`}>
+      <div>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+        <h3 className="text-3xl font-black text-slate-800">{value}</h3>
       </div>
-      <div className="text-left">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
-          {label}
-        </p>
-        <p className="text-xl font-black text-slate-900 leading-none">
-          {value}
-        </p>
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconBgCls}`}>
+        <Icon size={24} className={iconColorCls} />
       </div>
     </div>
   );
@@ -1332,22 +794,11 @@ function StatCard({ label, value, iconBgCls, borderCls, icon }) {
 
 function LabeledInput({ label, children }) {
   return (
-    <div className="flex flex-col gap-1 text-left">
-      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
         {label}
       </label>
       {children}
-    </div>
-  );
-}
-
-function InfoCell({ label, value }) {
-  return (
-    <div className="bg-slate-50 rounded-xl px-4 py-3">
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-        {label}
-      </p>
-      <p className="text-[13px] font-bold text-slate-800">{value || "—"}</p>
     </div>
   );
 }

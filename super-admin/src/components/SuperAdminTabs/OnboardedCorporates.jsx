@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiXCircle, FiInbox, FiClock, FiX, FiEye, FiCreditCard, FiArrowLeft, FiCalendar, FiPower } from "react-icons/fi";
+import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiXCircle, FiInbox, FiClock, FiX, FiEye, FiCreditCard, FiArrowLeft, FiCalendar, FiPower, FiPercent } from "react-icons/fi";
 import { MdVerifiedUser, MdBusiness, MdAccountBalanceWallet } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import AddCorporateModal from "../../Modal/AddCorporateModal";
@@ -8,7 +8,7 @@ import ViewCorporateModal from "../../Modal/ViewCorporateModal";
 import ToggleStatusModal from "../../Modal/ToggleStatusModal";
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import TableActionBar from "../Shared/TableActionBar";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import { onboardedCorporatesExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const C = {
@@ -88,7 +88,7 @@ export default function OnboardedCorporates() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const tableScrollRef = useRef(null);
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
 
   const { corporates = [], loading } = useSelector(
     (state) => state.corporateList
@@ -109,8 +109,25 @@ export default function OnboardedCorporates() {
 
   const handleExport = () => {
     if (loading) return;
-    exportCsv({
+
+    const statCards = [
+      { label: "Total Corporates", value: stats.total },
+      { label: "Active Corporates", value: stats.active },
+      { label: "Pending Approval", value: stats.pending },
+      { label: "Postpaid Accounts", value: stats.postpaid },
+    ];
+
+    const appliedFilters = [
+      { label: "Search", value: search || "None" },
+      { label: "Filter Status", value: filter },
+      { label: "Date Filter", value: dateFilter || "Any" },
+    ];
+
+    exportExcel({
       key: "onboarded_corporates",
+      pageHeader: "Onboarded Corporates",
+      statCards,
+      appliedFilters,
       data: filtered,
       columns: onboardedCorporatesExportTemplate,
       filenamePrefix: "onboarded_corporates_export",
@@ -372,20 +389,15 @@ export default function OnboardedCorporates() {
                             <FiEye size={16} />
                           </button>
                           
-                          {/* <button
+                          <button
                             onClick={() => {
-                              setSelectedCorporate(c);
-                              setOpenStatusModal(true);
+                              navigate(`/corporate-markup/${c._id}`, { state: { corporate: c } });
                             }}
-                            className={`p-2 rounded transition-colors cursor-pointer ${
-                              c.status?.toLowerCase() === "active" || c.status?.toLowerCase() === "approved"
-                                ? "hover:bg-amber-100 text-amber-500" 
-                                : "hover:bg-emerald-100 text-emerald-500"
-                            }`}
-                            title="Toggle Status"
+                            className="p-2 rounded hover:bg-violet-100 text-violet-600 transition-colors cursor-pointer"
+                            title="Markup Configuration"
                           >
-                            <FiPower size={16} />
-                          </button> */}
+                            <FiPercent size={16} />
+                          </button>
                         </div>
                       </td>
                     </tr>

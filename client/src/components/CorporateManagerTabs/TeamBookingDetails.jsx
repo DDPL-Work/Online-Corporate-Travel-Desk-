@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
@@ -33,6 +34,7 @@ import {
   FiPhone,
   FiInfo,
   FiHash,
+  FiEye,
 } from "react-icons/fi";
 import { getTeamExecutedFlightRequestById } from "../../Redux/Actions/manager.thunk";
 import {
@@ -42,8 +44,9 @@ import {
   fetchChangeStatus,
   createCancellationQuery,
 } from "../../Redux/Actions/amendmentThunks";
-import { createReissueRequest } from "../../Redux/Actions/reissueThunks";
+import { checkReissueEligibility, fetchOfflineReissueRequestByBooking, createReissueRequest } from "../../Redux/Actions/reissueThunks";
 import { resetAmendmentState } from "../../Redux/Slice/amendmentSlice";
+import { clearEligibility } from "../../Redux/Slice/reissueSlice";
 import {
   formatDate,
   formatTime,
@@ -59,6 +62,45 @@ import ReissueModal from "../EmployeeDashboard/ReissueModal";
 /* ────────────────────────────────────────────────────────────── */
 /*  Utility helpers (unchanged)                                   */
 /* ────────────────────────────────────────────────────────────── */
+
+function getOfflineReissueBadgeMeta(status) {
+  switch (status) {
+    case "RAISED":
+      return {
+        label: "Offline Reissue Requested",
+        className: "bg-amber-50 text-amber-700 border border-amber-100",
+      };
+    case "ASSIGNED":
+    case "IN_PROGRESS":
+    case "WAITING_AIRLINE":
+      return {
+        label: "Processing Reissue",
+        className: "bg-blue-50 text-blue-700 border border-blue-100",
+      };
+    case "TICKET_GENERATED":
+    case "COMPLETED":
+      return {
+        label: "Reissued Ticket Ready",
+        className: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+      };
+    case "REJECTED":
+      return {
+        label: "Reissue Rejected",
+        className: "bg-rose-50 text-rose-700 border border-rose-100",
+      };
+    case "FAILED":
+      return {
+        label: "Reissue Failed",
+        className: "bg-rose-50 text-rose-700 border border-rose-100",
+      };
+    default:
+      return {
+        label: "Offline Reissue Requested",
+        className: "bg-slate-50 text-slate-700 border border-slate-100",
+      };
+  }
+}
+
 function formatPaxType(paxType) {
   const map = { ADULT: "Adult", CHILD: "Child", INFANT: "Infant" };
   return map[paxType] || paxType || "Unknown";
@@ -1686,7 +1728,16 @@ export default function TeamBookingDetails() {
   const [amendmentType, setAmendmentType] = useState(null);
   const [showPartialCancel, setShowPartialCancel] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
+  const [showReissueModal, setShowReissueModal] = useState(false);
   const [activeTab, setActiveTab] = useState("flight_details");
+
+  // ── Reissue eligibility ──
+  const { eligibility, eligibilityLoading, bookingOfflineRequest } = useSelector((s) => s.reissue);
+  const isOnlineEligible = eligibility?.support?.onlineReissueAllowed === true;
+  const isOfflineRequired = Boolean(eligibility) && !isOnlineEligible;
+  const offlineReissueBadge = bookingOfflineRequest
+    ? getOfflineReissueBadgeMeta(bookingOfflineRequest.status)
+    : null;
 
   const cancelRequested =
     sessionStorage.getItem(`cancelRequested_${booking?._id}`) === "true";
@@ -1699,6 +1750,28 @@ export default function TeamBookingDetails() {
   useEffect(() => {
     if (id) dispatch(getTeamExecutedFlightRequestById(id));
   }, [id, dispatch]);
+
+  // ── Check reissue eligibility when booking loads ──
+  useEffect(() => {
+    if (
+      booking?._id &&
+      booking?.bookingType === "flight" &&
+      booking?.executionStatus === "ticketed"
+    ) {
+      dispatch(checkReissueEligibility(booking._id));
+      dispatch(fetchOfflineReissueRequestByBooking(booking._id));
+    }
+    return () => {
+      dispatch(clearEligibility());
+    };
+  }, [booking?._id, booking?.executionStatus, dispatch]);
+
+  // ── Listen for reissue modal trigger from CancellationModal ──
+  useEffect(() => {
+    const handler = () => setShowReissueModal(true);
+    window.addEventListener("openReissueModal", handler);
+    return () => window.removeEventListener("openReissueModal", handler);
+  }, []);
 
   useEffect(() => {
     if (
@@ -2204,6 +2277,27 @@ export default function TeamBookingDetails() {
                           </div>
                         </div>
 
+                        <div className="flex gap-2 p-4">
+                          {eligibilityLoading ? (
+                            <button
+                              disabled
+                              className="w-full flex justify-center items-center gap-1.5 py-4 border-2 border-indigo-100 text-indigo-400 rounded-xl font-bold text-[13px] bg-slate-50"
+                            >
+                              <FiLoader size={14} className="animate-spin" /> Checking...
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                window.dispatchEvent(new Event("openReissueModal"));
+                                onClose();
+                              }}
+                              className="w-full flex justify-center items-center gap-1.5 py-4 border-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50 rounded-xl font-bold text-[13px] transition"
+                            >
+                              <FiRefreshCw size={14} /> {isOnlineEligible ? "Reissue Online" : "Raise Reissue Request"}
+                            </button>
+                          )}
+                        </div>
+
                         <div className="p-5">
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div className="space-y-1">
@@ -2567,13 +2661,61 @@ export default function TeamBookingDetails() {
                         Ticket is live — changes apply immediately
                       </p>
                     </div>
-                    <button
-                      onClick={() => setShowCancellationModal(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-semibold hover:bg-red-100"
-                    >
-                      <FiXCircle size={14} /> Cancellation Charges
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {eligibilityLoading ? (
+                        <span className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 text-slate-400 rounded-lg text-sm font-semibold">
+                          <FiLoader size={14} className="animate-spin" /> Checking...
+                        </span>
+                      ) : bookingOfflineRequest ? (
+                        <button
+                          onClick={() => navigate(`/my-reissued?bookingId=${booking._id}`)}
+                          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition"
+                        >
+                          <FiEye size={14} /> View Reissue Status
+                        </button>
+                      ) : isOnlineEligible ? (
+                        <button
+                          onClick={() => setShowReissueModal(true)}
+                          className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-semibold hover:bg-indigo-100 transition"
+                        >
+                          <FiRefreshCw size={14} /> Reissue Online
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setShowReissueModal(true)}
+                          className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-semibold hover:bg-amber-100 transition"
+                        >
+                          <FiFileText size={14} /> Raise Reissue Request
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setShowCancellationModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-semibold hover:bg-red-100"
+                      >
+                        <FiXCircle size={14} /> Cancellation Charges
+                      </button>
+                    </div>
                   </div>
+                  {eligibility && !eligibilityLoading && (
+                    <div className={`mt-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold ${
+                      bookingOfflineRequest
+                        ? offlineReissueBadge?.className || "bg-slate-50 text-slate-700 border border-slate-100"
+                        : isOnlineEligible
+                          ? "bg-green-50 text-green-700 border border-green-100"
+                          : "bg-amber-50 text-amber-700 border border-amber-100"
+                    }`}>
+                      {bookingOfflineRequest ? (
+                        <>
+                          <FiCheckCircle size={13} /> {offlineReissueBadge?.label}
+                          {bookingOfflineRequest.requestId ? ` • ${bookingOfflineRequest.requestId}` : ""}
+                        </>
+                      ) : isOnlineEligible ? (
+                        <><FiCheckCircle size={13} /> Online Reissue Available</>
+                      ) : (
+                        <><FiAlertCircle size={13} /> Offline Reissue Required — This booking/fare does not support online reissue</>
+                      )}
+                    </div>
+                  )}
                   <p className="text-[11px] text-gray-400 mt-3">
                     Charges may apply as per fare rules. Cancellation cannot be
                     undone.
@@ -2595,6 +2737,8 @@ export default function TeamBookingDetails() {
       {showCancellationModal && (
         <CancellationModal
           booking={booking}
+          isOnlineEligible={isOnlineEligible}
+          eligibilityLoading={eligibilityLoading}
           onClose={() => {
             setShowCancellationModal(false);
             dispatch(resetAmendmentState());
@@ -2615,6 +2759,12 @@ export default function TeamBookingDetails() {
           onClose={() => setShowPartialCancel(false)}
         />
       )}
+      {showReissueModal && (
+        <ReissueModal
+          booking={booking}
+          onClose={() => setShowReissueModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -2623,7 +2773,7 @@ export default function TeamBookingDetails() {
 /*  ★ CANCELLATION CHARGES MODAL (FROM EMPLOYEE DASHBOARD)        */
 /* ─────────────────────────────────────────────────────────────── */
 
-function CancellationModal({ booking, onClose, onSuccess }) {
+function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible, eligibilityLoading }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 

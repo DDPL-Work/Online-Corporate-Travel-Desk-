@@ -33,6 +33,8 @@ import {
 import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { totalFlightsExportTemplate, totalHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const RouteCell = ({ routes, airline }) => {
   if (!routes || routes.length === 0) return <span className="text-slate-400">No Route</span>;
@@ -84,6 +86,8 @@ function FlightSection() {
   const [empFilter, setEmp] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -206,19 +210,27 @@ function FlightSection() {
       <ResponsiveDataTable 
         title="Flight Ledger" 
         subtitle={`${filtered.length} active deployments`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Ledger",
+          statCards: [
+            { label: "Flight Manifest", value: filtered.length },
+            { label: "Ticketed Assets", value: filtered.filter(b => b.status === "Confirmed").length },
+            { label: "Pending Sync", value: filtered.filter(b => b.status === "Pending").length },
+            { label: "Capital Outlay", value: `₹${totalSpend.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Status", value: statusFilter },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `total_flights_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Personnel", key: "travellerName" },
-            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
-            { header: "Email", key: "employeeId" },
-            { header: "Status", key: "status" },
-            { header: "PNR Ref", key: "pnr" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: totalFlightsExportTemplate,
+          filenamePrefix: "total_flights"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
@@ -286,6 +298,8 @@ function HotelSection() {
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -364,19 +378,25 @@ function HotelSection() {
       <ResponsiveDataTable 
         title="Hotel Ledger" 
         subtitle={`${filtered.length} active stays`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Ledger",
+          statCards: [
+            { label: "Hotel Manifest", value: filtered.length },
+            { label: "Vouchered Assets", value: filtered.length },
+            { label: "Capital Outlay", value: `₹${totalSpend.toLocaleString()}` },
+            { label: "Unique Properties", value: new Set(filtered.map(b => b.hotelName)).size }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `total_hotels_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order Reference", key: "orderId" },
-            { header: "Personnel", key: "guestName" },
-            { header: "Email", key: "employeeId" },
-            { header: "Asset Detail", key: "hotelName" },
-            { header: "Booked Date", accessor: (r) => new Date(r.bookedDate).toLocaleDateString("en-IN") },
-            { header: "Status", key: "status" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: totalHotelsExportTemplate,
+          filenamePrefix: "total_hotels"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >

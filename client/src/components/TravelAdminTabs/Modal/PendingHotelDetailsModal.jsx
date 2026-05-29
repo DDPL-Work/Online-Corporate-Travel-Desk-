@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { fetchManagerRequests } from "../../../Redux/Actions/travelAdmin.thunks";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import {
   FiX,
@@ -439,7 +440,15 @@ export const PendingHotelDetailsModal = ({
     }
     setActionModal({ isOpen: false, action: null });
   };
+  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
+  const { managerRequests } = useSelector((state) => state.adminBooking || {});
+
+  useEffect(() => {
+    dispatch(fetchManagerRequests());
+  }, [dispatch]);
+
+  // Manager matching moved below approver definition
 
   const isCurrentUserSecondApprover = booking?.secondApprover?.email === user?.email;
   const isPendingWithMe = ["pending_approval", "manager_approved"].includes(booking?.requestStatus) || (booking?.requestStatus === "pending_second_approval" && isCurrentUserSecondApprover);
@@ -491,6 +500,25 @@ export const PendingHotelDetailsModal = ({
   const displayRooms = Object.values(groupedRooms);
 
   const approver = resolveApproverDetails(booking);
+  
+  const matchedManagerReq = managerRequests?.find(req => {
+    if (req.orderId && booking?.orderId && req.orderId === booking.orderId) return true;
+    
+    const reqProjCode = String(req.projectCodeId || "").toLowerCase().trim();
+    const bkProjCode = String(booking?.projectId || "").toLowerCase().trim();
+    const isSameProject = reqProjCode === bkProjCode;
+
+    const reqEmpEmail = String(req.employeeId?.email || "").toLowerCase().trim();
+    const bkEmpEmail = String(booking?.userId?.email || "").toLowerCase().trim();
+    const isSameEmployee = reqEmpEmail === bkEmpEmail;
+
+    const mgrEmail1 = String(req.managerEmail || "").toLowerCase().trim();
+    const mgrEmail2 = String(approver.email || "").toLowerCase().trim();
+    const isSameManager = mgrEmail1 === mgrEmail2;
+
+    return isSameProject && isSameEmployee && isSameManager && req.status === "pending";
+  });
+  const isManagerPending = matchedManagerReq?.status === "pending";
 
   // 💰 PRICE CALCULATION FALLBACK
   const { totalAmount, baseFare, tax } = (() => {
@@ -1050,9 +1078,16 @@ export const PendingHotelDetailsModal = ({
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                           Assigned Approver
                         </p>
-                        <p className="text-sm font-black text-[#1A1714] uppercase tracking-tighter">
-                          {approver.name}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-black text-[#1A1714] uppercase tracking-tighter">
+                            {approver.name}
+                          </p>
+                          {isManagerPending && (
+                            <span className="text-[9px] font-black bg-amber-50 border border-amber-200 text-amber-600 px-1.5 py-0.5 rounded uppercase tracking-widest">
+                              Not Verified
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] font-bold text-slate-400 mt-1">
                           {approver.email}
                         </p>
@@ -1343,7 +1378,15 @@ export const PendingFlightDetailsModal = ({
     }
     setActionModal({ isOpen: false, action: null });
   };
+  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
+  const { managerRequests } = useSelector((state) => state.adminBooking || {});
+
+  useEffect(() => {
+    dispatch(fetchManagerRequests());
+  }, [dispatch]);
+
+  // Manager matching moved below approver definition
   const [fetchedFareRules, setFetchedFareRules] = useState(null);
   const [fetchingRules, setFetchingRules] = useState(false);
 
@@ -1381,6 +1424,25 @@ export const PendingFlightDetailsModal = ({
   const travelers = booking.travellers || [];
   const bookSnap = booking.bookingSnapshot || {};
   const approver = resolveApproverDetails(booking);
+  
+  const matchedManagerReq = managerRequests?.find(req => {
+    if (req.orderId && booking?.orderId && req.orderId === booking.orderId) return true;
+    
+    const reqProjCode = String(req.projectCodeId || "").toLowerCase().trim();
+    const bkProjCode = String(booking?.projectId || "").toLowerCase().trim();
+    const isSameProject = reqProjCode === bkProjCode;
+
+    const reqEmpEmail = String(req.employeeId?.email || "").toLowerCase().trim();
+    const bkEmpEmail = String(booking?.userId?.email || "").toLowerCase().trim();
+    const isSameEmployee = reqEmpEmail === bkEmpEmail;
+
+    const mgrEmail1 = String(req.managerEmail || "").toLowerCase().trim();
+    const mgrEmail2 = String(approver.email || "").toLowerCase().trim();
+    const isSameManager = mgrEmail1 === mgrEmail2;
+
+    return isSameProject && isSameEmployee && isSameManager && req.status === "pending";
+  });
+  const isManagerPending = matchedManagerReq?.status === "pending";
   const pricingSnapshot = booking.pricingSnapshot || {};
   const ssrSnap = flightRequest.ssrSnapshot || booking.ssrSnapshot || {};
 
@@ -2099,9 +2161,16 @@ export const PendingFlightDetailsModal = ({
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                           Assigned Approver
                         </p>
-                        <p className="text-sm font-black text-[#1A1714] uppercase tracking-tighter">
-                          {approver.name}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-black text-[#1A1714] uppercase tracking-tighter">
+                            {approver.name}
+                          </p>
+                          {isManagerPending && (
+                            <span className="text-[9px] font-black bg-amber-50 border border-amber-200 text-amber-600 px-1.5 py-0.5 rounded uppercase tracking-widest">
+                              Not Verified
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] font-bold text-slate-400 mt-1">
                           {approver.email}
                         </p>

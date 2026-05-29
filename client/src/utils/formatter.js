@@ -30,6 +30,7 @@ export const formatDate = (d) =>
     weekday: "short",
     day: "2-digit",
     month: "short",
+    year: "numeric",
   });
 
 export const formatDateTime = (date) => {

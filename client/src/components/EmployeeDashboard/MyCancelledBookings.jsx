@@ -30,6 +30,7 @@ import {
 import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
 
 /* ─── helpers ─── */
 function fmtDate(d, opts = { day: "2-digit", month: "short", year: "numeric" }) {
@@ -74,6 +75,8 @@ function FlightSection() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { list: flightBookings = [], loading } = useSelector((state) => state.bookings);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { dispatch(fetchMyBookings()); }, [dispatch]);
 
@@ -144,18 +147,30 @@ function FlightSection() {
       <ResponsiveDataTable 
         title="Cancellation Ledger" 
         subtitle={`${filtered.length} terminated bookings`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Cancellation Ledger",
+          statCards: [
+            { label: "Terminated Bookings", value: filtered.length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booked On", value: startDate || "Any" },
+            { label: "Cancelled Window", value: `${cancelStartDate || "Any"} to ${cancelEndDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `my_cancelled_flights_${new Date().toISOString().split('T')[0]}.csv`,
           columns: [
             { header: "Order ID", key: "orderId" },
-            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
-            { header: "Cancelled On", accessor: (r) => fmtDate(r.cancelledOn) },
+            { header: "Route", value: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
+            { header: "Cancelled On", value: (r) => r.cancelledOn ? new Date(r.cancelledOn).toLocaleDateString("en-IN") : "—" },
             { header: "Status", key: "status" },
             { header: "PNR Ref", key: "pnr" },
-            ...(isAdmin ? [{ header: "Original Fare", accessor: (r) => `₹${r.amount.toLocaleString()}` }] : [{ header: "Reason", key: "reason" }])
-          ]
-        }}
+            ...(isAdmin ? [{ header: "Original Fare", value: (r) => `₹${r.amount.toLocaleString()}` }] : [{ header: "Reason", key: "reason" }])
+          ],
+          filenamePrefix: "my_cancelled_flights"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
@@ -210,6 +225,8 @@ function HotelSection() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { completed: hotelBookings = [], loading } = useSelector((state) => state.hotelBookings);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { dispatch(fetchMyHotelBookings()); }, [dispatch]);
 
@@ -266,17 +283,29 @@ function HotelSection() {
       <ResponsiveDataTable 
         title="Hotel Cancellation Ledger" 
         subtitle={`${filtered.length} terminated stays`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Cancellation Ledger",
+          statCards: [
+            { label: "Terminated Stays", value: filtered.length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booked On", value: startDate || "Any" },
+            { label: "Cancelled Window", value: `${cancelStartDate || "Any"} to ${cancelEndDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `my_cancelled_hotels_${new Date().toISOString().split('T')[0]}.csv`,
           columns: [
             { header: "Order ID", key: "orderId" },
             { header: "Hotel", key: "hotelName" },
-            { header: "Cancelled On", accessor: (r) => fmtDate(r.cancelledOn) },
-            { header: "Status", accessor: () => "Cancelled" },
-            ...(isAdmin ? [{ header: "Original Fare", accessor: (r) => `₹${r.amount.toLocaleString()}` }] : [{ header: "Reason", key: "reason" }])
-          ]
-        }}
+            { header: "Cancelled On", value: (r) => r.cancelledOn ? new Date(r.cancelledOn).toLocaleDateString("en-IN") : "—" },
+            { header: "Status", value: () => "Cancelled" },
+            ...(isAdmin ? [{ header: "Original Fare", value: (r) => `₹${r.amount.toLocaleString()}` }] : [{ header: "Reason", key: "reason" }])
+          ],
+          filenamePrefix: "my_cancelled_hotels"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >

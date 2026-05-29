@@ -40,6 +40,8 @@ import {
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminSecondApproverFlightsExportTemplate, adminSecondApproverHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Shared Components for both sections                            */
@@ -113,8 +115,7 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
       return true;
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
-
-  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">                             
@@ -149,19 +150,25 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
       <ResponsiveDataTable 
         title="Flight Queue" 
         subtitle={`${filtered.length} records awaiting action`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Queue",
+          statCards: [
+            { label: "Pending Flights", value: filtered.length },
+            { label: "Critical/Expired", value: filtered.filter(r => r.isTravelPassed).length },
+            { label: "Est. Commitment", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Date Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+          ],
           data: filtered,
-          filename: `transferred_flights_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Personnel", key: "employee" },
-            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
-            { header: "Email", key: "employeeId" },
-            { header: "Status", key: "status" },
-            { header: "PNR Ref", accessor: (r) => r.pnr || "—" },
-            { header: "Amount", accessor: (r) => `₹${r.estimatedCost.toLocaleString()}` },
-          ]
-        }}
+          columns: adminSecondApproverFlightsExportTemplate,
+          filenamePrefix: "transferred_flights"
+        })}
         wrapperClass="!border-none !shadow-none"
       >
         <table className="w-full text-left border-collapse">
@@ -264,7 +271,7 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
 
-  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -299,19 +306,25 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
       <ResponsiveDataTable 
         title="Hotel Queue" 
         subtitle={`${filtered.length} records awaiting action`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Queue",
+          statCards: [
+            { label: "Pending Hotels", value: filtered.length },
+            { label: "Critical/Expired", value: filtered.filter(r => r.isTravelPassed).length },
+            { label: "Est. Commitment", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Date Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+          ],
           data: filtered,
-          filename: `transferred_hotels_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order Reference", key: "orderId" },
-            { header: "Personnel", key: "employee" },
-            { header: "Email", key: "employeeId" },
-            { header: "Asset Detail", key: "hotelName" },
-            { header: "Booked Date", accessor: (r) => r.bookedDate.toLocaleDateString() },
-            { header: "Status", key: "status" },
-            { header: "Amount", accessor: (r) => `₹${r.estimatedCost.toLocaleString()}` },
-          ]
-        }}
+          columns: adminSecondApproverHotelsExportTemplate,
+          filenamePrefix: "transferred_hotels"
+        })}
         wrapperClass="!border-none !shadow-none"
       >
         <table className="w-full text-left border-collapse">

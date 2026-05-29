@@ -33,6 +33,8 @@ import {
 import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { myRejectedFlightsExportTemplate, myRejectedHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─── helpers ─── */
 function fmtDate(d, opts = { day: "2-digit", month: "short", year: "numeric" }) {
@@ -124,6 +126,8 @@ function FlightSection({ onSelect }) {
   const dispatch = useDispatch();
   const rejectedFlights = useSelector(selectMyRejectedRequests);
 
+  const { exportExcel, isExporting } = useExcelExporter();
+
   useEffect(() => { dispatch(fetchMyRejectedRequests()); }, [dispatch]);
 
   const mapped = useMemo(() => {
@@ -183,17 +187,25 @@ function FlightSection({ onSelect }) {
       <ResponsiveDataTable 
         title="Rejection Ledger" 
         subtitle={`${filtered.length} denied authorizations`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Rejection Ledger",
+          statCards: [
+            { label: "Rejected Flights", value: filtered.length },
+            { label: "Awaiting Revision", value: filtered.length },
+            { label: "Policy Violations", value: filtered.length },
+            { label: "Rejected Assets", value: filtered.length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Rejection Date", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `my_rejected_flights_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Request ID", key: "id" },
-            { header: "Destination", accessor: (r) => `${r.destination} | ${r.airlineName}` },
-            { header: "Rejection Date", accessor: (r) => fmtDate(r.rejectedDate) },
-            { header: "Reason", key: "reason" },
-            { header: "Status", accessor: () => "Rejected" }
-          ]
-        }}
+          columns: myRejectedFlightsExportTemplate,
+          filenamePrefix: "my_rejected_flights"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
@@ -250,6 +262,8 @@ function HotelSection({ onSelect }) {
   const PAGE_SIZE = 10;
   const dispatch = useDispatch();
   const rejectedHotels = useSelector(selectMyRejectedHotelRequests);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { dispatch(fetchRejectedHotelRequests()); }, [dispatch]);
 
@@ -309,17 +323,25 @@ function HotelSection({ onSelect }) {
       <ResponsiveDataTable 
         title="Hotel Rejection Ledger" 
         subtitle={`${filtered.length} denied authorizations`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Rejection Ledger",
+          statCards: [
+            { label: "Rejected Stays", value: filtered.length },
+            { label: "Awaiting Revision", value: filtered.length },
+            { label: "Policy Violations", value: filtered.length },
+            { label: "Rejected Assets", value: filtered.length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Rejection Date", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `my_rejected_hotels_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Request ID", key: "id" },
-            { header: "Hotel", accessor: (r) => `${r.destination} | ${r.city}` },
-            { header: "Rejection Date", accessor: (r) => fmtDate(r.rejectedDate) },
-            { header: "Reason", key: "reason" },
-            { header: "Status", accessor: () => "Rejected" }
-          ]
-        }}
+          columns: myRejectedHotelsExportTemplate,
+          filenamePrefix: "my_rejected_hotels"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
