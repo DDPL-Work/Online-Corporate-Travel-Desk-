@@ -74,7 +74,6 @@ export const getRequestId = (req) => {
 export const getPnr = (req) => {
   if (!req) return "N/A";
   if (req.displayInfo?.pnr) return safeString(req.displayInfo.pnr);
-  if (req.displayInfo?.pnr) return safeString(req.displayInfo.pnr);
   return safeString(
     req.pnr ||
     req.originalPnr ||
@@ -87,7 +86,6 @@ export const getPnr = (req) => {
 
 export const getUserName = (req) => {
   if (!req) return "Not Available";
-  if (req.displayInfo?.userName) return req.displayInfo.userName;
   if (req.displayInfo?.userName) return req.displayInfo.userName;
   const name =
     req.requesterDetails?.name ||
@@ -113,7 +111,6 @@ export const getUserName = (req) => {
 export const getUserEmail = (req) => {
   if (!req) return "N/A";
   if (req.displayInfo?.userEmail) return safeString(req.displayInfo.userEmail);
-  if (req.displayInfo?.userEmail) return safeString(req.displayInfo.userEmail);
   return safeString(
     req.user?.email ||
     req.employee?.email ||
@@ -128,28 +125,12 @@ export const getCorporateName = (req) => {
   return req.corporateName || req.corporateId?.corporateName || req.companyId?.corporateName || req.metadata?.corporateName || "N/A";
 };
 
-export const getCorporateName = (req) => {
-  if (!req) return "N/A";
-  if (req.displayInfo?.corporateName) return req.displayInfo.corporateName;
-  return req.corporateName || req.corporateId?.corporateName || req.companyId?.corporateName || req.metadata?.corporateName || "N/A";
-};
-
 /**
  * Journey type — reads from preferredJourney.metadata.searchParams.journeyType
  * Returns human-readable string. NEVER reads bookingSnapshot.
  */
 export const getJourneyType = (req) => {
   if (!req) return "N/A";
-  if (req.displayInfo?.journeyType) {
-    const mapping = {
-      0: "Not Set",
-      1: "One Way",
-      2: "Round Trip",
-      3: "Multi City",
-    };
-    const val = req.displayInfo.journeyType;
-    return mapping[val] || safeString(val);
-  }
   if (req.displayInfo?.journeyType) {
     const mapping = {
       0: "Not Set",
@@ -179,16 +160,12 @@ export const getJourneyType = (req) => {
 export const resolvePrimarySegment = (req = {}) => {
   const segs = getSegments(req);
   if (segs.length > 0) return segs[0];
-  // Fallback to preferredJourney if flat object
-  if (req?.preferredJourney && (req.preferredJourney.origin || req.preferredJourney.destination)) {
-    return req.preferredJourney;
+  if (req?.newJourney && (req.newJourney.origin || req.newJourney.destination)) {
+    return req.newJourney;
   }
-  return {};
-};
-export const resolvePrimarySegment = (req = {}) => {
-  const segs = getSegments(req);
-  if (segs.length > 0) return segs[0];
-  // Fallback to preferredJourney if flat object
+  if (req?.oldJourney && (req.oldJourney.origin || req.oldJourney.destination)) {
+    return req.oldJourney;
+  }
   if (req?.preferredJourney && (req.preferredJourney.origin || req.preferredJourney.destination)) {
     return req.preferredJourney;
   }
@@ -207,13 +184,11 @@ const airlineCodeMap = {
 
 export const resolveAirline = (req = {}) => {
   if (req?.displayInfo?.airline) return req.displayInfo.airline;
-  if (req?.displayInfo?.airline) return req.displayInfo.airline;
   const segment = resolvePrimarySegment(req);
 
   return (
     segment?.airlineName ||
     segment?.airline ||
-    req?.bookingSnapshot?.airlineName ||
     req?.selectedFlight?.airlineName ||
     req?.metadata?.airlineName ||
     req?.metadata?.selectedSegments?.[0]?.airlineName ||
@@ -227,7 +202,6 @@ export const resolveAirline = (req = {}) => {
 };
 
 export const resolveDeparture = (req = {}) => {
-  if (req?.displayInfo?.departureTime) return req.displayInfo.departureTime;
   if (req?.displayInfo?.departureTime) return req.displayInfo.departureTime;
   const segment = resolvePrimarySegment(req);
 
@@ -243,7 +217,6 @@ export const resolveDeparture = (req = {}) => {
 
 export const resolveArrival = (req = {}) => {
   if (req?.displayInfo?.arrivalTime) return req.displayInfo.arrivalTime;
-  if (req?.displayInfo?.arrivalTime) return req.displayInfo.arrivalTime;
   const segment = resolvePrimarySegment(req);
 
   return (
@@ -257,7 +230,6 @@ export const resolveArrival = (req = {}) => {
 };
 
 export const resolveDuration = (req = {}) => {
-  if (req?.displayInfo?.duration) return req.displayInfo.duration;
   if (req?.displayInfo?.duration) return req.displayInfo.duration;
   const segment = resolvePrimarySegment(req);
 
@@ -301,25 +273,6 @@ export const resolveTotalFare = (req = {}) => {
     0
   );
 };
-export const resolveTotalFare = (req = {}) => {
-  if (req?.displayInfo?.totalEstimate !== undefined && req?.displayInfo?.totalEstimate !== null) {
-    return req.displayInfo.totalEstimate;
-  }
-  return (
-    req?.pricingSnapshot?.totalAmount ||
-    req?.pricingSnapshot?.totalFare ||
-    req?.selectedFlight?.totalFare ||
-    req?.selectedFlight?.totalEstimate ||
-    req?.fareQuote?.totalFare ||
-    req?.pricing?.grandTotal ||
-    req?.reissuePricingSnapshot?.totalAmount ||
-    req?.reissuePricingSnapshot?.totalEstimate ||
-    req?.totalEstimate ||
-    // Online DTO: totalAdjustment is the net billing amount
-    req?.totalAdjustment ||
-    0
-  );
-};
 
 export const resolveOldFare = (req = {}) => {
   if (req?.displayInfo?.oldFare !== undefined && req?.displayInfo?.oldFare !== null) {
@@ -329,53 +282,21 @@ export const resolveOldFare = (req = {}) => {
     req?.oldFare ||
     req?.reissuePricingSnapshot?.oldFare ||
     req?.pricingSnapshot?.oldFare ||
+    req?.financialLedger?.currentTicketValue ||
+    req?.financialLedger?.originalTicketAmount ||
+    req?.lastTicketedSnapshot?.fare?.totalFare ||
+    req?.activeTicketSnapshot?.fareSnapshot?.offeredFare ||
     req?.bookingId?.pricingSnapshot?.totalAmount ||
     req?.bookingId?.pricingSnapshot?.totalFare ||
     req?.booking?.pricingSnapshot?.totalAmount ||
     req?.booking?.pricingSnapshot?.totalFare ||
     req?.fareAudit?.oldFare ||
-    req?.bookingSnapshot?.oldFare ||
-    // Online DTO: oldJourney may hold the original fare
-    req?.oldJourney?.totalFare ||
-    0
-  );
-};
-export const resolveOldFare = (req = {}) => {
-  if (req?.displayInfo?.oldFare !== undefined && req?.displayInfo?.oldFare !== null) {
-    return req.displayInfo.oldFare;
-  }
-  return (
-    req?.oldFare ||
-    req?.reissuePricingSnapshot?.oldFare ||
-    req?.pricingSnapshot?.oldFare ||
-    req?.bookingId?.pricingSnapshot?.totalAmount ||
-    req?.bookingId?.pricingSnapshot?.totalFare ||
-    req?.booking?.pricingSnapshot?.totalAmount ||
-    req?.booking?.pricingSnapshot?.totalFare ||
-    req?.fareAudit?.oldFare ||
-    req?.bookingSnapshot?.oldFare ||
     // Online DTO: oldJourney may hold the original fare
     req?.oldJourney?.totalFare ||
     0
   );
 };
 
-export const resolveNewFare = (req = {}) => {
-  if (req?.displayInfo?.newFare !== undefined && req?.displayInfo?.newFare !== null) {
-    return req.displayInfo.newFare;
-  }
-  return (
-    req?.newFare ||
-    req?.reissuePricingSnapshot?.newFare ||
-    req?.pricingSnapshot?.newFare ||
-    req?.selectedFlight?.newFare ||
-    req?.selectedFlight?.fare ||
-    req?.preferredJourney?.newFare ||
-    req?.preferredJourney?.fare ||
-    req?.pricingSnapshot?.totalAmount ||
-    resolveTotalFare(req)
-  );
-};
 export const resolveNewFare = (req = {}) => {
   if (req?.displayInfo?.newFare !== undefined && req?.displayInfo?.newFare !== null) {
     return req.displayInfo.newFare;
@@ -394,9 +315,6 @@ export const resolveNewFare = (req = {}) => {
 };
 
 export const resolveFareDifference = (req = {}) => {
-  if (req?.displayInfo?.fareDifference !== undefined && req?.displayInfo?.fareDifference !== null) {
-    return req.displayInfo.fareDifference;
-  }
   if (req?.displayInfo?.fareDifference !== undefined && req?.displayInfo?.fareDifference !== null) {
     return req.displayInfo.fareDifference;
   }
@@ -425,32 +343,7 @@ export const resolveReissueCharge = (req = {}) => {
     0
   );
 };
-export const resolveReissueCharge = (req = {}) => {
-  if (req?.displayInfo?.reissueCharge !== undefined && req?.displayInfo?.reissueCharge !== null) {
-    return req.displayInfo.reissueCharge;
-  }
-  return (
-    req?.normalizedPricing?.reissuePenalty ||
-    req?.reissueCharge ||
-    req?.pricingSnapshot?.reissueCharge ||
-    req?.penaltyAmount ||
-    // Online DTO field name
-    req?.reissueCharges ||
-    0
-  );
-};
 
-export const resolveRefund = (req = {}) => {
-  if (req?.displayInfo?.refundEstimate !== undefined && req?.displayInfo?.refundEstimate !== null) {
-    return req.displayInfo.refundEstimate;
-  }
-  return (
-    req?.refundAmount ||
-    req?.pricingSnapshot?.refundEstimate ||
-    req?.refundEstimate ||
-    0
-  );
-};
 export const resolveRefund = (req = {}) => {
   if (req?.displayInfo?.refundEstimate !== undefined && req?.displayInfo?.refundEstimate !== null) {
     return req.displayInfo.refundEstimate;
@@ -471,13 +364,13 @@ export const resolveBookingRef = (req = {}) =>
   req?.bookingId?.bookingReference ||
   req?.booking?.orderId ||
   req?.booking?.bookingReference ||
-  req?.bookingSnapshot?.bookingReference ||
+  req?.bookingLineage?.activeBookingId ||
+  req?.bookingLineage?.originalBookingId ||
   req?.bookingResult?.orderId ||
   req?.bookingRef ||
   "N/A";
 
 export const resolveCabinClass = (req = {}) => {
-  if (req?.displayInfo?.cabinClass) return req.displayInfo.cabinClass;
   if (req?.displayInfo?.cabinClass) return req.displayInfo.cabinClass;
   const raw =
     resolvePrimarySegment(req)?.cabinClass ||
@@ -491,7 +384,6 @@ export const resolveCabinClass = (req = {}) => {
 
 export const resolveJourneyType = (req = {}) => {
   if (req?.displayInfo?.journeyType) return req.displayInfo.journeyType;
-  if (req?.displayInfo?.journeyType) return req.displayInfo.journeyType;
   const raw = req?.metadata?.searchParams?.journeyType ?? req?.journeyType;
   const map = { 0: "Not Set", 1: "One Way", 2: "Round Trip", 3: "Multi City" };
   return map[raw] || raw || "One Way";
@@ -503,7 +395,6 @@ export const resolveJourneyType = (req = {}) => {
  */
 export const getAirline = (req) => {
   if (!req) return "N/A";
-  if (req.displayInfo?.airline) return req.displayInfo.airline;
   if (req.displayInfo?.airline) return req.displayInfo.airline;
   return (
     req?.selectedSegments?.[0]?.airlineName ||
@@ -530,11 +421,6 @@ export const getTotalFare = (req) => {
     const currency = req.displayInfo.currency || "INR";
     return `${currency} ${Number(fare).toLocaleString("en-IN")}`;
   }
-  if (req.displayInfo?.totalEstimate !== undefined && req.displayInfo?.totalEstimate !== null) {
-    const fare = req.displayInfo.totalEstimate;
-    const currency = req.displayInfo.currency || "INR";
-    return `${currency} ${Number(fare).toLocaleString("en-IN")}`;
-  }
   const fare =
     req?.totalEstimate ??
     req?.preferredJourney?.totalEstimate ??
@@ -555,7 +441,6 @@ export const getTotalFare = (req) => {
 
 export const getCurrency = (req) => {
   if (!req) return "INR";
-  if (req.displayInfo?.currency) return req.displayInfo.currency;
   if (req.displayInfo?.currency) return req.displayInfo.currency;
   return safeString(req.currency || req.preferredJourney?.currency || "INR");
 };
@@ -714,60 +599,7 @@ export const isVisibleLedgerRequest = (req = {}) => {
  * Route — reads from preferredJourney, selectedFlight, selectedSegments, oldJourney.
  * NEVER reads bookingSnapshot.
  */
-export const getRoute = (req) => {
-  return resolveDisplayRoute(req);
-  if (!req) return "N/A";
-  if (req.displayInfo?.route) return req.displayInfo.route;
-  if (req.displayInfo?.route) return req.displayInfo.route;
-
-  // Offline reissue schema
-  if (req?.preferredJourney?.origin && req?.preferredJourney?.destination) {
-    return `${req.preferredJourney.origin} → ${req.preferredJourney.destination}`;
-  }
-  if (req?.selectedFlight?.origin && req?.selectedFlight?.destination) {
-    return `${req.selectedFlight.origin} → ${req.selectedFlight.destination}`;
-  }
-
-  // Online reissue DTO: oldJourney sectors or segments
-  const oldJourney = req.oldJourney;
-  if (oldJourney) {
-    const sectors = Array.isArray(oldJourney.sectors) ? oldJourney.sectors : [];
-    if (sectors.length) return sectors.join(" / ");
-    const segs = Array.isArray(oldJourney.segments) ? oldJourney.segments : [];
-    if (segs.length) {
-      const first = segs[0];
-      const last = segs[segs.length - 1];
-      const o = first?.origin?.airportCode || first?.origin || "?";
-      const d = last?.destination?.airportCode || last?.destination || "?";
-      if (o !== "?" || d !== "?") return `${o} → ${d}`;
-    }
-  }
-
-  // metadata.selectedRoute
-  if (req?.metadata?.selectedRoute) {
-    return req.metadata.selectedRoute.replace(/-/g, " → ");
-  }
-
-  // selectedSegments chain
-  const segs = safeArray(req?.selectedSegments);
-  if (segs.length) {
-    const origins = segs.map((s) => s.origin || s.Origin || "?");
-    const lastDest = segs[segs.length - 1]?.destination || segs[segs.length - 1]?.Destination || "?";
-    return [...origins, lastDest].filter(Boolean).join(" → ");
-  }
-
-  // reissueHistory
-  const histSegs = safeArray(req?.reissueHistory?.[0]?.newFlight);
-  if (histSegs.length) {
-    const first = histSegs[0];
-    const last = histSegs[histSegs.length - 1];
-    const o = first?.origin?.airportCode || first?.origin || "?";
-    const d = last?.destination?.airportCode || last?.destination || "?";
-    if (o !== "?" || d !== "?") return `${o} → ${d}`;
-  }
-
-  return "N/A";
-};
+export const getRoute = resolveDisplayRoute;
 
 /**
  * Booking reference — reads from metadata, bookingReference, bookingId.
@@ -842,9 +674,6 @@ export const getFareDifference = (req) => {
   if (req.displayInfo?.fareDifference !== undefined && req.displayInfo?.fareDifference !== null) {
     return Number(req.displayInfo.fareDifference);
   }
-  if (req.displayInfo?.fareDifference !== undefined && req.displayInfo?.fareDifference !== null) {
-    return Number(req.displayInfo.fareDifference);
-  }
   return Number(
     req.fareDifference ??
     req.preferredJourney?.fareDifference ??
@@ -875,7 +704,20 @@ export const getSegments = (req) => {
     return req.segments;
   }
 
-  // 3. Ticketed/reissued historical snapshot
+  if (Array.isArray(req.newJourney?.segments) && req.newJourney.segments.length > 0) {
+    return req.newJourney.segments;
+  }
+  if (Array.isArray(req.oldJourney?.segments) && req.oldJourney.segments.length > 0) {
+    return req.oldJourney.segments;
+  }
+  if (Array.isArray(req.activeTicketSnapshot?.segments) && req.activeTicketSnapshot.segments.length > 0) {
+    return req.activeTicketSnapshot.segments;
+  }
+  if (Array.isArray(req.lastTicketedSnapshot?.segments) && req.lastTicketedSnapshot.segments.length > 0) {
+    return req.lastTicketedSnapshot.segments;
+  }
+
+  // 3. Ticketed/reissued historical data
   if (Array.isArray(req.reissueHistory) && req.reissueHistory.length > 0) {
     if (Array.isArray(req.reissueHistory[0].newFlight) && req.reissueHistory[0].newFlight.length > 0) {
       return req.reissueHistory[0].newFlight;
@@ -886,20 +728,11 @@ export const getSegments = (req) => {
   }
 
   // 4. Original booking request segments (lowest priority fallback)
-  if (req.bookingSnapshot && Array.isArray(req.bookingSnapshot.segments)) {
-    return req.bookingSnapshot.segments;
-  }
   if (req.bookingId && req.bookingId.flightRequest && Array.isArray(req.bookingId.flightRequest.segments)) {
     return req.bookingId.flightRequest.segments;
   }
   if (req.booking && req.booking.flightRequest && Array.isArray(req.booking.flightRequest.segments)) {
     return req.booking.flightRequest.segments;
-  }
-  if (req.bookingId && req.bookingId.bookingSnapshot && Array.isArray(req.bookingId.bookingSnapshot.segments)) {
-    return req.bookingId.bookingSnapshot.segments;
-  }
-  if (req.booking && req.booking.bookingSnapshot && Array.isArray(req.booking.bookingSnapshot.segments)) {
-    return req.booking.bookingSnapshot.segments;
   }
 
   return [];
@@ -910,7 +743,6 @@ export const resolveFinancialLedger = (req = {}) =>
   req?.pricingSnapshot?.financialLedger ||
   req?.reissuePricingSnapshot?.financialLedger ||
   req?.metadata?.financialLedger ||
-  req?.bookingSnapshot?.financialLedger ||
   null;
 
 const pickMoney = (...values) => {

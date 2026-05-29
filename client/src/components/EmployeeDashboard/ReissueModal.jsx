@@ -123,6 +123,16 @@ const formatDuration = (value) => {
   return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
 };
 
+const parseDurationMinutes = (value) => {
+  if (value === null || value === undefined || value === "") return 0;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) return numeric;
+  const text = String(value).toLowerCase();
+  const hours = Number(text.match(/(\d+)\s*h/)?.[1] || 0);
+  const minutes = Number(text.match(/(\d+)\s*m/)?.[1] || 0);
+  return hours * 60 + minutes;
+};
+
 // Calculate layover minutes between two ISO datetime strings
 const calcLayoverMinutes = (prevArrival, nextDeparture) => {
   if (!prevArrival || !nextDeparture) return null;
@@ -140,12 +150,49 @@ const getCabinLabel = (value) => {
   return "Economy";
 };
 
+const firstValue = (...values) =>
+  values.find((value) => value !== undefined && value !== null && String(value).trim() !== "") || null;
+
+const getAirportObject = (segment, side) =>
+  segment?.[side]?.Airport ||
+  segment?.[side]?.airport ||
+  segment?.[side] ||
+  {};
+
 const getSegmentAirport = (segment, side) =>
   segment?.[side]?.Airport?.AirportCode ||
   segment?.[side]?.AirportCode ||
   segment?.[side]?.airportCode ||
+  segment?.[side]?.code ||
   segment?.[side?.toLowerCase?.()] ||
   null;
+
+const getSegmentAirportName = (segment, side) => {
+  const airport = getAirportObject(segment, side);
+  const isOrigin = side === "Origin";
+  return firstValue(
+    airport?.AirportName,
+    airport?.airportName,
+    airport?.Name,
+    airport?.name,
+    isOrigin ? segment?.originAirportName : segment?.destinationAirportName,
+    isOrigin ? segment?.originName : segment?.destinationName,
+    isOrigin ? segment?.originAirport : segment?.destinationAirport,
+  );
+};
+
+const getSegmentTerminal = (segment, side) => {
+  const airport = getAirportObject(segment, side);
+  const isOrigin = side === "Origin";
+  const terminal = firstValue(
+    airport?.Terminal,
+    airport?.terminal,
+    isOrigin ? segment?.departureTerminal : segment?.arrivalTerminal,
+    isOrigin ? segment?.originTerminal : segment?.destinationTerminal,
+    isOrigin ? segment?.fromTerminal : segment?.toTerminal,
+  );
+  return terminal ? `Terminal ${String(terminal).replace(/^terminal\s*/i, "")}` : PLACEHOLDER;
+};
 
 const getSegmentTime = (segment, side) =>
   segment?.[side === "Origin" ? "Origin" : "Destination"]?.[side === "Origin" ? "DepTime" : "ArrTime"] ||
@@ -153,9 +200,59 @@ const getSegmentTime = (segment, side) =>
   segment?.[side === "Origin" ? "departureDateTime" : "arrivalDateTime"] ||
   null;
 
+const getSegmentBaggage = (segment) =>
+  firstValue(
+    segment?.Baggage,
+    segment?.baggage,
+    segment?.IncludedBaggage,
+    segment?.includedBaggage,
+    segment?.CabinBaggage,
+    segment?.cabinBaggage,
+  );
+
+const getFareFamily = (result, segment) =>
+  firstValue(
+    result?.FareClassification?.Type,
+    result?.FareClassification?.Color,
+    result?.SupplierFareClass,
+    result?.ResultFareType,
+    result?.Fare?.FareType,
+    result?.Fare?.FareFamily,
+    result?.fareFamily,
+    result?.fareBadge,
+    segment?.SupplierFareClass,
+    segment?.FareClass,
+    segment?.fareClass,
+  ) || "Standard Fare";
+
+const getMealInfo = (result, segment) =>
+  firstValue(
+    result?.Meal,
+    result?.meal,
+    result?.Fare?.Meal,
+    result?.Fare?.MealInfo,
+    segment?.Meal,
+    segment?.meal,
+    segment?.MealInfo,
+    segment?.mealInfo,
+  ) || "As per fare";
+
+const getSeatInfo = (result, segment, noOfSeats) =>
+  firstValue(
+    result?.Seat,
+    result?.seat,
+    result?.Fare?.Seat,
+    result?.Fare?.SeatInfo,
+    segment?.Seat,
+    segment?.seat,
+    segment?.SeatInfo,
+    segment?.seatInfo,
+    noOfSeats != null ? `${noOfSeats} seat(s) available` : null,
+  ) || "Standard seat";
+
 const getDurationFromSegments = (segments) =>
   toArray(segments).reduce((total, segment) => {
-    const value = Number(segment?.Duration || segment?.durationMinutes || segment?.duration || 0);
+    const value = parseDurationMinutes(segment?.Duration || segment?.durationMinutes || segment?.duration || 0);
     return Number.isFinite(value) ? total + value : total;
   }, 0);
 
@@ -176,23 +273,34 @@ const normalizeJourneyGroup = (segments = [], journeyType = "onward") => {
     durationMinutes,
     duration: formatDuration(durationMinutes),
     stops: Math.max(normalizedSegments.length - 1, 0),
-    airlineCode: first?.Airline?.AirlineCode || first?.AirlineCode || "",
-    airlineName: first?.Airline?.AirlineName || first?.AirlineName || "Airline",
-    flightNumber: first?.Airline?.FlightNumber || first?.FlightNumber || "",
+    airlineCode: first?.Airline?.AirlineCode || first?.AirlineCode || first?.airlineCode || "",
+    airlineName: first?.Airline?.AirlineName || first?.AirlineName || first?.airlineName || "Airline",
+    flightNumber: first?.Airline?.FlightNumber || first?.FlightNumber || first?.flightNumber || "",
+    originAirportName: getSegmentAirportName(first, "Origin") || PLACEHOLDER,
+    destinationAirportName: getSegmentAirportName(last, "Destination") || PLACEHOLDER,
+    departureTerminal: getSegmentTerminal(first, "Origin"),
+    arrivalTerminal: getSegmentTerminal(last, "Destination"),
     baggage:
-      first?.Baggage ||
-      first?.CabinBaggage ||
+      getSegmentBaggage(first) ||
       PLACEHOLDER,
     segments: normalizedSegments.map((segment) => ({
       origin: getSegmentAirport(segment, "Origin"),
       destination: getSegmentAirport(segment, "Destination"),
+      originAirportName: getSegmentAirportName(segment, "Origin") || PLACEHOLDER,
+      destinationAirportName: getSegmentAirportName(segment, "Destination") || PLACEHOLDER,
+      departureTerminal: getSegmentTerminal(segment, "Origin"),
+      arrivalTerminal: getSegmentTerminal(segment, "Destination"),
       departureTime: getSegmentTime(segment, "Origin"),
       arrivalTime: getSegmentTime(segment, "Destination"),
-      airlineCode: segment?.Airline?.AirlineCode || "",
-      airlineName: segment?.Airline?.AirlineName || "Airline",
-      flightNumber: segment?.Airline?.FlightNumber || segment?.FlightNumber || "",
+      airlineCode: segment?.Airline?.AirlineCode || segment?.AirlineCode || segment?.airlineCode || "",
+      airlineName: segment?.Airline?.AirlineName || segment?.AirlineName || segment?.airlineName || "Airline",
+      flightNumber: segment?.Airline?.FlightNumber || segment?.FlightNumber || segment?.flightNumber || "",
       duration: segment?.Duration ? formatDuration(segment.Duration) : null,
-      baggage: segment?.Baggage || segment?.CabinBaggage || null,
+      baggage: getSegmentBaggage(segment),
+      cabin: getCabinLabel(segment?.CabinClass || segment?.cabinClass),
+      fareFamily: getFareFamily({}, segment),
+      mealInfo: getMealInfo({}, segment),
+      seatInfo: getSeatInfo({}, segment),
       journeyType,
     })),
   };
@@ -259,9 +367,14 @@ const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
         result?.SupplierReissueCharges ??
         0,
     );
-    const fareDifference = Math.max(newFare - Number(oldFare || 0), 0);
-    const totalCollection = fareDifference + supplierCharge;
+    const previouslyPaid = Number(oldFare || 0);
+    const fareDifference = Math.max(newFare - previouslyPaid, 0);
+    const flightAdjustment = newFare - previouslyPaid;
+    const ssrDifference = Number(result?.Fare?.SSRTotal ?? result?.newSSRTotal ?? 0);
+    const totalCollection = fareDifference + supplierCharge + Math.max(ssrDifference, 0);
+    const netSettlement = flightAdjustment + supplierCharge + ssrDifference;
     const noOfSeats = result?.NoOfSeatAvailable ?? null;
+    const fareFamily = getFareFamily(result, first);
 
     return {
       id: `${result?.ResultIndex ?? index}`,
@@ -272,6 +385,10 @@ const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
       flightNumber: firstGroup?.flightNumber || "",
       origin: firstGroup?.origin || PLACEHOLDER,
       destination: lastGroup?.destination || PLACEHOLDER,
+      originAirportName: firstGroup?.originAirportName || PLACEHOLDER,
+      destinationAirportName: lastGroup?.destinationAirportName || PLACEHOLDER,
+      departureTerminal: firstGroup?.departureTerminal || PLACEHOLDER,
+      arrivalTerminal: lastGroup?.arrivalTerminal || PLACEHOLDER,
       departureDate: firstGroup?.departureDate || getSegmentTime(first, "Origin"),
       departureTime: firstGroup?.departureTime || getSegmentTime(first, "Origin"),
       arrivalTime: lastGroup?.arrivalTime || getSegmentTime(last, "Destination"),
@@ -296,18 +413,178 @@ const normalizeOnlineFlightOptions = ({ rawResults, oldFare }) => {
         first?.CabinBaggage ||
         result?.Fare?.BaggageAllowance ||
         PLACEHOLDER,
-      oldFare: Number(oldFare || 0),
+      fareFamily,
+      mealInfo: getMealInfo(result, first),
+      seatInfo: getSeatInfo(result, first, noOfSeats),
+      previouslyPaid,
+      oldFare: previouslyPaid,
       newFare,
       fareDifference,
+      flightAdjustment,
       reissueCharge: supplierCharge,
+      ssrDifference,
       totalCollection,
+      netSettlement,
+      refundDue: netSettlement < 0 ? Math.abs(netSettlement) : 0,
+      additionalCollection: netSettlement > 0 ? netSettlement : 0,
       currency: result?.Fare?.Currency || "INR",
       isNdc: !!(result?.SupplierFareClass || result?.FareClassification?.Type),
-      fareBadge: result?.SupplierFareClass || result?.ResultFareType || null,
+      fareBadge: fareFamily,
       journeyGroups,
       segments,
     };
   });
+};
+
+const normalizeOfflineFlightOptions = ({ rawResults }) =>
+  toArray(rawResults).map((option, index) => {
+    const fallbackSegments = toArray(option?.segments).length
+      ? option.segments
+      : [{
+          origin: option?.origin,
+          destination: option?.destination,
+          originAirportName: option?.originAirportName,
+          destinationAirportName: option?.destinationAirportName,
+          departureTerminal: option?.departureTerminal,
+          arrivalTerminal: option?.arrivalTerminal,
+          departureTime: option?.departureTime,
+          arrivalTime: option?.arrivalTime,
+          airlineCode: option?.airlineCode,
+          airlineName: option?.airlineName,
+          flightNumber: option?.flightNumber,
+          duration: option?.duration,
+          baggage: option?.baggage,
+          cabinClass: option?.cabinClass,
+          fareFamily: option?.fareFamily,
+          mealInfo: option?.mealInfo,
+          seatInfo: option?.seatInfo,
+        }];
+    const journeyGroups = buildJourneyGroups(fallbackSegments);
+    const segments = flattenJourneyGroups(journeyGroups).map((segment) => ({
+      ...segment,
+      duration: segment.duration || option?.duration || null,
+      fareFamily: segment.fareFamily || option?.fareFamily || "Standard Fare",
+      mealInfo: segment.mealInfo || option?.mealInfo || "As per fare",
+      seatInfo: segment.seatInfo || option?.seatInfo || "Standard seat",
+    }));
+    const firstGroup = journeyGroups[0] || {};
+    const lastGroup = journeyGroups[journeyGroups.length - 1] || firstGroup;
+    const pricingBreakdown = option?.pricingBreakdown || {};
+    const previouslyPaid = Number(
+      pricingBreakdown?.previouslyPaid ??
+        option?.previouslyPaid ??
+        option?.oldFare ??
+        0,
+    );
+    const newFare = Number(
+      pricingBreakdown?.newFlightFare ??
+        option?.newFare ??
+        option?.fare ??
+        option?.offeredFare ??
+        0,
+    );
+    const reissueCharge = Number(
+      pricingBreakdown?.airlineReissuePenalty ??
+        option?.airlineReissuePenalty ??
+        option?.reissueCharge ??
+        0,
+    );
+    const ssrDifference = Number(
+      pricingBreakdown?.newSSRTotal ??
+        option?.newSSRTotal ??
+        option?.ssrDifference ??
+        0,
+    );
+    const flightAdjustment = Number(
+      pricingBreakdown?.flightAdjustment ??
+        option?.flightAdjustment ??
+        newFare - previouslyPaid,
+    );
+    const netSettlement = Number(
+      pricingBreakdown?.netSettlement ??
+        option?.netPayable ??
+        option?.totalEstimate ??
+        flightAdjustment + reissueCharge + ssrDifference,
+    );
+
+    return {
+      ...option,
+      id: `${option?.resultIndex ?? index}`,
+      resultIndex: option?.resultIndex ?? index,
+      airlineCode: option?.airlineCode || firstGroup?.airlineCode || "",
+      airlineName: option?.airlineName || firstGroup?.airlineName || "Airline",
+      flightNumber: option?.flightNumber || firstGroup?.flightNumber || "",
+      origin: option?.origin || firstGroup?.origin || PLACEHOLDER,
+      destination: option?.destination || lastGroup?.destination || PLACEHOLDER,
+      originAirportName: option?.originAirportName || firstGroup?.originAirportName || PLACEHOLDER,
+      destinationAirportName: option?.destinationAirportName || lastGroup?.destinationAirportName || PLACEHOLDER,
+      departureTerminal: option?.departureTerminal || firstGroup?.departureTerminal || PLACEHOLDER,
+      arrivalTerminal: option?.arrivalTerminal || lastGroup?.arrivalTerminal || PLACEHOLDER,
+      departureDate: option?.departureDate || option?.departureTime || firstGroup?.departureDate,
+      departureTime: option?.departureTime || firstGroup?.departureTime,
+      arrivalTime: option?.arrivalTime || lastGroup?.arrivalTime,
+      duration: option?.duration || firstGroup?.duration,
+      durationMinutes: parseDurationMinutes(option?.durationMinutes || option?.duration || firstGroup?.durationMinutes || firstGroup?.duration || 0),
+      stops: Number(option?.stops ?? firstGroup?.stops ?? 0),
+      cabin: getCabinLabel(option?.cabinClass || firstGroup?.cabin),
+      baggage: option?.baggage || firstGroup?.baggage || PLACEHOLDER,
+      fareFamily: option?.fareFamily || firstGroup?.fareFamily || "Standard Fare",
+      mealInfo: option?.mealInfo || firstGroup?.mealInfo || "As per fare",
+      seatInfo: option?.seatInfo || firstGroup?.seatInfo || "Standard seat",
+      previouslyPaid,
+      oldFare: previouslyPaid,
+      newFare,
+      fareDifference: Number(option?.fareDifference ?? flightAdjustment),
+      flightAdjustment,
+      reissueCharge,
+      ssrDifference,
+      totalCollection: Number(option?.totalEstimate ?? netSettlement),
+      netSettlement,
+      refundDue: Number(option?.refundEstimate || (netSettlement < 0 ? Math.abs(netSettlement) : 0)),
+      additionalCollection: netSettlement > 0 ? netSettlement : 0,
+      currency: option?.currency || "INR",
+      journeyGroups,
+      segments,
+    };
+  });
+
+const getOptionNetSettlement = (option) =>
+  Number(
+    option?.netSettlement ??
+      option?.totalCollection ??
+      option?.totalEstimate ??
+      (Number(option?.flightAdjustment || 0) +
+        Number(option?.reissueCharge || 0) +
+        Number(option?.ssrDifference || 0)),
+  );
+
+const annotateDecisionBadges = (options = []) => {
+  const list = toArray(options);
+  const firstBy = (selector, predicate = () => true) => {
+    let best = null;
+    list.forEach((option) => {
+      if (!predicate(option)) return;
+      const value = selector(option);
+      if (!Number.isFinite(value)) return;
+      if (!best || value < best.value) best = { id: option.id, value };
+    });
+    return best?.id || null;
+  };
+
+  const cheapestId = firstBy((option) => Number(option.newFare ?? option.fare));
+  const earliestId = firstBy((option) => new Date(option.departureTime || option.departureDate || 0).getTime());
+  const shortestId = firstBy((option) => Number(option.durationMinutes || 0), (option) => Number(option.durationMinutes || 0) > 0);
+  const bestRefundId = firstBy((option) => getOptionNetSettlement(option));
+
+  return list.map((option) => ({
+    ...option,
+    decisionBadges: [
+      option.id === bestRefundId ? "Best Refund" : null,
+      option.id === cheapestId ? "Cheapest" : null,
+      option.id === earliestId ? "Earliest Departure" : null,
+      option.id === shortestId ? "Shortest Duration" : null,
+    ].filter(Boolean),
+  }));
 };
 
 const extractRuleMessages = (rules) => {
@@ -394,6 +671,7 @@ function PricingSection({ label }) {
 function FlightOptionCard({
   option,
   selected,
+  disabled,
   expanded,
   onToggleDetails,
   onSelect,
@@ -410,9 +688,23 @@ function FlightOptionCard({
       className={`rounded-3xl border p-5 shadow-sm transition ${
         selected
           ? "border-[#0A4D68] bg-[#f4fbff] shadow-[0_18px_50px_rgba(10,77,104,0.12)]"
-          : "border-slate-200 bg-white hover:border-slate-300"
+          : disabled
+            ? "border-slate-200 bg-slate-50 opacity-60"
+            : "border-slate-200 bg-white hover:border-slate-300"
       }`}
     >
+      {!!option.decisionBadges?.length && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {option.decisionBadges.map((badge) => (
+            <span
+              key={badge}
+              className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-100"
+            >
+              {badge}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         {/* LEFT — Flight identity + schedule */}
         <div className="min-w-0 flex-1">
@@ -440,6 +732,12 @@ function FlightOptionCard({
               <p className="mt-0.5 text-sm font-semibold text-slate-500">
                 {option.airlineCode || PLACEHOLDER}{option.flightNumber ? ` · ${option.flightNumber}` : ""}
               </p>
+              {selected && (
+                <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#0A4D68] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white">
+                  <FiCheckCircle size={12} />
+                  Selected
+                </div>
+              )}
 
               {/* Main schedule block */}
               <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
@@ -448,6 +746,9 @@ function FlightOptionCard({
                   <div className="text-center">
                     <p className="text-2xl font-black text-slate-900">{depTime}</p>
                     <p className="mt-0.5 text-sm font-bold text-slate-600">{option.origin || PLACEHOLDER}</p>
+                    <p className="mt-1 line-clamp-2 text-[11px] font-medium leading-snug text-slate-400">
+                      {option.originAirportName || PLACEHOLDER}
+                    </p>
                   </div>
                   {/* Arrow + duration */}
                   <div className="flex flex-1 flex-col items-center gap-1">
@@ -467,11 +768,24 @@ function FlightOptionCard({
                   <div className="text-center">
                     <p className="text-2xl font-black text-slate-900">{arrTime}</p>
                     <p className="mt-0.5 text-sm font-bold text-slate-600">{option.destination || PLACEHOLDER}</p>
+                    <p className="mt-1 line-clamp-2 text-[11px] font-medium leading-snug text-slate-400">
+                      {option.destinationAirportName || PLACEHOLDER}
+                    </p>
                   </div>
                 </div>
                 {travelDate && travelDate !== PLACEHOLDER && (
                   <p className="mt-2 text-center text-xs font-medium text-slate-400">{travelDate}</p>
                 )}
+                <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3 text-xs text-slate-600 sm:grid-cols-2">
+                  <div className="rounded-xl bg-white px-3 py-2">
+                    <p className="font-black uppercase tracking-[0.14em] text-slate-400">Departure Terminal</p>
+                    <p className="mt-1 font-bold text-slate-800">{option.departureTerminal || PLACEHOLDER}</p>
+                  </div>
+                  <div className="rounded-xl bg-white px-3 py-2">
+                    <p className="font-black uppercase tracking-[0.14em] text-slate-400">Arrival Terminal</p>
+                    <p className="mt-1 font-bold text-slate-800">{option.arrivalTerminal || PLACEHOLDER}</p>
+                  </div>
+                </div>
                 {journeyGroups.length > 1 && (
                   <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
                     {journeyGroups.map((group) => (
@@ -502,13 +816,22 @@ function FlightOptionCard({
               {/* Cabin / baggage tags */}
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-                  {option.cabin || "Economy"}
+                  Cabin: {option.cabin || "Economy"}
+                </span>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                  Fare: {option.fareFamily || "Standard Fare"}
                 </span>
                 {option.baggage && option.baggage !== PLACEHOLDER && (
                   <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
                     Bag: {option.baggage}
                   </span>
                 )}
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                  Meal: {option.mealInfo || "As per fare"}
+                </span>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                  Seat: {option.seatInfo || "Standard seat"}
+                </span>
               </div>
             </div>
           </div>
@@ -520,11 +843,12 @@ function FlightOptionCard({
             {mode === "ONLINE" ? "Online Reissue Estimate" : "Offline Reissue Estimate"}
           </p>
           {(() => {
-            const previouslyPaid = Number(option.oldFare || 0);
+            const previouslyPaid = Number(option.previouslyPaid ?? option.oldFare ?? 0);
             const newFlightFare  = Number(option.newFare ?? option.fare ?? 0);
             const penalty        = Number(option.reissueCharge || 0);
-            const flightAdj      = newFlightFare - previouslyPaid;
-            const netSettlement  = flightAdj + penalty;
+            const ssrDifference  = Number(option.ssrDifference || 0);
+            const flightAdj      = Number(option.flightAdjustment ?? newFlightFare - previouslyPaid);
+            const netSettlement  = Number(option.netSettlement ?? flightAdj + penalty + ssrDifference);
             const isRefund       = netSettlement < 0;
             return (
               <div className="mt-3 space-y-1">
@@ -535,6 +859,7 @@ function FlightOptionCard({
                 {/* ── Section 2: New Itinerary Cost ── */}
                 <PricingSection label="New Itinerary Cost" />
                 <PricingRow label="New Flight Fare" value={formatMoney(newFlightFare, option.currency)} />
+                <PricingRow label="SSR Difference" value={formatMoney(ssrDifference, option.currency)} />
                 <div className="my-2 border-t border-slate-200" />
                 {/* ── Section 3: Reissue Adjustments ── */}
                 <PricingSection label="Reissue Adjustments" />
@@ -577,13 +902,16 @@ function FlightOptionCard({
             <button
               type="button"
               onClick={onSelect}
+              disabled={disabled}
               className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
                 selected
                   ? "bg-[#0A4D68] text-white"
+                  : disabled
+                    ? "cursor-not-allowed border border-slate-200 text-slate-400"
                   : "border border-[#0A4D68] text-[#0A4D68] hover:bg-[#eef8fc]"
               }`}
             >
-              {selected ? "✓ Selected" : "Select Flight"}
+              {selected ? "Deselect" : "Select Flight"}
             </button>
           </div>
         </div>
@@ -762,6 +1090,20 @@ export default function ReissueModal({ booking, onClose }) {
     };
   }, [quoteSnapshot]);
 
+  const visibleOnlineOptions = useMemo(
+    () => annotateDecisionBadges(onlineOptions),
+    [onlineOptions],
+  );
+
+  const visibleOfflineOptions = useMemo(
+    () => annotateDecisionBadges(normalizeOfflineFlightOptions({ rawResults: offlineSearchResults })),
+    [offlineSearchResults],
+  );
+
+  const visibleFlightOptions = showOfflineFlow
+    ? visibleOfflineOptions
+    : visibleOnlineOptions;
+
   const todayIso = new Date().toISOString().split("T")[0];
   const isDepartureDateValid = Boolean(departureDate) && departureDate >= todayIso;
   const isReturnDateValid =
@@ -860,15 +1202,7 @@ export default function ReissueModal({ booking, onClose }) {
       setOfflineSearchId(response.searchId);
       setSearchPage(page);
       setCurrentStep(STEP.SEARCH_RESULTS);
-      setSelectedOption((currentSelection) => {
-        if (!currentSelection) return null;
-        return (
-          response.results?.find(
-            (option) =>
-              String(option.resultIndex) === String(currentSelection.resultIndex),
-          ) || null
-        );
-      });
+      setSelectedOption(null);
     } catch (error) {
       setOfflineSearchId(null);
       setSelectedOption(null);
@@ -1421,7 +1755,7 @@ export default function ReissueModal({ booking, onClose }) {
                                 <p className="mt-1 text-sm text-slate-500">
                                   {showOfflineFlow
                                     ? `${offlineSearchPagination?.total || 0} result(s)`
-                                    : `${onlineOptions.length} result(s)`}
+                                    : `${visibleOnlineOptions.length} result(s)`}
                                 </p>
                               </div>
                               {showOfflineFlow && (
@@ -1438,38 +1772,38 @@ export default function ReissueModal({ booking, onClose }) {
                             </div>
                           </div>
 
-                          <div className="space-y-4">
-                            {(showOfflineFlow ? offlineSearchResults : onlineOptions).map((option) => (
+                          <div className="grid gap-4 xl:grid-cols-2">
+                            {visibleFlightOptions.map((option) => {
+                              const isSelected = String(selectedOption?.resultIndex) === String(option.resultIndex);
+                              const isDisabled = Boolean(selectedOption) && !isSelected;
+                              return (
                               <FlightOptionCard
                                 key={String(option.resultIndex)}
-                                option={
-                                  showOfflineFlow
-                                    ? {
-                                        ...option,
-                                        oldFare: option.oldFare,
-                                        newFare: option.fare || option.newFare,
-                                        totalCollection: option.totalEstimate,
-                                        cabin: option.cabinClass || "Economy",
-                                        baggage: option.baggage || PLACEHOLDER,
-                                      }
-                                    : option
-                                }
-                                selected={String(selectedOption?.resultIndex) === String(option.resultIndex)}
+                                option={option}
+                                selected={isSelected}
+                                disabled={isDisabled}
                                 expanded={expandedOptionId === option.resultIndex}
                                 onToggleDetails={() =>
                                   setExpandedOptionId((current) =>
                                     current === option.resultIndex ? null : option.resultIndex,
                                   )
                                 }
-                                onSelect={() => setSelectedOption(option)}
+                                onSelect={() =>
+                                  setSelectedOption((current) =>
+                                    String(current?.resultIndex) === String(option.resultIndex)
+                                      ? null
+                                      : option,
+                                  )
+                                }
                                 mode={showOfflineFlow ? "OFFLINE" : "ONLINE"}
                               />
-                            ))}
+                              );
+                            })}
                           </div>
 
-                          {showOfflineFlow && !offlineSearchResults?.length && (
+                          {!visibleFlightOptions.length && (
                             <div className="rounded-3xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-600">
-                              {offlineSearchError || OFFLINE_SEARCH_FALLBACK_MESSAGE}
+                              {offlineSearchError || "No alternative flights available for selected date"}
                             </div>
                           )}
 
