@@ -1588,10 +1588,26 @@ const HotelReviewBooking = () => {
       // AGE VALIDATION
       const ageNum = Number(t.age);
       if (t.paxType === 2) {
-        if (isNaN(ageNum) || ageNum < 0 || ageNum > 18) {
+        // DOB is required for children
+        if (!t.dob) {
+          tErrors.dob = "Date of Birth is required for child";
+        } else {
+          // Calculate age from DOB and check if it matches the searched age
+          const today = new Date();
+          const birth = new Date(t.dob);
+          if (isNaN(birth.getTime())) {
+            tErrors.dob = "Invalid Date of Birth";
+          } else {
+            let calcAge = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) calcAge--;
+            if (t.originalAge && String(calcAge) !== String(t.originalAge)) {
+              tErrors.dob = `Age from DOB (${calcAge} yrs) does not match searched age (${t.originalAge} yrs). Please enter a valid Date of Birth.`;
+            }
+          }
+        }
+        if (!tErrors.dob && (isNaN(ageNum) || ageNum < 0 || ageNum > 18)) {
           tErrors.age = "Child age must be 0-18";
-        } else if (t.originalAge && String(ageNum) !== String(t.originalAge)) {
-          tErrors.age = `Must match searched age (${t.originalAge})`;
         }
       } else {
         if (isNaN(ageNum) || ageNum <= 18) {
@@ -1684,12 +1700,20 @@ const HotelReviewBooking = () => {
     setFormErrors({ ...errors, ...newGlobalErrors });
 
     if (Object.keys(errors).length > 0 || hasGlobalErrors) {
+      Swal.fire({
+        icon: "error",
+        title: "Incomplete Details",
+        text: "Please fill all required fields correctly before proceeding.",
+        confirmButtonColor: "#C9A84C",
+      });
       return;
     }
     if (!selectedRoom.length) {
-      ToastWithTimer({
-        type: "error",
-        message: "Please select at least one room",
+      Swal.fire({
+        icon: "error",
+        title: "No Room Selected",
+        text: "Please select at least one room",
+        confirmButtonColor: "#C9A84C",
       });
       return;
     }
@@ -1901,9 +1925,11 @@ const HotelReviewBooking = () => {
       });
       navigate("/my-pending-approvals");
     } catch (err) {
-      ToastWithTimer({
-        type: "error",
-        message: err || "Failed to submit request",
+      Swal.fire({
+        icon: "error",
+        title: "Booking Failed",
+        text: typeof err === "string" ? err : err?.message || "Failed to submit request",
+        confirmButtonColor: "#C9A84C",
       });
     }
   };
@@ -1966,8 +1992,8 @@ const HotelReviewBooking = () => {
   }
 
   if (loading && !hotel && !isBookNowMode) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-
+  // Removed global error return to prevent blank page on API error
+  
   /* ──────────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -1985,18 +2011,7 @@ const HotelReviewBooking = () => {
           >
             <MdArrowBack size={18} />
             Back to Details
-          </button>
-
-          {actionLoading && (
-            <div className="flex items-center gap-2 text-[#C9A84C] font-semibold animate-pulse">
-              <div className="w-4 h-4 border-2 border-[#C9A84C] border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs uppercase tracking-wider">
-                Requesting...
-              </span>
-            </div>
-          )}
-
-          
+          </button>          
         </div>
       </div>
 
@@ -2388,7 +2403,7 @@ const HotelReviewBooking = () => {
                             </div>
                             <div className="flex flex-col gap-1">
                               <label className="field-label">
-                                Date of Birth
+                                Date of Birth{t.paxType === 2 && <span className="text-red-500 ml-0.5">*</span>}
                               </label>
                               <input
                                 type="date"
@@ -2411,8 +2426,13 @@ const HotelReviewBooking = () => {
                                   updateTraveler(t.id, "dob", dob);
                                   updateTraveler(t.id, "age", age);
                                 }}
-                                className="field-input"
+                                className={`field-input ${formErrors[t.id]?.dob ? "border-red-500 ring-1 ring-red-500" : ""}`}
                               />
+                              {formErrors[t.id]?.dob && (
+                                <p className="text-[10px] text-red-500 mt-1">
+                                  {formErrors[t.id].dob}
+                                </p>
+                              )}
                             </div>
                             <div className="flex flex-col gap-1">
                               <label className="field-label">
@@ -2473,8 +2493,8 @@ const HotelReviewBooking = () => {
                                     {formErrors[t.id].panCard}
                                   </p>
                                 )}
-                                <p className="text-[10px] text-slate-500">
-                                  Required only for adults older than 18.
+                                <p className="text-[10px] text-yellow-700 font-semibold">
+                                  {isCorporateBooking ? "Enter Valid Corporate PAN." : "Required only for adults older than 18."}
                                 </p>
                               </div>
                             )}
@@ -2589,7 +2609,7 @@ const HotelReviewBooking = () => {
                 </div>
 
                 {/* Make Corporate Booking Checkbox */}
-                {!isBookNowMode && (
+                {!isBookNowMode && validation?.CorporateBookingAllowed && validation?.CrpPANMandatory && (
                   <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between rounded-b-2xl">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center h-5">
