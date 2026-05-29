@@ -1041,7 +1041,7 @@ const HotelReviewBooking = () => {
   }, [dispatch, id]);
 
   useEffect(() => {
-    if (user?.role === "employee" || user?.role === "manager") {
+    if (user?.role === "employee" || user?.role === "manager" || user?.role === "travel-admin" || user?.role === "finance_team") {
       dispatch(fetchMySSRPolicy());
       dispatch(fetchMyProfile());
     }
@@ -1095,6 +1095,7 @@ const HotelReviewBooking = () => {
           let lName = "";
           let email = "";
           let phone = "";
+          let dob = "";
 
           if (isLead) {
             const sourceProfile = myProfile || user;
@@ -1117,6 +1118,8 @@ const HotelReviewBooking = () => {
                 sourceProfile.mobile ||
                 sourceProfile.phoneWithCode ||
                 "";
+              const rawDob = sourceProfile.dob || sourceProfile.dateOfBirth || "";
+              dob = rawDob ? rawDob.split("T")[0] : "";
             }
           }
 
@@ -1127,7 +1130,7 @@ const HotelReviewBooking = () => {
             lastName: lName,
             paxType: 1,
             age: "",
-            dob: "",
+            dob: dob,
             gender: "Male",
             leadPassenger: isLead,
             email: email,
@@ -1165,6 +1168,7 @@ const HotelReviewBooking = () => {
         let lName = "";
         let email = "";
         let phone = "";
+        let dob = "";
 
         const sourceProfile = myProfile || user;
         if (sourceProfile) {
@@ -1186,6 +1190,8 @@ const HotelReviewBooking = () => {
             sourceProfile.mobile ||
             sourceProfile.phoneWithCode ||
             "";
+          const rawDob = sourceProfile.dob || sourceProfile.dateOfBirth || "";
+          dob = rawDob ? rawDob.split("T")[0] : "";
         }
 
         generatedTravelers.push({
@@ -1195,7 +1201,7 @@ const HotelReviewBooking = () => {
           lastName: lName,
           paxType: 1,
           age: "",
-          dob: "",
+          dob: dob,
           gender: "Male",
           leadPassenger: true,
           email: email,
@@ -1216,6 +1222,35 @@ const HotelReviewBooking = () => {
     totalChildrenFromSearch,
     searchParams,
   ]);
+
+  // ── Sync profile to lead passenger if myProfile loads later ──
+  useEffect(() => {
+    if (!isBookNowMode && travelers.length > 0 && myProfile) {
+      setTravelers((prev) => {
+        const newTravelers = [...prev];
+        const leadIndex = newTravelers.findIndex((t) => t.leadPassenger);
+        if (leadIndex !== -1) {
+          let updated = false;
+          const lead = { ...newTravelers[leadIndex] };
+          if (!lead.phoneWithCode) {
+            lead.phoneWithCode =
+              myProfile.phone || myProfile.mobile || myProfile.phoneWithCode || "";
+            updated = true;
+          }
+          if (!lead.dob) {
+            const rawDob = myProfile.dob || myProfile.dateOfBirth || "";
+            lead.dob = rawDob ? rawDob.split("T")[0] : "";
+            updated = true;
+          }
+          if (updated) {
+            newTravelers[leadIndex] = lead;
+            return newTravelers;
+          }
+        }
+        return prev;
+      });
+    }
+  }, [myProfile, isBookNowMode]);
 
   // ── Guest management ──
   const handleAddGuest = (paxType = 1) => {

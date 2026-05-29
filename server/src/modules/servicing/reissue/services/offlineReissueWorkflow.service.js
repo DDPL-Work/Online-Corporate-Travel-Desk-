@@ -561,8 +561,8 @@ class OfflineReissueWorkflowService {
     domainEventBus.emit(eventName, {
       reissueRequestId: request._id.toString(),
       reissueId: request.requestId,
-      bookingId: request.bookingId?.toString?.(),
-      corporateId: request.corporateId?.toString?.(),
+      bookingId: request.bookingId?._id?.toString?.() || request.bookingId?.toString?.(),
+      corporateId: request.corporateId?._id?.toString?.() || request.corporateId?.toString?.(),
       userId: request.employeeId?._id?.toString?.() || request.employeeId?.toString?.(),
       metadata: {
         employeeEmail: request.metadata?.employeeEmail || null,

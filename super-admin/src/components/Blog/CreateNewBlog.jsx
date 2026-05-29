@@ -198,68 +198,76 @@ const CreateBlogPage = () => {
   };
 
   return (
-    <div className="min-h-screen font-sans" style={{ backgroundColor: "#F8FAFC" }}>
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: "#f8fafc" }}>
       <BlogPreviewModal
         isOpen={showPreview}
         onClose={() => setShowPreview(false)}
         blogData={formData}
       />
 
-      <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white text-xl">
-              <FaFileAlt />
-            </div>
-            <div className="text-left">
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase leading-none">
-                Create Article
-              </h1>
-              <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-widest">
-                Compose your next masterpiece
-              </p>
-            </div>
-          </div>
+      {/* Header */}
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3">
+                <button 
+                  type="button"
+                  onClick={() => navigate("/blog-and-articles")} 
+                  className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 text-white shadow-sm"
+                >
+                  <FiArrowLeft size={20} />
+                </button>
+              </div>
+              
+              <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
 
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => navigate("/blog-and-articles")}
-              className="flex items-center justify-center space-x-2 px-4 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 transition-all shadow-md text-xs font-bold uppercase"
-            >
-              <FiArrowLeft className="w-3 h-3" />
-              <span>Back</span>
-            </button>
-            <button
-              type="button"
-              onClick={handlePreview}
-              className="flex items-center justify-center space-x-2 px-4 py-2 bg-[#088395] text-white rounded-lg hover:bg-[#0A4D68] transition-all shadow-md text-xs font-bold uppercase"
-            >
-              <FiEye className="w-3 h-3" />
-              <span>Preview</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSaveBlog("draft")}
-              disabled={createLoading}
-              className="flex items-center justify-center space-x-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-all shadow-md text-xs font-bold uppercase disabled:opacity-50"
-            >
-              <FiSave className="w-3 h-3" />
-              <span>Save Draft</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSaveBlog("published")}
-              disabled={createLoading}
-              className="flex items-center justify-center space-x-2 px-6 py-2 bg-[#0A4D68] text-white rounded-lg hover:bg-[#088395] transition-all shadow-md text-xs font-bold uppercase disabled:opacity-50"
-            >
-              <FiPlus className="w-3 h-3" />
-              <span>Publish Now</span>
-            </button>
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
+                  <FaFileAlt size={28} />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-black tracking-tight leading-none">
+                    Create Article
+                  </h1>
+                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                    Compose your next masterpiece
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={handlePreview}
+                className="flex items-center justify-center space-x-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm"
+              >
+                <FiEye className="w-4 h-4" />
+                <span>Preview</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveBlog("draft")}
+                disabled={createLoading}
+                className="flex items-center justify-center space-x-2 px-5 py-2.5 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-all shadow-md text-xs font-black uppercase tracking-wider disabled:opacity-50"
+              >
+                <FiSave className="w-4 h-4" />
+                <span>Save Draft</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveBlog("published")}
+                disabled={createLoading}
+                className="flex items-center justify-center space-x-2 px-5 py-2.5 bg-[#C9A84C] text-white rounded-xl hover:bg-[#a78b2e] transition-all shadow-sm text-xs font-black uppercase tracking-wider disabled:opacity-50"
+              >
+                <FiPlus className="w-4 h-4" />
+                <span>Publish Now</span>
+              </button>
+            </div>
           </div>
         </div>
 
+      <div className="w-full px-4 md:px-10 -mt-10 space-y-8">
         {/* Tab Navigation */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
           <div className="flex border-b border-slate-100">
@@ -271,7 +279,7 @@ const CreateBlogPage = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex-1 flex items-center justify-center space-x-2 py-4 text-[11px] font-black uppercase tracking-widest transition-all ${
                     activeTab === tab.id
-                      ? "bg-slate-50 text-[#0A4D68] border-b-2 border-[#0A4D68]"
+                      ? "bg-slate-50 border-b-2 border-[#C9A84C] text-[#C9A84C]"
                       : "text-slate-400 hover:text-slate-600 hover:bg-slate-50/50"
                   }`}
                 >
@@ -296,7 +304,7 @@ const CreateBlogPage = () => {
                       value={formData.title}
                       onChange={handleInputChange}
                       placeholder="Enter a compelling headline..."
-                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#0A4D68] focus:border-transparent outline-none text-xl font-bold text-slate-800 placeholder:text-slate-300"
+                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#003399]/20 focus:border-[#003399] focus:border-transparent outline-none text-xl font-bold text-slate-800 placeholder:text-slate-300"
                       required
                     />
                   </div>
@@ -307,7 +315,7 @@ const CreateBlogPage = () => {
                     </label>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div className="space-y-4">
-                        <div className="relative h-48 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 flex flex-col items-center justify-center text-center group hover:border-[#0A4D68] transition-all cursor-pointer overflow-hidden">
+                        <div className="relative h-48 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 flex flex-col items-center justify-center text-center group hover:border-[#003399] transition-all cursor-pointer overflow-hidden">
                           {formData.featured_image.url ? (
                             <>
                               <img src={formData.featured_image.url} className="w-full h-full object-cover" alt="Preview" />
@@ -331,7 +339,7 @@ const CreateBlogPage = () => {
                               value={formData.featured_image.alt}
                               onChange={(e) => setFormData(prev => ({ ...prev, featured_image: { ...prev.featured_image, alt: e.target.value } }))}
                               placeholder="Describe this image for accessibility..."
-                              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-[#0A4D68]"
+                              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-[#003399]"
                             />
                           </div>
                         )}
@@ -374,7 +382,7 @@ const CreateBlogPage = () => {
                           value={formData.meta_title}
                           onChange={handleInputChange}
                           maxLength={60}
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#0A4D68] text-sm font-medium"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#003399]/20 focus:border-[#003399] text-sm font-medium"
                           placeholder="Headline for search engines..."
                         />
                         <div className="flex justify-between items-center px-1">
@@ -391,7 +399,7 @@ const CreateBlogPage = () => {
                           onChange={handleInputChange}
                           maxLength={160}
                           rows={4}
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#0A4D68] text-sm font-medium resize-none"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#003399]/20 focus:border-[#003399] text-sm font-medium resize-none"
                           placeholder="Brief summary for search results..."
                         />
                         <div className="flex justify-between items-center px-1">
@@ -411,7 +419,7 @@ const CreateBlogPage = () => {
                             name="slug"
                             value={formData.slug}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-r-xl outline-none focus:ring-2 focus:ring-[#0A4D68] text-sm font-mono"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-r-xl outline-none focus:ring-2 focus:ring-[#003399]/20 focus:border-[#003399] text-sm font-mono"
                           />
                         </div>
                       </div>
@@ -425,7 +433,7 @@ const CreateBlogPage = () => {
                             value={formData.categories[0] || ""}
                             onChange={handleCategoryChange}
                             placeholder="e.g. Technology, Travel Tips..."
-                            className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#0A4D68] text-sm font-bold"
+                            className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#003399]/20 focus:border-[#003399] text-sm font-bold"
                             required
                           />
                         </div>
@@ -439,7 +447,7 @@ const CreateBlogPage = () => {
                             value={newKeyword}
                             onChange={(e) => setNewKeyword(e.target.value)}
                             onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addKeyword())}
-                            className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0A4D68]"
+                            className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#003399]"
                             placeholder="Type and press Enter..."
                           />
                         </div>
@@ -448,7 +456,7 @@ const CreateBlogPage = () => {
                             <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">No keywords added</span>
                           ) : (
                             formData.meta_keywords.map((kw, i) => (
-                              <span key={i} className="px-3 py-1 bg-white border border-slate-100 rounded-full text-[10px] font-black uppercase tracking-tight text-[#0A4D68] flex items-center gap-1.5 shadow-sm">
+                              <span key={i} className="px-3 py-1 bg-white border border-slate-100 rounded-full text-[10px] font-black uppercase tracking-tight text-[#003399] flex items-center gap-1.5 shadow-sm">
                                 {kw} <button onClick={() => removeKeyword(kw)} className="text-rose-400 hover:text-rose-600 transition-colors"><FiX /></button>
                               </span>
                             ))
@@ -464,7 +472,7 @@ const CreateBlogPage = () => {
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <div className="max-w-xl bg-slate-50 rounded-2xl border border-slate-100 p-8 space-y-6">
                     <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                      <FaUser className="text-[#0A4D68]" /> Author Configuration
+                      <FaUser className="text-[#003399]" /> Author Configuration
                     </h3>
                     
                     <div className="space-y-4">
@@ -480,7 +488,7 @@ const CreateBlogPage = () => {
                           name="author_name"
                           value={formData.author_name}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-[#0A4D68]"
+                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-[#003399]/20 focus:border-[#003399]"
                           placeholder="Your public author name..."
                         />
                       </div>

@@ -51,21 +51,6 @@ import {
 import { generateHotelVoucher } from "../../Redux/Actions/booking.thunks";
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Design tokens Mapping (for reference during conversion)        */
-/* ─────────────────────────────────────────────────────────────── */
-// bg: "#FAF8F4"         -> bg-[#FAF8F4]
-// surface: "#FFFFFF"    -> bg-white
-// border: "#EAE4D9"     -> border-[#EAE4D9]
-// gold: "#B5862A"       -> text-[#B5862A] / bg-[#B5862A]
-// text: "#1A1714"       -> text-[#1A1714]
-// textMuted: "#7A7068"  -> text-[#7A7068]
-// textLight: "#A89F94"  -> text-[#A89F94]
-// green: "#2C7A4B"      -> text-[#2C7A4B] / bg-[#2C7A4B]
-// red: "#B5341A"        -> text-[#B5341A] / bg-[#B5341A]
-// amber: "#8A6200"      -> text-[#8A6200] / bg-[#8A6200]
-// blue: "#1A4A7A"       -> text-[#1A4A7A] / bg-[#1A4A7A]
-
-/* ─────────────────────────────────────────────────────────────── */
 /*  Helpers                                                        */
 /* ─────────────────────────────────────────────────────────────── */
 function fmtDate(d, opts = { day: "2-digit", month: "short", year: "numeric" }) {
@@ -144,11 +129,19 @@ function StatusPill({ status }) {
 /*  Stars                                                          */
 /* ─────────────────────────────────────────────────────────────── */
 function Stars({ count = 0 }) {
-  if (!count) return null;
+  const rating = Math.min(Math.max(Number(count) || 0, 0), 5);
   return (
     <span className="inline-flex gap-[2px]">
-      {Array.from({ length: Math.min(count, 5) }).map((_, i) => (
-        <svg key={i} width="13" height="13" fill="#B5862A" viewBox="0 0 20 20">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <svg 
+          key={i} 
+          width="13" 
+          height="13" 
+          viewBox="0 0 20 20" 
+          fill={i < rating ? "#B5862A" : "none"} 
+          stroke="#B5862A" 
+          strokeWidth={i < rating ? "0" : "1.5"}
+        >
           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
         </svg>
       ))}
@@ -514,6 +507,7 @@ function RoomSection({ rooms, selectedRoom }) {
           ? room.PriceBreakUp[0] || {}
           : room.PriceBreakUp || {};
         const dayRates = toArray(room.DayRates).flat().filter(Boolean);
+        const supplements = toArray(room.Supplements).flat(Infinity).filter(Boolean);
         const roomFacts = [
           { label: "Adults", value: room.AdultCount },
           { label: "Children", value: room.ChildCount },
@@ -630,54 +624,45 @@ function RoomSection({ rooms, selectedRoom }) {
               ))}
             </div>
 
-            {(dayRates.length > 0 || Object.keys(priceBreakUp).length > 0) && (
-              <div className="bg-white border border-[#EAE4D9] border-t-0 p-5 mt-5">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
-                      Room Price
-                    </div>
-                    <div className="text-[16px] font-bold text-[#1A1714]">
-                      {formatMoney(priceBreakUp.RoomRate || selectedRoom?.totalFare || room.TotalFare || 0, priceBreakUp.CurrencyCode || selectedRoom?.currency || "INR")}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
-                      Service Fee
-                    </div>
-                    <div className="text-[16px] font-bold text-[#1A1714]">
-                      {formatMoney(priceBreakUp.ServiceFee || 0, priceBreakUp.CurrencyCode || selectedRoom?.currency || "INR")}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
-                      Room Tax
-                    </div>
-                    <div className="text-[16px] font-bold text-[#1A1714]">
-                      {formatMoney(priceBreakUp.RoomTax || 0, priceBreakUp.CurrencyCode || selectedRoom?.currency || "INR")}
-                    </div>
-                  </div>
-                </div>
 
-                {dayRates.length > 0 && (
-                  <div className="mt-5">
-                    <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
-                      Day Rates
-                    </div>
-                    <div className="grid grid-cols-3 gap-[1px] bg-[#EAE4D9]">
-                      {dayRates.map((rate, i) => (
-                        <div key={i} className="bg-[#FAF8F4] p-3">
-                          <div className="text-[11px] text-[#A89F94] mb-1">
-                            {rate.Date ? fmtDate(rate.Date) : `Night ${i + 1}`}
-                          </div>
-                          <div className="text-[13px] font-semibold text-[#1A1714]">
-                            {formatMoney(rate.BasePrice || rate.RoomRate || 0, priceBreakUp.CurrencyCode || selectedRoom?.currency || "INR")}
-                          </div>
+
+            {/* Standalone Supplements Section */}
+            {supplements.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-[12px] font-semibold tracking-[0.1em] uppercase text-[#A89F94] mb-3">
+                  Supplements (Payable at Property)
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {supplements.map((supp, si) => {
+                    const type = supp.Type || supp.type || "Fee";
+                    const desc = supp.Description || supp.description || "";
+                    const price = supp.Price !== undefined ? supp.Price : supp.price;
+                    const currency = supp.Currency || supp.currency;
+                    const indexVal = supp.Index || supp.index;
+
+                    return (
+                      <div
+                        key={si}
+                        className="flex justify-between items-center bg-white border border-[#EAE4D9] px-5 py-4 rounded shadow-sm relative overflow-hidden"
+                      >
+                        {/* accent line */}
+                        <div className="absolute left-0 top-0 w-[3px] h-full bg-[#D4A843]" />
+                        
+                        <div className="flex flex-col gap-[2px] pl-2">
+                          <span className="text-[10px] font-bold text-[#B5862A] uppercase tracking-wider">
+                            {indexVal ? `Ref: ${indexVal} • ` : ""}{type}
+                          </span>
+                          <span className="text-[15px] font-semibold text-[#1A1714] capitalize">
+                            {desc ? desc.replace(/_/g, " ") : "Mandatory Tax / Supplement"}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                        <div className="text-[16px] font-bold text-[#1A1714] whitespace-nowrap ml-4">
+                          {formatMoney(price, currency)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -903,7 +888,6 @@ function BookingReferencesSection({ booking, bookingDetail, result }) {
       label: "Payment ID",
       val: booking.payment?.paymentId || "—",
       hash: true,
-      highlight: !!booking.payment?.paymentId,
     },
     {
       label: "Confirmation No.",
@@ -932,12 +916,12 @@ function BookingReferencesSection({ booking, bookingDetail, result }) {
         {refs.map((r, i) => (
           <div
             key={i}
-            className={`p-5 ${r.highlight ? "bg-amber-50" : "bg-white"}`}
+            className="p-5 bg-white"
           >
             <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-[6px]">
-              <span className={`mr-1 ${r.highlight ? "text-amber-500" : "text-[#B5862A]"}`}>#</span> {r.label}
+              <span className="mr-1 text-[#B5862A]">#</span> {r.label}
             </div>
-            <div className={`font-['DM_Mono'] text-[13px] font-medium break-all ${r.highlight && r.val !== "—" ? "text-amber-700" : "text-[#1A1714]"}`}>
+            <div className="font-['DM_Mono'] text-[13px] font-medium break-all text-[#1A1714]">
               {r.val}
             </div>
           </div>
@@ -1036,172 +1020,127 @@ function GuestSection({ travellers = [] }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  08 Fare Breakdown                                              */
 /* ─────────────────────────────────────────────────────────────── */
-function FareBreakdownSection({ priceBreakUp, totalFare, detailRoom }) {
+function FareBreakdownSection({ priceBreakUp, totalFare, detailRoom, selectedRoom }) {
   if (!priceBreakUp || Object.keys(priceBreakUp).length === 0) return null;
 
-  const taxBreakupArray = Array.isArray(priceBreakUp.TaxBreakup) ? priceBreakUp.TaxBreakup : [];
-
-  let calculatedTotalTaxes = 0;
-  if (taxBreakupArray.length > 0) {
-    calculatedTotalTaxes = taxBreakupArray.reduce((acc, tax) => acc + (tax.TaxAmount || 0), 0);
-  } else {
-    calculatedTotalTaxes = ((priceBreakUp.Tax || 0) + (priceBreakUp.ServiceTax || 0) + (priceBreakUp.ServiceCharge || 0) + (priceBreakUp.GST?.CGSTAmount || 0) + (priceBreakUp.GST?.SGSTAmount || 0) + (priceBreakUp.GST?.IGSTAmount || 0) + (priceBreakUp.GST?.CessAmount || 0));
-  }
-
-  // Ensure RoomRate is picked up from the best available source
-  const firstDayRate = toArray(detailRoom?.DayRates).flat().find(Boolean);
-  const roomPrice = priceBreakUp?.RoomRate || priceBreakUp?.RoomPrice || 
-                    firstDayRate?.BasePrice || 
-                    firstDayRate?.RoomRate || 0;
+  const dayRates = toArray(detailRoom?.DayRates).flat().filter(Boolean);
 
   return (
     <div className="bg-white border border-[#EAE4D9] p-6">
-      <div className="max-w-[600px]">
-        <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-4">
-          Base Charges
+      <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
+        Price Breakdown
+      </div>
+      <div className="flex flex-col border border-[#EAE4D9] rounded bg-[#FAF8F4] overflow-hidden mb-6">
+        {/* Table Header */}
+        <div className="flex justify-between items-center bg-[#EAE4D9] px-4 py-2">
+          <span className="text-[11px] font-bold tracking-[0.1em] uppercase text-[#1A1714]">Fee Type</span>
+          <span className="text-[11px] font-bold tracking-[0.1em] uppercase text-[#1A1714]">Amount</span>
         </div>
-        <div className="flex flex-col gap-3">
-          <div className="flex justify-between text-[14px]">
-            <span className="text-[#7A7068]">Room Price</span>
-            <span className="font-semibold">
-              ₹{Number(roomPrice).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+        {/* Rows */}
+        <div className="flex flex-col divide-y divide-[#EAE4D9] bg-white">
+          <div className="flex justify-between px-4 py-3">
+            <span className="text-[13px] font-medium text-[#7A7068]">Room Rate</span>
+            <span className="text-[14px] font-bold text-[#1A1714]">
+              {formatMoney(priceBreakUp.RoomRate || selectedRoom?.totalFare || 0, priceBreakUp.CurrencyCode || selectedRoom?.currency || "INR")}
             </span>
           </div>
-          {(priceBreakUp?.ExtraGuestCharge > 0 || priceBreakUp?.RoomExtraGuestCharges > 0) && (
-            <div className="flex justify-between text-[14px]">
-              <span className="text-[#7A7068]">Extra Guest Charges</span>
-              <span className="font-semibold">
-                ₹{Number(priceBreakUp.ExtraGuestCharge || priceBreakUp.RoomExtraGuestCharges).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-          )}
-          {(priceBreakUp?.ChildCharge > 0 || priceBreakUp?.RoomChildCharges > 0) && (
-            <div className="flex justify-between text-[14px]">
-              <span className="text-[#7A7068]">Child Charges</span>
-              <span className="font-semibold">
-                ₹{Number(priceBreakUp.ChildCharge || priceBreakUp.RoomChildCharges).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-          )}
-          {priceBreakUp?.OtherCharges > 0 && (
-            <div className="flex justify-between text-[14px]">
-              <span className="text-[#7A7068]">Other Charges</span>
-              <span className="font-semibold">
-                ₹{Number(priceBreakUp.OtherCharges).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-          )}
-          {priceBreakUp?.Discount > 0 && (
-            <div className="flex justify-between text-[14px] text-[#2C7A4B]">
-              <span>Discount</span>
-              <span className="font-semibold">
-                -₹{Number(priceBreakUp.Discount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-          )}
-          {priceBreakUp?.ServiceFee > 0 && (
-            <div className="flex justify-between text-[14px]">
-              <span className="text-[#7A7068]">Service Fee</span>
-              <span className="font-semibold">
-                ₹{Number(priceBreakUp.ServiceFee).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+          {(priceBreakUp.RoomTax !== undefined) && (
+            <div className="flex justify-between px-4 py-3">
+              <span className="text-[13px] font-medium text-[#7A7068]">Room Tax</span>
+              <span className="text-[14px] font-bold text-[#1A1714]">
+                {formatMoney(priceBreakUp.RoomTax, priceBreakUp.CurrencyCode || selectedRoom?.currency || "INR")}
               </span>
             </div>
           )}
 
-          <div className="flex flex-col gap-2 pt-3 border-t border-dashed border-[#EAE4D9]">
-            {taxBreakupArray.length > 0 ? (
-              taxBreakupArray.map((tax, idx) => {
-                return (
-                  <div key={idx} className="flex justify-between text-[13px]">
-                    <span className="text-[#7A7068]">{tax.TaxType?.replace('Tax_', '') || 'Tax'}</span>
-                    <span className="font-medium">
-                      ₹{Number(tax.TaxAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                );
-              })
-            ) : (
-              <>
-                {priceBreakUp?.Tax > 0 && (
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-[#7A7068]">Tax</span>
-                    <span className="font-medium">
-                      ₹{Number(priceBreakUp.Tax).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-                {priceBreakUp?.ServiceTax > 0 && (
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-[#7A7068]">Service Tax</span>
-                    <span className="font-medium">
-                      ₹{Number(priceBreakUp.ServiceTax).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-                {priceBreakUp?.ServiceCharge > 0 && (
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-[#7A7068]">Service Charge</span>
-                    <span className="font-medium">
-                      ₹{Number(priceBreakUp.ServiceCharge).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-                {priceBreakUp?.TDS > 0 && (
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-[#7A7068]">TDS</span>
-                    <span className="font-medium">
-                      ₹{Number(priceBreakUp.TDS).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-                {priceBreakUp?.GST && (
-                  <>
-                    {priceBreakUp.GST.CGSTAmount > 0 && (
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-[#7A7068]">CGST</span>
-                        <span className="font-medium">
-                          ₹{Number(priceBreakUp.GST.CGSTAmount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    )}
-                    {priceBreakUp.GST.SGSTAmount > 0 && (
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-[#7A7068]">SGST</span>
-                        <span className="font-medium">
-                          ₹{Number(priceBreakUp.GST.SGSTAmount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    )}
-                    {priceBreakUp.GST.IGSTAmount > 0 && (
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-[#7A7068]">IGST</span>
-                        <span className="font-medium">
-                          ₹{Number(priceBreakUp.GST.IGSTAmount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    )}
-                    {priceBreakUp.GST.CessAmount > 0 && (
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-[#7A7068]">Cess</span>
-                        <span className="font-medium">
-                          ₹{Number(priceBreakUp.GST.CessAmount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-
-            <div className="flex justify-between text-[14px] pt-2 border-t border-dashed border-[#EAE4D9]">
-              <span className="text-[#1A1714] font-bold">Total Taxes & Fees</span>
-              <span className="font-bold text-[#B5341A]">
-                ₹{calculatedTotalTaxes.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {(priceBreakUp.RoomExtraGuestCharges > 0) && (
+            <div className="flex justify-between px-4 py-3">
+              <span className="text-[13px] font-medium text-[#7A7068]">Extra Guest Charges</span>
+              <span className="text-[14px] font-bold text-[#1A1714]">
+                {formatMoney(priceBreakUp.RoomExtraGuestCharges, priceBreakUp.CurrencyCode || "INR")}
               </span>
             </div>
-          </div>
+          )}
+
+          {(priceBreakUp.RoomChildCharges > 0) && (
+            <div className="flex justify-between px-4 py-3">
+              <span className="text-[13px] font-medium text-[#7A7068]">Child Charges</span>
+              <span className="text-[14px] font-bold text-[#1A1714]">
+                {formatMoney(priceBreakUp.RoomChildCharges, priceBreakUp.CurrencyCode || "INR")}
+              </span>
+            </div>
+          )}
+
+          {(priceBreakUp.ServiceFee !== undefined) && (
+            <div className="flex justify-between px-4 py-3">
+              <span className="text-[13px] font-medium text-[#7A7068]">Service Fee</span>
+              <span className="text-[14px] font-bold text-[#1A1714]">
+                {formatMoney(priceBreakUp.ServiceFee, priceBreakUp.CurrencyCode || "INR")}
+              </span>
+            </div>
+          )}
+
+          {(priceBreakUp.AgentCommission !== undefined) && (
+            <div className="flex justify-between px-4 py-3">
+              <span className="text-[13px] font-medium text-[#7A7068]">Agent Commission</span>
+              <span className="text-[14px] font-bold text-[#1A1714]">
+                {formatMoney(priceBreakUp.AgentCommission, priceBreakUp.CurrencyCode || "INR")}
+              </span>
+            </div>
+          )}
+
+          {Array.isArray(priceBreakUp.TaxBreakup) && priceBreakUp.TaxBreakup.length > 0 && (
+            <div className="p-4 bg-[#FAF8F4] overflow-x-auto">
+              <table className="w-full border-collapse border border-[#EAE4D9] text-[13px] text-left">
+                <tbody>
+                  <tr>
+                    <td className="border border-[#EAE4D9] p-[8px_12px] font-medium text-[#7A7068] bg-white whitespace-nowrap">
+                      Tax Type
+                    </td>
+                    {priceBreakUp.TaxBreakup.map((tax, tIdx) => (
+                      <td key={tIdx} className="border border-[#EAE4D9] p-[8px_12px] font-medium text-[#1A1714] bg-white whitespace-nowrap">
+                        {tax.TaxType}
+                      </td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td className="border border-[#EAE4D9] p-[8px_12px] font-medium text-[#7A7068] bg-white whitespace-nowrap">
+                      value
+                    </td>
+                    {priceBreakUp.TaxBreakup.map((tax, tIdx) => (
+                      <td key={tIdx} className="border border-[#EAE4D9] p-[8px_12px] font-bold text-[#1A1714] bg-white whitespace-nowrap">
+                        {tax.TaxAmount || 0}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
+
+      {dayRates.length > 0 && (
+        <div className="mb-6">
+          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
+            Day Rates
+          </div>
+          <div className="grid grid-cols-3 gap-[1px] bg-[#EAE4D9]">
+            {dayRates.map((rate, i) => (
+              <div key={i} className="bg-[#FAF8F4] p-3">
+                <div className="text-[11px] text-[#A89F94] mb-1">
+                  {rate.Date ? fmtDate(rate.Date) : `Night ${i + 1}`}
+                </div>
+                <div className="text-[13px] font-semibold text-[#1A1714]">
+                  {formatMoney(rate.BasePrice || rate.RoomRate || 0, priceBreakUp.CurrencyCode || selectedRoom?.currency || "INR")}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 p-4 bg-[#FAF8F4] border border-[#EAE4D9] flex justify-between items-center">
         <span className="text-[12px] font-semibold uppercase tracking-[0.05em]">
@@ -1994,6 +1933,12 @@ export default function BookedHotelDetails() {
     amendmentStatus,
   } = useSelector((state) => state.corporateRelated);
 
+  const [activeTab, setActiveTab] = useState("hotel_details");
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   useEffect(() => {
     if (id) dispatch(fetchBookedHotelDetails(id));
   }, [id, dispatch]);
@@ -2074,7 +2019,8 @@ export default function BookedHotelDetails() {
       `}</style>
 
       {/* ── Sticky nav ── */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[#EAE4D9] h-14 px-8 flex items-center gap-4">
+      <div className="sticky top-0 z-40 bg-white border-b border-[#EAE4D9]">
+      <header className="h-14 px-8 flex items-center gap-4">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-[6px] bg-none border-none cursor-pointer text-[12px] font-semibold text-[#B5862A] font-['DM_Sans'] tracking-[0.05em] uppercase hover:opacity-80 transition-opacity"
@@ -2123,146 +2069,165 @@ export default function BookedHotelDetails() {
         </div>
       </header>
 
+      {/* Tabs Navigation */}
+      <div className="max-w-[1440px] mx-auto px-5 h-14 flex items-center gap-6 border-t border-[#EAE4D9] overflow-x-auto">
+        {[
+          { id: "hotel_details", label: "Hotel Details" },
+          { id: "room_details", label: "Room Details" },
+          { id: "passengers", label: "Guests" },
+          { id: "cancellation", label: "Rules & Policy" },
+          { id: "amendment", label: "Cancellations & Amendments" },
+          { id: "history", label: "History" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`pb-3 pt-3 text-sm font-bold tracking-wide transition-colors whitespace-nowrap relative ${
+              activeTab === tab.id
+                ? "text-[#1A1714] border-b-2 border-[#B5862A]"
+                : "text-[#A89F94] hover:text-[#7A7068]"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      </div>
+
       {/* ── Main ── */}
-      <main className="max-w-[1200px] mx-auto p-[32px_24px_120px]">
-        {/* Hero */}
-        <div className="mb-10">
-          <HotelHeroCard
-            booking={booking}
-            bookingDetail={bookingDetail}
-            paymentSuccessful={paymentSuccessful}
-          />
-        </div>
+      <main className="max-w-[1440px] w-full mx-auto px-4 lg:px-10 py-8 pb-24 space-y-6">
+        
+        {activeTab === "hotel_details" && (
+          <div className="space-y-6">
+            {/* Hero */}
+            <div className="mb-10">
+              <HotelHeroCard
+                booking={booking}
+                bookingDetail={bookingDetail}
+                paymentSuccessful={paymentSuccessful}
+              />
+            </div>
 
-        {/* Payment status */}
-        <div className="mb-10">
-          <PaymentStatusCard
-            booking={booking}
-            paymentSuccessful={paymentSuccessful}
-            isConfirmed={isConfirmed}
-            hotelReq={hotelReq}
-          />
-        </div>
+            {/* Payment status */}
+            <div className="mb-10">
+              <PaymentStatusCard
+                booking={booking}
+                paymentSuccessful={paymentSuccessful}
+                isConfirmed={isConfirmed}
+                hotelReq={hotelReq}
+              />
+            </div>
 
-        {/* ── Numbered sections ── */}
+            {/* 08 Fare Breakdown */}
+            {priceBreakUp && (
+              <section className="mb-12">
+                <SectionHeader num={8} title="Fare Breakdown" />
+                <FareBreakdownSection
+                  priceBreakUp={priceBreakUp}
+                  totalFare={totalFare}
+                  detailRoom={detailRoom}
+                  selectedRoom={selectedRoom}
+                />
+              </section>
+            )}
 
-        {/* 01 The Room */}
-        {rooms.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={1}
-              title="The Room"
-            />
-            <RoomSection
-              rooms={rooms}
-              selectedRoom={selectedRoom}
-            />
-          </section>
+            {/* 05 Booking References */}
+            <section className="mb-12">
+              <SectionHeader num={5} title="Order ID" />
+              <BookingReferencesSection
+                booking={booking}
+                bookingDetail={bookingDetail}
+                result={result}
+              />
+            </section>
+
+            {/* 09 Provider Audit */}
+            {liveBooking && (
+              <section className="mb-12">
+                <SectionHeader num={9} title="Provider Audit" />
+                <ProviderAuditSection bookingDetail={bookingDetail} />
+              </section>
+            )}
+          </div>
         )}
 
-        {/* 02 Amenities */}
-        <section className="mb-12">
-          <SectionHeader
-            num={2}
-            title="Amenities"
-          />
-          <AmenitiesSection amenities={amenities} />
-        </section>
+        {activeTab === "room_details" && (
+          <div className="space-y-6">
+            {/* 01 The Room */}
+            {rooms.length > 0 && (
+              <section className="mb-12">
+                <SectionHeader num={1} title="The Room" />
+                <RoomSection rooms={rooms} selectedRoom={selectedRoom} />
+              </section>
+            )}
 
-        {/* 03 Check-in Instructions */}
-        {rateConditions.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={3}
-              title="Check-in Instructions"
-            />
-            <CheckInInstructions conditions={rateConditions} />
-          </section>
+            {/* 02 Amenities */}
+            <section className="mb-12">
+              <SectionHeader num={2} title="Amenities" />
+              <AmenitiesSection amenities={amenities} />
+            </section>
+          </div>
         )}
 
-        {/* 04 Cancellation Policy */}
-        {cancelPolicies.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={4}
-              title="Cancellation Policy"
-            />
-            <CancellationPolicySection
-              policies={cancelPolicies}
-              lastCancellationDate={
-                detailRoom?.LastCancellationDate ||
-                bookingDetail?.LastCancellationDate
-              }
-            />
-          </section>
+        {activeTab === "passengers" && (
+          <div className="space-y-6">
+            {/* 06 Guest */}
+            {travellers.length > 0 && (
+              <section className="mb-12">
+                <SectionHeader num={6} title="Guest" />
+                <GuestSection travellers={travellers} />
+              </section>
+            )}
+          </div>
         )}
 
-        {/* 05 Booking References */}
-        <section className="mb-12">
-          <SectionHeader
-            num={5}
-            title="Order ID"
-          />
-          <BookingReferencesSection
-            booking={booking}
-            bookingDetail={bookingDetail}
-            result={result}
-          />
-        </section>
-
-        {/* 06 Guest */}
-        {travellers.length > 0 && (
-          <section className="mb-12">
-            <SectionHeader
-              num={6}
-              title="Guest"
-            />
-            <GuestSection travellers={travellers} />
-          </section>
+        {activeTab === "cancellation" && (
+          <div className="space-y-6">
+            {/* 03 Check-in Instructions */}
+            {rateConditions.length > 0 && (
+              <section className="mb-12">
+                <SectionHeader num={3} title="Check-in Instructions" />
+                <CheckInInstructions conditions={rateConditions} />
+              </section>
+            )}
+          </div>
         )}
 
-        {/* 08 Fare Breakdown */}
-        {priceBreakUp && (
-          <section className="mb-12">
-            <SectionHeader
-              num={8}
-              title="Fare Breakdown"
-            />
-            <FareBreakdownSection
-              priceBreakUp={priceBreakUp}
-              totalFare={totalFare}
-              detailRoom={detailRoom}
-            />
-          </section>
+        {activeTab === "amendment" && (
+          <div className="space-y-6">
+            {/* 04 Cancellation Policy */}
+            {cancelPolicies.length > 0 && (
+              <section className="mb-12">
+                <SectionHeader num={4} title="Cancellation Policy" />
+                <CancellationPolicySection
+                  policies={cancelPolicies}
+                  lastCancellationDate={
+                    detailRoom?.LastCancellationDate ||
+                    bookingDetail?.LastCancellationDate
+                  }
+                />
+              </section>
+            )}
+
+            {/* 07 Cancellation Request */}
+            <section className="mb-12">
+              <SectionHeader num={7} title="Cancellation Request" />
+              <CancellationSection
+                booking={booking}
+                isConfirmed={isConfirmed}
+                cancelPolicies={cancelPolicies}
+                totalFare={totalFare}
+              />
+            </section>
+          </div>
         )}
 
-        {/* 07 Cancellation Request */}
-        <section className="mb-12">
-          <SectionHeader
-            num={7}
-            title="Cancellation Request"
-          />
-          <CancellationSection
-            booking={booking}
-            isConfirmed={isConfirmed}
-            cancelPolicies={cancelPolicies}
-            totalFare={totalFare}
-          />
-        </section>
-
-        {/* 09 Provider Audit */}
-        {liveBooking && (
-          <section className="mb-12">
-            <SectionHeader
-              num={9}
-              title="Provider Audit"
-            />
-            <ProviderAuditSection bookingDetail={bookingDetail} />
-          </section>
+        {activeTab === "history" && (
+          <div className="space-y-6">
+            {/* 10 Booking History */}
+            <BookingHistory booking={booking} />
+          </div>
         )}
-
-        {/* 10 Booking History */}
-        <BookingHistory booking={booking} />
       </main>
     </div>
   );

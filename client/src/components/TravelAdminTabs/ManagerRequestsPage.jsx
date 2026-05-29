@@ -250,8 +250,8 @@ const ManagerRequestsPage = () => {
             columns: [
               { header: "Personnel", accessor: (r) => getNameFromObj(r.employeeId || r.employee) || r.employeeName || "Unknown" },
               { header: "Project Scope", accessor: (r) => r.projectName || "—" },
-              { header: "Booking Context", accessor: (r) => (r.bookingSnapshot || {}).hotelName || r.bookingType || "Hotel Booking" },
-              { header: "Order ID", accessor: (r) => r.orderId || "—" },
+              // { header: "Booking Context", accessor: (r) => (r.bookingSnapshot || {}).hotelName || r.bookingType || "Hotel Booking" },
+              // { header: "Order ID", accessor: (r) => r.orderId || "—" },
               { header: "Designated Approver", accessor: (r) => getNameFromObj(r.managerId || r.manager) || r.managerName || "Manager" },
               { header: "Requested On", accessor: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN") : "—" },
               { header: "Status", key: "status" }
@@ -265,8 +265,8 @@ const ManagerRequestsPage = () => {
               <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
                 <Th className="!px-6 !py-5">Personnel</Th>
                 <Th className="!px-6 !py-5">Project Scope</Th>
-                <Th className="!px-6 !py-5">Booking Context</Th>
-                <Th className="!px-6 !py-5">Order ID</Th>
+                {/* <Th className="!px-6 !py-5">Booking Context</Th>
+                <Th className="!px-6 !py-5">Order ID</Th> */}
                 <Th className="!px-6 !py-5">Designated Approver</Th>
                 <Th className="!px-6 !py-5">Requested On</Th>
                 <Th className="!px-6 !py-5">Status</Th>
@@ -296,13 +296,13 @@ const ManagerRequestsPage = () => {
                        <p className="text-xs font-black truncate max-w-[150px]" style={{ color: C.navy }}>{req.projectName || "—"}</p>
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{req.projectCodeId || "—"}</p>
                     </td>
-                    <td className="!px-6 !py-5">
+                    {/* <td className="!px-6 !py-5">
                        <p className="text-xs font-black truncate max-w-[150px]" style={{ color: C.navy }}>{bookingSnap.hotelName || req.bookingType || "Hotel Booking"}</p>
                        <p className="text-[10px] font-bold text-gold uppercase">{bookingSnap.city || "—"}</p>
                     </td>
                     <td className="!px-6 !py-5">
                        <p className="text-[11px] font-black" style={{ color: C.navy }}>{req.orderId || "—"}</p>
-                    </td>
+                    </td> */}
                     <td className="!px-6 !py-5">
                        <div className="flex items-center gap-2">
                           <Avatar name={managerName} size="sm" />

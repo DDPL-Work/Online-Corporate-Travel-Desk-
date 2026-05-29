@@ -7,8 +7,13 @@ import {
   FiClock,
   FiArrowDown,
   FiArrowUp,
+  FiArrowRight,
+  FiRefreshCw,
+  FiDownload,
+  FiX,
 } from "react-icons/fi";
-import { FaPlane, FaHotel, FaRupeeSign } from "react-icons/fa";
+import { FaPlane, FaHotel, FaRupeeSign, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { airlineLogo } from "../../utils/formatter";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -17,20 +22,11 @@ import {
 } from "../../Redux/Actions/corporate.related.thunks";
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import Pagination from "../Shared/Pagination";
-import TableActionBar from "../Shared/TableActionBar";
 import useCsvExporter from "../../services/export/useCsvExporter";
 import {
   flightBookingsExportTemplate,
   hotelBookingsExportTemplate,
 } from "../../templates/exportTemplates/superAdminExportTemplates";
-
-const colors = {
-  primary: "#0A4D68",
-  secondary: "#088395",
-  accent: "#05BFDB",
-  light: "#F8FAFC",
-  dark: "#1E293B",
-};
 
 const DEFAULT_LIMIT = 10;
 const EMPTY_VALUE = "—";
@@ -141,9 +137,17 @@ const normalizeFlight = (b = {}) => {
       if (fRes?.ChangeRequestStatus === 4 || fRes?.RefundedAmount > 0) return "Processed";
       return dbStatus || null;
     })(),
+    // airlineCode  → always the IATA code (e.g. "EY", "AI") for logo lookup
+    // airline      → human-readable name / code for display
+    airlineCode:
+      b.airlineDetails?.code ||
+      segments[0]?.airlineCode ||
+      null,
     airline:
-      b.bookingSnapshot?.airline ||
+      // Prefer the full name from the first segment, fall back to bookingSnapshot.airline
       segments[0]?.airlineName ||
+      b.airlineDetails?.name ||
+      b.bookingSnapshot?.airline ||
       segments[0]?.airlineCode ||
       "",
   };
@@ -286,12 +290,12 @@ const SortHeader = ({ label, sortKey, sort, onSort }) => {
   );
 };
 
-// Truncate long IDs for display
 const truncateId = (id = "", maxLen = 16) => {
   if (!id || id === EMPTY_VALUE) return id;
   return id.length > maxLen ? `${id.slice(0, maxLen)}…` : id;
 };
 
+// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export default function GlobalBookingsDashboard() {
   const tableScrollRef = useRef(null);
   const dispatch = useDispatch();
@@ -397,6 +401,7 @@ export default function GlobalBookingsDashboard() {
   }, [filtered, sort]);
 
   const totalSpend = sortedFiltered.reduce((sum, b) => sum + (b.amount || 0), 0);
+
   const handleViewBooking = (booking, type = activeTab) => {
     const id = booking?._raw?._id || booking?.id || booking?._id;
     if (!id) return;
@@ -424,13 +429,36 @@ export default function GlobalBookingsDashboard() {
     else setHotelPage(page);
   };
 
+  const handleRefresh = () => {
+    if (activeTab === "Flight") dispatch(fetchFlightBookings());
+    else dispatch(fetchHotelBookings());
+  };
+
+  const handleScrollTable = (direction) => {
+    if (tableScrollRef.current) {
+      tableScrollRef.current.scrollBy({
+        left: direction === "left" ? -300 : 300,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  const resetFilters = () => {
+    setSearch("");
+    setStartDate("");
+    setEndDate("");
+    setTravelDate("");
+    setCheckIn("");
+    setCheckOut("");
+    setCorporate("All");
+  };
+
   const isLoading = activeTab === "Flight" ? loadingFlights : loadingHotels;
   const exportKey = `bookings_${activeTab.toLowerCase()}`;
   const isExporting = exportingKey === exportKey;
 
   const handleExport = () => {
     if (isLoading) return;
-
     exportCsv({
       key: exportKey,
       data: paginatedData,
@@ -445,51 +473,78 @@ export default function GlobalBookingsDashboard() {
   };
 
   return (
-    <div className="min-h-screen w-full p-4 md:p-5 xl:p-6 font-sans" style={{ backgroundColor: colors.light }}>
-      <div className="max-w-[1440px] mx-auto w-full space-y-4 xl:space-y-5">
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: "#f8fafc" }}>
+      {/* ── Navy Gradient Header ── */}
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 text-white shadow-sm"
+              >
+                <FiArrowRight className="rotate-180" size={20} />
+              </button>
+              <button
+                onClick={handleRefresh}
+                className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${isLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                disabled={isLoading}
+              >
+                <div className={isLoading ? "animate-spin" : ""}>
+                  <FiRefreshCw size={20} />
+                </div>
+              </button>
+            </div>
 
-        {/* PAGE HEADER */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-10 h-10 xl:w-12 xl:h-12 rounded-xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white shrink-0">
-            <FiList size={20} />
-          </div>
-          <div className="text-left min-w-0">
-            <h1 className="text-lg xl:text-2xl font-black text-slate-900 tracking-tight uppercase leading-tight">
-              Global Bookings Summary
-            </h1>
-            <p className="text-[10px] text-slate-400 mt-0.5 font-bold uppercase tracking-widest">
-              Multi-Corporate Administration
-            </p>
+            <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
+                <FiList size={28} />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black tracking-tight leading-none">
+                  Global Bookings Summary
+                </h1>
+                <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                  Multi-Corporate Administration
+                </p>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* TABS */}
-        <div className="flex flex-wrap items-end gap-1 border-b-2 border-slate-200">
-          {["Flight", "Hotel"].map((tab) => (
+      <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
+        {/* ── Tab Switcher ── */}
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+          {[
+            ["Flight", "Flight Manifest", FaPlane],
+            ["Hotel", "Hotel Manifest", FaHotel],
+          ].map(([k, lbl, Icon]) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex items-center gap-2 px-5 xl:px-8 py-2.5 text-[13px] font-bold transition-all border-b-2 -mb-0.5 rounded-t-lg ${
-                activeTab === tab
-                  ? `bg-white border-b-[${tab === "Flight" ? "#0A4D68" : "#088395"}] shadow-sm ${tab === "Flight" ? "text-[#0A4D68] border-b-[#0A4D68]" : "text-[#088395] border-b-[#088395]"}`
-                  : "text-slate-400 border-transparent hover:text-slate-600 hover:bg-white/60"
+              key={k}
+              onClick={() => setActiveTab(k)}
+              className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${
+                activeTab === k
+                  ? "bg-[#000D26] text-white shadow-lg scale-[1.02]"
+                  : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
               }`}
             >
-              {tab === "Flight" ? <FaPlane size={13} /> : <FaHotel size={13} />}
-              {tab} Bookings
+              <Icon size={14} /> {lbl}
             </button>
           ))}
         </div>
 
-        {/* SUMMARY STATS */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 xl:gap-4">
+        {/* ── Summary Stats ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             label={`Total ${activeTab}s`}
             value={filtered.length}
             Icon={activeTab === "Flight" ? FaPlane : FaHotel}
-            borderCls={activeTab === "Flight" ? "border-[#0A4D68]" : "border-[#088395]"}
-            iconBgCls={activeTab === "Flight" ? "bg-[#0A4D68]/10" : "bg-[#088395]/10"}
-            iconColorCls={activeTab === "Flight" ? "text-[#0A4D68]" : "text-[#088395]"}
+            borderCls="border-[#000D26]"
+            iconBgCls="bg-slate-100"
+            iconColorCls="text-[#000D26]"
           />
           <StatCard
             label="Confirmed"
@@ -517,120 +572,172 @@ export default function GlobalBookingsDashboard() {
           />
         </div>
 
-        {/* FILTERS */}
-        <div className="bg-white rounded-xl shadow-sm p-4 xl:p-5 border border-slate-100">
-          <div className={`grid grid-cols-2 md:grid-cols-3 gap-3 ${
-            activeTab === "Flight" ? "xl:grid-cols-5" : "xl:grid-cols-6"
+        {/* ── Filters ── */}
+        <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: "#e2e8f0" }}>
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-5 ${
+            activeTab === "Flight" ? "lg:grid-cols-5" : "lg:grid-cols-6"
           }`}>
             {/* Search */}
-            <LabeledInput label="Search">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <FiSearch size={12} /> Search
+              </label>
               <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
                 <input
                   type="text"
                   placeholder="Traveller or booking..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 border rounded-lg text-xs outline-none bg-slate-50 focus:border-[#0A4D68] focus:bg-white transition-colors"
+                  className="w-full pl-9 pr-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white"
                 />
+                <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
               </div>
-            </LabeledInput>
+            </div>
 
             {/* Corporate */}
-            <LabeledInput label="Corporate Account">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                Corporate Account
+              </label>
               <select
                 value={corporate}
                 onChange={(e) => setCorporate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-xs outline-none bg-slate-50 cursor-pointer focus:border-[#0A4D68] focus:bg-white transition-colors"
+                className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white cursor-pointer"
               >
                 {corporates.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
-            </LabeledInput>
+            </div>
 
             {/* Date filters */}
             {activeTab === "Flight" ? (
-              <LabeledInput label="Travel Date">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                  Travel Date
+                </label>
                 <input
                   type="date"
                   value={travelDate}
                   onChange={(e) => setTravelDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-xs outline-none bg-slate-50 focus:border-[#0A4D68] focus:bg-white transition-colors"
+                  className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white"
                 />
-              </LabeledInput>
+              </div>
             ) : (
               <>
-                <LabeledInput label="Check-In Date">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    Check-In
+                  </label>
                   <input
                     type="date"
                     value={checkIn}
                     onChange={(e) => setCheckIn(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg text-xs outline-none bg-slate-50 focus:border-[#0A4D68] focus:bg-white transition-colors"
+                    className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white"
                   />
-                </LabeledInput>
-                <LabeledInput label="Check-Out Date">
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    Check-Out
+                  </label>
                   <input
                     type="date"
                     value={checkOut}
                     onChange={(e) => setCheckOut(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg text-xs outline-none bg-slate-50 focus:border-[#0A4D68] focus:bg-white transition-colors"
+                    className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white"
                   />
-                </LabeledInput>
+                </div>
               </>
             )}
 
-            <LabeledInput label="Booking From">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                Booking From
+              </label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-xs outline-none bg-slate-50 focus:border-[#0A4D68] focus:bg-white transition-colors"
+                className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white"
               />
-            </LabeledInput>
+            </div>
 
-            <LabeledInput label="Booking To">
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-xs outline-none bg-slate-50 focus:border-[#0A4D68] focus:bg-white transition-colors"
-              />
-            </LabeledInput>
+            <div className="flex items-end">
+              <button
+                onClick={resetFilters}
+                className="w-full py-2.5 rounded-xl font-black text-[13px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-100 hover:text-slate-700 bg-white text-slate-500 border-slate-200"
+              >
+                <FiX size={14} /> Reset
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* TABLE SECTION */}
-        <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
-          {/* Table Header */}
-          <div className="px-4 xl:px-5 py-3.5 border-b border-slate-100 flex flex-wrap gap-3 justify-between items-center bg-slate-50/50">
-            <h2 className="font-black text-slate-700 uppercase tracking-tighter text-base xl:text-lg">
-              {activeTab} Detailed Report
-            </h2>
-            <TableActionBar
-              scrollRef={tableScrollRef}
-              exportLabel="Export CSV"
-              onExport={handleExport}
-              exportDisabled={isLoading || isExporting}
-              exportLoading={isExporting}
-              exportClassName={activeTab === "Flight"
-                ? "bg-[#0A4D68] hover:bg-[#083d52] shadow-[#0A4D68]/20"
-                : "bg-[#088395] hover:bg-[#066f7e] shadow-[#088395]/20"}
-              arrowClassName={activeTab === "Flight"
-                ? "border-cyan-100 bg-cyan-50 text-[#0A4D68] hover:bg-cyan-100 hover:border-cyan-200 hover:text-[#083d52] disabled:hover:bg-cyan-50"
-                : "border-teal-100 bg-teal-50 text-[#088395] hover:bg-teal-100 hover:border-teal-200 hover:text-[#066f7e] disabled:hover:bg-teal-50"}
-            />
+        {/* ── Table Section ── */}
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
+          {/* Table Titlebar */}
+          <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-3 justify-between items-center bg-slate-50/50">
+            {/* Left: title + count */}
+            <div>
+              <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
+                {activeTab} Detailed Report
+              </h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+                {sortedFiltered.length} records found
+              </p>
+            </div>
+
+            {/* Right: Export + Scroll controls */}
+            <div className="flex items-center gap-2">
+              {/* Export */}
+            <button
+              onClick={handleExport}
+              disabled={isLoading || isExporting}
+              className="flex items-center justify-center space-x-2 px-5 py-1.5 bg-[#000d26] text-white hover:text-white hover:border-[#C9A84C] transition-all shadow-sm rounded-2xl"
+            >
+              <FiDownload className="w-4 h-4" />
+              <span>{isExporting ? "Exporting..." : "Export"}</span>
+            </button>
+              {/* Divider */}
+              <div className="w-px h-7 bg-slate-200 mx-1" />
+
+              {/* Scroll Left */}
+              <button
+                onClick={() => handleScrollTable("left")}
+                title="Scroll table left"
+                className="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-[#C9A84C] hover:border-[#C9A84C] transition-all shadow-sm"
+              >
+                <FaChevronLeft size={15} />
+              </button>
+
+              {/* Scroll Right */}
+              <button
+                onClick={() => handleScrollTable("right")}
+                title="Scroll table right"
+               className="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-[#C9A84C] hover:border-[#C9A84C] transition-all shadow-sm"
+              >
+                <FaChevronRight size={15} />
+              </button>
+            </div>
           </div>
 
-          {/* Table — no horizontal scroll, fixed layout fills 100% width */}
+          {/* Table Body */}
           <div ref={tableScrollRef} className="w-full overflow-x-auto">
             {isLoading ? (
-              <div className="p-8 text-center text-sm text-slate-500">
-                Loading {activeTab.toLowerCase()} bookings...
+              <div className="py-20 text-center">
+                <FiRefreshCw className="animate-spin mx-auto text-[#003399] mb-4" size={32} />
+                <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">
+                  Loading {activeTab.toLowerCase()} bookings...
+                </p>
               </div>
             ) : sortedFiltered.length === 0 ? (
-              <div className="p-8 text-center text-sm text-slate-500">
-                No {activeTab.toLowerCase()} bookings found.
+              <div className="py-20 text-center">
+                <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 mx-auto mb-4">
+                  <FiSearch size={32} />
+                </div>
+                <p className="text-sm font-bold text-slate-400">
+                  No {activeTab.toLowerCase()} bookings found.
+                </p>
               </div>
             ) : activeTab === "Flight" ? (
               <FlightTable
@@ -650,7 +757,7 @@ export default function GlobalBookingsDashboard() {
           </div>
 
           {/* Pagination */}
-          <div className="flex flex-wrap gap-3 items-center justify-between px-4 xl:px-5 py-3 border-t border-slate-100 bg-white">
+          <div className="flex flex-wrap gap-3 items-center justify-between px-6 py-3 border-t border-slate-100 bg-white">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               Page {currentPage} of {totalPages}
             </span>
@@ -663,13 +770,11 @@ export default function GlobalBookingsDashboard() {
           </div>
 
           {/* Footer */}
-          <div className="bg-slate-50 px-4 xl:px-5 py-3 border-t border-slate-100 flex flex-wrap gap-2 justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+          <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 flex flex-wrap gap-2 justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
             <span>Showing {sortedFiltered.length} {activeTab} Records</span>
             <span>
               Est. Market Value:{" "}
-              <span className={activeTab === "Flight" ? "text-[#0A4D68]" : "text-[#088395]"}>
-                ₹{totalSpend.toLocaleString()}
-              </span>
+              <span className="text-[#003399]">₹{totalSpend.toLocaleString()}</span>
             </span>
           </div>
         </div>
@@ -678,22 +783,9 @@ export default function GlobalBookingsDashboard() {
   );
 }
 
-// ─── FLIGHT TABLE ────────────────────────────────────────────────────────────
+// ─── FLIGHT TABLE ─────────────────────────────────────────────────────────────
 const FlightTable = ({ data, onView, sort, onSort }) => (
   <>
-    {/*
-      table-fixed + w-full = fills container exactly, no horizontal scroll.
-      Column widths sum to 100%. Adjust percentages as needed.
-        Order ID      : 14%
-        Booked Date   : 12%
-        Corporate     : 16%
-        Traveller/ID  : 15%
-        Travel Date   : 10%
-        PNR           :  9%
-        Status        : 14%
-        Airline/Route : 13%
-        Action        :  5%
-    */}
     <table className="min-w-[1240px] w-full table-fixed text-left border-collapse">
       <colgroup>
         <col style={{ width: "12%" }} />
@@ -708,35 +800,38 @@ const FlightTable = ({ data, onView, sort, onSort }) => (
         <col style={{ width: "5%" }} />
       </colgroup>
       <thead>
-        <tr className="bg-[#0A4D68]">
-          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-teal-50 uppercase tracking-wider">Order ID</th>
-          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-teal-50 uppercase tracking-wider">Payment ID</th>
-          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-teal-50">
+        <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+          <th className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold uppercase tracking-wider">Order ID</th>
+          <th className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold uppercase tracking-wider">Payment ID</th>
+          <th className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold">
             <SortHeader label="Booked Date" sortKey="bookedDate" sort={sort} onSort={onSort} />
           </th>
           {["Corporate Account", "Traveller / ID"].map((h) => (
-            <th key={h} className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-teal-50 uppercase tracking-wider">
+            <th key={h} className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold uppercase tracking-wider">
               {h}
             </th>
           ))}
-          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-teal-50">
+          <th className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold">
             <SortHeader label="Travel Date" sortKey="date" sort={sort} onSort={onSort} />
           </th>
           {["PNR", "Status", "Airline / Route", ""].map((h) => (
-            <th key={h} className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-teal-50 uppercase tracking-wider">
+            <th key={h} className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold uppercase tracking-wider">
               {h}
             </th>
           ))}
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-100 text-sm">
-        {data.map((b) => (
-          <tr key={b.id || b.orderId || b.empId} className="h-[92px] hover:bg-slate-50/70 transition-colors bg-white">
-
+        {data.map((b, i) => (
+          <tr
+            key={b.id || b.orderId || b.empId}
+            className="h-[92px] hover:bg-slate-50 transition-colors"
+            style={{ background: i % 2 === 0 ? "#ffffff" : "#f8fafc" }}
+          >
             {/* Order ID */}
             <td className="px-4 xl:px-5 py-4 align-middle">
               <div className="flex min-h-[52px] items-center">
-                <span className="font-mono text-[11px] text-[#0A4D68] font-black truncate block">
+                <span className="font-mono text-[11px] text-[#003399] font-black truncate block">
                   {truncateId(b.orderId, 22)}
                 </span>
               </div>
@@ -768,7 +863,7 @@ const FlightTable = ({ data, onView, sort, onSort }) => (
             {/* Traveller */}
             <td className="px-4 xl:px-5 py-4 align-middle">
               <div className="flex min-h-[52px] items-center">
-                <p className="font-bold text-slate-700 text-[12px] truncate">{b.employee}</p>
+                <p className="font-bold text-[#003399] text-[12px] truncate">{b.employee}</p>
               </div>
             </td>
 
@@ -781,7 +876,7 @@ const FlightTable = ({ data, onView, sort, onSort }) => (
 
             {/* PNR */}
             <td className="px-4 xl:px-5 py-4 align-middle">
-              <div className="flex min-h-[52px] items-center font-mono font-black text-[12px] text-[#0A4D68] uppercase tracking-tight">
+              <div className="flex min-h-[52px] items-center font-mono font-black text-[12px] text-[#003399] uppercase tracking-tight">
                 {b.pnr}
               </div>
             </td>
@@ -796,9 +891,21 @@ const FlightTable = ({ data, onView, sort, onSort }) => (
 
             {/* Airline / Route */}
             <td className="px-4 xl:px-5 py-4 align-middle">
-              <div className="flex min-h-[52px] flex-col justify-center">
-                <p className="font-bold text-slate-700 text-[12px] truncate">{b.destination}</p>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate mt-1">{b.airline}</p>
+              <div className="flex min-h-[52px] flex-col justify-center gap-1">
+                <div className="flex items-center gap-2">
+                  <img
+                    src={airlineLogo(b.airlineCode || b.airline)}
+                    alt={b.airline || "Airline"}
+                    className="w-7 h-7 rounded-md object-contain bg-slate-50 border border-slate-100 flex-shrink-0"
+                    onError={(e) => {
+                      e.currentTarget.src = "https://via.placeholder.com/32";
+                    }}
+                  />
+                  <p className="font-bold text-slate-700 text-[12px] truncate">{b.destination}</p>
+                </div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate pl-9">
+                  {b.airline || b.airlineCode || "—"}
+                </p>
               </div>
             </td>
 
@@ -807,10 +914,13 @@ const FlightTable = ({ data, onView, sort, onSort }) => (
               <div className="flex min-h-[52px] items-center justify-center">
                 <button
                   onClick={() => onView(b, "Flight")}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-[#0A4D68] hover:bg-[#0A4D68]/10 transition-colors"
+                  className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-white hover:to-white group"
                   title="View details"
                 >
-                  <FiEye size={15} />
+                  <FiArrowRight
+                    size={16}
+                    className="text-[#E7C695] group-hover:text-[#000d26] transition-colors"
+                  />
                 </button>
               </div>
             </td>
@@ -821,21 +931,9 @@ const FlightTable = ({ data, onView, sort, onSort }) => (
   </>
 );
 
-// ─── HOTEL TABLE ─────────────────────────────────────────────────────────────
+// ─── HOTEL TABLE ──────────────────────────────────────────────────────────────
 const HotelTable = ({ data, onView, sort, onSort }) => (
   <>
-    {/*
-      Column widths:
-        Order ID      : 14%
-        Booked Date   : 12%
-        Corporate     : 15%
-        Guest/ID      : 15%
-        Duration      : 13%
-        Amount        :  9%
-        Status        : 14%
-        Hotel/Room    : 11%
-        Action        :  5%
-    */}
     <table className="min-w-[1240px] w-full table-fixed text-left border-collapse">
       <colgroup>
         <col style={{ width: "12%" }} />
@@ -850,35 +948,38 @@ const HotelTable = ({ data, onView, sort, onSort }) => (
         <col style={{ width: "5%" }} />
       </colgroup>
       <thead>
-        <tr className="bg-[#088395]">
-          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-cyan-50 uppercase tracking-wider">Order ID</th>
-          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-cyan-50 uppercase tracking-wider">Payment ID</th>
-          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-cyan-50">
+        <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+          <th className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold uppercase tracking-wider">Order ID</th>
+          <th className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold uppercase tracking-wider">Payment ID</th>
+          <th className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold">
             <SortHeader label="Booked Date" sortKey="bookedDate" sort={sort} onSort={onSort} />
           </th>
           {["Corporate Account", "Guest / ID"].map((h) => (
-            <th key={h} className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-cyan-50 uppercase tracking-wider">
+            <th key={h} className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold uppercase tracking-wider">
               {h}
             </th>
           ))}
-          <th className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-cyan-50">
+          <th className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold">
             <SortHeader label="Duration" sortKey="checkIn" sort={sort} onSort={onSort} />
           </th>
           {["Amount", "Status", "Hotel / Room", ""].map((h) => (
-            <th key={h} className="px-4 xl:px-5 py-4 align-middle text-[10px] font-bold text-cyan-50 uppercase tracking-wider">
+            <th key={h} className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold uppercase tracking-wider">
               {h}
             </th>
           ))}
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-100 text-sm">
-        {data.map((b) => (
-          <tr key={b.id || b.orderId || b.empId} className="h-[92px] hover:bg-slate-50/70 transition-colors bg-white">
-
+        {data.map((b, i) => (
+          <tr
+            key={b.id || b.orderId || b.empId}
+            className="h-[92px] hover:bg-slate-50 transition-colors"
+            style={{ background: i % 2 === 0 ? "#ffffff" : "#f8fafc" }}
+          >
             {/* Order ID */}
             <td className="px-4 xl:px-5 py-4 align-middle">
               <div className="flex min-h-[52px] items-center">
-                <span className="font-mono text-[11px] text-[#088395] font-black truncate block">
+                <span className="font-mono text-[11px] text-[#003399] font-black truncate block">
                   {truncateId(b.orderId, 22)}
                 </span>
               </div>
@@ -910,7 +1011,7 @@ const HotelTable = ({ data, onView, sort, onSort }) => (
             {/* Guest */}
             <td className="px-4 xl:px-5 py-4 align-middle">
               <div className="flex min-h-[52px] items-center">
-                <p className="font-bold text-slate-700 text-[12px] truncate">{b.employee}</p>
+                <p className="font-bold text-[#003399] text-[12px] truncate">{b.employee}</p>
               </div>
             </td>
 
@@ -921,7 +1022,7 @@ const HotelTable = ({ data, onView, sort, onSort }) => (
             </td>
 
             {/* Amount */}
-            <td className="px-3 xl:px-4 py-3.5 align-middle font-black text-slate-900 text-[12px] whitespace-nowrap">
+            <td className="px-3 xl:px-4 py-3.5 align-middle font-black text-[#003399] text-[12px] whitespace-nowrap">
               ₹{(b.amount || 0).toLocaleString()}
             </td>
 
@@ -943,10 +1044,13 @@ const HotelTable = ({ data, onView, sort, onSort }) => (
             <td className="pl-3 pr-6 xl:pl-4 xl:pr-8 py-3.5 align-middle text-center">
               <button
                 onClick={() => onView(b, "Hotel")}
-                className="p-1.5 rounded-lg bg-slate-100 text-[#088395] hover:bg-[#088395]/10 transition-colors"
+                className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-white hover:to-white group"
                 title="View details"
               >
-                <FiEye size={15} />
+                <FiArrowRight
+                  size={16}
+                  className="text-[#E7C695] group-hover:text-[#000d26] transition-colors"
+                />
               </button>
             </td>
           </tr>
@@ -971,25 +1075,14 @@ function RefundMeta({ refundStatus }) {
 
 function StatCard({ label, value, iconBgCls, iconColorCls, borderCls, Icon }) {
   return (
-    <div className={`bg-white rounded-xl p-3.5 xl:p-4 flex items-center gap-3 shadow-sm border-l-4 ${borderCls}`}>
-      <div className={`w-9 h-9 xl:w-10 xl:h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBgCls}`}>
-        <Icon size={16} className={iconColorCls} />
+    <div className={`bg-white rounded-2xl p-6 border-b-4 ${borderCls} shadow-sm flex items-center justify-between`}>
+      <div>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+        <h3 className="text-3xl font-black text-slate-800">{value}</h3>
       </div>
-      <div className="text-left min-w-0">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 truncate">{label}</p>
-        <p className="text-lg xl:text-xl font-black text-slate-900 leading-none">{value}</p>
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconBgCls}`}>
+        <Icon size={24} className={iconColorCls} />
       </div>
-    </div>
-  );
-}
-
-function LabeledInput({ label, children }) {
-  return (
-    <div className="flex flex-col gap-1 text-left">
-      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-        {label}
-      </label>
-      {children}
     </div>
   );
 }

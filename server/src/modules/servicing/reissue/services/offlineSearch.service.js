@@ -157,15 +157,40 @@ const extractResultSegments = (result) => {
         segment?.Duration ?? segment?.JourneyDuration ?? segment?.SegmentDuration ?? 0,
       );
 
+      const originAirport = segment?.Origin?.Airport || segment?.origin?.airport || segment?.OriginAirport || {};
+      const originDetails = {
+        code: origin,
+        name: originAirport?.AirportName || originAirport?.name || segment?.Origin?.AirportName || null,
+        city: originAirport?.CityName || originAirport?.city || segment?.Origin?.CityName || null,
+        terminal: originAirport?.Terminal || originAirport?.terminal || segment?.Origin?.Terminal || null,
+        gate: segment?.Origin?.Gate || null,
+      };
+
+      const destinationAirport = segment?.Destination?.Airport || segment?.destination?.airport || segment?.DestinationAirport || {};
+      const destinationDetails = {
+        code: destination,
+        name: destinationAirport?.AirportName || destinationAirport?.name || segment?.Destination?.AirportName || null,
+        city: destinationAirport?.CityName || destinationAirport?.city || segment?.Destination?.CityName || null,
+        terminal: destinationAirport?.Terminal || destinationAirport?.terminal || segment?.Destination?.Terminal || null,
+        gate: segment?.Destination?.Gate || null,
+      };
+
+      const availableSeats = segment?.NoOfSeatAvailable || segment?.AvailableSeats || segment?.SeatsAvailable || null;
+      const fareClass = segment?.Airline?.FareClass || segment?.FareClass || null;
+      const supplierFareClass = segment?.SupplierFareClass || segment?.Airline?.SupplierFareClass || null;
+
       if (!origin || !destination) return null;
       return {
-        origin,
-        destination,
+        origin: originDetails,
+        destination: destinationDetails,
         departureTime,
         arrivalTime,
         flightNumber,
         airlineCode,
         airlineName,
+        fareClass,
+        supplierFareClass,
+        availableSeats,
         stops,
         duration: Number.isFinite(duration) && duration > 0 ? duration : null,
       };
@@ -323,8 +348,8 @@ const normalizeSearchResults = async (searchResponse, booking) => {
   const traceId = searchResponse?.Response?.TraceId || searchResponse?.TraceId || null;
   const normalizedResults = rawResults.map((result, index) => {
     const segments = extractResultSegments(result);
-    const origin = segments[0]?.origin || null;
-    const destination = segments[segments.length - 1]?.destination || null;
+    const origin = segments[0]?.origin?.code || segments[0]?.origin || null;
+    const destination = segments[segments.length - 1]?.destination?.code || segments[segments.length - 1]?.destination || null;
     // Primary: pull from normalised segment data (already fixed to read TBO nested fields)
     // Fallback: try top-level result fields and TBO nested Origin/Destination
     const departureTime =
