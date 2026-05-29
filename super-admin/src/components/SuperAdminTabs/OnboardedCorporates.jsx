@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiXCircle, FiInbox, FiClock, FiX, FiEye, FiCreditCard, FiArrowLeft, FiCalendar, FiPower } from "react-icons/fi";
+import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiXCircle, FiInbox, FiClock, FiX, FiEye, FiCreditCard, FiArrowLeft, FiCalendar, FiPower, FiPercent } from "react-icons/fi";
 import { MdVerifiedUser, MdBusiness, MdAccountBalanceWallet } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import AddCorporateModal from "../../Modal/AddCorporateModal";
@@ -389,20 +389,15 @@ export default function OnboardedCorporates() {
                             <FiEye size={16} />
                           </button>
                           
-                          {/* <button
+                          <button
                             onClick={() => {
-                              setSelectedCorporate(c);
-                              setOpenStatusModal(true);
+                              navigate(`/corporate-markup/${c._id}`, { state: { corporate: c } });
                             }}
-                            className={`p-2 rounded transition-colors cursor-pointer ${
-                              c.status?.toLowerCase() === "active" || c.status?.toLowerCase() === "approved"
-                                ? "hover:bg-amber-100 text-amber-500" 
-                                : "hover:bg-emerald-100 text-emerald-500"
-                            }`}
-                            title="Toggle Status"
+                            className="p-2 rounded hover:bg-violet-100 text-violet-600 transition-colors cursor-pointer"
+                            title="Markup Configuration"
                           >
-                            <FiPower size={16} />
-                          </button> */}
+                            <FiPercent size={16} />
+                          </button>
                         </div>
                       </td>
                     </tr>

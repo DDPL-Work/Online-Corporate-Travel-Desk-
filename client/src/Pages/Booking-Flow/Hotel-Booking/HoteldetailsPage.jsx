@@ -229,7 +229,7 @@ const HotelDetailsPage = () => {
         rooms: searchPayload?.PaxRooms?.map((r) => ({
           adults: r.Adults,
           children: r.Children,
-          childAges: r.ChildAge,
+          childAges: r.ChildrenAges || r.ChildAge || r.childrenAges || [],
         })),
         city: hotelFromSearch?.CityName,
         guestNationality: searchPayload?.GuestNationality || "",

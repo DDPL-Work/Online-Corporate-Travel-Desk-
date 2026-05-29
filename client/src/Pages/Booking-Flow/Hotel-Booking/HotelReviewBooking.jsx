@@ -1024,12 +1024,12 @@ const HotelReviewBooking = () => {
     {};
 
   const totalAdultsFromSearch =
-    (searchParams?.rooms || []).reduce(
+    (searchParams?.rooms || searchParams?.PaxRooms || []).reduce(
       (sum, r) => sum + (r.Adults || r.adults || 0),
       0,
     ) || 1;
   const totalChildrenFromSearch =
-    (searchParams?.rooms || []).reduce(
+    (searchParams?.rooms || searchParams?.PaxRooms || []).reduce(
       (sum, r) => sum + (r.Children || r.children || 0),
       0,
     ) || 0;
@@ -1081,13 +1081,13 @@ const HotelReviewBooking = () => {
   useEffect(() => {
     if (!isBookNowMode && travelers.length === 0 && user) {
       const generatedTravelers = [];
-      const roomsFromSearch = searchParams?.rooms || [];
+      const roomsFromSearch = searchParams?.rooms || searchParams?.PaxRooms || [];
 
       roomsFromSearch.forEach((room, roomIdx) => {
         const adults = room.Adults || room.adults || 0;
         const children = room.Children || room.children || 0;
         const childAges =
-          room.ChildrenAges || room.ChildAge || room.childAges || [];
+          room.childrenAges || room.ChildrenAges || room.ChildAge || room.childAges || [];
 
         for (let a = 0; a < adults; a++) {
           const isLead = generatedTravelers.length === 0;
@@ -1096,6 +1096,7 @@ const HotelReviewBooking = () => {
           let email = "";
           let phone = "";
           let dob = "";
+          let age = "";
 
           if (isLead) {
             const sourceProfile = myProfile || user;
@@ -1120,6 +1121,17 @@ const HotelReviewBooking = () => {
                 "";
               const rawDob = sourceProfile.dob || sourceProfile.dateOfBirth || "";
               dob = rawDob ? rawDob.split("T")[0] : "";
+              if (dob) {
+                const today = new Date();
+                const birth = new Date(dob);
+                if (!isNaN(birth.getTime())) {
+                  age = today.getFullYear() - birth.getFullYear();
+                  const m = today.getMonth() - birth.getMonth();
+                  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+                    age--;
+                  }
+                }
+              }
             }
           }
 
@@ -1129,7 +1141,7 @@ const HotelReviewBooking = () => {
             firstName: fName,
             lastName: lName,
             paxType: 1,
-            age: "",
+            age: age,
             dob: dob,
             gender: "Male",
             leadPassenger: isLead,
@@ -1150,6 +1162,7 @@ const HotelReviewBooking = () => {
             lastName: "",
             paxType: 2,
             age: childAges[c] || "",
+            originalAge: childAges[c] || "",
             dob: "",
             gender: "Male",
             leadPassenger: false,
@@ -1169,6 +1182,7 @@ const HotelReviewBooking = () => {
         let email = "";
         let phone = "";
         let dob = "";
+        let age = "";
 
         const sourceProfile = myProfile || user;
         if (sourceProfile) {
@@ -1192,6 +1206,17 @@ const HotelReviewBooking = () => {
             "";
           const rawDob = sourceProfile.dob || sourceProfile.dateOfBirth || "";
           dob = rawDob ? rawDob.split("T")[0] : "";
+          if (dob) {
+            const today = new Date();
+            const birth = new Date(dob);
+            if (!isNaN(birth.getTime())) {
+              age = today.getFullYear() - birth.getFullYear();
+              const m = today.getMonth() - birth.getMonth();
+              if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+                age--;
+              }
+            }
+          }
         }
 
         generatedTravelers.push({
@@ -1200,7 +1225,7 @@ const HotelReviewBooking = () => {
           firstName: fName,
           lastName: lName,
           paxType: 1,
-          age: "",
+          age: age,
           dob: dob,
           gender: "Male",
           leadPassenger: true,
@@ -1240,6 +1265,18 @@ const HotelReviewBooking = () => {
           if (!lead.dob) {
             const rawDob = myProfile.dob || myProfile.dateOfBirth || "";
             lead.dob = rawDob ? rawDob.split("T")[0] : "";
+            if (lead.dob) {
+              const today = new Date();
+              const birth = new Date(lead.dob);
+              if (!isNaN(birth.getTime())) {
+                let calcAge = today.getFullYear() - birth.getFullYear();
+                const m = today.getMonth() - birth.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+                  calcAge--;
+                }
+                lead.age = calcAge;
+              }
+            }
             updated = true;
           }
           if (updated) {
@@ -1428,15 +1465,15 @@ const HotelReviewBooking = () => {
     ? {
         checkIn: bookingRequest?.bookingSnapshot?.checkInDate,
         checkOut: bookingRequest?.bookingSnapshot?.checkOutDate,
-        rooms: bookingRequest?.hotelRequest?.rooms || [],
+        rooms: bookingRequest?.hotelRequest?.rooms || bookingRequest?.hotelRequest?.PaxRooms || [],
       }
     : searchParams;
 
-  const totalAdults = (displaySearchParams?.rooms || []).reduce(
+  const totalAdults = (displaySearchParams?.rooms || displaySearchParams?.PaxRooms || []).reduce(
     (sum, r) => sum + (r.Adults || r.adults || 0),
     0,
   );
-  const totalChildren = (displaySearchParams?.rooms || []).reduce(
+  const totalChildren = (displaySearchParams?.rooms || displaySearchParams?.PaxRooms || []).reduce(
     (sum, r) => sum + (r.Children || r.children || 0),
     0,
   );
@@ -1553,6 +1590,8 @@ const HotelReviewBooking = () => {
       if (t.paxType === 2) {
         if (isNaN(ageNum) || ageNum < 0 || ageNum > 18) {
           tErrors.age = "Child age must be 0-18";
+        } else if (t.originalAge && String(ageNum) !== String(t.originalAge)) {
+          tErrors.age = `Must match searched age (${t.originalAge})`;
         }
       } else {
         if (isNaN(ageNum) || ageNum <= 18) {
@@ -1671,7 +1710,7 @@ const HotelReviewBooking = () => {
         Adults: Number(room.Adults || room.adults || 0),
         Children: Number(room.Children || room.children || 0),
         ChildrenAges:
-          room.ChildrenAges || room.childAges || room.ChildAge || [],
+          room.childrenAges || room.ChildrenAges || room.childAges || room.ChildAge || [],
       }));
 
     const payload = {
@@ -1732,7 +1771,7 @@ const HotelReviewBooking = () => {
           displaySearchParams?.rooms?.map((r) => ({
             noOfAdults: r.Adults || r.adults || 0,
             noOfChild: r.Children || r.children || 0,
-            childAge: r.ChildrenAges || r.ChildAge || r.childAges || [],
+            childAge: r.childrenAges || r.ChildrenAges || r.ChildAge || r.childAges || [],
           })) || roomGuests,
         rooms: (() => {
           const baseRooms =
