@@ -37,6 +37,7 @@ import {
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { airlineLogo } from "../../utils/formatter";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
 
 const FLIGHT_EXCLUDE = new Set(["ticketed", "cancel_requested", "cancelled", "TICKET_GENERATED", "COMPLETED"]);
 const HOTEL_EXCLUDE = new Set(["voucher_generated", "cancelled", "COMPLETED"]);
@@ -110,7 +111,7 @@ function FlightApprovalsSection({ requests, refreshing, employeeOptions }) {
     });
   }, [requests, search, empFilter, execFilter, dateFrom, dateTo]);
 
-  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -141,18 +142,35 @@ function FlightApprovalsSection({ requests, refreshing, employeeOptions }) {
       <ResponsiveDataTable 
         title="Flight Fulfillment Queue" 
         subtitle={`${filtered.length} missions awaiting ticketing`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Fulfillment Queue",
+          statCards: [
+            { label: "Approved Flights", value: filtered.length },
+            { label: "Pending Ticketing", value: filtered.filter(a => a.executionStatus === "not_started").length },
+            { label: "Critical Failures", value: filtered.filter(a => a.executionStatus === "failed").length },
+            { label: "Est. Spend", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Execution Status", value: execFilter },
+            { label: "From Date", value: dateFrom || "Any" },
+            { label: "To Date", value: dateTo || "Any" }
+          ],
           data: filtered,
-          filename: `approved_flight_requests_${new Date().toISOString().split('T')[0]}.csv`,
           columns: [
             { header: "Order ID", key: "orderId" },
             { header: "Personnel", key: "employee" },
             { header: "Email Identifier", key: "employeeId" },
-            { header: "Route", accessor: (r) => r.routes?.length > 0 ? `${r.routes[0]?.fromCode} → ${r.routes[r.routes.length-1]?.toCode}` : "—" },
+            { header: "Route", value: (r) => r.routes?.length > 0 ? `${r.routes[0]?.fromCode} → ${r.routes[r.routes.length-1]?.toCode}` : "—" },
             { header: "Status", key: "executionStatus" },
-            { header: "Amount", accessor: (r) => `₹${r.estimatedCost.toLocaleString()}` },
-          ]
-        }} 
+            { header: "Amount", value: (r) => `₹${r.estimatedCost.toLocaleString()}` },
+          ],
+          filenamePrefix: "approved_flight_requests"
+        })} 
         wrapperClass="!border-none !shadow-none"
       >
         <table className="w-full text-left border-collapse">
@@ -249,7 +267,7 @@ function HotelApprovalsSection({ requests, refreshing, employeeOptions }) {
     });
   }, [requests, search, empFilter, execFilter, dateFrom, dateTo]);
 
-  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -280,18 +298,35 @@ function HotelApprovalsSection({ requests, refreshing, employeeOptions }) {
       <ResponsiveDataTable 
         title="Hotel Fulfillment Queue" 
         subtitle={`${filtered.length} authorizations pending deployment`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Fulfillment Queue",
+          statCards: [
+            { label: "Approved Hotels", value: filtered.length },
+            { label: "Voucher Required", value: filtered.filter(a => a.executionStatus === "not_started").length },
+            { label: "Deployment Errors", value: filtered.filter(a => a.executionStatus === "failed").length },
+            { label: "Est. Commitment", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Execution Status", value: execFilter },
+            { label: "From Date", value: dateFrom || "Any" },
+            { label: "To Date", value: dateTo || "Any" }
+          ],
           data: filtered,
-          filename: `approved_hotel_requests_${new Date().toISOString().split('T')[0]}.csv`,
           columns: [
             { header: "Order Reference", key: "orderId" },
             { header: "Personnel", key: "employee" },
             { header: "Email Identifier", key: "employeeId" },
             { header: "Hotel", key: "hotelName" },
             { header: "Status", key: "executionStatus" },
-            { header: "Amount", accessor: (r) => `₹${r.estimatedCost.toLocaleString()}` },
-          ]
-        }} 
+            { header: "Amount", value: (r) => `₹${r.estimatedCost.toLocaleString()}` },
+          ],
+          filenamePrefix: "approved_hotel_requests"
+        })} 
         wrapperClass="!border-none !shadow-none"
       >
         <table className="w-full text-left border-collapse">

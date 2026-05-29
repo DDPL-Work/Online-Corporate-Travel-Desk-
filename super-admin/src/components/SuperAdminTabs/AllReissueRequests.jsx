@@ -29,7 +29,7 @@ import {
   getStatusTone,
   getJourneyLabel,
 } from "../reissue/reissueUi";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import { reissueRequestsExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 function readToken() {
@@ -64,7 +64,7 @@ export default function AllReissueRequests() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const tableScrollRef = useRef(null);
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
   const token = readToken();
   const currentRole = token.role || token.userRole || "super-admin";
   const currentUserId = token.id || token._id || null;
@@ -187,8 +187,30 @@ export default function AllReissueRequests() {
 
   const handleExport = () => {
     if (loading) return;
-    exportCsv({
+
+    const statCards = [
+      { label: "Open Requests", value: stats.total },
+      { label: "Processing", value: stats.processing },
+      { label: "Ticket Ready", value: stats.completed },
+      { label: "Overdue", value: stats.overdue },
+    ];
+
+    const appliedFilters = [
+      { label: "Search", value: search || "None" },
+      { label: "Status", value: status },
+      { label: "Airline", value: airline || "All" },
+      { label: "Assigned Agent", value: assignedTo || "All" },
+      { label: "Created From", value: createdFrom || "Any" },
+      { label: "Created To", value: createdTo || "Any" },
+      { label: "Overdue Only", value: overdueOnly ? "Yes" : "No" },
+      { label: "SLA Breach", value: breachedOnly ? "Yes" : "No" },
+    ];
+
+    exportExcel({
       key: "reissue_requests",
+      pageHeader: "Offline Reissue Management",
+      statCards,
+      appliedFilters,
       data: filteredRequests.map((request) => ({
         ...request,
         exportJourneyLabel: getJourneyLabel(request.selectedFlight || request.preferredJourney),

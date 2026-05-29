@@ -29,6 +29,8 @@ import {
 } from "../../Redux/Actions/manager.thunk";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { pastFlightsExportTemplate, pastHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const RouteCell = ({ routes, airline }) => {
   if (!routes || routes.length === 0) return <span className="text-slate-400">No Route</span>;
@@ -80,6 +82,8 @@ function FlightSection() {
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const { teamExecutedFlightRequests: flightBookings } = useSelector((state) => state.manager);
 
@@ -197,19 +201,25 @@ function FlightSection() {
       <ResponsiveDataTable 
         title="Historical Flight Records" 
         subtitle={`${filtered.length} completed trips archived`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Historical Flight Records",
+          statCards: [
+            { label: "Archived Flights", value: filtered.length },
+            { label: "Completed", value: filtered.length },
+            { label: "Last 30 Days", value: filtered.filter(t => t.travelKey >= new Date(Date.now() - 30*86400000).toISOString().slice(0,10)).length },
+            { label: "Total Records", value: filtered.length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `past_flights_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Personnel", key: "travellerName" },
-            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
-            { header: "Email", key: "employeeId" },
-            { header: "Status", key: "status" },
-            { header: "PNR Ref", key: "pnr" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: pastFlightsExportTemplate,
+          filenamePrefix: "past_flights"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
@@ -276,6 +286,8 @@ function HotelSection() {
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const { teamExecutedHotelRequests: hotelBookings } = useSelector((state) => state.manager);
 
@@ -365,18 +377,25 @@ function HotelSection() {
       <ResponsiveDataTable 
         title="Historical Hotel Records" 
         subtitle={`${filtered.length} stay records archived`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Historical Hotel Records",
+          statCards: [
+            { label: "Archived Stays", value: filtered.length },
+            { label: "Completed", value: filtered.length },
+            { label: "Total Records", value: filtered.length },
+            { label: "History Count", value: filtered.length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `past_hotels_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order Reference", key: "orderId" },
-            { header: "Personnel", key: "guestName" },
-            { header: "Email", key: "employeeId" },
-            { header: "Asset Detail", key: "hotelName" },
-            { header: "Status", key: "status" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: pastHotelsExportTemplate,
+          filenamePrefix: "past_hotels"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >

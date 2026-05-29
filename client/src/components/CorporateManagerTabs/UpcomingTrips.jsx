@@ -30,6 +30,8 @@ import {
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { totalFlightsExportTemplate, pastHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const RouteCell = ({ routes, airline }) => {
   if (!routes || routes.length === 0) return <span className="text-slate-400">No Route</span>;
@@ -81,6 +83,8 @@ function FlightSection() {
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const flightBookings = useSelector((state) => state.manager.teamExecutedFlightRequests);
 
@@ -197,19 +201,25 @@ function FlightSection() {
       <ResponsiveDataTable 
         title="Upcoming Flight Manifest" 
         subtitle={`${filtered.length} itineraries confirmed`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Upcoming Flight Manifest",
+          statCards: [
+            { label: "Upcoming Flights", value: filtered.length },
+            { label: "Confirmed", value: filtered.length },
+            { label: "Next 7 Days", value: filtered.filter(t => t.travelKey <= new Date(Date.now() + 7*86400000).toISOString().slice(0,10)).length },
+            { label: "Team Deployments", value: new Set(filtered.map(t => t.travellerName)).size }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Travel Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `upcoming_flights_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Personnel", key: "travellerName" },
-            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
-            { header: "Email", key: "employeeId" },
-            { header: "Status", key: "status" },
-            { header: "PNR Ref", key: "pnr" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: totalFlightsExportTemplate,
+          filenamePrefix: "upcoming_flights"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
@@ -276,6 +286,8 @@ function HotelSection() {
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const { teamExecutedHotelRequests: hotelBookings } = useSelector((state) => state.manager);
 
@@ -362,18 +374,25 @@ function HotelSection() {
       <ResponsiveDataTable 
         title="Upcoming Hotel Manifest" 
         subtitle={`${filtered.length} bookings confirmed`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Upcoming Hotel Manifest",
+          statCards: [
+            { label: "Upcoming Stays", value: filtered.length },
+            { label: "Confirmed", value: filtered.length },
+            { label: "Properties", value: new Set(filtered.map(t => t.hotelName)).size },
+            { label: "Next 7 Days", value: filtered.filter(t => t.checkInISO <= new Date(Date.now() + 7*86400000).toISOString().slice(0,10)).length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Check-In Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `upcoming_hotels_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order Reference", key: "orderId" },
-            { header: "Personnel", key: "guestName" },
-            { header: "Email", key: "employeeId" },
-            { header: "Asset Detail", key: "hotelName" },
-            { header: "Status", key: "status" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: pastHotelsExportTemplate,
+          filenamePrefix: "upcoming_hotels"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >

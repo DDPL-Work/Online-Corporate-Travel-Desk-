@@ -32,6 +32,8 @@ import {
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { Pagination } from "./Shared/Pagination";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminManagerRequestsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const Avatar = ({ name = "", size = "md" }) => {
   const nameStr = typeof name === "string" ? name : String(name || "");
@@ -170,6 +172,8 @@ const ManagerRequestsPage = () => {
 
   const handleRefresh = () => dispatch(fetchManagerRequests());
 
+  const { exportExcel, isExporting } = useExcelExporter();
+
   return (
     <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
       {/* Navy Header Section - Matched with TotalBookings */}
@@ -244,19 +248,25 @@ const ManagerRequestsPage = () => {
         <ResponsiveDataTable 
           title="Verification Ledger" 
           subtitle={`${filtered.length} authentication entries`} 
-          exportConfig={{
+          exportLabel="Export Excel"
+          exportLoading={isExporting}
+          exportDisabled={isExporting}
+          onExport={() => exportExcel({
+            pageHeader: "Verification Ledger",
+            statCards: [
+              { label: "Total Requests", value: stats.total },
+              { label: "Pending Review", value: stats.pending },
+              { label: "Verified Assets", value: stats.approved },
+              { label: "Denied Access", value: stats.rejected }
+            ],
+            appliedFilters: [
+              { label: "Search", value: search || "None" },
+              { label: "Filter Status", value: filter }
+            ],
             data: filtered,
-            filename: `manager_requests_${new Date().toISOString().split('T')[0]}.csv`,
-            columns: [
-              { header: "Personnel", accessor: (r) => getNameFromObj(r.employeeId || r.employee) || r.employeeName || "Unknown" },
-              { header: "Project Scope", accessor: (r) => r.projectName || "—" },
-              // { header: "Booking Context", accessor: (r) => (r.bookingSnapshot || {}).hotelName || r.bookingType || "Hotel Booking" },
-              // { header: "Order ID", accessor: (r) => r.orderId || "—" },
-              { header: "Designated Approver", accessor: (r) => getNameFromObj(r.managerId || r.manager) || r.managerName || "Manager" },
-              { header: "Requested On", accessor: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN") : "—" },
-              { header: "Status", key: "status" }
-            ]
-          }}
+            columns: adminManagerRequestsExportTemplate,
+            filenamePrefix: "manager_requests"
+          })}
           wrapperClass="!border-none !shadow-none"
           pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
         >

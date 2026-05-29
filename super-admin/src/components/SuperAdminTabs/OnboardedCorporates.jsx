@@ -8,7 +8,7 @@ import ViewCorporateModal from "../../Modal/ViewCorporateModal";
 import ToggleStatusModal from "../../Modal/ToggleStatusModal";
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import TableActionBar from "../Shared/TableActionBar";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import { onboardedCorporatesExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const C = {
@@ -88,7 +88,7 @@ export default function OnboardedCorporates() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const tableScrollRef = useRef(null);
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
 
   const { corporates = [], loading } = useSelector(
     (state) => state.corporateList
@@ -109,8 +109,25 @@ export default function OnboardedCorporates() {
 
   const handleExport = () => {
     if (loading) return;
-    exportCsv({
+
+    const statCards = [
+      { label: "Total Corporates", value: stats.total },
+      { label: "Active Corporates", value: stats.active },
+      { label: "Pending Approval", value: stats.pending },
+      { label: "Postpaid Accounts", value: stats.postpaid },
+    ];
+
+    const appliedFilters = [
+      { label: "Search", value: search || "None" },
+      { label: "Filter Status", value: filter },
+      { label: "Date Filter", value: dateFilter || "Any" },
+    ];
+
+    exportExcel({
       key: "onboarded_corporates",
+      pageHeader: "Onboarded Corporates",
+      statCards,
+      appliedFilters,
       data: filtered,
       columns: onboardedCorporatesExportTemplate,
       filenamePrefix: "onboarded_corporates_export",

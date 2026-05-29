@@ -33,6 +33,8 @@ import {
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { airlineLogo } from "../../utils/formatter";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminRejectedFlightsExportTemplate, adminRejectedHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Shared Components                                              */
@@ -98,8 +100,7 @@ function FlightRejectionsSection({ requests, refreshing, employeeOptions }) {
       return true;
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
-
-  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -134,19 +135,25 @@ function FlightRejectionsSection({ requests, refreshing, employeeOptions }) {
       <ResponsiveDataTable 
         title="Flight Rejection Ledger" 
         subtitle={`${filtered.length} denied authorizations`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Rejection Ledger",
+          statCards: [
+            { label: "Rejected Flights", value: filtered.length },
+            { label: "Est. Loss Value", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` },
+            { label: "Critical Rejections", value: filtered.filter(r => r.reason.length > 50).length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Date Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+          ],
           data: filtered,
-          filename: `rejected_flight_requests_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Personnel", key: "employee" },
-            { header: "Email", key: "employeeId" },
-            { header: "Route", accessor: (r) => `${r.routes[0]?.fromCode || ""} → ${r.routes[r.routes.length-1]?.toCode || ""}` },
-            { header: "Rejected Date", accessor: (r) => r.rejectedDate.toLocaleDateString() },
-            { header: "Reason", key: "reason" },
-            { header: "Cost", accessor: (r) => `₹${r.estimatedCost.toLocaleString()}` },
-          ]
-        }}
+          columns: adminRejectedFlightsExportTemplate,
+          filenamePrefix: "rejected_flight_requests"
+        })}
         wrapperClass="!border-none !shadow-none"
       >
         <table className="w-full text-left border-collapse">
@@ -238,8 +245,7 @@ function HotelRejectionsSection({ requests, refreshing, employeeOptions }) {
       return true;
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
-
-  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -274,19 +280,25 @@ function HotelRejectionsSection({ requests, refreshing, employeeOptions }) {
       <ResponsiveDataTable 
         title="Hotel Rejection Ledger" 
         subtitle={`${filtered.length} denied authorizations`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Rejection Ledger",
+          statCards: [
+            { label: "Rejected Hotels", value: filtered.length },
+            { label: "Est. Revenue Loss", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` },
+            { label: "Compliance Blocks", value: filtered.filter(r => r.reason.toLowerCase().includes('policy')).length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Date Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+          ],
           data: filtered,
-          filename: `rejected_hotel_requests_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order Reference", key: "orderId" },
-            { header: "Personnel", key: "employee" },
-            { header: "Email", key: "employeeId" },
-            { header: "Hotel", key: "hotelName" },
-            { header: "Rejected Date", accessor: (r) => r.rejectedDate.toLocaleDateString() },
-            { header: "Reason", key: "reason" },
-            { header: "Cost", accessor: (r) => `₹${r.estimatedCost.toLocaleString()}` },
-          ]
-        }}
+          columns: adminRejectedHotelsExportTemplate,
+          filenamePrefix: "rejected_hotel_requests"
+        })}
         wrapperClass="!border-none !shadow-none"
       >
         <table className="w-full text-left border-collapse">

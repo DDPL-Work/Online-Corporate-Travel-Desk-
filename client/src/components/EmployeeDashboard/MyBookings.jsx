@@ -40,6 +40,8 @@ import {
 import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { myFlightsExportTemplate, myHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─── helpers ─── */
 function fmtDate(d, opts = { day: "2-digit", month: "short", year: "numeric" }) {
@@ -100,6 +102,8 @@ function FlightSection() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { list: flightBookings = [], loading } = useSelector((state) => state.bookings);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { dispatch(fetchMyBookings()); }, [dispatch]);
 
@@ -217,18 +221,26 @@ function FlightSection() {
       <ResponsiveDataTable 
         title="Flight Ledger" 
         subtitle={`${filtered.length} active bookings`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Ledger",
+          statCards: [
+            { label: "My Flights", value: filtered.length },
+            { label: "Confirmed", value: filtered.filter(b => b.status === "Confirmed").length },
+            { label: "Pending", value: filtered.filter(b => b.status === "Pending").length },
+            { label: "Total Spent", value: `₹${totalSpend.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Status", value: statusFilter },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `my_flights_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
-            { header: "Booked Date", accessor: (r) => new Date(r.bookedDate).toLocaleDateString("en-IN") },
-            { header: "Status", key: "status" },
-            { header: "PNR Ref", key: "pnr" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: myFlightsExportTemplate,
+          filenamePrefix: "my_flights"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
@@ -293,6 +305,8 @@ function HotelSection() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { completed: hotelBookings = [], loading } = useSelector((state) => state.hotelBookings);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { dispatch(fetchMyHotelBookings()); }, [dispatch]);
 
@@ -361,18 +375,25 @@ function HotelSection() {
       <ResponsiveDataTable 
         title="Hotel Ledger" 
         subtitle={`${filtered.length} active stays`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Ledger",
+          statCards: [
+            { label: "My Hotels", value: filtered.length },
+            { label: "Confirmed", value: filtered.filter(b => b.status === "Confirmed").length },
+            { label: "Unique Cities", value: new Set(filtered.map(b => b.city)).size },
+            { label: "Total Spent", value: `₹${totalSpend.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `my_hotels_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Hotel", key: "hotelName" },
-            { header: "City", key: "city" },
-            { header: "Stay Dates", accessor: (r) => `${fmtDate(r.bookingSnapshot?.checkInDate)} - ${fmtDate(r.bookingSnapshot?.checkOutDate)}` },
-            { header: "Status", key: "status" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: myHotelsExportTemplate,
+          filenamePrefix: "my_hotels"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >

@@ -28,7 +28,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { BlogViewModal } from "./components";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import { blogArticlesExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const C = {
@@ -47,7 +47,7 @@ const C = {
 const BlogListPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
   const { items: blogs, loading, error } = useSelector((state) => state.blogs);
 
   // Modal states
@@ -146,9 +146,26 @@ const BlogListPage = () => {
   const handleExport = () => {
     if (loading) return;
 
-    exportCsv({
+    const statCards = [
+      { label: "Total Articles", value: blogs.length },
+      { label: "Published", value: blogs.filter(b => b.status === 'published').length },
+      { label: "Drafts", value: blogs.filter(b => b.status === 'draft').length },
+      { label: "Total Views", value: blogs.reduce((acc, b) => acc + (b.view_count || 0), 0) },
+    ];
+    
+    const appliedFilters = [
+      { label: "Search", value: searchTerm || "None" },
+      { label: "Status", value: statusFilter },
+      { label: "Sort By", value: sortBy },
+      { label: "Sort Order", value: sortOrder },
+    ];
+
+    exportExcel({
       key: "blog_articles",
-      data: currentBlogs,
+      pageHeader: "Blog Management",
+      statCards,
+      appliedFilters,
+      data: filteredAndSortedBlogs,
       columns: blogArticlesExportTemplate,
       filenamePrefix: "blog_articles_export",
       emptyMessage: "No blog articles available to export",

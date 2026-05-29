@@ -57,6 +57,11 @@ import {
 } from "../../Redux/Actions/corporate.related.thunks";
 import api from "../../API/axios";
 import { toast } from "sonner";
+import useExcelExporter from "../../services/export/useExcelExporter";
+import {
+  corporateRevenueLeaderboardExportTemplate,
+  corporateRevenueTransactionsExportTemplate,
+} from "../../templates/exportTemplates/superAdminExportTemplates";
 import Pagination from "../Shared/Pagination";
 import TableActionBar from "../Shared/TableActionBar";
 
@@ -111,6 +116,7 @@ export default function CorporateRevenue() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const leaderboardScrollRef = useRef(null);
+  const { exportExcel, exportingKey } = useExcelExporter();
 
   // 🟢 1. STATE HOOKS
   const [dateRange, setDateRange] = useState("thisMonth");
@@ -210,29 +216,68 @@ export default function CorporateRevenue() {
       toast.error("No data to export");
       return;
     }
-    toast.success("Exporting data...");
-    const headers = ["Order ID", "Payment ID", "Traveller", "Email", "Payment Date", "Category", "Status", "Amount"];
-    const rows = filteredDrillDownData.map(b => {
-      return [
-        b.reference || "-",
-        b.transactionId || "-",
-        b.employee || "-",
-        b.email || "-",
-        new Date(b.date).toLocaleDateString("en-IN"),
-        b.type || "-",
-        b.status || "-",
-        b.amount || "0"
-      ].map(v => `"${v}"`).join(",");
+
+    const corp = corporates.find((c) => c._id === drillDownId) || companyWise.find((c) => c.corporateId === drillDownId) || {};
+    const corpName = corp.corporateName || corp.companyName || "Corporate Revenue Drill Down";
+    const totalSelectedRev = filteredDrillDownData.reduce((sum, b) => sum + b.amount, 0);
+    const formattedDateRange = ddStartDate && ddEndDate ? `${new Date(ddStartDate).toLocaleDateString("en-GB", {day:"numeric", month:"short"})} - ${new Date(ddEndDate).toLocaleDateString("en-GB", {day:"numeric", month:"short"})}` : "All Dates";
+    
+    exportExcel({
+      key: "corporate_revenue_transactions",
+      pageHeader: corpName,
+      statCards: [
+        { label: "Corporate Spent", value: inr(totalSelectedRev) },
+        { label: "Detailed Bookings", value: filteredDrillDownData.length },
+        { label: "Date Range", value: formattedDateRange }
+      ],
+      appliedFilters: [
+        { label: "Search", value: ddSearch || "None" },
+        { label: "Category", value: ddCategory },
+        { label: "Status", value: ddStatus },
+        { label: "Start Date", value: ddStartDate || "Any" },
+        { label: "End Date", value: ddEndDate || "Any" }
+      ],
+      data: filteredDrillDownData,
+      columns: corporateRevenueTransactionsExportTemplate,
+      filenamePrefix: `${corpName.replace(/\s+/g, "_")}_revenue_drilldown`,
+      emptyMessage: "No drilldown data available to export",
+      successMessage: "Drilldown data exported",
     });
-    const csvContent = headers.join(",") + "\n" + rows.join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Transactions_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  };
+
+  const handleLeaderboardExport = () => {
+    if (companyWise.length === 0) {
+      toast.error("No data to export");
+      return;
+    }
+
+    const exportData = companyWise.map((company, index) => ({
+      ...company,
+      exportRank: index + 1
+    }));
+
+    exportExcel({
+      key: "corporate_revenue_leaderboard",
+      pageHeader: "Corporate Revenue Leaderboard",
+      statCards: [
+        { label: "Total Revenue", value: inr(summary?.totalRevenue) },
+        { label: "Flight Revenue", value: inr(summary?.flights?.totalRevenue) },
+        { label: "Hotel Revenue", value: inr(summary?.hotels?.totalRevenue) },
+        { label: "Avg Booking Value", value: inr(summary?.avgBookingValue) }
+      ],
+      appliedFilters: [
+        { label: "Date Range", value: dateRange },
+        { label: "Start Date", value: startDate || "Any" },
+        { label: "End Date", value: endDate || "Any" },
+        { label: "Booking Type", value: bookingType },
+        { label: "Corporate", value: selectedCorporate }
+      ],
+      data: exportData,
+      columns: corporateRevenueLeaderboardExportTemplate,
+      filenamePrefix: "corporate_revenue_leaderboard",
+      emptyMessage: "No leaderboard data available to export",
+      successMessage: "Leaderboard data exported",
+    });
   };
 
   const paginatedDrillDown = useMemo(() => {
@@ -512,10 +557,15 @@ export default function CorporateRevenue() {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 bg-[#003399] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#002266] transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-[#003399]/30"
+                disabled={exportingKey === "corporate_revenue_transactions"}
+                className="flex items-center gap-2 px-4 py-2 bg-[#003399] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#002266] transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-[#003399]/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <FiDownload size={14} />
-                Export
+                {exportingKey === "corporate_revenue_transactions" ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <FiDownload size={14} />
+                )}
+                {exportingKey === "corporate_revenue_transactions" ? "Exporting..." : "Export"}
               </button>
               
               <div className="w-px h-6 bg-slate-200 mx-1"></div>
@@ -1138,7 +1188,9 @@ export default function CorporateRevenue() {
             <TableActionBar
               scrollRef={leaderboardScrollRef}
               exportLabel="Export"
-              onExport={() => toast.info("Preparing report...")}
+              onExport={handleLeaderboardExport}
+              exportDisabled={exportingKey === "corporate_revenue_leaderboard"}
+              exportLoading={exportingKey === "corporate_revenue_leaderboard"}
               exportClassName="bg-slate-900 hover:bg-black shadow-black/10"
               arrowClassName="border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 disabled:hover:bg-slate-50"
             />

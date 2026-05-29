@@ -30,7 +30,7 @@ import {
   FlightBookingModal,
   HotelBookingModal,
 } from "../Shared/BookingRequestDetailsModal";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import {
   flightCancellationQueriesExportTemplate,
   hotelCancellationQueriesExportTemplate,
@@ -256,7 +256,7 @@ const _normalizeHotel = (b = {}) => {
 function CancellationQueryTab() {
   const tableScrollRef = useRef(null);
   const dispatch = useDispatch();
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
   const {
     cancellationQueries,
     loadingCancellationQueries,
@@ -380,9 +380,28 @@ function CancellationQueryTab() {
   const handleExport = () => {
     if (loadingCancellationQueries) return;
 
-    exportCsv({
+    const statCards = [
+      { label: "Open", value: statusCounts.OPEN },
+      { label: "In Progress", value: statusCounts.IN_PROGRESS },
+      { label: "Resolved", value: statusCounts.RESOLVED },
+      { label: "Rejected", value: statusCounts.REJECTED },
+    ];
+
+    const appliedFilters = [
+      { label: "Search", value: search || "None" },
+      { label: "Status", value: statusFilter },
+      { label: "Priority", value: priorityFilter },
+      { label: "Booking From", value: fromDate || "Any" },
+      { label: "Booking To", value: toDate || "Any" },
+      { label: "Requested Date", value: requestedDate || "Any" },
+    ];
+
+    exportExcel({
       key: "flight_cancellation_queries",
-      data: paginatedQueries,
+      pageHeader: "Cancellation Archive",
+      statCards,
+      appliedFilters,
+      data: filtered,
       columns: flightCancellationQueriesExportTemplate,
       filenamePrefix: "flight_cancellation_queries_export",
       emptyMessage: "No flight cancellation queries available to export",
@@ -769,6 +788,17 @@ function StatCard({ label, value, iconBgCls, iconColorCls, borderCls, Icon }) {
       <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconBgCls}`}>
         <Icon size={24} className={iconColorCls} />
       </div>
+    </div>
+  );
+}
+
+function LabeledInput({ label, children }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+        {label}
+      </label>
+      {children}
     </div>
   );
 }

@@ -22,7 +22,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchWalletRechargeLogs } from "../../Redux/Slice/walletRechargeLogsSlice";
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import Pagination from "../Shared/Pagination";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import { walletRechargeLogsExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const C = {
@@ -35,7 +35,7 @@ export default function WalletRechargeLogs() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const tableScrollRef = useRef(null);
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
 
   // Filter states
   const [startDate, setStartDate] = useState("");
@@ -44,6 +44,7 @@ export default function WalletRechargeLogs() {
   const [status, setStatus] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [apiPage, setApiPage] = useState(1);
 
   const { logs, loading, pagination } = useSelector(
     (state) => state.walletRechargeLogs,
@@ -60,11 +61,11 @@ export default function WalletRechargeLogs() {
         corporateId: corporate !== "All" ? corporate : undefined,
         from: startDate || undefined,
         to: endDate || undefined,
-        page: currentPage,
-        limit: 10,
+        page: apiPage,
+        limit: 500,
       }),
     );
-  }, [dispatch, status, corporate, startDate, endDate, currentPage]);
+  }, [dispatch, status, corporate, startDate, endDate, apiPage]);
 
   useEffect(() => {
     dispatch(fetchCorporates());
@@ -112,6 +113,12 @@ export default function WalletRechargeLogs() {
 
   const finalLogs = searchedLogs;
 
+  const ITEMS_PER_PAGE = 10;
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return finalLogs.slice(start, start + ITEMS_PER_PAGE);
+  }, [finalLogs, currentPage]);
+
   const corporateOptions = useMemo(() => {
     const fromOnboarded = (onboardedCorporates || []).map(
       (c) => c.corporateName || c.name || c.title,
@@ -135,6 +142,7 @@ export default function WalletRechargeLogs() {
 
   const updateFilter = (setter, value) => {
     setCurrentPage(1);
+    setApiPage(1);
     setter(value);
   };
 
@@ -145,16 +153,35 @@ export default function WalletRechargeLogs() {
         corporateId: corporate !== "All" ? corporate : undefined,
         from: startDate || undefined,
         to: endDate || undefined,
-        page: currentPage,
-        limit: 10,
+        page: apiPage,
+        limit: 500,
       }),
     );
   };
 
   const handleExport = () => {
     if (loading) return;
-    exportCsv({
+
+    const statCards = [
+      { label: "Total Recharge", value: `₹${totalRecharge.toLocaleString("en-IN")}` },
+      { label: "Successful", value: successCount },
+      { label: "Failed", value: failedCount },
+      { label: "Pending", value: pendingCount },
+    ];
+
+    const appliedFilters = [
+      { label: "Search", value: searchTerm || "None" },
+      { label: "From Date", value: startDate || "Any" },
+      { label: "To Date", value: endDate || "Any" },
+      { label: "Corporate", value: corporate },
+      { label: "Status", value: status },
+    ];
+
+    exportExcel({
       key: "wallet_recharge_logs",
+      pageHeader: "Wallet Recharge Logs",
+      statCards,
+      appliedFilters,
       data: finalLogs,
       columns: walletRechargeLogsExportTemplate,
       filenamePrefix: "wallet_recharge_logs_export",
@@ -418,7 +445,7 @@ export default function WalletRechargeLogs() {
                       </td>
                     </tr>
                   ) : (
-                    finalLogs.map((log) => (
+                    paginatedLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-slate-50/50 transition-all group">
 
                         {/* Date */}
@@ -495,9 +522,15 @@ export default function WalletRechargeLogs() {
               Showing {finalLogs.length} recharge(s)
             </span>
             <Pagination
-              currentPage={pagination?.page || 1}
-              totalPages={pagination?.pages || 1}
-              onPageChange={setCurrentPage}
+              currentPage={currentPage}
+              totalPages={pagination?.total ? Math.max(1, Math.ceil(pagination.total / ITEMS_PER_PAGE)) : Math.max(1, Math.ceil(finalLogs.length / ITEMS_PER_PAGE))}
+              onPageChange={(page) => {
+                setCurrentPage(page);
+                const requiredApiPage = Math.ceil((page * ITEMS_PER_PAGE) / 500);
+                if (requiredApiPage > apiPage && requiredApiPage <= (pagination?.pages || 1)) {
+                  setApiPage(requiredApiPage);
+                }
+              }}
               showFirstLast={true}
             />
           </div>

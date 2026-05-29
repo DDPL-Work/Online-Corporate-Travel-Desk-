@@ -22,7 +22,7 @@ import {
 } from "../../Redux/Actions/corporate.related.thunks";
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import Pagination from "../Shared/Pagination";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import {
   flightBookingsExportTemplate,
   hotelBookingsExportTemplate,
@@ -300,7 +300,7 @@ export default function GlobalBookingsDashboard() {
   const tableScrollRef = useRef(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
   const {
     flightBookings,
     hotelBookings,
@@ -459,9 +459,35 @@ export default function GlobalBookingsDashboard() {
 
   const handleExport = () => {
     if (isLoading) return;
-    exportCsv({
+
+    // Build stat cards for export
+    const statCards = [
+      { label: `Total ${activeTab}s`, value: filtered.length },
+      { label: "Confirmed", value: filtered.filter((b) => isSuccessStatus(b.status)).length },
+      { label: "Pending", value: filtered.filter((b) => isPendingStatus(b.status)).length },
+      { label: "Total Spend", value: `₹${totalSpend.toLocaleString()}` },
+    ];
+
+    // Build applied filters for export
+    const appliedFilters = [
+      { label: "Search", value: search || "None" },
+      { label: "Corporate Account", value: corporate },
+    ];
+    if (activeTab === "Flight") {
+      appliedFilters.push({ label: "Travel Date", value: travelDate || "Any" });
+    } else {
+      appliedFilters.push({ label: "Check-In", value: checkIn || "Any" });
+      appliedFilters.push({ label: "Check-Out", value: checkOut || "Any" });
+    }
+    if (startDate) appliedFilters.push({ label: "Booking From", value: startDate });
+    if (endDate) appliedFilters.push({ label: "Booking To", value: endDate });
+
+    exportExcel({
       key: exportKey,
-      data: paginatedData,
+      pageHeader: `Global Bookings Summary - ${activeTab} Detailed Report`,
+      statCards,
+      appliedFilters,
+      data: filtered,
       columns:
         activeTab === "Flight"
           ? flightBookingsExportTemplate

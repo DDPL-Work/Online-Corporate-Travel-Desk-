@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   FiFilter,
   FiDownload,
@@ -37,7 +38,7 @@ import {
 } from "../../Redux/Slice/walletSlice";
 import { C } from "../Shared/color";
 import { useNavigate } from "react-router-dom";
-import { exportToCSV } from "../../utils/exportToCSV";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 
 const StatusBadge = ({ status }) => {
@@ -244,18 +245,7 @@ export default function CorporateWallet() {
     .filter((tx) => tx.type === "debit")
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
-  const exportConfig = {
-    data: filteredTransactions,
-    filename: `wallet_ledger_${new Date().toISOString().split('T')[0]}.csv`,
-    columns: [
-      { header: "Date", accessor: (tx) => new Date(tx.createdAt).toLocaleDateString("en-IN") },
-      { header: "Description", accessor: (tx) => tx.description || "—" },
-      { header: "Order ID", accessor: (tx) => tx.orderId || tx._id || tx.bookingId || "—" },
-      { header: "Type", accessor: (tx) => tx.type || "—" },
-      { header: "Amount", accessor: (tx) => `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}` },
-      { header: "Status", accessor: (tx) => getTransactionStatus(tx) }
-    ]
-  };
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => {
     if (rechargeOrder?.gateway === "phonepe" && rechargeOrder.redirectUrl) {
@@ -334,7 +324,7 @@ export default function CorporateWallet() {
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
           {[
             ["booking", "Consumption Ledger", FiArrowUpRight],
-            ["recharge", "Infusion Ledger", FiArrowDownLeft],
+            ["recharge", "Wallet Recharge Ledger", FiArrowDownLeft],
           ].map(([k, lbl, Icon]) => (
             <button
               key={k}
@@ -367,14 +357,16 @@ export default function CorporateWallet() {
             iconBgCls="bg-emerald-50"
             iconColorCls="text-emerald-600"
           />
-          <StatCard
-            label="Total Capital Out"
-            value={`₹${totalDebit.toLocaleString()}`}
-            Icon={FiArrowUpRight}
-            borderCls="border-amber-500"
-            iconBgCls="bg-amber-50"
-            iconColorCls="text-amber-600"
-          />
+          {activeTab !== "recharge" && (
+            <StatCard
+              label="Total Capital Out"
+              value={`₹${totalDebit.toLocaleString()}`}
+              Icon={FiArrowUpRight}
+              borderCls="border-amber-500"
+              iconBgCls="bg-amber-50"
+              iconColorCls="text-amber-600"
+            />
+          )}
           <StatCard
             label="Ledger Entries"
             value={filteredTransactions.length}
@@ -458,7 +450,7 @@ export default function CorporateWallet() {
               <h2 className="text-xl font-black" style={{ color: C.navy }}>
                 {activeTab === "booking"
                   ? "Asset Consumption Ledger"
-                  : "Capital Infusion Ledger"}
+                  : "Wallet Recharge Ledger"}
               </h2>
               <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
                 {filteredTransactions.length} records processed
@@ -487,18 +479,34 @@ export default function CorporateWallet() {
           </div>
 
           <ResponsiveDataTable
-            exportConfig={{
+            exportLabel="Export Excel"
+            exportLoading={isExporting}
+            exportDisabled={isExporting}
+            onExport={() => exportExcel({
+              pageHeader: activeTab === "booking" ? "Asset Consumption Ledger" : "Wallet Recharge Ledger",
+              statCards: [
+                { label: "Available Asset", value: loading ? "..." : `${currency || "₹"} ${(balance || 0).toLocaleString()}` },
+                { label: "Total Capital In", value: `₹${totalCredit.toLocaleString()}` },
+                ...(activeTab !== "recharge" ? [{ label: "Total Capital Out", value: `₹${totalDebit.toLocaleString()}` }] : []),
+                { label: "Ledger Entries", value: filteredTransactions.length }
+              ],
+              appliedFilters: [
+                { label: "Universal Search", value: searchTerm || "None" },
+                { label: "Ledger Period", value: `${startDate || "Any"} to ${endDate || "Any"}` },
+                { label: "Execution Status", value: statusFilter }
+              ],
               data: filteredTransactions,
-              filename: `wallet_ledger_${new Date().toISOString().split('T')[0]}.csv`,
               columns: [
-                { header: "Date", accessor: (tx) => new Date(tx.createdAt).toLocaleDateString("en-IN") },
-                { header: "Description", accessor: (tx) => tx.description || "—" },
-                { header: "Order ID", accessor: (tx) => tx.orderId || tx._id || tx.bookingId || "—" },
-                { header: "Type", accessor: (tx) => tx.type || "—" },
-                { header: "Amount", accessor: (tx) => `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}` },
-                { header: "Status", accessor: (tx) => getTransactionStatus(tx) }
-              ]
-            }}
+                { header: "Date", value: (tx) => new Date(tx.createdAt).toLocaleDateString("en-IN") },
+                { header: "Description", value: (tx) => tx.description || "—" },
+                { header: "Asset Reference", value: (tx) => tx.orderId || tx.reference || tx._id || tx.bookingId || "—" },
+                ...(activeTab === "recharge" ? [{ header: "Payment ID", value: (tx) => tx.paymentGateway?.paymentId || "—" }] : []),
+                { header: "Type", value: (tx) => tx.type || "—" },
+                { header: "Amount", value: (tx) => `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}` },
+                { header: "Status", value: (tx) => getTransactionStatus(tx) }
+              ],
+              filenamePrefix: "wallet_ledger"
+            })}
             wrapperClass="!border-none !shadow-none"
           >
             <div className="overflow-x-auto" ref={ledgerScrollRef}>
@@ -523,7 +531,7 @@ export default function CorporateWallet() {
                   const gatewayInfo =
                     tx.paymentGateway?.name || tx.type === "debit"
                       ? "Corporate Asset"
-                      : "Direct Infusion";
+                      : "Direct Recharge";
 
                   return (
                     <tr
@@ -674,7 +682,7 @@ export default function CorporateWallet() {
                 <FiPlusCircle size={40} />
               </div>
               <h3 className="text-3xl font-black text-white tracking-tight leading-none mb-2">
-                Capital Infusion
+                Wallet Recharge
               </h3>
               <p className="text-[10px] text-white/50 font-black uppercase tracking-[0.3em]">
                 Authorized Recharge Protocol
@@ -768,7 +776,7 @@ const RechargeDetailsModal = ({ tx, onClose }) => {
     ? `${tx.processedBy.name.firstName || ""} ${tx.processedBy.name.lastName || ""}`.trim()
     : "System Protocol";
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 backdrop-blur-sm animate-in fade-in duration-300"
@@ -1000,7 +1008,8 @@ const RechargeDetailsModal = ({ tx, onClose }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

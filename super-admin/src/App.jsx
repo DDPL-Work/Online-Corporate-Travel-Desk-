@@ -11,6 +11,7 @@ function App() {
       <Toaster
         position="top-right"
         expand
+        closeButton
         toastOptions={{
           unstyled: true, // 🚀 this disables Sonner’s default styles completely
           classNames: {
@@ -19,6 +20,7 @@ function App() {
             error: "error",
             warning: "warning",
             info: "info",
+            closeButton: "sonner-close-button",
           },
         }}
       />

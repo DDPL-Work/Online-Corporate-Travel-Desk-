@@ -43,6 +43,8 @@ import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { Pagination } from "./Shared/Pagination";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminProjectRegistryExportTemplate, adminProjectBookingsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Helpers                                                        */
@@ -731,59 +733,7 @@ export default function ProjectsTable({ projects, setProjects }) {
 
   const bookingTotalBookings = filteredBookings.length;
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Project ID", "Project Name", "Client Name", "Start Date", "End Date"];
-    const rows = filtered.map(p => [p.projectCodeId || p.projectId || p.code || "N/A", p.projectName || p.name || "N/A", p.clientName || "N/A", fmtDate(p.startDate), fmtDate(p.endDate)]);
-    const tableRows = rows.map(row => `<tr>${row.map(cell => `<td style="border:1px solid #dbe4f0;padding:8px;">${String(cell ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `projects-${new Date().toISOString().slice(0, 10)}.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
-
-  const handleBookingExport = () => {
-    if (!filteredBookings.length) return;
-    
-    const headers = ["Booking Type", "Order ID", "Personnel", "Deployment Info", "Ingestion Date", "Status", "Amount"];
-      
-    const rows = filteredBookings.map((b) => {
-      const isFlight = b.bookingType === "flight";
-      const name = isFlight ? b.travellerName : b.guestName;
-      const details = isFlight 
-        ? b.routes?.map((l) => `${l.fromCode}→${l.toCode}`).join(" | ") || "—"
-        : `${b.hotelName} (${b.city})`;
-
-      return [
-        b.bookingType.toUpperCase(),
-        b.orderId,
-        name,
-        details,
-        new Date(b.bookedDate).toLocaleDateString(),
-        b.status,
-        `₹${b.amount.toLocaleString()}`,
-      ];
-    });
-
-    const tableHtml = rows
-      .map(
-        (r) =>
-          `<tr>${r.map((c) => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`,
-      )
-      .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `project-manifest-${selectedProjectId}.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const ledgerDateRange = useMemo(() => {
     const fmt = (d) => {
@@ -904,18 +854,24 @@ export default function ProjectsTable({ projects, setProjects }) {
               <ResponsiveDataTable 
                 title="Project Registry" 
                 subtitle={`${filtered.length} entries located`} 
-                exportConfig={{
+                exportLabel="Export Excel"
+                exportLoading={isExporting}
+                exportDisabled={isExporting}
+                onExport={() => exportExcel({
+                  pageHeader: "Project Registry",
+                  statCards: [
+                    { label: "Total Projects", value: effectiveProjects.length },
+                    { label: "Active Clients", value: clients.length - 1 },
+                    { label: "Last Updated", value: "Today" }
+                  ],
+                  appliedFilters: [
+                    { label: "Search", value: search || "None" },
+                    { label: "Client Entity", value: clientFilter }
+                  ],
                   data: filtered,
-                  filename: `project_registry_${new Date().toISOString().split('T')[0]}.csv`,
-                  columns: [
-                    { header: "ID Protocol", accessor: (p) => p.projectCodeId || p.code || "—" },
-                    { header: "Project Title", accessor: (p) => p.projectName || p.name || "Untitled" },
-                    { header: "Client Entity", accessor: (p) => p.clientName || p.client || "—" },
-                    { header: "Flight Bookings", accessor: (p) => p.flightBookings?.length || 0 },
-                    { header: "Hotel Bookings", accessor: (p) => p.hotelBookings?.length || 0 },
-                    { header: "Ingestion Date", accessor: (p) => new Date(p.createdAt || p.addedOn).toLocaleDateString() }
-                  ]
-                }}
+                  columns: adminProjectRegistryExportTemplate,
+                  filenamePrefix: "project_registry"
+                })}
                 wrapperClass="!border-none !shadow-none"
               pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
             >
@@ -1105,19 +1061,26 @@ export default function ProjectsTable({ projects, setProjects }) {
                     : "Project Hotel Manifests"
                 }
                 subtitle={`${filteredBookings.length} deployment entries mapped`}
-                exportConfig={{
+                exportLabel="Export Excel"
+                exportLoading={isExporting}
+                exportDisabled={isExporting}
+                onExport={() => exportExcel({
+                  pageHeader: bookingTypeFilter === "all" ? "Combined Project Ledger" : bookingTypeFilter === "flight" ? "Project Flight Manifests" : "Project Hotel Manifests",
+                  statCards: [
+                    { label: "Selected Project", value: selectedProjectId === "all" ? "All Projects" : selectedProjectId || "None" },
+                    { label: "Total Amount", value: `₹${bookingTotalSpend.toLocaleString()}` },
+                    { label: "Ledger Timeline", value: ledgerDateRange }
+                  ],
+                  appliedFilters: [
+                    { label: "Personnel Filter", value: selectedEmployeeEmail },
+                    { label: "Search Manifest", value: bookingSearch || "None" },
+                    { label: "Booking Window", value: `${bookingStartDate || "Any"} to ${bookingEndDate || "Any"}` },
+                    { label: "Type", value: bookingTypeFilter }
+                  ],
                   data: filteredBookings,
-                  filename: `project_bookings_${new Date().toISOString().split('T')[0]}.csv`,
-                  columns: [
-                    { header: "Type", key: "bookingType" },
-                    { header: "Order Reference", key: "orderId" },
-                    { header: "Personnel", accessor: (b) => b.bookingType === "flight" ? b.travellerName : b.guestName },
-                    { header: "Email Identifier", key: "employeeId" },
-                    { header: "Ingestion Date", accessor: (b) => new Date(b.bookedDate).toLocaleDateString() },
-                    { header: "Status", key: "status" },
-                    { header: "Net Outlay", accessor: (b) => `₹${b.amount.toLocaleString()}` },
-                  ]
-                }}
+                  columns: adminProjectBookingsExportTemplate,
+                  filenamePrefix: "project_bookings"
+                })}
                 wrapperClass="!border-none !shadow-none"
                 pagination={
                   <Pagination

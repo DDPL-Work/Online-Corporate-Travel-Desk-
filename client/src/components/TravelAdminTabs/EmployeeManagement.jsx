@@ -40,6 +40,7 @@ import {
 } from "../../Redux/Actions/travelAdmin.thunks";
 import { ToastWithTimer } from "../../utils/ToastConfirm";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
 
 const PAGE_SIZE = 10;
 
@@ -164,6 +165,8 @@ export default function EmployeeManagement() {
       timeline 
     };
   }, [filtered, employeeExpenses, expenseStartDate, expenseEndDate]);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const handleStatusChange = async (employee) => {
     const id = employee._id;
@@ -443,21 +446,45 @@ export default function EmployeeManagement() {
           title="Employee Records" 
           subtitle={`${filtered.length} registered personnel`} 
           wrapperClass="!border-none !shadow-none"
-          exportConfig={{
+          exportLabel="Export Excel"
+          exportLoading={isExporting}
+          exportDisabled={isExporting}
+          onExport={() => exportExcel({
+            pageHeader: "Employee Records",
+            statCards: activeTab === "employees" ? [
+              { label: "Total Employees", value: stats.total },
+              { label: "Unit Managers", value: stats.managers },
+              { label: "Active Status", value: stats.active },
+              { label: "Deactivated", value: stats.suspended }
+            ] : [
+              { label: "Total Outlay", value: expenseStats.totalSpend },
+              { label: "Top Spender", value: expenseStats.topSpenderName },
+              { label: "Total Spenders", value: expenseStats.spendersCount },
+              { label: "Ledger Timeline", value: expenseStats.timeline }
+            ],
+            appliedFilters: [
+              { label: "Search", value: search || "None" },
+              { label: "Role", value: roleFilter },
+              { label: "Department", value: deptFilter },
+              { label: "Status", value: statusFilter },
+              ...(activeTab === "expenses" ? [
+                { label: "Expense Timeline", value: expenseStats.timeline }
+              ] : [])
+            ],
             data: filtered,
-            filename: `employee_management_${new Date().toISOString().split('T')[0]}.csv`,
             columns: [
-              { header: "Name", accessor: (row) => `${row.name?.firstName || ""} ${row.name?.lastName || ""}`.trim() },
+              { header: "Name", value: (row) => `${row.name?.firstName || ""} ${row.name?.lastName || ""}`.trim() },
               { header: "Email", key: "email" },
               { header: "Phone", key: "phone" },
               { header: "Department", key: "department" },
               { header: "Role", key: "role" },
               ...(activeTab === "expenses" 
-                ? [{ header: "Total Spend Amount", accessor: (row) => employeeExpenses?.[row._id] || 0 }]
-                : [{ header: "Status", accessor: (row) => row.isActive ? "Active" : "Inactive" }]),
-              { header: "Joining Date", accessor: (row) => new Date(row.createdAt || Date.now()).toLocaleDateString() },
-            ]
-          }}
+                ? [{ header: "Total Spend Amount", value: (row) => employeeExpenses?.[row._id] || 0 }]
+                : [{ header: "Status", value: (row) => row.isActive ? "Active" : "Inactive" }]),
+              { header: "Joining Date", value: (row) => new Date(row.createdAt || Date.now()).toLocaleDateString("en-IN") },
+            ],
+            filenamePrefix: "employee_management"
+          })}
           pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
         >
           <table className="w-full text-left border-collapse">

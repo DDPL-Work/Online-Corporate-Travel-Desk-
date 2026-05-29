@@ -21,7 +21,7 @@ import EditApiConfigModal from "../../Modal/EditApiConfigModal";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchTboBalance } from "../../Redux/Slice/tboBalanceSlice";
 import TableActionBar from "../Shared/TableActionBar";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import { apiConfigurationsExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const C = {
@@ -40,7 +40,7 @@ const C = {
 export default function ApiConfigurations() {
   const navigate = useNavigate();
   const tableScrollRef = useRef(null);
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
   const [records, setRecords] = useState(apiConfigurationsData);
   const [openAdd, setOpenAdd] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
@@ -101,8 +101,24 @@ export default function ApiConfigurations() {
   }
 
   const handleExport = () => {
-    exportCsv({
+    const statCards = [
+      { label: "TBO API Balance", value: balanceLoading ? "Loading…" : `${currency} ${(Number(balance) || 0).toLocaleString()}` },
+      { label: "Credit Limit", value: `${currency} ${(Number(creditLimit) || 0).toLocaleString()}` },
+      { label: "Total APIs", value: total },
+      { label: "Active APIs", value: active },
+    ];
+    
+    const appliedFilters = [
+      { label: "Search", value: searchTerm || "None" },
+      { label: "API Type", value: type },
+      { label: "Status", value: status },
+    ];
+
+    exportExcel({
       key: "api_configurations",
+      pageHeader: "API Configurations",
+      statCards,
+      appliedFilters,
       data: filtered,
       columns: apiConfigurationsExportTemplate,
       filenamePrefix: "api_configurations_export",

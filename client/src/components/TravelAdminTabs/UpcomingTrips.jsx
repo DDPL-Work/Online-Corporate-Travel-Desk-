@@ -29,6 +29,8 @@ import {
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { airlineLogo } from "../../utils/formatter";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminUpcomingFlightsExportTemplate, adminUpcomingHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Shared Components                                              */
@@ -71,6 +73,7 @@ const RouteCell = ({ routes, airline }) => {
 /* ───────────────────────────────────────────────────────────────────────────── */
 function FlightSection({ trips, refreshing, employeeOptions }) {
   const navigate = useNavigate();
+  const { exportExcel, isExporting } = useExcelExporter();
   const [search, setSearch] = useState("");
   const [empFilter, setEmp] = useState("All Employees");
   const [dateFrom, setDateFrom] = useState("");
@@ -132,18 +135,32 @@ function FlightSection({ trips, refreshing, employeeOptions }) {
       <ResponsiveDataTable 
         title="Flight Deployment Manifest" 
         subtitle={`${filtered.length} scheduled departures`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Deployment Manifest",
+          statCards: [
+            { label: "Upcoming Flights", value: filtered.length },
+            { label: "Confirmed Plans", value: filtered.filter(t => t.status === "Confirmed").length },
+            { label: "Next 7 Days", value: filtered.filter(t => {
+                const d = new Date(t.departureDate);
+                const limit = new Date();
+                limit.setDate(limit.getDate() + 7);
+                return d <= limit;
+              }).length 
+            },
+            { label: "Total Units", value: new Set(filtered.map(t => t.originalData?.userId?.department)).size }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Departure Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+          ],
           data: filtered,
-          filename: `upcoming_flight_trips_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Personnel", key: "employee" },
-            { header: "Route", accessor: (t) => t.routes?.map(r => `${r.fromCode}→${r.toCode}`).join(" | ") || "—" },
-            { header: "Departure Date", accessor: (t) => new Date(t.departureDate).toLocaleDateString() },
-            { header: "Email Identifier", key: "employeeEmail" },
-            { header: "Status", key: "status" },
-          ]
-        }}
+          columns: adminUpcomingFlightsExportTemplate,
+          filenamePrefix: "upcoming_flight_trips"
+        })}
         wrapperClass="!border-none !shadow-none"
       >
         <table className="w-full text-left border-collapse">
@@ -207,6 +224,7 @@ function FlightSection({ trips, refreshing, employeeOptions }) {
 /* ───────────────────────────────────────────────────────────────────────────── */
 function HotelSection({ trips, refreshing, employeeOptions }) {
   const navigate = useNavigate();
+  const { exportExcel, isExporting } = useExcelExporter();
   const [search, setSearch] = useState("");
   const [empFilter, setEmp] = useState("All Employees");
   const [dateFrom, setDateFrom] = useState("");
@@ -264,18 +282,26 @@ function HotelSection({ trips, refreshing, employeeOptions }) {
       <ResponsiveDataTable 
         title="Hotel Deployment Manifest" 
         subtitle={`${filtered.length} scheduled stays`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Deployment Manifest",
+          statCards: [
+            { label: "Upcoming Stays", value: filtered.length },
+            { label: "Confirmed Assets", value: filtered.length },
+            { label: "Active Locations", value: new Set(filtered.map(t => t.city)).size },
+            { label: "Personnel", value: new Set(filtered.map(t => t.employee)).size }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Check-In Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+          ],
           data: filtered,
-          filename: `upcoming_hotel_stays_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Personnel", key: "employee" },
-            { header: "Asset Detail", key: "destination" },
-            { header: "Duration", accessor: (t) => `${new Date(t.departureDate).toLocaleDateString()} — ${new Date(t.returnDate).toLocaleDateString()}` },
-            { header: "Email Identifier", key: "employeeId" },
-            { header: "Status", key: "status" },
-          ]
-        }}
+          columns: adminUpcomingHotelsExportTemplate,
+          filenamePrefix: "upcoming_hotel_stays"
+        })}
         wrapperClass="!border-none !shadow-none"
       >
         <table className="w-full text-left border-collapse">

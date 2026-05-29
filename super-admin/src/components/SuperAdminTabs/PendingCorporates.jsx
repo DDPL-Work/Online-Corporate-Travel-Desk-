@@ -7,7 +7,7 @@ import ViewCorporateModal from "../../Modal/ViewCorporateModal";
 import FinancialApprovalModal from "../../Modal/FinancialApprovalModal";
 import { fetchCorporates, fetchCorporateById } from "../../Redux/Slice/corporateListSlice";
 import TableActionBar from "../Shared/TableActionBar";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import { pendingCorporatesExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 import { toast } from "sonner";
 
@@ -88,7 +88,7 @@ export default function PendingCorporates() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const tableScrollRef = useRef(null);
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
 
   const { corporates = [], loading } = useSelector(
     (state) => state.corporateList
@@ -117,8 +117,26 @@ export default function PendingCorporates() {
 
   const handleExport = () => {
     if (loading) return;
-    exportCsv({
+
+    const statCards = [
+      { label: "Total Pending", value: stats.total },
+      { label: "Postpaid Accounts", value: stats.postpaid },
+      { label: "Prepaid Accounts", value: stats.wallet },
+      { label: "Total Credit Request", value: `₹${stats.creditSum.toLocaleString('en-IN')}` },
+    ];
+
+    const appliedFilters = [
+      { label: "Search Pending", value: search || "None" },
+      { label: "Corporate", value: selectedCorporateId !== "all" ? selectedCorporateId : "All Corporates" },
+      { label: "Start Date", value: startDate || "Any" },
+      { label: "End Date", value: endDate || "Any" },
+    ];
+
+    exportExcel({
       key: "pending_corporates",
+      pageHeader: "Pending Corporates",
+      statCards,
+      appliedFilters,
       data: filtered,
       columns: pendingCorporatesExportTemplate,
       filenamePrefix: "pending_corporates_export",

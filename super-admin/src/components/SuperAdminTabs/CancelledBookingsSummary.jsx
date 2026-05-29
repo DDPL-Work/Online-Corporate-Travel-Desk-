@@ -28,7 +28,7 @@ import {
 } from "../../Redux/Actions/corporate.related.thunks";
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import Pagination from "../Shared/Pagination";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import {
   flightCancellationSummaryExportTemplate,
   hotelCancellationSummaryExportTemplate,
@@ -398,7 +398,7 @@ function ActionCell({ onClick }) {
       <button
         type="button"
         onClick={onClick}
-        className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#003399] to-[#000d26] text-white hover:shadow-lg hover:scale-105 transition-all inline-flex items-center justify-center"
+        className="w-9 h-9 rounded-xl bg-linea-to-br from-[#003399] to-[#000d26] text-white hover:shadow-lg hover:scale-105 transition-all inline-flex items-center justify-center"
         title="View details"
       >
         <span className="text-sm font-black">→</span>
@@ -410,7 +410,7 @@ function ActionCell({ onClick }) {
 // ─── Flight table ─────────────────────────────────────────────────────────────
 function FlightCancellationTable({ rows, sort, onSort, onView }) {
   return (
-    <table className="min-w-[1200px] w-full table-fixed text-left border-collapse">
+    <table className="min-w-300 w-full table-fixed text-left border-collapse">
       <colgroup>
         <col style={{ width: "9%" }} />
         <col style={{ width: "9%" }} />
@@ -423,7 +423,7 @@ function FlightCancellationTable({ rows, sort, onSort, onView }) {
         <col style={{ width: "4%" }} />
       </colgroup>
       <thead>
-        <tr className="bg-gradient-to-r from-[#001a66] to-[#000d26]">
+        <tr className="bg-linea-to-r from-[#001a66] to-[#000d26]">
           <TableHead>Order ID</TableHead>
           <TableHead>Cancel Req. ID</TableHead>
           <TableHead>Corporate</TableHead>
@@ -454,12 +454,12 @@ function FlightCancellationTable({ rows, sort, onSort, onView }) {
             </BodyCell>
             <PeopleCell people={row.people} />
             <td className="px-4 xl:px-5 py-4 align-middle">
-              <div className="flex min-h-[52px] flex-col justify-center gap-1">
+              <div className="flex min-h-13 flex-col justify-center gap-1">
                 <div className="flex items-center gap-2">
                   <img
                     src={airlineLogo(row.airlineCode || row.airlineName)}
                     alt={row.airlineName || "Airline"}
-                    className="w-7 h-7 rounded-md object-contain bg-slate-50 border border-slate-100 flex-shrink-0"
+                    className="w-7 h-7 rounded-md object-contain bg-slate-50 border border-slate-100 shrink-0"
                     onError={(e) => {
                       e.currentTarget.src = "https://via.placeholder.com/32";
                     }}
@@ -487,7 +487,7 @@ function FlightCancellationTable({ rows, sort, onSort, onView }) {
 // ─── Hotel table ──────────────────────────────────────────────────────────────
 function HotelCancellationTable({ rows, sort, onSort, onView }) {
   return (
-    <table className="min-w-[1200px] w-full table-fixed text-left border-collapse">
+    <table className="min-w-300 w-full table-fixed text-left border-collapse">
       <colgroup>
         <col style={{ width: "9%" }} />
         <col style={{ width: "9%" }} />
@@ -500,7 +500,7 @@ function HotelCancellationTable({ rows, sort, onSort, onView }) {
         <col style={{ width: "4%" }} />
       </colgroup>
       <thead>
-        <tr className="bg-gradient-to-r from-[#001a66] to-[#000d26]">
+        <tr className="bg-linea-to-r from-[#001a66] to-[#000d26]">
           <TableHead>Order ID</TableHead>
           <TableHead>Cancel Req. ID</TableHead>
           <TableHead>Corporate</TableHead>
@@ -566,7 +566,7 @@ function StatCard({ label, value, icon, borderColor }) {
     <div
       className={`bg-white rounded-2xl p-5 flex items-center gap-4 shadow-sm border border-slate-100 border-b-4 ${borderColor}`}
     >
-      <div className="w-11 h-11 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 flex-shrink-0">
+      <div className="w-11 h-11 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 shrink-0">
         {icon}
       </div>
       <div>
@@ -583,7 +583,7 @@ function TableSkeleton({ activeTab }) {
     <div className="p-5 space-y-3">
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className="h-14 rounded-xl bg-slate-100 overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-pulse" />
+          <div className="absolute inset-0 bg-linea-to-r from-transparent via-white/60 to-transparent animate-pulse" />
         </div>
       ))}
       <p className="text-center text-[11px] font-black text-slate-400 uppercase tracking-widest pt-3">
@@ -596,7 +596,7 @@ function TableSkeleton({ activeTab }) {
 // ─── Empty state ──────────────────────────────────────────────────────────────
 function EmptyState({ activeTab }) {
   return (
-    <div className="min-h-[420px] flex flex-col items-center justify-center text-center p-8">
+    <div className="min-h-105 flex flex-col items-center justify-center text-center p-8">
       <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300 mb-4">
         {activeTab === "Flight" ? <FaPlane size={28} /> : <FaHotel size={28} />}
       </div>
@@ -612,7 +612,7 @@ function EmptyState({ activeTab }) {
 export default function CancellationDashboard() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
   const tableScrollRef = useRef(null);
 
   const {
@@ -721,8 +721,25 @@ export default function CancellationDashboard() {
   };
 
   const handleExport = () => {
-    exportCsv({
+    const appliedFilters = [
+      { label: "Search", value: search || "None" },
+      { label: "Status", value: status },
+      { label: "Corporate", value: corporate },
+      { label: "From Date", value: fromDate || "Any" },
+      { label: "To Date", value: toDate || "Any" },
+      { label: "Active Tab", value: activeTab },
+    ];
+
+    exportExcel({
       key: exportKey,
+      pageHeader: activeTab === "Flight" ? "Flight Cancellation Summary" : "Hotel Cancellation Summary",
+      statCards: [
+        { label: "Total Records", value: sorted.length },
+        { label: "Requested", value: rows.filter((r) => r.status === "Requested").length },
+        { label: "Approved", value: rows.filter((r) => r.status === "Approved").length },
+        { label: "Needs Review", value: rows.filter((r) => r.status === "In Review").length },
+      ],
+      appliedFilters,
       data: sorted,
       columns:
         activeTab === "Flight"
@@ -743,7 +760,7 @@ export default function CancellationDashboard() {
       style={{ background: "#f8fafc" }}
     >
       {/* ── Navy Gradient Header ── */}
-      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+      <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
           {/* Left: nav + title */}
           <div className="flex items-center gap-6">
@@ -767,7 +784,7 @@ export default function CancellationDashboard() {
               </button>
             </div>
 
-            <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+            <div className="h-12 w-px bg-white/10 mx-2 hidden md:block" />
 
             <div className="flex items-center gap-5">
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
@@ -969,7 +986,7 @@ export default function CancellationDashboard() {
           </div>
 
           {/* Table Body */}
-          <div ref={tableScrollRef} className="w-full overflow-x-auto min-h-[420px]">
+          <div ref={tableScrollRef} className="w-full overflow-x-auto min-h-105">
             {isLoading ? (
               <TableSkeleton activeTab={activeTab} />
             ) : sorted.length === 0 ? (

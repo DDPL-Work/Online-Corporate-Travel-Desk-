@@ -30,6 +30,8 @@ import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { airlineLogo } from "../../utils/formatter";
 import { C } from "../Shared/color";
 import { Pagination } from "./Shared/Pagination";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminPastFlightTripsExportTemplate, adminPastHotelStaysExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Shared Components                                              */
@@ -99,6 +101,8 @@ function FlightSection({ trips, refreshing, employeeOptions }) {
 
   const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
 
+  const { exportExcel, isExporting } = useExcelExporter();
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -130,18 +134,24 @@ function FlightSection({ trips, refreshing, employeeOptions }) {
       <ResponsiveDataTable 
         title="Flight History Ledger" 
         subtitle={`${filtered.length} archived deployments`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight History Ledger",
+          statCards: [
+            { label: "Archived Flights", value: filtered.length },
+            { label: "Completed Journeys", value: filtered.length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Travel Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+          ],
           data: filtered,
-          filename: `past_flight_trips_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Personnel", key: "employee" },
-            { header: "Route", accessor: (t) => t.routes?.map(r => `${r.fromCode}→${r.toCode}`).join(" | ") || "—" },
-            { header: "Travel Date", accessor: (t) => new Date(t.departureDate).toLocaleDateString() },
-            { header: "Email Identifier", key: "employeeId" },
-            { header: "Status", key: "status" },
-          ]
-        }}
+          columns: adminPastFlightTripsExportTemplate,
+          filenamePrefix: "past_flight_trips"
+        })}
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />} 
         wrapperClass="!border-none !shadow-none"
       >
@@ -233,6 +243,8 @@ function HotelSection({ trips, refreshing, employeeOptions }) {
 
   const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
 
+  const { exportExcel, isExporting } = useExcelExporter();
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -264,18 +276,24 @@ function HotelSection({ trips, refreshing, employeeOptions }) {
       <ResponsiveDataTable 
         title="Hotel History Ledger" 
         subtitle={`${filtered.length} archived stays`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel History Ledger",
+          statCards: [
+            { label: "Archived Hotels", value: filtered.length },
+            { label: "Completed Stays", value: filtered.length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Stay Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+          ],
           data: filtered,
-          filename: `past_hotel_stays_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Personnel", key: "employee" },
-            { header: "Asset Detail", key: "destination" },
-            { header: "Duration", accessor: (t) => `${new Date(t.departureDate).toLocaleDateString()} — ${new Date(t.returnDate).toLocaleDateString()}` },
-            { header: "Email Identifier", key: "employeeId" },
-            { header: "Status", key: "status" },
-          ]
-        }}
+          columns: adminPastHotelStaysExportTemplate,
+          filenamePrefix: "past_hotel_stays"
+        })}
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />} 
         wrapperClass="!border-none !shadow-none"
       >

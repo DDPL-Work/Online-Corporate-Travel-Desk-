@@ -28,6 +28,8 @@ import {
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { cancelledFlightsExportTemplate, cancelledHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const mapCancelStatus = (status) => {
   if (status === "refunded") return "Refunded";
@@ -99,6 +101,8 @@ function CancelledFlightSection() {
   const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
   const PAGE_SIZE = 10;
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const dispatch = useDispatch();
   const { teamExecutedFlightRequests: flightBookings } = useSelector((state) => state.manager);
@@ -217,20 +221,26 @@ function CancelledFlightSection() {
       <ResponsiveDataTable 
         title="Flight Cancellation Registry" 
         subtitle={`${filtered.length} records processed`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Cancelled Flights",
+          statCards: [
+            { label: "Cancelled Flights", value: filtered.length },
+            { label: "Refunded", value: filtered.filter(b => b.status === "Refunded").length },
+            { label: "Refund Pending", value: filtered.filter(b => b.status === "Refund Pending").length },
+            { label: "Total Refund Value", value: `₹${filtered.reduce((s, b) => s + (b.refundAmount || 0), 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Status", value: cancelStatusFilter },
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `cancelled_flights_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Personnel", key: "travellerName" },
-            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
-            { header: "Email", key: "employeeId" },
-            { header: "Status", key: "status" },
-            { header: "Cancelled On", accessor: (r) => r.cancelledDate ? new Date(r.cancelledDate).toLocaleDateString("en-IN") : "—" },
-            { header: "PNR Ref", key: "pnr" },
-            { header: "Refund Est.", accessor: (r) => `₹${r.refundAmount.toLocaleString()}` }
-          ]
-        }}
+          columns: cancelledFlightsExportTemplate,
+          filenamePrefix: "cancelled_flights"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
@@ -302,6 +312,8 @@ function CancelledHotelSection() {
   const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
   const PAGE_SIZE = 10;
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const dispatch = useDispatch();
   const { teamExecutedHotelRequests: hotelBookings } = useSelector((state) => state.manager);
@@ -382,19 +394,26 @@ function CancelledHotelSection() {
       <ResponsiveDataTable 
         title="Hotel Cancellation Registry" 
         subtitle={`${filtered.length} records processed`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Cancelled Hotels",
+          statCards: [
+            { label: "Cancelled Hotels", value: filtered.length },
+            { label: "Refunded", value: filtered.filter(b => b.status === "Refunded").length },
+            { label: "Refund Pending", value: filtered.filter(b => b.status === "Refund Pending").length },
+            { label: "Total Refund Value", value: `₹${filtered.reduce((s, b) => s + (b.refundAmount || 0), 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Status", value: cancelStatusFilter },
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `cancelled_hotels_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order Reference", key: "orderId" },
-            { header: "Personnel", key: "guestName" },
-            { header: "Email", key: "employeeId" },
-            { header: "Asset Detail", key: "hotelName" },
-            { header: "Status", key: "status" },
-            { header: "Cancelled On", accessor: (r) => r.cancelledDate ? new Date(r.cancelledDate).toLocaleDateString("en-IN") : "—" },
-            { header: "Refund Est.", accessor: (r) => `₹${r.refundAmount.toLocaleString()}` }
-          ]
-        }}
+          columns: cancelledHotelsExportTemplate,
+          filenamePrefix: "cancelled_hotels"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
