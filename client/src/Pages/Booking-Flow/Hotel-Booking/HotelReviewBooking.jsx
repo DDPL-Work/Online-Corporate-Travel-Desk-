@@ -58,6 +58,7 @@ import api from "../../../API/axios";
 import { ProjectApproverBlock } from "./components/ProjectApproverBlock";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
+import CustomDatePicker from "../../../components/Shared/CustomDatePicker";
 import { fetchMyProfile } from "../../../Redux/Slice/employeeActionSlice";
 import {
   handleHotelPreBookSessionExpiry,
@@ -1003,6 +1004,7 @@ const HotelReviewBooking = () => {
 
   const [travelers, setTravelers] = useState([]);
   const [purposeOfTravel, setPurposeOfTravel] = useState("");
+  const [applyLeadPan, setApplyLeadPan] = useState(false);
   const [bookingRequest, setBookingRequest] = useState(null);
   const [flightRulesStatus, setFlightRulesStatus] = useState("loading"); // "loading", "ready", "error"
   const [isCorporateBooking, setIsCorporateBooking] = useState(false);
@@ -1610,8 +1612,10 @@ const HotelReviewBooking = () => {
           tErrors.age = "Child age must be 0-18";
         }
       } else {
-        if (isNaN(ageNum) || ageNum <= 18) {
-          tErrors.age = "Adult age must be above 18";
+        if (t.dob || t.age) {
+          if (isNaN(ageNum) || ageNum <= 18) {
+            tErrors.age = "Adult age must be above 18";
+          }
         }
       }
 
@@ -2136,7 +2140,7 @@ const HotelReviewBooking = () => {
               </div>
             ) : (
               /* Non-BookNow mode: editable guest form */
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C]">
@@ -2169,10 +2173,11 @@ const HotelReviewBooking = () => {
                   {travelers.map((t, index) => (
                     <div
                       key={t.id || t._id || index}
-                      className="rounded-2xl border border-slate-200 overflow-hidden shadow-md shadow-black/20"
+                      className="rounded-2xl border border-slate-200 shadow-md shadow-black/20 relative"
+                      style={{ zIndex: travelers.length - index + 10 }}
                     >
                       {/* Card Header */}
-                      <div className="flex items-center justify-between px-5 py-3 bg-linear-to-r from-[#C9A84C]/5 to-[#C9A84C]/10 border-b border-slate-200">
+                      <div className="flex items-center justify-between px-5 py-3 bg-linear-to-r from-[#C9A84C]/5 to-[#C9A84C]/10 border-b border-slate-200 rounded-t-2xl">
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full bg-[#C9A84C] flex items-center justify-center text-white text-xs font-bold">
                             {index + 1}
@@ -2189,7 +2194,7 @@ const HotelReviewBooking = () => {
                         </div>
                       </div>
 
-                      <div className="p-5 space-y-6 bg-white">
+                      <div className="p-5 space-y-6 bg-white rounded-b-2xl">
                         {/* Full Name */}
                         <div>
                           <SectionHeading
@@ -2397,29 +2402,43 @@ const HotelReviewBooking = () => {
                               <label className="field-label">
                                 Date of Birth{t.paxType === 2 && <span className="text-red-500 ml-0.5">*</span>}
                               </label>
-                              <input
-                                type="date"
-                                value={t.dob || ""}
-                                disabled={isBookNowMode}
-                                onChange={(e) => {
-                                  const dob = e.target.value;
-                                  const today = new Date();
-                                  const birth = new Date(dob);
-                                  let age =
-                                    today.getFullYear() - birth.getFullYear();
-                                  const m = today.getMonth() - birth.getMonth();
-                                  if (
-                                    m < 0 ||
-                                    (m === 0 &&
-                                      today.getDate() < birth.getDate())
-                                  )
-                                    age--;
-
-                                  updateTraveler(t.id, "dob", dob);
-                                  updateTraveler(t.id, "age", age);
-                                }}
-                                className={`field-input ${formErrors[t.id]?.dob ? "border-red-500 ring-1 ring-red-500" : ""}`}
-                              />
+                              {isBookNowMode ? (
+                                <input
+                                  type="date"
+                                  value={t.dob || ""}
+                                  disabled={true}
+                                  className="field-input"
+                                />
+                              ) : (
+                                <div className={formErrors[t.id]?.dob ? "rounded-lg border border-red-500 ring-1 ring-red-500" : ""}>
+                                  <CustomDatePicker
+                                    value={t.dob || ""}
+                                    maxDate={new Date().toISOString().split("T")[0]}
+                                    minDate={(() => {
+                                      if (t.paxType === 2 && t.originalAge) {
+                                        const minYear = new Date().getFullYear() - Number(t.originalAge) - 1;
+                                        return `${minYear}-01-01`;
+                                      }
+                                      return undefined;
+                                    })()}
+                                    onChange={(val) => {
+                                      if (!val) {
+                                        updateTraveler(t.id, "dob", "");
+                                        updateTraveler(t.id, "age", "");
+                                        return;
+                                      }
+                                      const dob = val;
+                                      const today = new Date();
+                                      const birth = new Date(dob);
+                                      let age = today.getFullYear() - birth.getFullYear();
+                                      const m = today.getMonth() - birth.getMonth();
+                                      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+                                      updateTraveler(t.id, "dob", dob);
+                                      updateTraveler(t.id, "age", age);
+                                    }}
+                                  />
+                                </div>
+                              )}
                               {formErrors[t.id]?.dob && (
                                 <p className="text-[10px] text-red-500 mt-1">
                                   {formErrors[t.id].dob}
@@ -2469,13 +2488,20 @@ const HotelReviewBooking = () => {
                                     t.paxType === 2 ||
                                     (t.age && Number(t.age) <= 18)
                                   }
-                                  onChange={(e) =>
-                                    updateTraveler(
-                                      t.id,
-                                      "panCard",
-                                      e.target.value.toUpperCase(),
-                                    )
-                                  }
+                                  onChange={(e) => {
+                                    const val = e.target.value.toUpperCase();
+                                    setTravelers((prev) =>
+                                      prev.map((tr) => {
+                                        if (tr.id === t.id) {
+                                          return { ...tr, panCard: val };
+                                        }
+                                        if (t.leadPassenger && applyLeadPan && tr.paxType === 1 && !tr.leadPassenger) {
+                                          return { ...tr, panCard: val };
+                                        }
+                                        return tr;
+                                      })
+                                    );
+                                  }}
                                   placeholder="ABCDE1234F"
                                   maxLength={10}
                                   className={`field-input font-mono tracking-widest ${formErrors[t.id]?.panCard ? "border-red-500 ring-1 ring-red-500" : ""}`}
@@ -2488,6 +2514,32 @@ const HotelReviewBooking = () => {
                                 <p className="text-[10px] text-yellow-700 font-semibold">
                                   {isCorporateBooking ? "Enter Valid Corporate PAN." : "Required only for adults older than 18."}
                                 </p>
+                                {t.leadPassenger && travelers.some(tr => tr.paxType === 1 && !tr.leadPassenger) && (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <input 
+                                      type="checkbox" 
+                                      id="applyLeadPan"
+                                      checked={applyLeadPan}
+                                      onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setApplyLeadPan(checked);
+                                        if (checked && t.panCard) {
+                                          setTravelers(prev => prev.map(tr => 
+                                            (tr.paxType === 1 && !tr.leadPassenger) ? { ...tr, panCard: t.panCard } : tr
+                                          ));
+                                        } else if (!checked) {
+                                          setTravelers(prev => prev.map(tr => 
+                                            (tr.paxType === 1 && !tr.leadPassenger) ? { ...tr, panCard: "" } : tr
+                                          ));
+                                        }
+                                      }}
+                                      className="w-4 h-4 text-[#C9A84C] focus:ring-[#C9A84C] cursor-pointer"
+                                    />
+                                    <label htmlFor="applyLeadPan" className="text-xs text-slate-600 font-medium cursor-pointer">
+                                      Apply this PAN card to all other adults
+                                    </label>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

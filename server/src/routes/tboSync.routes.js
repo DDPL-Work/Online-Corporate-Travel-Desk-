@@ -13,4 +13,11 @@ router.post("/sync-hotels", tboSyncCtrl.syncAllTboHotels);
 router.post("/sync-hotel-details", tboSyncCtrl.syncAllTboHotelDetails);
 router.post("/master-sync", tboSyncCtrl.triggerMasterSync);
 
+// AIRLINE SEED ROUTES
+router.post("/seed-airlines", tboSyncCtrl.seedAirlines);
+router.get("/seed-airlines/status", tboSyncCtrl.getSeedAirlinesStatus);
+
+// AIRPORT SEED ROUTES
+router.post("/seed-airports", tboSyncCtrl.seedAirports);
+
 module.exports = router;
