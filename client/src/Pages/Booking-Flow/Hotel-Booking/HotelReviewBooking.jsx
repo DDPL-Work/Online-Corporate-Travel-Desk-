@@ -1700,20 +1700,12 @@ const HotelReviewBooking = () => {
     setFormErrors({ ...errors, ...newGlobalErrors });
 
     if (Object.keys(errors).length > 0 || hasGlobalErrors) {
-      Swal.fire({
-        icon: "error",
-        title: "Incomplete Details",
-        text: "Please fill all required fields correctly before proceeding.",
-        confirmButtonColor: "#C9A84C",
-      });
       return;
     }
     if (!selectedRoom.length) {
-      Swal.fire({
-        icon: "error",
-        title: "No Room Selected",
-        text: "Please select at least one room",
-        confirmButtonColor: "#C9A84C",
+      ToastWithTimer({
+        type: "error",
+        message: "Please select at least one room",
       });
       return;
     }

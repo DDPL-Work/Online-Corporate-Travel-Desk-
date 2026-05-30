@@ -814,6 +814,46 @@ export default function CorporateRevenue() {
 
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
 
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KPICard
+          label="Total Revenue"
+          value={inr(summary?.totalRevenue)}
+          icon={<FaRupeeSign />}
+          borderCls="border-[#000D26]"
+          iconBgCls="bg-slate-100"
+          iconColorCls="text-[#000D26]"
+          trend="+12.5%"
+          isGood={true}
+        />
+        <KPICard
+          label="Flight Revenue"
+          value={inr(summary?.flights?.totalRevenue)}
+          icon={<FaPlane />}
+          borderCls="border-[#003399]"
+          iconBgCls="bg-[#003399]/10"
+          iconColorCls="text-[#003399]"
+          subLabel={`${summary?.flights?.totalBookings} Bookings`}
+        />
+        <KPICard
+          label="Hotel Revenue"
+          value={inr(summary?.hotels?.totalRevenue)}
+          icon={<FaBuilding />}
+          borderCls="border-[#d97706]"
+          iconBgCls="bg-[#d97706]/10"
+          iconColorCls="text-[#d97706]"
+          subLabel={`${summary?.hotels?.totalBookings} Bookings`}
+        />
+        <KPICard
+          label="Avg Booking Value"
+          value={inr(summary?.avgBookingValue)}
+          icon={<FiTrendingUp />}
+          borderCls="border-emerald-500"
+          iconBgCls="bg-emerald-50"
+          iconColorCls="text-emerald-600"
+          subLabel="Per successful booking"
+        />
+      </div>
+
         {/* Filter Section */}
         <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
@@ -881,45 +921,7 @@ export default function CorporateRevenue() {
           </div>
         </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KPICard
-          label="Total Revenue"
-          value={inr(summary?.totalRevenue)}
-          icon={<FaRupeeSign />}
-          borderCls="border-[#000D26]"
-          iconBgCls="bg-slate-100"
-          iconColorCls="text-[#000D26]"
-          trend="+12.5%"
-          isGood={true}
-        />
-        <KPICard
-          label="Flight Revenue"
-          value={inr(summary?.flights?.totalRevenue)}
-          icon={<FaPlane />}
-          borderCls="border-[#003399]"
-          iconBgCls="bg-[#003399]/10"
-          iconColorCls="text-[#003399]"
-          subLabel={`${summary?.flights?.totalBookings} Bookings`}
-        />
-        <KPICard
-          label="Hotel Revenue"
-          value={inr(summary?.hotels?.totalRevenue)}
-          icon={<FaBuilding />}
-          borderCls="border-[#d97706]"
-          iconBgCls="bg-[#d97706]/10"
-          iconColorCls="text-[#d97706]"
-          subLabel={`${summary?.hotels?.totalBookings} Bookings`}
-        />
-        <KPICard
-          label="Avg Booking Value"
-          value={inr(summary?.avgBookingValue)}
-          icon={<FiTrendingUp />}
-          borderCls="border-emerald-500"
-          iconBgCls="bg-emerald-50"
-          iconColorCls="text-emerald-600"
-          subLabel="Per successful booking"
-        />
-      </div>
+    
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
@@ -1393,7 +1395,7 @@ function KPICard({ label, value, icon, borderCls, iconBgCls, iconColorCls, trend
   const cCls = iconColorCls || "text-[#000D26]";
 
   return (
-    <div className={`bg-white rounded-2xl ${isSmall ? "p-4" : "p-6"} border-b-4 ${bCls} shadow-sm flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300`}>
+    <div className={`bg-white rounded-2xl ${isSmall ? "p-4" : "p-6"} border-b-4 ${bCls} shadow-sm flex flex-col justify-between`}>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>

@@ -69,7 +69,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, showFirstLast = tru
               onClick={() => handlePageChange(page)}
               className={`w-8 h-8 rounded-lg text-sm font-medium transition ${
                 currentPage === page
-                  ? "bg-[#0A4D68] text-white shadow-sm"
+                  ? "bg-[#003399] text-white shadow-sm"
                   : "text-slate-600 hover:bg-slate-50"
               }`}
             >
