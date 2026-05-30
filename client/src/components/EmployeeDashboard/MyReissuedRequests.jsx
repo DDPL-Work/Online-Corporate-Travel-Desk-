@@ -559,7 +559,7 @@ const MyReissueRequests = () => {
                 {activeTab === "company" && (
                   <Th className="px-6! py-5!">Employee / Context</Th>
                 )}
-                <Th className="px-6! py-5!">PNR / Ref</Th>
+                <Th className="px-6! py-5!">PNR </Th>
                 <Th className="px-6! py-5!">Airline & Route</Th>
                 <Th className="px-6! py-5!">Type & Reason</Th>
                 <Th className="px-6! py-5!">Status</Th>
@@ -628,14 +628,14 @@ const MyReissueRequests = () => {
                         </td>
                       )}
 
-                      {/* PNR / Ref */}
+                      {/* PNR  */}
                       <td className="px-6! py-5!">
                         <p className="font-black text-sm text-slate-900 uppercase">
                           {pnr}
                         </p>
-                        <p className="text-[11px] font-bold text-slate-400 font-mono mt-0.5">
+                        {/* <p className="text-[11px] font-bold text-slate-400 font-mono mt-0.5">
                           {bookingRef}
-                        </p>
+                        </p> */}
                       </td>
 
                       {/* Airline & Route */}

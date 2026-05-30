@@ -55,6 +55,11 @@ import {
   formatDateWithYear,
 } from "../../../utils/formatter";
 import {
+  CANCELLATION_CHARGES_UNAVAILABLE_MESSAGE,
+  CANCELLATION_REFERENCE_UNAVAILABLE_MESSAGE,
+  resolveCancellationBookingReference,
+} from "../../../utils/cancellationQuery";
+import {
   ExecStatusBadge,
   getSegCity,
   InfoBadge,
@@ -201,7 +206,7 @@ const AmendmentActionsPanel = ({ booking, type, onClose }) => {
     if (result.meta.requestStatus === "fulfilled") {
       toast.success("Cancellation charges fetched");
     } else {
-      toast.error(result.payload?.message || "Failed to fetch charges");
+      toast.info(CANCELLATION_CHARGES_UNAVAILABLE_MESSAGE);
     }
   };
 
@@ -233,14 +238,27 @@ const AmendmentActionsPanel = ({ booking, type, onClose }) => {
           }),
         );
       } else if (actionType === "offline") {
+        const bookingReference = resolveCancellationBookingReference(booking);
+
+        if (!bookingReference) {
+          return toast.error(CANCELLATION_REFERENCE_UNAVAILABLE_MESSAGE);
+        }
+
         const payload = {
           bookingId: booking._id,
-          bookingReference: booking.bookingReference,
+          bookingReference,
+          priority: "MEDIUM",
           remarks: remarks,
           segments: booking.flightRequest?.segments || [],
           corporate: { id: booking.corporateId },
           bookingSnapshot: booking.bookingSnapshot || {},
           passengers: booking.travellers || [],
+          user: {
+            id: booking?.user?._id,
+            name: booking?.user?.name,
+            email: booking?.user?.email,
+            phone: booking?.user?.phone,
+          },
         };
         result = await dispatch(createQueryThunk(payload));
       } else if (actionType === "status") {

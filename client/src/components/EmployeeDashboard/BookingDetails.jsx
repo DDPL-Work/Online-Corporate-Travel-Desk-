@@ -65,6 +65,12 @@ import {
 } from "../../utils/formatter";
 import Swal from "sweetalert2";
 import ReissueModal from "./ReissueModal";
+import {
+  CANCELLATION_CHARGES_UNAVAILABLE_MESSAGE,
+  CANCELLATION_REFERENCE_UNAVAILABLE_MESSAGE,
+  isCancellationChargesUnavailableResponse,
+  resolveCancellationBookingReference,
+} from "../../utils/cancellationQuery";
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Utility helpers (unchanged)                                   */
@@ -1258,6 +1264,13 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
           throw new Error("Failed to fetch charges");
         }
 
+        if (isCancellationChargesUnavailableResponse(res.payload)) {
+          setChargesError(CANCELLATION_CHARGES_UNAVAILABLE_MESSAGE);
+          setCharges(null);
+          setStep("charges");
+          return;
+        }
+
         setCharges(res.payload);
         setStep("charges");
       } catch (err) {
@@ -1294,6 +1307,13 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
     parsedCharges?.[0]?.creditNoteNo ?? charges?.CreditNoteNo ?? null;
   const cancellationCharge = parsedCharges?.[0]?.cancellationCharge ?? null;
   const refundedAmount = parsedCharges?.[0]?.refundedAmount ?? null;
+  const chargesUnavailable =
+    Boolean(chargesError) ||
+    parsedCharges.length === 0 ||
+    parsedCharges.every(
+      (charge) =>
+        charge.cancellationCharge == null && charge.refundedAmount == null,
+    );
 
   /* ── Full Cancellation ── */
   const handleFullCancel = async () => {
@@ -1455,13 +1475,23 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
 
   const handleRaiseQuery = async () => {
     try {
+      const bookingReference = resolveCancellationBookingReference(booking);
+
+      if (!bookingReference) {
+        setShowQueryModal(false);
+        setChargesError(CANCELLATION_REFERENCE_UNAVAILABLE_MESSAGE);
+        setStep("error");
+        toast.error(CANCELLATION_REFERENCE_UNAVAILABLE_MESSAGE);
+        return;
+      }
+
       setShowQueryModal(false);
       setStep("processing");
       setProcessingLabel("Creating cancellation query...");
 
       const payload = {
         bookingId: booking._id,
-        orderId: booking.orderId || booking.bookingReference,
+        bookingReference,
         priority: queryPriority,
         remarks:
           queryRemarks || "User requested cancellation but charges API failed",
@@ -1758,11 +1788,9 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
                     </span>
                   </div>
                 )}
-                {(parsedCharges.length === 0 || chargesError) && (
+                {chargesUnavailable && (
                   <p className="text-xs text-amber-600 italic">
-                    {chargesError
-                      ? "Unable to fetch charges. You can still proceed with cancellation. Final charges will be applied as per airline rules."
-                      : "Charges not available. They will be applied as per fare rules."}
+                    {CANCELLATION_CHARGES_UNAVAILABLE_MESSAGE}
                   </p>
                 )}
               </div>
@@ -1849,7 +1877,7 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
                 )}
 
                 {/* ✅ NEW BUTTON (ONLY WHEN API FAILS) */}
-                {(chargesError || parsedCharges.length === 0) && (
+                {chargesUnavailable && (
                   <button
                     onClick={() => setShowQueryModal(true)}
                     className="w-full py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition flex items-center justify-center gap-2"
