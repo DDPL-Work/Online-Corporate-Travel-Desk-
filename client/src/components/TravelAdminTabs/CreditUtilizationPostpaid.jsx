@@ -38,6 +38,7 @@ import { C } from "../Shared/color";
 import { useNavigate } from "react-router-dom";
 import { airlineLogo } from "../../utils/formatter";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
 
 const fmt = (d) =>
   d
@@ -258,7 +259,7 @@ export default function CreditUtilizationPostpaid() {
     dispatch(clearCycleTransactions());
   };
 
-  // `handleExport` is now handled by ResponsiveDataTable's exportConfig
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const handleScroll = (dir) => {
     if (scrollRef.current) {
@@ -632,17 +633,55 @@ export default function CreditUtilizationPostpaid() {
           </div>
 
           <ResponsiveDataTable
-            exportConfig={!drillCycle ? {
-              data: activeTab === "current" && currentCycleRow ? [currentCycleRow] : (previousCycles || []),
-              filename: `credit_ledger_report_${new Date().toISOString().split('T')[0]}.csv`,
-              columns: [
-                { header: "Statement ID", key: "statementId" },
-                { header: "Billing Cycle", accessor: (c) => `${fmt(c.periodStart)} - ${fmt(c.periodEnd)}` },
-                { header: "Usage", accessor: (c) => `₹${(c.statementAmount || 0).toLocaleString()}` },
-                { header: "Due Date", accessor: (c) => fmt(c.dueDate) },
-                { header: "Payment Received", accessor: (c) => c.isCurrent ? "N/A" : fmt(c.paymentReceivedAt) }
-              ]
-            } : null}
+            exportLabel="Export Excel"
+            exportLoading={isExporting}
+            exportDisabled={isExporting}
+            onExport={() => {
+              if (!drillCycle) {
+                exportExcel({
+                  pageHeader: activeTab === "current" ? "Active Cycle Registry" : "Archive Cycle Registry",
+                  statCards: [
+                    { label: "Total Credit Limit", value: `₹${fmtAmt(displayStats.totalLimit)}` },
+                    { label: displayStats.usedLabel, value: `₹${fmtAmt(displayStats.usedCredit)}` },
+                    { label: displayStats.availableLabel, value: `₹${fmtAmt(displayStats.availableCredit)}` }
+                  ],
+                  appliedFilters: [],
+                  data: activeTab === "current" && currentCycleRow ? [currentCycleRow] : (previousCycles || []),
+                  columns: [
+                    { header: "Statement ID", key: "statementId" },
+                    { header: "Billing Cycle", value: (c) => `${fmt(c.periodStart)} - ${fmt(c.periodEnd)}` },
+                    { header: "Usage", value: (c) => `₹${(c.statementAmount || 0).toLocaleString()}` },
+                    { header: "Due Date", value: (c) => fmt(c.dueDate) },
+                    { header: "Payment Received", value: (c) => c.isCurrent ? "N/A" : fmt(c.paymentReceivedAt) }
+                  ],
+                  filenamePrefix: "credit_ledger_report"
+                });
+              } else {
+                exportExcel({
+                  pageHeader: `Transaction Matrix: ${drillCycle.statementId}`,
+                  statCards: [
+                    { label: "Total Credit Limit", value: `₹${fmtAmt(displayStats.totalLimit)}` },
+                    { label: displayStats.usedLabel, value: `₹${fmtAmt(displayStats.usedCredit)}` },
+                    { label: displayStats.availableLabel, value: `₹${fmtAmt(displayStats.availableCredit)}` }
+                  ],
+                  appliedFilters: [
+                    { label: "Universal Search", value: searchTerm || "None" },
+                    { label: "From Date", value: fromDate || "Any" },
+                    { label: "To Date", value: toDate || "Any" },
+                    { label: "Employee", value: selectedEmployee ? (companyUsers.find(u => u._id === selectedEmployee)?.name?.firstName || "Selected") : "All" },
+                    { label: "Booking Type", value: selectedType || "All" }
+                  ],
+                  data: drillTx,
+                  columns: [
+                    { header: "Generation Date", value: (t) => fmt(t.createdAt) },
+                    { header: "Personnel", value: (t) => t.userId?.name ? `${t.userId.name.firstName} ${t.userId.name.lastName}` : "Staff Member" },
+                    { header: "Capital Flow", value: (t) => t.type || "—" },
+                    { header: "Amount", value: (t) => `₹${(t.amount || 0).toLocaleString()}` }
+                  ],
+                  filenamePrefix: "credit_transactions"
+                });
+              }
+            }}
             wrapperClass="!border-none !shadow-none"
           >
             <div className="overflow-x-auto" ref={scrollRef}>

@@ -25,7 +25,7 @@ import {
   OPS_DEPARTMENT_OPTIONS,
   OPS_DESIGNATION_OPTIONS,
 } from "../../constants/opsMember";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import { opsTeamExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const colors = {
@@ -43,7 +43,7 @@ export default function OpsTeamManagement() {
   const isSuperAdmin = role === "super-admin";
 
   const [members, setMembers] = useState([]);
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
@@ -127,8 +127,25 @@ export default function OpsTeamManagement() {
   const handleExport = () => {
     if (loading) return;
 
-    exportCsv({
+    const statCards = [
+      { label: "Total Members", value: members.length },
+      { label: "Departments", value: new Set(members.map((member) => normalizeOpsMemberRecord(member).department).filter(Boolean)).size },
+      { label: "Active", value: members.filter((member) => member.status === "Active").length },
+      { label: "Inactive", value: members.filter((member) => member.status === "Inactive").length },
+    ];
+
+    const appliedFilters = [
+      { label: "Search", value: search || "None" },
+      { label: "Designation", value: designationFilter || "All Designations" },
+      { label: "Department", value: departmentFilter || "All Departments" },
+      { label: "Status", value: statusFilter || "All Status" },
+    ];
+
+    exportExcel({
       key: "ops_team",
+      pageHeader: "OPS Team Management",
+      statCards,
+      appliedFilters,
       data: members.map((member) => {
         const normalizedMember = normalizeOpsMemberRecord(member);
         return {

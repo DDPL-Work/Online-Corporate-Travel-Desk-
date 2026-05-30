@@ -31,6 +31,8 @@ import {
 import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { myPendingFlightsExportTemplate, myPendingHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─── helpers ─── */
 function fmtDate(d, opts = { day: "2-digit", month: "short", year: "numeric" }) {
@@ -48,6 +50,8 @@ function FlightSection() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { myRequests = [], loading } = useSelector((state) => state.bookings);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { dispatch(fetchMyBookingRequests()); }, [dispatch]);
 
@@ -128,17 +132,25 @@ function FlightSection() {
       <ResponsiveDataTable 
         title={activeSubTab === "pending_approval" ? "Pending Approval Pipeline" : "Approved Pipeline"} 
         subtitle={`${filtered.length} active requests`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: activeSubTab === "pending_approval" ? "Flight Pending Approval Pipeline" : "Flight Approved Pipeline",
+          statCards: [
+            { label: "Total Active Requests", value: allActiveFlights.length },
+            { label: "Awaiting Approval", value: totalPending },
+            { label: "Approved (Queued)", value: totalApproved },
+            { label: "Pipeline Value", value: `₹${totalPipeline.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Request Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `my_${activeSubTab}_flights_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Request ID", key: "orderId" },
-            { header: "Route / Details", accessor: (r) => `${r.route} | ${r.airlineName}` },
-            { header: "Travel Date", accessor: (r) => fmtDate(r.travelDate) },
-            { header: "Status", key: "requestStatus" },
-            { header: "Est. Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: myPendingFlightsExportTemplate,
+          filenamePrefix: `my_${activeSubTab}_flights`
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
@@ -197,6 +209,8 @@ function HotelSection() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { requests: hotelRequests = [], loading } = useSelector((state) => state.hotelBookings);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { dispatch(fetchMyHotelRequests()); }, [dispatch]);
 
@@ -271,17 +285,25 @@ function HotelSection() {
       <ResponsiveDataTable 
         title={activeSubTab === "pending_approval" ? "Hotel Pending Approval Pipeline" : "Hotel Approved Pipeline"} 
         subtitle={`${filtered.length} active requests`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: activeSubTab === "pending_approval" ? "Hotel Pending Approval Pipeline" : "Hotel Approved Pipeline",
+          statCards: [
+            { label: "Total Active Requests", value: allActiveHotels.length },
+            { label: "Awaiting Approval", value: totalPending },
+            { label: "Approved (Queued)", value: totalApproved },
+            { label: "Pipeline Value", value: `₹${totalPipeline.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Request Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `my_${activeSubTab}_hotels_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Request ID", key: "orderId" },
-            { header: "Hotel", key: "hotelName" },
-            { header: "Check-In Date", accessor: (r) => fmtDate(r.ci) },
-            { header: "Status", key: "requestStatus" },
-            { header: "Est. Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: myPendingHotelsExportTemplate,
+          filenamePrefix: `my_${activeSubTab}_hotels`
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >

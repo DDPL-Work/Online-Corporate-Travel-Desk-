@@ -32,6 +32,8 @@ import {
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { Pagination } from "./Shared/Pagination";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminManagerRequestsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const Avatar = ({ name = "", size = "md" }) => {
   const nameStr = typeof name === "string" ? name : String(name || "");
@@ -170,6 +172,8 @@ const ManagerRequestsPage = () => {
 
   const handleRefresh = () => dispatch(fetchManagerRequests());
 
+  const { exportExcel, isExporting } = useExcelExporter();
+
   return (
     <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
       {/* Navy Header Section - Matched with TotalBookings */}
@@ -244,19 +248,25 @@ const ManagerRequestsPage = () => {
         <ResponsiveDataTable 
           title="Verification Ledger" 
           subtitle={`${filtered.length} authentication entries`} 
-          exportConfig={{
+          exportLabel="Export Excel"
+          exportLoading={isExporting}
+          exportDisabled={isExporting}
+          onExport={() => exportExcel({
+            pageHeader: "Verification Ledger",
+            statCards: [
+              { label: "Total Requests", value: stats.total },
+              { label: "Pending Review", value: stats.pending },
+              { label: "Verified Assets", value: stats.approved },
+              { label: "Denied Access", value: stats.rejected }
+            ],
+            appliedFilters: [
+              { label: "Search", value: search || "None" },
+              { label: "Filter Status", value: filter }
+            ],
             data: filtered,
-            filename: `manager_requests_${new Date().toISOString().split('T')[0]}.csv`,
-            columns: [
-              { header: "Personnel", accessor: (r) => getNameFromObj(r.employeeId || r.employee) || r.employeeName || "Unknown" },
-              { header: "Project Scope", accessor: (r) => r.projectName || "—" },
-              { header: "Booking Context", accessor: (r) => (r.bookingSnapshot || {}).hotelName || r.bookingType || "Hotel Booking" },
-              { header: "Order ID", accessor: (r) => r.orderId || "—" },
-              { header: "Designated Approver", accessor: (r) => getNameFromObj(r.managerId || r.manager) || r.managerName || "Manager" },
-              { header: "Requested On", accessor: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN") : "—" },
-              { header: "Status", key: "status" }
-            ]
-          }}
+            columns: adminManagerRequestsExportTemplate,
+            filenamePrefix: "manager_requests"
+          })}
           wrapperClass="!border-none !shadow-none"
           pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
         >
@@ -265,8 +275,8 @@ const ManagerRequestsPage = () => {
               <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
                 <Th className="!px-6 !py-5">Personnel</Th>
                 <Th className="!px-6 !py-5">Project Scope</Th>
-                <Th className="!px-6 !py-5">Booking Context</Th>
-                <Th className="!px-6 !py-5">Order ID</Th>
+                {/* <Th className="!px-6 !py-5">Booking Context</Th>
+                <Th className="!px-6 !py-5">Order ID</Th> */}
                 <Th className="!px-6 !py-5">Designated Approver</Th>
                 <Th className="!px-6 !py-5">Requested On</Th>
                 <Th className="!px-6 !py-5">Status</Th>
@@ -296,13 +306,13 @@ const ManagerRequestsPage = () => {
                        <p className="text-xs font-black truncate max-w-[150px]" style={{ color: C.navy }}>{req.projectName || "—"}</p>
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{req.projectCodeId || "—"}</p>
                     </td>
-                    <td className="!px-6 !py-5">
+                    {/* <td className="!px-6 !py-5">
                        <p className="text-xs font-black truncate max-w-[150px]" style={{ color: C.navy }}>{bookingSnap.hotelName || req.bookingType || "Hotel Booking"}</p>
                        <p className="text-[10px] font-bold text-gold uppercase">{bookingSnap.city || "—"}</p>
                     </td>
                     <td className="!px-6 !py-5">
                        <p className="text-[11px] font-black" style={{ color: C.navy }}>{req.orderId || "—"}</p>
-                    </td>
+                    </td> */}
                     <td className="!px-6 !py-5">
                        <div className="flex items-center gap-2">
                           <Avatar name={managerName} size="sm" />

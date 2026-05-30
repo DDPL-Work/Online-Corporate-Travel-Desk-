@@ -42,6 +42,8 @@ import {
 } from "../TravelAdminTabs/Shared/CommonComponents";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { pendingFlightsExportTemplate, pendingHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const RouteCell = ({ routes, airline }) => {
   if (!routes || routes.length === 0) return <span className="text-slate-400">No Route</span>;
@@ -92,6 +94,8 @@ function FlightSection({ data, loading, onRefresh, handleAction, isVerified, onS
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
   const navigate = useNavigate();
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const formatted = useMemo(() => (data || []).map(b => {
     const traveller = b.travellers?.length
@@ -190,20 +194,25 @@ function FlightSection({ data, loading, onRefresh, handleAction, isVerified, onS
       <ResponsiveDataTable 
         title="Flight Approval Queue" 
         subtitle={`${filtered.length} pending decisions`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Approval Queue",
+          statCards: [
+            { label: "Pending Flights", value: filtered.length },
+            { label: "Urgent Review", value: filtered.filter(r => !r.isTravelPassed).length },
+            { label: "Expired/Discarded", value: filtered.filter(r => r.isTravelPassed).length },
+            { label: "Potential Outlay", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `pending_flights_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order ID", key: "orderId" },
-            { header: "Personnel", key: "travellerName" },
-            { header: "Requested On", accessor: (r) => new Date(r.bookedDate).toLocaleDateString("en-IN") },
-            { header: "Travel Date", accessor: (r) => r.travelDate ? new Date(r.travelDate).toLocaleDateString("en-IN") : "—" },
-            { header: "Route", accessor: (r) => r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—" },
-            { header: "Email", key: "employeeId" },
-            { header: "Status", key: "status" },
-            { header: "Amount", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: pendingFlightsExportTemplate,
+          filenamePrefix: "pending_flights"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
@@ -284,6 +293,8 @@ function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSe
   const PAGE_SIZE = 10;
   const navigate = useNavigate();
 
+  const { exportExcel, isExporting } = useExcelExporter();
+
   const formatted = useMemo(() => (data || []).map(b => {
     const guest = b.travellers?.length
       ? `${b.travellers[0].title || ""} ${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim()
@@ -360,20 +371,25 @@ function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSe
       <ResponsiveDataTable 
         title="Hotel Approval Queue" 
         subtitle={`${filtered.length} pending decisions`} 
-        exportConfig={{
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Approval Queue",
+          statCards: [
+            { label: "Pending Hotels", value: filtered.length },
+            { label: "Urgent Review", value: filtered.filter(r => !r.isTravelPassed).length },
+            { label: "Expired/Discarded", value: filtered.filter(r => r.isTravelPassed).length },
+            { label: "Potential Outlay", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
           data: filtered,
-          filename: `pending_hotels_${new Date().toISOString().split('T')[0]}.csv`,
-          columns: [
-            { header: "Order Reference", key: "orderId" },
-            { header: "Personnel", key: "guestName" },
-            { header: "Requested On", accessor: (r) => new Date(r.bookedDate).toLocaleDateString("en-IN") },
-            { header: "Check-in", accessor: (r) => r.checkIn ? new Date(r.checkIn).toLocaleDateString("en-IN") : "—" },
-            { header: "Email", key: "employeeId" },
-            { header: "Asset Detail", key: "hotelName" },
-            { header: "Status", key: "status" },
-            { header: "Estimate", accessor: (r) => `₹${r.amount.toLocaleString()}` }
-          ]
-        }}
+          columns: pendingHotelsExportTemplate,
+          filenamePrefix: "pending_hotels"
+        })}
         wrapperClass="!border-none !shadow-none" 
         pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >

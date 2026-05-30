@@ -184,6 +184,28 @@ const extractResultSegments = (result) => {
         segment?.Duration ?? segment?.JourneyDuration ?? segment?.SegmentDuration ?? 0,
       );
 
+      const originAirport = segment?.Origin?.Airport || segment?.origin?.airport || segment?.OriginAirport || {};
+      const originDetails = {
+        code: origin,
+        name: originAirport?.AirportName || originAirport?.name || segment?.Origin?.AirportName || null,
+        city: originAirport?.CityName || originAirport?.city || segment?.Origin?.CityName || null,
+        terminal: originAirport?.Terminal || originAirport?.terminal || segment?.Origin?.Terminal || null,
+        gate: segment?.Origin?.Gate || null,
+      };
+
+      const destinationAirport = segment?.Destination?.Airport || segment?.destination?.airport || segment?.DestinationAirport || {};
+      const destinationDetails = {
+        code: destination,
+        name: destinationAirport?.AirportName || destinationAirport?.name || segment?.Destination?.AirportName || null,
+        city: destinationAirport?.CityName || destinationAirport?.city || segment?.Destination?.CityName || null,
+        terminal: destinationAirport?.Terminal || destinationAirport?.terminal || segment?.Destination?.Terminal || null,
+        gate: segment?.Destination?.Gate || null,
+      };
+
+      const availableSeats = segment?.NoOfSeatAvailable || segment?.AvailableSeats || segment?.SeatsAvailable || null;
+      const fareClass = segment?.Airline?.FareClass || segment?.FareClass || null;
+      const supplierFareClass = segment?.SupplierFareClass || segment?.Airline?.SupplierFareClass || null;
+
       if (!origin || !destination) return null;
       return {
         origin,
@@ -197,6 +219,9 @@ const extractResultSegments = (result) => {
         flightNumber,
         airlineCode,
         airlineName,
+        fareClass,
+        supplierFareClass,
+        availableSeats,
         stops,
         duration: Number.isFinite(duration) && duration > 0 ? duration : null,
         cabinClass: segment?.CabinClass || segment?.CabinClassName || segment?.cabinClass || null,

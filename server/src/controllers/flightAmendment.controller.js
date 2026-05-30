@@ -707,12 +707,19 @@ exports.createCancellationQuery = async (req, res) => {
     let {
       bookingId,
       bookingReference,
+      priority,
       remarks,
       segments,
       corporate,
       bookingSnapshot,
       passengers,
+      user: requestUser,
     } = req.body;
+
+    console.log("[CancellationQuery] create payload identifiers", {
+      receivedBookingId: bookingId,
+      receivedBookingReference: bookingReference,
+    });
 
     /* ─────────────────────────────
        🔥 VALIDATION
@@ -796,6 +803,7 @@ exports.createCancellationQuery = async (req, res) => {
       bookingId,
       bookingReference,
       queryId,
+      priority,
       remarks,
 
       passengers,
@@ -804,9 +812,10 @@ exports.createCancellationQuery = async (req, res) => {
       segments,
 
       user: {
-        id: req.user?._id,
-        name: req.user?.name,
-        email: req.user?.email,
+        id: req.user?._id || requestUser?.id,
+        name: req.user?.name || requestUser?.name,
+        email: req.user?.email || requestUser?.email,
+        phone: req.user?.phone || requestUser?.phone,
       },
 
       logs: [

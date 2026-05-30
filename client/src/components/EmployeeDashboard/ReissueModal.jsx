@@ -928,18 +928,18 @@ function FlightOptionCard({
                   ? calcLayoverMinutes(prevSeg.arrivalTime, segment.departureTime)
                   : null;
                 return (
-                  <div key={`${segment.origin}-${segment.destination}-${index}`}>
+                  <div key={`${segment.origin?.code || segment.origin}-${segment.destination?.code || segment.destination}-${index}`}>
                     {layoverMins !== null && (
                       <div className="flex items-center gap-2 py-2 pl-4 text-xs font-semibold text-amber-700">
                         <span className="h-4 w-0.5 rounded bg-amber-300" />
-                        Layover at {prevSeg?.destination || ""}: {formatDuration(layoverMins)}
+                        Layover at {prevSeg?.destination?.code || prevSeg?.destination || ""}: {formatDuration(layoverMins)}
                       </div>
                     )}
                     <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-bold text-slate-900">
-                            {segment.origin || PLACEHOLDER} → {segment.destination || PLACEHOLDER}
+                            {segment.origin?.code || segment.origin || PLACEHOLDER} → {segment.destination?.code || segment.destination || PLACEHOLDER}
                           </p>
                           <p className="mt-0.5 text-xs text-slate-500">
                             {segment.airlineName || segment.airlineCode || "Airline"}

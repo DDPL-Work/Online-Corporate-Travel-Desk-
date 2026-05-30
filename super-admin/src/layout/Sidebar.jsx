@@ -55,8 +55,11 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
 
   const { user } = useSelector((state) => state.auth || {});
 
-  const toggleGroup = (label) =>
-    setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+ const toggleGroup = (label) => {
+  setOpenGroups((prev) => ({
+    [label]: !prev[label],
+  }));
+};
 
 const superAdminMenu = [
   {
@@ -161,18 +164,17 @@ const superAdminMenu = [
 ];
 
   // Automatically open parent menu if a child is active
-  useEffect(() => {
-    superAdminMenu.forEach((item) => {
-      if (item.subItems) {
-        const isChildActive = item.subItems.some(
-          (sub) => location.pathname === sub.to,
-        );
-        if (isChildActive) {
-          setOpenGroups((prev) => ({ ...prev, [item.label]: true }));
-        }
-      }
+useEffect(() => {
+  const activeParent = superAdminMenu.find((item) =>
+    item.subItems?.some((sub) => location.pathname === sub.to)
+  );
+
+  if (activeParent) {
+    setOpenGroups({
+      [activeParent.label]: true,
     });
-  }, [location.pathname]);
+  }
+}, [location.pathname]);
 
   const menus = {
     "super-admin": superAdminMenu,

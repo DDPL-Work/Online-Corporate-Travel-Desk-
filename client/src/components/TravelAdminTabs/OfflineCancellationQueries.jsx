@@ -23,6 +23,8 @@ import { StatCard, IdCell, Th, LabeledField } from "./Shared/CommonComponents";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import CancellationQueryDetailsPage from "./CancellationQueryDetailsPage";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminOfflineCancellationQueriesExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*                                  HELPERS                                   */
@@ -176,6 +178,8 @@ const OfflineCancellationQueries = () => {
   const [activeTab, setActiveTab] = useState("my");
   const [search, setSearch] = useState("");
   const [selectedQueryId, setSelectedQueryId] = useState(null);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => {
     dispatch(fetchCancellationQueries());
@@ -338,18 +342,25 @@ const OfflineCancellationQueries = () => {
             title="Governance Ledger"
             subtitle={`${filteredQueries.length} active queries tracked`}
             tableMinWidth="1000px"
-            exportConfig={{
+            exportLabel="Export Excel"
+            exportLoading={isExporting}
+            exportDisabled={isExporting}
+            onExport={() => exportExcel({
+              pageHeader: "Governance Ledger",
+              statCards: [
+                { label: "Total Submissions", value: stats.total },
+                { label: "Pending Review", value: stats.open },
+                { label: "Under Process", value: stats.inProgress },
+                { label: "Closed Queries", value: stats.resolved }
+              ],
+              appliedFilters: [
+                { label: "Search", value: search || "None" },
+                { label: "Tab Filter", value: activeTab }
+              ],
               data: filteredQueries,
-              filename: `offline_cancellation_queries_${new Date().toISOString().split('T')[0]}.csv`,
-              columns: [
-                { header: "Query ID", accessor: (q) => `Q-${String(q.queryId || q._id).slice(-6).toUpperCase()}` },
-                { header: "Travel Asset", key: "bookingReference" },
-                { header: "Personnel", accessor: (q) => q.corporate?.employeeName || "—" },
-                { header: "Email Identifier", accessor: (q) => q.corporate?.employeeEmail || "—" },
-                { header: "Submission Time", accessor: (q) => new Date(q.requestedAt).toLocaleString() },
-                { header: "Protocol Status", key: "status" },
-              ]
-            }}
+              columns: adminOfflineCancellationQueriesExportTemplate,
+              filenamePrefix: "offline_cancellation_queries"
+            })}
           >
             <table className="w-full text-left border-collapse">
               <thead>

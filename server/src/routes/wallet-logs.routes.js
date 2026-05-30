@@ -13,7 +13,7 @@ router.get(
   verifyToken,
   authorizeRoles("super-admin", "ops-member"),
   async (req, res) => {
-    const { status, corporateId, page = 1, limit = 20 } = req.query;
+    const { status, corporateId, page = 1, limit = 500 } = req.query;
 
     const query = {};
     if (status) query.status = status;

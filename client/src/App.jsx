@@ -11,6 +11,7 @@ function App() {
       <Toaster
         position="top-right"
         expand
+        closeButton
         toastOptions={{
           unstyled: true,
           classNames: {
@@ -19,6 +20,7 @@ function App() {
             error: "error",
             info: "info",
             warning: "warning",
+            closeButton: "sonner-close-button",
           },
         }}
       />

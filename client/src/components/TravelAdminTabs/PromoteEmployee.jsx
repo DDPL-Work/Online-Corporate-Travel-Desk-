@@ -30,6 +30,8 @@ import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { FiRefreshCw, FiX } from "react-icons/fi";
 import { C } from "../Shared/color";
 import Swal from "sweetalert2";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminEmployeeDirectoryExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 // ── Dummy Data ────────────────────────────────────────────────────────────────
 const DUMMY_EMPLOYEES = [
@@ -174,7 +176,7 @@ export default function PromoteEmployee() {
     }
   }
 
-  // Export handled via exportConfig in ResponsiveDataTable
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="min-h-screen font-sans pb-20 px-6 pt-8" style={{ background: C.offWhite }}>
@@ -244,18 +246,27 @@ export default function PromoteEmployee() {
         <ResponsiveDataTable 
           title="Member Ledger" 
           subtitle={`${filtered.length} personnel found`} 
-          exportConfig={{
+          exportLabel="Export Excel"
+          exportLoading={isExporting}
+          exportDisabled={isExporting}
+          onExport={() => exportExcel({
+            pageHeader: "Personnel Directory",
+            statCards: [
+              { label: "Active Personnel", value: stats.active },
+              { label: "Governance Team", value: stats.managers },
+              { label: "Suspended Accounts", value: stats.inactive },
+              { label: "Total Headcount", value: stats.total }
+            ],
+            appliedFilters: [
+              { label: "Search", value: search || "None" },
+              { label: "Role Type", value: roleFilter },
+              { label: "Status", value: statusFilter },
+              { label: "Joined Range", value: `${joinedFrom || "Any"} to ${joinedTo || "Any"}` }
+            ],
             data: filtered,
-            filename: `employee_directory_${new Date().toISOString().split('T')[0]}.csv`,
-            columns: [
-              { header: "Name", accessor: (e) => `${e.name.firstName} ${e.name.lastName}` },
-              { header: "Email", key: "email" },
-              { header: "Role", key: "role" },
-              { header: "Status", key: "status" },
-              { header: "Department", key: "department" },
-              { header: "Joined Date", key: "joinedDate" },
-            ]
-          }}
+            columns: adminEmployeeDirectoryExportTemplate,
+            filenamePrefix: "employee_directory"
+          })}
           pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
         >
           <table className="w-full border-collapse">

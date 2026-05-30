@@ -23,17 +23,31 @@ import {
   FaGlobe,
   FaFileAlt,
   FaDownload,
+  FaArrowLeft,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { BlogViewModal } from "./components";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import { blogArticlesExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
+
+const C = {
+  navy: "#003399",
+  offWhite: "#f8fafc",
+  white: "#ffffff",
+  border: "#e2e8f0",
+  muted: "#64748b",
+  lightGray: "#f1f5f9",
+  gold: "#d97706",
+  emerald: "#10b981",
+  red: "#ef4444",
+  amber: "#f59e0b"
+};
 
 const BlogListPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
   const { items: blogs, loading, error } = useSelector((state) => state.blogs);
 
   // Modal states
@@ -132,9 +146,26 @@ const BlogListPage = () => {
   const handleExport = () => {
     if (loading) return;
 
-    exportCsv({
+    const statCards = [
+      { label: "Total Articles", value: blogs.length },
+      { label: "Published", value: blogs.filter(b => b.status === 'published').length },
+      { label: "Drafts", value: blogs.filter(b => b.status === 'draft').length },
+      { label: "Total Views", value: blogs.reduce((acc, b) => acc + (b.view_count || 0), 0) },
+    ];
+    
+    const appliedFilters = [
+      { label: "Search", value: searchTerm || "None" },
+      { label: "Status", value: statusFilter },
+      { label: "Sort By", value: sortBy },
+      { label: "Sort Order", value: sortOrder },
+    ];
+
+    exportExcel({
       key: "blog_articles",
-      data: currentBlogs,
+      pageHeader: "Blog Management",
+      statCards,
+      appliedFilters,
+      data: filteredAndSortedBlogs,
       columns: blogArticlesExportTemplate,
       filenamePrefix: "blog_articles_export",
       emptyMessage: "No blog articles available to export",
@@ -195,7 +226,7 @@ const BlogListPage = () => {
             className="h-48 w-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
-          <div className="h-48 w-full bg-gradient-to-br from-[#0A4D68]/20 to-[#088395]/10 flex items-center justify-center">
+          <div className="h-48 w-full bg-gradient-to-br from-[#003399]/20 to-[#000d26]/10 flex items-center justify-center">
             <FaFileAlt className="w-12 h-12 text-slate-300" />
           </div>
         )}
@@ -207,7 +238,7 @@ const BlogListPage = () => {
       </div>
       <div className="p-5 flex flex-col flex-grow">
         <div className="flex-grow">
-          <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-2 group-hover:text-[#0A4D68] transition-colors leading-tight">
+          <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-2 group-hover:text-[#003399] transition-colors leading-tight">
             {blog.title || "Untitled"}
           </h3>
           <p className="text-xs text-slate-500 mb-4 line-clamp-2 leading-relaxed">
@@ -216,15 +247,15 @@ const BlogListPage = () => {
         </div>
         <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-4">
           <div className="flex items-center gap-3">
-            <div className="flex items-center"><FaUser size={10} className="mr-1 text-[#088395]" />{blog.author || "Admin"}</div>
-            <div className="flex items-center"><FaCalendar size={10} className="mr-1 text-[#088395]" />{formatDate(blog.created_at)}</div>
+            <div className="flex items-center"><FaUser size={10} className="mr-1 text-[#003399]" />{blog.author || "Admin"}</div>
+            <div className="flex items-center"><FaCalendar size={10} className="mr-1 text-[#003399]" />{formatDate(blog.created_at)}</div>
           </div>
-          <div className="flex items-center text-[#0A4D68]"><FaEye size={10} className="mr-1" />{blog.view_count || 0}</div>
+          <div className="flex items-center text-[#003399]"><FaEye size={10} className="mr-1" />{blog.view_count || 0}</div>
         </div>
         <div className="flex items-center justify-between pt-4 border-t border-slate-50">
           <div className="flex gap-2">
-            <button onClick={(e) => handleView(blog, e)} className="p-2 text-slate-400 hover:text-[#0A4D68] hover:bg-[#0A4D68]/5 rounded-lg transition-all"><FaEye size={14} /></button>
-            <button onClick={(e) => handleEdit(blog, e)} className="p-2 text-slate-400 hover:text-[#088395] hover:bg-[#088395]/5 rounded-lg transition-all"><FaEdit size={14} /></button>
+            <button onClick={(e) => handleView(blog, e)} className="p-2 text-slate-400 hover:text-[#003399] hover:bg-[#003399]/5 rounded-lg transition-all"><FaEye size={14} /></button>
+            <button onClick={(e) => handleEdit(blog, e)} className="p-2 text-slate-400 hover:text-[#003399] hover:bg-[#003399]/5 rounded-lg transition-all"><FaEdit size={14} /></button>
           </div>
           <button onClick={(e) => handleDelete(blog._id, e)} className="p-2 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><FaTrash size={14} /></button>
         </div>
@@ -247,17 +278,17 @@ const BlogListPage = () => {
         </div>
         <div className="flex-1 p-4 flex flex-col justify-between">
           <div>
-            <h3 className="text-base font-bold text-slate-800 mb-1 group-hover:text-[#0A4D68] transition-colors line-clamp-1">{blog.title || "Untitled"}</h3>
+            <h3 className="text-base font-bold text-slate-800 mb-1 group-hover:text-[#003399] transition-colors line-clamp-1">{blog.title || "Untitled"}</h3>
             <p className="text-xs text-slate-500 line-clamp-1 mb-2">{blog.meta_description || "No description available"}</p>
             <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              <span className="flex items-center gap-1"><FaUser size={10} className="text-[#088395]" /> {blog.author || "Admin"}</span>
-              <span className="flex items-center gap-1"><FaCalendar size={10} className="text-[#088395]" /> {formatDate(blog.created_at)}</span>
-              <span className="flex items-center gap-1"><FaEye size={10} className="text-[#0A4D68]" /> {blog.view_count || 0}</span>
+              <span className="flex items-center gap-1"><FaUser size={10} className="text-[#003399]" /> {blog.author || "Admin"}</span>
+              <span className="flex items-center gap-1"><FaCalendar size={10} className="text-[#003399]" /> {formatDate(blog.created_at)}</span>
+              <span className="flex items-center gap-1"><FaEye size={10} className="text-[#003399]" /> {blog.view_count || 0}</span>
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-2">
-            <button onClick={(e) => handleView(blog, e)} className="p-1.5 text-slate-400 hover:text-[#0A4D68] rounded-md"><FaEye size={14} /></button>
-            <button onClick={(e) => handleEdit(blog, e)} className="p-1.5 text-slate-400 hover:text-[#088395] rounded-md"><FaEdit size={14} /></button>
+            <button onClick={(e) => handleView(blog, e)} className="p-1.5 text-slate-400 hover:text-[#003399] rounded-md"><FaEye size={14} /></button>
+            <button onClick={(e) => handleEdit(blog, e)} className="p-1.5 text-slate-400 hover:text-[#003399] rounded-md"><FaEdit size={14} /></button>
             <button onClick={(e) => handleDelete(blog._id, e)} className="p-1.5 text-rose-300 hover:text-rose-600 rounded-md"><FaTrash size={14} /></button>
           </div>
         </div>
@@ -266,82 +297,126 @@ const BlogListPage = () => {
   );
 
   return (
-    <div className="min-h-screen font-sans" style={{ backgroundColor: "#F8FAFC" }}>
-      <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0A4D68] to-[#088395] flex items-center justify-center shadow-lg text-white text-xl"><FaFileAlt /></div>
-            <div className="text-left">
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase leading-none">Blog Management</h1>
-              <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-widest">Create and manage your resource center</p>
-            </div>
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: "#f8fafc" }}>
+      {/* ── Navy Gradient Header ── */}
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+             <div className="flex items-center gap-3">
+               <button 
+                  onClick={() => navigate(-1)} 
+                  className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 text-white shadow-sm"
+               >
+                 <FaArrowLeft size={20} />
+               </button>
+               <button 
+                  onClick={handleRefresh} 
+                  className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                  disabled={loading}
+               >
+                 <div className={loading ? "animate-spin" : ""}>
+                   <FaSyncAlt size={20} />
+                 </div>
+               </button>
+             </div>
+             
+             <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+
+             <div className="flex items-center gap-5">
+               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
+                 <FaFileAlt size={28} />
+               </div>
+               <div>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Blog Management</h1>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                   Create and manage your resource center
+                 </p>
+               </div>
+             </div>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button onClick={handleExport} disabled={loading || isExporting} className="flex items-center justify-center space-x-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-all shadow-md text-xs font-bold uppercase disabled:opacity-50">
-              <FaDownload className="w-3 h-3" /><span>{isExporting ? "Exporting..." : "Export"}</span>
-            </button>
-            <button onClick={handleRefresh} disabled={loading} className="flex items-center justify-center space-x-2 px-4 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 transition-all shadow-md text-xs font-bold uppercase disabled:opacity-50">
-              <FaSyncAlt className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} /><span>Refresh</span>
-            </button>
-            <button onClick={() => navigate("/blog-and-articles/add")} className="flex items-center justify-center space-x-2 px-6 py-2 bg-[#0A4D68] text-white rounded-lg hover:bg-[#088395] transition-all shadow-md text-xs font-bold uppercase">
-              <FaPlus className="w-3 h-3" /><span>Add New Blog</span>
-            </button>
+             <button onClick={handleExport} disabled={loading || isExporting} className="flex items-center justify-center space-x-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm disabled:opacity-50">
+               <FaDownload className="w-4 h-4" /><span>{isExporting ? "Exporting..." : "Export"}</span>
+             </button>
+             <button onClick={() => navigate("/blog-and-articles/add")} className="flex items-center justify-center space-x-2 px-5 py-2.5 bg-[#C9A240] text-white rounded-xl hover:bg-[#a78b2e] transition-all shadow-sm text-xs font-black uppercase tracking-wider">
+               <FaPlus className="w-4 h-4" /><span>Add New Blog</span>
+             </button>
           </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Articles" value={blogs.length} Icon={FaFolder} borderCls="border-[#0A4D68]" iconBgCls="bg-[#0A4D68]/10" iconColorCls="text-[#0A4D68]" />
+      <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
+        {/* Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard label="Total Articles" value={blogs.length} Icon={FaFolder} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
           <StatCard label="Published" value={blogs.filter(b => b.status === 'published').length} Icon={FaGlobe} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
           <StatCard label="Drafts" value={blogs.filter(b => b.status === 'draft').length} Icon={FaEdit} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-          <StatCard label="Total Views" value={blogs.reduce((acc, b) => acc + (b.view_count || 0), 0)} Icon={FaEye} borderCls="border-[#05BFDB]" iconBgCls="bg-[#05BFDB]/10" iconColorCls="text-[#05BFDB]" />
+          <StatCard label="Total Views" value={blogs.reduce((acc, b) => acc + (b.view_count || 0), 0)} Icon={FaEye} borderCls="border-[#003399]" iconBgCls="bg-indigo-50" iconColorCls="text-indigo-600" />
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Search</label>
+        {/* Filter Section */}
+        <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
+            <div className="flex flex-col gap-1.5 lg:col-span-4">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><FaSearch size={12}/> Search</label>
               <div className="relative">
-                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-3 h-3" />
-                <input type="text" placeholder="Search articles..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A4D68] text-sm" />
+                <input
+                  type="text"
+                  placeholder="Search articles..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white"
+                />
+                <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
               </div>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</label>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0A4D68] cursor-pointer">
+            
+            <div className="flex flex-col gap-1.5 lg:col-span-2">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><FaFilter size={12}/> Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white cursor-pointer"
+              >
                 <option value="all">All Status</option>
                 <option value="published">Published</option>
                 <option value="draft">Draft</option>
               </select>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sort By</label>
+            
+            <div className="flex flex-col gap-1.5 lg:col-span-4">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><FaSort size={12}/> Sort By</label>
               <div className="flex gap-2">
-                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0A4D68] cursor-pointer">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white cursor-pointer"
+                >
                   <option value="created_at">Date Created</option>
                   <option value="title">Title</option>
                   <option value="view_count">Views</option>
                 </select>
-                <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#0A4D68] cursor-pointer">
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  className="w-24 px-3 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white cursor-pointer"
+                >
                   <option value="desc">DESC</option>
                   <option value="asc">ASC</option>
                 </select>
               </div>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Layout & Reset</label>
-              <div className="flex items-center gap-2 h-full">
-                <div className="flex items-center space-x-1 bg-slate-100 rounded-lg p-1">
-                  <button onClick={() => setViewMode("grid")} className={`p-1.5 rounded-md ${viewMode === "grid" ? "bg-white text-[#0A4D68] shadow-sm" : "text-slate-400"}`}><FaThLarge size={14} /></button>
-                  <button onClick={() => setViewMode("list")} className={`p-1.5 rounded-md ${viewMode === "list" ? "bg-white text-[#0A4D68] shadow-sm" : "text-slate-400"}`}><FaList size={14} /></button>
-                </div>
-                <button onClick={resetFilters} className="flex-1 px-3 py-2 text-[10px] font-black uppercase text-rose-600 bg-rose-50 rounded-lg hover:bg-rose-100 transition-all border border-rose-100">Reset</button>
-              </div>
+            
+            <div className="flex items-end lg:col-span-2">
+               <button onClick={resetFilters} title="Reset Filters" className="w-full py-2.5 rounded-xl font-black text-[13px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-100 hover:text-slate-700 bg-white text-slate-500 border-slate-200">
+                  <FaSyncAlt size={14} /> Reset
+               </button>
             </div>
           </div>
         </div>
 
         {loading ? (
-          <div className="py-20 text-center"><FaSyncAlt className="animate-spin mx-auto text-[#0A4D68] mb-4" size={32} /><p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Loading Blogs...</p></div>
+          <div className="py-20 text-center"><FaSyncAlt className="animate-spin mx-auto text-[#003399] mb-4" size={32} /><p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Loading Blogs...</p></div>
         ) : filteredAndSortedBlogs.length === 0 ? (
           <div className="bg-white rounded-xl border border-dashed border-slate-300 py-20 text-center">
             <FaFolder className="mx-auto text-slate-200 mb-4" size={64} />
@@ -375,13 +450,13 @@ const BlogListPage = () => {
 
 function StatCard({ label, value, Icon, borderCls, iconBgCls, iconColorCls }) {
   return (
-    <div className={`bg-white rounded-xl p-4 flex items-center gap-3 shadow-sm border-l-4 ${borderCls}`}>
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBgCls}`}>
-        <Icon size={18} className={iconColorCls} />
+    <div className={`bg-white rounded-2xl p-6 border-b-4 ${borderCls} shadow-sm flex items-center justify-between`}>
+      <div>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+        <h3 className="text-3xl font-black text-slate-800">{value}</h3>
       </div>
-      <div className="text-left flex-1">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{label}</p>
-        <p className="text-xl font-black text-slate-900 leading-none">{value}</p>
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconBgCls} ${iconColorCls}`}>
+        <Icon size={24} />
       </div>
     </div>
   );

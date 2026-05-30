@@ -19,7 +19,7 @@ import {
   toggleCorporateStatus
 } from "../../Redux/Slice/corporateListSlice";
 import TableActionBar from "../Shared/TableActionBar";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import { corporateAccessExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 import { ToastConfirm } from "../../utils/ToastConfirm";
 
@@ -103,7 +103,7 @@ export default function CorporateAccessControl() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const tableScrollRef = useRef(null);
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
 
   const { corporates = [], loading } = useSelector(
     (state) => state.corporateList
@@ -139,8 +139,27 @@ export default function CorporateAccessControl() {
 
   const handleExport = () => {
     if (loading) return;
-    exportCsv({
+
+    const statCards = [
+      { label: "Total Corporates", value: stats.total },
+      { label: "Active", value: stats.active },
+      { label: "Inactive", value: stats.inactive },
+      { label: "Total Credit Limit", value: `₹${stats.creditSum.toLocaleString('en-IN')}` },
+    ];
+
+    const appliedFilters = [
+      { label: "Search Directory", value: search || "None" },
+      { label: "Filter Status", value: filter },
+      { label: "Corporate", value: selectedCorporateId !== "all" ? selectedCorporateId : "All Corporates" },
+      { label: "Start Date", value: startDate || "Any" },
+      { label: "End Date", value: endDate || "Any" },
+    ];
+
+    exportExcel({
       key: "corporate_access",
+      pageHeader: "Corporate Access Control",
+      statCards,
+      appliedFilters,
       data: filtered,
       columns: corporateAccessExportTemplate,
       filenamePrefix: "corporate_access_export",
