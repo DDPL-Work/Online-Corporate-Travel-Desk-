@@ -45,10 +45,10 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
     [DASHBOARD_ROLES?.OPS_MEMBER || "ops-member"]: "OPS Team Member",
   };
 
-  const fullName = typeof user?.name === "string" 
-    ? user.name 
+  const fullName = typeof user?.name === "string"
+    ? user.name
     : (user?.name?.firstName ? `${user.name.firstName} ${user.name.lastName || ""}` : "Super Admin");
-    
+
   const initial = typeof user?.name === "string" && user.name.length > 0
     ? user.name.charAt(0).toUpperCase()
     : (user?.name?.firstName?.charAt(0).toUpperCase() || "S");
@@ -65,7 +65,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
         <div className="flex items-center gap-3">
           <NotificationBell onOpen={() => setProfileDropdownOpen(false)} />
 
-          <div className="relative" ref={profileRef}>
+          {/* <div className="relative" ref={profileRef}>
             <div
               className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer font-bold text-sm transition-all shadow-sm hover:shadow-md"
               onClick={() => {
@@ -83,7 +83,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
               {initial}
             </div>
             
-            {/* Profile Dropdown */}
+            {/* Profile Dropdown *
             <div
               className={`absolute right-0 top-full mt-2 w-48 rounded-xl shadow-xl transition-all overflow-hidden z-50 ${profileDropdownOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"}`}
               style={{
@@ -115,7 +115,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
                 <RiUserLine size={15} /> Sign Out
               </button>
             </div>
-          </div>
+          </div> */}
 
           {/* Sidebar Toggle */}
           <button
