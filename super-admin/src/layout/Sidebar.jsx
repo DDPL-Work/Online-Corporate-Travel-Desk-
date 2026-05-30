@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import {
   FaClipboardList,
   FaTimes,
@@ -21,6 +21,7 @@ import {
   FaQuestionCircle,
   FaServer,
   FaUser,
+  FaSignOutAlt,
 } from "react-icons/fa";
 
 import {
@@ -29,152 +30,159 @@ import {
   MdCancelScheduleSend,
 } from "react-icons/md";
 import { canAccessMenuItem, DASHBOARD_ROLES, OPS_PERMISSIONS } from "../constants/rbac";
+import { logoutUser } from "../Redux/Slice/authSlice";
 
 export const C = {
-  navy:      "#000D26",
-  navyDeep:  "#04112F",
-  navyMid:   "#0A243D",
-  navyDark:  "#102238",
-  gold:      "#C9A240",
-  amber:     "#D97706",
-  emerald:   "#059669",
-  muted:     "#65758B",
-  border:    "#E1E7EF",
+  navy: "#000D26",
+  navyDeep: "#04112F",
+  navyMid: "#0A243D",
+  navyDark: "#102238",
+  gold: "#C9A240",
+  amber: "#D97706",
+  emerald: "#059669",
+  muted: "#65758B",
+  border: "#E1E7EF",
   lightGray: "#F5F5F5",
-  offWhite:  "#F8FAFC",
-  cream:     "#FFFBEB",
-  white:     "#FFFFFF",
-  black:     "#000000",
+  offWhite: "#F8FAFC",
+  cream: "#FFFBEB",
+  white: "#FFFFFF",
+  black: "#000000",
   nearBlack: "#1A1714",
 };
 
 export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const location = useLocation();
   const [openGroups, setOpenGroups] = useState({});
 
   const { user } = useSelector((state) => state.auth || {});
 
- const toggleGroup = (label) => {
-  setOpenGroups((prev) => ({
-    [label]: !prev[label],
-  }));
-};
+  const toggleGroup = (label) => {
+    setOpenGroups((prev) => ({
+      [label]: !prev[label],
+    }));
+  };
 
-const superAdminMenu = [
-  {
-    label: "Corporate Management",
-    icon: <FaBuilding />,
-    subItems: [
-      {
-        to: "/all-corporates",
-        label: "All Corporates",
-        icon: <FaBuilding />,
-      },
-      {
-        to: "/pending-corporates",
-        label: "Pending Corporates",
-        icon: <MdOutlinePendingActions />,
-      },
-      {
-        to: "/corporate-access-control",
-        label: "Access Control",
-        icon: <FaUserShield />,
-      },
-    ],
-  },
+  const handleLogout = () => {
+    dispatch(logoutUser());
+    navigate("/login", { replace: true });
+  };
 
-  {
-    label: "Booking Operations",
-    icon: <FaClipboardList />,
-    subItems: [
-      {
-        to: "/bookings-summary",
-        label: "Bookings Summary",
-        icon: <FaClipboardList />,
-      },
-      {
-        to: "/all-reissue-requests",
-        label: "Reissue Requests",
-        icon: <FaExchangeAlt />,
-      },
-      {
-        to: "/cancellation-summary",
-        label: "Cancellation Summary",
-        icon: <FaBan />,
-      },
-      {
-        to: "/cancellation-queries",
-        label: "Cancel Queries",
-        icon: <FaQuestionCircle />,
-      },
-    ],
-  },
+  const superAdminMenu = [
+    {
+      label: "Corporate Management",
+      icon: <FaBuilding />,
+      subItems: [
+        {
+          to: "/all-corporates",
+          label: "All Corporates",
+          icon: <FaBuilding />,
+        },
+        {
+          to: "/pending-corporates",
+          label: "Pending Corporates",
+          icon: <MdOutlinePendingActions />,
+        },
+        {
+          to: "/corporate-access-control",
+          label: "Access Control",
+          icon: <FaUserShield />,
+        },
+      ],
+    },
 
-  {
-    label: "Finance",
-    icon: <FaWallet />,
-    subItems: [
-      {
-        to: "/corporate-revenue",
-        label: "Corporate Revenue",
-        icon: <FaFileInvoiceDollar />,
-      },
-      {
-        to: "/wallet-recharge-logs",
-        label: "Wallet Recharge Logs",
-        icon: <FaWallet />,
-      },
-      {
-        to: "/credit-status-alerts",
-        label: "Credit Alerts",
-        icon: <FaBell />,
-      },
-    ],
-  },
+    {
+      label: "Booking Operations",
+      icon: <FaClipboardList />,
+      subItems: [
+        {
+          to: "/bookings-summary",
+          label: "Bookings Summary",
+          icon: <FaClipboardList />,
+        },
+        {
+          to: "/all-reissue-requests",
+          label: "Reissue Requests",
+          icon: <FaExchangeAlt />,
+        },
+        {
+          to: "/cancellation-summary",
+          label: "Cancellation Summary",
+          icon: <FaBan />,
+        },
+        {
+          to: "/cancellation-queries",
+          label: "Cancel Queries",
+          icon: <FaQuestionCircle />,
+        },
+      ],
+    },
 
-  {
-    label: "Administration",
-    icon: <FaUserShield />,
-    subItems: [
-      {
-        to: "/ops-management",
-        label: "OPS Team Management",
-        icon: <FaUsers />,
-      },
-      {
-        to: "/api-configurations",
-        label: "API Configurations",
-        icon: <FaServer />,
-      },
-    ],
-  },
+    {
+      label: "Finance",
+      icon: <FaWallet />,
+      subItems: [
+        {
+          to: "/corporate-revenue",
+          label: "Corporate Revenue",
+          icon: <FaFileInvoiceDollar />,
+        },
+        {
+          to: "/wallet-recharge-logs",
+          label: "Wallet Recharge Logs",
+          icon: <FaWallet />,
+        },
+        {
+          to: "/credit-status-alerts",
+          label: "Credit Alerts",
+          icon: <FaBell />,
+        },
+      ],
+    },
 
-  {
-    label: "Content",
-    icon: <FaBlog />,
-    subItems: [
-      {
-        to: "/blog-and-articles",
-        label: "Blog Section",
-        icon: <FaBlog />,
-      },
-    ],
-  },
-];
+    {
+      label: "Administration",
+      icon: <FaUserShield />,
+      subItems: [
+        {
+          to: "/ops-management",
+          label: "OPS Team Management",
+          icon: <FaUsers />,
+        },
+        {
+          to: "/api-configurations",
+          label: "API Configurations",
+          icon: <FaServer />,
+        },
+      ],
+    },
+
+    {
+      label: "Content",
+      icon: <FaBlog />,
+      subItems: [
+        {
+          to: "/blog-and-articles",
+          label: "Blog Section",
+          icon: <FaBlog />,
+        },
+      ],
+    },
+  ];
 
   // Automatically open parent menu if a child is active
-useEffect(() => {
-  const activeParent = superAdminMenu.find((item) =>
-    item.subItems?.some((sub) => location.pathname === sub.to)
-  );
+  useEffect(() => {
+    const activeParent = superAdminMenu.find((item) =>
+      item.subItems?.some((sub) => location.pathname === sub.to)
+    );
 
-  if (activeParent) {
-    setOpenGroups({
-      [activeParent.label]: true,
-    });
-  }
-}, [location.pathname]);
+    if (activeParent) {
+      setOpenGroups({
+        [activeParent.label]: true,
+      });
+    }
+  }, [location.pathname]);
 
   const menus = {
     "super-admin": superAdminMenu,
@@ -239,10 +247,9 @@ useEffect(() => {
               <button
                 onClick={() => toggleGroup(m.label)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200
-                  ${
-                    openGroups[m.label]
-                      ? "text-white"
-                      : "text-slate-400 hover:bg-white/5 hover:text-white"
+                  ${openGroups[m.label]
+                    ? "text-white"
+                    : "text-slate-400 hover:bg-white/5 hover:text-white"
                   }`}
                 style={{
                   background: openGroups[m.label]
@@ -279,10 +286,9 @@ useEffect(() => {
                       onClick={onClose}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-2 rounded-lg text-[12px] font-medium transition-all duration-200
-                        ${
-                          isActive
-                            ? "text-white"
-                            : "text-slate-400 hover:bg-white/5 hover:text-white"
+                        ${isActive
+                          ? "text-white"
+                          : "text-slate-400 hover:bg-white/5 hover:text-white"
                         }`
                       }
                       style={({ isActive }) => ({
@@ -306,10 +312,9 @@ useEffect(() => {
               onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200
-                ${
-                  isActive
-                    ? "text-white"
-                    : "text-slate-400 hover:bg-white/5 hover:text-white"
+                ${isActive
+                  ? "text-white"
+                  : "text-slate-400 hover:bg-white/5 hover:text-white"
                 }`
               }
               style={({ isActive }) => ({
@@ -328,28 +333,67 @@ useEffect(() => {
 
       {/* Sidebar User Profile Footer */}
       <div
-        className="p-4 border-t mt-auto flex items-center gap-3"
+        className="p-4 border-t mt-auto"
         style={{ borderColor: `${C.gold}11` }}
       >
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-lg shrink-0"
-          style={{ background: C.gold, color: C.navy }}
-        >
-          {typeof user?.name === "string" && user.name.length > 0
-            ? user.name.charAt(0).toUpperCase()
-            : (user?.name?.firstName?.charAt(0).toUpperCase() || "S")}
-        </div>
-        <div className="flex flex-col min-w-0">
-          <p className="text-sm font-bold text-white truncate leading-tight">
-            {typeof user?.name === "string" 
-              ? user.name 
-              : (user?.name?.firstName ? `${user.name.firstName} ${user.name.lastName || ""}` : "Super Admin")}
-          </p>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1 truncate">
-            {roleLabels[role] || "System Admin"}
-          </p>
+        <div className="flex items-center gap-5">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-lg shrink-0"
+            style={{ background: C.gold, color: C.navy }}
+          >
+            {typeof user?.name === "string" && user.name.length > 0
+              ? user.name.charAt(0).toUpperCase()
+              : (user?.name?.firstName?.charAt(0).toUpperCase() || "S")}
+          </div>
+          <div className="flex flex-col min-w-0">
+            <p className="text-sm font-bold text-white truncate leading-tight">
+              {typeof user?.name === "string"
+                ? user.name
+                : (user?.name?.firstName ? `${user.name.firstName} ${user.name.lastName || ""}` : "Super Admin")}
+            </p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1 truncate">
+              {roleLabels[role] || "System Admin"}
+            </p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:text-white hover:bg-red-500/20 transition-colors shrink-0"
+            title="Sign Out"
+          >
+            <FaSignOutAlt size={14} />
+          </button>
         </div>
       </div>
+      {/* <div
+              className="p-4 border-t mt-auto"
+              style={{ borderColor: `${C.gold}11` }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-lg shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                  style={{ background: C.gold, color: C.navy }}
+                  onClick={() => navigate("/my-profile")}
+                  title="My Profile"
+                >
+                  {user?.name?.firstName?.charAt(0).toUpperCase() || "U"}
+                </div>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <p className="text-sm font-bold text-white truncate leading-tight">
+                    {user?.name?.firstName} {user?.name?.lastName}
+                  </p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1 truncate">
+                    {user?.role?.replace("-", " ")}
+                  </p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:text-white hover:bg-red-500/20 transition-colors shrink-0"
+                  title="Sign Out"
+                >
+                  <FaSignOutAlt size={14} />
+                </button>
+              </div>
+            </div> */}
     </aside>
   );
 }

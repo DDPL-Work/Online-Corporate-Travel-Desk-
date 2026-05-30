@@ -19,6 +19,7 @@ import {
   FiFilter,
   FiEdit2,
   FiX,
+  FiRefreshCw,
 } from "react-icons/fi";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import { 
@@ -220,6 +221,11 @@ export default function CreditStatusAlerts() {
     const delayDays = dueDate && new Date() > dueDate
       ? Math.floor((new Date().getTime() - dueDate.getTime()) / 86400000)
       : 0;
+    
+    const remainingDays = balance.currentCycleEnd 
+      ? Math.max(0, Math.ceil((new Date(balance.currentCycleEnd).getTime() - new Date().getTime()) / 86400000))
+      : 0;
+
     return {
       rowNum: 1,
       cycleIndex: "current",
@@ -230,6 +236,7 @@ export default function CreditStatusAlerts() {
       statementDate: stmtDate,
       dueDate,
       delayDays,
+      remainingDays,
       statementAmount: balance.usedCredit || 0,
       isCurrent: true,
     };
@@ -435,6 +442,9 @@ export default function CreditStatusAlerts() {
     });
   };
 
+
+   const handleRefresh = () => dispatch(fetchCorporates());
+
   if (loading) {
     return (
       <div className="p-10 flex flex-col items-center justify-center min-h-[60vh]">
@@ -489,7 +499,7 @@ export default function CreditStatusAlerts() {
     };
 
     return (
-      <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6 animate-in slide-in-from-bottom-4 duration-500" style={{ background: COLORS.offWhite }}>
+      <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: COLORS.offWhite }}>
         <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
           <div className="w-full flex flex-col lg:flex-row lg:items-center justify-between gap-8">
             <div className="flex items-center gap-6">
@@ -561,7 +571,7 @@ export default function CreditStatusAlerts() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 m-4 animate-in zoom-in-95 duration-200 border border-slate-100">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Edit Received Amount</h3>
+              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Add Received Amount</h3>
               <button 
                 onClick={() => setEditModal({ isOpen: false, row: null, receivedAmount: "" })}
                 className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
@@ -578,18 +588,26 @@ export default function CreditStatusAlerts() {
                 </div>
               </div>
               
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Total Amount</label>
-                <div className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black text-slate-900 cursor-not-allowed mt-1">
-                  ₹{fmtAmt(editModal.row.statementAmount)}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Total Due</label>
+                  <div className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black text-slate-900 cursor-not-allowed mt-1">
+                    ₹{fmtAmt(editModal.row.statementAmount)}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Previously Received</label>
+                  <div className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black text-slate-600 cursor-not-allowed mt-1">
+                    ₹{fmtAmt(editModal.row.receivedAmount || 0)}
+                  </div>
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-black  uppercase tracking-widest px-1 text-[#003399]">Received Amount</label>
+                <label className="text-[10px] font-black uppercase tracking-widest px-1 text-[#003399]">New Received Amount</label>
                 <input 
                   type="number"
-                  placeholder="Enter amount received"
+                  placeholder="Enter additional amount received"
                   value={editModal.receivedAmount}
                   onChange={(e) => setEditModal({ ...editModal, receivedAmount: e.target.value })}
                   className="w-full px-4 py-3 bg-white border border-slate-200 focus:border-[#003399] rounded-xl text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-[#003399]/10 transition-all mt-1"
@@ -597,14 +615,14 @@ export default function CreditStatusAlerts() {
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Remaining Amount</label>
-                <div className={`w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black mt-1 ${editModal.row.statementAmount - Number(editModal.receivedAmount || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                  ₹{fmtAmt(Math.max(0, editModal.row.statementAmount - Number(editModal.receivedAmount || 0)))}
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Remaining Balance</label>
+                <div className={`w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black mt-1 ${editModal.row.statementAmount - ((Number(editModal.row.receivedAmount) || 0) + Number(editModal.receivedAmount || 0)) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                  ₹{fmtAmt(Math.max(0, editModal.row.statementAmount - ((Number(editModal.row.receivedAmount) || 0) + Number(editModal.receivedAmount || 0))))}
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Payment Received</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Last Payment Date</label>
                 <div className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-600 cursor-not-allowed mt-1">
                   {fmt(editModal.row.paymentReceivedAt)}
                 </div>
@@ -621,10 +639,11 @@ export default function CreditStatusAlerts() {
               <button 
                 onClick={async () => {
                   try {
+                    const newTotal = (Number(editModal.row.receivedAmount) || 0) + Number(editModal.receivedAmount || 0);
                     await dispatch(updateCycleReceipt({
                       corporateId: drillDownId,
                       cycleIndex: editModal.row.cycleIndex,
-                      receivedAmount: editModal.receivedAmount
+                      receivedAmount: newTotal
                     })).unwrap();
                     toast.success("Amount updated successfully");
                     setEditModal({ isOpen: false, row: null, receivedAmount: "" });
@@ -834,7 +853,7 @@ export default function CreditStatusAlerts() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
-                    {STMT_COLS.map((h) => (
+                    {(activeTab === "current" ? STMT_COLS.filter(h => !["Payment Received", "Received (₹)", "Action"].includes(h)) : STMT_COLS).map((h) => (
                       <th key={h} className="px-8 py-4 text-[9px] font-black uppercase tracking-widest opacity-90 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -863,7 +882,7 @@ export default function CreditStatusAlerts() {
                           key={c.cycleIndex} 
                           row={c} 
                           onClick={() => openDrillDownCycle(c)}
-                          onEdit={(row) => setEditModal({ isOpen: true, row, receivedAmount: row.receivedAmount || "" })}
+                          onEdit={(row) => setEditModal({ isOpen: true, row, receivedAmount: "" })}
                         />
                       ))
                     )
@@ -890,11 +909,30 @@ export default function CreditStatusAlerts() {
 
   // --- MAIN VIEW ---
   return (
-    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6 animate-in fade-in duration-500" style={{ background: COLORS.offWhite }}>
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: COLORS.offWhite }}>
       {/* Navy Header Section */}
       <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col lg:flex-row lg:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
+             <div className="flex items-center gap-3">
+               <button 
+                  onClick={() => navigate(-1)} 
+                  className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 text-white shadow-sm"
+               >
+                 <FiArrowLeft size={20} />
+               </button>
+               <button 
+                  onClick={handleRefresh} 
+                  className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                  disabled={loading}
+               >
+                 <div className={loading ? "animate-spin" : ""}>
+                   <FiRefreshCw size={20} />
+                 </div>
+               </button>
+             </div>
+             
+             <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
               <FiShield size={28} />
             </div>
@@ -1204,31 +1242,44 @@ function StatementRow({ row, onClick, onEdit }) {
       </td>
       <td className="px-8 py-4 whitespace-nowrap text-slate-500">{fmt(row.statementDate)}</td>
       <td className="px-8 py-4 whitespace-nowrap text-slate-500">{fmt(row.dueDate)}</td>
-      <td className="px-8 py-4 whitespace-nowrap text-slate-500">
-        {row.isCurrent ? "—" : fmt(row.paymentReceivedAt)}
-      </td>
+      
+      {!row.isCurrent && (
+        <td className="px-8 py-4 whitespace-nowrap text-slate-500">
+          {fmt(row.paymentReceivedAt)}
+        </td>
+      )}
+
       <td className="px-8 py-4 text-center">
-        <span
-          className={`px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-xs ${row.delayDays > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}
-        >
-          {row.delayDays} Days Delay
-        </span>
-      </td>
-      <td className="px-8 py-4 font-black text-slate-900 text-[13px]">₹{fmtAmt(row.statementAmount)}</td>
-      <td className="px-8 py-4 font-black text-[#003399] text-[13px]">
-        {row.isCurrent ? "—" : `₹${fmtAmt(row.receivedAmount || 0)}`}
-      </td>
-      <td className="px-8 py-4 text-center">
-        {!row.isCurrent && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(row); }}
-            className="p-2 text-slate-400 hover:text-[#003399] bg-slate-100 hover:bg-[#003399]/10 rounded-xl transition-all shadow-sm active:scale-95"
-            title="Edit Received Amount"
+        {row.isCurrent ? (
+          <span className="px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-xs bg-indigo-50 text-indigo-600 border border-indigo-100">
+            {row.remainingDays} Days Remaining
+          </span>
+        ) : (
+          <span
+            className={`px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-xs ${row.delayDays > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}
           >
-            <FiEdit2 size={14} />
-          </button>
+            {row.delayDays} Days Delay
+          </span>
         )}
       </td>
+      <td className="px-8 py-4 font-black text-slate-900 text-[13px]">₹{fmtAmt(row.statementAmount)}</td>
+      
+      {!row.isCurrent && (
+        <>
+          <td className="px-8 py-4 font-black text-[#003399] text-[13px]">
+            ₹{fmtAmt(row.receivedAmount || 0)}
+          </td>
+          <td className="px-8 py-4 text-center">
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit(row); }}
+              className="p-2 text-slate-400 hover:text-[#003399] bg-slate-100 hover:bg-[#003399]/10 rounded-xl transition-all shadow-sm active:scale-95"
+              title="Edit Received Amount"
+            >
+              <FiEdit2 size={14} />
+            </button>
+          </td>
+        </>
+      )}
     </tr>
   );
 }
@@ -1236,7 +1287,7 @@ function StatementRow({ row, onClick, onEdit }) {
 function SummaryCard({ label, value, icon, color, sub }) {
   return (
     <div
-      className="bg-white rounded-2xl p-6 border-b-4 shadow-sm flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300"
+      className="bg-white rounded-2xl p-6 border-b-4 shadow-sm flex flex-col justify-between"
       style={{ borderBottomColor: color }}
     >
       <div className="flex items-start justify-between">
